@@ -1,0 +1,22 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Launch AnimeLocalTracker (.NET 8 WPF)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build",
+      "program": "${workspaceFolder}/AnimeLocalTracker/bin/Debug/net8.0-windows/AnimeLocalTracker.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/AnimeLocalTracker",
+      "stopAtEntry": false,
+      "console": "internalConsole",
+      "pipeTransport": {
+        "pipeCwd": "${workspaceFolder}",
+        "debuggerPath": "C:\\Users\\HP\\.netcoredbg\\netcoredbg\\netcoredbg.exe",
+        "pipeProgram": "cmd",
+        "pipeArgs": ["/c"]
+      }
+    }
+  ]
+}
