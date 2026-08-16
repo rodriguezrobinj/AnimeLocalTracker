@@ -346,7 +346,7 @@ public partial class DetalleViewModel : ObservableObject
         if (exito)
         {
             MostrandoEditorSeguimiento = false;
-            AnimeSeleccionado.Estado = estadoEnIngles;
+            AnimeSeleccionado.EstadoUsuario = estadoEnIngles;
             await _databaseService.ActualizarAnimeAsync(AnimeSeleccionado);
             await _dialogService.MostrarDialogoAsync("Nube Sincronizada", "¡Seguimiento actualizado en AniList con éxito!", false, "CloudCheck", "#4CAF50");
         }

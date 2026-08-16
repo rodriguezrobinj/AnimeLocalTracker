@@ -32,6 +32,15 @@ public partial class AnimeItem : ObservableObject
     [NotifyPropertyChangedFor(nameof(ColorEstado))]
     private string _estado = string.Empty;
 
+    // Estado del usuario ("CURRENT", "COMPLETED", "PLANNING", etc)
+    [ObservableProperty]
+    private string _estadoUsuario = string.Empty;
+
+    // Estado transitorio para la UI de Selección Múltiple
+    [property: Ignore]
+    [ObservableProperty]
+    private bool _estaSeleccionado;
+
     // === PROPIEDADES VISUALES (NO SE GUARDAN EN SQLITE) ===
     [Ignore] 
     public string EstadoVisual => Estado == "RELEASING" ? "En Emisión" : (Estado == "FINISHED" ? "Finalizado" : "Desconocido");

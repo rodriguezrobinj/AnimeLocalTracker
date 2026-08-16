@@ -36,6 +36,7 @@
         </Grid.Style>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
@@ -60,6 +61,17 @@
                         <TextBlock Text="CONECTAR" VerticalAlignment="Center" FontWeight="SemiBold"/>
                     </StackPanel>
                 </Button>
+                
+                <ToggleButton Command="{Binding ToggleModoSeleccionCommand}" 
+                              IsChecked="{Binding ModoSeleccion, Mode=OneWay}"
+                              Style="{StaticResource MaterialDesignActionToggleButton}"
+                              Background="#2A2A2A" BorderThickness="0" Margin="0,0,15,0"
+                              ToolTip="Selección múltiple" Width="40" Height="40">
+                    <materialDesign:ToggleButtonAssist.OnContent>
+                        <materialDesign:PackIcon Kind="Close" Width="20" Height="20" Foreground="White"/>
+                    </materialDesign:ToggleButtonAssist.OnContent>
+                    <materialDesign:PackIcon Kind="CheckAll" Width="20" Height="20" Foreground="{DynamicResource MaterialDesignBody}"/>
+                </ToggleButton>
 
                 <Border Background="#1AFFFFFF" CornerRadius="20" Padding="12,4" Margin="0,0,15,0"
                         Visibility="{Binding EstaConectado, Converter={StaticResource BoolToVis}}">
@@ -85,8 +97,66 @@
             </StackPanel>
         </Grid>
 
+        <!-- BARRA DE BÚSQUEDA Y FILTROS -->
+        <Grid Grid.Row="1" Margin="0,0,0,20" Visibility="{Binding BibliotecaVacia, Converter={StaticResource InverseBoolToVis}}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Buscador Local -->
+            <Border Grid.Column="0" Background="#1AFFFFFF" CornerRadius="12" Height="46" VerticalAlignment="Center" Padding="15,0,5,0" Margin="0,0,20,0"
+                    HorizontalAlignment="Left" Width="350" ClipToBounds="True">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    
+                    <materialDesign:PackIcon Kind="Magnify" Width="22" Height="22" Foreground="#8A8A8A" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                    
+                    <TextBox Grid.Column="1" 
+                             Text="{Binding TextoBusqueda, UpdateSourceTrigger=PropertyChanged}"
+                             materialDesign:HintAssist.Hint="Buscar anime guardado..."
+                             materialDesign:HintAssist.IsFloating="False"
+                             materialDesign:TextFieldAssist.DecorationVisibility="Hidden"
+                             materialDesign:TextFieldAssist.HasClearButton="True"
+                             BorderThickness="0"
+                             Background="Transparent"
+                             VerticalAlignment="Center"
+                             FontSize="15"
+                             Foreground="White"
+                             Margin="0,0,10,0">
+                    </TextBox>
+                </Grid>
+            </Border>
+
+            <!-- Chips de Estado -->
+            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                <RadioButton Content="Todos" Margin="0,0,10,0" IsChecked="True" GroupName="FiltroEstado"
+                             Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="Todos"
+                             Style="{StaticResource MaterialDesignTabRadioButton}" 
+                             Height="32" Padding="16,0" FontSize="13" FontWeight="SemiBold"/>
+                
+                <RadioButton Content="Viendo" Margin="0,0,10,0" GroupName="FiltroEstado"
+                             Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="Viendo"
+                             Style="{StaticResource MaterialDesignTabRadioButton}" 
+                             Height="32" Padding="16,0" FontSize="13" FontWeight="SemiBold"/>
+                             
+                <RadioButton Content="Completados" Margin="0,0,10,0" GroupName="FiltroEstado"
+                             Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="Completados"
+                             Style="{StaticResource MaterialDesignTabRadioButton}" 
+                             Height="32" Padding="16,0" FontSize="13" FontWeight="SemiBold"/>
+                             
+                <RadioButton Content="Planeando" Margin="0,0,0,0" GroupName="FiltroEstado"
+                             Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="Planeando"
+                             Style="{StaticResource MaterialDesignTabRadioButton}" 
+                             Height="32" Padding="16,0" FontSize="13" FontWeight="SemiBold"/>
+            </StackPanel>
+        </Grid>
+
         <!-- Panel de progreso FLOTANTE -->
-        <materialDesign:Card Grid.Row="1" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,40" 
+        <materialDesign:Card Grid.Row="2" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,40" 
                              Padding="25,12" UniformCornerRadius="25" Background="#1E1E1E"
                              Visibility="{Binding EstaActualizando, Converter={StaticResource BoolToVis}}" 
                              Panel.ZIndex="50" materialDesign:ElevationAssist.Elevation="Dp8">
@@ -102,8 +172,35 @@
             </StackPanel>
         </materialDesign:Card>
 
-        <!-- ESTADO VACÍO -->
-        <StackPanel Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,50,0,0"
+        <!-- BARRA DE ACCIONES MÚLTIPLES (FLOTANTE) -->
+        <Border Grid.Row="2" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,30" 
+                Background="#252525" CornerRadius="24" Padding="20,8"
+                Visibility="{Binding ModoSeleccion, Converter={StaticResource BoolToVis}}"
+                Panel.ZIndex="100" BorderBrush="#40FFFFFF" BorderThickness="1">
+            <Border.Effect>
+                <DropShadowEffect Color="Black" BlurRadius="20" Opacity="0.5" Direction="270" ShadowDepth="4"/>
+            </Border.Effect>
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="Mover a:" Foreground="White" VerticalAlignment="Center" Margin="0,0,15,0" FontWeight="Bold" FontSize="14"/>
+                
+                <Button Content="Viendo" Command="{Binding CategorizarSeleccionadosCommand}" CommandParameter="CURRENT" 
+                        Style="{StaticResource MaterialDesignFlatButton}" Foreground="#64B5F6" FontWeight="Bold"/>
+                
+                <Button Content="Completados" Command="{Binding CategorizarSeleccionadosCommand}" CommandParameter="COMPLETED" 
+                        Style="{StaticResource MaterialDesignFlatButton}" Foreground="#81C784" FontWeight="Bold"/>
+                
+                <Button Content="Planeando" Command="{Binding CategorizarSeleccionadosCommand}" CommandParameter="PLANNING" 
+                        Style="{StaticResource MaterialDesignFlatButton}" Foreground="#E0E0E0" FontWeight="Bold"/>
+                
+                <Border Width="1" Background="#40FFFFFF" Margin="10,5"/>
+                
+                <Button Content="Cancelar" Command="{Binding ToggleModoSeleccionCommand}" 
+                        Style="{StaticResource MaterialDesignFlatButton}" Foreground="#E57373" FontWeight="Bold"/>
+            </StackPanel>
+        </Border>
+
+        <!-- ESTADO VACÍO (0 animes guardados) -->
+        <StackPanel Grid.Row="2" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,50,0,0"
                     Visibility="{Binding BibliotecaVacia, Converter={StaticResource BoolToVis}}">
             <materialDesign:PackIcon Kind="ArchiveOutline" Width="80" Height="80" Foreground="{DynamicResource MaterialDesignBodyLight}" HorizontalAlignment="Center" Margin="0,0,0,20" Opacity="0.5"/>
             <TextBlock Text="Tu biblioteca está vacía" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource MaterialDesignBody}" HorizontalAlignment="Center"/>
@@ -116,8 +213,16 @@
             </Button>
         </StackPanel>
 
+        <!-- SIN RESULTADOS (La búsqueda o filtro no encontró nada) -->
+        <StackPanel Grid.Row="2" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,50,0,0"
+                    Visibility="{Binding SinResultados, Converter={StaticResource BoolToVis}}">
+            <materialDesign:PackIcon Kind="MagnifyRemoveOutline" Width="80" Height="80" Foreground="{DynamicResource MaterialDesignBodyLight}" HorizontalAlignment="Center" Margin="0,0,0,20" Opacity="0.5"/>
+            <TextBlock Text="No se encontraron animes" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource MaterialDesignBody}" HorizontalAlignment="Center"/>
+            <TextBlock Text="Intenta usar otros términos de búsqueda o cambia el filtro de estado." FontSize="14" Foreground="{DynamicResource MaterialDesignBodyLight}" HorizontalAlignment="Center" Margin="0,10,0,0" Opacity="0.8"/>
+        </StackPanel>
+
         <!-- Lista virtualizada -->
-        <ListBox Grid.Row="1" ItemsSource="{Binding BibliotecaLocales}" Margin="-14,0,-14,0" Padding="0"
+        <ListBox Grid.Row="2" ItemsSource="{Binding BibliotecaFiltrada}" Margin="-14,0,-14,0" Padding="0"
                  Visibility="{Binding BibliotecaVacia, Converter={StaticResource InverseBoolToVis}}"
                  Background="Transparent" BorderThickness="0" 
                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
@@ -199,9 +304,22 @@
                                 <Grid>
                                     <Image Source="{Binding PortadaVisible, TargetNullValue={x:Null}, FallbackValue={x:Null}, IsAsync=True}" Stretch="UniformToFill" />
                                     
+                                    <!-- OVERLAY DE SELECCIÓN -->
+                                    <Border Background="#66000000" Visibility="{Binding EstaSeleccionado, Converter={StaticResource BoolToVis}}"/>
+                                    <Border BorderBrush="#3F51B5" BorderThickness="4" CornerRadius="10" Visibility="{Binding EstaSeleccionado, Converter={StaticResource BoolToVis}}"/>
+                                    
+                                    <!-- CHECKBOX DE SELECCIÓN (Visible solo en ModoSeleccion) -->
+                                    <CheckBox IsChecked="{Binding EstaSeleccionado}" 
+                                              Visibility="{Binding DataContext.ModoSeleccion, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVis}}"
+                                              HorizontalAlignment="Right" VerticalAlignment="Top" Margin="8"
+                                              Style="{StaticResource MaterialDesignDarkCheckBox}"
+                                              IsHitTestVisible="False"
+                                              Panel.ZIndex="10"/>
+
                                     <Border Background="{Binding ColorEstado}" Padding="8,4" CornerRadius="6" 
                                             HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10"
-                                            materialDesign:ElevationAssist.Elevation="Dp2">
+                                            materialDesign:ElevationAssist.Elevation="Dp2"
+                                            Visibility="{Binding EstaSeleccionado, Converter={StaticResource InverseBoolToVis}}">
                                         <TextBlock Text="{Binding EstadoVisual}" Foreground="White" FontSize="11" FontWeight="Bold"/>
                                     </Border>
 
