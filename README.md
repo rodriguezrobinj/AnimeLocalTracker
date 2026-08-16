@@ -34,7 +34,7 @@
 Si prefieres compilar la aplicación tú mismo:
 
 ```bash
-git clone https://github.com/tu-usuario/AnimeLocalTracker.git
+git clone https://github.com/rodriguezrobinj/AnimeLocalTracker.git
 cd AnimeLocalTracker
 dotnet build -c Release
 ```
