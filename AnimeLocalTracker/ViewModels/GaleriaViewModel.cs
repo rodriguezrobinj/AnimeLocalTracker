@@ -53,9 +53,12 @@ public partial class GaleriaViewModel : ObservableObject, IRecipient<UsuarioLoge
 
     public void Receive(AnimeAñadidoMensaje message)
     {
-        BibliotecaLocales.Add(message.NuevoAnime);
-        OnPropertyChanged(nameof(BibliotecaVacia));
-        _ = DescargarPortadaSiNoExisteAsync(message.NuevoAnime);
+        if (!BibliotecaLocales.Any(a => a.AniListId == message.NuevoAnime.AniListId))
+        {
+            BibliotecaLocales.Add(message.NuevoAnime);
+            OnPropertyChanged(nameof(BibliotecaVacia));
+            _ = DescargarPortadaSiNoExisteAsync(message.NuevoAnime);
+        }
     }
     
     private async Task CargarBibliotecaAsync()

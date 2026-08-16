@@ -177,6 +177,18 @@ public partial class MainViewModel : ObservableObject,
     {
         if (animeAPI?.Title?.Romaji == null) return;
 
+        // Validar si el anime ya existe en la biblioteca
+        var animesGuardados = await _databaseService.ObtenerTodosLosAnimesAsync();
+        if (animesGuardados.Any(a => a.AniListId == animeAPI.Id))
+        {
+            IsDialogOpen = false;
+            await Task.Delay(250); // Permitir que la animación de cierre termine
+            TextoBusqueda = string.Empty;
+            ResultadosBusqueda.Clear();
+            await MostrarDialogoLocalAsync("Anime Existente", $"El anime '{animeAPI.Title.Romaji}' ya se encuentra en tu biblioteca.", false, "InformationOutline", "#FF9800");
+            return;
+        }
+
         string nombreSeguro = string.Join("_", animeAPI.Title.Romaji.Split(System.IO.Path.GetInvalidFileNameChars()));
         string rutaBaseVideos = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), "Anime");
         string nuevaRutaCarpeta = System.IO.Path.Combine(rutaBaseVideos, nombreSeguro);
@@ -208,6 +220,7 @@ public partial class MainViewModel : ObservableObject,
         WeakReferenceMessenger.Default.Send(new AnimeAñadidoMensaje(nuevoAnimeLocal));
 
         IsDialogOpen = false;
+        await Task.Delay(250); // Permitir que la animación de cierre termine antes de limpiar
         TextoBusqueda = string.Empty;
         ResultadosBusqueda.Clear();
         
