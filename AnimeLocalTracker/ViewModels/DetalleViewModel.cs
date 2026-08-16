@@ -166,7 +166,29 @@ public partial class DetalleViewModel : ObservableObject
 
         try
         {
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = episodio.RutaCompleta, UseShellExecute = true });
+            string[] potPlayerPaths = {
+                @"C:\Program Files\DAUM\PotPlayer\PotPlayer64.exe",
+                @"C:\Program Files\DAUM\PotPlayer\PotPlayerMini64.exe",
+                @"C:\Program Files (x86)\DAUM\PotPlayer\PotPlayer.exe",
+                @"C:\Program Files (x86)\DAUM\PotPlayer\PotPlayerMini.exe"
+            };
+
+            string potPlayerExe = potPlayerPaths.FirstOrDefault(System.IO.File.Exists);
+
+            if (!string.IsNullOrEmpty(potPlayerExe))
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo 
+                { 
+                    FileName = potPlayerExe, 
+                    Arguments = $"\"{episodio.RutaCompleta}\"", 
+                    UseShellExecute = false 
+                });
+            }
+            else
+            {
+                // Fallback al reproductor por defecto del sistema si no se encuentra PotPlayer
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = episodio.RutaCompleta, UseShellExecute = true });
+            }
         }
         catch (System.Exception ex)
         {
