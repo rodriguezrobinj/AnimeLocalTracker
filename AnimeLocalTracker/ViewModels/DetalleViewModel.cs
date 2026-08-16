@@ -173,7 +173,7 @@ public partial class DetalleViewModel : ObservableObject
                 @"C:\Program Files (x86)\DAUM\PotPlayer\PotPlayerMini.exe"
             };
 
-            string potPlayerExe = potPlayerPaths.FirstOrDefault(System.IO.File.Exists);
+            string? potPlayerExe = potPlayerPaths.FirstOrDefault(System.IO.File.Exists);
 
             if (!string.IsNullOrEmpty(potPlayerExe))
             {

@@ -64,12 +64,50 @@ public class AniListMedia
     [JsonPropertyName("nextAiringEpisode")]
     public AniListNextAiringEpisode? NextAiringEpisode { get; set; }
     
+    [JsonPropertyName("startDate")]
+    public AniListFuzzyDate? StartDate { get; set; }
+    
     [JsonPropertyName("status")]
     public string? Status { get; set; }
     
     // NUEVO: La entrada personal del usuario autenticado
     [JsonPropertyName("mediaListEntry")]
     public AniListMediaList? MediaListEntry { get; set; }
+
+    // ====== PROPIEDADES DE APOYO PARA LA UI (BÚSQUEDA) ======
+    
+    [JsonIgnore]
+    public string FormattedStatus => Status switch
+    {
+        "RELEASING" => "En Emisión",
+        "FINISHED" => "Finalizado",
+        "NOT_YET_RELEASED" => "Próximamente",
+        "CANCELLED" => "Cancelado",
+        "HIATUS" => "Pausado",
+        _ => "Desconocido"
+    };
+
+    [JsonIgnore]
+    public string StatusColorBrush => Status switch
+    {
+        "RELEASING" => "#4CAF50", // Verde
+        "FINISHED" => "#2196F3",  // Azul
+        "NOT_YET_RELEASED" => "#FF9800", // Naranja
+        "CANCELLED" => "#F44336", // Rojo
+        "HIATUS" => "#9C27B0", // Morado
+        _ => "#757575"
+    };
+
+    [JsonIgnore]
+    public string FormattedEpisodes => Episodes.HasValue ? $"{Episodes} episodios" : "Episodios: ?";
+
+    [JsonIgnore]
+    public string FormattedYear => StartDate?.Year?.ToString() ?? "Año ?";
+
+    [JsonIgnore]
+    public string FormattedGenres => Genres != null && Genres.Count > 0 
+        ? string.Join(" • ", Genres) 
+        : "Sin géneros";
 }
 
 public class AniListTitle

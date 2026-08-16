@@ -267,6 +267,7 @@ public class AniListTrackingService(HttpClient httpClient) : IAnimeTrackingServi
                         description
                         genres
                         episodes
+                        startDate { year month day }
                         nextAiringEpisode { episode }
                     }
                 }

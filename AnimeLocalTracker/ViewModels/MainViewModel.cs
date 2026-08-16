@@ -38,6 +38,8 @@ public partial class MainViewModel : ObservableObject,
     // === BUSCADOR FLOTANTE ===
     [ObservableProperty] private bool _isDialogOpen;
     [ObservableProperty] private ObservableCollection<AniListMedia> _resultadosBusqueda = [];
+    [ObservableProperty] private bool _isSearching;
+    [ObservableProperty] private bool _busquedaSinResultados;
     private System.Threading.CancellationTokenSource? _searchCts;
     
     private string _textoBusqueda = string.Empty;
@@ -47,6 +49,7 @@ public partial class MainViewModel : ObservableObject,
         set
         {
             SetProperty(ref _textoBusqueda, value);
+            BusquedaSinResultados = false; // Resetear al escribir
             EjecutarBusquedaEnVivoAsync(value);
         }
     }
@@ -136,6 +139,8 @@ public partial class MainViewModel : ObservableObject,
         if (string.IsNullOrWhiteSpace(busqueda) || busqueda.Length < 3)
         {
             ResultadosBusqueda.Clear();
+            IsSearching = false;
+            BusquedaSinResultados = false;
             return;
         }
 
@@ -145,6 +150,7 @@ public partial class MainViewModel : ObservableObject,
 
         try
         {
+            IsSearching = true;
             await Task.Delay(500, token); 
             
             if (!token.IsCancellationRequested)
@@ -152,9 +158,18 @@ public partial class MainViewModel : ObservableObject,
                 var resultados = await _animeTrackingService.BuscarAnimesEnVivoAsync(busqueda);
                 ResultadosBusqueda.Clear();
                 foreach (var r in resultados) ResultadosBusqueda.Add(r);
+                
+                BusquedaSinResultados = ResultadosBusqueda.Count == 0;
             }
         }
         catch (TaskCanceledException) { }
+        finally
+        {
+            if (!token.IsCancellationRequested)
+            {
+                IsSearching = false;
+            }
+        }
     }
 
     [RelayCommand]

@@ -34,58 +34,99 @@
     <Grid>
         <materialDesign:DialogHost IsOpen="{Binding IsDialogOpen}" CloseOnClickAway="True">
             <materialDesign:DialogHost.DialogContent>
-                <Grid Width="500" Height="600" Background="#1E1E1E">
+                <Grid Width="600" MaxHeight="650" Background="#1E1E1E">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
                     <!-- Header -->
                     <Grid Grid.Row="0" Margin="25,25,25,15">
-                        <TextBlock Text="Añadir Nuevo Anime" Style="{StaticResource MaterialDesignHeadline5TextBlock}" FontWeight="Bold" VerticalAlignment="Center"/>
+                        <TextBlock Text="Buscar y Añadir Anime" Style="{StaticResource MaterialDesignHeadline5TextBlock}" FontWeight="Bold" VerticalAlignment="Center"/>
                         <Button Command="{Binding CerrarDialogoBusquedaCommand}" Style="{StaticResource MaterialDesignIconForegroundButton}" HorizontalAlignment="Right" VerticalAlignment="Center">
                             <materialDesign:PackIcon Kind="Close" />
                         </Button>
                     </Grid>
 
                     <!-- Barra de búsqueda dinámica (Auto-búsqueda) -->
-                    <TextBox Grid.Row="1" Margin="25,0,25,20" Text="{Binding TextoBusqueda, UpdateSourceTrigger=PropertyChanged}"
-                             materialDesign:HintAssist.Hint="Buscar en AniList (Escribe al menos 3 letras)..."
-                             Style="{StaticResource MaterialDesignOutlinedTextBox}"
-                             materialDesign:TextFieldAssist.HasClearButton="True">
-                    </TextBox>
+                    <Grid Grid.Row="1" Margin="25,0,25,15">
+                        <TextBox Text="{Binding TextoBusqueda, UpdateSourceTrigger=PropertyChanged}"
+                                 materialDesign:HintAssist.Hint="Buscar en AniList (Escribe al menos 3 letras)..."
+                                 Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                                 materialDesign:TextFieldAssist.HasClearButton="True"
+                                 materialDesign:TextFieldAssist.LeadingIcon="Search"
+                                 materialDesign:TextFieldAssist.LeadingIconSize="24"
+                                 FontSize="16" />
+                    </Grid>
+
+                    <!-- Spinner de carga centrado en los resultados -->
+                    <ProgressBar Grid.Row="2" Style="{StaticResource MaterialDesignCircularProgressBar}" 
+                                 Value="0" IsIndeterminate="True" 
+                                 Visibility="{Binding IsSearching, Converter={StaticResource BoolToVis}}" 
+                                 HorizontalAlignment="Center" VerticalAlignment="Center" Width="40" Height="40" Panel.ZIndex="10" Margin="0,30,0,40"/>
+
+                    <!-- Estado Vacío / Sin Resultados -->
+                    <StackPanel Grid.Row="2" Visibility="{Binding BusquedaSinResultados, Converter={StaticResource BoolToVis}}" 
+                                VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,20,0,40">
+                        <materialDesign:PackIcon Kind="MagnifyClose" Width="64" Height="64" Foreground="#757575" HorizontalAlignment="Center"/>
+                        <TextBlock Text="No se encontraron resultados" FontSize="18" Foreground="#757575" FontWeight="Medium" Margin="0,10,0,0"/>
+                        <TextBlock Text="Intenta usar el título en Romaji o inglés" FontSize="14" Foreground="#757575" HorizontalAlignment="Center" Margin="0,5,0,0"/>
+                    </StackPanel>
 
                     <!-- Lista de Resultados -->
-                    <ListBox Grid.Row="2" ItemsSource="{Binding ResultadosBusqueda}" Margin="10,0"
-                             ScrollViewer.VerticalScrollBarVisibility="Auto">
+                    <ListBox Grid.Row="2" ItemsSource="{Binding ResultadosBusqueda}" Margin="10,0,10,10"
+                             MaxHeight="460"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto"
+                             HorizontalContentAlignment="Stretch" BorderThickness="0">
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem" BasedOn="{StaticResource MaterialDesignListBoxItem}">
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                <Setter Property="Padding" Value="0" />
+                                <Setter Property="Margin" Value="0,0,0,4" />
+                            </Style>
+                        </ListBox.ItemContainerStyle>
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <Button Command="{Binding DataContext.SeleccionarYCrearAnimeCommand, RelativeSource={RelativeSource AncestorType=materialDesign:DialogHost}}" 
-                                        CommandParameter="{Binding}" 
-                                        Style="{StaticResource MaterialDesignFlatButton}" Height="Auto" Padding="10" HorizontalContentAlignment="Stretch">
+                                <Border Background="Transparent" Padding="15" Cursor="Hand">
+                                    <Border.InputBindings>
+                                        <MouseBinding Gesture="LeftClick" 
+                                                      Command="{Binding DataContext.SeleccionarYCrearAnimeCommand, RelativeSource={RelativeSource AncestorType=materialDesign:DialogHost}}" 
+                                                      CommandParameter="{Binding}" />
+                                    </Border.InputBindings>
                                     <Grid>
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="60"/>
+                                            <ColumnDefinition Width="65"/>
                                             <ColumnDefinition Width="*"/>
                                         </Grid.ColumnDefinitions>
                                         
-                                        <!-- Mini portada redonda -->
-                                        <Ellipse Grid.Column="0" Width="50" Height="50" HorizontalAlignment="Left">
-                                            <Ellipse.Fill>
-                                                <ImageBrush ImageSource="{Binding CoverImage.Large, TargetNullValue={x:Null}, FallbackValue={x:Null}}" Stretch="UniformToFill"/>
-                                            </Ellipse.Fill>
-                                        </Ellipse>
+                                        <!-- Mini portada -->
+                                        <Border Grid.Column="0" Width="55" Height="80" CornerRadius="6" ClipToBounds="True" HorizontalAlignment="Left">
+                                            <Image Source="{Binding CoverImage.ExtraLarge, IsAsync=True, TargetNullValue={x:Null}, FallbackValue={x:Null}}" Stretch="UniformToFill" />
+                                        </Border>
                                         
                                         <StackPanel Grid.Column="1" Margin="15,0,0,0" VerticalAlignment="Center">
-                                            <TextBlock Text="{Binding Title.Romaji}" FontWeight="Bold" FontSize="14" TextWrapping="Wrap"/>
-                                            <StackPanel Orientation="Horizontal" Margin="0,5,0,0" Opacity="0.7">
-                                                <TextBlock Text="{Binding Status}" FontSize="12" Margin="0,0,10,0"/>
-                                                <TextBlock Text="{Binding Episodes, StringFormat='{}Episodios: {0}'}" FontSize="12"/>
+                                            <TextBlock Text="{Binding Title.Romaji}" FontWeight="Bold" FontSize="16" TextWrapping="Wrap" MaxHeight="45" TextTrimming="CharacterEllipsis"/>
+                                            
+                                            <!-- Sub-info: Año, Episodios, Estado -->
+                                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                                <!-- Etiqueta de Estado -->
+                                                <Border Background="{Binding StatusColorBrush}" CornerRadius="4" Padding="6,2" Margin="0,0,10,0">
+                                                    <TextBlock Text="{Binding FormattedStatus}" FontSize="11" FontWeight="Bold" Foreground="White"/>
+                                                </Border>
+                                                
+                                                <materialDesign:PackIcon Kind="CalendarBlank" Width="14" Height="14" Foreground="#9E9E9E" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                                <TextBlock Text="{Binding FormattedYear}" FontSize="12" Foreground="#9E9E9E" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                                
+                                                <materialDesign:PackIcon Kind="FormatListNumbered" Width="14" Height="14" Foreground="#9E9E9E" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                                <TextBlock Text="{Binding FormattedEpisodes}" FontSize="12" Foreground="#9E9E9E" VerticalAlignment="Center"/>
                                             </StackPanel>
+                                            
+                                            <!-- Géneros -->
+                                            <TextBlock Text="{Binding FormattedGenres}" FontSize="12" Foreground="#757575" Margin="0,6,0,0" TextTrimming="CharacterEllipsis"/>
                                         </StackPanel>
                                     </Grid>
-                                </Button>
+                                </Border>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
