@@ -9,7 +9,8 @@
         "build",
         "${workspaceFolder}/AnimeLocalTracker/AnimeLocalTracker.csproj",
         "/property:GenerateFullPaths=true",
-        "/consoleloggerparameters:NoSummary"
+        "/consoleloggerparameters:NoSummary",
+        "/p:UseSharedCompilation=false"
       ],
       "problemMatcher": "$msCompile"
     }

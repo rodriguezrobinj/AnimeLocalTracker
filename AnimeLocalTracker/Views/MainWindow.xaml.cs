@@ -7,17 +7,20 @@ public partial class MainWindow : Window
 {
     private bool _isFullScreen = false;
 
+    private MainViewModel _viewModel;
+
     // Recibimos el ViewModel mágicamente gracias a la inyección de dependencias
     public MainWindow(MainViewModel viewModel) 
     {
         InitializeComponent();
+        _viewModel = viewModel;
         
         // FIX: Evitar que al maximizar la ventana oculte la barra de tareas de Windows
         MaxHeight = SystemParameters.MaximizedPrimaryScreenHeight;
         MaxWidth = SystemParameters.MaximizedPrimaryScreenWidth;
         
         // ¡Esta es la línea más importante de MVVM!
-        DataContext = viewModel; 
+        DataContext = _viewModel; 
     }
 
     private void BtnMinimizar_Click(object sender, RoutedEventArgs e)

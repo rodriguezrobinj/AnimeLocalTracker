@@ -1,13 +1,16 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 
+using CommunityToolkit.Mvvm.Messaging;
+using AnimeLocalTracker.Messages;
+
 namespace AnimeLocalTracker.Services;
 
-public class AuthService
+public class AuthService : IAuthService
 {
     // 1. PEGA TU NÚMERO DE CLIENTE AQUÍ:
     private const string ClientId = "48217";
@@ -91,6 +94,10 @@ public class AuthService
             if (!string.IsNullOrEmpty(tokenCapturado))
             {
                 File.WriteAllText(_rutaToken, tokenCapturado); // Guardamos la llave en el disco duro
+                
+                // NOTIFICAMOS A TODA LA APP QUE ALGUIEN SE LOGEÓ
+                WeakReferenceMessenger.Default.Send(new UsuarioLogeadoMensaje());
+                
                 return true;
             }
         }

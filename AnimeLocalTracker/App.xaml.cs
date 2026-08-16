@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Windows;
 using AnimeLocalTracker.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
@@ -26,11 +26,16 @@ public partial class App : Application
 
         // 2. Aquí registraremos los ViewModels
         services.AddTransient<MainViewModel>();
+        services.AddTransient<GaleriaViewModel>();
+        services.AddTransient<DetalleViewModel>();
 
         // 3. Aquí registraremos los Servicios
-        // services.AddSingleton<IScannerService, ScannerService>();
+        services.AddSingleton<IDialogService, DialogService>();
+        services.AddSingleton<IAuthService, AuthService>();
+        services.AddTransient<IFileScannerService, FileScannerService>();
         
-        services.AddHttpClient<IAniListService, AniListService>();
+        // IHttpClientFactory nativo
+        services.AddHttpClient<IAnimeTrackingService, AniListTrackingService>();
         
         // Lo registramos como Singleton porque queremos que haya una sola conexión a la BD en toda la app
         services.AddSingleton<IDatabaseService, DatabaseService>();
@@ -40,8 +45,17 @@ public partial class App : Application
     {
         base.OnStartup(e);
         
+        // Manejo Global de Errores
+        this.DispatcherUnhandledException += (s, args) => 
+        {
+            args.Handled = true; // Evita que se cierre la app
+            MessageBox.Show("Ha ocurrido un error inesperado.\n\nDetalles técnicos:\n" + args.Exception.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        };
+        
         // Pedimos la instancia del servicio de base de datos
         var dbService = ServiceProvider.GetRequiredService<IDatabaseService>();
+        
+        // Inicializar reproductor de video nativo (Removido)
         
         // Obligamos a que se cree el archivo y la tabla antes de continuar
         await dbService.InicializarBaseDatosAsync();

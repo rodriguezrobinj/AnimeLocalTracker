@@ -10,13 +10,7 @@
       "args": [],
       "cwd": "${workspaceFolder}/AnimeLocalTracker",
       "stopAtEntry": false,
-      "console": "internalConsole",
-      "pipeTransport": {
-        "pipeCwd": "${workspaceFolder}",
-        "debuggerPath": "C:\\Users\\HP\\.netcoredbg\\netcoredbg\\netcoredbg.exe",
-        "pipeProgram": "cmd",
-        "pipeArgs": ["/c"]
-      }
+      "console": "internalConsole"
     }
   ]
 }
