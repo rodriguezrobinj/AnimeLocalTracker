@@ -5,6 +5,7 @@
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         xmlns:local="clr-namespace:AnimeLocalTracker.Views"
         xmlns:viewmodels="clr-namespace:AnimeLocalTracker.ViewModels"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         Title="Mi Biblioteca" Height="700" Width="1100"
         WindowStartupLocation="CenterScreen"
         TextElement.Foreground="{DynamicResource MaterialDesignBody}"
@@ -144,31 +145,9 @@
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
 
-                <!-- SIDEBAR -->
-                <Border Grid.Column="0" Background="Transparent" BorderBrush="#1AFFFFFF" BorderThickness="0,0,1,0" Panel.ZIndex="10">
-                    <StackPanel HorizontalAlignment="Center">
-                        <StackPanel.Style>
-                            <Style TargetType="StackPanel">
-                                <Setter Property="Margin" Value="0,60,0,0"/>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding Topmost, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
-                                        <Setter Property="Margin" Value="0,30,0,0"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </StackPanel.Style>
-                        <Button Command="{Binding NavegarGaleriaCommand}" Style="{StaticResource MaterialDesignIconForegroundButton}" Width="45" Height="45" Margin="0,10" ToolTip="Biblioteca">
-                            <materialDesign:PackIcon Kind="ViewGallery" Width="24" Height="24" Foreground="{DynamicResource MaterialDesignBodyLight}" />
-                        </Button>
-                        <Button Command="{Binding NavegarCalendarioCommand}" Style="{StaticResource MaterialDesignIconForegroundButton}" Width="45" Height="45" Margin="0,10" ToolTip="Calendario de Emisión">
-                            <materialDesign:PackIcon Kind="CalendarClock" Width="24" Height="24" Foreground="{DynamicResource MaterialDesignBodyLight}" />
-                        </Button>
-                    </StackPanel>
-                </Border>
-
-                <!-- CONTENIDO PRINCIPAL: Solo un ContentControl que se actualiza según la propiedad VistaActual -->
-                <!-- Sin margen superior para que el fondo (ej. desenfoque) cubra toda la ventana detrás de la barra de título -->
-                <ContentControl Grid.Column="0" Grid.ColumnSpan="2" Content="{Binding VistaActual}" />
+                <!-- ================== FASE 4: MIGRACIÓN A REACT ================== -->
+                <!-- El WebView2 reemplaza toda la UI nativa (Sidebar + Vistas) -->
+                <wv2:WebView2 x:Name="ReactWebView" Grid.Column="0" Grid.ColumnSpan="2" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
                 
                 <!-- BARRA DE TÍTULO CUSTOM -->
                 <Grid Grid.Column="0" Grid.ColumnSpan="2" x:Name="BarraTitulo" Height="45" Background="Transparent" VerticalAlignment="Top" Panel.ZIndex="20">

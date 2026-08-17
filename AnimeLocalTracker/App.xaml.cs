@@ -67,6 +67,9 @@ public partial class App : Application
                 });
     }
 
+    private System.Diagnostics.Process? _goDaemonProcess;
+    private System.Diagnostics.Process? _pythonDaemonProcess;
+
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
@@ -78,10 +81,56 @@ public partial class App : Application
             MessageBox.Show("Ha ocurrido un error inesperado.\n\nDetalles técnicos:\n" + args.Exception.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
         };
         
+        // === FASE 2: ORQUESTACIÓN DEL DAEMON GO ===
+        try
+        {
+            string baseDir = AppContext.BaseDirectory;
+            // Calcular ruta al ejecutable (sube 4 niveles desde bin/Debug/net8.0-windows/ y entra a BackendGo)
+            string goDaemonPath = System.IO.Path.GetFullPath(System.IO.Path.Combine(baseDir, @"..\..\..\..\BackendGo\tracker_daemon.exe"));
+            
+            if (System.IO.File.Exists(goDaemonPath))
+            {
+                var startInfo = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = goDaemonPath,
+                    UseShellExecute = false,
+                    CreateNoWindow = true // Ejecutar de manera invisible
+                };
+                _goDaemonProcess = System.Diagnostics.Process.Start(startInfo);
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error al iniciar Go Daemon: {ex.Message}");
+        }
+
+        // === FASE 3: ORQUESTACIÓN DEL DAEMON PYTHON ===
+        try
+        {
+            string baseDir = AppContext.BaseDirectory;
+            string pythonExe = System.IO.Path.GetFullPath(System.IO.Path.Combine(baseDir, @"..\..\..\..\BackendPython\venv\Scripts\python.exe"));
+            string pythonScript = System.IO.Path.GetFullPath(System.IO.Path.Combine(baseDir, @"..\..\..\..\BackendPython\main.py"));
+            
+            if (System.IO.File.Exists(pythonExe) && System.IO.File.Exists(pythonScript))
+            {
+                var startInfo = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = pythonExe,
+                    Arguments = $"\"{pythonScript}\"",
+                    UseShellExecute = false,
+                    CreateNoWindow = true, // Ejecutar de manera invisible
+                    WorkingDirectory = System.IO.Path.GetDirectoryName(pythonScript)
+                };
+                _pythonDaemonProcess = System.Diagnostics.Process.Start(startInfo);
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error al iniciar Python Daemon: {ex.Message}");
+        }
+        
         // Pedimos la instancia del servicio de base de datos
         var dbService = ServiceProvider.GetRequiredService<IDatabaseService>();
-        
-        // Inicializar reproductor de video nativo (Removido)
         
         // Obligamos a que se cree el archivo y la tabla antes de continuar
         await dbService.InicializarBaseDatosAsync();
@@ -91,5 +140,30 @@ public partial class App : Application
         // con todas sus dependencias ya inyectadas.
         var mainWindow = ServiceProvider.GetRequiredService<MainWindow>();
         mainWindow.Show();
+    }
+
+    protected override void OnExit(ExitEventArgs e)
+    {
+        // === MATAR DAEMON GO ===
+        if (_goDaemonProcess != null && !_goDaemonProcess.HasExited)
+        {
+            try
+            {
+                _goDaemonProcess.Kill();
+            }
+            catch { /* Ignorar errores al matar proceso */ }
+        }
+        
+        // === MATAR DAEMON PYTHON ===
+        if (_pythonDaemonProcess != null && !_pythonDaemonProcess.HasExited)
+        {
+            try
+            {
+                _pythonDaemonProcess.Kill();
+            }
+            catch { /* Ignorar errores al matar proceso */ }
+        }
+        
+        base.OnExit(e);
     }
 }

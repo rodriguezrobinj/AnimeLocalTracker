@@ -1,5 +1,6 @@
 using System.Windows;
 using AnimeLocalTracker.ViewModels; // Asegúrate de importar el namespace
+using AnimeLocalTracker.Services;
 
 namespace AnimeLocalTracker.Views;
 
@@ -8,12 +9,16 @@ public partial class MainWindow : Window
     private bool _isFullScreen = false;
 
     private MainViewModel _viewModel;
+    private IDatabaseService _databaseService;
+    private IAnimeTrackingService _animeTrackingService;
 
-    // Recibimos el ViewModel mágicamente gracias a la inyección de dependencias
-    public MainWindow(MainViewModel viewModel) 
+    // Recibimos el ViewModel y DatabaseService mágicamente gracias a la inyección de dependencias
+    public MainWindow(MainViewModel viewModel, IDatabaseService databaseService, IAnimeTrackingService animeTrackingService) 
     {
         InitializeComponent();
         _viewModel = viewModel;
+        _databaseService = databaseService;
+        _animeTrackingService = animeTrackingService;
         
         // FIX: Evitar que al maximizar la ventana oculte la barra de tareas de Windows
         MaxHeight = SystemParameters.MaximizedPrimaryScreenHeight;
@@ -21,6 +26,129 @@ public partial class MainWindow : Window
         
         // ¡Esta es la línea más importante de MVVM!
         DataContext = _viewModel; 
+        
+        InitializeWebViewAsync();
+    }
+
+    private async void InitializeWebViewAsync()
+    {
+        try
+        {
+            // Usamos la misma carpeta de userData que usaba WebUIWindow
+            string userDataFolder = System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData), "AnimeLocalTracker", "WebView2Data");
+            var env = await Microsoft.Web.WebView2.Core.CoreWebView2Environment.CreateAsync(null, userDataFolder);
+            await ReactWebView.EnsureCoreWebView2Async(env);
+            
+            // Cargar la URL del servidor de desarrollo de React (Fase 4)
+            ReactWebView.Source = new System.Uri("http://localhost:5173");
+            
+            ReactWebView.CoreWebView2.WebMessageReceived += CoreWebView2_WebMessageReceived;
+        }
+        catch (System.Exception ex)
+        {
+            MessageBox.Show($"Error al inicializar WebView2: {ex.Message}", "Error WebView2", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private async void CoreWebView2_WebMessageReceived(object? sender, Microsoft.Web.WebView2.Core.CoreWebView2WebMessageReceivedEventArgs e)
+    {
+        try
+        {
+            var message = e.TryGetWebMessageAsString();
+            System.Diagnostics.Debug.WriteLine($"Mensaje recibido desde React: {message}");
+
+            if (message == "ReactReady")
+            {
+                var animes = await _databaseService.ObtenerTodosLosAnimesAsync();
+                
+                // Cargar progreso local
+                foreach (var a in animes)
+                {
+                    var registros = await _databaseService.ObtenerRegistrosPorAnimeAsync(a.AniListId);
+                    a.EpisodiosVistos = System.Linq.Enumerable.Count(registros, r => r.VistoLocal);
+                }
+                
+                var options = new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase };
+                var json = System.Text.Json.JsonSerializer.Serialize(new { type = "UpdateGallery", data = animes }, options);
+                ReactWebView.CoreWebView2.PostWebMessageAsString(json);
+            }
+            else if (message.StartsWith("{"))
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(message);
+                if (doc.RootElement.TryGetProperty("action", out var actionProp))
+                {
+                    var action = actionProp.GetString();
+
+                    if (action == "GetEpisodios")
+                    {
+                        var aniListId = doc.RootElement.GetProperty("aniListId").GetInt32();
+                        var registros = await _databaseService.ObtenerRegistrosPorAnimeAsync(aniListId);
+                        
+                        var options = new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase };
+                        var json = System.Text.Json.JsonSerializer.Serialize(new { type = "UpdateEpisodios", aniListId = aniListId, data = registros }, options);
+                        ReactWebView.CoreWebView2.PostWebMessageAsString(json);
+                    }
+                    else if (action == "AbrirVideo")
+                    {
+                        var ruta = doc.RootElement.GetProperty("ruta").GetString();
+                        if (!string.IsNullOrEmpty(ruta) && System.IO.File.Exists(ruta))
+                        {
+                            var startInfo = new System.Diagnostics.ProcessStartInfo
+                            {
+                                FileName = ruta,
+                                UseShellExecute = true
+                            };
+                            System.Diagnostics.Process.Start(startInfo);
+                        }
+                    }
+                    else if (action == "GetCalendario")
+                    {
+                        var animes = await _databaseService.ObtenerTodosLosAnimesAsync();
+                        var ids = System.Linq.Enumerable.ToList(System.Linq.Enumerable.Select(animes, a => a.AniListId));
+
+                        System.DateTime ahora = System.DateTime.Now;
+                        int diff = (7 + (ahora.DayOfWeek - System.DayOfWeek.Monday)) % 7;
+                        System.DateTime inicioSemana = ahora.AddDays(-1 * diff).Date;
+                        System.DateTime finSemana = inicioSemana.AddDays(7).AddTicks(-1);
+
+                        long timestampInicio = ((System.DateTimeOffset)inicioSemana).ToUnixTimeSeconds();
+                        long timestampFin = ((System.DateTimeOffset)finSemana).ToUnixTimeSeconds();
+
+                        var schedule = await _animeTrackingService.ObtenerCalendarioEmisionAsync(ids, timestampInicio, timestampFin);
+
+                        var options = new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase };
+                        var json = System.Text.Json.JsonSerializer.Serialize(new { type = "UpdateCalendario", data = schedule }, options);
+                        ReactWebView.CoreWebView2.PostWebMessageAsString(json);
+                    }
+                    else if (action == "Sincronizar")
+                    {
+                        var animesParaSincronizar = await _databaseService.ObtenerTodosLosAnimesAsync();
+                        foreach (var anime in animesParaSincronizar)
+                        {
+                            var datosFrescos = await _animeTrackingService.ObtenerAnimePorIdAsync(anime.AniListId);
+                            if (datosFrescos != null)
+                            {
+                                int episodiosEmitidos = datosFrescos.NextAiringEpisode != null 
+                                    ? datosFrescos.NextAiringEpisode.Episode - 1 
+                                    : (datosFrescos.Episodes ?? 0);
+                                
+                                anime.TotalEpisodios = episodiosEmitidos;
+                                anime.Estado = datosFrescos.Status ?? "UNKNOWN";
+                                await _databaseService.ActualizarAnimeAsync(anime);
+                            }
+                        }
+                        
+                        var options = new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase };
+                        var json = System.Text.Json.JsonSerializer.Serialize(new { type = "SyncComplete" }, options);
+                        ReactWebView.CoreWebView2.PostWebMessageAsString(json);
+                    }
+                }
+            }
+        }
+        catch (System.Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error procesando mensaje: {ex.Message}");
+        }
     }
 
     protected override void OnSourceInitialized(System.EventArgs e)

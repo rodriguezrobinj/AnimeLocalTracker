@@ -106,6 +106,63 @@ public partial class MainViewModel : ObservableObject,
         VistaActual = _serviceProvider.GetRequiredService<CalendarioViewModel>();
     }
 
+    [RelayCommand]
+    private void AbrirInterfazWeb()
+    {
+        var webWindow = new AnimeLocalTracker.Views.WebUIWindow();
+        webWindow.Show();
+    }
+
+    [RelayCommand]
+    private async Task HacerPingGoAsync()
+    {
+        try
+        {
+            using var client = new System.Net.Http.HttpClient();
+            client.Timeout = TimeSpan.FromSeconds(3);
+            var response = await client.GetAsync("http://localhost:8080/ping");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                await MostrarDialogoLocalAsync("Ping Exitoso (Go)", $"Respuesta del Daemon Go:\n{json}", false, "ServerNetwork", "#00ADD8");
+            }
+            else
+            {
+                await MostrarDialogoLocalAsync("Error de Ping", $"El servidor Go respondió con código: {response.StatusCode}", false, "AlertCircle", "#F44336");
+            }
+        }
+        catch (Exception ex)
+        {
+            await MostrarDialogoLocalAsync("Error de Conexión", $"No se pudo conectar al Daemon Go.\n¿Está corriendo?\n\n{ex.Message}", false, "AlertCircle", "#F44336");
+        }
+    }
+
+    [RelayCommand]
+    private async Task HacerPingPythonAsync()
+    {
+        try
+        {
+            using var client = new System.Net.Http.HttpClient();
+            client.Timeout = TimeSpan.FromSeconds(3);
+            var response = await client.GetAsync("http://localhost:8000/ping");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                await MostrarDialogoLocalAsync("Ping Exitoso (Python)", $"Respuesta del Daemon Python:\n{json}", false, "Brain", "#FDD835");
+            }
+            else
+            {
+                await MostrarDialogoLocalAsync("Error de Ping", $"El servidor Python respondió con código: {response.StatusCode}", false, "AlertCircle", "#F44336");
+            }
+        }
+        catch (Exception ex)
+        {
+            await MostrarDialogoLocalAsync("Error de Conexión", $"No se pudo conectar al Daemon Python.\n¿Está corriendo?\n\n{ex.Message}", false, "AlertCircle", "#F44336");
+        }
+    }
+
     public void Receive(AbrirBuscadorMensaje message)
     {
         TextoBusqueda = string.Empty;
