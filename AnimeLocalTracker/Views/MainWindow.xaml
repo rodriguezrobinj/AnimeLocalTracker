@@ -107,7 +107,10 @@
                                         
                                         <!-- Mini portada -->
                                         <Border Grid.Column="0" Width="55" Height="80" CornerRadius="6" ClipToBounds="True" HorizontalAlignment="Left">
-                                            <Image Source="{Binding CoverImage.ExtraLarge, IsAsync=True, TargetNullValue={x:Null}, FallbackValue={x:Null}}" Stretch="UniformToFill" />
+                                            <Grid>
+                                                <Border Style="{StaticResource ShimmerEffectStyle}" />
+                                                <Image Source="{Binding CoverImage.ExtraLarge, IsAsync=True, TargetNullValue={x:Null}, FallbackValue={x:Null}}" Stretch="UniformToFill" />
+                                            </Grid>
                                         </Border>
                                         
                                         <StackPanel Grid.Column="1" Margin="15,0,0,0" VerticalAlignment="Center">

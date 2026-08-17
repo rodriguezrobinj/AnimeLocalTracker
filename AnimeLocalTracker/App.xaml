@@ -11,6 +11,32 @@
                 <!-- EL CAMBIO VITAL: Ahora usamos MaterialDesign3 -->
                 <ResourceDictionary Source="pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesign3.Defaults.xaml" />
             </ResourceDictionary.MergedDictionaries>
+
+            <!-- Estilo Shimmer Global para imágenes cargando -->
+            <Style x:Key="ShimmerEffectStyle" TargetType="Border">
+                <Setter Property="Background">
+                    <Setter.Value>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                            <LinearGradientBrush.RelativeTransform>
+                                <TranslateTransform X="-1"/>
+                            </LinearGradientBrush.RelativeTransform>
+                            <GradientStop Color="#151515" Offset="0" />
+                            <GradientStop Color="#2A2A2A" Offset="0.5" />
+                            <GradientStop Color="#151515" Offset="1" />
+                        </LinearGradientBrush>
+                    </Setter.Value>
+                </Setter>
+                <Style.Triggers>
+                    <EventTrigger RoutedEvent="Loaded">
+                        <BeginStoryboard>
+                            <Storyboard RepeatBehavior="Forever">
+                                <DoubleAnimation Storyboard.TargetProperty="(Border.Background).(LinearGradientBrush.RelativeTransform).(TranslateTransform.X)"
+                                                 From="-1" To="1" Duration="0:0:1.5" />
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </EventTrigger>
+                </Style.Triggers>
+            </Style>
             
             <!-- Conversores Globales -->
             <BooleanToVisibilityConverter x:Key="BoolToVis" />

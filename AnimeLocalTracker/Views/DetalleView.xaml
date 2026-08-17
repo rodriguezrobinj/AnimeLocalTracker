@@ -81,7 +81,10 @@
 
                 <!-- Portada con elevación profunda y tamaño fijo -->
                 <materialDesign:Card Grid.Column="0" Width="260" Height="370" UniformCornerRadius="12" VerticalAlignment="Top" materialDesign:ElevationAssist.Elevation="Dp8">
-                    <Image Source="{Binding AnimeSeleccionado.PortadaVisible, TargetNullValue={x:Null}, FallbackValue={x:Null}, IsAsync=True}" Stretch="UniformToFill" />
+                    <Grid>
+                        <Border Style="{StaticResource ShimmerEffectStyle}" CornerRadius="12" />
+                        <Image Source="{Binding AnimeSeleccionado.PortadaVisible, TargetNullValue={x:Null}, FallbackValue={x:Null}, IsAsync=True}" Stretch="UniformToFill" />
+                    </Grid>
                 </materialDesign:Card>
 
                 <!-- COLUMNA DERECHA: Textos y Episodios -->

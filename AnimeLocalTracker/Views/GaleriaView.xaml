@@ -306,6 +306,7 @@
                                     </ControlTemplate>
                                 </Button.Template>
                                 <Grid>
+                                    <Border Style="{StaticResource ShimmerEffectStyle}" CornerRadius="10" />
                                     <Image Source="{Binding PortadaVisible, TargetNullValue={x:Null}, FallbackValue={x:Null}, IsAsync=True}" Stretch="UniformToFill" />
                                     
                                     <!-- OVERLAY DE SELECCIÓN -->
