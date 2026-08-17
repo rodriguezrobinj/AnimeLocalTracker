@@ -219,6 +219,53 @@
                         </StackPanel>
                     </materialDesign:Card>
                 </Grid>
+
+                <!-- TOAST NOTIFICATION (Residual) -->
+                <Border Grid.Column="0" Grid.ColumnSpan="2" HorizontalAlignment="Center" VerticalAlignment="Bottom" Panel.ZIndex="3000" IsHitTestVisible="False">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Opacity" Value="0"/>
+                            <Setter Property="Margin" Value="0,0,0,-100"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ToastVisible}" Value="True">
+                                    <DataTrigger.EnterActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetProperty="Opacity" From="0" To="1" Duration="0:0:0.3"/>
+                                                <ThicknessAnimation Storyboard.TargetProperty="Margin" From="0,0,0,-100" To="0,0,0,30" Duration="0:0:0.3">
+                                                    <ThicknessAnimation.EasingFunction>
+                                                        <CubicEase EasingMode="EaseOut"/>
+                                                    </ThicknessAnimation.EasingFunction>
+                                                </ThicknessAnimation>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </DataTrigger.EnterActions>
+                                    <DataTrigger.ExitActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetProperty="Opacity" From="1" To="0" Duration="0:0:0.3"/>
+                                                <ThicknessAnimation Storyboard.TargetProperty="Margin" From="0,0,0,30" To="0,0,0,-100" Duration="0:0:0.3">
+                                                    <ThicknessAnimation.EasingFunction>
+                                                        <CubicEase EasingMode="EaseIn"/>
+                                                    </ThicknessAnimation.EasingFunction>
+                                                </ThicknessAnimation>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </DataTrigger.ExitActions>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <materialDesign:Card UniformCornerRadius="10" Background="#1E1E1E" Padding="20,15" materialDesign:ElevationAssist.Elevation="Dp8">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="{Binding ToastIcono}" Foreground="{Binding ToastColor}" Width="28" Height="28" VerticalAlignment="Center" Margin="0,0,15,0"/>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="{Binding ToastTitulo}" FontWeight="Bold" FontSize="15" Foreground="White"/>
+                                <TextBlock Text="{Binding ToastMensaje}" TextWrapping="Wrap" MaxWidth="450" Foreground="#CCCCCC" FontSize="13" Margin="0,4,0,0"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </materialDesign:Card>
+                </Border>
             </Grid>
         </materialDesign:DialogHost>
 

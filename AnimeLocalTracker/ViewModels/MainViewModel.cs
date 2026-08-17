@@ -36,6 +36,13 @@ public partial class MainViewModel : ObservableObject,
     
     private TaskCompletionSource<bool>? _dialogTcs;
 
+    // === TOAST NOTIFICATIONS ===
+    [ObservableProperty] private bool _toastVisible;
+    [ObservableProperty] private string _toastTitulo = "";
+    [ObservableProperty] private string _toastMensaje = "";
+    [ObservableProperty] private string _toastIcono = "InformationOutline";
+    [ObservableProperty] private string _toastColor = "#3F51B5";
+
     // === BUSCADOR FLOTANTE ===
     [ObservableProperty] private bool _isDialogOpen;
     [ObservableProperty] private ObservableCollection<AniListMedia> _resultadosBusqueda = [];
@@ -117,6 +124,27 @@ public partial class MainViewModel : ObservableObject,
     // ==========================================
     private async Task<bool> MostrarDialogoLocalAsync(string titulo, string mensaje, bool esConfirmacion, string icono, string color)
     {
+        if (!esConfirmacion)
+        {
+            // Si no es confirmación, mostrar una notificación (Toast) residual
+            ToastTitulo = titulo;
+            ToastMensaje = mensaje;
+            ToastIcono = icono;
+            ToastColor = color;
+            ToastVisible = true;
+            
+            // Ocultar automáticamente después de 3.5 segundos
+            _ = Task.Run(async () => 
+            {
+                await Task.Delay(3500);
+                System.Windows.Application.Current.Dispatcher.Invoke(() => ToastVisible = false);
+            });
+            
+            // Retorna true automáticamente porque no requiere la interacción del usuario
+            return true;
+        }
+
+        // Si es confirmación, mostrar el diálogo bloqueante estándar
         DialogoTitulo = titulo;
         DialogoMensaje = mensaje;
         DialogoEsConfirmacion = esConfirmacion;
