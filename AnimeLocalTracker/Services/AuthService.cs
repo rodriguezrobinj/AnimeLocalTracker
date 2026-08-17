@@ -126,4 +126,19 @@ public class AuthService : IAuthService
         // 3. Si no existe, el usuario no está conectado
         return null; 
     }
+
+    public void CerrarSesion()
+    {
+        Token = null;
+        if (System.IO.File.Exists(_rutaToken))
+        {
+            System.IO.File.Delete(_rutaToken);
+        }
+        if (System.IO.File.Exists(ArchivoToken))
+        {
+            System.IO.File.Delete(ArchivoToken);
+        }
+        
+        WeakReferenceMessenger.Default.Send(new UsuarioDesconectadoMensaje());
+    }
 }

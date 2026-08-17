@@ -13,7 +13,7 @@ using AnimeLocalTracker.Messages;
 
 namespace AnimeLocalTracker.ViewModels;
 
-public partial class DetalleViewModel : ObservableObject
+public partial class DetalleViewModel : ObservableObject, IRecipient<UsuarioLogeadoMensaje>, IRecipient<UsuarioDesconectadoMensaje>
 {
     private readonly IAnimeTrackingService _animeTrackingService;
     private readonly IDatabaseService _databaseService;
@@ -46,6 +46,8 @@ public partial class DetalleViewModel : ObservableObject
     [ObservableProperty] private string _editEstadoVisual = "Viendo";
     public List<string> OpcionesEstadoVisual { get; } = ["Viendo", "Finalizado", "En Pausa", "Abandonado", "Planeando"];
 
+    [ObservableProperty] private bool _estaConectado;
+
     public DetalleViewModel(
         IAnimeTrackingService animeTrackingService, 
         IDatabaseService databaseService, 
@@ -58,7 +60,14 @@ public partial class DetalleViewModel : ObservableObject
         _authService = authService;
         _fileScannerService = fileScannerService;
         _dialogService = dialogService;
+        
+        WeakReferenceMessenger.Default.Register<UsuarioLogeadoMensaje>(this);
+        WeakReferenceMessenger.Default.Register<UsuarioDesconectadoMensaje>(this);
+        EstaConectado = _authService.EstaAutenticado();
     }
+
+    public void Receive(UsuarioLogeadoMensaje message) => EstaConectado = true;
+    public void Receive(UsuarioDesconectadoMensaje message) => EstaConectado = false;
 
     public async Task InicializarAsync(AnimeItem anime)
     {

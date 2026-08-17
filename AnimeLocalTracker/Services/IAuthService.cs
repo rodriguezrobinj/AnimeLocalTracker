@@ -9,4 +9,5 @@ public interface IAuthService
     string ObtenerTokenGuardado();
     Task<bool> IniciarSesionAsync();
     string? ObtenerToken();
+    void CerrarSesion();
 }

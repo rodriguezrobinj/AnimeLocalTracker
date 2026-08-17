@@ -13,7 +13,7 @@ using AnimeLocalTracker.Messages;
 
 namespace AnimeLocalTracker.ViewModels;
 
-public partial class GaleriaViewModel : ObservableObject, IRecipient<UsuarioLogeadoMensaje>, IRecipient<AnimeAñadidoMensaje>
+public partial class GaleriaViewModel : ObservableObject, IRecipient<UsuarioLogeadoMensaje>, IRecipient<AnimeAñadidoMensaje>, IRecipient<UsuarioDesconectadoMensaje>
 {
     private readonly IAnimeTrackingService _animeTrackingService;
     private readonly IDatabaseService _databaseService;
@@ -72,6 +72,7 @@ public partial class GaleriaViewModel : ObservableObject, IRecipient<UsuarioLoge
         
         WeakReferenceMessenger.Default.Register<UsuarioLogeadoMensaje>(this);
         WeakReferenceMessenger.Default.Register<AnimeAñadidoMensaje>(this);
+        WeakReferenceMessenger.Default.Register<UsuarioDesconectadoMensaje>(this);
         
         _ = CargarBibliotecaAsync();
     }
@@ -79,6 +80,13 @@ public partial class GaleriaViewModel : ObservableObject, IRecipient<UsuarioLoge
     public void Receive(UsuarioLogeadoMensaje message)
     {
         _ = CargarPerfilUsuarioAsync();
+    }
+
+    public void Receive(UsuarioDesconectadoMensaje message)
+    {
+        EstaConectado = false;
+        NombreUsuarioAniList = "Usuario";
+        AvatarUsuarioAniList = null;
     }
 
     public void Receive(AnimeAñadidoMensaje message)
@@ -231,14 +239,46 @@ public partial class GaleriaViewModel : ObservableObject, IRecipient<UsuarioLoge
         WeakReferenceMessenger.Default.Send(new AbrirBuscadorMensaje());
     }
 
+    private bool _menuUsuarioAbierto;
+    public bool MenuUsuarioAbierto
+    {
+        get => _menuUsuarioAbierto;
+        set => SetProperty(ref _menuUsuarioAbierto, value);
+    }
+
+    [RelayCommand]
+    private void ToggleMenuUsuario()
+    {
+        MenuUsuarioAbierto = !MenuUsuarioAbierto;
+    }
+
+    [RelayCommand]
+    private void CerrarMenuUsuario()
+    {
+        MenuUsuarioAbierto = false;
+    }
+
     [RelayCommand]
     private async Task ConectarAniListAsync()
     {
+        MenuUsuarioAbierto = false;
         bool exito = await _authService.IniciarSesionAsync();
         if (exito)
         {
             await _dialogService.MostrarDialogoAsync("Nube Activada", "¡Conectado a AniList exitosamente! Tu progreso ahora se sincronizará.", false, "CloudCheck", "#4CAF50");
         }
+        else
+        {
+            await _dialogService.MostrarDialogoAsync("Autenticación Cancelada", "No se pudo iniciar sesión con AniList o el proceso fue cancelado.", false, "AlertCircle", "#FF5252");
+        }
+    }
+
+    [RelayCommand]
+    private async Task DesconectarAniListAsync()
+    {
+        MenuUsuarioAbierto = false; // Cierra el menú antes de desloguear
+        _authService.CerrarSesion();
+        await _dialogService.MostrarDialogoAsync("Sesión Cerrada", "Te has desconectado de AniList correctamente.", false, "Logout", "#FF5252");
     }
     
     [RelayCommand]
