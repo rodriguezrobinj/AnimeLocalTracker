@@ -11,14 +11,13 @@
         Background="#121212"
         WindowStyle="None"
         MinWidth="800" MinHeight="600"
-        ResizeMode="CanMinimize"
+        ResizeMode="NoResize"
         WindowState="Maximized"
         KeyDown="Window_KeyDown">
     
 
-
     <WindowChrome.WindowChrome>
-        <WindowChrome CaptionHeight="45" ResizeBorderThickness="5" CornerRadius="0" GlassFrameThickness="0" UseAeroCaptionButtons="False" />
+        <WindowChrome CaptionHeight="0" ResizeBorderThickness="0" CornerRadius="0" GlassFrameThickness="0" UseAeroCaptionButtons="False" />
     </WindowChrome.WindowChrome>
 
     <Window.Resources>

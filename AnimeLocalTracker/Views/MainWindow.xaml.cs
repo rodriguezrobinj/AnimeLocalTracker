@@ -168,7 +168,7 @@ public partial class MainWindow : Window
         
         // 2. Deshacer la pantalla completa
         WindowStyle = WindowStyle.None;
-        ResizeMode = ResizeMode.CanMinimize;
+        ResizeMode = ResizeMode.NoResize;
         Topmost = false;
         
         // 3. Restaurar los límites de la pantalla para maximizado normal
