@@ -4,6 +4,7 @@ using AnimeLocalTracker.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 using AnimeLocalTracker.Views; // Asegúrate de que este namespace exista
 using AnimeLocalTracker.Services;
+using Polly;
 
 namespace AnimeLocalTracker;
 
@@ -28,17 +29,42 @@ public partial class App : Application
         services.AddTransient<MainViewModel>();
         services.AddTransient<GaleriaViewModel>();
         services.AddTransient<DetalleViewModel>();
+        services.AddTransient<CalendarioViewModel>();
 
         // 3. Aquí registraremos los Servicios
         services.AddSingleton<IDialogService, DialogService>();
         services.AddSingleton<IAuthService, AuthService>();
         services.AddTransient<IFileScannerService, FileScannerService>();
         
-        // IHttpClientFactory nativo
-        services.AddHttpClient<IAnimeTrackingService, AniListTrackingService>();
+        // IHttpClientFactory nativo con Polly para Rate Limiting
+        services.AddHttpClient<IAnimeTrackingService, AniListTrackingService>()
+            .AddPolicyHandler(GetRetryPolicy());
         
         // Lo registramos como Singleton porque queremos que haya una sola conexión a la BD en toda la app
         services.AddSingleton<IDatabaseService, DatabaseService>();
+    }
+
+    private static Polly.IAsyncPolicy<System.Net.Http.HttpResponseMessage> GetRetryPolicy()
+    {
+        return Polly.Extensions.Http.HttpPolicyExtensions
+            .HandleTransientHttpError()
+            .OrResult(msg => msg.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+            .WaitAndRetryAsync(
+                retryCount: 3,
+                sleepDurationProvider: (retryCount, response, context) =>
+                {
+                    var delay = TimeSpan.FromSeconds(60); // Por defecto AniList bloquea 1 minuto
+                    if (response.Result?.Headers.RetryAfter?.Delta.HasValue == true)
+                    {
+                        delay = response.Result.Headers.RetryAfter.Delta.Value.Add(TimeSpan.FromSeconds(1));
+                    }
+                    return delay;
+                },
+                onRetryAsync: (outcome, timespan, retryCount, context) =>
+                {
+                    System.Diagnostics.Debug.WriteLine($"[AniList Rate Limit] Esperando {timespan.TotalSeconds} segundos. Reintento {retryCount}...");
+                    return System.Threading.Tasks.Task.CompletedTask;
+                });
     }
 
     protected override async void OnStartup(StartupEventArgs e)

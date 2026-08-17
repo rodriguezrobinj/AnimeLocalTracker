@@ -6,13 +6,17 @@
              TextElement.Foreground="{DynamicResource MaterialDesignBody}"
              Background="Transparent">
 
-    <Grid MaxWidth="1248" Margin="30,60,30,30">
+    <Grid MaxWidth="1248">
         <Grid.RenderTransform>
             <TranslateTransform Y="0"/>
         </Grid.RenderTransform>
         <Grid.Style>
             <Style TargetType="Grid">
+                <Setter Property="Margin" Value="95,60,30,30" />
                 <Style.Triggers>
+                    <DataTrigger Binding="{Binding Topmost, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                        <Setter Property="Margin" Value="95,30,30,30" />
+                    </DataTrigger>
                     <Trigger Property="Visibility" Value="Visible">
                         <Trigger.EnterActions>
                             <BeginStoryboard>

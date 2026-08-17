@@ -35,6 +35,22 @@ public class AniListPage
     
     [JsonPropertyName("media")]
     public List<AniListMedia>? Media { get; set; }
+    
+    // NUEVO: Para recibir el calendario de emisiones
+    [JsonPropertyName("airingSchedules")]
+    public List<AiringScheduleNode>? AiringSchedules { get; set; }
+}
+
+public class AiringScheduleNode
+{
+    [JsonPropertyName("episode")]
+    public int Episode { get; set; }
+
+    [JsonPropertyName("airingAt")]
+    public long AiringAt { get; set; }
+
+    [JsonPropertyName("media")]
+    public AniListMedia? Media { get; set; }
 }
 
 public class AniListMedia

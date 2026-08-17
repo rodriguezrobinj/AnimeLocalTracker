@@ -288,4 +288,68 @@ public class AniListTrackingService(HttpClient httpClient) : IAnimeTrackingServi
         }
         catch { return []; }
     }
+
+    public async Task<List<AiringEpisode>> ObtenerCalendarioEmisionAsync(List<int> mediaIds, long inicioSemana, long finSemana)
+    {
+        if (mediaIds == null || mediaIds.Count == 0) return new List<AiringEpisode>();
+
+        var query = @"
+        query($mediaIds: [Int], $airingAt_greater: Int, $airingAt_lesser: Int) {
+          Page(page: 1, perPage: 50) {
+            airingSchedules(mediaId_in: $mediaIds, airingAt_greater: $airingAt_greater, airingAt_lesser: $airingAt_lesser, sort: TIME) {
+              episode
+              airingAt
+              media {
+                id
+                title { romaji }
+                coverImage { extraLarge }
+              }
+            }
+          }
+        }";
+
+        var requestBody = new
+        {
+            query,
+            variables = new
+            {
+                mediaIds,
+                airingAt_greater = inicioSemana,
+                airingAt_lesser = finSemana
+            }
+        };
+
+        var jsonContent = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
+
+        try
+        {
+            var response = await _httpClient.PostAsync("https://graphql.anilist.co", jsonContent);
+            if (!response.IsSuccessStatusCode) return new List<AiringEpisode>();
+
+            var jsonResponse = await response.Content.ReadAsStringAsync();
+            var result = JsonSerializer.Deserialize<AniListResponse>(jsonResponse);
+
+            var schedules = result?.Data?.Page?.AiringSchedules;
+            if (schedules == null) return new List<AiringEpisode>();
+
+            var airingList = new List<AiringEpisode>();
+            foreach (var s in schedules)
+            {
+                if (s.Media == null) continue;
+                airingList.Add(new AiringEpisode
+                {
+                    AniListId = s.Media.Id,
+                    Titulo = s.Media.Title.Romaji,
+                    UrlPortada = s.Media.CoverImage.ExtraLarge ?? "",
+                    NumeroEpisodio = s.Episode,
+                    FechaEmision = DateTimeOffset.FromUnixTimeSeconds(s.AiringAt).DateTime
+                });
+            }
+            return airingList;
+        }
+        catch
+        {
+            return new List<AiringEpisode>();
+        }
+    }
 }

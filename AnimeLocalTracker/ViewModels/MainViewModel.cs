@@ -14,6 +14,7 @@ namespace AnimeLocalTracker.ViewModels;
 public partial class MainViewModel : ObservableObject, 
     IRecipient<NavegarMensaje_Galeria>,
     IRecipient<NavegarMensaje_Detalle>,
+    IRecipient<NavegarMensaje_Calendario>,
     IRecipient<AbrirBuscadorMensaje>,
     IRecipient<MostrarDialogoRequestMessage>
 {
@@ -79,6 +80,23 @@ public partial class MainViewModel : ObservableObject,
         var detalleVm = _serviceProvider.GetRequiredService<DetalleViewModel>();
         VistaActual = detalleVm;
         await detalleVm.InicializarAsync(message.AnimeSeleccionado);
+    }
+
+    public void Receive(NavegarMensaje_Calendario message)
+    {
+        VistaActual = _serviceProvider.GetRequiredService<CalendarioViewModel>();
+    }
+
+    [RelayCommand]
+    private void NavegarGaleria()
+    {
+        VistaActual = _serviceProvider.GetRequiredService<GaleriaViewModel>();
+    }
+
+    [RelayCommand]
+    private void NavegarCalendario()
+    {
+        VistaActual = _serviceProvider.GetRequiredService<CalendarioViewModel>();
     }
 
     public void Receive(AbrirBuscadorMensaje message)

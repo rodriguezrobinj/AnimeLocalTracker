@@ -11,10 +11,12 @@
         Background="#121212"
         WindowStyle="None"
         MinWidth="800" MinHeight="600"
-        ResizeMode="CanResize"
+        ResizeMode="CanMinimize"
         WindowState="Maximized"
         KeyDown="Window_KeyDown">
     
+
+
     <WindowChrome.WindowChrome>
         <WindowChrome CaptionHeight="45" ResizeBorderThickness="5" CornerRadius="0" GlassFrameThickness="0" UseAeroCaptionButtons="False" />
     </WindowChrome.WindowChrome>
@@ -27,11 +29,14 @@
         <DataTemplate DataType="{x:Type viewmodels:DetalleViewModel}">
             <local:DetalleView />
         </DataTemplate>
+        <DataTemplate DataType="{x:Type viewmodels:CalendarioViewModel}">
+            <local:CalendarioView />
+        </DataTemplate>
         
         <Style TargetType="ScrollBar" BasedOn="{StaticResource MaterialDesignScrollBarMinimal}" />
     </Window.Resources>
     
-    <Grid>
+    <Grid x:Name="RootLayout">
         <materialDesign:DialogHost IsOpen="{Binding IsDialogOpen}" CloseOnClickAway="True">
             <materialDesign:DialogHost.DialogContent>
                 <Grid Width="600" MaxHeight="650" Background="#1E1E1E">
@@ -134,12 +139,39 @@
             </materialDesign:DialogHost.DialogContent>
 
             <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="65" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- SIDEBAR -->
+                <Border Grid.Column="0" Background="Transparent" BorderBrush="#1AFFFFFF" BorderThickness="0,0,1,0" Panel.ZIndex="10">
+                    <StackPanel HorizontalAlignment="Center">
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="Margin" Value="0,60,0,0"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Topmost, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                        <Setter Property="Margin" Value="0,30,0,0"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+                        <Button Command="{Binding NavegarGaleriaCommand}" Style="{StaticResource MaterialDesignIconForegroundButton}" Width="45" Height="45" Margin="0,10" ToolTip="Biblioteca">
+                            <materialDesign:PackIcon Kind="ViewGallery" Width="24" Height="24" Foreground="{DynamicResource MaterialDesignBodyLight}" />
+                        </Button>
+                        <Button Command="{Binding NavegarCalendarioCommand}" Style="{StaticResource MaterialDesignIconForegroundButton}" Width="45" Height="45" Margin="0,10" ToolTip="Calendario de Emisión">
+                            <materialDesign:PackIcon Kind="CalendarClock" Width="24" Height="24" Foreground="{DynamicResource MaterialDesignBodyLight}" />
+                        </Button>
+                    </StackPanel>
+                </Border>
+
                 <!-- CONTENIDO PRINCIPAL: Solo un ContentControl que se actualiza según la propiedad VistaActual -->
                 <!-- Sin margen superior para que el fondo (ej. desenfoque) cubra toda la ventana detrás de la barra de título -->
-                <ContentControl Content="{Binding VistaActual}" />
+                <ContentControl Grid.Column="0" Grid.ColumnSpan="2" Content="{Binding VistaActual}" />
                 
                 <!-- BARRA DE TÍTULO CUSTOM -->
-                <Grid x:Name="BarraTitulo" Height="45" Background="Transparent" VerticalAlignment="Top">
+                <Grid Grid.Column="0" Grid.ColumnSpan="2" x:Name="BarraTitulo" Height="45" Background="Transparent" VerticalAlignment="Top" Panel.ZIndex="20">
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="15,0,0,0">
                         <materialDesign:PackIcon Kind="PlayCircle" Foreground="#3F51B5" Width="20" Height="20" VerticalAlignment="Center" Margin="0,0,8,0"/>
                         <TextBlock Text="AnimeTracker" FontWeight="Bold" Foreground="{DynamicResource MaterialDesignBodyLight}" VerticalAlignment="Center" FontSize="14"/>
@@ -152,7 +184,7 @@
                         <Button WindowChrome.IsHitTestVisibleInChrome="True" Click="BtnMinimizar_Click" Width="45" Height="45" Style="{StaticResource MaterialDesignFlatButton}" Padding="0" Foreground="{DynamicResource MaterialDesignBodyLight}">
                             <materialDesign:PackIcon Kind="WindowMinimize" />
                         </Button>
-                        <Button WindowChrome.IsHitTestVisibleInChrome="True" Click="BtnMaximizar_Click" Width="45" Height="45" Style="{StaticResource MaterialDesignFlatButton}" Padding="0" Foreground="{DynamicResource MaterialDesignBodyLight}">
+                        <Button WindowChrome.IsHitTestVisibleInChrome="True" Click="BtnMaximizar_Click" Width="45" Height="45" Style="{StaticResource MaterialDesignFlatButton}" Padding="0" Foreground="{DynamicResource MaterialDesignBodyLight}" IsEnabled="False">
                             <materialDesign:PackIcon Kind="WindowMaximize" />
                         </Button>
                         <Button WindowChrome.IsHitTestVisibleInChrome="True" Click="BtnCerrar_Click" Width="45" Height="45" Style="{StaticResource MaterialDesignFlatButton}" Padding="0" Foreground="{DynamicResource MaterialDesignBodyLight}">
@@ -163,6 +195,7 @@
 
                 <!-- DIÁLOGO CUSTOM PARA TODA LA APP -->
                 <Grid Visibility="{Binding DialogoVisible, Converter={StaticResource BoolToVis}}" 
+                      Grid.Column="0" Grid.ColumnSpan="2"
                       Background="#B2000000" Panel.ZIndex="2000">
                     <materialDesign:Card Width="400" VerticalAlignment="Center" HorizontalAlignment="Center" 
                                          UniformCornerRadius="14" Background="{DynamicResource MaterialDesignPaper}" 
