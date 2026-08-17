@@ -39,6 +39,7 @@ public partial class CalendarioViewModel : ObservableObject
         LimpiarListas();
 
         var animes = await _databaseService.ObtenerTodosLosAnimesAsync();
+        var dicPortadas = animes.ToDictionary(a => a.AniListId, a => a.PortadaVisible);
         var ids = animes.Select(a => a.AniListId).ToList();
 
         if (ids.Count == 0)
@@ -60,6 +61,11 @@ public partial class CalendarioViewModel : ObservableObject
 
         foreach (var eps in schedule.OrderBy(e => e.FechaEmision))
         {
+            if (dicPortadas.TryGetValue(eps.AniListId, out var portadaLocal) && !string.IsNullOrEmpty(portadaLocal))
+            {
+                eps.UrlPortada = portadaLocal;
+            }
+
             switch (eps.DiaSemana)
             {
                 case DayOfWeek.Monday: Lunes.Add(eps); break;
