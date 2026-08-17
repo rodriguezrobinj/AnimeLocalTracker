@@ -41,6 +41,24 @@ public partial class AnimeItem : ObservableObject
     [ObservableProperty]
     private bool _estaSeleccionado;
 
+    // === PROPIEDADES DE PROGRESO LOCAL ===
+    [property: Ignore]
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ProgresoPorcentaje))]
+    private int _episodiosVistos;
+
+    [property: Ignore]
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(TieneNuevosEpisodios))]
+    private int _nuevosEpisodios;
+
+    [Ignore]
+    public double ProgresoPorcentaje => TotalEpisodios > 0 ? (EpisodiosVistos / (double)TotalEpisodios) * 100 : 0;
+
+    [Ignore]
+    public bool TieneNuevosEpisodios => NuevosEpisodios > 0;
+
+
     // === PROPIEDADES VISUALES (NO SE GUARDAN EN SQLITE) ===
     [Ignore] 
     public string EstadoVisual => Estado == "RELEASING" ? "En Emisión" : (Estado == "FINISHED" ? "Finalizado" : "Desconocido");

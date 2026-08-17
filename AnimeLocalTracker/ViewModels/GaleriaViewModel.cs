@@ -98,10 +98,13 @@ public partial class GaleriaViewModel : ObservableObject, IRecipient<UsuarioLoge
         // MIGRACIÓN INTELIGENTE: Recuperar el estado basado en lo que realmente has visto localmente
         foreach (var a in animes)
         {
+            var registros = await _databaseService.ObtenerRegistrosPorAnimeAsync(a.AniListId);
+            a.EpisodiosVistos = registros.Count(r => r.VistoLocal);
+            a.NuevosEpisodios = registros.Count(r => !r.VistoLocal);
+
             if (string.IsNullOrEmpty(a.EstadoUsuario) || a.EstadoUsuario == "PLANNING")
             {
-                var registros = await _databaseService.ObtenerRegistrosPorAnimeAsync(a.AniListId);
-                int episodiosVistos = registros.Count(r => r.VistoLocal);
+                int episodiosVistos = a.EpisodiosVistos;
                 
                 if (episodiosVistos > 0)
                 {
