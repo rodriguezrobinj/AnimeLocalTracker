@@ -16,7 +16,9 @@ public partial class MainViewModel : ObservableObject,
     IRecipient<NavegarMensaje_Detalle>,
     IRecipient<NavegarMensaje_Calendario>,
     IRecipient<AbrirBuscadorMensaje>,
-    IRecipient<MostrarDialogoRequestMessage>
+    IRecipient<MostrarDialogoRequestMessage>,
+    IRecipient<NavegarMensaje_Reproductor>,
+    IRecipient<NavegarMensaje_VolverDelReproductor>
 {
     private readonly IServiceProvider _serviceProvider;
     private readonly IAnimeTrackingService _animeTrackingService;
@@ -92,6 +94,32 @@ public partial class MainViewModel : ObservableObject,
     public void Receive(NavegarMensaje_Calendario message)
     {
         VistaActual = _serviceProvider.GetRequiredService<CalendarioViewModel>();
+    }
+
+    public void Receive(NavegarMensaje_Reproductor message)
+    {
+        // Guardar la vista actual antes de navegar al reproductor
+        _vistaAnteriorAlReproductor = VistaActual;
+
+        var viewModel = _serviceProvider.GetRequiredService<ReproductorViewModel>();
+        viewModel.CargarVideo(message.RutaVideo, message.AnimeId, message.TituloAnime, message.Episodio);
+        VistaActual = viewModel;
+    }
+
+    // Vista a la que volver al salir del reproductor
+    private ObservableObject? _vistaAnteriorAlReproductor;
+
+    public void Receive(NavegarMensaje_VolverDelReproductor message)
+    {
+        if (_vistaAnteriorAlReproductor != null)
+        {
+            VistaActual = _vistaAnteriorAlReproductor;
+            _vistaAnteriorAlReproductor = null;
+        }
+        else
+        {
+            VistaActual = _serviceProvider.GetRequiredService<GaleriaViewModel>();
+        }
     }
 
     [RelayCommand]

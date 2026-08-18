@@ -1,99 +1,64 @@
 using System.Windows;
-using AnimeLocalTracker.ViewModels; // Asegúrate de importar el namespace
+using System.Runtime.InteropServices;
+using AnimeLocalTracker.ViewModels;
 
 namespace AnimeLocalTracker.Views;
 
 public partial class MainWindow : Window
 {
-    private bool _isFullScreen = false;
+    public bool IsFullScreen { get; private set; }
 
     private MainViewModel _viewModel;
+    private System.Windows.Shell.WindowChrome? _chromeCache;
 
-    // Recibimos el ViewModel mágicamente gracias a la inyección de dependencias
     public MainWindow(MainViewModel viewModel) 
     {
         InitializeComponent();
         _viewModel = viewModel;
-        
-        // FIX: Evitar que al maximizar la ventana oculte la barra de tareas de Windows
-        MaxHeight = SystemParameters.MaximizedPrimaryScreenHeight;
-        MaxWidth = SystemParameters.MaximizedPrimaryScreenWidth;
-        
-        // ¡Esta es la línea más importante de MVVM!
         DataContext = _viewModel; 
     }
 
-    protected override void OnSourceInitialized(System.EventArgs e)
+    // ═══════════════════════════════════════════════════════════════
+    //  WM_GETMINMAXINFO: Fuerza que WindowState.Maximized respete
+    //  el área de trabajo del monitor (sin cubrir la barra de tareas).
+    //  Se desactiva cuando IsFullScreen=true para cubrir TODO.
+    // ═══════════════════════════════════════════════════════════════
+
+    protected override void OnSourceInitialized(EventArgs e)
     {
         base.OnSourceInitialized(e);
-        System.Windows.Interop.HwndSource source = System.Windows.Interop.HwndSource.FromHwnd(new System.Windows.Interop.WindowInteropHelper(this).Handle);
+        var source = System.Windows.Interop.HwndSource.FromHwnd(
+            new System.Windows.Interop.WindowInteropHelper(this).Handle);
         source?.AddHook(WindowProc);
     }
 
-    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
-    public struct MINMAXINFO
+    private IntPtr WindowProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
-        public POINT ptReserved;
-        public POINT ptMaxSize;
-        public POINT ptMaxPosition;
-        public POINT ptMinTrackSize;
-        public POINT ptMaxTrackSize;
-    }
-
-    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
-    public struct POINT
-    {
-        public int x;
-        public int y;
-    }
-
-    [System.Runtime.InteropServices.DllImport("user32.dll")]
-    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
-    static extern bool GetMonitorInfo(System.IntPtr hMonitor, ref MONITORINFO lpmi);
-
-    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential, CharSet = System.Runtime.InteropServices.CharSet.Auto)]
-    public struct MONITORINFO
-    {
-        public int cbSize;
-        public RECT rcMonitor;
-        public RECT rcWork;
-        public uint dwFlags;
-    }
-
-    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
-    public struct RECT
-    {
-        public int left;
-        public int top;
-        public int right;
-        public int bottom;
-    }
-
-    [System.Runtime.InteropServices.DllImport("user32.dll")]
-    static extern System.IntPtr MonitorFromWindow(System.IntPtr hwnd, uint dwFlags);
-
-    private System.IntPtr WindowProc(System.IntPtr hwnd, int msg, System.IntPtr wParam, System.IntPtr lParam, ref bool handled)
-    {
-        if (msg == 0x0024 && !_isFullScreen) // WM_GETMINMAXINFO
+        // WM_GETMINMAXINFO = 0x0024
+        if (msg == 0x0024 && !IsFullScreen)
         {
-            MINMAXINFO mmi = (MINMAXINFO)System.Runtime.InteropServices.Marshal.PtrToStructure(lParam, typeof(MINMAXINFO))!;
-            System.IntPtr monitor = MonitorFromWindow(hwnd, 2); // MONITOR_DEFAULTTONEAREST
-            if (monitor != System.IntPtr.Zero)
+            var mmi = Marshal.PtrToStructure<MINMAXINFO>(lParam);
+            IntPtr monitor = MonitorFromWindow(hwnd, 2); // MONITOR_DEFAULTTONEAREST
+            if (monitor != IntPtr.Zero)
             {
-                MONITORINFO monitorInfo = new MONITORINFO();
-                monitorInfo.cbSize = System.Runtime.InteropServices.Marshal.SizeOf(typeof(MONITORINFO));
-                GetMonitorInfo(monitor, ref monitorInfo);
+                var mi = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
+                GetMonitorInfo(monitor, ref mi);
 
-                mmi.ptMaxPosition.x = System.Math.Abs(monitorInfo.rcWork.left - monitorInfo.rcMonitor.left);
-                mmi.ptMaxPosition.y = System.Math.Abs(monitorInfo.rcWork.top - monitorInfo.rcMonitor.top);
-                mmi.ptMaxSize.x = System.Math.Abs(monitorInfo.rcWork.right - monitorInfo.rcWork.left);
-                mmi.ptMaxSize.y = System.Math.Abs(monitorInfo.rcWork.bottom - monitorInfo.rcWork.top);
+                // rcWork = área útil sin la barra de tareas
+                mmi.ptMaxPosition.x = Math.Abs(mi.rcWork.left - mi.rcMonitor.left);
+                mmi.ptMaxPosition.y = Math.Abs(mi.rcWork.top  - mi.rcMonitor.top);
+                mmi.ptMaxSize.x     = Math.Abs(mi.rcWork.right  - mi.rcWork.left);
+                mmi.ptMaxSize.y     = Math.Abs(mi.rcWork.bottom - mi.rcWork.top);
             }
-            System.Runtime.InteropServices.Marshal.StructureToPtr(mmi, lParam, true);
+            Marshal.StructureToPtr(mmi, lParam, true);
             handled = true;
         }
-        return System.IntPtr.Zero;
+        return IntPtr.Zero;
     }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  Botones de la barra de título
+    // ═══════════════════════════════════════════════════════════════
 
     private void BtnMinimizar_Click(object sender, RoutedEventArgs e)
     {
@@ -102,10 +67,8 @@ public partial class MainWindow : Window
 
     private void BtnMaximizar_Click(object sender, RoutedEventArgs e)
     {
-        if (_isFullScreen) 
+        if (IsFullScreen) 
         {
-            // Si estábamos en pantalla completa real y le damos al botón de restaurar/maximizar,
-            // primero debemos desactivar la pantalla completa.
             SalirPantallaCompleta();
         }
         else 
@@ -121,63 +84,59 @@ public partial class MainWindow : Window
     
     private void BtnPantallaCompleta_Click(object sender, RoutedEventArgs e)
     {
-        if (_isFullScreen)
-        {
-            SalirPantallaCompleta();
-        }
-        else
-        {
-            EntrarPantallaCompleta();
-        }
+        TogglePantallaCompleta();
     }
 
-    private System.Windows.Shell.WindowChrome? _chromeCache;
+    // ═══════════════════════════════════════════════════════════════
+    //  Pantalla completa (cubre barra de tareas)
+    // ═══════════════════════════════════════════════════════════════
+
+    public void TogglePantallaCompleta()
+    {
+        if (IsFullScreen)
+            SalirPantallaCompleta();
+        else
+            EntrarPantallaCompleta();
+    }
 
     private void EntrarPantallaCompleta()
     {
-        _isFullScreen = true; // IMPORTANTÍSIMO: Setear antes de maximizar para que WM_GETMINMAXINFO lo ignore.
-        
-        // 1. Guardar y remover el WindowChrome (es el culpable de que no cubra la barra de tareas)
-        if (_chromeCache == null)
-        {
-            _chromeCache = System.Windows.Shell.WindowChrome.GetWindowChrome(this);
-        }
+        IsFullScreen = true; // Desactiva WM_GETMINMAXINFO → permite cubrir toda la pantalla
+
+        // 1. Guardar y quitar WindowChrome (es el que impide cubrir la barra de tareas)
+        _chromeCache ??= System.Windows.Shell.WindowChrome.GetWindowChrome(this);
         System.Windows.Shell.WindowChrome.SetWindowChrome(this, null);
 
-        // 2. Ocultar nuestra barra de botones
+        // 2. Ocultar barra de título
         BarraTitulo.Visibility = Visibility.Collapsed;
 
-        // 3. Configurar la ventana para pantalla completa real
+        // 3. Configurar ventana para fullscreen real
         WindowStyle = WindowStyle.None;
-        ResizeMode = ResizeMode.NoResize; 
-        Topmost = true; 
-        
-        // 4. Forzar el refresco y maximizar quitando límites
+        ResizeMode  = ResizeMode.NoResize; 
+        Topmost     = true; 
+
+        // 4. Forzar refresco (Normal → Maximized) para que WPF recalcule sin límites
         WindowState = WindowState.Normal;
-        MaxHeight = double.PositiveInfinity;
-        MaxWidth = double.PositiveInfinity;
         WindowState = WindowState.Maximized;
     }
 
     private void SalirPantallaCompleta()
     {
-        _isFullScreen = false; // IMPORTANTÍSIMO: Setear antes de restablecer los estados.
-        
-        // 1. Volver a mostrar nuestra barra de título
+        IsFullScreen = false; // Reactiva WM_GETMINMAXINFO → respeta barra de tareas
+
+        // 1. Restaurar barra de título
         BarraTitulo.Visibility = Visibility.Visible;
         
-        // 2. Deshacer la pantalla completa
+        // 2. Restaurar propiedades de ventana
         WindowStyle = WindowStyle.None;
-        ResizeMode = ResizeMode.NoResize;
-        Topmost = false;
+        ResizeMode  = ResizeMode.CanResize;
+        Topmost     = false;
         
-        // 3. Restaurar los límites de la pantalla para maximizado normal
-        MaxHeight = SystemParameters.MaximizedPrimaryScreenHeight;
-        MaxWidth = SystemParameters.MaximizedPrimaryScreenWidth;
-        
+        // 3. Re-maximizar (ahora WM_GETMINMAXINFO limitará al área de trabajo)
+        WindowState = WindowState.Normal;
         WindowState = WindowState.Maximized;
         
-        // 4. Restaurar el WindowChrome
+        // 4. Restaurar WindowChrome
         if (_chromeCache != null)
         {
             System.Windows.Shell.WindowChrome.SetWindowChrome(this, _chromeCache);
@@ -188,7 +147,43 @@ public partial class MainWindow : Window
     {
         if (e.Key == System.Windows.Input.Key.F11)
         {
-            BtnPantallaCompleta_Click(this, new RoutedEventArgs());
+            TogglePantallaCompleta();
         }
     }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  Win32 interop structs
+    // ═══════════════════════════════════════════════════════════════
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint dwFlags);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MINMAXINFO
+    {
+        public POINT ptReserved;
+        public POINT ptMaxSize;
+        public POINT ptMaxPosition;
+        public POINT ptMinTrackSize;
+        public POINT ptMaxTrackSize;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct POINT { public int x, y; }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
+    private struct MONITORINFO
+    {
+        public int  cbSize;
+        public RECT rcMonitor;
+        public RECT rcWork;
+        public uint dwFlags;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct RECT { public int left, top, right, bottom; }
 }

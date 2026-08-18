@@ -31,6 +31,9 @@
         <DataTemplate DataType="{x:Type viewmodels:CalendarioViewModel}">
             <local:CalendarioView />
         </DataTemplate>
+        <DataTemplate DataType="{x:Type viewmodels:ReproductorViewModel}">
+            <local:ReproductorView />
+        </DataTemplate>
         
         <Style TargetType="ScrollBar" BasedOn="{StaticResource MaterialDesignScrollBarMinimal}" />
     </Window.Resources>

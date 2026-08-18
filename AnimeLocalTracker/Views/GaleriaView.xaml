@@ -425,7 +425,7 @@
                             </materialDesign:Card.Style>
         
                             <!-- NOTA: Usaremos RelativeSource AncestorType UserControl para encontrar el ViewModel de la Galería -->
-                            <Button Command="{Binding DataContext.AbrirDetalleCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                            <Button Command="{Binding DataContext.AbrirDetalleCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
                                     CommandParameter="{Binding}" 
                                     Padding="0" Background="Transparent" BorderThickness="0" Height="265" 
                                     HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" ClipToBounds="False">
@@ -446,7 +446,7 @@
                                     
                                     <!-- CHECKBOX DE SELECCIÓN (Visible solo en ModoSeleccion) -->
                                     <CheckBox IsChecked="{Binding EstaSeleccionado}" 
-                                              Visibility="{Binding DataContext.ModoSeleccion, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVis}}"
+                                              Visibility="{Binding DataContext.ModoSeleccion, RelativeSource={RelativeSource AncestorType=ListBox}, Converter={StaticResource BoolToVis}}"
                                               HorizontalAlignment="Right" VerticalAlignment="Top" Margin="8"
                                               Style="{StaticResource MaterialDesignDarkCheckBox}"
                                               IsHitTestVisible="False"

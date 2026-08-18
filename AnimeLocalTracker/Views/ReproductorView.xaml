@@ -1,0 +1,190 @@
+<UserControl x:Class="AnimeLocalTracker.Views.ReproductorView"
+        x:Name="RootWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:fl="clr-namespace:FlyleafLib.Controls.WPF;assembly=FlyleafLib"
+        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        xmlns:local="clr-namespace:AnimeLocalTracker.Views"
+        TextElement.Foreground="{DynamicResource MaterialDesignBody}"
+        Background="Black">
+
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+    </UserControl.Resources>
+
+    <Grid>
+        <!-- Reproductor NATIVO Flyleaf -->
+        <fl:FlyleafHost Player="{Binding Player}">
+            <!-- Controles Overlays -->
+            <Grid x:Name="OverlayControls" Background="Transparent" DataContext="{x:Null}">
+                
+                <!-- Gradiente Superior -->
+                <Grid VerticalAlignment="Top" Height="120">
+                    <Grid.Background>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                            <GradientStop Color="#B3000000" Offset="0"/>
+                            <GradientStop Color="#00000000" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Grid.Background>
+                    <Grid Margin="20,20,20,0" VerticalAlignment="Top">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <!-- Back Arrow -->
+                        <Button Grid.Column="0" Command="{Binding CerrarCommand}"
+                                Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="50" Height="50" Margin="0,0,15,0">
+                            <materialDesign:PackIcon Kind="ArrowLeft" Width="36" Height="36" />
+                        </Button>
+                        <!-- Titulos Netflix Style -->
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,-3,0,0">
+                            <TextBlock Text="{Binding TituloAnime}" FontWeight="Bold" FontSize="22" Foreground="White"/>
+                            <TextBlock Text="{Binding TituloEpisodio}" FontSize="16" Foreground="#CCCCCC"/>
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+
+                <!-- Barra Inferior Completa -->
+                <Grid VerticalAlignment="Bottom">
+                    <Grid.Background>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                            <GradientStop Color="#00000000" Offset="0"/>
+                            <GradientStop Color="#40000000" Offset="0.5"/>
+                            <GradientStop Color="#CC000000" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Grid.Background>
+                    
+                    <Grid Margin="20,60,20,15" VerticalAlignment="Bottom">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/> <!-- Skip Intro -->
+                            <RowDefinition Height="Auto"/> <!-- Slider -->
+                            <RowDefinition Height="Auto"/> <!-- Botones -->
+                        </Grid.RowDefinitions>
+
+                        <!-- Botón Skip Intro (Crunchyroll Style) -->
+                        <Button Grid.Row="0" Command="{Binding SkipIntroCommand}"
+                                Visibility="{Binding MostrarSkipIntro, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                Content="Saltar intro"
+                                HorizontalAlignment="Right" Margin="0,0,0,15"
+                                Background="#99000000" Foreground="White" BorderBrush="White" BorderThickness="1"
+                                Padding="15,5" FontSize="13" FontWeight="SemiBold" Cursor="Hand"
+                                materialDesign:ButtonAssist.CornerRadius="0" />
+
+                        <!-- Barra de progreso con hover interactivo -->
+                        <Grid Grid.Row="1" Margin="0,0,0,15" x:Name="ProgressBarArea" Cursor="Hand">
+                            <!-- Línea de progreso visual -->
+                            <ProgressBar Minimum="0" Maximum="{Binding TotalSeconds}" Value="{Binding CurrentSeconds, Mode=OneWay}"
+                                         Height="3" Foreground="White" Background="#44FFFFFF" BorderThickness="0" VerticalAlignment="Center">
+                                <ProgressBar.Style>
+                                    <Style TargetType="ProgressBar" BasedOn="{StaticResource {x:Type ProgressBar}}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Grid}}" Value="True">
+                                                <DataTrigger.EnterActions>
+                                                    <BeginStoryboard>
+                                                        <Storyboard>
+                                                            <DoubleAnimation Storyboard.TargetProperty="Height" To="5" Duration="0:0:0.15"/>
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </DataTrigger.EnterActions>
+                                                <DataTrigger.ExitActions>
+                                                    <BeginStoryboard>
+                                                        <Storyboard>
+                                                            <DoubleAnimation Storyboard.TargetProperty="Height" To="3" Duration="0:0:0.15"/>
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </DataTrigger.ExitActions>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </ProgressBar.Style>
+                            </ProgressBar>
+                            
+                            <!-- Slider transparente encima -->
+                            <Slider Minimum="0" Maximum="{Binding TotalSeconds}" Value="{Binding CurrentSeconds, Mode=TwoWay}"
+                                    IsMoveToPointEnabled="True" PreviewMouseDown="Slider_PreviewMouseDown" Foreground="White" Focusable="False"
+                                    PreviewMouseUp="Slider_PreviewMouseUp" Opacity="0.01" Height="20" VerticalAlignment="Center" />
+                        </Grid>
+
+                        <!-- Controles -->
+                        <Grid Grid.Row="2" Margin="0,0,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/> <!-- Play -->
+                                <ColumnDefinition Width="Auto"/> <!-- Volumen -->
+                                <ColumnDefinition Width="Auto"/> <!-- Tiempo -->
+                                <ColumnDefinition Width="*"/>    <!-- Espacio -->
+                                <ColumnDefinition Width="Auto"/> <!-- Retroceder -->
+                                <ColumnDefinition Width="Auto"/> <!-- Adelantar -->
+                                <ColumnDefinition Width="Auto"/> <!-- Fullscreen -->
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Play/Pause -->
+                            <Button Grid.Column="0" Command="{Binding TogglePlayPauseCommand}" 
+                                    Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,5,0">
+                                <materialDesign:PackIcon Kind="{Binding PlayPauseIcon}" Width="28" Height="28" />
+                            </Button>
+
+                            <!-- Contenedor Volumen Animado -->
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" x:Name="VolumePanel" Background="Transparent" Margin="0,0,10,0">
+                                <Button Command="{Binding ToggleMuteCommand}" Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40">
+                                    <materialDesign:PackIcon Kind="{Binding VolumenIcon}" Width="24" Height="24" />
+                                </Button>
+                                <Slider Minimum="0" Maximum="100" Value="{Binding Volumen, Mode=TwoWay}" VerticalAlignment="Center" Foreground="White" Focusable="False">
+                                    <Slider.Style>
+                                        <Style TargetType="Slider" BasedOn="{StaticResource {x:Type Slider}}">
+                                            <Setter Property="Width" Value="0" />
+                                            <Setter Property="Margin" Value="0,0,0,0" />
+                                            <Setter Property="Opacity" Value="0" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=StackPanel}, Path=IsMouseOver}" Value="True">
+                                                    <DataTrigger.EnterActions>
+                                                        <BeginStoryboard>
+                                                            <Storyboard>
+                                                                <DoubleAnimation Storyboard.TargetProperty="Width" To="80" Duration="0:0:0.2" />
+                                                                <ThicknessAnimation Storyboard.TargetProperty="Margin" To="5,0,10,0" Duration="0:0:0.2" />
+                                                                <DoubleAnimation Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.2" />
+                                                            </Storyboard>
+                                                        </BeginStoryboard>
+                                                    </DataTrigger.EnterActions>
+                                                    <DataTrigger.ExitActions>
+                                                        <BeginStoryboard>
+                                                            <Storyboard>
+                                                                <DoubleAnimation Storyboard.TargetProperty="Width" To="0" Duration="0:0:0.2" />
+                                                                <ThicknessAnimation Storyboard.TargetProperty="Margin" To="0,0,0,0" Duration="0:0:0.2" />
+                                                                <DoubleAnimation Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.2" />
+                                                            </Storyboard>
+                                                        </BeginStoryboard>
+                                                    </DataTrigger.ExitActions>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Slider.Style>
+                                </Slider>
+                            </StackPanel>
+
+                            <!-- Tiempo -->
+                            <TextBlock Grid.Column="2" Text="{Binding TiempoCombinadoTexto}" 
+                                       Foreground="White" VerticalAlignment="Center" FontSize="13" FontWeight="Bold" Margin="5,0,0,0" Opacity="0.9"/>
+                                       
+                            <!-- Retroceder 10s -->
+                            <Button Grid.Column="4" Command="{Binding Rewind10Command}" 
+                                    Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,5,0">
+                                <materialDesign:PackIcon Kind="Rewind10" Width="26" Height="26" />
+                            </Button>
+
+                            <!-- Adelantar 10s -->
+                            <Button Grid.Column="5" Command="{Binding Forward10Command}" 
+                                    Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,10,0">
+                                <materialDesign:PackIcon Kind="FastForward10" Width="26" Height="26" />
+                            </Button>
+                            
+                            <!-- Fullscreen con ícono dinámico -->
+                            <Button Grid.Column="6" Command="{Binding ToggleFullscreenCommand}" Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,0,0">
+                                <materialDesign:PackIcon Kind="{Binding FullscreenIcon}" Width="26" Height="26" />
+                            </Button>
+                        </Grid>
+                    </Grid>
+                </Grid>
+            </Grid>
+        </fl:FlyleafHost>
+    </Grid>
+</UserControl>

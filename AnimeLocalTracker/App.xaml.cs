@@ -24,12 +24,14 @@ public partial class App : Application
     {
         // 1. Registramos las Vistas (Ventanas)
         services.AddTransient<MainWindow>();
+        services.AddTransient<ReproductorView>();
 
         // 2. Aquí registraremos los ViewModels
         services.AddTransient<MainViewModel>();
         services.AddTransient<GaleriaViewModel>();
         services.AddTransient<DetalleViewModel>();
         services.AddTransient<CalendarioViewModel>();
+        services.AddTransient<ReproductorViewModel>();
 
         // 3. Aquí registraremos los Servicios
         services.AddSingleton<IDialogService, DialogService>();
@@ -81,7 +83,12 @@ public partial class App : Application
         // Pedimos la instancia del servicio de base de datos
         var dbService = ServiceProvider.GetRequiredService<IDatabaseService>();
         
-        // Inicializar reproductor de video nativo (Removido)
+        // Inicializar reproductor de video nativo (Flyleaf)
+        FlyleafLib.Engine.Start(new FlyleafLib.EngineConfig()
+        {
+            FFmpegPath = ":FFmpeg", // Usa las DLLs del paquete NuGet Flyleaf.FFmpeg
+            UIRefresh = true
+        });
         
         // Obligamos a que se cree el archivo y la tabla antes de continuar
         await dbService.InicializarBaseDatosAsync();

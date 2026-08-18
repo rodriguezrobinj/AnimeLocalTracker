@@ -175,33 +175,17 @@ public partial class DetalleViewModel : ObservableObject, IRecipient<UsuarioLoge
 
         try
         {
-            string[] potPlayerPaths = {
-                @"C:\Program Files\DAUM\PotPlayer\PotPlayer64.exe",
-                @"C:\Program Files\DAUM\PotPlayer\PotPlayerMini64.exe",
-                @"C:\Program Files (x86)\DAUM\PotPlayer\PotPlayer.exe",
-                @"C:\Program Files (x86)\DAUM\PotPlayer\PotPlayerMini.exe"
-            };
-
-            string? potPlayerExe = potPlayerPaths.FirstOrDefault(System.IO.File.Exists);
-
-            if (!string.IsNullOrEmpty(potPlayerExe))
-            {
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo 
-                { 
-                    FileName = potPlayerExe, 
-                    Arguments = $"\"{episodio.RutaCompleta}\"", 
-                    UseShellExecute = false 
-                });
-            }
-            else
-            {
-                // Fallback al reproductor por defecto del sistema si no se encuentra PotPlayer
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = episodio.RutaCompleta, UseShellExecute = true });
-            }
+            // Enviamos un mensaje a la aplicación principal para que abra nuestra nueva ventana de reproductor
+            WeakReferenceMessenger.Default.Send(new NavegarMensaje_Reproductor(
+                episodio.RutaCompleta,
+                AnimeSeleccionado.AniListId,
+                AnimeSeleccionado.Titulo,
+                episodio.NumeroEpisodio
+            ));
         }
         catch (System.Exception ex)
         {
-            await _dialogService.MostrarDialogoAsync("Error", $"Error al intentar reproducir: {ex.Message}", false, "AlertCircleOutline", "#E53935");
+            await _dialogService.MostrarDialogoAsync("Error", $"Error al intentar iniciar el reproductor: {ex.Message}", false, "AlertCircleOutline", "#E53935");
         }
     }
     

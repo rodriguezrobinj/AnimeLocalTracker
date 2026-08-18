@@ -10,7 +10,8 @@
       "args": [],
       "cwd": "${workspaceFolder}/AnimeLocalTracker",
       "stopAtEntry": false,
-      "console": "internalConsole"
+      "console": "internalConsole",
+      "justMyCode": true
     }
   ]
 }
