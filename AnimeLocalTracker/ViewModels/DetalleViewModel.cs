@@ -13,7 +13,7 @@ using AnimeLocalTracker.Messages;
 
 namespace AnimeLocalTracker.ViewModels;
 
-public partial class DetalleViewModel : ObservableObject, IRecipient<UsuarioLogeadoMensaje>, IRecipient<UsuarioDesconectadoMensaje>
+public partial class DetalleViewModel : ObservableObject, IRecipient<UsuarioLogeadoMensaje>, IRecipient<UsuarioDesconectadoMensaje>, IRecipient<EpisodioActualizadoMensaje>
 {
     private readonly IAnimeTrackingService _animeTrackingService;
     private readonly IDatabaseService _databaseService;
@@ -63,11 +63,28 @@ public partial class DetalleViewModel : ObservableObject, IRecipient<UsuarioLoge
         
         WeakReferenceMessenger.Default.Register<UsuarioLogeadoMensaje>(this);
         WeakReferenceMessenger.Default.Register<UsuarioDesconectadoMensaje>(this);
+        WeakReferenceMessenger.Default.Register<EpisodioActualizadoMensaje>(this);
         EstaConectado = _authService.EstaAutenticado();
     }
 
     public void Receive(UsuarioLogeadoMensaje message) => EstaConectado = true;
     public void Receive(UsuarioDesconectadoMensaje message) => EstaConectado = false;
+
+    public void Receive(EpisodioActualizadoMensaje message)
+    {
+        if (AnimeSeleccionado == null || AnimeSeleccionado.AniListId != message.AnimeId) return;
+
+        var episodio = _todosLosEpisodios.FirstOrDefault(e => e.NumeroEpisodio == message.NumeroEpisodio);
+        if (episodio != null)
+        {
+            // Ejecutar en el hilo principal de la UI
+            System.Windows.Application.Current.Dispatcher.Invoke(() =>
+            {
+                episodio.Visto = message.VistoLocal;
+                AplicarFiltrosYOrdenamiento();
+            });
+        }
+    }
 
     public async Task InicializarAsync(AnimeItem anime)
     {

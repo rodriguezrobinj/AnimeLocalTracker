@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using AnimeLocalTracker.Services;
@@ -44,12 +45,16 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
     private int _animeId;
     private int _episodio;
+    private string _rutaVideo = string.Empty;
     private bool _fueMarcadoComoVisto = false;
+    
+    private readonly AnimeLocalTracker.Services.IAuthService _authService;
 
-    public ReproductorViewModel(IDatabaseService databaseService, IAnimeTrackingService animeTrackingService)
+    public ReproductorViewModel(IDatabaseService databaseService, IAnimeTrackingService animeTrackingService, AnimeLocalTracker.Services.IAuthService authService)
     {
         _databaseService = databaseService;
         _animeTrackingService = animeTrackingService;
+        _authService = authService;
         
         Player = new Player();
     }
@@ -167,6 +172,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
     public void CargarVideo(string rutaVideo, int animeId, string tituloAnime, int episodio)
     {
+        _rutaVideo = rutaVideo;
         _animeId = animeId;
         _episodio = episodio;
         TituloAnime = tituloAnime;
@@ -219,7 +225,49 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                 if (porcentaje >= 0.90 && !_fueMarcadoComoVisto)
                 {
                     _fueMarcadoComoVisto = true;
-                    // TODO: Actualizar AniList y SQLite
+                    
+                    try 
+                    {
+                        // 1. Guardar localmente
+                        var registros = await _databaseService.ObtenerRegistrosPorAnimeAsync(_animeId);
+                        var registro = registros.FirstOrDefault(r => r.NumeroEpisodio == _episodio);
+                        
+                        if (registro != null)
+                        {
+                            registro.VistoLocal = true;
+                        }
+                        else
+                        {
+                            registro = new Models.RegistroEpisodio 
+                            {
+                                AniListId = _animeId,
+                                NumeroEpisodio = _episodio,
+                                RutaArchivo = _rutaVideo,
+                                VistoLocal = true
+                            };
+                        }
+                        await _databaseService.GuardarRegistroEpisodioAsync(registro);
+
+                        // 2. Guardar en AniList
+                        var token = _authService.ObtenerTokenGuardado();
+                        if (!string.IsNullOrEmpty(token))
+                        {
+                            await _animeTrackingService.ActualizarProgresoAsync(_animeId, _episodio, token);
+                        }
+
+                        // 3. Notificación flotante sutil (Toast)
+                        _ = WeakReferenceMessenger.Default.Send(new Messages.MostrarDialogoRequestMessage(
+                            "Auto-Tracking", 
+                            $"Episodio {_episodio} marcado como visto.", 
+                            false, "CheckCircle", "#4CAF50"));
+                            
+                        // 4. Avisar a la vista de detalles para que actualice la lista automáticamente
+                        WeakReferenceMessenger.Default.Send(new Messages.EpisodioActualizadoMensaje(_animeId, _episodio, true));
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Error en auto-tracking: {ex.Message}");
+                    }
                 }
                 
                 // Botón Skip Intro (Mostrar entre 0:30 y 3:00)
