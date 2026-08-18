@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Net;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -21,9 +22,34 @@ public class AuthService : IAuthService
     // Ruta donde guardaremos el token para que no inicies sesión cada vez que abras la app
     private readonly string _rutaToken = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AnimeLocalTracker", "anilist_token.txt");
 
-    public bool EstaAutenticado() => File.Exists(_rutaToken);
+    public bool EstaAutenticado() => File.Exists(_rutaToken) && ObtenerTokenGuardado() != string.Empty;
     
-    public string ObtenerTokenGuardado() => File.Exists(_rutaToken) ? File.ReadAllText(_rutaToken) : string.Empty;
+    public string ObtenerTokenGuardado()
+    {
+        if (!File.Exists(_rutaToken)) return string.Empty;
+        
+        try
+        {
+            byte[] ciphertext = File.ReadAllBytes(_rutaToken);
+            byte[] plaintext = ProtectedData.Unprotect(ciphertext, null, DataProtectionScope.CurrentUser);
+            return Encoding.UTF8.GetString(plaintext);
+        }
+        catch
+        {
+            // Podría ser un token viejo en texto plano, intentamos leerlo.
+            string plain = File.ReadAllText(_rutaToken);
+            if (!string.IsNullOrWhiteSpace(plain) && plain.Length > 20)
+            {
+                // Es un token viejo, vamos a cifrarlo para el futuro
+                byte[] plaintext = Encoding.UTF8.GetBytes(plain);
+                byte[] ciphertext = ProtectedData.Protect(plaintext, null, DataProtectionScope.CurrentUser);
+                File.WriteAllBytes(_rutaToken, ciphertext);
+                return plain;
+            }
+        }
+        
+        return string.Empty;
+    }
 
     public async Task<bool> IniciarSesionAsync()
     {
@@ -93,7 +119,9 @@ public class AuthService : IAuthService
             
             if (!string.IsNullOrEmpty(tokenCapturado))
             {
-                File.WriteAllText(_rutaToken, tokenCapturado); // Guardamos la llave en el disco duro
+                byte[] plaintext = Encoding.UTF8.GetBytes(tokenCapturado);
+                byte[] ciphertext = ProtectedData.Protect(plaintext, null, DataProtectionScope.CurrentUser);
+                File.WriteAllBytes(_rutaToken, ciphertext); // Guardamos la llave cifrada de forma segura
                 
                 // NOTIFICAMOS A TODA LA APP QUE ALGUIEN SE LOGEÓ
                 WeakReferenceMessenger.Default.Send(new UsuarioLogeadoMensaje());
@@ -116,11 +144,11 @@ public class AuthService : IAuthService
         if (!string.IsNullOrEmpty(Token))
             return Token;
 
-        // 2. Si no está en memoria, buscamos en el disco duro (sesión guardada)
-        if (System.IO.File.Exists(ArchivoToken))
+        // 2. Si no está en memoria, buscamos en el disco duro cifrado (sesión guardada)
+        if (System.IO.File.Exists(_rutaToken))
         {
-            Token = System.IO.File.ReadAllText(ArchivoToken);
-            return Token;
+            Token = ObtenerTokenGuardado();
+            if (!string.IsNullOrEmpty(Token)) return Token;
         }
 
         // 3. Si no existe, el usuario no está conectado
