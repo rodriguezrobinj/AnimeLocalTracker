@@ -5,6 +5,7 @@ using System.Windows;
 using AnimeLocalTracker.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using FlyleafLib;
 using FlyleafLib.MediaPlayer;
 using CommunityToolkit.Mvvm.Messaging;
 using AnimeLocalTracker.Messages;
@@ -15,6 +16,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 {
     private readonly IDatabaseService _databaseService;
     private readonly IAnimeTrackingService _animeTrackingService;
+    private readonly AnimeLocalTracker.Services.IAuthService _authService;
 
     [ObservableProperty]
     private Player _player;
@@ -34,13 +36,28 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string _tiempoActualTexto = "00:00";
     [ObservableProperty] private string _tiempoTotalTexto = "00:00";
     [ObservableProperty] private string _tiempoCombinadoTexto = "00:00 / 00:00";
-    [ObservableProperty] private string _playPauseIcon = "Pause"; // O "Play"
+    [ObservableProperty] private string _playPauseIcon = "Pause";
     [ObservableProperty] private bool _isDraggingSlider = false;
+    
     private string _fullscreenIcon = "Fullscreen";
     public string FullscreenIcon
     {
         get => _fullscreenIcon;
         set => SetProperty(ref _fullscreenIcon, value);
+    }
+    
+    private string _subtitulosIcon = "Subtitles";
+    public string SubtitulosIcon
+    {
+        get => _subtitulosIcon;
+        set => SetProperty(ref _subtitulosIcon, value);
+    }
+    
+    private bool _subtitulosHabilitados = true;
+    public bool SubtitulosHabilitados
+    {
+        get => _subtitulosHabilitados;
+        set => SetProperty(ref _subtitulosHabilitados, value);
     }
 
     private int _animeId;
@@ -48,7 +65,9 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     private string _rutaVideo = string.Empty;
     private bool _fueMarcadoComoVisto = false;
     
-    private readonly AnimeLocalTracker.Services.IAuthService _authService;
+    // Cache para evitar recalcular duración en cada tick
+    private double _lastNotifiedSeconds = -1;
+    private bool _durationCached = false;
 
     public ReproductorViewModel(IDatabaseService databaseService, IAnimeTrackingService animeTrackingService, AnimeLocalTracker.Services.IAuthService authService)
     {
@@ -56,7 +75,20 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         _animeTrackingService = animeTrackingService;
         _authService = authService;
         
-        Player = new Player();
+        // No crear Player aquí — se crea en CargarVideo() con config optimizada
+    }
+
+    private Player CreateOptimizedPlayer()
+    {
+        var config = new Config();
+        
+        // Seeking rápido por keyframe (no frame-accurate)
+        config.Player.SeekAccurate = false;
+        
+        // Subtítulos habilitados por defecto
+        config.Subtitles.Enabled = SubtitulosHabilitados;
+        
+        return new Player(config);
     }
 
     [RelayCommand]
@@ -94,23 +126,21 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         Player.CurTime = newTime;
     }
 
-    // Comando para cuando el usuario suelta el slider (Thumb.DragCompleted)
+    // Comando para cuando el usuario suelta el slider (Thumb.DragCompleted) o click directo
     [RelayCommand]
     private void Seek(double seconds)
     {
         if (Player != null)
         {
             Player.CurTime = TimeSpan.FromSeconds(seconds).Ticks;
-            var curSeconds = TimeSpan.FromTicks(Player.CurTime).TotalSeconds;
             
-            if (!IsDraggingSlider)
-            {
-                CurrentSeconds = curSeconds;
-                
-                var t = TimeSpan.FromSeconds(curSeconds);
-                TiempoActualTexto = t.ToString(t.Hours > 0 ? @"hh\:mm\:ss" : @"mm\:ss");
-                TiempoCombinadoTexto = $"{TiempoActualTexto} / {TiempoTotalTexto}";
-            }
+            // Actualizar UI inmediatamente para feedback instantáneo
+            var curSeconds = TimeSpan.FromTicks(Player.CurTime).TotalSeconds;
+            CurrentSeconds = curSeconds;
+            
+            var t = TimeSpan.FromSeconds(curSeconds);
+            TiempoActualTexto = t.ToString(t.Hours > 0 ? @"hh\:mm\:ss" : @"mm\:ss");
+            TiempoCombinadoTexto = $"{TiempoActualTexto} / {TiempoTotalTexto}";
         }
     }
 
@@ -122,7 +152,6 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         if (Player != null)
         {
             try {
-                // Flyleaf v3 uses Player.Audio.Volume, handled safely
                 Player.Audio.Volume = value;
             } catch { }
         }
@@ -170,6 +199,27 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         }
     }
 
+    [RelayCommand]
+    private void SelectSubtitleStream(object stream)
+    {
+        if (Player == null || stream == null) return;
+        
+        SubtitulosHabilitados = true;
+        Player.Config.Subtitles.Enabled = true;
+        Player.OpenAsync((dynamic)stream);
+        SubtitulosIcon = "Subtitles";
+    }
+
+    [RelayCommand]
+    private void TurnOffSubtitles()
+    {
+        if (Player == null) return;
+        
+        SubtitulosHabilitados = false;
+        Player.Config.Subtitles.Enabled = false;
+        SubtitulosIcon = "SubtitlesOutline";
+    }
+
     public void CargarVideo(string rutaVideo, int animeId, string tituloAnime, int episodio)
     {
         _rutaVideo = rutaVideo;
@@ -177,6 +227,9 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         _episodio = episodio;
         TituloAnime = tituloAnime;
         TituloEpisodio = $"Episodio {episodio}";
+        _fueMarcadoComoVisto = false;
+        _durationCached = false;
+        _lastNotifiedSeconds = -1;
 
         // Sincronizar ícono de fullscreen con el estado actual de la ventana
         if (System.Windows.Application.Current.MainWindow is AnimeLocalTracker.Views.MainWindow mainWindow)
@@ -184,8 +237,14 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             FullscreenIcon = mainWindow.IsFullScreen ? "FullscreenExit" : "Fullscreen";
         }
 
-        if (Player == null)
-            Player = new Player();
+        // Dispose del player anterior si existe
+        if (Player != null)
+        {
+            try { Player.Dispose(); } catch { }
+        }
+
+        // Crear player con configuración optimizada para seeking rápido
+        Player = CreateOptimizedPlayer();
 
         Player.OpenAsync(rutaVideo);
         Player.Play();
@@ -204,22 +263,32 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                 
                 if (!IsDraggingSlider)
                 {
-                    CurrentSeconds = curSeconds;
-                    TotalSeconds = durSeconds;
-                    
-                    TimeSpan tCur = TimeSpan.FromSeconds(curSeconds);
-                    TimeSpan tDur = TimeSpan.FromSeconds(durSeconds);
-                    string textCur = tCur.ToString(tCur.Hours > 0 ? "h\\:mm\\:ss" : "m\\:ss");
-                    string textDur = tDur.ToString(tDur.Hours > 0 ? "h\\:mm\\:ss" : "m\\:ss");
-                    
-                    TiempoActualTexto = textCur;
-                    TiempoTotalTexto = textDur;
-                    TiempoCombinadoTexto = $"{textCur} / {textDur}";
+                    // Solo notificar si el cambio es significativo (> 0.3s)
+                    // para evitar property-changed spam innecesario
+                    if (Math.Abs(curSeconds - _lastNotifiedSeconds) >= 0.3)
+                    {
+                        CurrentSeconds = curSeconds;
+                        _lastNotifiedSeconds = curSeconds;
+                        
+                        TimeSpan tCur = TimeSpan.FromSeconds(curSeconds);
+                        TiempoActualTexto = tCur.ToString(tCur.Hours > 0 ? @"hh\:mm\:ss" : @"mm\:ss");
+                        
+                        // Cachear la duración (no cambia durante la reproducción)
+                        if (!_durationCached && durSeconds > 0)
+                        {
+                            TotalSeconds = durSeconds;
+                            TimeSpan tDur = TimeSpan.FromSeconds(durSeconds);
+                            TiempoTotalTexto = tDur.ToString(tDur.Hours > 0 ? @"hh\:mm\:ss" : @"mm\:ss");
+                            _durationCached = true;
+                        }
+                        
+                        TiempoCombinadoTexto = $"{TiempoActualTexto} / {TiempoTotalTexto}";
+                    }
                 }
 
                 if (PlayPauseIcon != "Pause") PlayPauseIcon = "Pause";
 
-                double porcentaje = curSeconds / durSeconds;
+                double porcentaje = durSeconds > 0 ? curSeconds / durSeconds : 0;
 
                 // Auto-Tracking al 90%
                 if (porcentaje >= 0.90 && !_fueMarcadoComoVisto)
@@ -285,7 +354,8 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                 // Auto-Play siguiente episodio si existe
             }
 
-            await Task.Delay(1000);
+            // 250ms para UI más responsive (antes era 1000ms)
+            await Task.Delay(250);
         }
     }
 
@@ -300,15 +370,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         // No pasarse de la duración total
         if (nuevoTiempo > Player.Duration) nuevoTiempo = Player.Duration;
         
-        // Flyleaf Player.Seek() o Player.CurTime (set) no está claro si CurTime tiene setter, pero usualmente usan Seek o se setea
-        // Vamos a probar asignar CurTime o Seek
-        // Según documentación de Flyleaf, usualmente se puede setear CurTime o hacer Seek.
-        // Voy a intentar asignar CurTime, pero la API a veces solo tiene Get.
-        // Wait, 'Player' no contiene SeekToTime. 
-        // Si no tiene, tal vez es:
-        // Player.CurTime = nuevoTiempo; (ya veremos si funciona)
         Player.CurTime = nuevoTiempo;
-        
         MostrarSkipIntro = false;
     }
 
@@ -338,11 +400,15 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     {
         if (Player != null)
         {
-            if (Player.Status == Status.Playing)
+            try
             {
-                Player.Pause();
+                if (Player.Status == Status.Playing)
+                {
+                    Player.Pause();
+                }
+                Player.Dispose();
             }
-            Player.Dispose();
+            catch { }
             Player = null!;
         }
     }

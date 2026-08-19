@@ -4,9 +4,11 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:fl="clr-namespace:FlyleafLib.Controls.WPF;assembly=FlyleafLib"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
-        xmlns:local="clr-namespace:AnimeLocalTracker.Views"
+        xmlns:primitives="clr-namespace:System.Windows.Controls.Primitives;assembly=PresentationFramework"
         TextElement.Foreground="{DynamicResource MaterialDesignBody}"
-        Background="Black">
+        Background="Black"
+        Focusable="True"
+        PreviewKeyDown="ReproductorView_PreviewKeyDown">
 
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
@@ -15,8 +17,32 @@
     <Grid>
         <!-- Reproductor NATIVO Flyleaf -->
         <fl:FlyleafHost Player="{Binding Player}">
-            <!-- Controles Overlays -->
-            <Grid x:Name="OverlayControls" Background="Transparent" DataContext="{x:Null}">
+            <Grid>
+                <!-- Subtítulos optimizados: 2 TextBlocks en vez de 9 -->
+                <Viewbox VerticalAlignment="Bottom" Margin="40,40,40,25" StretchDirection="DownOnly" MaxHeight="150" IsHitTestVisible="False">
+                    <Grid MaxWidth="1200">
+                        <Grid.Effect>
+                            <DropShadowEffect Color="Black" BlurRadius="8" ShadowDepth="0" Opacity="0.9"/>
+                        </Grid.Effect>
+                        
+                        <!-- Stroke negro (una sola capa con outline grueso simulado por shadow) -->
+                        <TextBlock Text="{Binding Player.Subtitles.SubsText}" 
+                                   Foreground="Black" FontSize="44" FontFamily="Trebuchet MS, Arial" 
+                                   FontWeight="Bold" TextWrapping="Wrap" TextAlignment="Center">
+                            <TextBlock.Effect>
+                                <BlurEffect Radius="2.5" KernelType="Gaussian"/>
+                            </TextBlock.Effect>
+                        </TextBlock>
+                        
+                        <!-- Texto interior blanco -->
+                        <TextBlock Text="{Binding Player.Subtitles.SubsText}" 
+                                   Foreground="White" FontSize="44" FontFamily="Trebuchet MS, Arial" 
+                                   FontWeight="Bold" TextWrapping="Wrap" TextAlignment="Center" />
+                    </Grid>
+                </Viewbox>
+
+                <!-- Controles Overlays -->
+                <Grid x:Name="OverlayControls" Background="Transparent" DataContext="{x:Null}">
                 
                 <!-- Gradiente Superior -->
                 <Grid VerticalAlignment="Top" Height="120">
@@ -101,8 +127,11 @@
                             
                             <!-- Slider transparente encima -->
                             <Slider Minimum="0" Maximum="{Binding TotalSeconds}" Value="{Binding CurrentSeconds, Mode=TwoWay}"
-                                    IsMoveToPointEnabled="True" PreviewMouseDown="Slider_PreviewMouseDown" Foreground="White" Focusable="False"
-                                    PreviewMouseUp="Slider_PreviewMouseUp" Opacity="0.01" Height="20" VerticalAlignment="Center" />
+                                    IsMoveToPointEnabled="True" Foreground="White" Focusable="False"
+                                    primitives:Thumb.DragStarted="Slider_DragStarted"
+                                    primitives:Thumb.DragCompleted="Slider_DragCompleted"
+                                    PreviewMouseLeftButtonUp="Slider_PreviewMouseLeftButtonUp"
+                                    Opacity="0.01" Height="20" VerticalAlignment="Center" />
                         </Grid>
 
                         <!-- Controles -->
@@ -114,6 +143,7 @@
                                 <ColumnDefinition Width="*"/>    <!-- Espacio -->
                                 <ColumnDefinition Width="Auto"/> <!-- Retroceder -->
                                 <ColumnDefinition Width="Auto"/> <!-- Adelantar -->
+                                <ColumnDefinition Width="Auto"/> <!-- Subtítulos -->
                                 <ColumnDefinition Width="Auto"/> <!-- Fullscreen -->
                             </Grid.ColumnDefinitions>
 
@@ -176,15 +206,83 @@
                                     Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,10,0">
                                 <materialDesign:PackIcon Kind="FastForward10" Width="26" Height="26" />
                             </Button>
+                            <!-- Subtítulos (Menú Manual) -->
+                            <ToggleButton x:Name="SubtitlesToggle" Grid.Column="6"
+                                    Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,5,0">
+                                <materialDesign:PackIcon Kind="{Binding SubtitulosIcon}" Width="26" Height="26" />
+                            </ToggleButton>
+                            
+                            <Popup x:Name="SubtitlesPopup" IsOpen="{Binding IsChecked, Source={x:Reference SubtitlesToggle}, Mode=TwoWay}" StaysOpen="False" 
+                                   PlacementTarget="{Binding Source={x:Reference SubtitlesToggle}}" Placement="Top" 
+                                   VerticalOffset="-35" HorizontalOffset="10" PopupAnimation="Fade" AllowsTransparency="True">
+                                <Border Background="#F2141414" BorderThickness="0" CornerRadius="8" Padding="10" MinWidth="200">
+                                    <Border.Effect>
+                                        <DropShadowEffect Color="Black" BlurRadius="15" ShadowDepth="5" Opacity="0.5"/>
+                                    </Border.Effect>
+                                    
+                                    <Border.Resources>
+                                        <!-- Estilo premium para los botones del menú -->
+                                        <Style TargetType="Button" x:Key="MenuItemButton">
+                                            <Setter Property="Background" Value="Transparent"/>
+                                            <Setter Property="Foreground" Value="#E5E5E5"/>
+                                            <Setter Property="BorderThickness" Value="0"/>
+                                            <Setter Property="Padding" Value="15,10"/>
+                                            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+                                            <Setter Property="FontSize" Value="14"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                            <Setter Property="Cursor" Value="Hand"/>
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="Button">
+                                                        <Border Background="{TemplateBinding Background}" CornerRadius="4">
+                                                            <ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"/>
+                                                        </Border>
+                                                        <ControlTemplate.Triggers>
+                                                            <Trigger Property="IsMouseOver" Value="True">
+                                                                <Setter Property="Background" Value="#33FFFFFF"/>
+                                                                <Setter Property="Foreground" Value="White"/>
+                                                            </Trigger>
+                                                        </ControlTemplate.Triggers>
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                        </Style>
+                                    </Border.Resources>
+
+                                    <StackPanel>
+                                        <TextBlock Text="Subtítulos" Foreground="Gray" FontSize="12" FontWeight="Bold" Margin="15,0,0,10" />
+                                        
+                                        <!-- Apagar -->
+                                        <Button Content="Apagar" Command="{Binding TurnOffSubtitlesCommand}" Style="{StaticResource MenuItemButton}"/>
+                                        
+                                        <!-- Lista de streams disponibles -->
+                                        <ItemsControl ItemsSource="{Binding Player.Subtitles.Streams}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Button Command="{Binding DataContext.SelectSubtitleStreamCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" 
+                                                            CommandParameter="{Binding}" Style="{StaticResource MenuItemButton}">
+                                                        <TextBlock>
+                                                            <Run Text="{Binding Language, Mode=OneWay}" /> 
+                                                            <Run Text="—" Foreground="#888888"/> 
+                                                            <Run Text="{Binding Title, Mode=OneWay}" Foreground="#AAAAAA"/>
+                                                        </TextBlock>
+                                                    </Button>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </Border>
+                            </Popup>
                             
                             <!-- Fullscreen con ícono dinámico -->
-                            <Button Grid.Column="6" Command="{Binding ToggleFullscreenCommand}" Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,0,0">
+                            <Button Grid.Column="7" Command="{Binding ToggleFullscreenCommand}" Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,0,0">
                                 <materialDesign:PackIcon Kind="{Binding FullscreenIcon}" Width="26" Height="26" />
                             </Button>
                         </Grid>
                     </Grid>
                 </Grid>
             </Grid>
-        </fl:FlyleafHost>
-    </Grid>
+        </Grid>
+    </fl:FlyleafHost>
+</Grid>
 </UserControl>

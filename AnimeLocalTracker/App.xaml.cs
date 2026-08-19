@@ -18,6 +18,19 @@ public partial class App : Application
         var services = new ServiceCollection();
         ConfigureServices(services);
         ServiceProvider = services.BuildServiceProvider();
+        AppDomain.CurrentDomain.UnhandledException += (s, args) =>
+        {
+            var ex = args.ExceptionObject as Exception;
+            MessageBox.Show($"Error crítico en hilo secundario:\n{ex?.Message}\n{ex?.StackTrace}", 
+                            "Error fatal", MessageBoxButton.OK, MessageBoxImage.Error);
+        };
+
+        this.DispatcherUnhandledException += (s, args) =>
+        {
+            MessageBox.Show($"Error crítico en hilo UI:\n{args.Exception.Message}\n{args.Exception.StackTrace}", 
+                            "Error fatal UI", MessageBoxButton.OK, MessageBoxImage.Error);
+            args.Handled = true;
+        };
     }
 
     private void ConfigureServices(IServiceCollection services)
@@ -72,13 +85,6 @@ public partial class App : Application
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
-        
-        // Manejo Global de Errores
-        this.DispatcherUnhandledException += (s, args) => 
-        {
-            args.Handled = true; // Evita que se cierre la app
-            MessageBox.Show("Ha ocurrido un error inesperado.\n\nDetalles técnicos:\n" + args.Exception.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-        };
         
         // Pedimos la instancia del servicio de base de datos
         var dbService = ServiceProvider.GetRequiredService<IDatabaseService>();
