@@ -60,7 +60,17 @@
 
         <!-- Header -->
         <Grid Grid.Row="0" Margin="0,0,0,20">
-            <TextBlock Text="Calendario de Emisión" Style="{StaticResource MaterialDesignHeadline4TextBlock}" FontWeight="Bold" VerticalAlignment="Center"/>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="Calendario de Emisión" Style="{StaticResource MaterialDesignHeadline4TextBlock}" FontWeight="Bold" VerticalAlignment="Center"/>
+                
+                <!-- BADGE CONTEO EN EMISIÓN -->
+                <Border Background="#1E293B" BorderBrush="#334155" BorderThickness="1" 
+                        CornerRadius="12" Height="24" MinWidth="26" Padding="7,0" Margin="14,0,0,0" 
+                        VerticalAlignment="Center">
+                    <TextBlock Text="{Binding TotalAnimesEnEmision}" FontSize="12" FontWeight="Bold" Foreground="#60A5FA" 
+                               VerticalAlignment="Center" HorizontalAlignment="Center" TextAlignment="Center"/>
+                </Border>
+            </StackPanel>
             <Button Command="{Binding CargarCalendarioCommand}" HorizontalAlignment="Right" Style="{StaticResource MaterialDesignOutlinedButton}">
                 <StackPanel Orientation="Horizontal">
                     <materialDesign:PackIcon Kind="Refresh" Margin="0,0,5,0" VerticalAlignment="Center"/>

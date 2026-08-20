@@ -72,6 +72,10 @@ public class AniListMedia
     [JsonPropertyName("genres")]
     public List<string> Genres { get; set; } = new();
     
+    // NUEVO: Lista de títulos sinónimos/alternativos
+    [JsonPropertyName("synonyms")]
+    public List<string> Synonyms { get; set; } = new();
+
     // NUEVO: Total de episodios que tiene el anime
     [JsonPropertyName("episodes")]
     public int? Episodes { get; set; }
@@ -130,6 +134,15 @@ public class AniListTitle
 {
     [JsonPropertyName("romaji")]
     public string Romaji { get; set; } = string.Empty;
+
+    [JsonPropertyName("english")]
+    public string? English { get; set; }
+
+    [JsonPropertyName("native")]
+    public string? Native { get; set; }
+
+    [JsonPropertyName("userPreferred")]
+    public string? UserPreferred { get; set; }
 }
 
 public class AniListCoverImage

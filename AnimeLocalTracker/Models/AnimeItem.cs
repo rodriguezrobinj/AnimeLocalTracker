@@ -10,6 +10,9 @@ public partial class AnimeItem : ObservableObject
     
     [ObservableProperty]
     private string _titulo = string.Empty;
+
+    [ObservableProperty]
+    private string _nombresAlternativos = string.Empty;
     
     [ObservableProperty]
     private string _rutaCarpeta = string.Empty;
@@ -25,6 +28,9 @@ public partial class AnimeItem : ObservableObject
     private string _generos = string.Empty;
     
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ProgresoPorcentaje))]
+    [NotifyPropertyChangedFor(nameof(NuevosEpisodios))]
+    [NotifyPropertyChangedFor(nameof(TieneNuevosEpisodios))]
     private int _totalEpisodios;
     
     [ObservableProperty]
@@ -45,12 +51,12 @@ public partial class AnimeItem : ObservableObject
     [property: Ignore]
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ProgresoPorcentaje))]
+    [NotifyPropertyChangedFor(nameof(NuevosEpisodios))]
+    [NotifyPropertyChangedFor(nameof(TieneNuevosEpisodios))]
     private int _episodiosVistos;
 
-    [property: Ignore]
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(TieneNuevosEpisodios))]
-    private int _nuevosEpisodios;
+    [Ignore]
+    public int NuevosEpisodios => TotalEpisodios > EpisodiosVistos ? (TotalEpisodios - EpisodiosVistos) : 0;
 
     [Ignore]
     public double ProgresoPorcentaje => TotalEpisodios > 0 ? (EpisodiosVistos / (double)TotalEpisodios) * 100 : 0;

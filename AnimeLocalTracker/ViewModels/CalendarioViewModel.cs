@@ -15,6 +15,7 @@ public partial class CalendarioViewModel : ObservableObject
     private readonly IAnimeTrackingService _animeTrackingService;
 
     [ObservableProperty] private bool _estaCargando;
+    [ObservableProperty] private int _totalAnimesEnEmision;
 
     public ObservableCollection<AiringEpisode> Lunes { get; } = new();
     public ObservableCollection<AiringEpisode> Martes { get; } = new();
@@ -39,6 +40,8 @@ public partial class CalendarioViewModel : ObservableObject
         LimpiarListas();
 
         var animes = await _databaseService.ObtenerTodosLosAnimesAsync();
+        TotalAnimesEnEmision = animes.Count(a => a.Estado.Equals("RELEASING", StringComparison.OrdinalIgnoreCase));
+        
         var dicPortadas = animes.ToDictionary(a => a.AniListId, a => a.PortadaVisible);
         var ids = animes.Select(a => a.AniListId).ToList();
 
@@ -58,6 +61,12 @@ public partial class CalendarioViewModel : ObservableObject
         long timestampFin = ((DateTimeOffset)finSemana).ToUnixTimeSeconds();
 
         var schedule = await _animeTrackingService.ObtenerCalendarioEmisionAsync(ids, timestampInicio, timestampFin);
+
+        int animesConEmisionSemanal = schedule.Select(e => e.AniListId).Distinct().Count();
+        if (animesConEmisionSemanal > TotalAnimesEnEmision)
+        {
+            TotalAnimesEnEmision = animesConEmisionSemanal;
+        }
 
         foreach (var eps in schedule.OrderBy(e => e.FechaEmision))
         {

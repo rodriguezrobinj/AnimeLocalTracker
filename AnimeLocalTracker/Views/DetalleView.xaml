@@ -143,13 +143,13 @@
                             <!-- Filtro y Orden -->
                             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                                 <ComboBox ItemsSource="{Binding OpcionesFiltro}" SelectedItem="{Binding FiltroEpisodios}" 
-                                          Width="110" materialDesign:TextFieldAssist.HasClearButton="False" 
+                                          Width="130" materialDesign:TextFieldAssist.HasClearButton="False" 
                                           Foreground="{DynamicResource MaterialDesignBody}"
                                           Style="{StaticResource MaterialDesignOutlinedComboBox}" Padding="10,6" Margin="0,0,10,0"/>
                                           
                                 <ToggleButton IsChecked="{Binding OrdenAscendente}" Style="{StaticResource MaterialDesignActionToggleButton}"
-                                              Content="{materialDesign:PackIcon Kind=SortAscending, Size=20}"
-                                              materialDesign:ToggleButtonAssist.OnContent="{materialDesign:PackIcon Kind=SortDescending, Size=20}"
+                                              Content="{materialDesign:PackIcon Kind=SortDescending, Size=20}"
+                                              materialDesign:ToggleButtonAssist.OnContent="{materialDesign:PackIcon Kind=SortAscending, Size=20}"
                                               ToolTip="Cambiar orden" Width="36" Height="36" Background="#2A2A2A" BorderThickness="0" Foreground="White" />
                             </StackPanel>
                             
@@ -208,52 +208,121 @@
 
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <Border Padding="10,8">
+                                <Border Padding="12,10" Background="Transparent">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
+                                            <!-- Columna 0: Punto azul no visto -->
                                             <ColumnDefinition Width="Auto"/>
+                                            <!-- Columna 1: Título y subtítulo -->
                                             <ColumnDefinition Width="*"/>
+                                            <!-- Columna 2: Tamaño de archivo -->
                                             <ColumnDefinition Width="Auto"/>
+                                            <!-- Columna 3: Acción (Descargar / Progreso Circular / Reproducir) -->
+                                            <ColumnDefinition Width="Auto"/>
+                                            <!-- Columna 4: Estrella Favorito -->
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
 
-                                        <Button Grid.Column="0" 
-                                                Command="{Binding DataContext.ReproducirEpisodioCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                CommandParameter="{Binding}"
-                                                Style="{StaticResource MaterialDesignIconButton}" Width="35" Height="35" Margin="0,0,15,0"
-                                                ToolTip="Reproducir Episodio">
-                                            <materialDesign:PackIcon x:Name="IconoEstado" Kind="CloudDownload" Foreground="Gray" VerticalAlignment="Center" Width="20" Height="20"/>
-                                        </Button>
+                                        <!-- PUNTO AZUL (No Visto) -->
+                                        <Ellipse Grid.Column="0" x:Name="PuntoNoVisto" Width="7" Height="7" 
+                                                 Fill="#448AFF" VerticalAlignment="Center" Margin="0,0,12,0"
+                                                 Visibility="{Binding Visto, Converter={StaticResource InverseBoolToVis}}"/>
 
-                                        <TextBlock Grid.Column="1" x:Name="TextoTitulo" Text="{Binding TituloVisual}" 
-                                                   Foreground="{DynamicResource MaterialDesignBody}" VerticalAlignment="Center" FontSize="15" FontWeight="Medium"/>
+                                        <!-- TÍTULO Y SUBTÍTULO -->
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock x:Name="TextoTitulo" Text="{Binding TituloVisual}" 
+                                                       Foreground="White" FontSize="15" FontWeight="SemiBold"/>
+                                        </StackPanel>
 
-                                        <Button Grid.Column="2"
+                                        <!-- TAMAÑO DE ARCHIVO (Cuando está descargado) -->
+                                        <TextBlock Grid.Column="2" Text="{Binding TamanoArchivoFormateado}" 
+                                                   Foreground="#90CAF9" FontSize="13" FontWeight="Medium" 
+                                                   VerticalAlignment="Center" Margin="0,0,15,0"
+                                                   Visibility="{Binding Descargado, Converter={StaticResource BoolToVis}}"/>
+
+                                        <!-- BOTÓN / INDICADOR DE ACCIÓN -->
+                                        <Grid Grid.Column="3" Width="36" Height="36" VerticalAlignment="Center" Margin="0,0,5,0">
+                                            <!-- 1. ESTADO: DESCARGADO (Checkmark circular para reproducir) -->
+                                            <Button Command="{Binding DataContext.ReproducirEpisodioCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}"
+                                                    Style="{StaticResource MaterialDesignIconButton}" Width="36" Height="36"
+                                                    ToolTip="Reproducir episodio"
+                                                    Visibility="{Binding Descargado, Converter={StaticResource BoolToVis}}">
+                                                <materialDesign:PackIcon Kind="CheckCircle" Foreground="#82B1FF" Width="26" Height="26" VerticalAlignment="Center"/>
+                                            </Button>
+
+                                            <!-- 2. ESTADO: DESCARGANDO O EN ESPERA -->
+                                            <Grid Width="36" Height="36" VerticalAlignment="Center" HorizontalAlignment="Center"
+                                                  ToolTip="Descargando"
+                                                  Visibility="{Binding IsDownloading, Converter={StaticResource BoolToVis}}">
+                                                
+                                                <!-- Lienzo / Pista circular de fondo (Track) para visualizar el total -->
+                                                <Ellipse Width="26" Height="26" Stroke="#33FFFFFF" StrokeThickness="3" 
+                                                         VerticalAlignment="Center" HorizontalAlignment="Center"/>
+
+                                                <!-- Animación de espera / en cola (Progreso 0%) -->
+                                                <ProgressBar Width="26" Height="26" Foreground="#82B1FF"
+                                                             Style="{StaticResource MaterialDesignCircularProgressBar}"
+                                                             IsIndeterminate="True"
+                                                             ToolTip="Descargando"
+                                                             Visibility="{Binding EstaEnEspera, Converter={StaticResource BoolToVis}}"
+                                                             VerticalAlignment="Center" HorizontalAlignment="Center"/>
+
+                                                <!-- Progreso activo circular determinado (> 0%) -->
+                                                <ProgressBar Value="{Binding DownloadProgress}" Minimum="0" Maximum="100" 
+                                                             Style="{StaticResource MaterialDesignCircularProgressBar}"
+                                                             Width="26" Height="26" Foreground="#82B1FF"
+                                                             IsIndeterminate="False"
+                                                             ToolTip="Descargando"
+                                                             Visibility="{Binding ProgresoDescargaActivo, Converter={StaticResource BoolToVis}}"
+                                                             VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                            </Grid>
+
+                                            <!-- 3. ESTADO: NO DESCARGADO (Icono circular flecha abajo para descargar) -->
+                                            <Button Command="{Binding DataContext.DescargarEpisodioCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}"
+                                                    Width="36" Height="36"
+                                                    ToolTip="Descargar episodio">
+                                                <Button.Style>
+                                                    <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Descargado}" Value="True">
+                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding IsDownloading}" Value="True">
+                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
+                                                <materialDesign:PackIcon Kind="DownloadCircleOutline" Foreground="#82B1FF" Width="26" Height="26" VerticalAlignment="Center"/>
+                                            </Button>
+                                        </Grid>
+
+                                        <!-- BOTÓN FAVORITO -->
+                                        <Button Grid.Column="4"
                                                 Command="{Binding DataContext.AlternarFavoritoEpisodioCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                 CommandParameter="{Binding}"
-                                                Style="{StaticResource MaterialDesignIconButton}" Width="35" Height="35" Margin="0,0,5,0"
+                                                Style="{StaticResource MaterialDesignIconButton}" Width="34" Height="34" Margin="0,0,2,0"
                                                 ToolTip="Marcar como favorito">
-                                            <materialDesign:PackIcon x:Name="IconoEstrella" Kind="StarOutline" Foreground="Gray" VerticalAlignment="Center" Width="20" Height="20"/>
+                                            <materialDesign:PackIcon x:Name="IconoEstrella" Kind="StarOutline" Foreground="#555555" VerticalAlignment="Center" Width="18" Height="18"/>
                                         </Button>
-
-                                        <materialDesign:PackIcon Grid.Column="3" x:Name="IconoVisto" Kind="CheckBold" Margin="5,0,5,0" 
-                                                                 Foreground="#4CAF50" VerticalAlignment="Center" Width="22" Height="22"
-                                                                 Visibility="{Binding Visto, Converter={StaticResource BoolToVis}}" />
                                     </Grid>
                                 </Border>
                                 
                                 <DataTemplate.Triggers>
-                                    <DataTrigger Binding="{Binding Descargado}" Value="True">
-                                        <Setter TargetName="IconoEstado" Property="Kind" Value="Play" />
-                                        <Setter TargetName="IconoEstado" Property="Foreground" Value="{DynamicResource MaterialDesignBody}" />
-                                        <Setter TargetName="IconoEstado" Property="Width" Value="24" />
-                                        <Setter TargetName="IconoEstado" Property="Height" Value="24" />
-                                    </DataTrigger>
+                                    <!-- ESTADO VISTO: TÍTULO ATENUADO -->
                                     <DataTrigger Binding="{Binding Visto}" Value="True">
-                                        <Setter TargetName="TextoTitulo" Property="Foreground" Value="#4CAF50" />
-                                        <Setter TargetName="TextoTitulo" Property="Opacity" Value="0.7" />
-                                        <Setter TargetName="TextoTitulo" Property="FontWeight" Value="SemiBold" />
+                                        <Setter TargetName="TextoTitulo" Property="Foreground" Value="#757D8A" />
+                                        <Setter TargetName="TextoTitulo" Property="Opacity" Value="0.6" />
+                                        <Setter TargetName="TextoTitulo" Property="FontWeight" Value="Normal" />
                                     </DataTrigger>
+                                    <!-- ESTADO DESCARGANDO -->
+                                    <DataTrigger Binding="{Binding IsDownloading}" Value="True">
+                                        <Setter TargetName="TextoTitulo" Property="Opacity" Value="0.75" />
+                                    </DataTrigger>
+                                    <!-- FAVORITO -->
                                     <DataTrigger Binding="{Binding Favorito}" Value="True">
                                         <Setter TargetName="IconoEstrella" Property="Kind" Value="Star" />
                                         <Setter TargetName="IconoEstrella" Property="Foreground" Value="#FFC107" />
@@ -274,9 +343,9 @@
                                 </Style.Triggers>
                             </Style>
                         </StackPanel.Style>
-                        <materialDesign:PackIcon Kind="Ghost" Width="56" Height="56" Foreground="#44FFFFFF" HorizontalAlignment="Center" Margin="0,0,0,15"/>
-                        <TextBlock Text="No hay episodios para mostrar" Foreground="#66FFFFFF" FontSize="18" HorizontalAlignment="Center" FontWeight="SemiBold"/>
-                        <TextBlock Text="El filtro actual no encontró coincidencias." Foreground="#44FFFFFF" FontSize="14" HorizontalAlignment="Center" Margin="0,5,0,0"/>
+                        <materialDesign:PackIcon Kind="ClockAlertOutline" Width="56" Height="56" Foreground="#44FFFFFF" HorizontalAlignment="Center" Margin="0,0,0,15"/>
+                        <TextBlock Text="{Binding MensajeSinEpisodios}" Foreground="#AAFFFFFF" FontSize="18" HorizontalAlignment="Center" FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding SubtituloSinEpisodios}" Foreground="#66FFFFFF" FontSize="14" HorizontalAlignment="Center" Margin="0,5,0,0"/>
                     </StackPanel>
                 </Grid>
             </Grid>

@@ -19,7 +19,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     private readonly AnimeLocalTracker.Services.IAuthService _authService;
 
     [ObservableProperty]
-    private Player _player;
+    private Player _player = null!;
 
     [ObservableProperty]
     private string _tituloAnime = string.Empty;

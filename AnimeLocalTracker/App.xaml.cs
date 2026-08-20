@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using System.Windows;
 using AnimeLocalTracker.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,18 +19,39 @@ public partial class App : Application
         var services = new ServiceCollection();
         ConfigureServices(services);
         ServiceProvider = services.BuildServiceProvider();
-        AppDomain.CurrentDomain.UnhandledException += (s, args) =>
-        {
-            var ex = args.ExceptionObject as Exception;
-            MessageBox.Show($"Error crítico en hilo secundario:\n{ex?.Message}\n{ex?.StackTrace}", 
-                            "Error fatal", MessageBoxButton.OK, MessageBoxImage.Error);
-        };
-
+        
+        // === MANEJADORES GLOBALES DE EXCEPCIONES ===
+        
+        // 1. Excepciones no manejadas en el hilo de UI (Dispatcher)
         this.DispatcherUnhandledException += (s, args) =>
         {
-            MessageBox.Show($"Error crítico en hilo UI:\n{args.Exception.Message}\n{args.Exception.StackTrace}", 
-                            "Error fatal UI", MessageBoxButton.OK, MessageBoxImage.Error);
-            args.Handled = true;
+            try {
+                string logPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "crash_log.txt");
+                System.IO.File.WriteAllText(logPath, $"[{DateTime.Now}] UI Thread Exception:\n{args.Exception}");
+            } catch {}
+            
+            MessageBox.Show($"Error en la aplicación:\n{args.Exception.Message}", 
+                            "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+            args.Handled = true; // Prevenir cierre de la app
+        };
+        
+        // 2. Excepciones no manejadas en hilos secundarios (fatal, no se puede prevenir el cierre)
+        AppDomain.CurrentDomain.UnhandledException += (s, args) =>
+        {
+            try {
+                string logPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "crash_log_domain.txt");
+                System.IO.File.WriteAllText(logPath, $"[{DateTime.Now}] Domain Exception:\n{args.ExceptionObject}");
+            } catch {}
+        };
+        
+        // 3. Excepciones de Tasks async no observadas (esta es la causa más probable del crash silencioso)
+        TaskScheduler.UnobservedTaskException += (s, args) =>
+        {
+            try {
+                string logPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "crash_log_task.txt");
+                System.IO.File.WriteAllText(logPath, $"[{DateTime.Now}] Unobserved Task Exception:\n{args.Exception}");
+            } catch {}
+            args.SetObserved(); // Marcar como observada para prevenir cierre
         };
     }
 
@@ -38,6 +60,7 @@ public partial class App : Application
         // 1. Registramos las Vistas (Ventanas)
         services.AddTransient<MainWindow>();
         services.AddTransient<ReproductorView>();
+        services.AddTransient<DescargasView>();
 
         // 2. Aquí registraremos los ViewModels
         services.AddTransient<MainViewModel>();
@@ -45,11 +68,14 @@ public partial class App : Application
         services.AddTransient<DetalleViewModel>();
         services.AddTransient<CalendarioViewModel>();
         services.AddTransient<ReproductorViewModel>();
+        services.AddTransient<DescargasViewModel>();
 
         // 3. Aquí registraremos los Servicios
         services.AddSingleton<IDialogService, DialogService>();
         services.AddSingleton<IAuthService, AuthService>();
         services.AddTransient<IFileScannerService, FileScannerService>();
+        services.AddHttpClient();
+        services.AddSingleton<IDownloadService, DownloadService>();
         
         // IHttpClientFactory nativo con Polly para Rate Limiting
         services.AddHttpClient<IAnimeTrackingService, AniListTrackingService>()
@@ -85,7 +111,7 @@ public partial class App : Application
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
-        
+
         // Pedimos la instancia del servicio de base de datos
         var dbService = ServiceProvider.GetRequiredService<IDatabaseService>();
         

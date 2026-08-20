@@ -20,7 +20,8 @@ public class AniListTrackingService(HttpClient httpClient) : IAnimeTrackingServi
             query ($id: Int) {
                 Media(id: $id, type: ANIME) {
                     id
-                    title { romaji }
+                    title { romaji english native userPreferred }
+                    synonyms
                     coverImage { extraLarge }
                     description(asHtml: false) 
                     genres
@@ -56,7 +57,8 @@ public class AniListTrackingService(HttpClient httpClient) : IAnimeTrackingServi
                 Page(page: 1, perPage: 5) { 
                     media(search: $search, type: ANIME) {
                         id
-                        title { romaji }
+                        title { romaji english native userPreferred }
+                        synonyms
                         coverImage { extraLarge }
                         description(asHtml: false) 
                         genres
@@ -261,7 +263,8 @@ public class AniListTrackingService(HttpClient httpClient) : IAnimeTrackingServi
                 Page (page: 1, perPage: 8) {
                     media (search: $search, type: ANIME) {
                         id
-                        title { romaji }
+                        title { romaji english native userPreferred }
+                        synonyms
                         coverImage { extraLarge }
                         status
                         description

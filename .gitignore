@@ -3,6 +3,12 @@
 ##
 ## Get latest from `dotnet new gitignore`
 
+# Temporary binaries and scratch folders
+scratch/
+flyleaf_readme.md
+AnimeLocalTracker/FFmpeg/
+AnimeLocalTracker/Tools/
+
 # dotenv files
 .env
 
@@ -184,6 +190,7 @@ DocProject/Help/html
 
 # Click-Once directory
 publish/
+publish_output/
 
 # Publish Web Output
 *.[Pp]ublish.xml

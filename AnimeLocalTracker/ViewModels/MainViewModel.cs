@@ -15,18 +15,35 @@ public partial class MainViewModel : ObservableObject,
     IRecipient<NavegarMensaje_Galeria>,
     IRecipient<NavegarMensaje_Detalle>,
     IRecipient<NavegarMensaje_Calendario>,
+    IRecipient<NavegarMensaje_Descargas>,
     IRecipient<AbrirBuscadorMensaje>,
     IRecipient<MostrarDialogoRequestMessage>,
     IRecipient<NavegarMensaje_Reproductor>,
-    IRecipient<NavegarMensaje_VolverDelReproductor>
+    IRecipient<NavegarMensaje_VolverDelReproductor>,
+    IRecipient<DescargaProgresoMensaje>
 {
     private readonly IServiceProvider _serviceProvider;
     private readonly IAnimeTrackingService _animeTrackingService;
     private readonly IDatabaseService _databaseService;
+    private readonly IDownloadService _downloadService;
 
     // === NAVEGACIÓN (ViewModel-First) ===
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(EsGaleriaActiva))]
+    [NotifyPropertyChangedFor(nameof(EsCalendarioActivo))]
+    [NotifyPropertyChangedFor(nameof(EsDescargasActivas))]
     private ObservableObject _vistaActual = null!;
+
+    public bool EsGaleriaActiva => VistaActual is GaleriaViewModel || VistaActual is DetalleViewModel;
+    public bool EsCalendarioActivo => VistaActual is CalendarioViewModel;
+    public bool EsDescargasActivas => VistaActual is DescargasViewModel;
+
+    // === BADGE DE DESCARGAS ===
+    [ObservableProperty]
+    private int _conteoDescargasActivas;
+
+    [ObservableProperty]
+    private bool _tieneDescargasActivas;
 
     // === DIÁLOGOS CUSTOM ===
     [ObservableProperty] private bool _dialogoVisible;
@@ -64,16 +81,37 @@ public partial class MainViewModel : ObservableObject,
         }
     }
 
-    public MainViewModel(IServiceProvider serviceProvider, IAnimeTrackingService animeTrackingService, IDatabaseService databaseService)
+    public MainViewModel(
+        IServiceProvider serviceProvider, 
+        IAnimeTrackingService animeTrackingService, 
+        IDatabaseService databaseService,
+        IDownloadService downloadService)
     {
         _serviceProvider = serviceProvider;
         _animeTrackingService = animeTrackingService;
         _databaseService = databaseService;
+        _downloadService = downloadService;
 
         WeakReferenceMessenger.Default.RegisterAll(this);
 
         // Cargamos la vista inicial
         VistaActual = _serviceProvider.GetRequiredService<GaleriaViewModel>();
+        ActualizarConteoDescargas();
+    }
+
+    public void Receive(DescargaProgresoMensaje message)
+    {
+        ActualizarConteoDescargas();
+    }
+
+    private void ActualizarConteoDescargas()
+    {
+        System.Windows.Application.Current?.Dispatcher.InvokeAsync(() =>
+        {
+            var activas = _downloadService.ObtenerDescargasActivas();
+            ConteoDescargasActivas = System.Linq.Enumerable.Count(activas, d => d.IsDownloading);
+            TieneDescargasActivas = ConteoDescargasActivas > 0;
+        });
     }
 
     // ==========================================
@@ -94,6 +132,11 @@ public partial class MainViewModel : ObservableObject,
     public void Receive(NavegarMensaje_Calendario message)
     {
         VistaActual = _serviceProvider.GetRequiredService<CalendarioViewModel>();
+    }
+
+    public void Receive(NavegarMensaje_Descargas message)
+    {
+        VistaActual = _serviceProvider.GetRequiredService<DescargasViewModel>();
     }
 
     public void Receive(NavegarMensaje_Reproductor message)
@@ -132,6 +175,12 @@ public partial class MainViewModel : ObservableObject,
     private void NavegarCalendario()
     {
         VistaActual = _serviceProvider.GetRequiredService<CalendarioViewModel>();
+    }
+
+    [RelayCommand]
+    private void NavegarDescargas()
+    {
+        VistaActual = _serviceProvider.GetRequiredService<DescargasViewModel>();
     }
 
     public void Receive(AbrirBuscadorMensaje message)
@@ -272,14 +321,39 @@ public partial class MainViewModel : ObservableObject,
             System.IO.Directory.CreateDirectory(nuevaRutaCarpeta);
         }
 
-        int episodiosEmitidos = animeAPI.NextAiringEpisode != null 
-            ? animeAPI.NextAiringEpisode.Episode - 1 
-            : (animeAPI.Episodes ?? 12);
+        int episodiosEmitidos = 0;
+        string estadoAnime = animeAPI.Status?.ToUpperInvariant() ?? "UNKNOWN";
+
+        if (estadoAnime == "NOT_YET_RELEASED")
+        {
+            episodiosEmitidos = 0;
+        }
+        else if (estadoAnime == "RELEASING")
+        {
+            if (animeAPI.NextAiringEpisode != null)
+            {
+                episodiosEmitidos = Math.Max(0, animeAPI.NextAiringEpisode.Episode - 1);
+            }
+            else
+            {
+                episodiosEmitidos = animeAPI.Episodes ?? 0;
+            }
+        }
+        else // FINISHED, etc.
+        {
+            episodiosEmitidos = animeAPI.Episodes ?? 0;
+        }
             
+        var titulosAlt = new System.Collections.Generic.List<string>();
+        if (!string.IsNullOrWhiteSpace(animeAPI.Title.English)) titulosAlt.Add(animeAPI.Title.English);
+        if (!string.IsNullOrWhiteSpace(animeAPI.Title.UserPreferred) && animeAPI.Title.UserPreferred != animeAPI.Title.Romaji) titulosAlt.Add(animeAPI.Title.UserPreferred);
+        if (animeAPI.Synonyms != null) titulosAlt.AddRange(System.Linq.Enumerable.Where(animeAPI.Synonyms, s => !string.IsNullOrWhiteSpace(s)));
+
         var nuevoAnimeLocal = new AnimeItem
         {
             AniListId = animeAPI.Id,
             Titulo = animeAPI.Title.Romaji,
+            NombresAlternativos = string.Join(" | ", System.Linq.Enumerable.Distinct(titulosAlt)),
             UrlPortada = animeAPI.CoverImage?.ExtraLarge ?? animeAPI.CoverImage?.Large ?? "",
             RutaCarpeta = nuevaRutaCarpeta,
             Estado = animeAPI.Status ?? "UNKNOWN",

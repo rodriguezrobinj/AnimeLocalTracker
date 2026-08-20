@@ -13,7 +13,11 @@ using AnimeLocalTracker.Messages;
 
 namespace AnimeLocalTracker.ViewModels;
 
-public partial class GaleriaViewModel : ObservableObject, IRecipient<UsuarioLogeadoMensaje>, IRecipient<AnimeAñadidoMensaje>, IRecipient<UsuarioDesconectadoMensaje>
+public partial class GaleriaViewModel : ObservableObject, 
+    IRecipient<UsuarioLogeadoMensaje>, 
+    IRecipient<AnimeAñadidoMensaje>, 
+    IRecipient<UsuarioDesconectadoMensaje>,
+    IRecipient<EpisodioActualizadoMensaje>
 {
     private readonly IAnimeTrackingService _animeTrackingService;
     private readonly IDatabaseService _databaseService;
@@ -24,9 +28,12 @@ public partial class GaleriaViewModel : ObservableObject, IRecipient<UsuarioLoge
 
     public bool SinResultados => BibliotecaLocales.Count > 0 && (BibliotecaFiltrada?.IsEmpty ?? false);
 
+    public int TotalAnimesBiblioteca => BibliotecaLocales.Count;
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(BibliotecaVacia))]
     [NotifyPropertyChangedFor(nameof(SinResultados))]
+    [NotifyPropertyChangedFor(nameof(TotalAnimesBiblioteca))]
     private ObservableCollection<AnimeItem> _bibliotecaLocales = [];
     
     public ICollectionView? BibliotecaFiltrada { get; private set; }
@@ -73,6 +80,7 @@ public partial class GaleriaViewModel : ObservableObject, IRecipient<UsuarioLoge
         WeakReferenceMessenger.Default.Register<UsuarioLogeadoMensaje>(this);
         WeakReferenceMessenger.Default.Register<AnimeAñadidoMensaje>(this);
         WeakReferenceMessenger.Default.Register<UsuarioDesconectadoMensaje>(this);
+        WeakReferenceMessenger.Default.Register<EpisodioActualizadoMensaje>(this);
         
         _ = CargarBibliotecaAsync();
     }
@@ -95,7 +103,21 @@ public partial class GaleriaViewModel : ObservableObject, IRecipient<UsuarioLoge
         {
             BibliotecaLocales.Add(message.NuevoAnime);
             OnPropertyChanged(nameof(BibliotecaVacia));
+            OnPropertyChanged(nameof(TotalAnimesBiblioteca));
             _ = DescargarPortadaSiNoExisteAsync(message.NuevoAnime);
+        }
+    }
+
+    public async void Receive(EpisodioActualizadoMensaje message)
+    {
+        var anime = BibliotecaLocales.FirstOrDefault(a => a.AniListId == message.AnimeId);
+        if (anime != null)
+        {
+            var registros = await _databaseService.ObtenerRegistrosPorAnimeAsync(anime.AniListId);
+            System.Windows.Application.Current?.Dispatcher?.Invoke(() =>
+            {
+                anime.EpisodiosVistos = registros.Count(r => r.VistoLocal);
+            });
         }
     }
     
@@ -108,7 +130,6 @@ public partial class GaleriaViewModel : ObservableObject, IRecipient<UsuarioLoge
         {
             var registros = await _databaseService.ObtenerRegistrosPorAnimeAsync(a.AniListId);
             a.EpisodiosVistos = registros.Count(r => r.VistoLocal);
-            a.NuevosEpisodios = registros.Count(r => !r.VistoLocal);
 
             if (string.IsNullOrEmpty(a.EstadoUsuario) || a.EstadoUsuario == "PLANNING")
             {

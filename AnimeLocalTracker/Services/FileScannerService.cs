@@ -16,6 +16,20 @@ public class FileScannerService : IFileScannerService
             var lista = new List<EpisodioItem>();
             if (!Directory.Exists(carpeta)) return lista;
 
+            // Limpiar archivos residuales incompletos de descargas interrumpidas
+            try
+            {
+                var residuales = Directory.EnumerateFiles(carpeta, "*.*", new EnumerationOptions { RecurseSubdirectories = true })
+                    .Where(f => f.EndsWith(".downloading", System.StringComparison.OrdinalIgnoreCase) || 
+                                f.EndsWith(".tmp", System.StringComparison.OrdinalIgnoreCase) || 
+                                f.EndsWith(".part", System.StringComparison.OrdinalIgnoreCase));
+                foreach (var res in residuales)
+                {
+                    try { File.Delete(res); } catch { }
+                }
+            }
+            catch { }
+
             // Buscamos archivos .mkv, .mp4, .avi de forma nativa en el sistema (10x más rápido)
             var extensiones = new[] { ".mkv", ".mp4", ".avi" };
             var archivos = Directory.EnumerateFiles(carpeta, "*.*", new EnumerationOptions { RecurseSubdirectories = true })
@@ -31,11 +45,13 @@ public class FileScannerService : IFileScannerService
                 
                 int numero = match.Success ? int.Parse(match.Groups[1].Value) : 0;
 
-                lista.Add(new EpisodioItem {
+                var item = new EpisodioItem {
                     TituloArchivo = nombre,
                     RutaCompleta = archivo,
                     NumeroEpisodio = numero
-                });
+                };
+                item.CalcularTamanoArchivo();
+                lista.Add(item);
             }
             return lista.OrderBy(x => x.NumeroEpisodio).ToList();
         });

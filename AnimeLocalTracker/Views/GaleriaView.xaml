@@ -55,7 +55,17 @@
 
         <!-- HEADER MODERNO CON ÍCONOS -->
         <Grid Grid.Row="0" Margin="0,0,0,20" Panel.ZIndex="10">
-            <TextBlock Text="Mi Colección" Style="{StaticResource MaterialDesignHeadline4TextBlock}" FontWeight="Bold" VerticalAlignment="Center"/>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="Mi Colección" Style="{StaticResource MaterialDesignHeadline4TextBlock}" FontWeight="Bold" VerticalAlignment="Center"/>
+                
+                <!-- BADGE CONTEO BIBLIOTECA -->
+                <Border Background="#1E293B" BorderBrush="#334155" BorderThickness="1" 
+                        CornerRadius="12" Height="24" MinWidth="26" Padding="7,0" Margin="14,0,0,0" 
+                        VerticalAlignment="Center">
+                    <TextBlock Text="{Binding TotalAnimesBiblioteca}" FontSize="12" FontWeight="Bold" Foreground="#60A5FA" 
+                               VerticalAlignment="Center" HorizontalAlignment="Center" TextAlignment="Center"/>
+                </Border>
+            </StackPanel>
             
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                 <Button Command="{Binding AñadirAnimeManualCommand}" 

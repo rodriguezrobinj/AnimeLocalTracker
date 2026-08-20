@@ -18,7 +18,49 @@ public partial class EpisodioItem : ObservableObject
     [ObservableProperty]
     private bool _favorito;
     
-    // NUEVO: Bandera para saber si el archivo existe en el disco duro
     [ObservableProperty]
     private bool _descargado;
+    
+    [ObservableProperty]
+    private string _tamanoArchivoFormateado = string.Empty;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(EstaEnEspera))]
+    [NotifyPropertyChangedFor(nameof(ProgresoDescargaActivo))]
+    private bool _isDownloading;
+    
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(EstaEnEspera))]
+    [NotifyPropertyChangedFor(nameof(ProgresoDescargaActivo))]
+    private double _downloadProgress;
+
+    public bool EstaEnEspera => IsDownloading && DownloadProgress <= 0.0;
+    public bool ProgresoDescargaActivo => IsDownloading && DownloadProgress > 0.0;
+
+    public void CalcularTamanoArchivo()
+    {
+        if (!string.IsNullOrEmpty(RutaCompleta) && System.IO.File.Exists(RutaCompleta))
+        {
+            try
+            {
+                var len = new System.IO.FileInfo(RutaCompleta).Length;
+                if (len >= 1024 * 1024 * 1024)
+                    TamanoArchivoFormateado = $"{len / (1024.0 * 1024.0 * 1024.0):F1} GB";
+                else if (len >= 1024 * 1024)
+                    TamanoArchivoFormateado = $"{len / (1024.0 * 1024.0):F0} MB";
+                else if (len >= 1024)
+                    TamanoArchivoFormateado = $"{len / 1024.0:F0} KB";
+                else
+                    TamanoArchivoFormateado = $"{len} B";
+            }
+            catch
+            {
+                TamanoArchivoFormateado = string.Empty;
+            }
+        }
+        else
+        {
+            TamanoArchivoFormateado = string.Empty;
+        }
+    }
 }

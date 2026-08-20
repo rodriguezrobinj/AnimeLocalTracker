@@ -13,13 +13,18 @@ using AnimeLocalTracker.Messages;
 
 namespace AnimeLocalTracker.ViewModels;
 
-public partial class DetalleViewModel : ObservableObject, IRecipient<UsuarioLogeadoMensaje>, IRecipient<UsuarioDesconectadoMensaje>, IRecipient<EpisodioActualizadoMensaje>
+public partial class DetalleViewModel : ObservableObject, 
+    IRecipient<UsuarioLogeadoMensaje>, 
+    IRecipient<UsuarioDesconectadoMensaje>, 
+    IRecipient<EpisodioActualizadoMensaje>,
+    IRecipient<DescargaProgresoMensaje>
 {
     private readonly IAnimeTrackingService _animeTrackingService;
     private readonly IDatabaseService _databaseService;
     private readonly IAuthService _authService;
     private readonly IFileScannerService _fileScannerService;
     private readonly IDialogService _dialogService;
+    private readonly IDownloadService _downloadService;
     
     [ObservableProperty]
     private AnimeItem? _animeSeleccionado;
@@ -29,12 +34,15 @@ public partial class DetalleViewModel : ObservableObject, IRecipient<UsuarioLoge
     public ObservableCollection<EpisodioItem> EpisodiosDelAnime { get; } = [];
 
     [ObservableProperty]
-    private bool _ordenAscendente = true;
+    private bool _ordenAscendente = false;
 
     [ObservableProperty]
     private string _filtroEpisodios = "Todos";
 
-    public string[] OpcionesFiltro { get; } = ["Todos", "Vistos", "No Vistos", "Favoritos"];
+    public string[] OpcionesFiltro { get; } = ["Todos", "Descargados", "Vistos", "No Vistos", "Favoritos"];
+
+    [ObservableProperty] private string _mensajeSinEpisodios = "No hay episodios para mostrar";
+    [ObservableProperty] private string _subtituloSinEpisodios = "El filtro actual no encontró coincidencias.";
 
     // === EDITOR DE SEGUIMIENTO ===
     [ObservableProperty] private bool _mostrandoEditorSeguimiento;
@@ -53,17 +61,20 @@ public partial class DetalleViewModel : ObservableObject, IRecipient<UsuarioLoge
         IDatabaseService databaseService, 
         IAuthService authService, 
         IFileScannerService fileScannerService,
-        IDialogService dialogService)
+        IDialogService dialogService,
+        IDownloadService downloadService)
     {
         _animeTrackingService = animeTrackingService;
         _databaseService = databaseService;
         _authService = authService;
         _fileScannerService = fileScannerService;
         _dialogService = dialogService;
+        _downloadService = downloadService;
         
         WeakReferenceMessenger.Default.Register<UsuarioLogeadoMensaje>(this);
         WeakReferenceMessenger.Default.Register<UsuarioDesconectadoMensaje>(this);
         WeakReferenceMessenger.Default.Register<EpisodioActualizadoMensaje>(this);
+        WeakReferenceMessenger.Default.Register<DescargaProgresoMensaje>(this);
         EstaConectado = _authService.EstaAutenticado();
     }
 
@@ -86,20 +97,56 @@ public partial class DetalleViewModel : ObservableObject, IRecipient<UsuarioLoge
         }
     }
 
+    public void Receive(DescargaProgresoMensaje message)
+    {
+        if (AnimeSeleccionado == null || AnimeSeleccionado.AniListId != message.AniListId) return;
+
+        System.Windows.Application.Current.Dispatcher.Invoke(() =>
+        {
+            var episodio = _todosLosEpisodios.FirstOrDefault(e => e.NumeroEpisodio == message.NumeroEpisodio);
+            if (episodio != null)
+            {
+                episodio.IsDownloading = message.IsDownloading;
+                episodio.DownloadProgress = message.Progreso;
+
+                if (message.IsCompleted)
+                {
+                    episodio.Descargado = true;
+                    episodio.RutaCompleta = message.RutaArchivo;
+                    episodio.CalcularTamanoArchivo();
+                    _dialogService.MostrarDialogoAsync("Descarga Completada", 
+                        $"El episodio {episodio.NumeroEpisodio} se ha descargado exitosamente.", 
+                        false, "CheckCircleOutline", "#4CAF50");
+                    AplicarFiltrosYOrdenamiento();
+                }
+                else if (!string.IsNullOrEmpty(message.Error))
+                {
+                    _dialogService.MostrarDialogoAsync("Error de descarga", 
+                        $"Error al descargar el episodio {episodio.NumeroEpisodio}:\n{message.Error}", 
+                        false, "AlertCircleOutline", "#E53935");
+                }
+            }
+        });
+    }
+
     public async Task InicializarAsync(AnimeItem anime)
     {
         AnimeSeleccionado = anime;
         EpisodiosDelAnime.Clear(); 
         _todosLosEpisodios.Clear();
         
-        OrdenAscendente = true;
+        OrdenAscendente = false;
         FiltroEpisodios = "Todos";
 
         var encontrados = await _fileScannerService.EscanearEpisodiosAsync(anime.RutaCarpeta);
         var registrosGuardados = await _databaseService.ObtenerRegistrosPorAnimeAsync(anime.AniListId);
 
-        int maxEpisodio = anime.TotalEpisodios > 0 ? anime.TotalEpisodios : 
-            (encontrados.Count > 0 ? encontrados.Max(e => e.NumeroEpisodio) : 12);
+        int maxEpisodio = anime.TotalEpisodios;
+        if (encontrados.Count > 0)
+        {
+            int maxLocal = encontrados.Max(e => e.NumeroEpisodio);
+            if (maxLocal > maxEpisodio) maxEpisodio = maxLocal;
+        }
 
         // USAMOS TASK.RUN PARA NO CONGELAR LA UI
         var episodiosGenerados = await Task.Run(() => 
@@ -110,13 +157,18 @@ public partial class DetalleViewModel : ObservableObject, IRecipient<UsuarioLoge
                 var archivoLocal = encontrados.FirstOrDefault(e => e.NumeroEpisodio == i);
                 var memoria = registrosGuardados.FirstOrDefault(r => r.NumeroEpisodio == i);
                 
+                bool estaDescargando = _downloadService.EstaDescargando(anime.AniListId, i, out double prog);
+
                 temp.Add(new EpisodioItem
                 {
                     NumeroEpisodio = i,
                     Descargado = archivoLocal != null,
                     RutaCompleta = archivoLocal?.RutaCompleta ?? string.Empty,
+                    TamanoArchivoFormateado = archivoLocal?.TamanoArchivoFormateado ?? string.Empty,
                     Visto = memoria != null && memoria.VistoLocal,
-                    Favorito = memoria != null && memoria.FavoritoLocal
+                    Favorito = memoria != null && memoria.FavoritoLocal,
+                    IsDownloading = estaDescargando,
+                    DownloadProgress = prog
                 });
             }
             return temp;
@@ -131,12 +183,29 @@ public partial class DetalleViewModel : ObservableObject, IRecipient<UsuarioLoge
 
     private void AplicarFiltrosYOrdenamiento()
     {
-        if (_todosLosEpisodios == null || _todosLosEpisodios.Count == 0) return;
+        if (_todosLosEpisodios == null || _todosLosEpisodios.Count == 0)
+        {
+            EpisodiosDelAnime.Clear();
+            if (AnimeSeleccionado != null && (AnimeSeleccionado.Estado == "NOT_YET_RELEASED" || AnimeSeleccionado.TotalEpisodios == 0))
+            {
+                MensajeSinEpisodios = "Anime aún no estrenado";
+                SubtituloSinEpisodios = "Este anime aún no cuenta con episodios emitidos.";
+            }
+            else
+            {
+                MensajeSinEpisodios = "No hay episodios para mostrar";
+                SubtituloSinEpisodios = "No se encontraron episodios para este anime.";
+            }
+            return;
+        }
 
         var query = _todosLosEpisodios.AsEnumerable();
 
         switch (FiltroEpisodios)
         {
+            case "Descargados":
+                query = query.Where(e => e.Descargado);
+                break;
             case "Vistos":
                 query = query.Where(e => e.Visto);
                 break;
@@ -152,6 +221,12 @@ public partial class DetalleViewModel : ObservableObject, IRecipient<UsuarioLoge
 
         EpisodiosDelAnime.Clear();
         foreach (var ep in query) EpisodiosDelAnime.Add(ep);
+
+        if (EpisodiosDelAnime.Count == 0)
+        {
+            MensajeSinEpisodios = "No hay episodios con este filtro";
+            SubtituloSinEpisodios = $"No se encontraron episodios en la categoría '{FiltroEpisodios}'.";
+        }
     }
 
     [RelayCommand]
@@ -281,25 +356,45 @@ public partial class DetalleViewModel : ObservableObject, IRecipient<UsuarioLoge
         var datosFrescos = await _animeTrackingService.ObtenerAnimePorIdAsync(AnimeSeleccionado.AniListId);
         if (datosFrescos != null)
         {
-            int episodiosEmitidos = datosFrescos.NextAiringEpisode != null 
-                ? datosFrescos.NextAiringEpisode.Episode - 1 
-                : (datosFrescos.Episodes ?? AnimeSeleccionado.TotalEpisodios);
-            
-            if (episodiosEmitidos == 0) episodiosEmitidos = 12;
-            
-            if (episodiosEmitidos > 0)
+            string estadoFresco = datosFrescos.Status?.ToUpperInvariant() ?? "UNKNOWN";
+            int episodiosEmitidos = 0;
+
+            if (estadoFresco == "NOT_YET_RELEASED")
             {
-                AnimeSeleccionado.TotalEpisodios = episodiosEmitidos;
-                AnimeSeleccionado.Estado = datosFrescos.Status ?? "UNKNOWN";
-                AnimeSeleccionado.Generos = datosFrescos.Genres != null ? string.Join(", ", datosFrescos.Genres) : "";
-                AnimeSeleccionado.UrlPortada = datosFrescos.CoverImage?.ExtraLarge ?? datosFrescos.CoverImage?.Large ?? AnimeSeleccionado.UrlPortada;
-                
-                await _databaseService.ActualizarAnimeAsync(AnimeSeleccionado);
-                
-                await InicializarAsync(AnimeSeleccionado);
-                
-                await _dialogService.MostrarDialogoAsync("Actualizado", $"Anime actualizado. Total de episodios emitidos hasta ahora: {episodiosEmitidos}", false, "CheckCircleOutline", "#4CAF50");
+                episodiosEmitidos = 0;
             }
+            else if (estadoFresco == "RELEASING")
+            {
+                if (datosFrescos.NextAiringEpisode != null)
+                {
+                    episodiosEmitidos = Math.Max(0, datosFrescos.NextAiringEpisode.Episode - 1);
+                }
+                else
+                {
+                    episodiosEmitidos = datosFrescos.Episodes ?? 0;
+                }
+            }
+            else
+            {
+                episodiosEmitidos = datosFrescos.Episodes ?? AnimeSeleccionado.TotalEpisodios;
+            }
+
+            var titulosAlt = new List<string>();
+            if (!string.IsNullOrWhiteSpace(datosFrescos.Title.English)) titulosAlt.Add(datosFrescos.Title.English);
+            if (!string.IsNullOrWhiteSpace(datosFrescos.Title.UserPreferred) && datosFrescos.Title.UserPreferred != datosFrescos.Title.Romaji) titulosAlt.Add(datosFrescos.Title.UserPreferred);
+            if (datosFrescos.Synonyms != null) titulosAlt.AddRange(datosFrescos.Synonyms.Where(s => !string.IsNullOrWhiteSpace(s)));
+            AnimeSeleccionado.NombresAlternativos = string.Join(" | ", titulosAlt.Distinct());
+
+            AnimeSeleccionado.TotalEpisodios = episodiosEmitidos;
+            AnimeSeleccionado.Estado = datosFrescos.Status ?? "UNKNOWN";
+            AnimeSeleccionado.Generos = datosFrescos.Genres != null ? string.Join(", ", datosFrescos.Genres) : "";
+            AnimeSeleccionado.UrlPortada = datosFrescos.CoverImage?.ExtraLarge ?? datosFrescos.CoverImage?.Large ?? AnimeSeleccionado.UrlPortada;
+            
+            await _databaseService.ActualizarAnimeAsync(AnimeSeleccionado);
+            
+            await InicializarAsync(AnimeSeleccionado);
+            
+            await _dialogService.MostrarDialogoAsync("Actualizado", $"Anime actualizado. Total de episodios emitidos: {episodiosEmitidos}", false, "CheckCircleOutline", "#4CAF50");
         }
         else
         {
@@ -391,4 +486,27 @@ public partial class DetalleViewModel : ObservableObject, IRecipient<UsuarioLoge
         "PLANNING" => "Planeando",
         _ => "Viendo"
     };
+
+    [RelayCommand]
+    private async Task DescargarEpisodioAsync(EpisodioItem episodio)
+    {
+        if (episodio == null || AnimeSeleccionado == null) return;
+        if (episodio.IsDownloading) return;
+
+        episodio.IsDownloading = true;
+        episodio.DownloadProgress = 0;
+
+        var titulosCandidatos = new List<string>();
+        if (!string.IsNullOrWhiteSpace(AnimeSeleccionado.NombresAlternativos))
+        {
+            titulosCandidatos.AddRange(AnimeSeleccionado.NombresAlternativos.Split([" | ", ";"], StringSplitOptions.RemoveEmptyEntries));
+        }
+
+        await _downloadService.IniciarDescargaEpisodioAsync(
+            AnimeSeleccionado.AniListId, 
+            AnimeSeleccionado.Titulo, 
+            AnimeSeleccionado.RutaCarpeta, 
+            episodio.NumeroEpisodio,
+            titulosCandidatos);
+    }
 }
