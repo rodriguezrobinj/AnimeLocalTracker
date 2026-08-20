@@ -48,7 +48,14 @@
                         <!-- ENCABEZADO DE GRUPO (AnimeAv1) -->
                         <TextBlock Text="AnimeAv1" FontSize="15" FontWeight="SemiBold" Foreground="#9E9E9E" Margin="10,0,0,15"/>
 
-                        <ItemsControl ItemsSource="{Binding ColaDescargas}">
+                        <ItemsControl ItemsSource="{Binding ColaDescargas}"
+                                      VirtualizingPanel.IsVirtualizing="True"
+                                      VirtualizingPanel.VirtualizationMode="Recycling">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <VirtualizingStackPanel/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <Border Background="#141923" CornerRadius="10" Padding="16,14" Margin="0,0,0,10" BorderBrush="#1F2937" BorderThickness="1">

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Net.Http;
 using System.Threading.Tasks;
 using System.ComponentModel;
 using System.Windows.Data;
@@ -23,6 +24,7 @@ public partial class GaleriaViewModel : ObservableObject,
     private readonly IDatabaseService _databaseService;
     private readonly IAuthService _authService;
     private readonly IDialogService _dialogService;
+    private readonly IHttpClientFactory _httpClientFactory;
     
     public bool BibliotecaVacia => BibliotecaLocales.Count == 0;
 
@@ -70,12 +72,13 @@ public partial class GaleriaViewModel : ObservableObject,
     // --- PROPIEDADES DE SELECCIÓN MÚLTIPLE ---
     [ObservableProperty] private bool _modoSeleccion;
 
-    public GaleriaViewModel(IAnimeTrackingService animeTrackingService, IDatabaseService databaseService, IAuthService authService, IDialogService dialogService)
+    public GaleriaViewModel(IAnimeTrackingService animeTrackingService, IDatabaseService databaseService, IAuthService authService, IDialogService dialogService, IHttpClientFactory httpClientFactory)
     {
         _animeTrackingService = animeTrackingService;
         _databaseService = databaseService;
         _authService = authService;
         _dialogService = dialogService;
+        _httpClientFactory = httpClientFactory;
         
         WeakReferenceMessenger.Default.Register<UsuarioLogeadoMensaje>(this);
         WeakReferenceMessenger.Default.Register<AnimeAñadidoMensaje>(this);
@@ -124,12 +127,21 @@ public partial class GaleriaViewModel : ObservableObject,
     private async Task CargarBibliotecaAsync()
     {
         var animes = await _databaseService.ObtenerTodosLosAnimesAsync();
+        var todosRegistros = await _databaseService.ObtenerTodosLosRegistrosAsync();
+        var registrosPorAnime = todosRegistros.GroupBy(r => r.AniListId)
+                                              .ToDictionary(g => g.Key, g => g.ToList());
         
         // MIGRACIÓN INTELIGENTE: Recuperar el estado basado en lo que realmente has visto localmente
         foreach (var a in animes)
         {
-            var registros = await _databaseService.ObtenerRegistrosPorAnimeAsync(a.AniListId);
-            a.EpisodiosVistos = registros.Count(r => r.VistoLocal);
+            if (registrosPorAnime.TryGetValue(a.AniListId, out var registros))
+            {
+                a.EpisodiosVistos = registros.Count(r => r.VistoLocal);
+            }
+            else
+            {
+                a.EpisodiosVistos = 0;
+            }
 
             if (string.IsNullOrEmpty(a.EstadoUsuario) || a.EstadoUsuario == "PLANNING")
             {
@@ -221,16 +233,19 @@ public partial class GaleriaViewModel : ObservableObject,
             try 
             {
                 System.IO.Directory.CreateDirectory(directory);
-                using var client = new System.Net.Http.HttpClient();
+                using var client = _httpClientFactory.CreateClient();
                 var bytes = await client.GetByteArrayAsync(anime.UrlPortada);
                 await System.IO.File.WriteAllBytesAsync(localPath, bytes);
                 
-                System.Windows.Application.Current.Dispatcher.Invoke(() => 
+                System.Windows.Application.Current?.Dispatcher?.Invoke(() => 
                 {
                     anime.NotificarPortadaActualizada();
                 });
             }
-            catch { /* Ignorar falla de red */ }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("GaleriaViewModel", $"No se pudo descargar la portada para AnimeId {anime.AniListId}: {ex.Message}");
+            }
         }
     }
 

@@ -25,32 +25,29 @@ public partial class App : Application
         // 1. Excepciones no manejadas en el hilo de UI (Dispatcher)
         this.DispatcherUnhandledException += (s, args) =>
         {
-            try {
-                string logPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "crash_log.txt");
-                System.IO.File.WriteAllText(logPath, $"[{DateTime.Now}] UI Thread Exception:\n{args.Exception}");
-            } catch {}
-            
+            AppLogger.Error("App", "UI Thread Exception", args.Exception);
             MessageBox.Show($"Error en la aplicación:\n{args.Exception.Message}", 
                             "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
-            args.Handled = true; // Prevenir cierre de la app
+            args.Handled = true; // Prevenir cierre inesperado
         };
         
-        // 2. Excepciones no manejadas en hilos secundarios (fatal, no se puede prevenir el cierre)
+        // 2. Excepciones no manejadas en hilos secundarios (fatal)
         AppDomain.CurrentDomain.UnhandledException += (s, args) =>
         {
-            try {
-                string logPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "crash_log_domain.txt");
-                System.IO.File.WriteAllText(logPath, $"[{DateTime.Now}] Domain Exception:\n{args.ExceptionObject}");
-            } catch {}
+            if (args.ExceptionObject is Exception ex)
+            {
+                AppLogger.Error("App", "Domain Unhandled Exception (Fatal)", ex);
+            }
+            else
+            {
+                AppLogger.Error("App", $"Domain Unhandled Exception: {args.ExceptionObject}");
+            }
         };
         
-        // 3. Excepciones de Tasks async no observadas (esta es la causa más probable del crash silencioso)
+        // 3. Excepciones de Tasks async no observadas
         TaskScheduler.UnobservedTaskException += (s, args) =>
         {
-            try {
-                string logPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "crash_log_task.txt");
-                System.IO.File.WriteAllText(logPath, $"[{DateTime.Now}] Unobserved Task Exception:\n{args.Exception}");
-            } catch {}
+            AppLogger.Error("App", "Unobserved Task Exception", args.Exception);
             args.SetObserved(); // Marcar como observada para prevenir cierre
         };
     }
@@ -62,13 +59,13 @@ public partial class App : Application
         services.AddTransient<ReproductorView>();
         services.AddTransient<DescargasView>();
 
-        // 2. Aquí registraremos los ViewModels
+        // 2. Registramos los ViewModels (Vistas principales como Singleton para preservar estado y no repetir queries al cambiar de pestaña)
         services.AddTransient<MainViewModel>();
-        services.AddTransient<GaleriaViewModel>();
+        services.AddSingleton<GaleriaViewModel>();
         services.AddTransient<DetalleViewModel>();
-        services.AddTransient<CalendarioViewModel>();
+        services.AddSingleton<CalendarioViewModel>();
         services.AddTransient<ReproductorViewModel>();
-        services.AddTransient<DescargasViewModel>();
+        services.AddSingleton<DescargasViewModel>();
 
         // 3. Aquí registraremos los Servicios
         services.AddSingleton<IDialogService, DialogService>();

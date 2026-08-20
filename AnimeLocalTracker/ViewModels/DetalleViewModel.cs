@@ -151,11 +151,16 @@ public partial class DetalleViewModel : ObservableObject,
         // USAMOS TASK.RUN PARA NO CONGELAR LA UI
         var episodiosGenerados = await Task.Run(() => 
         {
-            var temp = new List<EpisodioItem>();
+            var archivosPorEp = encontrados.GroupBy(e => e.NumeroEpisodio)
+                                           .ToDictionary(g => g.Key, g => g.First());
+            var registrosPorEp = registrosGuardados.GroupBy(r => r.NumeroEpisodio)
+                                                   .ToDictionary(g => g.Key, g => g.First());
+
+            var temp = new List<EpisodioItem>(maxEpisodio);
             for (int i = 1; i <= maxEpisodio; i++)
             {
-                var archivoLocal = encontrados.FirstOrDefault(e => e.NumeroEpisodio == i);
-                var memoria = registrosGuardados.FirstOrDefault(r => r.NumeroEpisodio == i);
+                archivosPorEp.TryGetValue(i, out var archivoLocal);
+                registrosPorEp.TryGetValue(i, out var memoria);
                 
                 bool estaDescargando = _downloadService.EstaDescargando(anime.AniListId, i, out double prog);
 

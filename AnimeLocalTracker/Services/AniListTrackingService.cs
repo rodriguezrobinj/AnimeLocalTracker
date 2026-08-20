@@ -1,4 +1,6 @@
 // 2. La Implementación (AniListService.cs)
+using System;
+using System.Collections.Generic;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
@@ -15,7 +17,6 @@ public class AniListTrackingService(HttpClient httpClient) : IAnimeTrackingServi
     {
         try
         {
-
             var query = @"
             query ($id: Int) {
                 Media(id: $id, type: ANIME) {
@@ -34,24 +35,27 @@ public class AniListTrackingService(HttpClient httpClient) : IAnimeTrackingServi
             var variables = new { id };
             var payload = new { query, variables };
             
-            var jsonContent = System.Text.Json.JsonSerializer.Serialize(payload);
-            var requestContent = new StringContent(jsonContent, System.Text.Encoding.UTF8, "application/json");
+            var jsonContent = JsonSerializer.Serialize(payload);
+            var requestContent = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
             var response = await _httpClient.PostAsync("https://graphql.anilist.co", requestContent);
             if (response.IsSuccessStatusCode)
             {
                 var content = await response.Content.ReadAsStringAsync();
-                var result = System.Text.Json.JsonSerializer.Deserialize<AniListResponse>(content);
-                return result?.Data?.Media; // Fíjate que devolvemos un solo objeto, no una lista
+                var result = JsonSerializer.Deserialize<AniListResponse>(content);
+                return result?.Data?.Media;
             }
             return null;
         }
-        catch { return null; }
+        catch (Exception ex)
+        {
+            AppLogger.Error("AniListTrackingService", $"Error al obtener anime por ID {id}", ex);
+            return null;
+        }
     }
 
     public async Task<List<AniListMedia>> BuscarAnimePorTituloAsync(string titulo)
     {
-        // Cambiamos perPage: 1 a perPage: 5
         var query = @"
             query ($search: String) {
                 Page(page: 1, perPage: 5) { 
@@ -79,12 +83,11 @@ public class AniListTrackingService(HttpClient httpClient) : IAnimeTrackingServi
             var jsonResponse = await response.Content.ReadAsStringAsync();
             var result = JsonSerializer.Deserialize<AniListResponse>(jsonResponse);
 
-            // Devolvemos la lista completa, o una lista vacía si viene nulo
             return result?.Data?.Page?.Media ?? []; 
         }
-        catch (HttpRequestException ex)
+        catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"Error de red: {ex.Message}");
+            AppLogger.Error("AniListTrackingService", $"Error al buscar anime por título '{titulo}'", ex);
             return [];
         }
     }
@@ -94,8 +97,6 @@ public class AniListTrackingService(HttpClient httpClient) : IAnimeTrackingServi
         try
         {
             var request = new HttpRequestMessage(HttpMethod.Post, "https://graphql.anilist.co");
-            
-            // LA CLAVE DE LA CIBERSEGURIDAD: Nos identificamos con el token interceptado
             request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
 
             var query = @"
@@ -109,16 +110,15 @@ public class AniListTrackingService(HttpClient httpClient) : IAnimeTrackingServi
             var variables = new { mediaId, progress = episodio };
             var payload = new { query, variables };
 
-            var jsonContent = System.Text.Json.JsonSerializer.Serialize(payload);
+            var jsonContent = JsonSerializer.Serialize(payload);
             request.Content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
             var response = await _httpClient.SendAsync(request);
-            
-            // Si el servidor responde con código 200 (OK), la nube fue actualizada
             return response.IsSuccessStatusCode; 
         }
-        catch
+        catch (Exception ex)
         {
+            AppLogger.Error("AniListTrackingService", $"Error al actualizar progreso para MediaId {mediaId}", ex);
             return false;
         }
     }
@@ -130,7 +130,6 @@ public class AniListTrackingService(HttpClient httpClient) : IAnimeTrackingServi
             var request = new HttpRequestMessage(HttpMethod.Post, "https://graphql.anilist.co");
             request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
 
-            // CORRECCIÓN: Le preguntamos al Anime por TU entrada específica (mediaListEntry)
             var query = @"
             query ($id: Int) {
                 Media(id: $id) {
@@ -146,26 +145,26 @@ public class AniListTrackingService(HttpClient httpClient) : IAnimeTrackingServi
             }";
 
             var payload = new { query, variables = new { id = mediaId } };
-            var jsonContent = System.Text.Json.JsonSerializer.Serialize(payload);
-            var requestContent = new StringContent(jsonContent, System.Text.Encoding.UTF8, "application/json");
-
-            request.Content = new StringContent(jsonContent, System.Text.Encoding.UTF8, "application/json");
+            var jsonContent = JsonSerializer.Serialize(payload);
+            request.Content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
             var response = await _httpClient.SendAsync(request);
             if (response.IsSuccessStatusCode)
             {
                 var content = await response.Content.ReadAsStringAsync();
-                var result = System.Text.Json.JsonSerializer.Deserialize<AniListResponse>(content);
-                
-                // Extraemos la información de la nueva ruta
+                var result = JsonSerializer.Deserialize<AniListResponse>(content);
                 return result?.Data?.Media?.MediaListEntry; 
             }
             return null;
         }
-        catch { return null; }
+        catch (Exception ex)
+        {
+            AppLogger.Error("AniListTrackingService", $"Error al obtener seguimiento de usuario para MediaId {mediaId}", ex);
+            return null;
+        }
     }
 
-    public async Task<bool> GuardarSeguimientoUsuarioAsync(int mediaId, string estado, int progreso, float puntaje, System.DateTime? fechaInicio, System.DateTime? fechaFin, string token)
+    public async Task<bool> GuardarSeguimientoUsuarioAsync(int mediaId, string estado, int progreso, float puntaje, DateTime? fechaInicio, DateTime? fechaFin, string token)
     {
         try
         {
@@ -193,28 +192,23 @@ public class AniListTrackingService(HttpClient httpClient) : IAnimeTrackingServi
             };
 
             var payload = new { query, variables };
-            var jsonContent = System.Text.Json.JsonSerializer.Serialize(payload);
-            var requestContent = new StringContent(jsonContent, System.Text.Encoding.UTF8, "application/json");
-
-            request.Content = new StringContent(jsonContent, System.Text.Encoding.UTF8, "application/json");
+            var jsonContent = JsonSerializer.Serialize(payload);
+            request.Content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
             var response = await _httpClient.SendAsync(request);
-            
-            // === EL ANTÍDOTO CONTRA EL FALSO POSITIVO ===
             var content = await response.Content.ReadAsStringAsync();
             
-            // Si GraphQL detecta un error de validación, incrusta un arreglo llamado "errors"
             if (content.Contains("\"errors\""))
             {
-                // Extraemos el mensaje crudo para que veas EXACTAMENTE qué regla rompiste
-                System.Windows.MessageBox.Show($"AniList rechazó los datos.\n\nRespuesta del servidor:\n{content}", "Fallo de Validación", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+                AppLogger.Warn("AniListTrackingService", $"AniList rechazó los datos para MediaId {mediaId}. Servidor: {content}");
                 return false;
             }
 
             return response.IsSuccessStatusCode;
         }
-        catch 
-        { 
+        catch (Exception ex)
+        {
+            AppLogger.Error("AniListTrackingService", $"Error al guardar seguimiento de usuario para MediaId {mediaId}", ex);
             return false; 
         }
     }
@@ -235,29 +229,29 @@ public class AniListTrackingService(HttpClient httpClient) : IAnimeTrackingServi
             }";
 
             var payload = new { query };
-            var jsonContent = System.Text.Json.JsonSerializer.Serialize(payload);
-            var requestContent = new StringContent(jsonContent, System.Text.Encoding.UTF8, "application/json");
-
-            request.Content = new StringContent(jsonContent, System.Text.Encoding.UTF8, "application/json");
+            var jsonContent = JsonSerializer.Serialize(payload);
+            request.Content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
             var response = await _httpClient.SendAsync(request);
             if (response.IsSuccessStatusCode)
             {
                 var content = await response.Content.ReadAsStringAsync();
-                var result = System.Text.Json.JsonSerializer.Deserialize<AniListResponse>(content);
+                var result = JsonSerializer.Deserialize<AniListResponse>(content);
                 return result?.Data?.Viewer;
             }
             return null;
         }
-        catch { return null; }
+        catch (Exception ex)
+        {
+            AppLogger.Error("AniListTrackingService", "Error al obtener perfil de usuario", ex);
+            return null;
+        }
     }
     
     public async Task<List<AniListMedia>> BuscarAnimesEnVivoAsync(string busqueda)
     {
         try
         {
-
-            // Petición GraphQL optimizada para el buscador
             var query = @"
             query ($search: String) {
                 Page (page: 1, perPage: 8) {
@@ -277,24 +271,28 @@ public class AniListTrackingService(HttpClient httpClient) : IAnimeTrackingServi
             }";
 
             var payload = new { query, variables = new { search = busqueda } };
-            var jsonContent = System.Text.Json.JsonSerializer.Serialize(payload);
-            var requestContent = new StringContent(jsonContent, System.Text.Encoding.UTF8, "application/json");
+            var jsonContent = JsonSerializer.Serialize(payload);
+            var requestContent = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
             var response = await _httpClient.PostAsync("https://graphql.anilist.co", requestContent);
             if (response.IsSuccessStatusCode)
             {
                 var content = await response.Content.ReadAsStringAsync();
-                var result = System.Text.Json.JsonSerializer.Deserialize<AniListResponse>(content);
+                var result = JsonSerializer.Deserialize<AniListResponse>(content);
                 return result?.Data?.Page?.Media ?? [];
             }
             return [];
         }
-        catch { return []; }
+        catch (Exception ex)
+        {
+            AppLogger.Error("AniListTrackingService", $"Error al buscar animes en vivo para '{busqueda}'", ex);
+            return [];
+        }
     }
 
     public async Task<List<AiringEpisode>> ObtenerCalendarioEmisionAsync(List<int> mediaIds, long inicioSemana, long finSemana)
     {
-        if (mediaIds == null || mediaIds.Count == 0) return new List<AiringEpisode>();
+        if (mediaIds == null || mediaIds.Count == 0) return [];
 
         var query = @"
         query($mediaIds: [Int], $airingAt_greater: Int, $airingAt_lesser: Int) {
@@ -327,13 +325,13 @@ public class AniListTrackingService(HttpClient httpClient) : IAnimeTrackingServi
         try
         {
             var response = await _httpClient.PostAsync("https://graphql.anilist.co", jsonContent);
-            if (!response.IsSuccessStatusCode) return new List<AiringEpisode>();
+            if (!response.IsSuccessStatusCode) return [];
 
             var jsonResponse = await response.Content.ReadAsStringAsync();
             var result = JsonSerializer.Deserialize<AniListResponse>(jsonResponse);
 
             var schedules = result?.Data?.Page?.AiringSchedules;
-            if (schedules == null) return new List<AiringEpisode>();
+            if (schedules == null) return [];
 
             var airingList = new List<AiringEpisode>();
             foreach (var s in schedules)
@@ -350,9 +348,10 @@ public class AniListTrackingService(HttpClient httpClient) : IAnimeTrackingServi
             }
             return airingList;
         }
-        catch
+        catch (Exception ex)
         {
-            return new List<AiringEpisode>();
+            AppLogger.Error("AniListTrackingService", "Error al obtener calendario de emisión", ex);
+            return [];
         }
     }
 }

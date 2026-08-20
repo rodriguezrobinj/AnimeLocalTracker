@@ -76,30 +76,28 @@ public partial class AnimeItem : ObservableObject
     public string[] GenerosLista => string.IsNullOrWhiteSpace(Generos) ? [] : Generos.Split(", ");
     
     // === LÓGICA DE CACHÉ DE PORTADAS OFFLINE ===
+    private string? _portadaCacheada;
+
     [Ignore]
     public string PortadaVisible
     {
         get
         {
+            if (_portadaCacheada != null) return _portadaCacheada;
             if (string.IsNullOrWhiteSpace(UrlPortada)) return string.Empty;
             
             string appData = System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData);
             string directory = System.IO.Path.Combine(appData, "AnimeLocalTracker", "Covers");
             string localPath = System.IO.Path.Combine(directory, $"{AniListId}.jpg");
             
-            // Si el archivo ya se descargó, usamos la ruta local
-            if (System.IO.File.Exists(localPath))
-            {
-                return localPath;
-            }
-            
-            // Fallback: usar la URL web
-            return UrlPortada;
+            _portadaCacheada = System.IO.File.Exists(localPath) ? localPath : UrlPortada;
+            return _portadaCacheada;
         }
     }
 
     public void NotificarPortadaActualizada()
     {
+        _portadaCacheada = null;
         OnPropertyChanged(nameof(PortadaVisible));
     }
 }

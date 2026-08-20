@@ -49,6 +49,19 @@ public class DownloadService : IDownloadService
         return false;
     }
 
+    private static void LimpiarArchivoTemporal(string? path)
+    {
+        if (string.IsNullOrEmpty(path)) return;
+        try
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+        catch { }
+    }
+
     public void CancelarDescarga(int aniListId, int numeroEpisodio)
     {
         string key = $"{aniListId}_{numeroEpisodio}";
@@ -60,14 +73,7 @@ public class DownloadService : IDownloadService
             }
             catch { }
 
-            try
-            {
-                if (!string.IsNullOrEmpty(state.RutaTemporal) && File.Exists(state.RutaTemporal))
-                {
-                    File.Delete(state.RutaTemporal);
-                }
-            }
-            catch { }
+            LimpiarArchivoTemporal(state.RutaTemporal);
 
             WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(aniListId, numeroEpisodio, 0, isDownloading: false, isCompleted: false, "", "Descarga cancelada", state.AnimeTitulo));
         }
@@ -85,14 +91,7 @@ public class DownloadService : IDownloadService
                 }
                 catch { }
 
-                try
-                {
-                    if (!string.IsNullOrEmpty(state.RutaTemporal) && File.Exists(state.RutaTemporal))
-                    {
-                        File.Delete(state.RutaTemporal);
-                    }
-                }
-                catch { }
+                LimpiarArchivoTemporal(state.RutaTemporal);
 
                 WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, 0, isDownloading: false, isCompleted: false, "", "Descarga cancelada", state.AnimeTitulo));
             }
@@ -116,10 +115,10 @@ public class DownloadService : IDownloadService
             .ToList();
     }
 
-    public async Task IniciarDescargaEpisodioAsync(int aniListId, string animeTitulo, string carpetaDestino, int numeroEpisodio, IEnumerable<string>? titulosAlternativos = null)
+    public Task IniciarDescargaEpisodioAsync(int aniListId, string animeTitulo, string carpetaDestino, int numeroEpisodio, IEnumerable<string>? titulosAlternativos = null)
     {
         string key = $"{aniListId}_{numeroEpisodio}";
-        if (_activeDownloads.ContainsKey(key)) return;
+        if (_activeDownloads.ContainsKey(key)) return Task.CompletedTask;
 
         var state = new DownloadState
         {
@@ -130,7 +129,7 @@ public class DownloadService : IDownloadService
             Progreso = 0
         };
 
-        if (!_activeDownloads.TryAdd(key, state)) return;
+        if (!_activeDownloads.TryAdd(key, state)) return Task.CompletedTask;
 
         // Notificar que entró en cola de descarga
         WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(aniListId, numeroEpisodio, 0, isDownloading: true, isCompleted: false, "", animeTitulo: animeTitulo));
@@ -152,11 +151,14 @@ public class DownloadService : IDownloadService
         {
             string tempPath = string.Empty;
             string targetPath = string.Empty;
+            bool acquired = false;
 
-            // Esperar turno en la cola (1 descarga a la vez)
-            await _downloadLock.WaitAsync(state.Cts.Token);
             try
             {
+                // Esperar turno en la cola (1 descarga a la vez)
+                await _downloadLock.WaitAsync(state.Cts.Token);
+                acquired = true;
+
                 if (state.Cts.IsCancellationRequested) return;
 
                 // Paso 1: Buscar y extraer URL directa probando nombres principales y alternativos
@@ -204,37 +206,26 @@ public class DownloadService : IDownloadService
             catch (OperationCanceledException)
             {
                 Debug.WriteLine($"[DownloadService] Descarga cancelada: {animeTitulo} Ep {numeroEpisodio}");
-                try
-                {
-                    if (!string.IsNullOrEmpty(tempPath) && File.Exists(tempPath))
-                    {
-                        File.Delete(tempPath);
-                    }
-                }
-                catch { }
+                LimpiarArchivoTemporal(tempPath);
                 _activeDownloads.TryRemove(key, out _);
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"[DownloadService] Error descargando {animeTitulo} Ep {numeroEpisodio}: {ex.Message}");
-                try
-                {
-                    if (!string.IsNullOrEmpty(tempPath) && File.Exists(tempPath))
-                    {
-                        File.Delete(tempPath);
-                    }
-                }
-                catch { }
+                LimpiarArchivoTemporal(tempPath);
                 _activeDownloads.TryRemove(key, out _);
                 WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(aniListId, numeroEpisodio, 0, isDownloading: false, isCompleted: false, "", ex.Message, animeTitulo));
             }
             finally
             {
-                _downloadLock.Release();
+                if (acquired)
+                {
+                    _downloadLock.Release();
+                }
             }
         });
 
-        await Task.CompletedTask;
+        return Task.CompletedTask;
     }
 
     private async Task<string?> BuscarUrlEpisodioEnAnimeAv1Async(IEnumerable<string> titulos, int numeroEpisodio, CancellationToken cancellationToken)

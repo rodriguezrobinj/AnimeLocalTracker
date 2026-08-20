@@ -55,28 +55,51 @@ public class AuthService : IAuthService
     {
         if (EstaAutenticado()) return true;
 
-        // Levantamos el servidor invisible en el puerto 5050
         using var listener = new HttpListener();
-        listener.Prefixes.Add("http://localhost:5050/");
-        listener.Start();
+        try
+        {
+            listener.Prefixes.Add("http://localhost:5050/");
+            listener.Start();
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("AuthService", "No se pudo iniciar el listener local en el puerto 5050. Puede que el puerto esté ocupado por otra instancia.", ex);
+            return false;
+        }
 
         // Lanzamos el navegador web del usuario pidiendo permisos
         var url = $"https://anilist.co/api/v2/oauth/authorize?client_id={ClientId}&response_type=token";
-        Process.Start(new ProcessStartInfo { FileName = url, UseShellExecute = true });
+        try
+        {
+            Process.Start(new ProcessStartInfo { FileName = url, UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("AuthService", "No se pudo abrir el navegador web para la autenticación OAuth", ex);
+        }
 
         string? tokenCapturado = null;
+        using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromMinutes(2));
 
         try
         {
-            while (tokenCapturado == null)
+            while (tokenCapturado == null && !cts.Token.IsCancellationRequested)
             {
-                var context = await listener.GetContextAsync();
+                var contextTask = listener.GetContextAsync();
+                var completedTask = await Task.WhenAny(contextTask, Task.Delay(Timeout.Infinite, cts.Token));
+
+                if (completedTask != contextTask)
+                {
+                    AppLogger.Warn("AuthService", "Tiempo de espera de autenticación OAuth expirado (timeout de 2 minutos).");
+                    break;
+                }
+
+                var context = await contextTask;
                 var request = context.Request;
                 var response = context.Response;
 
                 if (request.Url?.AbsolutePath == "/callback")
                 {
-                    // El navegador llegó. Le inyectamos el JavaScript espía.
                     string html = @"
                         <html>
                         <head><meta charset='UTF-8'><title>Conectando...</title></head>
@@ -86,7 +109,6 @@ public class AuthService : IAuthService
                                 var hash = window.location.hash;
                                 if (hash.includes('access_token')) {
                                     var token = new URLSearchParams(hash.substring(1)).get('access_token');
-                                    // Le devolvemos el token a C# por la puerta trasera (/token)
                                     fetch('/token?val=' + token)
                                         .then(() => document.getElementById('mensaje').innerText = '¡Éxito! Ya puedes cerrar esta pestaña y volver a la aplicación.')
                                         .catch(() => document.getElementById('mensaje').innerText = 'Error interno.');
@@ -104,11 +126,10 @@ public class AuthService : IAuthService
                 }
                 else if (request.Url?.AbsolutePath == "/token")
                 {
-                    // ¡El JavaScript nos acaba de entregar la llave!
                     tokenCapturado = request.QueryString["val"];
                     response.StatusCode = 200;
                     response.OutputStream.Close();
-                    break; // Salimos de la matriz.
+                    break;
                 }
                 else
                 {
@@ -121,18 +142,24 @@ public class AuthService : IAuthService
             {
                 byte[] plaintext = Encoding.UTF8.GetBytes(tokenCapturado);
                 byte[] ciphertext = ProtectedData.Protect(plaintext, null, DataProtectionScope.CurrentUser);
-                File.WriteAllBytes(_rutaToken, ciphertext); // Guardamos la llave cifrada de forma segura
+                File.WriteAllBytes(_rutaToken, ciphertext);
                 
-                // NOTIFICAMOS A TODA LA APP QUE ALGUIEN SE LOGEÓ
                 WeakReferenceMessenger.Default.Send(new UsuarioLogeadoMensaje());
-                
+                AppLogger.Info("AuthService", "Sesión iniciada y token guardado correctamente.");
                 return true;
             }
         }
-        catch (Exception) { /* Fallo silencioso si cierran la app antes de terminar */ }
+        catch (Exception ex)
+        {
+            AppLogger.Error("AuthService", "Error durante el flujo de autenticación", ex);
+        }
         finally
         {
-            listener.Stop();
+            try
+            {
+                listener.Stop();
+            }
+            catch { }
         }
 
         return false;
