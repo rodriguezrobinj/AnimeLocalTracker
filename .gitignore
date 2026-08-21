@@ -3,11 +3,13 @@
 ##
 ## Get latest from `dotnet new gitignore`
 
-# Temporary binaries and scratch folders
+# Temporary binaries, publish and scratch folders
 scratch/
 flyleaf_readme.md
 AnimeLocalTracker/FFmpeg/
 AnimeLocalTracker/Tools/
+publish/
+installer_output/
 
 # dotenv files
 .env

@@ -13,7 +13,10 @@ public interface IDatabaseService
     
     // === NUEVOS MÉTODOS PARA EL TRACKING ===
     Task GuardarRegistroEpisodioAsync(RegistroEpisodio registro);
+    Task GuardarRegistrosEpisodioBulkAsync(IEnumerable<RegistroEpisodio> registros);
     Task<List<RegistroEpisodio>> ObtenerRegistrosPorAnimeAsync(int aniListId);
     Task<List<RegistroEpisodio>> ObtenerTodosLosRegistrosAsync();
+    Task<List<RegistroEpisodio>> ObtenerEpisodiosNoSincronizadosAsync();
+    Task MarcarEpisodiosSincronizadosAsync(IEnumerable<int> ids);
     Task ActualizarAnimeAsync(AnimeItem anime);
 }

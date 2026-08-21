@@ -141,12 +141,16 @@ public partial class DetalleViewModel : ObservableObject,
         var encontrados = await _fileScannerService.EscanearEpisodiosAsync(anime.RutaCarpeta);
         var registrosGuardados = await _databaseService.ObtenerRegistrosPorAnimeAsync(anime.AniListId);
 
-        int maxEpisodio = anime.TotalEpisodios;
+        int maxEpisodio = Math.Max(0, anime.TotalEpisodios);
         if (encontrados.Count > 0)
         {
             int maxLocal = encontrados.Max(e => e.NumeroEpisodio);
             if (maxLocal > maxEpisodio) maxEpisodio = maxLocal;
         }
+
+        // Límite de seguridad para prevenir asignaciones anómalas de memoria (máx 3000)
+        const int LimiteSeguridadEpisodios = 3000;
+        int episodiosACargar = Math.Min(maxEpisodio, LimiteSeguridadEpisodios);
 
         // USAMOS TASK.RUN PARA NO CONGELAR LA UI
         var episodiosGenerados = await Task.Run(() => 
@@ -156,8 +160,8 @@ public partial class DetalleViewModel : ObservableObject,
             var registrosPorEp = registrosGuardados.GroupBy(r => r.NumeroEpisodio)
                                                    .ToDictionary(g => g.Key, g => g.First());
 
-            var temp = new List<EpisodioItem>(maxEpisodio);
-            for (int i = 1; i <= maxEpisodio; i++)
+            var temp = new List<EpisodioItem>(episodiosACargar);
+            for (int i = 1; i <= episodiosACargar; i++)
             {
                 archivosPorEp.TryGetValue(i, out var archivoLocal);
                 registrosPorEp.TryGetValue(i, out var memoria);
@@ -317,19 +321,19 @@ public partial class DetalleViewModel : ObservableObject,
         if (episodiosSeleccionados == null || episodiosSeleccionados.Count == 0 || AnimeSeleccionado == null) return;
 
         var episodios = episodiosSeleccionados.Cast<EpisodioItem>().ToList();
+        var listaRegistros = new List<RegistroEpisodio>(episodios.Count);
         foreach (var ep in episodios)
         {
             ep.Visto = true;
-            
-            var registro = new RegistroEpisodio 
+            listaRegistros.Add(new RegistroEpisodio 
             {
                 AniListId = AnimeSeleccionado.AniListId,
                 NumeroEpisodio = ep.NumeroEpisodio,
                 VistoLocal = true,
                 RutaArchivo = ep.RutaCompleta ?? string.Empty
-            };
-            await _databaseService.GuardarRegistroEpisodioAsync(registro); 
+            });
         }
+        await _databaseService.GuardarRegistrosEpisodioBulkAsync(listaRegistros);
     }
 
     [RelayCommand]
@@ -338,19 +342,19 @@ public partial class DetalleViewModel : ObservableObject,
         if (episodiosSeleccionados == null || episodiosSeleccionados.Count == 0 || AnimeSeleccionado == null) return;
 
         var episodios = episodiosSeleccionados.Cast<EpisodioItem>().ToList();
+        var listaRegistros = new List<RegistroEpisodio>(episodios.Count);
         foreach (var ep in episodios)
         {
             ep.Visto = false;
-            
-            var registro = new RegistroEpisodio 
+            listaRegistros.Add(new RegistroEpisodio 
             {
                 AniListId = AnimeSeleccionado.AniListId,
                 NumeroEpisodio = ep.NumeroEpisodio,
                 VistoLocal = false,
                 RutaArchivo = ep.RutaCompleta ?? string.Empty
-            };
-            await _databaseService.GuardarRegistroEpisodioAsync(registro); 
+            });
         }
+        await _databaseService.GuardarRegistrosEpisodioBulkAsync(listaRegistros);
     }
 
     [RelayCommand]

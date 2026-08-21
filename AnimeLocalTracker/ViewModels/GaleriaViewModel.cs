@@ -221,6 +221,8 @@ public partial class GaleriaViewModel : ObservableObject,
         return true;
     }
     
+    private static readonly System.Threading.SemaphoreSlim _coverDownloadSemaphore = new(4, 4);
+    
     private async Task DescargarPortadaSiNoExisteAsync(AnimeItem anime)
     {
         if (string.IsNullOrWhiteSpace(anime.UrlPortada)) return;
@@ -230,8 +232,11 @@ public partial class GaleriaViewModel : ObservableObject,
         
         if (!System.IO.File.Exists(localPath))
         {
+            await _coverDownloadSemaphore.WaitAsync();
             try 
             {
+                if (System.IO.File.Exists(localPath)) return; // Doble verificación tras adquirir semáforo
+
                 System.IO.Directory.CreateDirectory(directory);
                 using var client = _httpClientFactory.CreateClient();
                 var bytes = await client.GetByteArrayAsync(anime.UrlPortada);
@@ -245,6 +250,10 @@ public partial class GaleriaViewModel : ObservableObject,
             catch (Exception ex)
             {
                 AppLogger.Warn("GaleriaViewModel", $"No se pudo descargar la portada para AnimeId {anime.AniListId}: {ex.Message}");
+            }
+            finally
+            {
+                _coverDownloadSemaphore.Release();
             }
         }
     }

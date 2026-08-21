@@ -220,6 +220,8 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         SubtitulosIcon = "SubtitlesOutline";
     }
 
+    private CancellationTokenSource? _trackingCts;
+
     public void CargarVideo(string rutaVideo, int animeId, string tituloAnime, int episodio)
     {
         _rutaVideo = rutaVideo;
@@ -231,8 +233,13 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         _durationCached = false;
         _lastNotifiedSeconds = -1;
 
+        // Cancelar rastreo previo
+        _trackingCts?.Cancel();
+        _trackingCts?.Dispose();
+        _trackingCts = new CancellationTokenSource();
+
         // Sincronizar ícono de fullscreen con el estado actual de la ventana
-        if (System.Windows.Application.Current.MainWindow is AnimeLocalTracker.Views.MainWindow mainWindow)
+        if (System.Windows.Application.Current?.MainWindow is AnimeLocalTracker.Views.MainWindow mainWindow)
         {
             FullscreenIcon = mainWindow.IsFullScreen ? "FullscreenExit" : "Fullscreen";
         }
@@ -240,7 +247,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         // Dispose del player anterior si existe
         if (Player != null)
         {
-            try { Player.Dispose(); } catch { }
+            try { Player.Dispose(); } catch (Exception ex) { AppLogger.Debug("ReproductorViewModel", $"Player dispose: {ex.Message}"); }
         }
 
         // Crear player con configuración optimizada para seeking rápido
@@ -249,113 +256,126 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         Player.OpenAsync(rutaVideo);
         Player.Play();
 
-        _ = RastrearProgresoAsync();
+        _ = RastrearProgresoAsync(_trackingCts.Token);
     }
 
-    private async Task RastrearProgresoAsync()
+    private async Task RastrearProgresoAsync(CancellationToken ct)
     {
-        while (Player != null && !Player.IsDisposed)
+        while (Player != null && !Player.IsDisposed && !ct.IsCancellationRequested)
         {
-            if (Player.Status == Status.Playing)
+            try
             {
-                double curSeconds = TimeSpan.FromTicks(Player.CurTime).TotalSeconds;
-                double durSeconds = TimeSpan.FromTicks(Player.Duration).TotalSeconds;
-                
-                if (!IsDraggingSlider)
+                if (Player.Status == Status.Playing)
                 {
-                    // Solo notificar si el cambio es significativo (> 0.3s)
-                    // para evitar property-changed spam innecesario
-                    if (Math.Abs(curSeconds - _lastNotifiedSeconds) >= 0.3)
-                    {
-                        CurrentSeconds = curSeconds;
-                        _lastNotifiedSeconds = curSeconds;
-                        
-                        TimeSpan tCur = TimeSpan.FromSeconds(curSeconds);
-                        TiempoActualTexto = tCur.ToString(tCur.Hours > 0 ? @"hh\:mm\:ss" : @"mm\:ss");
-                        
-                        // Cachear la duración (no cambia durante la reproducción)
-                        if (!_durationCached && durSeconds > 0)
-                        {
-                            TotalSeconds = durSeconds;
-                            TimeSpan tDur = TimeSpan.FromSeconds(durSeconds);
-                            TiempoTotalTexto = tDur.ToString(tDur.Hours > 0 ? @"hh\:mm\:ss" : @"mm\:ss");
-                            _durationCached = true;
-                        }
-                        
-                        TiempoCombinadoTexto = $"{TiempoActualTexto} / {TiempoTotalTexto}";
-                    }
-                }
-
-                if (PlayPauseIcon != "Pause") PlayPauseIcon = "Pause";
-
-                double porcentaje = durSeconds > 0 ? curSeconds / durSeconds : 0;
-
-                // Auto-Tracking al 90%
-                if (porcentaje >= 0.90 && !_fueMarcadoComoVisto)
-                {
-                    _fueMarcadoComoVisto = true;
+                    double curSeconds = TimeSpan.FromTicks(Player.CurTime).TotalSeconds;
+                    double durSeconds = TimeSpan.FromTicks(Player.Duration).TotalSeconds;
                     
-                    try 
+                    if (!IsDraggingSlider)
                     {
-                        // 1. Guardar localmente
-                        var registros = await _databaseService.ObtenerRegistrosPorAnimeAsync(_animeId);
-                        var registro = registros.FirstOrDefault(r => r.NumeroEpisodio == _episodio);
-                        
-                        if (registro != null)
+                        // Solo notificar si el cambio es significativo (> 0.3s)
+                        // para evitar property-changed spam innecesario
+                        if (Math.Abs(curSeconds - _lastNotifiedSeconds) >= 0.3)
                         {
-                            registro.VistoLocal = true;
-                        }
-                        else
-                        {
-                            registro = new Models.RegistroEpisodio 
-                            {
-                                AniListId = _animeId,
-                                NumeroEpisodio = _episodio,
-                                RutaArchivo = _rutaVideo,
-                                VistoLocal = true
-                            };
-                        }
-                        await _databaseService.GuardarRegistroEpisodioAsync(registro);
-
-                        // 2. Guardar en AniList
-                        var token = _authService.ObtenerTokenGuardado();
-                        if (!string.IsNullOrEmpty(token))
-                        {
-                            await _animeTrackingService.ActualizarProgresoAsync(_animeId, _episodio, token);
-                        }
-
-                        // 3. Notificación flotante sutil (Toast)
-                        _ = WeakReferenceMessenger.Default.Send(new Messages.MostrarDialogoRequestMessage(
-                            "Auto-Tracking", 
-                            $"Episodio {_episodio} marcado como visto.", 
-                            false, "CheckCircle", "#4CAF50"));
+                            CurrentSeconds = curSeconds;
+                            _lastNotifiedSeconds = curSeconds;
                             
-                        // 4. Avisar a la vista de detalles para que actualice la lista automáticamente
-                        WeakReferenceMessenger.Default.Send(new Messages.EpisodioActualizadoMensaje(_animeId, _episodio, true));
+                            TimeSpan tCur = TimeSpan.FromSeconds(curSeconds);
+                            TiempoActualTexto = tCur.ToString(tCur.Hours > 0 ? @"hh\:mm\:ss" : @"mm\:ss");
+                            
+                            // Cachear la duración (no cambia durante la reproducción)
+                            if (!_durationCached && durSeconds > 0)
+                            {
+                                TotalSeconds = durSeconds;
+                                TimeSpan tDur = TimeSpan.FromSeconds(durSeconds);
+                                TiempoTotalTexto = tDur.ToString(tDur.Hours > 0 ? @"hh\:mm\:ss" : @"mm\:ss");
+                                _durationCached = true;
+                            }
+                            
+                            TiempoCombinadoTexto = $"{TiempoActualTexto} / {TiempoTotalTexto}";
+                        }
                     }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"Error en auto-tracking: {ex.Message}");
-                    }
-                }
-                
-                // Botón Skip Intro (Mostrar entre 0:30 y 3:00)
-                if (curSeconds >= 30 && curSeconds <= 180)
-                {
-                    if (!MostrarSkipIntro) MostrarSkipIntro = true;
-                }
-                else
-                {
-                    if (MostrarSkipIntro) MostrarSkipIntro = false;
-                }
-            }
-            else if (Player?.Status == Status.Ended)
-            {
-                // Auto-Play siguiente episodio si existe
-            }
 
-            // 250ms para UI más responsive (antes era 1000ms)
-            await Task.Delay(250);
+                    if (PlayPauseIcon != "Pause") PlayPauseIcon = "Pause";
+
+                    double porcentaje = durSeconds > 0 ? curSeconds / durSeconds : 0;
+
+                    // Auto-Tracking al 90%
+                    if (porcentaje >= 0.90 && !_fueMarcadoComoVisto)
+                    {
+                        _fueMarcadoComoVisto = true;
+                        
+                        try 
+                        {
+                            // 1. Guardar localmente
+                            var registros = await _databaseService.ObtenerRegistrosPorAnimeAsync(_animeId);
+                            var registro = registros.FirstOrDefault(r => r.NumeroEpisodio == _episodio);
+                            
+                            if (registro != null)
+                            {
+                                registro.VistoLocal = true;
+                            }
+                            else
+                            {
+                                registro = new Models.RegistroEpisodio 
+                                {
+                                    AniListId = _animeId,
+                                    NumeroEpisodio = _episodio,
+                                    RutaArchivo = _rutaVideo,
+                                    VistoLocal = true
+                                };
+                            }
+                            await _databaseService.GuardarRegistroEpisodioAsync(registro);
+
+                            // 2. Guardar en AniList
+                            var token = _authService.ObtenerTokenGuardado();
+                            if (!string.IsNullOrEmpty(token))
+                            {
+                                await _animeTrackingService.ActualizarProgresoAsync(_animeId, _episodio, token);
+                            }
+
+                            // 3. Notificación flotante sutil (Toast)
+                            _ = WeakReferenceMessenger.Default.Send(new Messages.MostrarDialogoRequestMessage(
+                                "Auto-Tracking", 
+                                $"Episodio {_episodio} marcado como visto.", 
+                                false, "CheckCircle", "#4CAF50"));
+                                
+                            // 4. Avisar a la vista de detalles para que actualice la lista automáticamente
+                            WeakReferenceMessenger.Default.Send(new Messages.EpisodioActualizadoMensaje(_animeId, _episodio, true));
+                        }
+                        catch (Exception ex)
+                        {
+                            AppLogger.Error("ReproductorViewModel", "Error en auto-tracking", ex);
+                        }
+                    }
+                    
+                    // Botón Skip Intro (Mostrar entre 0:30 y 3:00)
+                    if (curSeconds >= 30 && curSeconds <= 180)
+                    {
+                        if (!MostrarSkipIntro) MostrarSkipIntro = true;
+                    }
+                    else
+                    {
+                        if (MostrarSkipIntro) MostrarSkipIntro = false;
+                    }
+                }
+                else if (Player?.Status == Status.Ended)
+                {
+                    // Auto-Play siguiente episodio si existe
+                }
+
+                // Sondeo adaptativo: 250ms mientras reproduce, 1000ms cuando está en pausa/detenido
+                int delayMs = (Player?.Status == Status.Playing) ? 250 : 1000;
+                await Task.Delay(delayMs, ct);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("ReproductorViewModel", $"Error en bucle de progreso: {ex.Message}");
+                await Task.Delay(1000, ct);
+            }
         }
     }
 
@@ -383,11 +403,11 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         WeakReferenceMessenger.Default.Send(new NavegarMensaje_VolverDelReproductor());
 
         // Forzar el foco de vuelta a la ventana principal para que F11 funcione de inmediato
-        System.Windows.Application.Current.Dispatcher.BeginInvoke(
+        System.Windows.Application.Current?.Dispatcher?.BeginInvoke(
             System.Windows.Threading.DispatcherPriority.Input,
             () =>
             {
-                var window = System.Windows.Application.Current.MainWindow;
+                var window = System.Windows.Application.Current?.MainWindow;
                 if (window != null)
                 {
                     window.Focus();
@@ -398,6 +418,10 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
+        _trackingCts?.Cancel();
+        _trackingCts?.Dispose();
+        _trackingCts = null;
+
         if (Player != null)
         {
             try
@@ -408,7 +432,10 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                 }
                 Player.Dispose();
             }
-            catch { }
+            catch (Exception ex)
+            {
+                AppLogger.Debug("ReproductorViewModel", $"Player dispose cleanup: {ex.Message}");
+            }
             Player = null!;
         }
     }

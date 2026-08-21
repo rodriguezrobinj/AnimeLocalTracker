@@ -80,6 +80,9 @@ public partial class App : Application
         
         // Lo registramos como Singleton porque queremos que haya una sola conexión a la BD en toda la app
         services.AddSingleton<IDatabaseService, DatabaseService>();
+
+        // Servicio de sincronización offline-online en segundo plano
+        services.AddSingleton<ISyncService, SyncService>();
     }
 
     private static Polly.IAsyncPolicy<System.Net.Http.HttpResponseMessage> GetRetryPolicy()
@@ -121,6 +124,10 @@ public partial class App : Application
         
         // Obligamos a que se cree el archivo y la tabla antes de continuar
         await dbService.InicializarBaseDatosAsync();
+
+        // Iniciar sincronización periódica en segundo plano
+        var syncService = ServiceProvider.GetRequiredService<ISyncService>();
+        syncService.IniciarSincronizacionPeriodica(TimeSpan.FromMinutes(5));
 
         // En lugar de que WPF abra la ventana automáticamente (StartupUri),
         // nosotros le pedimos al contenedor DI que nos construya la ventana

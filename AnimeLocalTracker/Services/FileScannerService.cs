@@ -8,8 +8,16 @@ using AnimeLocalTracker.Models;
 
 namespace AnimeLocalTracker.Services;
 
-public class FileScannerService : IFileScannerService
+public partial class FileScannerService : IFileScannerService
 {
+    private static readonly HashSet<string> VideoExtensions = new(StringComparer.OrdinalIgnoreCase) { ".mkv", ".mp4", ".avi" };
+
+    [GeneratedRegex(@"(?:\b(?:E|EP|Episode|Episodio|Cap|Capitulo)[\s._-]*|[\[\(-])(\d{1,4})(?:[\]\)-]|\b|$)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex PatronExplicitoRegex();
+
+    [GeneratedRegex(@"(?<!\d)(\d{1,4})(?!\d)", RegexOptions.CultureInvariant)]
+    private static partial Regex PatronGenericoRegex();
+
     public async Task<List<EpisodioItem>> EscanearEpisodiosAsync(string carpeta)
     {
         return await Task.Run(() =>
@@ -17,13 +25,15 @@ public class FileScannerService : IFileScannerService
             var lista = new List<EpisodioItem>();
             if (!Directory.Exists(carpeta)) return lista;
 
+            var dirInfo = new DirectoryInfo(carpeta);
+
             // Limpiar archivos residuales incompletos de descargas interrumpidas propias
             try
             {
-                var residuales = Directory.EnumerateFiles(carpeta, "Episodio *.downloading", SearchOption.TopDirectoryOnly);
+                var residuales = dirInfo.EnumerateFiles("Episodio *.downloading", SearchOption.TopDirectoryOnly);
                 foreach (var res in residuales)
                 {
-                    try { File.Delete(res); } catch { }
+                    try { res.Delete(); } catch { }
                 }
             }
             catch (Exception ex)
@@ -33,22 +43,28 @@ public class FileScannerService : IFileScannerService
 
             try
             {
-                // Buscamos archivos de video comunes de forma nativa en el sistema
-                var extensiones = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".mkv", ".mp4", ".avi" };
-                var archivos = Directory.EnumerateFiles(carpeta, "*.*", new EnumerationOptions { RecurseSubdirectories = true })
-                                        .Where(f => extensiones.Contains(Path.GetExtension(f)));
-
-                foreach (var archivo in archivos)
+                var enumerationOptions = new EnumerationOptions
                 {
-                    var nombre = Path.GetFileNameWithoutExtension(archivo);
-                    int numero = ExtraerNumeroEpisodio(nombre);
+                    RecurseSubdirectories = true,
+                    IgnoreInaccessible = true,
+                    AttributesToSkip = FileAttributes.ReparsePoint
+                };
 
-                    var item = new EpisodioItem {
-                        TituloArchivo = nombre,
-                        RutaCompleta = archivo,
+                var archivos = dirInfo.EnumerateFiles("*.*", enumerationOptions)
+                                      .Where(f => VideoExtensions.Contains(f.Extension));
+
+                foreach (var fileInfo in archivos)
+                {
+                    var nombreSinExtension = Path.GetFileNameWithoutExtension(fileInfo.Name);
+                    int numero = ExtraerNumeroEpisodio(nombreSinExtension);
+
+                    var item = new EpisodioItem
+                    {
+                        TituloArchivo = nombreSinExtension,
+                        RutaCompleta = fileInfo.FullName,
                         NumeroEpisodio = numero
                     };
-                    item.CalcularTamanoArchivo();
+                    item.CalcularTamanoArchivo(fileInfo.Length);
                     lista.Add(item);
                 }
             }
@@ -61,18 +77,18 @@ public class FileScannerService : IFileScannerService
         });
     }
 
-    private static int ExtraerNumeroEpisodio(string nombre)
+    public static int ExtraerNumeroEpisodio(string nombre)
     {
         // 1. Patrón explícito de episodio: "Ep 05", "E05", "Episode 05", "Episodio 05", "Cap 05"
-        var matchExplicito = Regex.Match(nombre, @"(?:\b(?:E|EP|Episode|Episodio|Cap|Capitulo)[\s._-]*|[\[\(-])(\d{1,3})(?:[\]\)-]|\b|$)", RegexOptions.IgnoreCase);
+        var matchExplicito = PatronExplicitoRegex().Match(nombre);
         if (matchExplicito.Success && int.TryParse(matchExplicito.Groups[1].Value, out int epExp))
         {
             if (epExp is not 480 and not 720 and not 1080 and not 2160)
                 return epExp;
         }
 
-        // 2. Patrón genérico: busca números de 1 a 3 dígitos excluyendo resoluciones comunes
-        var matches = Regex.Matches(nombre, @"(?<!\d)(\d{1,3})(?!\d)");
+        // 2. Patrón genérico: busca números de 1 a 4 dígitos excluyendo resoluciones comunes
+        var matches = PatronGenericoRegex().Matches(nombre);
         foreach (Match m in matches)
         {
             if (int.TryParse(m.Groups[1].Value, out int num))

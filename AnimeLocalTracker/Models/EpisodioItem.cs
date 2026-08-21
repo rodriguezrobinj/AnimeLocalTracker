@@ -37,6 +37,20 @@ public partial class EpisodioItem : ObservableObject
     public bool EstaEnEspera => IsDownloading && DownloadProgress <= 0.0;
     public bool ProgresoDescargaActivo => IsDownloading && DownloadProgress > 0.0;
 
+    public void CalcularTamanoArchivo(long len)
+    {
+        if (len >= 1024L * 1024 * 1024)
+            TamanoArchivoFormateado = $"{len / (1024.0 * 1024.0 * 1024.0):F1} GB";
+        else if (len >= 1024L * 1024)
+            TamanoArchivoFormateado = $"{len / (1024.0 * 1024.0):F0} MB";
+        else if (len >= 1024L)
+            TamanoArchivoFormateado = $"{len / 1024.0:F0} KB";
+        else if (len >= 0)
+            TamanoArchivoFormateado = $"{len} B";
+        else
+            TamanoArchivoFormateado = string.Empty;
+    }
+
     public void CalcularTamanoArchivo()
     {
         if (!string.IsNullOrEmpty(RutaCompleta) && System.IO.File.Exists(RutaCompleta))
@@ -44,14 +58,7 @@ public partial class EpisodioItem : ObservableObject
             try
             {
                 var len = new System.IO.FileInfo(RutaCompleta).Length;
-                if (len >= 1024 * 1024 * 1024)
-                    TamanoArchivoFormateado = $"{len / (1024.0 * 1024.0 * 1024.0):F1} GB";
-                else if (len >= 1024 * 1024)
-                    TamanoArchivoFormateado = $"{len / (1024.0 * 1024.0):F0} MB";
-                else if (len >= 1024)
-                    TamanoArchivoFormateado = $"{len / 1024.0:F0} KB";
-                else
-                    TamanoArchivoFormateado = $"{len} B";
+                CalcularTamanoArchivo(len);
             }
             catch
             {

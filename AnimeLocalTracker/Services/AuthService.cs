@@ -67,8 +67,10 @@ public class AuthService : IAuthService
             return false;
         }
 
-        // Lanzamos el navegador web del usuario pidiendo permisos
-        var url = $"https://anilist.co/api/v2/oauth/authorize?client_id={ClientId}&response_type=token";
+        string expectedState = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+
+        // Lanzamos el navegador web del usuario pidiendo permisos con state criptográfico
+        var url = $"https://anilist.co/api/v2/oauth/authorize?client_id={ClientId}&response_type=token&state={expectedState}";
         try
         {
             Process.Start(new ProcessStartInfo { FileName = url, UseShellExecute = true });
@@ -108,10 +110,23 @@ public class AuthService : IAuthService
                             <script>
                                 var hash = window.location.hash;
                                 if (hash.includes('access_token')) {
-                                    var token = new URLSearchParams(hash.substring(1)).get('access_token');
-                                    fetch('/token?val=' + token)
-                                        .then(() => document.getElementById('mensaje').innerText = '¡Éxito! Ya puedes cerrar esta pestaña y volver a la aplicación.')
-                                        .catch(() => document.getElementById('mensaje').innerText = 'Error interno.');
+                                    var params = new URLSearchParams(hash.substring(1));
+                                    var token = params.get('access_token');
+                                    var state = params.get('state') || '';
+                                    
+                                    fetch('/token', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ token: token, state: state })
+                                    })
+                                    .then(r => {
+                                        if (r.ok) {
+                                            document.getElementById('mensaje').innerText = '¡Éxito! Ya puedes cerrar esta pestaña y volver a la aplicación.';
+                                        } else {
+                                            document.getElementById('mensaje').innerText = 'Error de seguridad: el parámetro de estado no coincide.';
+                                        }
+                                    })
+                                    .catch(() => document.getElementById('mensaje').innerText = 'Error interno de comunicación.');
                                 } else {
                                     document.getElementById('mensaje').innerText = 'Autorización denegada.';
                                 }
@@ -120,16 +135,47 @@ public class AuthService : IAuthService
                         </html>";
                     
                     byte[] buffer = Encoding.UTF8.GetBytes(html);
+                    response.ContentType = "text/html; charset=utf-8";
                     response.ContentLength64 = buffer.Length;
                     await response.OutputStream.WriteAsync(buffer, 0, buffer.Length);
                     response.OutputStream.Close();
                 }
-                else if (request.Url?.AbsolutePath == "/token")
+                else if (request.Url?.AbsolutePath == "/token" && request.HttpMethod == "POST")
                 {
-                    tokenCapturado = request.QueryString["val"];
-                    response.StatusCode = 200;
-                    response.OutputStream.Close();
-                    break;
+                    try
+                    {
+                        using var reader = new StreamReader(request.InputStream, Encoding.UTF8);
+                        var body = await reader.ReadToEndAsync();
+                        using var doc = System.Text.Json.JsonDocument.Parse(body);
+                        var root = doc.RootElement;
+                        
+                        string? receivedState = root.TryGetProperty("state", out var sProp) ? sProp.GetString() : null;
+                        string? receivedToken = root.TryGetProperty("token", out var tProp) ? tProp.GetString() : null;
+
+                        if (!string.IsNullOrEmpty(receivedState) && receivedState == expectedState && !string.IsNullOrWhiteSpace(receivedToken))
+                        {
+                            tokenCapturado = receivedToken;
+                            response.StatusCode = 200;
+                            byte[] okMsg = Encoding.UTF8.GetBytes("{\"success\":true}");
+                            response.ContentType = "application/json";
+                            response.ContentLength64 = okMsg.Length;
+                            await response.OutputStream.WriteAsync(okMsg, 0, okMsg.Length);
+                            response.OutputStream.Close();
+                            break;
+                        }
+                        else
+                        {
+                            AppLogger.Warn("AuthService", "Fallo de validación de seguridad (state no coincide o token vacío).");
+                            response.StatusCode = 400;
+                            response.OutputStream.Close();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        AppLogger.Error("AuthService", "Error al procesar payload de token POST", ex);
+                        response.StatusCode = 500;
+                        response.OutputStream.Close();
+                    }
                 }
                 else
                 {
@@ -159,7 +205,10 @@ public class AuthService : IAuthService
             {
                 listener.Stop();
             }
-            catch { }
+            catch (Exception ex)
+            {
+                AppLogger.Debug("AuthService", $"Listener stop no-op: {ex.Message}");
+            }
         }
 
         return false;

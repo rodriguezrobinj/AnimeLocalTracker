@@ -10,20 +10,37 @@ namespace AnimeLocalTracker.Services;
 
 public class DatabaseService : IDatabaseService
 {
+    private readonly string? _customDbPath;
     private SQLiteAsyncConnection _conexion = null!;
+
+    public DatabaseService(string? customDbPath = null)
+    {
+        _customDbPath = customDbPath;
+    }
 
     public async Task InicializarBaseDatosAsync()
     {
         if (_conexion != null) return;
 
-        var rutaAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        var rutaCarpetaApp = Path.Combine(rutaAppData, "AnimeLocalTracker");
-        Directory.CreateDirectory(rutaCarpetaApp); 
-
-        var rutaBaseDatos = Path.Combine(rutaCarpetaApp, "biblioteca.db");
+        string rutaBaseDatos;
+        if (!string.IsNullOrEmpty(_customDbPath))
+        {
+            rutaBaseDatos = _customDbPath;
+        }
+        else
+        {
+            var rutaAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            var rutaCarpetaApp = Path.Combine(rutaAppData, "AnimeLocalTracker");
+            Directory.CreateDirectory(rutaCarpetaApp); 
+            rutaBaseDatos = Path.Combine(rutaCarpetaApp, "biblioteca.db");
+        }
+        
         _conexion = new SQLiteAsyncConnection(rutaBaseDatos);
 
         await _conexion.ExecuteScalarAsync<string>("PRAGMA journal_mode=WAL;");
+        await _conexion.ExecuteAsync("PRAGMA synchronous = NORMAL;");
+        await _conexion.ExecuteAsync("PRAGMA temp_store = MEMORY;");
+        await _conexion.ExecuteAsync("PRAGMA cache_size = -64000;");
 
         // Creamos ambas tablas
         await _conexion.CreateTableAsync<AnimeItem>();
@@ -71,6 +88,31 @@ public class DatabaseService : IDatabaseService
         }
     }
 
+    public async Task GuardarRegistrosEpisodioBulkAsync(IEnumerable<RegistroEpisodio> registros)
+    {
+        if (registros == null) return;
+
+        await _conexion.RunInTransactionAsync(db =>
+        {
+            foreach (var registro in registros)
+            {
+                var existente = db.Table<RegistroEpisodio>()
+                    .FirstOrDefault(r => r.AniListId == registro.AniListId && r.NumeroEpisodio == registro.NumeroEpisodio);
+
+                if (existente != null)
+                {
+                    existente.VistoLocal = registro.VistoLocal;
+                    existente.FavoritoLocal = registro.FavoritoLocal;
+                    db.Update(existente);
+                }
+                else
+                {
+                    db.Insert(registro);
+                }
+            }
+        });
+    }
+
     public async Task<List<RegistroEpisodio>> ObtenerRegistrosPorAnimeAsync(int aniListId)
     {
         // Traemos todos los capítulos que ya viste de un anime en específico
@@ -82,6 +124,32 @@ public class DatabaseService : IDatabaseService
     public async Task<List<RegistroEpisodio>> ObtenerTodosLosRegistrosAsync()
     {
         return await _conexion.Table<RegistroEpisodio>().ToListAsync();
+    }
+
+    public async Task<List<RegistroEpisodio>> ObtenerEpisodiosNoSincronizadosAsync()
+    {
+        return await _conexion.Table<RegistroEpisodio>()
+            .Where(r => r.VistoLocal && !r.SincronizadoEnNube)
+            .ToListAsync();
+    }
+
+    public async Task MarcarEpisodiosSincronizadosAsync(IEnumerable<int> ids)
+    {
+        var idList = ids.ToList();
+        if (idList.Count == 0) return;
+
+        await _conexion.RunInTransactionAsync(db =>
+        {
+            foreach (var id in idList)
+            {
+                var reg = db.Find<RegistroEpisodio>(id);
+                if (reg != null)
+                {
+                    reg.SincronizadoEnNube = true;
+                    db.Update(reg);
+                }
+            }
+        });
     }
     
     public async Task ActualizarAnimeAsync(AnimeItem anime)
