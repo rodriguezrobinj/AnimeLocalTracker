@@ -277,11 +277,13 @@ public partial class DetalleViewModel : ObservableObject,
         try
         {
             // Enviamos un mensaje a la aplicación principal para que abra nuestra nueva ventana de reproductor
+            var episodiosDisponibles = _todosLosEpisodios.Where(e => e.Descargado && File.Exists(e.RutaCompleta)).ToList();
             WeakReferenceMessenger.Default.Send(new NavegarMensaje_Reproductor(
                 episodio.RutaCompleta,
                 AnimeSeleccionado.AniListId,
                 AnimeSeleccionado.Titulo,
-                episodio.NumeroEpisodio
+                episodio.NumeroEpisodio,
+                EpisodiosDisponibles: episodiosDisponibles
             ));
         }
         catch (System.Exception ex)

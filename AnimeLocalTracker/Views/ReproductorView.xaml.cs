@@ -217,6 +217,22 @@ namespace AnimeLocalTracker.Views
                     e.Handled = true;
                     RegistrarActividad();
                     break;
+                case Key.N:
+                    if (vm.TieneEpisodioSiguiente)
+                    {
+                        vm.SiguienteEpisodioCommand.Execute(null);
+                        e.Handled = true;
+                        RegistrarActividad();
+                    }
+                    break;
+                case Key.P:
+                    if (vm.TieneEpisodioAnterior)
+                    {
+                        vm.AnteriorEpisodioCommand.Execute(null);
+                        e.Handled = true;
+                        RegistrarActividad();
+                    }
+                    break;
                 case Key.Escape:
                     vm.CerrarCommand.Execute(null);
                     e.Handled = true;

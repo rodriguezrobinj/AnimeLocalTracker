@@ -1,13 +1,17 @@
 using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using AnimeLocalTracker.Models;
 using AnimeLocalTracker.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using CommunityToolkit.Mvvm.Messaging;
 using FlyleafLib;
 using FlyleafLib.MediaPlayer;
-using CommunityToolkit.Mvvm.Messaging;
 using AnimeLocalTracker.Messages;
 
 namespace AnimeLocalTracker.ViewModels;
@@ -16,7 +20,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 {
     private readonly IDatabaseService _databaseService;
     private readonly IAnimeTrackingService _animeTrackingService;
-    private readonly AnimeLocalTracker.Services.IAuthService _authService;
+    private readonly IAuthService _authService;
 
     [ObservableProperty]
     private Player _player = null!;
@@ -39,6 +43,52 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string _playPauseIcon = "Pause";
     [ObservableProperty] private bool _isDraggingSlider = false;
     
+    // Navegación entre episodios y AutoPlay
+    private bool _tieneEpisodioAnterior;
+    public bool TieneEpisodioAnterior
+    {
+        get => _tieneEpisodioAnterior;
+        set => SetProperty(ref _tieneEpisodioAnterior, value);
+    }
+
+    private bool _tieneEpisodioSiguiente;
+    public bool TieneEpisodioSiguiente
+    {
+        get => _tieneEpisodioSiguiente;
+        set => SetProperty(ref _tieneEpisodioSiguiente, value);
+    }
+
+    private bool _autoPlaySiguiente = true;
+    public bool AutoPlaySiguiente
+    {
+        get => _autoPlaySiguiente;
+        set => SetProperty(ref _autoPlaySiguiente, value);
+    }
+
+    private string _autoPlayIcon = "MotionPlay";
+    public string AutoPlayIcon
+    {
+        get => _autoPlayIcon;
+        set => SetProperty(ref _autoPlayIcon, value);
+    }
+
+    private string _episodioAnteriorTooltip = "Episodio anterior (P)";
+    public string EpisodioAnteriorTooltip
+    {
+        get => _episodioAnteriorTooltip;
+        set => SetProperty(ref _episodioAnteriorTooltip, value);
+    }
+
+    private string _episodioSiguienteTooltip = "Episodio siguiente (N)";
+    public string EpisodioSiguienteTooltip
+    {
+        get => _episodioSiguienteTooltip;
+        set => SetProperty(ref _episodioSiguienteTooltip, value);
+    }
+
+    private List<EpisodioItem> _episodiosDisponibles = new();
+    private bool _autoPlayDisparado = false;
+
     private string _fullscreenIcon = "Fullscreen";
     public string FullscreenIcon
     {
@@ -69,30 +119,36 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     private double _lastNotifiedSeconds = -1;
     private bool _durationCached = false;
 
-    public ReproductorViewModel(IDatabaseService databaseService, IAnimeTrackingService animeTrackingService, AnimeLocalTracker.Services.IAuthService authService)
+    public ReproductorViewModel(IDatabaseService databaseService, IAnimeTrackingService animeTrackingService, IAuthService authService)
     {
         _databaseService = databaseService;
         _animeTrackingService = animeTrackingService;
         _authService = authService;
-        
-        // No crear Player aquí — se crea en CargarVideo() con config optimizada
     }
 
-    private Player CreateOptimizedPlayer()
+    public virtual Player CreateOptimizedPlayer()
     {
-        var config = new Config();
-        
-        // Seeking rápido por keyframe (no frame-accurate)
-        config.Player.SeekAccurate = false;
-        
-        // Subtítulos habilitados por defecto
-        config.Subtitles.Enabled = SubtitulosHabilitados;
-        
-        return new Player(config);
+        try
+        {
+            var config = new Config();
+            
+            // Seeking rápido por keyframe (no frame-accurate)
+            config.Player.SeekAccurate = false;
+            
+            // Subtítulos habilitados por defecto
+            config.Subtitles.Enabled = SubtitulosHabilitados;
+            
+            return new Player(config);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn("ReproductorViewModel", $"No se pudo crear Player nativo (posible entorno de pruebas): {ex.Message}");
+            return null!;
+        }
     }
 
     [RelayCommand]
-    private void TogglePlayPause()
+    public void TogglePlayPause()
     {
         if (Player == null) return;
         
@@ -109,39 +165,38 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     }
     
     [RelayCommand]
-    private void Rewind10()
+    public void Rewind10()
     {
-        if (Player == null) return;
-        long newTime = Player.CurTime - TimeSpan.FromSeconds(10).Ticks;
-        if (newTime < 0) newTime = 0;
-        Player.CurTime = newTime;
+        double newSeconds = Math.Max(0, CurrentSeconds - 10);
+        Seek(newSeconds);
     }
     
     [RelayCommand]
-    private void Forward10()
+    public void Forward10()
     {
-        if (Player == null) return;
-        long newTime = Player.CurTime + TimeSpan.FromSeconds(10).Ticks;
-        if (newTime > Player.Duration) newTime = Player.Duration;
-        Player.CurTime = newTime;
+        double max = TotalSeconds > 0 ? TotalSeconds : double.MaxValue;
+        double newSeconds = Math.Min(max, CurrentSeconds + 10);
+        Seek(newSeconds);
     }
 
     // Comando para cuando el usuario suelta el slider (Thumb.DragCompleted) o click directo
     [RelayCommand]
-    private void Seek(double seconds)
+    public void Seek(double seconds)
     {
         if (Player != null)
         {
-            Player.CurTime = TimeSpan.FromSeconds(seconds).Ticks;
-            
-            // Actualizar UI inmediatamente para feedback instantáneo
-            var curSeconds = TimeSpan.FromTicks(Player.CurTime).TotalSeconds;
-            CurrentSeconds = curSeconds;
-            
-            var t = TimeSpan.FromSeconds(curSeconds);
-            TiempoActualTexto = t.ToString(t.Hours > 0 ? @"hh\:mm\:ss" : @"mm\:ss");
-            TiempoCombinadoTexto = $"{TiempoActualTexto} / {TiempoTotalTexto}";
+            try
+            {
+                Player.CurTime = TimeSpan.FromSeconds(seconds).Ticks;
+            }
+            catch { }
         }
+        
+        // Actualizar UI inmediatamente para feedback instantáneo
+        CurrentSeconds = seconds;
+        var t = TimeSpan.FromSeconds(seconds);
+        TiempoActualTexto = t.ToString(t.Hours > 0 ? @"hh\:mm\:ss" : @"mm\:ss");
+        TiempoCombinadoTexto = $"{TiempoActualTexto} / {TiempoTotalTexto}";
     }
 
     [ObservableProperty] private int _volumen = 100;
@@ -165,7 +220,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     private int _volumenAnterior = 100;
 
     [RelayCommand]
-    private void ToggleMute()
+    public void ToggleMute()
     {
         if (Volumen > 0)
         {
@@ -179,9 +234,9 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     }
 
     [RelayCommand]
-    private void ToggleFullscreen()
+    public void ToggleFullscreen()
     {
-        if (System.Windows.Application.Current.MainWindow is AnimeLocalTracker.Views.MainWindow mainWindow)
+        if (System.Windows.Application.Current?.MainWindow is AnimeLocalTracker.Views.MainWindow mainWindow)
         {
             mainWindow.TogglePantallaCompleta();
             
@@ -189,7 +244,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             FullscreenIcon = mainWindow.IsFullScreen ? "FullscreenExit" : "Fullscreen";
             
             // Forzar foco de vuelta a la ventana para que F11 siga funcionando
-            System.Windows.Application.Current.Dispatcher.BeginInvoke(
+            System.Windows.Application.Current?.Dispatcher?.BeginInvoke(
                 System.Windows.Threading.DispatcherPriority.Input,
                 () =>
                 {
@@ -200,7 +255,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     }
 
     [RelayCommand]
-    private void SelectSubtitleStream(object stream)
+    public void SelectSubtitleStream(object stream)
     {
         if (Player == null || stream == null) return;
         
@@ -211,7 +266,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     }
 
     [RelayCommand]
-    private void TurnOffSubtitles()
+    public void TurnOffSubtitles()
     {
         if (Player == null) return;
         
@@ -220,9 +275,67 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         SubtitulosIcon = "SubtitlesOutline";
     }
 
+    [RelayCommand]
+    public void ToggleAutoPlay()
+    {
+        AutoPlaySiguiente = !AutoPlaySiguiente;
+        AutoPlayIcon = AutoPlaySiguiente ? "MotionPlay" : "MotionPlayOff";
+    }
+
+    public EpisodioItem? ObtenerSiguienteEpisodio()
+    {
+        return _episodiosDisponibles
+            .Where(e => e.NumeroEpisodio > _episodio && (!string.IsNullOrWhiteSpace(e.RutaCompleta)))
+            .OrderBy(e => e.NumeroEpisodio)
+            .FirstOrDefault();
+    }
+
+    public EpisodioItem? ObtenerAnteriorEpisodio()
+    {
+        return _episodiosDisponibles
+            .Where(e => e.NumeroEpisodio < _episodio && (!string.IsNullOrWhiteSpace(e.RutaCompleta)))
+            .OrderByDescending(e => e.NumeroEpisodio)
+            .FirstOrDefault();
+    }
+
+    public void ActualizarEstadosNavegacionEpisodios()
+    {
+        var siguiente = ObtenerSiguienteEpisodio();
+        TieneEpisodioSiguiente = siguiente != null && !string.IsNullOrWhiteSpace(siguiente.RutaCompleta);
+        EpisodioSiguienteTooltip = TieneEpisodioSiguiente 
+            ? $"Siguiente: Episodio {siguiente!.NumeroEpisodio} (N)" 
+            : "No hay siguiente episodio";
+
+        var anterior = ObtenerAnteriorEpisodio();
+        TieneEpisodioAnterior = anterior != null && !string.IsNullOrWhiteSpace(anterior.RutaCompleta);
+        EpisodioAnteriorTooltip = TieneEpisodioAnterior 
+            ? $"Anterior: Episodio {anterior!.NumeroEpisodio} (P)" 
+            : "No hay episodio anterior";
+    }
+
+    [RelayCommand]
+    public void SiguienteEpisodio()
+    {
+        var siguiente = ObtenerSiguienteEpisodio();
+        if (siguiente != null && !string.IsNullOrWhiteSpace(siguiente.RutaCompleta))
+        {
+            CargarVideo(siguiente.RutaCompleta, _animeId, TituloAnime, siguiente.NumeroEpisodio, _episodiosDisponibles);
+        }
+    }
+
+    [RelayCommand]
+    public void AnteriorEpisodio()
+    {
+        var anterior = ObtenerAnteriorEpisodio();
+        if (anterior != null && !string.IsNullOrWhiteSpace(anterior.RutaCompleta))
+        {
+            CargarVideo(anterior.RutaCompleta, _animeId, TituloAnime, anterior.NumeroEpisodio, _episodiosDisponibles);
+        }
+    }
+
     private CancellationTokenSource? _trackingCts;
 
-    public void CargarVideo(string rutaVideo, int animeId, string tituloAnime, int episodio)
+    public void CargarVideo(string rutaVideo, int animeId, string tituloAnime, int episodio, List<EpisodioItem>? listaEpisodios = null)
     {
         _rutaVideo = rutaVideo;
         _animeId = animeId;
@@ -232,6 +345,17 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         _fueMarcadoComoVisto = false;
         _durationCached = false;
         _lastNotifiedSeconds = -1;
+        _autoPlayDisparado = false;
+
+        if (listaEpisodios != null)
+        {
+            _episodiosDisponibles = listaEpisodios
+                .Where(e => !string.IsNullOrWhiteSpace(e.RutaCompleta))
+                .OrderBy(e => e.NumeroEpisodio)
+                .ToList();
+        }
+
+        ActualizarEstadosNavegacionEpisodios();
 
         // Cancelar rastreo previo
         _trackingCts?.Cancel();
@@ -244,19 +368,82 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             FullscreenIcon = mainWindow.IsFullScreen ? "FullscreenExit" : "Fullscreen";
         }
 
-        // Dispose del player anterior si existe
-        if (Player != null)
+        // Mantener la instancia existente de Player para no destruir la superficie DirectX de FlyleafHost
+        if (Player == null || Player.IsDisposed)
         {
-            try { Player.Dispose(); } catch (Exception ex) { AppLogger.Debug("ReproductorViewModel", $"Player dispose: {ex.Message}"); }
+            Player = CreateOptimizedPlayer();
+        }
+        else
+        {
+            try
+            {
+                if (Player.Status == Status.Playing)
+                {
+                    Player.Pause();
+                }
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Debug("ReproductorViewModel", $"Player pause antes de cambiar archivo: {ex.Message}");
+            }
         }
 
-        // Crear player con configuración optimizada para seeking rápido
-        Player = CreateOptimizedPlayer();
-
-        Player.OpenAsync(rutaVideo);
-        Player.Play();
+        if (Player != null)
+        {
+            Player.OpenAsync(rutaVideo);
+            Player.Play();
+        }
 
         _ = RastrearProgresoAsync(_trackingCts.Token);
+    }
+
+    public async Task RealizarAutoTrackingAsync()
+    {
+        if (_fueMarcadoComoVisto) return;
+        _fueMarcadoComoVisto = true;
+        
+        try 
+        {
+            // 1. Guardar localmente
+            var registros = await _databaseService.ObtenerRegistrosPorAnimeAsync(_animeId);
+            var registro = registros.FirstOrDefault(r => r.NumeroEpisodio == _episodio);
+            
+            if (registro != null)
+            {
+                registro.VistoLocal = true;
+            }
+            else
+            {
+                registro = new Models.RegistroEpisodio 
+                {
+                    AniListId = _animeId,
+                    NumeroEpisodio = _episodio,
+                    RutaArchivo = _rutaVideo,
+                    VistoLocal = true
+                };
+            }
+            await _databaseService.GuardarRegistroEpisodioAsync(registro);
+
+            // 2. Guardar en AniList
+            var token = _authService.ObtenerTokenGuardado();
+            if (!string.IsNullOrEmpty(token))
+            {
+                await _animeTrackingService.ActualizarProgresoAsync(_animeId, _episodio, token);
+            }
+
+            // 3. Notificación flotante sutil (Toast)
+            _ = WeakReferenceMessenger.Default.Send(new Messages.MostrarDialogoRequestMessage(
+                "Auto-Tracking", 
+                $"Episodio {_episodio} marcado como visto.", 
+                false, "CheckCircle", "#4CAF50"));
+                
+            // 4. Avisar a la vista de detalles para que actualice la lista automáticamente
+            WeakReferenceMessenger.Default.Send(new Messages.EpisodioActualizadoMensaje(_animeId, _episodio, true));
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("ReproductorViewModel", "Error en auto-tracking", ex);
+        }
     }
 
     private async Task RastrearProgresoAsync(CancellationToken ct)
@@ -302,50 +489,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                     // Auto-Tracking al 90%
                     if (porcentaje >= 0.90 && !_fueMarcadoComoVisto)
                     {
-                        _fueMarcadoComoVisto = true;
-                        
-                        try 
-                        {
-                            // 1. Guardar localmente
-                            var registros = await _databaseService.ObtenerRegistrosPorAnimeAsync(_animeId);
-                            var registro = registros.FirstOrDefault(r => r.NumeroEpisodio == _episodio);
-                            
-                            if (registro != null)
-                            {
-                                registro.VistoLocal = true;
-                            }
-                            else
-                            {
-                                registro = new Models.RegistroEpisodio 
-                                {
-                                    AniListId = _animeId,
-                                    NumeroEpisodio = _episodio,
-                                    RutaArchivo = _rutaVideo,
-                                    VistoLocal = true
-                                };
-                            }
-                            await _databaseService.GuardarRegistroEpisodioAsync(registro);
-
-                            // 2. Guardar en AniList
-                            var token = _authService.ObtenerTokenGuardado();
-                            if (!string.IsNullOrEmpty(token))
-                            {
-                                await _animeTrackingService.ActualizarProgresoAsync(_animeId, _episodio, token);
-                            }
-
-                            // 3. Notificación flotante sutil (Toast)
-                            _ = WeakReferenceMessenger.Default.Send(new Messages.MostrarDialogoRequestMessage(
-                                "Auto-Tracking", 
-                                $"Episodio {_episodio} marcado como visto.", 
-                                false, "CheckCircle", "#4CAF50"));
-                                
-                            // 4. Avisar a la vista de detalles para que actualice la lista automáticamente
-                            WeakReferenceMessenger.Default.Send(new Messages.EpisodioActualizadoMensaje(_animeId, _episodio, true));
-                        }
-                        catch (Exception ex)
-                        {
-                            AppLogger.Error("ReproductorViewModel", "Error en auto-tracking", ex);
-                        }
+                        await RealizarAutoTrackingAsync();
                     }
                     
                     // Botón Skip Intro (Mostrar entre 0:30 y 3:00)
@@ -360,7 +504,26 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                 }
                 else if (Player?.Status == Status.Ended)
                 {
-                    // Auto-Play siguiente episodio si existe
+                    // Auto-Play siguiente episodio si existe y está habilitado
+                    if (AutoPlaySiguiente && TieneEpisodioSiguiente && !_autoPlayDisparado)
+                    {
+                        _autoPlayDisparado = true;
+                        
+                        if (!_fueMarcadoComoVisto)
+                        {
+                            await RealizarAutoTrackingAsync();
+                        }
+
+                        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+                        if (dispatcher != null && !dispatcher.HasShutdownStarted)
+                        {
+                            _ = dispatcher.InvokeAsync(() => SiguienteEpisodio());
+                        }
+                        else
+                        {
+                            SiguienteEpisodio();
+                        }
+                    }
                 }
 
                 // Sondeo adaptativo: 250ms mientras reproduce, 1000ms cuando está en pausa/detenido
@@ -380,7 +543,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     }
 
     [RelayCommand]
-    private void SkipIntro()
+    public void SkipIntro()
     {
         if (Player == null) return;
         
@@ -395,7 +558,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     }
 
     [RelayCommand]
-    private void Cerrar()
+    public void Cerrar()
     {
         Dispose();
         

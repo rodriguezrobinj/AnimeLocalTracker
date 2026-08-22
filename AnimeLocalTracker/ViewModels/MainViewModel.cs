@@ -145,7 +145,7 @@ public partial class MainViewModel : ObservableObject,
         _vistaAnteriorAlReproductor = VistaActual;
 
         var viewModel = _serviceProvider.GetRequiredService<ReproductorViewModel>();
-        viewModel.CargarVideo(message.RutaVideo, message.AnimeId, message.TituloAnime, message.Episodio);
+        viewModel.CargarVideo(message.RutaVideo, message.AnimeId, message.TituloAnime, message.Episodio, message.EpisodiosDisponibles);
         VistaActual = viewModel;
     }
 

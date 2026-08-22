@@ -137,24 +137,44 @@
                         <!-- Controles -->
                         <Grid Grid.Row="2" Margin="0,0,0,0">
                             <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/> <!-- Anterior -->
                                 <ColumnDefinition Width="Auto"/> <!-- Play -->
+                                <ColumnDefinition Width="Auto"/> <!-- Siguiente -->
                                 <ColumnDefinition Width="Auto"/> <!-- Volumen -->
                                 <ColumnDefinition Width="Auto"/> <!-- Tiempo -->
                                 <ColumnDefinition Width="*"/>    <!-- Espacio -->
                                 <ColumnDefinition Width="Auto"/> <!-- Retroceder -->
                                 <ColumnDefinition Width="Auto"/> <!-- Adelantar -->
+                                <ColumnDefinition Width="Auto"/> <!-- AutoPlay Siguiente -->
                                 <ColumnDefinition Width="Auto"/> <!-- Subtítulos -->
                                 <ColumnDefinition Width="Auto"/> <!-- Fullscreen -->
                             </Grid.ColumnDefinitions>
 
+                            <!-- Episodio Anterior -->
+                            <Button Grid.Column="0" Command="{Binding AnteriorEpisodioCommand}"
+                                    IsEnabled="{Binding TieneEpisodioAnterior}"
+                                    ToolTip="{Binding EpisodioAnteriorTooltip}"
+                                    Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="36" Height="36" Margin="0,0,2,0">
+                                <materialDesign:PackIcon Kind="SkipPrevious" Width="24" Height="24" />
+                            </Button>
+
                             <!-- Play/Pause -->
-                            <Button Grid.Column="0" Command="{Binding TogglePlayPauseCommand}" 
-                                    Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,5,0">
+                            <Button Grid.Column="1" Command="{Binding TogglePlayPauseCommand}" 
+                                    ToolTip="Reproducir / Pausar (Espacio)"
+                                    Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,2,0">
                                 <materialDesign:PackIcon Kind="{Binding PlayPauseIcon}" Width="28" Height="28" />
                             </Button>
 
+                            <!-- Episodio Siguiente -->
+                            <Button Grid.Column="2" Command="{Binding SiguienteEpisodioCommand}"
+                                    IsEnabled="{Binding TieneEpisodioSiguiente}"
+                                    ToolTip="{Binding EpisodioSiguienteTooltip}"
+                                    Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="36" Height="36" Margin="0,0,8,0">
+                                <materialDesign:PackIcon Kind="SkipNext" Width="24" Height="24" />
+                            </Button>
+
                             <!-- Contenedor Volumen Animado -->
-                            <StackPanel Grid.Column="1" Orientation="Horizontal" x:Name="VolumePanel" Background="Transparent" Margin="0,0,10,0">
+                            <StackPanel Grid.Column="3" Orientation="Horizontal" x:Name="VolumePanel" Background="Transparent" Margin="0,0,10,0">
                                 <Button Command="{Binding ToggleMuteCommand}" Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40">
                                     <materialDesign:PackIcon Kind="{Binding VolumenIcon}" Width="24" Height="24" />
                                 </Button>
@@ -192,22 +212,33 @@
                             </StackPanel>
 
                             <!-- Tiempo -->
-                            <TextBlock Grid.Column="2" Text="{Binding TiempoCombinadoTexto}" 
+                            <TextBlock Grid.Column="4" Text="{Binding TiempoCombinadoTexto}" 
                                        Foreground="White" VerticalAlignment="Center" FontSize="13" FontWeight="Bold" Margin="5,0,0,0" Opacity="0.9"/>
                                        
                             <!-- Retroceder 10s -->
-                            <Button Grid.Column="4" Command="{Binding Rewind10Command}" 
+                            <Button Grid.Column="6" Command="{Binding Rewind10Command}" 
+                                    ToolTip="Retroceder 10s (←)"
                                     Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,5,0">
                                 <materialDesign:PackIcon Kind="Rewind10" Width="26" Height="26" />
                             </Button>
 
                             <!-- Adelantar 10s -->
-                            <Button Grid.Column="5" Command="{Binding Forward10Command}" 
+                            <Button Grid.Column="7" Command="{Binding Forward10Command}" 
+                                    ToolTip="Adelantar 10s (→)"
                                     Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,10,0">
                                 <materialDesign:PackIcon Kind="FastForward10" Width="26" Height="26" />
                             </Button>
+
+                            <!-- AutoPlay Siguiente -->
+                            <Button Grid.Column="8" Command="{Binding ToggleAutoPlayCommand}"
+                                    ToolTip="Reproducción automática del siguiente capítulo"
+                                    Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,5,0">
+                                <materialDesign:PackIcon Kind="{Binding AutoPlayIcon}" Width="24" Height="24" />
+                            </Button>
+
                             <!-- Subtítulos (Menú Manual) -->
-                            <ToggleButton x:Name="SubtitlesToggle" Grid.Column="6"
+                            <ToggleButton x:Name="SubtitlesToggle" Grid.Column="9"
+                                    ToolTip="Subtítulos"
                                     Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,5,0">
                                 <materialDesign:PackIcon Kind="{Binding SubtitulosIcon}" Width="26" Height="26" />
                             </ToggleButton>
@@ -275,7 +306,9 @@
                             </Popup>
                             
                             <!-- Fullscreen con ícono dinámico -->
-                            <Button Grid.Column="7" Command="{Binding ToggleFullscreenCommand}" Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,0,0">
+                            <Button Grid.Column="10" Command="{Binding ToggleFullscreenCommand}" 
+                                    ToolTip="Pantalla completa (F11)"
+                                    Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,0,0">
                                 <materialDesign:PackIcon Kind="{Binding FullscreenIcon}" Width="26" Height="26" />
                             </Button>
                         </Grid>
