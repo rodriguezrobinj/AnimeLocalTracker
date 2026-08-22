@@ -89,6 +89,9 @@ public partial class App : Application
 
         // Servicio de actualizaciones automáticas con Velopack y GitHub Releases
         services.AddSingleton<IUpdateService, UpdateService>();
+
+        // Servicio de caché y precarga de imágenes optimizadas para 60fps
+        services.AddSingleton<IImageCacheService, ImageCacheService>();
     }
 
     private static Polly.IAsyncPolicy<System.Net.Http.HttpResponseMessage> GetRetryPolicy()

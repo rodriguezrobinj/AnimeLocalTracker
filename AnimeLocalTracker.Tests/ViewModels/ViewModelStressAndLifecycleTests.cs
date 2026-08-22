@@ -23,6 +23,7 @@ public class ViewModelStressAndLifecycleTests
     private readonly Mock<IDialogService> _dialogMock = new();
     private readonly Mock<IUpdateService> _updateMock = new();
     private readonly Mock<ISettingsService> _settingsMock = new();
+    private readonly Mock<IImageCacheService> _imageCacheMock = new();
 
     [Fact]
     public void MainViewModel_NavegacionMasiva100Veces_NoDeberiaLanzarExcepciones()
@@ -37,6 +38,7 @@ public class ViewModelStressAndLifecycleTests
         services.AddSingleton(_dialogMock.Object);
         services.AddSingleton(_updateMock.Object);
         services.AddSingleton(_settingsMock.Object);
+        services.AddSingleton(_imageCacheMock.Object);
 
         _downloadMock.Setup(d => d.ObtenerDescargasActivas()).Returns(new List<DescargaItem>());
 

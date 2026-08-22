@@ -18,6 +18,7 @@ public class GaleriaViewModelTests
     private readonly Mock<IAuthService> _authServiceMock = new();
     private readonly Mock<IDialogService> _dialogServiceMock = new();
     private readonly Mock<IHttpClientFactory> _httpClientFactoryMock = new();
+    private readonly Mock<IImageCacheService> _imageCacheServiceMock = new();
 
     private GaleriaViewModel CreateSut(List<AnimeItem>? animes = null)
     {
@@ -34,7 +35,8 @@ public class GaleriaViewModelTests
             _databaseServiceMock.Object,
             _authServiceMock.Object,
             _dialogServiceMock.Object,
-            _httpClientFactoryMock.Object
+            _httpClientFactoryMock.Object,
+            _imageCacheServiceMock.Object
         );
     }
 

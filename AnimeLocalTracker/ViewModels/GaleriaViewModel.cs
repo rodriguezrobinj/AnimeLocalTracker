@@ -25,6 +25,7 @@ public partial class GaleriaViewModel : ObservableObject,
     private readonly IAuthService _authService;
     private readonly IDialogService _dialogService;
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IImageCacheService _imageCacheService;
     
     public bool BibliotecaVacia => BibliotecaLocales.Count == 0;
 
@@ -72,13 +73,20 @@ public partial class GaleriaViewModel : ObservableObject,
     // --- PROPIEDADES DE SELECCIÓN MÚLTIPLE ---
     [ObservableProperty] private bool _modoSeleccion;
 
-    public GaleriaViewModel(IAnimeTrackingService animeTrackingService, IDatabaseService databaseService, IAuthService authService, IDialogService dialogService, IHttpClientFactory httpClientFactory)
+    public GaleriaViewModel(
+        IAnimeTrackingService animeTrackingService, 
+        IDatabaseService databaseService, 
+        IAuthService authService, 
+        IDialogService dialogService, 
+        IHttpClientFactory httpClientFactory,
+        IImageCacheService imageCacheService)
     {
         _animeTrackingService = animeTrackingService;
         _databaseService = databaseService;
         _authService = authService;
         _dialogService = dialogService;
         _httpClientFactory = httpClientFactory;
+        _imageCacheService = imageCacheService;
         
         WeakReferenceMessenger.Default.Register<UsuarioLogeadoMensaje>(this);
         WeakReferenceMessenger.Default.Register<AnimeAñadidoMensaje>(this);
@@ -104,10 +112,22 @@ public partial class GaleriaViewModel : ObservableObject,
     {
         if (!BibliotecaLocales.Any(a => a.AniListId == message.NuevoAnime.AniListId))
         {
+            message.NuevoAnime.PortadaImagen = _imageCacheService.ObtenerPortada(message.NuevoAnime.AniListId, message.NuevoAnime.UrlPortada);
             BibliotecaLocales.Add(message.NuevoAnime);
             OnPropertyChanged(nameof(BibliotecaVacia));
             OnPropertyChanged(nameof(TotalAnimesBiblioteca));
-            _ = DescargarPortadaSiNoExisteAsync(message.NuevoAnime);
+            
+            if (message.NuevoAnime.PortadaImagen == null && !string.IsNullOrWhiteSpace(message.NuevoAnime.UrlPortada))
+            {
+                _ = Task.Run(async () =>
+                {
+                    var img = await _imageCacheService.ObtenerPortadaAsync(message.NuevoAnime.AniListId, message.NuevoAnime.UrlPortada);
+                    if (img != null)
+                    {
+                        System.Windows.Application.Current?.Dispatcher?.Invoke(() => message.NuevoAnime.PortadaImagen = img);
+                    }
+                });
+            }
         }
     }
 
@@ -165,6 +185,9 @@ public partial class GaleriaViewModel : ObservableObject,
                     await _databaseService.ActualizarAnimeAsync(a);
                 }
             }
+
+            // Precarga ultra-rápida desde caché en memoria o archivo local (0ms en scroll)
+            a.PortadaImagen = _imageCacheService.ObtenerPortada(a.AniListId, a.UrlPortada);
         }
         
         BibliotecaLocales = new ObservableCollection<AnimeItem>(animes);
@@ -179,13 +202,32 @@ public partial class GaleriaViewModel : ObservableObject,
         OnPropertyChanged(nameof(BibliotecaFiltrada));
         OnPropertyChanged(nameof(SinResultados));
         
-        foreach (var anime in animes)
-        {
-            _ = DescargarPortadaSiNoExisteAsync(anime);
-        }
+        _ = CargarPortadasFaltantesEnSegundoPlanoAsync(animes);
         
         await CargarPerfilUsuarioAsync();
         OnPropertyChanged(nameof(BibliotecaVacia));
+    }
+
+    private async Task CargarPortadasFaltantesEnSegundoPlanoAsync(IEnumerable<AnimeItem> animes)
+    {
+        var faltantes = animes.Where(a => a.PortadaImagen == null && !string.IsNullOrWhiteSpace(a.UrlPortada)).ToList();
+        if (faltantes.Count == 0) return;
+
+        foreach (var anime in faltantes)
+        {
+            var img = await _imageCacheService.ObtenerPortadaAsync(anime.AniListId, anime.UrlPortada);
+            if (img != null)
+            {
+                if (System.Windows.Application.Current?.Dispatcher != null && !System.Windows.Application.Current.Dispatcher.CheckAccess())
+                {
+                    System.Windows.Application.Current.Dispatcher.Invoke(() => anime.PortadaImagen = img);
+                }
+                else
+                {
+                    anime.PortadaImagen = img;
+                }
+            }
+        }
     }
     
     private bool FiltrarAnime(object obj)
@@ -219,43 +261,6 @@ public partial class GaleriaViewModel : ObservableObject,
         }
 
         return true;
-    }
-    
-    private static readonly System.Threading.SemaphoreSlim _coverDownloadSemaphore = new(4, 4);
-    
-    private async Task DescargarPortadaSiNoExisteAsync(AnimeItem anime)
-    {
-        if (string.IsNullOrWhiteSpace(anime.UrlPortada)) return;
-        
-        string directory = System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData), "AnimeLocalTracker", "Covers");
-        string localPath = System.IO.Path.Combine(directory, $"{anime.AniListId}.jpg");
-        
-        if (!System.IO.File.Exists(localPath))
-        {
-            await _coverDownloadSemaphore.WaitAsync();
-            try 
-            {
-                if (System.IO.File.Exists(localPath)) return; // Doble verificación tras adquirir semáforo
-
-                System.IO.Directory.CreateDirectory(directory);
-                using var client = _httpClientFactory.CreateClient();
-                var bytes = await client.GetByteArrayAsync(anime.UrlPortada);
-                await System.IO.File.WriteAllBytesAsync(localPath, bytes);
-                
-                System.Windows.Application.Current?.Dispatcher?.Invoke(() => 
-                {
-                    anime.NotificarPortadaActualizada();
-                });
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Warn("GaleriaViewModel", $"No se pudo descargar la portada para AnimeId {anime.AniListId}: {ex.Message}");
-            }
-            finally
-            {
-                _coverDownloadSemaphore.Release();
-            }
-        }
     }
 
     private async Task CargarPerfilUsuarioAsync()

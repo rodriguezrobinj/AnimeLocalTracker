@@ -366,15 +366,19 @@
             <TextBlock Text="Intenta usar otros términos de búsqueda o cambia el filtro de estado." FontSize="14" Foreground="{DynamicResource MaterialDesignBodyLight}" HorizontalAlignment="Center" Margin="0,10,0,0" Opacity="0.8"/>
         </StackPanel>
 
-        <!-- Lista virtualizada -->
+        <!-- Lista virtualizada y acelerada por hardware -->
         <ListBox Grid.Row="2" ItemsSource="{Binding BibliotecaFiltrada}" Margin="-14,0,-14,0" Padding="0"
                  Visibility="{Binding BibliotecaVacia, Converter={StaticResource InverseBoolToVis}}"
                  Background="Transparent" BorderThickness="0" 
                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                  ScrollViewer.VerticalScrollBarVisibility="Auto"
+                 ScrollViewer.CanContentScroll="True"
+                 ScrollViewer.IsDeferredScrollingEnabled="False"
                  VirtualizingPanel.IsVirtualizing="True"
                  VirtualizingPanel.VirtualizationMode="Recycling"
-                 VirtualizingPanel.ScrollUnit="Pixel">
+                 VirtualizingPanel.ScrollUnit="Pixel"
+                 VirtualizingPanel.CacheLengthUnit="Item"
+                 VirtualizingPanel.CacheLength="4,4">
             <ListBox.ItemsPanel>
                 <ItemsPanelTemplate>
                     <vwp:VirtualizingWrapPanel Orientation="Horizontal" SpacingMode="None" />
@@ -399,116 +403,112 @@
             </ListBox.ItemContainerStyle>
 
             <ListBox.ItemTemplate>
-                    <DataTemplate>
-                        <materialDesign:Card Width="180" Height="265" Margin="14" 
-                                             UniformCornerRadius="10" Background="#121212"
-                                             RenderTransformOrigin="0.5,0.5" ClipToBounds="False"
-                                             CacheMode="BitmapCache">
-                            <materialDesign:Card.RenderTransform>
-                                <ScaleTransform ScaleX="1" ScaleY="1" />
-                            </materialDesign:Card.RenderTransform>
-                            <materialDesign:Card.Style>
-                                <Style TargetType="materialDesign:Card" BasedOn="{StaticResource {x:Type materialDesign:Card}}">
-                                    <Setter Property="materialDesign:ElevationAssist.Elevation" Value="Dp6" />
-                                    <Style.Triggers>
-                                        <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter Property="materialDesign:ElevationAssist.Elevation" Value="Dp12" />
-                                            <Trigger.EnterActions>
-                                                <BeginStoryboard>
-                                                    <Storyboard>
-                                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" To="1.05" Duration="0:0:0.15" />
-                                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" To="1.05" Duration="0:0:0.15" />
-                                                    </Storyboard>
-                                                </BeginStoryboard>
-                                            </Trigger.EnterActions>
-                                            <Trigger.ExitActions>
-                                                <BeginStoryboard>
-                                                    <Storyboard>
-                                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" To="1.0" Duration="0:0:0.15" />
-                                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" To="1.0" Duration="0:0:0.15" />
-                                                    </Storyboard>
-                                                </BeginStoryboard>
-                                            </Trigger.ExitActions>
-                                        </Trigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </materialDesign:Card.Style>
-        
-                            <!-- NOTA: Usaremos RelativeSource AncestorType UserControl para encontrar el ViewModel de la Galería -->
-                            <Button Command="{Binding DataContext.AbrirDetalleCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
-                                    CommandParameter="{Binding}" 
-                                    Padding="0" Background="Transparent" BorderThickness="0" Height="265" 
-                                    HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" ClipToBounds="False">
-                                <Button.Template>
-                                    <ControlTemplate TargetType="Button">
-                                        <Border Background="Transparent">
-                                            <ContentPresenter />
-                                        </Border>
-                                    </ControlTemplate>
-                                </Button.Template>
-                                <Grid>
-                                    <Border Style="{StaticResource ShimmerEffectStyle}" CornerRadius="10" />
-                                    <Image Source="{Binding PortadaVisible, TargetNullValue={x:Null}, FallbackValue={x:Null}, IsAsync=True}" Stretch="UniformToFill" />
-                                    
-                                    <!-- OVERLAY DE SELECCIÓN -->
-                                    <Border Background="#66000000" Visibility="{Binding EstaSeleccionado, Converter={StaticResource BoolToVis}}"/>
-                                    <Border BorderBrush="#3F51B5" BorderThickness="4" CornerRadius="10" Visibility="{Binding EstaSeleccionado, Converter={StaticResource BoolToVis}}"/>
-                                    
-                                    <!-- CHECKBOX DE SELECCIÓN (Visible solo en ModoSeleccion) -->
-                                    <CheckBox IsChecked="{Binding EstaSeleccionado}" 
-                                              Visibility="{Binding DataContext.ModoSeleccion, RelativeSource={RelativeSource AncestorType=ListBox}, Converter={StaticResource BoolToVis}}"
-                                              HorizontalAlignment="Right" VerticalAlignment="Top" Margin="8"
-                                              Style="{StaticResource MaterialDesignDarkCheckBox}"
-                                              IsHitTestVisible="False"
-                                              Panel.ZIndex="10"/>
-
-                                    <Border Background="{Binding ColorEstado}" Padding="8,4" CornerRadius="6" 
-                                            HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10"
-                                            materialDesign:ElevationAssist.Elevation="Dp2"
-                                            Visibility="{Binding EstaSeleccionado, Converter={StaticResource InverseBoolToVis}}">
-                                        <TextBlock Text="{Binding EstadoVisual}" Foreground="White" FontSize="11" FontWeight="Bold"/>
+                <DataTemplate>
+                    <materialDesign:Card Width="180" Height="265" Margin="14" 
+                                         UniformCornerRadius="10" Background="#161616"
+                                         RenderTransformOrigin="0.5,0.5" ClipToBounds="True">
+                        <materialDesign:Card.RenderTransform>
+                            <ScaleTransform ScaleX="1" ScaleY="1" />
+                        </materialDesign:Card.RenderTransform>
+                        <materialDesign:Card.Style>
+                            <Style TargetType="materialDesign:Card" BasedOn="{StaticResource {x:Type materialDesign:Card}}">
+                                <Setter Property="materialDesign:ElevationAssist.Elevation" Value="Dp2" />
+                                <Style.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="materialDesign:ElevationAssist.Elevation" Value="Dp8" />
+                                        <Trigger.EnterActions>
+                                            <BeginStoryboard>
+                                                <Storyboard>
+                                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" To="1.04" Duration="0:0:0.12" />
+                                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" To="1.04" Duration="0:0:0.12" />
+                                                </Storyboard>
+                                            </BeginStoryboard>
+                                        </Trigger.EnterActions>
+                                        <Trigger.ExitActions>
+                                            <BeginStoryboard>
+                                                <Storyboard>
+                                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" To="1.0" Duration="0:0:0.12" />
+                                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" To="1.0" Duration="0:0:0.12" />
+                                                </Storyboard>
+                                            </BeginStoryboard>
+                                        </Trigger.ExitActions>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </materialDesign:Card.Style>
+    
+                        <!-- Botón interactivo para abrir detalle -->
+                        <Button Command="{Binding DataContext.AbrirDetalleCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                CommandParameter="{Binding}" 
+                                Padding="0" Background="Transparent" BorderThickness="0" Height="265" 
+                                HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <ContentPresenter />
                                     </Border>
+                                </ControlTemplate>
+                            </Button.Template>
+                            <Grid>
+                                <!-- Fondo estático oscuro para carga instantánea sin animación infinita -->
+                                <Border Background="#1C1C1E" CornerRadius="10" />
 
-                                    <!-- BADGE NUEVOS EPISODIOS -->
-                                    <Border Background="#E53935" CornerRadius="10" Padding="8,4" 
-                                            HorizontalAlignment="Right" VerticalAlignment="Top" Margin="10"
-                                            Visibility="{Binding TieneNuevosEpisodios, Converter={StaticResource BoolToVis}}"
-                                            materialDesign:ElevationAssist.Elevation="Dp4"
-                                            Panel.ZIndex="15">
-                                        <TextBlock Text="{Binding NuevosEpisodios, StringFormat='{}{0} Nuevos'}" Foreground="White" FontSize="11" FontWeight="Bold"/>
-                                    </Border>
+                                <!-- Portada precargada y congelada en memoria para 0ms de latencia en scroll -->
+                                <Image Source="{Binding PortadaImagen}" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" />
+                                
+                                <!-- OVERLAY DE SELECCIÓN -->
+                                <Border Background="#66000000" Visibility="{Binding EstaSeleccionado, Converter={StaticResource BoolToVis}}"/>
+                                <Border BorderBrush="#3F51B5" BorderThickness="4" CornerRadius="10" Visibility="{Binding EstaSeleccionado, Converter={StaticResource BoolToVis}}"/>
+                                
+                                <!-- CHECKBOX DE SELECCIÓN (Visible solo en ModoSeleccion) -->
+                                <CheckBox IsChecked="{Binding EstaSeleccionado}" 
+                                          Visibility="{Binding DataContext.ModoSeleccion, RelativeSource={RelativeSource AncestorType=ListBox}, Converter={StaticResource BoolToVis}}"
+                                          HorizontalAlignment="Right" VerticalAlignment="Top" Margin="8"
+                                          Style="{StaticResource MaterialDesignDarkCheckBox}"
+                                          IsHitTestVisible="False"
+                                          Panel.ZIndex="10"/>
 
-                                    <Border VerticalAlignment="Bottom" Padding="12,25,12,12">
-                                        <Border.Background>
-                                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                                                <GradientStop Color="#00000000" Offset="0"/>
-                                                <GradientStop Color="#CC000000" Offset="0.5"/>
-                                                <GradientStop Color="#FF000000" Offset="1"/>
-                                            </LinearGradientBrush>
-                                        </Border.Background>
-                                        <StackPanel>
-                                            <TextBlock Text="{Binding Titulo}" Foreground="White" FontWeight="Bold" 
-                                                       FontSize="14" TextTrimming="CharacterEllipsis" MaxHeight="45" TextWrapping="Wrap" Margin="0,0,0,8" />
-                                            
-                                            <!-- PROGRESS BAR Y TEXTO -->
-                                            <ProgressBar Value="{Binding ProgresoPorcentaje, Mode=OneWay}" Height="4" 
-                                                         Background="#44FFFFFF" Foreground="#E53935" 
-                                                         BorderThickness="0" Margin="0,0,0,4"/>
-                                            
-                                            <TextBlock Foreground="#B3FFFFFF" FontSize="11" FontWeight="SemiBold">
-                                                <TextBlock.Text>
-                                                    <MultiBinding StringFormat="{}{0} de {1} vistos">
-                                                        <Binding Path="EpisodiosVistos"/>
-                                                        <Binding Path="TotalEpisodios"/>
-                                                    </MultiBinding>
-                                                </TextBlock.Text>
-                                            </TextBlock>
-                                        </StackPanel>
-                                    </Border>
-                                </Grid>
-                            </Button>
-                        </materialDesign:Card>
-                    </DataTemplate>
+                                <Border Background="{Binding ColorEstado}" Padding="8,4" CornerRadius="6" 
+                                        HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10"
+                                        materialDesign:ElevationAssist.Elevation="Dp2"
+                                        Visibility="{Binding EstaSeleccionado, Converter={StaticResource InverseBoolToVis}}">
+                                    <TextBlock Text="{Binding EstadoVisual}" Foreground="White" FontSize="11" FontWeight="Bold"/>
+                                </Border>
+
+                                <!-- BADGE NUEVOS EPISODIOS -->
+                                <Border Background="#E53935" CornerRadius="10" Padding="8,4" 
+                                        HorizontalAlignment="Right" VerticalAlignment="Top" Margin="10"
+                                        Visibility="{Binding TieneNuevosEpisodios, Converter={StaticResource BoolToVis}}"
+                                        materialDesign:ElevationAssist.Elevation="Dp4"
+                                        Panel.ZIndex="15">
+                                    <TextBlock Text="{Binding NuevosEpisodios, StringFormat='{}{0} Nuevos'}" Foreground="White" FontSize="11" FontWeight="Bold"/>
+                                </Border>
+
+                                <Border VerticalAlignment="Bottom" Padding="12,25,12,12">
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                            <GradientStop Color="#00000000" Offset="0"/>
+                                            <GradientStop Color="#CC000000" Offset="0.5"/>
+                                            <GradientStop Color="#FF000000" Offset="1"/>
+                                        </LinearGradientBrush>
+                                    </Border.Background>
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Titulo}" Foreground="White" FontWeight="Bold" 
+                                                   FontSize="14" TextTrimming="CharacterEllipsis" MaxHeight="45" TextWrapping="Wrap" Margin="0,0,0,8" />
+                                        
+                                        <!-- PROGRESS BAR DIRECTO SIN ANIMACIÓN DE TRANSICIÓN EN SCROLL -->
+                                        <ProgressBar Value="{Binding ProgresoPorcentaje, Mode=OneWay}" Height="4" 
+                                                     Background="#44FFFFFF" Foreground="#E53935" 
+                                                     BorderThickness="0" Margin="0,0,0,4"
+                                                     materialDesign:TransitionAssist.DisableTransitions="True"/>
+                                        
+                                        <TextBlock Text="{Binding ProgresoEpisodiosTexto}" Foreground="#B3FFFFFF" FontSize="11" FontWeight="SemiBold" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                        </Button>
+                    </materialDesign:Card>
+                </DataTemplate>
             </ListBox.ItemTemplate>
         </ListBox>
     </Grid>

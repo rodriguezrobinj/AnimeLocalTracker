@@ -31,6 +31,7 @@ public partial class AnimeItem : ObservableObject
     [NotifyPropertyChangedFor(nameof(ProgresoPorcentaje))]
     [NotifyPropertyChangedFor(nameof(NuevosEpisodios))]
     [NotifyPropertyChangedFor(nameof(TieneNuevosEpisodios))]
+    [NotifyPropertyChangedFor(nameof(ProgresoEpisodiosTexto))]
     private int _totalEpisodios;
     
     [ObservableProperty]
@@ -47,12 +48,18 @@ public partial class AnimeItem : ObservableObject
     [ObservableProperty]
     private bool _estaSeleccionado;
 
+    // Imagen en memoria congelada (optimización 60fps)
+    [property: Ignore]
+    [ObservableProperty]
+    private System.Windows.Media.ImageSource? _portadaImagen;
+
     // === PROPIEDADES DE PROGRESO LOCAL ===
     [property: Ignore]
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ProgresoPorcentaje))]
     [NotifyPropertyChangedFor(nameof(NuevosEpisodios))]
     [NotifyPropertyChangedFor(nameof(TieneNuevosEpisodios))]
+    [NotifyPropertyChangedFor(nameof(ProgresoEpisodiosTexto))]
     private int _episodiosVistos;
 
     [Ignore]
@@ -63,6 +70,9 @@ public partial class AnimeItem : ObservableObject
 
     [Ignore]
     public bool TieneNuevosEpisodios => NuevosEpisodios > 0;
+
+    [Ignore]
+    public string ProgresoEpisodiosTexto => $"{EpisodiosVistos} de {TotalEpisodios} vistos";
 
 
     // === PROPIEDADES VISUALES (NO SE GUARDAN EN SQLITE) ===

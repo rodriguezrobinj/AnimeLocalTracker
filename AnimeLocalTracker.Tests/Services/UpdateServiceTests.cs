@@ -72,6 +72,7 @@ public class UpdateServiceTests
         var settingsMock = new Mock<ISettingsService>();
         var authMock = new Mock<IAuthService>();
         var dialogMock = new Mock<IDialogService>();
+        var imageCacheMock = new Mock<IImageCacheService>();
 
         services.AddSingleton(trackingMock.Object);
         services.AddSingleton(dbMock.Object);
@@ -80,6 +81,7 @@ public class UpdateServiceTests
         services.AddSingleton(settingsMock.Object);
         services.AddSingleton(authMock.Object);
         services.AddSingleton(dialogMock.Object);
+        services.AddSingleton(imageCacheMock.Object);
         services.AddSingleton<GaleriaViewModel>();
 
         var sp = services.BuildServiceProvider();
