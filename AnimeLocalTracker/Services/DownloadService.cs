@@ -59,7 +59,10 @@ public class DownloadService : IDownloadService
                 File.Delete(path);
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            AppLogger.Warn("DownloadService", $"No se pudo limpiar archivo temporal '{path}': {ex.Message}");
+        }
     }
 
     public void CancelarDescarga(int aniListId, int numeroEpisodio)
@@ -71,7 +74,10 @@ public class DownloadService : IDownloadService
             {
                 state.Cts.Cancel();
             }
-            catch { }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("DownloadService", $"Excepción al cancelar CancellationToken para ({aniListId}, ep {numeroEpisodio}): {ex.Message}");
+            }
 
             LimpiarArchivoTemporal(state.RutaTemporal);
 
@@ -89,7 +95,10 @@ public class DownloadService : IDownloadService
                 {
                     state.Cts.Cancel();
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    AppLogger.Warn("DownloadService", $"Excepción al cancelar CancellationToken para ({state.AniListId}, ep {state.NumeroEpisodio}): {ex.Message}");
+                }
 
                 LimpiarArchivoTemporal(state.RutaTemporal);
 
@@ -525,7 +534,10 @@ public class DownloadService : IDownloadService
                     supportsRanges = headRes.Headers.AcceptRanges.Contains("bytes") || headRes.Content.Headers.ContentRange != null;
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("DownloadService", $"Error en sondeo HEAD para '{videoUrl}': {ex.Message}");
+            }
         }
 
         // Si HEAD no devolvió tamaño o soporte de rangos, probar con GET range 0-0
@@ -552,7 +564,10 @@ public class DownloadService : IDownloadService
                     totalBytes = testRes.Content.Headers.ContentLength ?? -1;
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("DownloadService", $"Error en sondeo GET Range(0,0) para '{videoUrl}': {ex.Message}");
+            }
         }
 
         // Descarga segmentada en paralelo si el servidor soporta Range y conocemos el tamaño (> 3MB)

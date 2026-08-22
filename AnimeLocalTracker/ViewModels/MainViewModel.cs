@@ -285,7 +285,10 @@ public partial class MainViewModel : ObservableObject,
                 BusquedaSinResultados = ResultadosBusqueda.Count == 0;
             }
         }
-        catch (TaskCanceledException) { }
+        catch (TaskCanceledException ex)
+        {
+            AppLogger.Debug("MainViewModel", $"Búsqueda en vivo cancelada por nuevo término: {ex.Message}");
+        }
         finally
         {
             if (!token.IsCancellationRequested)

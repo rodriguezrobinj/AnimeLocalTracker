@@ -128,7 +128,10 @@ public class SyncService : ISyncService
                 _cts.Cancel();
                 _cts.Dispose();
             }
-            catch { }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("SyncService", $"Excepción al cancelar token de sincronización periódica: {ex.Message}");
+            }
             _cts = null;
         }
     }

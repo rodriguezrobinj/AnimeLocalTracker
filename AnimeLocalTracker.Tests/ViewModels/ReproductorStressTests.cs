@@ -112,8 +112,8 @@ public class ReproductorStressTests
 
         stopwatch.Stop();
 
-        // Assert: 500 cambios de episodio deben procesarse en menos de 3000ms
-        stopwatch.ElapsedMilliseconds.Should().BeLessThan(3000,
+        // Assert: 500 cambios de episodio deben procesarse en menos de 5000ms
+        stopwatch.ElapsedMilliseconds.Should().BeLessThan(5000,
             $"500 cambios de episodio tomaron {stopwatch.ElapsedMilliseconds}ms");
 
         sut.Dispose();

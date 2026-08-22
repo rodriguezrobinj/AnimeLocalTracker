@@ -44,7 +44,10 @@ public static class AppLogger
         {
             LogEmitted?.Invoke(entry);
         }
-        catch { }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[AppLogger] Error en suscriptor de LogEmitted: {ex.Message}");
+        }
 
         string formattedLine = entry.ToString();
         System.Diagnostics.Debug.WriteLine(formattedLine);
@@ -59,9 +62,9 @@ public static class AppLogger
                 }
                 File.AppendAllText(LogPath, formattedLine + Environment.NewLine);
             }
-            catch
+            catch (Exception ex)
             {
-                // Silently ignore disk write failures to prevent crash in logging mechanism
+                System.Diagnostics.Debug.WriteLine($"[AppLogger] Error al escribir log en disco: {ex.Message}");
             }
         }
     }

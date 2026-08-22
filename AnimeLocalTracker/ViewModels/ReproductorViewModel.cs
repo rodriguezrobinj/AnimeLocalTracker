@@ -142,16 +142,22 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             var config = new Config();
             
             // Seeking rápido por keyframe (no frame-accurate)
-            config.Player.SeekAccurate = false;
+            if (config.Player != null)
+            {
+                config.Player.SeekAccurate = false;
+            }
             
             // Subtítulos habilitados por defecto
-            config.Subtitles.Enabled = SubtitulosHabilitados;
+            if (config.Subtitles != null)
+            {
+                config.Subtitles.Enabled = SubtitulosHabilitados;
+            }
             
             return new Player(config);
         }
         catch (Exception ex)
         {
-            AppLogger.Warn("ReproductorViewModel", $"No se pudo crear Player nativo (posible entorno de pruebas): {ex.Message}");
+            AppLogger.Debug("ReproductorViewModel", $"Player nativo no disponible en este entorno: {ex.Message}");
             return null!;
         }
     }
@@ -199,7 +205,10 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             {
                 Player.CurTime = TimeSpan.FromSeconds(seconds).Ticks;
             }
-            catch { }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("ReproductorViewModel", $"Excepción al ajustar posición nativa del reproductor: {ex.Message}");
+            }
         }
         
         // Actualizar UI inmediatamente para feedback instantáneo
@@ -216,9 +225,14 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     {
         if (Player != null)
         {
-            try {
+            try 
+            {
                 Player.Audio.Volume = value;
-            } catch { }
+            } 
+            catch (Exception ex) 
+            {
+                AppLogger.Warn("ReproductorViewModel", $"Excepción al cambiar volumen nativo: {ex.Message}");
+            }
         }
         
         if (value == 0) VolumenIcon = "VolumeMute";
@@ -326,7 +340,6 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     [RelayCommand]
     public void SiguienteEpisodio()
     {
-        _ = GuardarProgresoActualAsync();
         var siguiente = ObtenerSiguienteEpisodio();
         if (siguiente != null && !string.IsNullOrWhiteSpace(siguiente.RutaCompleta))
         {
@@ -337,7 +350,6 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     [RelayCommand]
     public void AnteriorEpisodio()
     {
-        _ = GuardarProgresoActualAsync();
         var anterior = ObtenerAnteriorEpisodio();
         if (anterior != null && !string.IsNullOrWhiteSpace(anterior.RutaCompleta))
         {
@@ -352,7 +364,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         try
         {
             var registros = await _databaseService.ObtenerRegistrosPorAnimeAsync(animeId);
-            var reg = registros.FirstOrDefault(r => r.NumeroEpisodio == episodio);
+            var reg = registros?.FirstOrDefault(r => r.NumeroEpisodio == episodio);
             if (reg != null && reg.ProgresoSegundos > 5)
             {
                 // Si no ha terminado (menos del 95% o duración no registrada)
@@ -469,7 +481,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             if (progresoAGuardar < 3) progresoAGuardar = 0;
 
             var registros = await _databaseService.ObtenerRegistrosPorAnimeAsync(_animeId);
-            var registro = registros.FirstOrDefault(r => r.NumeroEpisodio == _episodio);
+            var registro = registros?.FirstOrDefault(r => r.NumeroEpisodio == _episodio);
 
             if (registro != null)
             {
@@ -516,7 +528,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         {
             // 1. Guardar localmente
             var registros = await _databaseService.ObtenerRegistrosPorAnimeAsync(_animeId);
-            var registro = registros.FirstOrDefault(r => r.NumeroEpisodio == _episodio);
+            var registro = registros?.FirstOrDefault(r => r.NumeroEpisodio == _episodio);
             
             if (registro != null)
             {

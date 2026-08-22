@@ -34,8 +34,9 @@ public class AuthService : IAuthService
             byte[] plaintext = ProtectedData.Unprotect(ciphertext, null, DataProtectionScope.CurrentUser);
             return Encoding.UTF8.GetString(plaintext);
         }
-        catch
+        catch (Exception ex)
         {
+            AppLogger.Warn("AuthService", $"No se pudo desencriptar el token con DPAPI ({ex.Message}), intentando fallback en texto plano.");
             // Podría ser un token viejo en texto plano, intentamos leerlo.
             string plain = File.ReadAllText(_rutaToken);
             if (!string.IsNullOrWhiteSpace(plain) && plain.Length > 20)

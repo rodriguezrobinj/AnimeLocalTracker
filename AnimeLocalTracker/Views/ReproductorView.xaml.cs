@@ -5,6 +5,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
+using AnimeLocalTracker.Services;
 using AnimeLocalTracker.ViewModels;
 
 namespace AnimeLocalTracker.Views
@@ -104,11 +105,9 @@ namespace AnimeLocalTracker.Views
                     RegistrarActividad();
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                // Flyleaf usa ventanas nativas que pueden generar excepciones
-                // transitorias durante inicialización/destrucción. Las ignoramos
-                // silenciosamente para evitar crashes.
+                AppLogger.Warn("ReproductorView", $"Excepción transitoria en hook de eventos de mouse: {ex.Message}");
             }
         }
 

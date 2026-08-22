@@ -33,7 +33,7 @@ public partial class FileScannerService : IFileScannerService
                 var residuales = dirInfo.EnumerateFiles("Episodio *.downloading", SearchOption.TopDirectoryOnly);
                 foreach (var res in residuales)
                 {
-                    try { res.Delete(); } catch { }
+                    try { res.Delete(); } catch (Exception ex) { AppLogger.Warn("FileScannerService", $"No se pudo eliminar archivo residual '{res.FullName}': {ex.Message}"); }
                 }
             }
             catch (Exception ex)
