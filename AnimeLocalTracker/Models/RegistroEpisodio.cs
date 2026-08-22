@@ -19,4 +19,9 @@ public class RegistroEpisodio
     public bool VistoLocal { get; set; }
     public bool FavoritoLocal { get; set; } // Añadido para guardar si es favorito
     public bool SincronizadoEnNube { get; set; } // Preparando el terreno para la Fase 2
+
+    // Reanudación de reproducción (Resume Playback):
+    public double ProgresoSegundos { get; set; }
+    public double TotalSegundos { get; set; }
+    public System.DateTime? UltimaReproduccion { get; set; }
 }

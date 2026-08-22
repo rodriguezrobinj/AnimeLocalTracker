@@ -11,7 +11,7 @@ public record NavegarMensaje_Reproductor(string RutaVideo, int AnimeId, string T
 public record NavegarMensaje_VolverDelReproductor();
 
 // === Mensajes de Estado / Notificaciones ===
-public record EpisodioActualizadoMensaje(int AnimeId, int NumeroEpisodio, bool VistoLocal);
+public record EpisodioActualizadoMensaje(int AnimeId, int NumeroEpisodio, bool VistoLocal, double ProgresoSegundos = 0, double TotalSegundos = 0);
 public record AnimeAñadidoMensaje(AnimeItem NuevoAnime);
 public record UsuarioLogeadoMensaje();
 public record UsuarioDesconectadoMensaje();

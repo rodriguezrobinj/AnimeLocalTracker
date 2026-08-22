@@ -282,4 +282,89 @@ public class ReproductorViewModelTests
 
         WeakReferenceMessenger.Default.Unregister<NavegarMensaje_VolverDelReproductor>(this);
     }
+
+    [Fact]
+    public async Task VerificarProgresoPrevioAsync_ConProgresoValido_DeberiaEstablecerPosicionDeReanudacion()
+    {
+        // Arrange
+        var sut = CreateSut();
+        var registroPrevio = new RegistroEpisodio
+        {
+            AniListId = 101,
+            NumeroEpisodio = 3,
+            ProgresoSegundos = 450, // 7:30
+            TotalSegundos = 1440,   // 24:00
+            VistoLocal = false
+        };
+
+        _dbMock.Setup(d => d.ObtenerRegistrosPorAnimeAsync(101))
+            .ReturnsAsync(new List<RegistroEpisodio> { registroPrevio });
+
+        // Act
+        await sut.VerificarProgresoPrevioAsync(101, 3);
+
+        // Assert
+        sut.ResumingPositionSeconds.Should().Be(450);
+        sut.CurrentSeconds.Should().Be(450);
+        sut.TiempoActualTexto.Should().Be("07:30");
+        sut.TotalSeconds.Should().Be(1440);
+        sut.TiempoTotalTexto.Should().Be("24:00");
+
+        sut.Dispose();
+    }
+
+    [Fact]
+    public async Task GuardarProgresoActualAsync_DeberiaPersistirEnBdYEnviarMensaje()
+    {
+        // Arrange
+        var sut = CreateSut();
+        _dbMock.Setup(d => d.ObtenerRegistrosPorAnimeAsync(101))
+            .ReturnsAsync(new List<RegistroEpisodio>());
+
+        EpisodioActualizadoMensaje? msg = null;
+        WeakReferenceMessenger.Default.Register<EpisodioActualizadoMensaje>(this, (r, m) =>
+        {
+            if (m.AnimeId == 101 && m.NumeroEpisodio == 4) msg = m;
+        });
+
+        sut.CargarVideo("C:\\Anime\\Ep04.mkv", 101, "Frieren", 4);
+        sut.CurrentSeconds = 500;
+        sut.TotalSeconds = 1440;
+
+        // Act
+        await sut.GuardarProgresoActualAsync();
+
+        // Assert
+        _dbMock.Verify(d => d.GuardarRegistroEpisodioAsync(It.Is<RegistroEpisodio>(r =>
+            r.AniListId == 101 && r.NumeroEpisodio == 4 && r.ProgresoSegundos == 500 && r.TotalSegundos == 1440)), Times.AtLeastOnce);
+
+        msg.Should().NotBeNull();
+        msg!.ProgresoSegundos.Should().Be(500);
+        msg.TotalSegundos.Should().Be(1440);
+
+        WeakReferenceMessenger.Default.Unregister<EpisodioActualizadoMensaje>(this);
+        sut.Dispose();
+    }
+
+    [Fact]
+    public void EpisodioItem_ProgresoPropiedades_DeberianCalcularseCorrectamente()
+    {
+        // Arrange
+        var item = new EpisodioItem
+        {
+            NumeroEpisodio = 1,
+            ProgresoSegundos = 600, // 10:00
+            TotalSegundos = 1200,   // 20:00
+            Visto = false
+        };
+
+        // Assert
+        item.PorcentajeProgreso.Should().Be(0.5);
+        item.TieneProgresoGuardado.Should().BeTrue();
+        item.ProgresoFormateado.Should().Be("10:00 / 20:00");
+
+        // Si se marca como visto, no debe mostrar progreso guardado
+        item.Visto = true;
+        item.TieneProgresoGuardado.Should().BeFalse();
+    }
 }

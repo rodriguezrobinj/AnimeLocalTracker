@@ -111,12 +111,21 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     }
 
     private int _animeId;
+    public int AnimeId => _animeId;
+
     private int _episodio;
+    public int Episodio => _episodio;
+
     private string _rutaVideo = string.Empty;
+    public string RutaVideo => _rutaVideo;
+
     private bool _fueMarcadoComoVisto = false;
     
     // Cache para evitar recalcular duración en cada tick
     private double _lastNotifiedSeconds = -1;
+    private double _lastSavedSeconds = -1;
+    private double _resumingPositionSeconds = 0;
+    public double ResumingPositionSeconds => _resumingPositionSeconds;
     private bool _durationCached = false;
 
     public ReproductorViewModel(IDatabaseService databaseService, IAnimeTrackingService animeTrackingService, IAuthService authService)
@@ -156,6 +165,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         {
             Player.Pause();
             PlayPauseIcon = "Play";
+            _ = GuardarProgresoActualAsync();
         }
         else
         {
@@ -316,6 +326,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     [RelayCommand]
     public void SiguienteEpisodio()
     {
+        _ = GuardarProgresoActualAsync();
         var siguiente = ObtenerSiguienteEpisodio();
         if (siguiente != null && !string.IsNullOrWhiteSpace(siguiente.RutaCompleta))
         {
@@ -326,6 +337,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     [RelayCommand]
     public void AnteriorEpisodio()
     {
+        _ = GuardarProgresoActualAsync();
         var anterior = ObtenerAnteriorEpisodio();
         if (anterior != null && !string.IsNullOrWhiteSpace(anterior.RutaCompleta))
         {
@@ -335,8 +347,41 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
     private CancellationTokenSource? _trackingCts;
 
+    public async Task VerificarProgresoPrevioAsync(int animeId, int episodio)
+    {
+        try
+        {
+            var registros = await _databaseService.ObtenerRegistrosPorAnimeAsync(animeId);
+            var reg = registros.FirstOrDefault(r => r.NumeroEpisodio == episodio);
+            if (reg != null && reg.ProgresoSegundos > 5)
+            {
+                // Si no ha terminado (menos del 95% o duración no registrada)
+                if (reg.TotalSegundos <= 0 || reg.ProgresoSegundos < reg.TotalSegundos * 0.95)
+                {
+                    _resumingPositionSeconds = reg.ProgresoSegundos;
+                    CurrentSeconds = reg.ProgresoSegundos;
+                    var tCur = TimeSpan.FromSeconds(reg.ProgresoSegundos);
+                    TiempoActualTexto = tCur.ToString(tCur.Hours > 0 ? @"hh\:mm\:ss" : @"mm\:ss");
+                    if (reg.TotalSegundos > 0)
+                    {
+                        TotalSeconds = reg.TotalSegundos;
+                        var tDur = TimeSpan.FromSeconds(reg.TotalSegundos);
+                        TiempoTotalTexto = tDur.ToString(tDur.Hours > 0 ? @"hh\:mm\:ss" : @"mm\:ss");
+                    }
+                    TiempoCombinadoTexto = $"{TiempoActualTexto} / {TiempoTotalTexto}";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("ReproductorViewModel", $"Error comprobando progreso previo: {ex.Message}");
+        }
+    }
+
     public void CargarVideo(string rutaVideo, int animeId, string tituloAnime, int episodio, List<EpisodioItem>? listaEpisodios = null)
     {
+        _ = GuardarProgresoActualAsync();
+
         _rutaVideo = rutaVideo;
         _animeId = animeId;
         _episodio = episodio;
@@ -345,6 +390,8 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         _fueMarcadoComoVisto = false;
         _durationCached = false;
         _lastNotifiedSeconds = -1;
+        _lastSavedSeconds = -1;
+        _resumingPositionSeconds = 0;
         _autoPlayDisparado = false;
 
         if (listaEpisodios != null)
@@ -361,6 +408,9 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         _trackingCts?.Cancel();
         _trackingCts?.Dispose();
         _trackingCts = new CancellationTokenSource();
+
+        // Consultar progreso previo en la base de datos
+        _ = VerificarProgresoPrevioAsync(animeId, episodio);
 
         // Sincronizar ícono de fullscreen con el estado actual de la ventana
         if (System.Windows.Application.Current?.MainWindow is AnimeLocalTracker.Views.MainWindow mainWindow)
@@ -397,6 +447,66 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         _ = RastrearProgresoAsync(_trackingCts.Token);
     }
 
+    public async Task GuardarProgresoActualAsync(bool forzarProgresoCero = false)
+    {
+        if (_animeId <= 0 || _episodio <= 0) return;
+
+        try
+        {
+            double curSec = 0;
+            double durSec = 0;
+
+            if (Player != null && !Player.IsDisposed)
+            {
+                curSec = TimeSpan.FromTicks(Player.CurTime).TotalSeconds;
+                durSec = TimeSpan.FromTicks(Player.Duration).TotalSeconds;
+            }
+
+            if (durSec <= 0 && TotalSeconds > 0) durSec = TotalSeconds;
+            if (curSec <= 0 && CurrentSeconds > 0) curSec = CurrentSeconds;
+
+            double progresoAGuardar = forzarProgresoCero ? 0 : ((durSec > 0 && curSec >= durSec * 0.95) ? 0 : curSec);
+            if (progresoAGuardar < 3) progresoAGuardar = 0;
+
+            var registros = await _databaseService.ObtenerRegistrosPorAnimeAsync(_animeId);
+            var registro = registros.FirstOrDefault(r => r.NumeroEpisodio == _episodio);
+
+            if (registro != null)
+            {
+                registro.ProgresoSegundos = progresoAGuardar;
+                if (durSec > 0) registro.TotalSegundos = durSec;
+                registro.UltimaReproduccion = DateTime.UtcNow;
+                if (string.IsNullOrWhiteSpace(registro.RutaArchivo) && !string.IsNullOrWhiteSpace(_rutaVideo))
+                {
+                    registro.RutaArchivo = _rutaVideo;
+                }
+                await _databaseService.GuardarRegistroEpisodioAsync(registro);
+            }
+            else if (progresoAGuardar > 0)
+            {
+                registro = new RegistroEpisodio
+                {
+                    AniListId = _animeId,
+                    NumeroEpisodio = _episodio,
+                    RutaArchivo = _rutaVideo,
+                    ProgresoSegundos = progresoAGuardar,
+                    TotalSegundos = durSec,
+                    VistoLocal = _fueMarcadoComoVisto,
+                    UltimaReproduccion = DateTime.UtcNow
+                };
+                await _databaseService.GuardarRegistroEpisodioAsync(registro);
+            }
+
+            // Notificar a DetalleViewModel para actualizar la barra de progreso en vivo
+            WeakReferenceMessenger.Default.Send(new Messages.EpisodioActualizadoMensaje(
+                _animeId, _episodio, _fueMarcadoComoVisto, progresoAGuardar, durSec));
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("ReproductorViewModel", $"Error al guardar progreso actual: {ex.Message}");
+        }
+    }
+
     public async Task RealizarAutoTrackingAsync()
     {
         if (_fueMarcadoComoVisto) return;
@@ -411,6 +521,8 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             if (registro != null)
             {
                 registro.VistoLocal = true;
+                registro.ProgresoSegundos = 0; // Al marcarse como visto, el progreso se limpia a 0
+                registro.UltimaReproduccion = DateTime.UtcNow;
             }
             else
             {
@@ -419,7 +531,9 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                     AniListId = _animeId,
                     NumeroEpisodio = _episodio,
                     RutaArchivo = _rutaVideo,
-                    VistoLocal = true
+                    VistoLocal = true,
+                    ProgresoSegundos = 0,
+                    UltimaReproduccion = DateTime.UtcNow
                 };
             }
             await _databaseService.GuardarRegistroEpisodioAsync(registro);
@@ -438,7 +552,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                 false, "CheckCircle", "#4CAF50"));
                 
             // 4. Avisar a la vista de detalles para que actualice la lista automáticamente
-            WeakReferenceMessenger.Default.Send(new Messages.EpisodioActualizadoMensaje(_animeId, _episodio, true));
+            WeakReferenceMessenger.Default.Send(new Messages.EpisodioActualizadoMensaje(_animeId, _episodio, true, 0, TotalSeconds));
         }
         catch (Exception ex)
         {
@@ -456,11 +570,36 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                 {
                     double curSeconds = TimeSpan.FromTicks(Player.CurTime).TotalSeconds;
                     double durSeconds = TimeSpan.FromTicks(Player.Duration).TotalSeconds;
+
+                    // Reanudación automática desde última posición guardada
+                    if (_resumingPositionSeconds > 5 && (durSeconds > 0 || curSeconds >= 0))
+                    {
+                        double posToSeek = _resumingPositionSeconds;
+                        _resumingPositionSeconds = 0; // Solo una vez
+                        
+                        try
+                        {
+                            Player.CurTime = TimeSpan.FromSeconds(posToSeek).Ticks;
+                            _lastNotifiedSeconds = posToSeek;
+                            CurrentSeconds = posToSeek;
+                            
+                            var tPos = TimeSpan.FromSeconds(posToSeek);
+                            string tiempoFormateado = tPos.ToString(tPos.Hours > 0 ? @"hh\:mm\:ss" : @"mm\:ss");
+                            
+                            _ = WeakReferenceMessenger.Default.Send(new Messages.MostrarDialogoRequestMessage(
+                                "Reanudar Reproducción", 
+                                $"Continuando desde {tiempoFormateado}", 
+                                false, "PlaySpeed", "#2196F3"));
+                        }
+                        catch (Exception ex)
+                        {
+                            AppLogger.Debug("ReproductorViewModel", $"Error aplicando seek de reanudación: {ex.Message}");
+                        }
+                    }
                     
                     if (!IsDraggingSlider)
                     {
                         // Solo notificar si el cambio es significativo (> 0.3s)
-                        // para evitar property-changed spam innecesario
                         if (Math.Abs(curSeconds - _lastNotifiedSeconds) >= 0.3)
                         {
                             CurrentSeconds = curSeconds;
@@ -484,6 +623,13 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
                     if (PlayPauseIcon != "Pause") PlayPauseIcon = "Pause";
 
+                    // Guardado continuo periódico cada 5 segundos
+                    if (Math.Abs(curSeconds - _lastSavedSeconds) >= 5.0)
+                    {
+                        _lastSavedSeconds = curSeconds;
+                        _ = GuardarProgresoActualAsync();
+                    }
+
                     double porcentaje = durSeconds > 0 ? curSeconds / durSeconds : 0;
 
                     // Auto-Tracking al 90%
@@ -504,6 +650,9 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                 }
                 else if (Player?.Status == Status.Ended)
                 {
+                    // Al finalizar, resetear progreso a 0
+                    _ = GuardarProgresoActualAsync(forzarProgresoCero: true);
+
                     // Auto-Play siguiente episodio si existe y está habilitado
                     if (AutoPlaySiguiente && TieneEpisodioSiguiente && !_autoPlayDisparado)
                     {
@@ -560,6 +709,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     [RelayCommand]
     public void Cerrar()
     {
+        _ = GuardarProgresoActualAsync();
         Dispose();
         
         // Navegar a la vista anterior (detalle del anime), no a la galería
@@ -581,6 +731,8 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
+        _ = GuardarProgresoActualAsync();
+
         _trackingCts?.Cancel();
         _trackingCts?.Dispose();
         _trackingCts = null;

@@ -80,7 +80,6 @@ public partial class DetalleViewModel : ObservableObject,
 
     public void Receive(UsuarioLogeadoMensaje message) => EstaConectado = true;
     public void Receive(UsuarioDesconectadoMensaje message) => EstaConectado = false;
-
     public void Receive(EpisodioActualizadoMensaje message)
     {
         if (AnimeSeleccionado == null || AnimeSeleccionado.AniListId != message.AnimeId) return;
@@ -89,11 +88,29 @@ public partial class DetalleViewModel : ObservableObject,
         if (episodio != null)
         {
             // Ejecutar en el hilo principal de la UI
-            System.Windows.Application.Current.Dispatcher.Invoke(() =>
+            var dispatcher = System.Windows.Application.Current?.Dispatcher;
+            if (dispatcher != null && !dispatcher.HasShutdownStarted)
+            {
+                dispatcher.Invoke(() =>
+                {
+                    episodio.Visto = message.VistoLocal;
+                    episodio.ProgresoSegundos = message.ProgresoSegundos;
+                    if (message.TotalSegundos > 0)
+                    {
+                        episodio.TotalSegundos = message.TotalSegundos;
+                    }
+                    AplicarFiltrosYOrdenamiento();
+                });
+            }
+            else
             {
                 episodio.Visto = message.VistoLocal;
-                AplicarFiltrosYOrdenamiento();
-            });
+                episodio.ProgresoSegundos = message.ProgresoSegundos;
+                if (message.TotalSegundos > 0)
+                {
+                    episodio.TotalSegundos = message.TotalSegundos;
+                }
+            }
         }
     }
 
@@ -132,21 +149,26 @@ public partial class DetalleViewModel : ObservableObject,
     public async Task InicializarAsync(AnimeItem anime)
     {
         AnimeSeleccionado = anime;
-        EpisodiosDelAnime.Clear(); 
         _todosLosEpisodios.Clear();
-        
-        OrdenAscendente = false;
-        FiltroEpisodios = "Todos";
+        EpisodiosDelAnime.Clear();
 
-        var encontrados = await _fileScannerService.EscanearEpisodiosAsync(anime.RutaCarpeta);
+        // 1. CARGA RÁPIDA DE BASE DE DATOS Y DISCO (SIN INTERNET)
         var registrosGuardados = await _databaseService.ObtenerRegistrosPorAnimeAsync(anime.AniListId);
-
-        int maxEpisodio = Math.Max(0, anime.TotalEpisodios);
-        if (encontrados.Count > 0)
+        
+        // Escaneamos la carpeta local si existe
+        List<EpisodioItem> encontrados = new();
+        if (!string.IsNullOrEmpty(anime.RutaCarpeta))
         {
-            int maxLocal = encontrados.Max(e => e.NumeroEpisodio);
-            if (maxLocal > maxEpisodio) maxEpisodio = maxLocal;
+            encontrados = await _fileScannerService.EscanearEpisodiosAsync(anime.RutaCarpeta);
         }
+
+        int maxEpisodio = 0;
+        if (encontrados.Count > 0)
+            maxEpisodio = encontrados.Max(e => e.NumeroEpisodio);
+        if (anime.TotalEpisodios > maxEpisodio)
+            maxEpisodio = anime.TotalEpisodios;
+        if (anime.EpisodiosVistos > maxEpisodio)
+            maxEpisodio = anime.EpisodiosVistos;
 
         // Límite de seguridad para prevenir asignaciones anómalas de memoria (máx 3000)
         const int LimiteSeguridadEpisodios = 3000;
@@ -176,6 +198,8 @@ public partial class DetalleViewModel : ObservableObject,
                     TamanoArchivoFormateado = archivoLocal?.TamanoArchivoFormateado ?? string.Empty,
                     Visto = memoria != null && memoria.VistoLocal,
                     Favorito = memoria != null && memoria.FavoritoLocal,
+                    ProgresoSegundos = memoria?.ProgresoSegundos ?? 0,
+                    TotalSegundos = memoria?.TotalSegundos ?? 0,
                     IsDownloading = estaDescargando,
                     DownloadProgress = prog
                 });

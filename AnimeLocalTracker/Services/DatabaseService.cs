@@ -76,14 +76,25 @@ public class DatabaseService : IDatabaseService
 
         if (existente != null)
         {
-            // Si ya existe (ej: lo habías visto pero la sincronización falló), solo lo actualizamos
+            // Si ya existe, actualizamos los campos
             existente.VistoLocal = registro.VistoLocal;
             existente.FavoritoLocal = registro.FavoritoLocal;
+            existente.ProgresoSegundos = registro.ProgresoSegundos;
+            existente.TotalSegundos = registro.TotalSegundos;
+            existente.UltimaReproduccion = registro.UltimaReproduccion ?? DateTime.UtcNow;
+            if (!string.IsNullOrWhiteSpace(registro.RutaArchivo))
+            {
+                existente.RutaArchivo = registro.RutaArchivo;
+            }
             await _conexion.UpdateAsync(existente);
         }
         else
         {
-            // Si es la primera vez que lo ves, insertamos el nuevo registro
+            // Si es la primera vez, insertamos el nuevo registro
+            if (!registro.UltimaReproduccion.HasValue)
+            {
+                registro.UltimaReproduccion = DateTime.UtcNow;
+            }
             await _conexion.InsertAsync(registro);
         }
     }
@@ -103,10 +114,21 @@ public class DatabaseService : IDatabaseService
                 {
                     existente.VistoLocal = registro.VistoLocal;
                     existente.FavoritoLocal = registro.FavoritoLocal;
+                    existente.ProgresoSegundos = registro.ProgresoSegundos;
+                    existente.TotalSegundos = registro.TotalSegundos;
+                    existente.UltimaReproduccion = registro.UltimaReproduccion ?? DateTime.UtcNow;
+                    if (!string.IsNullOrWhiteSpace(registro.RutaArchivo))
+                    {
+                        existente.RutaArchivo = registro.RutaArchivo;
+                    }
                     db.Update(existente);
                 }
                 else
                 {
+                    if (!registro.UltimaReproduccion.HasValue)
+                    {
+                        registro.UltimaReproduccion = DateTime.UtcNow;
+                    }
                     db.Insert(registro);
                 }
             }
