@@ -236,9 +236,10 @@ public class ReproductorViewModelTests
             .ReturnsAsync(true);
 
         EpisodioActualizadoMensaje? mensajeRecibido = null;
-        WeakReferenceMessenger.Default.Register<EpisodioActualizadoMensaje>(this, (r, m) =>
+        WeakReferenceMessenger.Default.UnregisterAll(this);
+        WeakReferenceMessenger.Default.Register<ReproductorViewModelTests, EpisodioActualizadoMensaje>(this, (r, m) =>
         {
-            if (m.AnimeId == 101) mensajeRecibido = m;
+            if (m.AnimeId == 101 && m.VistoLocal) mensajeRecibido = m;
         });
 
         sut.CargarVideo("C:\\Anime\\Ep05.mkv", 101, "Solo Leveling", 5);
@@ -257,7 +258,7 @@ public class ReproductorViewModelTests
         mensajeRecibido.NumeroEpisodio.Should().Be(5);
         mensajeRecibido.VistoLocal.Should().BeTrue();
 
-        WeakReferenceMessenger.Default.Unregister<EpisodioActualizadoMensaje>(this);
+        WeakReferenceMessenger.Default.UnregisterAll(this);
         sut.Dispose();
     }
 

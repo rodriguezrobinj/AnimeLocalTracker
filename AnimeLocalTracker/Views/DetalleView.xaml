@@ -4,7 +4,7 @@
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
              TextElement.Foreground="{DynamicResource MaterialDesignBody}"
              Background="Transparent">
-    
+
     <Grid>
         <!-- EL FONDO DINÁMICO DESENFOCADO -->
         <Grid ClipToBounds="True">

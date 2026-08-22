@@ -37,6 +37,9 @@
         <DataTemplate DataType="{x:Type viewmodels:DescargasViewModel}">
             <local:DescargasView />
         </DataTemplate>
+        <DataTemplate DataType="{x:Type viewmodels:ConfiguracionViewModel}">
+            <local:ConfiguracionView />
+        </DataTemplate>
         
         <Style TargetType="ScrollBar" BasedOn="{StaticResource MaterialDesignScrollBarMinimal}" />
     </Window.Resources>
@@ -154,99 +157,142 @@
 
                 <!-- SIDEBAR -->
                 <Border Grid.Column="0" Background="Transparent" BorderBrush="#1AFFFFFF" BorderThickness="0,0,1,0" Panel.ZIndex="10">
-                    <StackPanel HorizontalAlignment="Center">
-                        <StackPanel.Style>
-                            <Style TargetType="StackPanel">
-                                <Setter Property="Margin" Value="0,60,0,0"/>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding Topmost, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
-                                        <Setter Property="Margin" Value="0,30,0,0"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </StackPanel.Style>
+                    <Grid>
+                        <!-- BOTONES SUPERIORES -->
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Top">
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Setter Property="Margin" Value="0,60,0,0"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Topmost, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                            <Setter Property="Margin" Value="0,30,0,0"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
 
-                        <!-- BOTÓN BIBLIOTECA (GALERÍA) -->
-                        <Grid Margin="0,8">
-                            <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#82B1FF" HorizontalAlignment="Left" Margin="-9,0,0,0"
-                                       Visibility="{Binding EsGaleriaActiva, Converter={StaticResource BoolToVis}}"/>
-                            <Button Command="{Binding NavegarGaleriaCommand}" Width="45" Height="45" ToolTip="Biblioteca">
-                                <Button.Style>
-                                    <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
-                                        <Setter Property="Background" Value="Transparent"/>
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding EsGaleriaActiva}" Value="True">
-                                                <Setter Property="Background" Value="#1A82B1FF"/>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Button.Style>
-                                <materialDesign:PackIcon Kind="ViewGallery" Width="24" Height="24">
-                                    <materialDesign:PackIcon.Style>
-                                        <Style TargetType="materialDesign:PackIcon">
-                                            <Setter Property="Foreground" Value="#78909C"/>
+                            <!-- BOTÓN BIBLIOTECA (GALERÍA) -->
+                            <Grid Margin="0,8">
+                                <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#82B1FF" HorizontalAlignment="Left" Margin="-9,0,0,0"
+                                           Visibility="{Binding EsGaleriaActiva, Converter={StaticResource BoolToVis}}"/>
+                                <Button Command="{Binding NavegarGaleriaCommand}" Width="45" Height="45" ToolTip="Biblioteca">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
+                                            <Setter Property="Background" Value="Transparent"/>
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding EsGaleriaActiva}" Value="True">
-                                                    <Setter Property="Foreground" Value="#82B1FF"/>
+                                                    <Setter Property="Background" Value="#1A82B1FF"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
-                                    </materialDesign:PackIcon.Style>
-                                </materialDesign:PackIcon>
-                            </Button>
-                        </Grid>
+                                    </Button.Style>
+                                    <materialDesign:PackIcon Kind="ViewGallery" Width="24" Height="24">
+                                        <materialDesign:PackIcon.Style>
+                                            <Style TargetType="materialDesign:PackIcon">
+                                                <Setter Property="Foreground" Value="#78909C"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding EsGaleriaActiva}" Value="True">
+                                                        <Setter Property="Foreground" Value="#82B1FF"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </materialDesign:PackIcon.Style>
+                                    </materialDesign:PackIcon>
+                                </Button>
+                            </Grid>
 
-                        <!-- BOTÓN CALENDARIO -->
-                        <Grid Margin="0,8">
-                            <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#82B1FF" HorizontalAlignment="Left" Margin="-9,0,0,0"
-                                       Visibility="{Binding EsCalendarioActivo, Converter={StaticResource BoolToVis}}"/>
-                            <Button Command="{Binding NavegarCalendarioCommand}" Width="45" Height="45" ToolTip="Calendario de Emisión">
-                                <Button.Style>
-                                    <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
-                                        <Setter Property="Background" Value="Transparent"/>
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding EsCalendarioActivo}" Value="True">
-                                                <Setter Property="Background" Value="#1A82B1FF"/>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Button.Style>
-                                <materialDesign:PackIcon Kind="CalendarClock" Width="24" Height="24">
-                                    <materialDesign:PackIcon.Style>
-                                        <Style TargetType="materialDesign:PackIcon">
-                                            <Setter Property="Foreground" Value="#78909C"/>
+                            <!-- BOTÓN CALENDARIO -->
+                            <Grid Margin="0,8">
+                                <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#82B1FF" HorizontalAlignment="Left" Margin="-9,0,0,0"
+                                           Visibility="{Binding EsCalendarioActivo, Converter={StaticResource BoolToVis}}"/>
+                                <Button Command="{Binding NavegarCalendarioCommand}" Width="45" Height="45" ToolTip="Calendario de Emisión">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
+                                            <Setter Property="Background" Value="Transparent"/>
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding EsCalendarioActivo}" Value="True">
-                                                    <Setter Property="Foreground" Value="#82B1FF"/>
+                                                    <Setter Property="Background" Value="#1A82B1FF"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
-                                    </materialDesign:PackIcon.Style>
-                                </materialDesign:PackIcon>
-                            </Button>
-                        </Grid>
+                                    </Button.Style>
+                                    <materialDesign:PackIcon Kind="CalendarClock" Width="24" Height="24">
+                                        <materialDesign:PackIcon.Style>
+                                            <Style TargetType="materialDesign:PackIcon">
+                                                <Setter Property="Foreground" Value="#78909C"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding EsCalendarioActivo}" Value="True">
+                                                        <Setter Property="Foreground" Value="#82B1FF"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </materialDesign:PackIcon.Style>
+                                    </materialDesign:PackIcon>
+                                </Button>
+                            </Grid>
 
-                        <!-- BOTÓN COLA DE DESCARGAS -->
-                        <Grid Margin="0,8">
+                            <!-- BOTÓN COLA DE DESCARGAS -->
+                            <Grid Margin="0,8">
+                                <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#82B1FF" HorizontalAlignment="Left" Margin="-9,0,0,0"
+                                           Visibility="{Binding EsDescargasActivas, Converter={StaticResource BoolToVis}}"/>
+                                <Button Command="{Binding NavegarDescargasCommand}" Width="45" Height="45" ToolTip="Cola de Descargas">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
+                                            <Setter Property="Background" Value="Transparent"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding EsDescargasActivas}" Value="True">
+                                                    <Setter Property="Background" Value="#1A82B1FF"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                    <materialDesign:PackIcon Kind="DownloadMultiple" Width="24" Height="24">
+                                        <materialDesign:PackIcon.Style>
+                                            <Style TargetType="materialDesign:PackIcon">
+                                                <Setter Property="Foreground" Value="#78909C"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding EsDescargasActivas}" Value="True">
+                                                        <Setter Property="Foreground" Value="#82B1FF"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </materialDesign:PackIcon.Style>
+                                    </materialDesign:PackIcon>
+                                </Button>
+
+                                <!-- BADGE CONTEO DE DESCARGAS -->
+                                <Border HorizontalAlignment="Right" VerticalAlignment="Top" 
+                                        Background="#1565C0" BorderBrush="#0D47A1" BorderThickness="1" 
+                                        CornerRadius="9" MinWidth="18" Height="18" Padding="4,0" Margin="0,-2,-2,0" 
+                                        IsHitTestVisible="False"
+                                        Visibility="{Binding TieneDescargasActivas, Converter={StaticResource BoolToVis}}">
+                                    <TextBlock Text="{Binding ConteoDescargasActivas}" FontSize="10" FontWeight="Bold" Foreground="White" 
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                            </Grid>
+                        </StackPanel>
+
+                        <!-- BOTÓN INFERIOR: CONFIGURACIÓN -->
+                        <Grid HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,15">
                             <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#82B1FF" HorizontalAlignment="Left" Margin="-9,0,0,0"
-                                       Visibility="{Binding EsDescargasActivas, Converter={StaticResource BoolToVis}}"/>
-                            <Button Command="{Binding NavegarDescargasCommand}" Width="45" Height="45" ToolTip="Cola de Descargas">
+                                       Visibility="{Binding EsConfiguracionActiva, Converter={StaticResource BoolToVis}}"/>
+                            <Button Command="{Binding NavegarConfiguracionCommand}" Width="45" Height="45" ToolTip="Configuración y Acerca de">
                                 <Button.Style>
                                     <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
                                         <Setter Property="Background" Value="Transparent"/>
                                         <Style.Triggers>
-                                            <DataTrigger Binding="{Binding EsDescargasActivas}" Value="True">
+                                            <DataTrigger Binding="{Binding EsConfiguracionActiva}" Value="True">
                                                 <Setter Property="Background" Value="#1A82B1FF"/>
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
                                 </Button.Style>
-                                <materialDesign:PackIcon Kind="DownloadMultiple" Width="24" Height="24">
+                                <materialDesign:PackIcon Kind="Cog" Width="24" Height="24">
                                     <materialDesign:PackIcon.Style>
                                         <Style TargetType="materialDesign:PackIcon">
                                             <Setter Property="Foreground" Value="#78909C"/>
                                             <Style.Triggers>
-                                                <DataTrigger Binding="{Binding EsDescargasActivas}" Value="True">
+                                                <DataTrigger Binding="{Binding EsConfiguracionActiva}" Value="True">
                                                     <Setter Property="Foreground" Value="#82B1FF"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
@@ -254,18 +300,8 @@
                                     </materialDesign:PackIcon.Style>
                                 </materialDesign:PackIcon>
                             </Button>
-
-                            <!-- BADGE CONTEO DE DESCARGAS -->
-                            <Border HorizontalAlignment="Right" VerticalAlignment="Top" 
-                                    Background="#1565C0" BorderBrush="#0D47A1" BorderThickness="1" 
-                                    CornerRadius="9" MinWidth="18" Height="18" Padding="4,0" Margin="0,-2,-2,0" 
-                                    IsHitTestVisible="False"
-                                    Visibility="{Binding TieneDescargasActivas, Converter={StaticResource BoolToVis}}">
-                                <TextBlock Text="{Binding ConteoDescargasActivas}" FontSize="10" FontWeight="Bold" Foreground="White" 
-                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            </Border>
                         </Grid>
-                    </StackPanel>
+                    </Grid>
                 </Border>
 
                 <!-- CONTENIDO PRINCIPAL: Solo un ContentControl que se actualiza según la propiedad VistaActual -->
@@ -277,6 +313,18 @@
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="15,0,0,0">
                         <materialDesign:PackIcon Kind="PlayCircle" Foreground="#3F51B5" Width="20" Height="20" VerticalAlignment="Center" Margin="0,0,8,0"/>
                         <TextBlock Text="AnimeTracker" FontWeight="Bold" Foreground="{DynamicResource MaterialDesignBodyLight}" VerticalAlignment="Center" FontSize="14"/>
+                        <Button Command="{Binding BuscarActualizacionesManualCommand}" 
+                                WindowChrome.IsHitTestVisibleInChrome="True"
+                                ToolTip="Comprobar actualizaciones en GitHub"
+                                Style="{StaticResource MaterialDesignFlatButton}" 
+                                Padding="8,2" Height="22" Margin="12,0,0,0"
+                                Background="#2A3B5C" Foreground="#90CAF9" 
+                                materialDesign:ButtonAssist.CornerRadius="11">
+                            <StackPanel Orientation="Horizontal">
+                                <materialDesign:PackIcon Kind="Update" Width="13" Height="13" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                <TextBlock Text="{Binding VersionAppTexto}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">

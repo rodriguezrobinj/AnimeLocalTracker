@@ -8,8 +8,11 @@
                 <!-- Tema Oscuro y colores de acento -->
                 <materialDesign:BundledTheme BaseTheme="Dark" PrimaryColor="DeepPurple" SecondaryColor="Teal" />
                 
-                <!-- EL CAMBIO VITAL: Ahora usamos MaterialDesign3 -->
+                <!-- MaterialDesign3 Defaults -->
                 <ResourceDictionary Source="pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesign3.Defaults.xaml" />
+                
+                <!-- Barra de Desplazamiento Ultra-Fina Personalizada (Sobrescribe MaterialDesign) -->
+                <ResourceDictionary Source="/Themes/MinimalScrollBar.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
             <!-- Estilo Shimmer Global para imágenes cargando -->

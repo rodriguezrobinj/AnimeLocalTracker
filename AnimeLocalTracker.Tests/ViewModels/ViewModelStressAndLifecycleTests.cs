@@ -21,6 +21,8 @@ public class ViewModelStressAndLifecycleTests
     private readonly Mock<IDownloadService> _downloadMock = new();
     private readonly Mock<IAuthService> _authMock = new();
     private readonly Mock<IDialogService> _dialogMock = new();
+    private readonly Mock<IUpdateService> _updateMock = new();
+    private readonly Mock<ISettingsService> _settingsMock = new();
 
     [Fact]
     public void MainViewModel_NavegacionMasiva100Veces_NoDeberiaLanzarExcepciones()
@@ -33,6 +35,8 @@ public class ViewModelStressAndLifecycleTests
         services.AddSingleton(_downloadMock.Object);
         services.AddSingleton(_authMock.Object);
         services.AddSingleton(_dialogMock.Object);
+        services.AddSingleton(_updateMock.Object);
+        services.AddSingleton(_settingsMock.Object);
 
         _downloadMock.Setup(d => d.ObtenerDescargasActivas()).Returns(new List<DescargaItem>());
 
@@ -42,9 +46,10 @@ public class ViewModelStressAndLifecycleTests
         services.AddSingleton<GaleriaViewModel>();
         services.AddSingleton<CalendarioViewModel>();
         services.AddSingleton<DescargasViewModel>();
+        services.AddSingleton<ConfiguracionViewModel>();
 
         var sp = services.BuildServiceProvider();
-        var sut = new MainViewModel(sp, _trackingMock.Object, _dbMock.Object, _downloadMock.Object);
+        var sut = new MainViewModel(sp, _trackingMock.Object, _dbMock.Object, _downloadMock.Object, _updateMock.Object, _settingsMock.Object);
 
         // Act: Conmutar 100 veces entre todas las vistas principales
         for (int i = 0; i < 100; i++)
@@ -54,6 +59,9 @@ public class ViewModelStressAndLifecycleTests
 
             sut.Receive(new NavegarMensaje_Descargas());
             sut.EsDescargasActivas.Should().BeTrue();
+
+            sut.Receive(new NavegarMensaje_Configuracion());
+            sut.EsConfiguracionActiva.Should().BeTrue();
 
             sut.Receive(new NavegarMensaje_Galeria());
             sut.EsGaleriaActiva.Should().BeTrue();

@@ -58,6 +58,7 @@ public partial class App : Application
         services.AddTransient<MainWindow>();
         services.AddTransient<ReproductorView>();
         services.AddTransient<DescargasView>();
+        services.AddTransient<ConfiguracionView>();
 
         // 2. Registramos los ViewModels (Vistas principales como Singleton para preservar estado y no repetir queries al cambiar de pestaña)
         services.AddTransient<MainViewModel>();
@@ -66,8 +67,10 @@ public partial class App : Application
         services.AddSingleton<CalendarioViewModel>();
         services.AddTransient<ReproductorViewModel>();
         services.AddSingleton<DescargasViewModel>();
+        services.AddSingleton<ConfiguracionViewModel>();
 
         // 3. Aquí registraremos los Servicios
+        services.AddSingleton<ISettingsService, SettingsService>();
         services.AddSingleton<IDialogService, DialogService>();
         services.AddSingleton<IAuthService, AuthService>();
         services.AddTransient<IFileScannerService, FileScannerService>();
@@ -83,6 +86,9 @@ public partial class App : Application
 
         // Servicio de sincronización offline-online en segundo plano
         services.AddSingleton<ISyncService, SyncService>();
+
+        // Servicio de actualizaciones automáticas con Velopack y GitHub Releases
+        services.AddSingleton<IUpdateService, UpdateService>();
     }
 
     private static Polly.IAsyncPolicy<System.Net.Http.HttpResponseMessage> GetRetryPolicy()
@@ -128,6 +134,10 @@ public partial class App : Application
         // Iniciar sincronización periódica en segundo plano
         var syncService = ServiceProvider.GetRequiredService<ISyncService>();
         syncService.IniciarSincronizacionPeriodica(TimeSpan.FromMinutes(5));
+
+        // Iniciar verificación de actualizaciones automáticas en segundo plano
+        var updateService = ServiceProvider.GetRequiredService<IUpdateService>();
+        updateService.IniciarVerificacionSegundoPlano(TimeSpan.FromHours(4));
 
         // En lugar de que WPF abra la ventana automáticamente (StartupUri),
         // nosotros le pedimos al contenedor DI que nos construya la ventana

@@ -16,6 +16,7 @@ public partial class MainViewModel : ObservableObject,
     IRecipient<NavegarMensaje_Detalle>,
     IRecipient<NavegarMensaje_Calendario>,
     IRecipient<NavegarMensaje_Descargas>,
+    IRecipient<NavegarMensaje_Configuracion>,
     IRecipient<AbrirBuscadorMensaje>,
     IRecipient<MostrarDialogoRequestMessage>,
     IRecipient<NavegarMensaje_Reproductor>,
@@ -26,17 +27,23 @@ public partial class MainViewModel : ObservableObject,
     private readonly IAnimeTrackingService _animeTrackingService;
     private readonly IDatabaseService _databaseService;
     private readonly IDownloadService _downloadService;
+    private readonly IUpdateService _updateService;
+    private readonly ISettingsService _settingsService;
+
+    public string VersionAppTexto => _updateService.ObtenerVersionActual();
 
     // === NAVEGACIÓN (ViewModel-First) ===
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(EsGaleriaActiva))]
     [NotifyPropertyChangedFor(nameof(EsCalendarioActivo))]
     [NotifyPropertyChangedFor(nameof(EsDescargasActivas))]
+    [NotifyPropertyChangedFor(nameof(EsConfiguracionActiva))]
     private ObservableObject _vistaActual = null!;
 
     public bool EsGaleriaActiva => VistaActual is GaleriaViewModel || VistaActual is DetalleViewModel;
     public bool EsCalendarioActivo => VistaActual is CalendarioViewModel;
     public bool EsDescargasActivas => VistaActual is DescargasViewModel;
+    public bool EsConfiguracionActiva => VistaActual is ConfiguracionViewModel;
 
     // === BADGE DE DESCARGAS ===
     [ObservableProperty]
@@ -85,18 +92,47 @@ public partial class MainViewModel : ObservableObject,
         IServiceProvider serviceProvider, 
         IAnimeTrackingService animeTrackingService, 
         IDatabaseService databaseService,
-        IDownloadService downloadService)
+        IDownloadService downloadService,
+        IUpdateService updateService,
+        ISettingsService settingsService)
     {
         _serviceProvider = serviceProvider;
         _animeTrackingService = animeTrackingService;
         _databaseService = databaseService;
         _downloadService = downloadService;
+        _updateService = updateService;
+        _settingsService = settingsService;
 
         WeakReferenceMessenger.Default.RegisterAll(this);
 
         // Cargamos la vista inicial
         VistaActual = _serviceProvider.GetRequiredService<GaleriaViewModel>();
         ActualizarConteoDescargas();
+    }
+
+    [RelayCommand]
+    public async Task BuscarActualizacionesManualAsync()
+    {
+        var update = await _updateService.ComprobarActualizacionesAsync(esManual: true);
+        if (update != null)
+        {
+            string nuevaVersion = update.TargetFullRelease?.Version.ToNormalizedString() ?? "nueva versión";
+            bool confirmar = await MostrarDialogoLocalAsync(
+                "Nueva versión disponible",
+                $"Se encontró la versión {nuevaVersion}. ¿Deseas descargarla e instalarla ahora?",
+                true,
+                "Update",
+                "#2196F3");
+
+            if (confirmar)
+            {
+                bool descargado = await _updateService.DescargarActualizacionAsync(update);
+                if (descargado)
+                {
+                    _updateService.AplicarActualizacionYReiniciar(update);
+                }
+            }
+        }
     }
 
     public void Receive(DescargaProgresoMensaje message)
@@ -181,6 +217,17 @@ public partial class MainViewModel : ObservableObject,
     private void NavegarDescargas()
     {
         VistaActual = _serviceProvider.GetRequiredService<DescargasViewModel>();
+    }
+
+    [RelayCommand]
+    private void NavegarConfiguracion()
+    {
+        VistaActual = _serviceProvider.GetRequiredService<ConfiguracionViewModel>();
+    }
+
+    public void Receive(NavegarMensaje_Configuracion message)
+    {
+        NavegarConfiguracion();
     }
 
     public void Receive(AbrirBuscadorMensaje message)
@@ -316,7 +363,7 @@ public partial class MainViewModel : ObservableObject,
         }
 
         string nombreSeguro = string.Join("_", animeAPI.Title.Romaji.Split(System.IO.Path.GetInvalidFileNameChars()));
-        string rutaBaseVideos = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), "Anime");
+        string rutaBaseVideos = _settingsService.ObtenerRutaBaseAnimes();
         string nuevaRutaCarpeta = System.IO.Path.Combine(rutaBaseVideos, nombreSeguro);
 
         if (!System.IO.Directory.Exists(nuevaRutaCarpeta))

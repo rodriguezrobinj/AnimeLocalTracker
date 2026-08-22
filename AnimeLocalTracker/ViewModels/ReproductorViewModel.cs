@@ -135,10 +135,33 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         _authService = authService;
     }
 
+    private static readonly object _engineLock = new();
+    private static bool _engineIniciado = false;
+
     public virtual Player CreateOptimizedPlayer()
     {
         try
         {
+            lock (_engineLock)
+            {
+                if (!_engineIniciado)
+                {
+                    try
+                    {
+                        Engine.Start(new EngineConfig()
+                        {
+                            FFmpegPath = ":FFmpeg",
+                            UIRefresh = true
+                        });
+                        _engineIniciado = true;
+                    }
+                    catch (Exception initEx)
+                    {
+                        AppLogger.Debug("ReproductorViewModel", $"No se pudo iniciar motor Flyleaf: {initEx.Message}");
+                    }
+                }
+            }
+
             var config = new Config();
             
             // Seeking rápido por keyframe (no frame-accurate)
@@ -425,9 +448,18 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         _ = VerificarProgresoPrevioAsync(animeId, episodio);
 
         // Sincronizar ícono de fullscreen con el estado actual de la ventana
-        if (System.Windows.Application.Current?.MainWindow is AnimeLocalTracker.Views.MainWindow mainWindow)
+        try
         {
-            FullscreenIcon = mainWindow.IsFullScreen ? "FullscreenExit" : "Fullscreen";
+            if (System.Windows.Application.Current != null && 
+                System.Windows.Application.Current.Dispatcher.CheckAccess() &&
+                System.Windows.Application.Current.MainWindow is AnimeLocalTracker.Views.MainWindow mainWindow)
+            {
+                FullscreenIcon = mainWindow.IsFullScreen ? "FullscreenExit" : "Fullscreen";
+            }
+        }
+        catch
+        {
+            // Entornos de pruebas sin Dispatcher o en subprocesos en segundo plano
         }
 
         // Mantener la instancia existente de Player para no destruir la superficie DirectX de FlyleafHost
