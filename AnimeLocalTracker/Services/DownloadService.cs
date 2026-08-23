@@ -1,9 +1,12 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using AnimeLocalTracker.Messages;
@@ -11,6 +14,19 @@ using CommunityToolkit.Mvvm.Messaging;
 using Microsoft.Win32.SafeHandles;
 
 namespace AnimeLocalTracker.Services;
+
+public class DownloadStateInfo
+{
+    public long TotalBytes { get; set; }
+    public List<SegmentState> Segments { get; set; } = new();
+}
+
+public class SegmentState
+{
+    public long Start { get; set; }
+    public long End { get; set; }
+    public long CurrentOffset { get; set; }
+}
 
 public class DownloadService : IDownloadService
 {
@@ -24,10 +40,13 @@ public class DownloadService : IDownloadService
         public long Orden { get; set; }
         public int AniListId { get; set; }
         public string AnimeTitulo { get; set; } = string.Empty;
+        public List<string> Titulos { get; set; } = new();
         public int NumeroEpisodio { get; set; }
         public double Progreso { get; set; }
         public string RutaDestino { get; set; } = string.Empty;
         public string RutaTemporal { get; set; } = string.Empty;
+        public string? VideoUrl { get; set; }
+        public bool IsPaused { get; set; }
         public CancellationTokenSource Cts { get; set; } = new();
         public DateTime FechaCreacion { get; set; } = DateTime.UtcNow;
     }
@@ -49,19 +68,18 @@ public class DownloadService : IDownloadService
         return false;
     }
 
-    private static void LimpiarArchivoTemporal(string? path)
+    private static void LimpiarArchivosTemporales(string? tempPath)
     {
-        if (string.IsNullOrEmpty(path)) return;
+        if (string.IsNullOrEmpty(tempPath)) return;
         try
         {
-            if (File.Exists(path))
-            {
-                File.Delete(path);
-            }
+            if (File.Exists(tempPath)) File.Delete(tempPath);
+            string statePath = tempPath + ".state";
+            if (File.Exists(statePath)) File.Delete(statePath);
         }
         catch (Exception ex)
         {
-            AppLogger.Warn("DownloadService", $"No se pudo limpiar archivo temporal '{path}': {ex.Message}");
+            AppLogger.Warn("DownloadService", $"No se pudo limpiar temporales '{tempPath}': {ex.Message}");
         }
     }
 
@@ -70,39 +88,75 @@ public class DownloadService : IDownloadService
         string key = $"{aniListId}_{numeroEpisodio}";
         if (_activeDownloads.TryRemove(key, out var state))
         {
-            try
-            {
-                state.Cts.Cancel();
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Warn("DownloadService", $"Excepción al cancelar CancellationToken para ({aniListId}, ep {numeroEpisodio}): {ex.Message}");
-            }
-
-            LimpiarArchivoTemporal(state.RutaTemporal);
-
-            WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(aniListId, numeroEpisodio, 0, isDownloading: false, isCompleted: false, "", "Descarga cancelada", state.AnimeTitulo));
+            try { state.Cts.Cancel(); } catch { }
+            LimpiarArchivosTemporales(state.RutaTemporal);
+            WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(aniListId, numeroEpisodio, 0, isDownloading: false, isCompleted: false, isPaused: false, "", "Descarga cancelada", state.AnimeTitulo));
         }
     }
 
     public void CancelarTodas()
     {
-        foreach (var kvp in _activeDownloads)
+        foreach (var kvp in _activeDownloads.ToList())
         {
             if (_activeDownloads.TryRemove(kvp.Key, out var state))
             {
-                try
-                {
-                    state.Cts.Cancel();
-                }
-                catch (Exception ex)
-                {
-                    AppLogger.Warn("DownloadService", $"Excepción al cancelar CancellationToken para ({state.AniListId}, ep {state.NumeroEpisodio}): {ex.Message}");
-                }
+                try { state.Cts.Cancel(); } catch { }
+                LimpiarArchivosTemporales(state.RutaTemporal);
+                WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, 0, isDownloading: false, isCompleted: false, isPaused: false, "", "Descarga cancelada", state.AnimeTitulo));
+            }
+        }
+    }
 
-                LimpiarArchivoTemporal(state.RutaTemporal);
+    public void PausarDescarga(int aniListId, int numeroEpisodio)
+    {
+        string key = $"{aniListId}_{numeroEpisodio}";
+        if (_activeDownloads.TryGetValue(key, out var state))
+        {
+            if (state.IsPaused) return;
+            state.IsPaused = true;
+            try { state.Cts.Cancel(); } catch { }
+            
+            WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(aniListId, numeroEpisodio, state.Progreso, isDownloading: true, isCompleted: false, isPaused: true, state.RutaDestino, null, state.AnimeTitulo));
+        }
+    }
 
-                WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, 0, isDownloading: false, isCompleted: false, "", "Descarga cancelada", state.AnimeTitulo));
+    public void PausarTodas()
+    {
+        foreach (var kvp in _activeDownloads)
+        {
+            var state = kvp.Value;
+            if (!state.IsPaused)
+            {
+                state.IsPaused = true;
+                try { state.Cts.Cancel(); } catch { }
+                WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, state.Progreso, isDownloading: true, isCompleted: false, isPaused: true, state.RutaDestino, null, state.AnimeTitulo));
+            }
+        }
+    }
+
+    public void ReanudarDescarga(int aniListId, int numeroEpisodio)
+    {
+        string key = $"{aniListId}_{numeroEpisodio}";
+        if (_activeDownloads.TryGetValue(key, out var state) && state.IsPaused)
+        {
+            state.IsPaused = false;
+            state.Cts = new CancellationTokenSource();
+            WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(aniListId, numeroEpisodio, state.Progreso, isDownloading: true, isCompleted: false, isPaused: false, state.RutaDestino, null, state.AnimeTitulo));
+            EjecutarBucleDescargaAsync(state); 
+        }
+    }
+
+    public void ReanudarTodas()
+    {
+        foreach (var kvp in _activeDownloads)
+        {
+            var state = kvp.Value;
+            if (state.IsPaused)
+            {
+                state.IsPaused = false;
+                state.Cts = new CancellationTokenSource();
+                WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, state.Progreso, isDownloading: true, isCompleted: false, isPaused: false, state.RutaDestino, null, state.AnimeTitulo));
+                EjecutarBucleDescargaAsync(state);
             }
         }
     }
@@ -119,6 +173,7 @@ public class DownloadService : IDownloadService
                 Progreso = s.Progreso,
                 IsDownloading = true,
                 IsCompleted = false,
+                IsPaused = s.IsPaused,
                 RutaArchivo = s.RutaDestino
             })
             .ToList();
@@ -129,21 +184,6 @@ public class DownloadService : IDownloadService
         string key = $"{aniListId}_{numeroEpisodio}";
         if (_activeDownloads.ContainsKey(key)) return Task.CompletedTask;
 
-        var state = new DownloadState
-        {
-            Orden = Interlocked.Increment(ref _ordenCounter),
-            AniListId = aniListId,
-            AnimeTitulo = animeTitulo,
-            NumeroEpisodio = numeroEpisodio,
-            Progreso = 0
-        };
-
-        if (!_activeDownloads.TryAdd(key, state)) return Task.CompletedTask;
-
-        // Notificar que entró en cola de descarga
-        WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(aniListId, numeroEpisodio, 0, isDownloading: true, isCompleted: false, "", animeTitulo: animeTitulo));
-
-        // Preparar lista de todos los títulos candidatos
         var todosLosTitulos = new List<string> { animeTitulo };
         if (titulosAlternativos != null)
         {
@@ -156,74 +196,97 @@ public class DownloadService : IDownloadService
             }
         }
 
+        var state = new DownloadState
+        {
+            Orden = Interlocked.Increment(ref _ordenCounter),
+            AniListId = aniListId,
+            AnimeTitulo = animeTitulo,
+            Titulos = todosLosTitulos,
+            NumeroEpisodio = numeroEpisodio,
+            Progreso = 0,
+            RutaDestino = Path.Combine(carpetaDestino, $"Episodio {numeroEpisodio:D2}.mp4"),
+        };
+        state.RutaTemporal = state.RutaDestino + ".downloading";
+
+        if (!_activeDownloads.TryAdd(key, state)) return Task.CompletedTask;
+
+        if (!Directory.Exists(carpetaDestino))
+        {
+            Directory.CreateDirectory(carpetaDestino);
+        }
+
+        WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(aniListId, numeroEpisodio, 0, isDownloading: true, isCompleted: false, isPaused: false, "", null, animeTitulo));
+
+        EjecutarBucleDescargaAsync(state);
+        return Task.CompletedTask;
+    }
+
+    private void EjecutarBucleDescargaAsync(DownloadState state)
+    {
+        string key = $"{state.AniListId}_{state.NumeroEpisodio}";
+
         _ = Task.Run(async () =>
         {
-            string tempPath = string.Empty;
-            string targetPath = string.Empty;
             bool acquired = false;
-
             try
             {
-                // Esperar turno en la cola (1 descarga a la vez)
                 await _downloadLock.WaitAsync(state.Cts.Token);
                 acquired = true;
 
-                if (state.Cts.IsCancellationRequested) return;
+                if (state.Cts.IsCancellationRequested || state.IsPaused) return;
 
-                // Paso 1: Buscar y extraer URL directa probando nombres principales y alternativos
-                string? directUrl = await BuscarUrlEpisodioEnAnimeAv1Async(todosLosTitulos, numeroEpisodio, state.Cts.Token);
-                
-                if (string.IsNullOrEmpty(directUrl))
+                if (string.IsNullOrEmpty(state.VideoUrl))
                 {
-                    Debug.WriteLine($"[DownloadService] No se encontró enlace para '{animeTitulo}' Ep {numeroEpisodio}.");
-                    _activeDownloads.TryRemove(key, out _);
-                    WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(
-                        aniListId, numeroEpisodio, 0, isDownloading: false, isCompleted: false, "", 
-                        $"No se encontró el episodio {numeroEpisodio} en el servidor con ningún nombre conocido.", animeTitulo));
-                    return;
+                    state.VideoUrl = await BuscarUrlEpisodioEnAnimeAv1Async(state.Titulos, state.NumeroEpisodio, state.Cts.Token);
+                    if (string.IsNullOrEmpty(state.VideoUrl))
+                    {
+                        if (state.IsPaused || state.Cts.IsCancellationRequested) return;
+
+                        Debug.WriteLine($"[DownloadService] No se encontró enlace para '{state.AnimeTitulo}' Ep {state.NumeroEpisodio}.");
+                        _activeDownloads.TryRemove(key, out _);
+                        WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, 0, isDownloading: false, isCompleted: false, isPaused: false, "", $"No se encontró el episodio {state.NumeroEpisodio} en el servidor.", state.AnimeTitulo));
+                        return;
+                    }
                 }
 
-                // Paso 2: Preparar rutas (temporal para descarga y final para reproducción)
-                if (!Directory.Exists(carpetaDestino))
-                {
-                    Directory.CreateDirectory(carpetaDestino);
-                }
-                targetPath = Path.Combine(carpetaDestino, $"Episodio {numeroEpisodio:D2}.mp4");
-                tempPath = targetPath + ".downloading";
-                state.RutaDestino = targetPath;
-                state.RutaTemporal = tempPath;
+                if (state.Cts.IsCancellationRequested || state.IsPaused) return;
 
-                // Paso 3: Descarga paralela multi-hilo en el archivo temporal
                 var progress = new Progress<double>(p =>
                 {
                     state.Progreso = p;
-                    WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(aniListId, numeroEpisodio, p, isDownloading: true, isCompleted: false, targetPath, animeTitulo: animeTitulo));
+                    WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, p, isDownloading: true, isCompleted: false, isPaused: false, state.RutaDestino, null, state.AnimeTitulo));
                 });
 
-                await DownloadVideoAsync(directUrl, tempPath, progress, state.Cts.Token);
+                await DownloadVideoAsync(state.VideoUrl, state.RutaTemporal, progress, state.Cts.Token);
 
-                // Paso 4: Finalización exitosa: solo al completar el 100% de los bytes se promueve al archivo final
-                if (File.Exists(targetPath))
-                {
-                    File.Delete(targetPath);
-                }
-                File.Move(tempPath, targetPath);
+                if (File.Exists(state.RutaDestino)) File.Delete(state.RutaDestino);
+                File.Move(state.RutaTemporal, state.RutaDestino);
+                LimpiarArchivosTemporales(state.RutaTemporal);
 
                 _activeDownloads.TryRemove(key, out _);
-                WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(aniListId, numeroEpisodio, 100, isDownloading: false, isCompleted: true, targetPath, animeTitulo: animeTitulo));
+                WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, 100, isDownloading: false, isCompleted: true, isPaused: false, state.RutaDestino, null, state.AnimeTitulo));
             }
             catch (OperationCanceledException)
             {
-                Debug.WriteLine($"[DownloadService] Descarga cancelada: {animeTitulo} Ep {numeroEpisodio}");
-                LimpiarArchivoTemporal(tempPath);
-                _activeDownloads.TryRemove(key, out _);
+                Debug.WriteLine($"[DownloadService] Descarga interrumpida: {state.AnimeTitulo} Ep {state.NumeroEpisodio}. Pausado: {state.IsPaused}");
+                if (!state.IsPaused)
+                {
+                    LimpiarArchivosTemporales(state.RutaTemporal);
+                    _activeDownloads.TryRemove(key, out _);
+                }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[DownloadService] Error descargando {animeTitulo} Ep {numeroEpisodio}: {ex.Message}");
-                LimpiarArchivoTemporal(tempPath);
+                if (state.IsPaused || state.Cts.IsCancellationRequested)
+                {
+                    Debug.WriteLine($"[DownloadService] Descarga pausada generó excepción esperada: {ex.Message}");
+                    return;
+                }
+
+                Debug.WriteLine($"[DownloadService] Error descargando {state.AnimeTitulo} Ep {state.NumeroEpisodio}: {ex.Message}");
+                LimpiarArchivosTemporales(state.RutaTemporal);
                 _activeDownloads.TryRemove(key, out _);
-                WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(aniListId, numeroEpisodio, 0, isDownloading: false, isCompleted: false, "", ex.Message, animeTitulo));
+                WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, 0, isDownloading: false, isCompleted: false, isPaused: false, "", ex.Message, state.AnimeTitulo));
             }
             finally
             {
@@ -233,8 +296,6 @@ public class DownloadService : IDownloadService
                 }
             }
         });
-
-        return Task.CompletedTask;
     }
 
     private async Task<string?> BuscarUrlEpisodioEnAnimeAv1Async(IEnumerable<string> titulos, int numeroEpisodio, CancellationToken cancellationToken)
@@ -583,79 +644,136 @@ public class DownloadService : IDownloadService
 
     private async Task DownloadSegmentedParallelAsync(string videoUrl, string destinationPath, long totalBytes, IProgress<double>? progress, CancellationToken cancellationToken)
     {
-        // 6 conexiones paralelas para maximizar el ancho de banda sin saturar el host
+        string statePath = destinationPath + ".state";
+        DownloadStateInfo stateInfo;
+
+        if (File.Exists(statePath))
+        {
+            try
+            {
+                string json = await File.ReadAllTextAsync(statePath, cancellationToken);
+                stateInfo = JsonSerializer.Deserialize<DownloadStateInfo>(json) ?? new DownloadStateInfo();
+                if (stateInfo.TotalBytes != totalBytes) throw new Exception("TotalBytes mismatch");
+            }
+            catch
+            {
+                stateInfo = new DownloadStateInfo { TotalBytes = totalBytes };
+            }
+        }
+        else
+        {
+            stateInfo = new DownloadStateInfo { TotalBytes = totalBytes };
+        }
+
         int segmentCount = 6;
         long segmentSize = totalBytes / segmentCount;
 
-        // Pre-reservar el archivo en disco para evitar fragmentación
-        using (var preAlloc = new FileStream(destinationPath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite, 4096, useAsync: true))
+        if (stateInfo.Segments.Count == 0)
         {
-            preAlloc.SetLength(totalBytes);
+            for (int i = 0; i < segmentCount; i++)
+            {
+                long start = i * segmentSize;
+                long end = (i == segmentCount - 1) ? totalBytes - 1 : (start + segmentSize - 1);
+                stateInfo.Segments.Add(new SegmentState { Start = start, End = end, CurrentOffset = start });
+            }
+        }
+
+        bool shouldPreAlloc = !File.Exists(destinationPath);
+        using (var preAlloc = new FileStream(destinationPath, FileMode.OpenOrCreate, FileAccess.Write, FileShare.ReadWrite, 4096, useAsync: true))
+        {
+            if (shouldPreAlloc || preAlloc.Length != totalBytes)
+            {
+                preAlloc.SetLength(totalBytes);
+            }
         }
 
         using SafeFileHandle fileHandle = File.OpenHandle(destinationPath, FileMode.Open, FileAccess.Write, FileShare.ReadWrite, FileOptions.Asynchronous);
 
-        long totalDownloaded = 0;
+        long totalDownloaded = stateInfo.Segments.Sum(s => s.CurrentOffset - s.Start);
         double lastReportedPercentage = -1.0;
         var lastReportTime = DateTime.UtcNow;
 
         var tasks = new Task[segmentCount];
 
-        for (int i = 0; i < segmentCount; i++)
+        try
         {
-            long start = i * segmentSize;
-            long end = (i == segmentCount - 1) ? totalBytes - 1 : (start + segmentSize - 1);
-
-            tasks[i] = Task.Run(async () =>
+            for (int i = 0; i < segmentCount; i++)
             {
-                using var req = new HttpRequestMessage(HttpMethod.Get, videoUrl);
-                req.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
-                req.Headers.Add("Referer", "https://www.mp4upload.com/");
-                req.Headers.Range = new RangeHeaderValue(start, end);
-
-                using var response = await _httpClient.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-                response.EnsureSuccessStatusCode();
-
-                using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-                byte[] buffer = new byte[131072]; // 128 KB por lectura
-                long currentOffset = start;
-
-                while (currentOffset <= end)
+                var segment = stateInfo.Segments[i];
+                tasks[i] = Task.Run(async () =>
                 {
-                    int bytesToRead = (int)Math.Min(buffer.Length, end - currentOffset + 1);
-                    int read = await stream.ReadAsync(buffer.AsMemory(0, bytesToRead), cancellationToken);
-                    if (read == 0) break;
+                    if (segment.CurrentOffset > segment.End) return; // Ya terminó este segmento
 
-                    await RandomAccess.WriteAsync(fileHandle, buffer.AsMemory(0, read), currentOffset, cancellationToken);
-                    currentOffset += read;
+                    using var req = new HttpRequestMessage(HttpMethod.Get, videoUrl);
+                    req.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+                    req.Headers.Add("Referer", "https://www.mp4upload.com/");
+                    req.Headers.Range = new RangeHeaderValue(segment.CurrentOffset, segment.End);
 
-                    long currentTotal = Interlocked.Add(ref totalDownloaded, read);
+                    using var response = await _httpClient.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+                    response.EnsureSuccessStatusCode();
 
-                    if (progress != null)
+                    using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+                    byte[] buffer = new byte[131072];
+
+                    while (segment.CurrentOffset <= segment.End)
                     {
-                        double percent = Math.Clamp((double)currentTotal / totalBytes * 100.0, 0.0, 100.0);
-                        var now = DateTime.UtcNow;
-                        if (percent - lastReportedPercentage >= 0.5 || (now - lastReportTime).TotalMilliseconds >= 150 || currentTotal == totalBytes)
+                        int bytesToRead = (int)Math.Min(buffer.Length, segment.End - segment.CurrentOffset + 1);
+                        int read = await stream.ReadAsync(buffer.AsMemory(0, bytesToRead), cancellationToken);
+                        if (read == 0) break;
+
+                        await RandomAccess.WriteAsync(fileHandle, buffer.AsMemory(0, read), segment.CurrentOffset, cancellationToken);
+                        segment.CurrentOffset += read;
+
+                        long currentTotal = Interlocked.Add(ref totalDownloaded, read);
+
+                        if (progress != null)
                         {
-                            lastReportedPercentage = percent;
-                            lastReportTime = now;
-                            progress.Report(percent);
+                            double percent = Math.Clamp((double)currentTotal / totalBytes * 100.0, 0.0, 100.0);
+                            var now = DateTime.UtcNow;
+                            if (percent - lastReportedPercentage >= 0.5 || (now - lastReportTime).TotalMilliseconds >= 150 || currentTotal == totalBytes)
+                            {
+                                lastReportedPercentage = percent;
+                                lastReportTime = now;
+                                progress.Report(percent);
+                            }
                         }
                     }
-                }
-            }, cancellationToken);
+                }, cancellationToken);
+            }
+
+            await Task.WhenAll(tasks);
+            progress?.Report(100.0);
         }
-
-        await Task.WhenAll(tasks);
-
-        progress?.Report(100.0);
+        catch (OperationCanceledException)
+        {
+            string json = JsonSerializer.Serialize(stateInfo);
+            await File.WriteAllTextAsync(statePath, json);
+            throw;
+        }
     }
 
     private async Task DownloadSequentialAsync(string videoUrl, string destinationPath, long totalBytes, IProgress<double>? progress, CancellationToken cancellationToken)
     {
+        long existingLength = 0;
+        if (File.Exists(destinationPath))
+        {
+            existingLength = new FileInfo(destinationPath).Length;
+        }
+
+        if (totalBytes > 0 && existingLength >= totalBytes)
+        {
+            progress?.Report(100.0);
+            return;
+        }
+
         using var req = new HttpRequestMessage(HttpMethod.Get, videoUrl);
         req.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
         req.Headers.Add("Referer", "https://www.mp4upload.com/");
+        
+        if (existingLength > 0 && totalBytes > 0)
+        {
+            req.Headers.Range = new RangeHeaderValue(existingLength, null);
+        }
 
         using var response = await _httpClient.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         response.EnsureSuccessStatusCode();
@@ -663,15 +781,16 @@ public class DownloadService : IDownloadService
         if (totalBytes <= 0)
         {
             totalBytes = response.Content.Headers.ContentLength ?? -1L;
+            if (existingLength > 0) totalBytes += existingLength; // Adjust total if resumed
         }
 
         var canReportProgress = totalBytes > 0 && progress != null;
 
         using var contentStream = await response.Content.ReadAsStreamAsync(cancellationToken);
-        using var fileStream = new FileStream(destinationPath, FileMode.Create, FileAccess.Write, FileShare.None, 131072, true);
+        using var fileStream = new FileStream(destinationPath, FileMode.Append, FileAccess.Write, FileShare.None, 131072, true);
 
-        var totalRead = 0L;
-        var buffer = new byte[131072]; // 128 KB
+        var totalRead = existingLength;
+        var buffer = new byte[131072];
         var isMoreToRead = true;
         var lastReportedPercentage = -1.0;
         var lastReportTime = DateTime.UtcNow;

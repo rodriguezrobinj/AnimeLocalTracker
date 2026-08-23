@@ -84,7 +84,7 @@ public partial class MainViewModel : ObservableObject,
         {
             SetProperty(ref _textoBusqueda, value);
             BusquedaSinResultados = false; // Resetear al escribir
-            EjecutarBusquedaEnVivoAsync(value);
+            EjecutarBusquedaEnVivoAsyncCore(value);
         }
     }
 
@@ -160,9 +160,16 @@ public partial class MainViewModel : ObservableObject,
 
     public async void Receive(NavegarMensaje_Detalle message)
     {
-        var detalleVm = _serviceProvider.GetRequiredService<DetalleViewModel>();
-        VistaActual = detalleVm;
-        await detalleVm.InicializarAsync(message.AnimeSeleccionado);
+        try
+        {
+            var detalleVm = _serviceProvider.GetRequiredService<DetalleViewModel>();
+            VistaActual = detalleVm;
+            await detalleVm.InicializarAsync(message.AnimeSeleccionado);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("MainViewModel", "Error al inicializar la vista de detalle", ex);
+        }
     }
 
     public void Receive(NavegarMensaje_Calendario message)
@@ -222,7 +229,15 @@ public partial class MainViewModel : ObservableObject,
     [RelayCommand]
     private void NavegarConfiguracion()
     {
-        VistaActual = _serviceProvider.GetRequiredService<ConfiguracionViewModel>();
+        try 
+        {
+            VistaActual = _serviceProvider.GetRequiredService<ConfiguracionViewModel>();
+        }
+        catch (Exception ex)
+        {
+            System.IO.File.AppendAllText("crash.log", $"[{DateTime.Now:O}] [MainViewModel] Error en NavegarConfiguracion: {ex}\n");
+            AppLogger.Error("MainViewModel", "Error navegando a configuración", ex);
+        }
     }
 
     public void Receive(NavegarMensaje_Configuracion message)
@@ -232,13 +247,47 @@ public partial class MainViewModel : ObservableObject,
 
     public void Receive(AbrirBuscadorMensaje message)
     {
+        CancelarBusquedaPendiente();
         TextoBusqueda = string.Empty;
         ResultadosBusqueda.Clear();
+        BusquedaSinResultados = false;
+        IsSearching = false;
         IsDialogOpen = true;
     }
 
     public void Receive(MostrarDialogoRequestMessage message)
     {
+        if (message.HasReceivedResponse)
+        {
+            return;
+        }
+
+        try
+        {
+            var dispatcher = System.Windows.Application.Current?.Dispatcher;
+            if (dispatcher != null && !dispatcher.CheckAccess())
+            {
+                // Marshaling al hilo de UI para evitar accesos cruzados (Flyleaf/descargas).
+                dispatcher.Invoke(() => ResponderDialogo(message));
+            }
+            else
+            {
+                ResponderDialogo(message);
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("MainViewModel", $"Error respondiendo a MostrarDialogoRequestMessage: {ex.Message}");
+        }
+    }
+
+    private void ResponderDialogo(MostrarDialogoRequestMessage message)
+    {
+        if (message.HasReceivedResponse)
+        {
+            return;
+        }
+
         // Respondemos a la petición asíncrona enviada por otros ViewModels
         message.Reply(MostrarDialogoLocalAsync(message.Titulo, message.Mensaje, message.EsConfirmacion, message.Icono, message.Color));
     }
@@ -260,8 +309,15 @@ public partial class MainViewModel : ObservableObject,
             // Ocultar automáticamente después de 3.5 segundos
             _ = Task.Run(async () => 
             {
-                await Task.Delay(3500);
-                System.Windows.Application.Current.Dispatcher.Invoke(() => ToastVisible = false);
+                try
+                {
+                    await Task.Delay(3500);
+                    System.Windows.Application.Current?.Dispatcher?.Invoke(() => ToastVisible = false);
+                }
+                catch (Exception ex)
+                {
+                    AppLogger.Debug("MainViewModel", $"Error al ocultar toast: {ex.Message}");
+                }
             });
             
             // Retorna true automáticamente porque no requiere la interacción del usuario
@@ -298,50 +354,84 @@ public partial class MainViewModel : ObservableObject,
     [RelayCommand]
     private void CerrarDialogoBusqueda()
     {
+        CancelarBusquedaPendiente();
         IsDialogOpen = false;
+    }
+
+    /// <summary>
+    /// Cancela de forma segura cualquier búsqueda pendiente.
+    /// Solo cancela el token — no dispone el CTS inmediatamente,
+    /// ya que tareas async previas aún pueden referenciar el token.
+    /// </summary>
+    private void CancelarBusquedaPendiente()
+    {
+        try
+        {
+            _searchCts?.Cancel();
+        }
+        catch (ObjectDisposedException) { }
     }
 
     // ==========================================
     // LÓGICA DE BÚSQUEDA Y CREACIÓN DE ANIME
     // ==========================================
-    private async void EjecutarBusquedaEnVivoAsync(string busqueda)
+
+    private async void EjecutarBusquedaEnVivoAsyncCore(string busqueda)
     {
         if (string.IsNullOrWhiteSpace(busqueda) || busqueda.Length < 3)
         {
+            CancelarBusquedaPendiente();
             ResultadosBusqueda.Clear();
             IsSearching = false;
             BusquedaSinResultados = false;
             return;
         }
 
-        _searchCts?.Cancel();
-        _searchCts = new System.Threading.CancellationTokenSource();
-        var token = _searchCts.Token;
+        // Cancelar la búsqueda anterior (solo Cancel, nunca Dispose desde aquí)
+        CancelarBusquedaPendiente();
+
+        // Crear un nuevo CTS para esta búsqueda
+        var cts = new System.Threading.CancellationTokenSource();
+        _searchCts = cts;
 
         try
         {
             IsSearching = true;
-            await Task.Delay(500, token); 
-            
-            if (!token.IsCancellationRequested)
+            await Task.Delay(400, cts.Token);
+
+            // Verificar si mientras esperábamos, otra búsqueda nos canceló
+            if (cts.Token.IsCancellationRequested) return;
+
+            var resultados = await _animeTrackingService.BuscarAnimesEnVivoAsync(busqueda, cts.Token);
+
+            if (cts.Token.IsCancellationRequested) return;
+
+            ResultadosBusqueda.Clear();
+            foreach (var r in resultados)
             {
-                var resultados = await _animeTrackingService.BuscarAnimesEnVivoAsync(busqueda);
-                ResultadosBusqueda.Clear();
-                foreach (var r in resultados) ResultadosBusqueda.Add(r);
-                
-                BusquedaSinResultados = ResultadosBusqueda.Count == 0;
+                ResultadosBusqueda.Add(r);
             }
+            BusquedaSinResultados = ResultadosBusqueda.Count == 0;
         }
-        catch (TaskCanceledException ex)
+        catch (OperationCanceledException)
         {
-            AppLogger.Debug("MainViewModel", $"Búsqueda en vivo cancelada por nuevo término: {ex.Message}");
+            // Normal: el usuario escribió otro carácter y cancelamos esta búsqueda.
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("MainViewModel", $"Error durante la búsqueda en vivo para '{busqueda}'", ex);
         }
         finally
         {
-            if (!token.IsCancellationRequested)
+            // Solo actualizar IsSearching si ESTE CTS sigue siendo el activo.
+            // Si _searchCts ya apunta a otro objeto, otra búsqueda tomó el control.
+            if (ReferenceEquals(_searchCts, cts))
             {
                 IsSearching = false;
             }
+
+            // Ahora sí es seguro disponer: ya salimos de todas las operaciones async.
+            cts.Dispose();
         }
     }
 
@@ -350,78 +440,86 @@ public partial class MainViewModel : ObservableObject,
     {
         if (animeAPI?.Title?.Romaji == null) return;
 
-        // Validar si el anime ya existe en la biblioteca
-        var animesGuardados = await _databaseService.ObtenerTodosLosAnimesAsync();
-        if (animesGuardados.Any(a => a.AniListId == animeAPI.Id))
+        try
         {
-            IsDialogOpen = false;
-            await Task.Delay(250); // Permitir que la animación de cierre termine
-            TextoBusqueda = string.Empty;
-            ResultadosBusqueda.Clear();
-            await MostrarDialogoLocalAsync("Anime Existente", $"El anime '{animeAPI.Title.Romaji}' ya se encuentra en tu biblioteca.", false, "InformationOutline", "#FF9800");
-            return;
-        }
-
-        string nombreSeguro = string.Join("_", animeAPI.Title.Romaji.Split(System.IO.Path.GetInvalidFileNameChars()));
-        string rutaBaseVideos = _settingsService.ObtenerRutaBaseAnimes();
-        string nuevaRutaCarpeta = System.IO.Path.Combine(rutaBaseVideos, nombreSeguro);
-
-        if (!System.IO.Directory.Exists(nuevaRutaCarpeta))
-        {
-            System.IO.Directory.CreateDirectory(nuevaRutaCarpeta);
-        }
-
-        int episodiosEmitidos = 0;
-        string estadoAnime = animeAPI.Status?.ToUpperInvariant() ?? "UNKNOWN";
-
-        if (estadoAnime == "NOT_YET_RELEASED")
-        {
-            episodiosEmitidos = 0;
-        }
-        else if (estadoAnime == "RELEASING")
-        {
-            if (animeAPI.NextAiringEpisode != null)
+            // Validar si el anime ya existe en la biblioteca
+            var animesGuardados = await _databaseService.ObtenerTodosLosAnimesAsync();
+            if (animesGuardados.Any(a => a.AniListId == animeAPI.Id))
             {
-                episodiosEmitidos = Math.Max(0, animeAPI.NextAiringEpisode.Episode - 1);
+                IsDialogOpen = false;
+                await Task.Delay(250); // Permitir que la animación de cierre termine
+                TextoBusqueda = string.Empty;
+                ResultadosBusqueda.Clear();
+                await MostrarDialogoLocalAsync("Anime Existente", $"El anime '{animeAPI.Title.Romaji}' ya se encuentra en tu biblioteca.", false, "InformationOutline", "#FF9800");
+                return;
             }
-            else
+
+            string nombreSeguro = string.Join("_", animeAPI.Title.Romaji.Split(System.IO.Path.GetInvalidFileNameChars()));
+            string rutaBaseVideos = _settingsService.ObtenerRutaBaseAnimes();
+            string nuevaRutaCarpeta = System.IO.Path.Combine(rutaBaseVideos, nombreSeguro);
+
+            if (!System.IO.Directory.Exists(nuevaRutaCarpeta))
+            {
+                System.IO.Directory.CreateDirectory(nuevaRutaCarpeta);
+            }
+
+            int episodiosEmitidos = 0;
+            string estadoAnime = animeAPI.Status?.ToUpperInvariant() ?? "UNKNOWN";
+
+            if (estadoAnime == "NOT_YET_RELEASED")
+            {
+                episodiosEmitidos = 0;
+            }
+            else if (estadoAnime == "RELEASING")
+            {
+                if (animeAPI.NextAiringEpisode != null)
+                {
+                    episodiosEmitidos = Math.Max(0, animeAPI.NextAiringEpisode.Episode - 1);
+                }
+                else
+                {
+                    episodiosEmitidos = animeAPI.Episodes ?? 0;
+                }
+            }
+            else // FINISHED, etc.
             {
                 episodiosEmitidos = animeAPI.Episodes ?? 0;
             }
-        }
-        else // FINISHED, etc.
-        {
-            episodiosEmitidos = animeAPI.Episodes ?? 0;
-        }
+                
+            var titulosAlt = new System.Collections.Generic.List<string>();
+            if (!string.IsNullOrWhiteSpace(animeAPI.Title.English)) titulosAlt.Add(animeAPI.Title.English);
+            if (!string.IsNullOrWhiteSpace(animeAPI.Title.UserPreferred) && animeAPI.Title.UserPreferred != animeAPI.Title.Romaji) titulosAlt.Add(animeAPI.Title.UserPreferred);
+            if (animeAPI.Synonyms != null) titulosAlt.AddRange(System.Linq.Enumerable.Where(animeAPI.Synonyms, s => !string.IsNullOrWhiteSpace(s)));
+
+            var nuevoAnimeLocal = new AnimeItem
+            {
+                AniListId = animeAPI.Id,
+                Titulo = animeAPI.Title.Romaji,
+                NombresAlternativos = string.Join(" | ", System.Linq.Enumerable.Distinct(titulosAlt)),
+                UrlPortada = animeAPI.CoverImage?.ExtraLarge ?? animeAPI.CoverImage?.Large ?? "",
+                RutaCarpeta = nuevaRutaCarpeta,
+                Estado = animeAPI.Status ?? "UNKNOWN",
+                TotalEpisodios = episodiosEmitidos,
+                Generos = animeAPI.Genres != null ? string.Join(", ", animeAPI.Genres) : "",
+                Sinopsis = animeAPI.Description ?? ""
+            };
+
+            await _databaseService.GuardarAnimeAsync(nuevoAnimeLocal);
+
+            // Notificamos a la Galeria que se añadió un anime
+            WeakReferenceMessenger.Default.Send(new AnimeAñadidoMensaje(nuevoAnimeLocal));
+
+            IsDialogOpen = false;
+            await Task.Delay(250); // Permitir que la animación de cierre termine antes de limpiar
+            TextoBusqueda = string.Empty;
+            ResultadosBusqueda.Clear();
             
-        var titulosAlt = new System.Collections.Generic.List<string>();
-        if (!string.IsNullOrWhiteSpace(animeAPI.Title.English)) titulosAlt.Add(animeAPI.Title.English);
-        if (!string.IsNullOrWhiteSpace(animeAPI.Title.UserPreferred) && animeAPI.Title.UserPreferred != animeAPI.Title.Romaji) titulosAlt.Add(animeAPI.Title.UserPreferred);
-        if (animeAPI.Synonyms != null) titulosAlt.AddRange(System.Linq.Enumerable.Where(animeAPI.Synonyms, s => !string.IsNullOrWhiteSpace(s)));
-
-        var nuevoAnimeLocal = new AnimeItem
+            await MostrarDialogoLocalAsync("Anime Añadido", $"Carpeta creada automáticamente en:\n{nuevaRutaCarpeta}", false, "FolderPlusOutline", "#4CAF50");
+        }
+        catch (Exception ex)
         {
-            AniListId = animeAPI.Id,
-            Titulo = animeAPI.Title.Romaji,
-            NombresAlternativos = string.Join(" | ", System.Linq.Enumerable.Distinct(titulosAlt)),
-            UrlPortada = animeAPI.CoverImage?.ExtraLarge ?? animeAPI.CoverImage?.Large ?? "",
-            RutaCarpeta = nuevaRutaCarpeta,
-            Estado = animeAPI.Status ?? "UNKNOWN",
-            TotalEpisodios = episodiosEmitidos,
-            Generos = animeAPI.Genres != null ? string.Join(", ", animeAPI.Genres) : "",
-            Sinopsis = animeAPI.Description ?? ""
-        };
-
-        await _databaseService.GuardarAnimeAsync(nuevoAnimeLocal);
-
-        // Notificamos a la Galeria que se añadió un anime
-        WeakReferenceMessenger.Default.Send(new AnimeAñadidoMensaje(nuevoAnimeLocal));
-
-        IsDialogOpen = false;
-        await Task.Delay(250); // Permitir que la animación de cierre termine antes de limpiar
-        TextoBusqueda = string.Empty;
-        ResultadosBusqueda.Clear();
-        
-        await MostrarDialogoLocalAsync("Anime Añadido", $"Carpeta creada automáticamente en:\n{nuevaRutaCarpeta}", false, "FolderPlusOutline", "#4CAF50");
+            AppLogger.Error("MainViewModel", $"Error al crear/añadir anime '{animeAPI?.Title?.Romaji}'", ex);
+            await MostrarDialogoLocalAsync("Error", $"No se pudo añadir el anime: {ex.Message}", false, "AlertCircleOutline", "#E53935");
+        }
     }
 }

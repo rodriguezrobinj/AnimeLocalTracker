@@ -131,21 +131,13 @@ public class ImageCacheService : IImageCacheService
     {
         try
         {
-            var bitmap = new BitmapImage();
-            bitmap.BeginInit();
-            bitmap.CacheOption = BitmapCacheOption.OnLoad;
-            bitmap.CreateOptions = BitmapCreateOptions.IgnoreImageCache;
-            if (decodeWidth > 0)
-            {
-                bitmap.DecodePixelWidth = decodeWidth;
-            }
-            bitmap.UriSource = new Uri(filePath, UriKind.Absolute);
-            bitmap.EndInit();
-            bitmap.Freeze();
-            return bitmap;
+            if (!File.Exists(filePath)) return null;
+            var bytes = File.ReadAllBytes(filePath);
+            return CargarBitmapDesdeBytes(bytes, decodeWidth);
         }
-        catch
+        catch (Exception ex)
         {
+            AppLogger.Debug("ImageCacheService", $"Error cargando bitmap desde archivo '{filePath}': {ex.Message}");
             return null;
         }
     }
@@ -154,11 +146,15 @@ public class ImageCacheService : IImageCacheService
     {
         try
         {
+            if (bytes == null || bytes.Length == 0) return null;
+
             using var stream = new MemoryStream(bytes);
             var bitmap = new BitmapImage();
             bitmap.BeginInit();
             bitmap.CacheOption = BitmapCacheOption.OnLoad;
-            bitmap.CreateOptions = BitmapCreateOptions.IgnoreImageCache;
+            // IMPORTANTE: Con StreamSource no se debe usar IgnoreImageCache porque WPF
+            // intenta buscar un Uri nulo en ImagingCache y lanza ArgumentNullException.
+            bitmap.CreateOptions = BitmapCreateOptions.None;
             if (decodeWidth > 0)
             {
                 bitmap.DecodePixelWidth = decodeWidth;
@@ -168,8 +164,9 @@ public class ImageCacheService : IImageCacheService
             bitmap.Freeze();
             return bitmap;
         }
-        catch
+        catch (Exception ex)
         {
+            AppLogger.Debug("ImageCacheService", $"Error cargando bitmap desde bytes: {ex.Message}");
             return null;
         }
     }

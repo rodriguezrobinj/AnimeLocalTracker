@@ -17,8 +17,13 @@ public partial class DescargaItem : ObservableObject
     [NotifyPropertyChangedFor(nameof(EstaEnEspera))]
     private double _progreso;
 
-    public string ProgresoTexto => Progreso > 0 ? $"{Progreso:F0}%" : "En espera...";
-    public bool EstaEnEspera => Progreso <= 0.0;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ProgresoTexto))]
+    [NotifyPropertyChangedFor(nameof(EstaEnEspera))]
+    private bool _isPaused;
+
+    public string ProgresoTexto => IsPaused ? $"Pausado ({Progreso:F0}%)" : (Progreso > 0 ? $"{Progreso:F0}%" : "En espera...");
+    public bool EstaEnEspera => Progreso <= 0.0 && !IsPaused;
 
     [ObservableProperty]
     private bool _isDownloading = true;

@@ -93,30 +93,51 @@ public class SyncService : ISyncService
     public void IniciarSincronizacionPeriodica(TimeSpan intervalo)
     {
         DetenerSincronizacionPeriodica();
-        _cts = new CancellationTokenSource();
-        var token = _cts.Token;
+        var cts = new CancellationTokenSource();
+        _cts = cts;
+        var token = cts.Token;
 
         _ = Task.Run(async () =>
         {
-            while (!token.IsCancellationRequested)
+            try
             {
-                try
+                while (!token.IsCancellationRequested)
                 {
-                    await Task.Delay(intervalo, token);
-                    if (token.IsCancellationRequested) break;
+                    try
+                    {
+                        await Task.Delay(intervalo, token);
+                        if (token.IsCancellationRequested) break;
 
-                    await SincronizarPendientesAsync();
-                }
-                catch (OperationCanceledException)
-                {
-                    break;
-                }
-                catch (Exception ex)
-                {
-                    AppLogger.Debug($"[SyncService] Error en ciclo periódico: {ex.Message}", "SyncService");
+                        await SincronizarPendientesAsync();
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        AppLogger.Debug($"[SyncService] Error en ciclo periódico: {ex.Message}", "SyncService");
+                    }
                 }
             }
-        }, token);
+            catch (Exception ex)
+            {
+                AppLogger.Error($"[SyncService] Excepción fatal en ciclo periódico: {ex.Message}", "SyncService", ex);
+            }
+            finally
+            {
+                // Disponer solo si todavía es el token activo
+                if (ReferenceEquals(_cts, cts))
+                {
+                    cts.Dispose();
+                    _cts = null;
+                }
+                else
+                {
+                    cts.Dispose();
+                }
+            }
+        });
     }
 
     public void DetenerSincronizacionPeriodica()
@@ -126,12 +147,8 @@ public class SyncService : ISyncService
             try
             {
                 _cts.Cancel();
-                _cts.Dispose();
             }
-            catch (Exception ex)
-            {
-                AppLogger.Warn("SyncService", $"Excepción al cancelar token de sincronización periódica: {ex.Message}");
-            }
+            catch (ObjectDisposedException) { }
             _cts = null;
         }
     }

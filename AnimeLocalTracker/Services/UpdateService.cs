@@ -203,48 +203,81 @@ public class UpdateService : IUpdateService
     {
         if (!EstaInstaladoPorVelopack()) return;
 
-        _backgroundCts?.Cancel();
-        _backgroundCts?.Dispose();
-        _backgroundCts = new CancellationTokenSource();
-        var token = _backgroundCts.Token;
+        DetenerVerificacionSegundoPlano();
+        var cts = new CancellationTokenSource();
+        _backgroundCts = cts;
+        var token = cts.Token;
 
         _ = Task.Run(async () =>
         {
-            // Esperar 15 segundos después de que inicie la app para no competir con el arranque
             try
             {
-                await Task.Delay(TimeSpan.FromSeconds(15), token);
-            }
-            catch (OperationCanceledException)
-            {
-                return;
-            }
-
-            while (!token.IsCancellationRequested)
-            {
+                // Esperar 15 segundos después de que inicie la app para no competir con el arranque
                 try
                 {
-                    var updateInfo = await ComprobarActualizacionesAsync(esManual: false);
-                    if (updateInfo != null)
-                    {
-                        await DescargarActualizacionAsync(updateInfo);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    AppLogger.Warn("UpdateService", $"Excepción en ciclo de actualización automática: {ex.Message}");
-                }
-
-                try
-                {
-                    await Task.Delay(intervalo, token);
+                    await Task.Delay(TimeSpan.FromSeconds(15), token);
                 }
                 catch (OperationCanceledException)
                 {
-                    break;
+                    return;
+                }
+
+                while (!token.IsCancellationRequested)
+                {
+                    try
+                    {
+                        var updateInfo = await ComprobarActualizacionesAsync(esManual: false);
+                        if (updateInfo != null)
+                        {
+                            await DescargarActualizacionAsync(updateInfo);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        AppLogger.Warn("UpdateService", $"Excepción en ciclo de actualización automática: {ex.Message}");
+                    }
+
+                    try
+                    {
+                        await Task.Delay(intervalo, token);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        break;
+                    }
                 }
             }
-        }, token);
+            catch (Exception ex)
+            {
+                AppLogger.Error("UpdateService", $"Excepción fatal en ciclo de actualización: {ex.Message}", ex);
+            }
+            finally
+            {
+                // Disponer solo si todavía es el token activo
+                if (ReferenceEquals(_backgroundCts, cts))
+                {
+                    cts.Dispose();
+                    _backgroundCts = null;
+                }
+                else
+                {
+                    cts.Dispose();
+                }
+            }
+        });
+    }
+
+    public void DetenerVerificacionSegundoPlano()
+    {
+        if (_backgroundCts != null)
+        {
+            try
+            {
+                _backgroundCts.Cancel();
+            }
+            catch (ObjectDisposedException) { }
+            // Dispose se manejará en el finally de la tarea
+        }
     }
 
     public async Task<ReleaseInfo> ObtenerInfoUltimaVersionAsync(bool forzarActualizacion = false)

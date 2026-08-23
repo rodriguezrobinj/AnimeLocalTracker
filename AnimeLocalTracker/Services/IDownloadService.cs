@@ -14,5 +14,9 @@ public interface IDownloadService
     Task IniciarDescargaEpisodioAsync(int aniListId, string animeTitulo, string carpetaDestino, int numeroEpisodio, IEnumerable<string>? titulosAlternativos = null);
     void CancelarDescarga(int aniListId, int numeroEpisodio);
     void CancelarTodas();
+    void PausarDescarga(int aniListId, int numeroEpisodio);
+    void PausarTodas();
+    void ReanudarDescarga(int aniListId, int numeroEpisodio);
+    void ReanudarTodas();
     IReadOnlyList<DescargaItem> ObtenerDescargasActivas();
 }

@@ -121,6 +121,9 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        // Desactivar aceleración de hardware para evitar crashes nativos de WPF en este equipo
+        System.Windows.Media.RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
+
         // Pedimos la instancia del servicio de base de datos
         var dbService = ServiceProvider.GetRequiredService<IDatabaseService>();
         

@@ -121,10 +121,17 @@ public partial class GaleriaViewModel : ObservableObject,
             {
                 _ = Task.Run(async () =>
                 {
-                    var img = await _imageCacheService.ObtenerPortadaAsync(message.NuevoAnime.AniListId, message.NuevoAnime.UrlPortada);
-                    if (img != null)
+                    try
                     {
-                        System.Windows.Application.Current?.Dispatcher?.Invoke(() => message.NuevoAnime.PortadaImagen = img);
+                        var img = await _imageCacheService.ObtenerPortadaAsync(message.NuevoAnime.AniListId, message.NuevoAnime.UrlPortada);
+                        if (img != null)
+                        {
+                            System.Windows.Application.Current?.Dispatcher?.Invoke(() => message.NuevoAnime.PortadaImagen = img);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        AppLogger.Debug("GaleriaViewModel", $"Error cargando portada de nuevo anime: {ex.Message}");
                     }
                 });
             }
@@ -133,14 +140,21 @@ public partial class GaleriaViewModel : ObservableObject,
 
     public async void Receive(EpisodioActualizadoMensaje message)
     {
-        var anime = BibliotecaLocales.FirstOrDefault(a => a.AniListId == message.AnimeId);
-        if (anime != null)
+        try
         {
-            var registros = await _databaseService.ObtenerRegistrosPorAnimeAsync(anime.AniListId);
-            System.Windows.Application.Current?.Dispatcher?.Invoke(() =>
+            var anime = BibliotecaLocales.FirstOrDefault(a => a.AniListId == message.AnimeId);
+            if (anime != null)
             {
-                anime.EpisodiosVistos = registros.Count(r => r.VistoLocal);
-            });
+                var registros = await _databaseService.ObtenerRegistrosPorAnimeAsync(anime.AniListId);
+                System.Windows.Application.Current?.Dispatcher?.Invoke(() =>
+                {
+                    anime.EpisodiosVistos = registros.Count(r => r.VistoLocal);
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("GaleriaViewModel", "Error al actualizar episodio visto en galería", ex);
         }
     }
     

@@ -23,6 +23,9 @@ public partial class DescargasViewModel : ObservableObject, IRecipient<DescargaP
     [ObservableProperty]
     private bool _tieneDescargas;
 
+    [ObservableProperty]
+    private bool _todasPausadas;
+
     public DescargasViewModel(IDownloadService downloadService)
     {
         _downloadService = downloadService;
@@ -57,6 +60,7 @@ public partial class DescargasViewModel : ObservableObject, IRecipient<DescargaP
                 item.Progreso = message.Progreso;
                 item.IsDownloading = message.IsDownloading;
                 item.IsCompleted = message.IsCompleted;
+                item.IsPaused = message.IsPaused;
                 item.RutaArchivo = message.RutaArchivo;
                 item.Error = message.Error;
 
@@ -65,17 +69,28 @@ public partial class DescargasViewModel : ObservableObject, IRecipient<DescargaP
                     // Remover de la cola de activas después de un pequeño retraso
                     _ = System.Threading.Tasks.Task.Run(async () =>
                     {
-                        await System.Threading.Tasks.Task.Delay(1500);
-                        Application.Current?.Dispatcher.Invoke(() =>
+                        try
                         {
-                            ColaDescargas.Remove(item);
-                            ActualizarConteo();
-                        });
+                            await System.Threading.Tasks.Task.Delay(1500);
+                            Application.Current?.Dispatcher?.Invoke(() =>
+                            {
+                                ColaDescargas.Remove(item);
+                                ActualizarConteo();
+                            });
+                        }
+                        catch (Exception ex)
+                        {
+                            AppLogger.Debug("DescargasViewModel", $"Error al remover descarga completada: {ex.Message}");
+                        }
                     });
                 }
                 else if (!string.IsNullOrEmpty(message.Error))
                 {
                     ColaDescargas.Remove(item);
+                    ActualizarConteo();
+                }
+                else
+                {
                     ActualizarConteo();
                 }
             }
@@ -88,7 +103,8 @@ public partial class DescargasViewModel : ObservableObject, IRecipient<DescargaP
                     NumeroEpisodio = message.NumeroEpisodio,
                     Progreso = message.Progreso,
                     IsDownloading = true,
-                    IsCompleted = false
+                    IsCompleted = false,
+                    IsPaused = message.IsPaused
                 };
                 ColaDescargas.Add(nuevo);
                 ActualizarConteo();
@@ -98,8 +114,9 @@ public partial class DescargasViewModel : ObservableObject, IRecipient<DescargaP
 
     private void ActualizarConteo()
     {
-        ConteoActivas = ColaDescargas.Count(d => d.IsDownloading);
+        ConteoActivas = ColaDescargas.Count(d => d.IsDownloading && !d.IsPaused);
         TieneDescargas = ColaDescargas.Count > 0;
+        TodasPausadas = ColaDescargas.Count > 0 && ColaDescargas.All(d => d.IsPaused);
     }
 
     [RelayCommand]
@@ -112,7 +129,47 @@ public partial class DescargasViewModel : ObservableObject, IRecipient<DescargaP
     }
 
     [RelayCommand]
-    private void PararTodas()
+    private void AlternarPausaDescarga(DescargaItem item)
+    {
+        if (item == null) return;
+        if (item.IsPaused)
+        {
+            item.IsPaused = false;
+            _downloadService.ReanudarDescarga(item.AniListId, item.NumeroEpisodio);
+        }
+        else
+        {
+            item.IsPaused = true;
+            _downloadService.PausarDescarga(item.AniListId, item.NumeroEpisodio);
+        }
+        ActualizarConteo();
+    }
+
+    [RelayCommand]
+    private void AlternarPausaTodas()
+    {
+        bool pausar = ColaDescargas.Any(d => !d.IsPaused);
+        if (pausar)
+        {
+            foreach (var d in ColaDescargas)
+            {
+                d.IsPaused = true;
+            }
+            _downloadService.PausarTodas();
+        }
+        else
+        {
+            foreach (var d in ColaDescargas)
+            {
+                d.IsPaused = false;
+            }
+            _downloadService.ReanudarTodas();
+        }
+        ActualizarConteo();
+    }
+
+    [RelayCommand]
+    private void CancelarTodas()
     {
         _downloadService.CancelarTodas();
         ColaDescargas.Clear();

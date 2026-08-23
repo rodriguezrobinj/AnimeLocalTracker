@@ -311,7 +311,7 @@ public class AniListTrackingService(HttpClient httpClient) : IAnimeTrackingServi
         }
     }
     
-    public async Task<List<AniListMedia>> BuscarAnimesEnVivoAsync(string busqueda)
+    public async Task<List<AniListMedia>> BuscarAnimesEnVivoAsync(string busqueda, System.Threading.CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(busqueda)) return [];
 
@@ -345,10 +345,10 @@ public class AniListTrackingService(HttpClient httpClient) : IAnimeTrackingServi
             var jsonContent = JsonSerializer.Serialize(payload, JsonOptions);
             var requestContent = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync("https://graphql.anilist.co", requestContent);
+            var response = await _httpClient.PostAsync("https://graphql.anilist.co", requestContent, cancellationToken);
             if (response.IsSuccessStatusCode)
             {
-                var content = await response.Content.ReadAsStringAsync();
+                var content = await response.Content.ReadAsStringAsync(cancellationToken);
                 var result = JsonSerializer.Deserialize<AniListResponse>(content, JsonOptions);
                 var mediaList = result?.Data?.Page?.Media ?? [];
                 if (mediaList.Count > 0)
@@ -357,6 +357,10 @@ public class AniListTrackingService(HttpClient httpClient) : IAnimeTrackingServi
                 }
                 return mediaList;
             }
+            return [];
+        }
+        catch (OperationCanceledException)
+        {
             return [];
         }
         catch (Exception ex)
