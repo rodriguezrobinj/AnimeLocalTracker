@@ -153,9 +153,24 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center">
                                     <TextBlock Text="Auto-Play del siguiente episodio" FontWeight="SemiBold" Foreground="White" FontSize="13"/>
-                                    <TextBlock Text="Reproduce automáticamente el siguiente capítulo al finalizar el actual" FontSize="11" Foreground="#9CA3AF" Margin="0,2,0,0"/>
+                                    <TextBlock Text="Muestra cuenta regresiva de 5s y reproduce automáticamente el siguiente capítulo" FontSize="11" Foreground="#9CA3AF" Margin="0,2,0,0"/>
                                 </StackPanel>
                                 <ToggleButton Grid.Column="1" HorizontalAlignment="Right" Margin="0,0,6,0" IsChecked="{Binding AutoPlaySiguiente}" Style="{StaticResource MaterialDesignSwitchToggleButton}" VerticalAlignment="Center"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- Fila 1.5: Auto-Skip Intro / Outro (AniSkip) -->
+                        <Border Background="#181D24" BorderBrush="#262E39" BorderThickness="1" CornerRadius="10" MinHeight="56" Padding="16,8" Margin="0,0,0,10">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="140"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="Saltar Intro / Outro automáticamente (AniSkip)" FontWeight="SemiBold" Foreground="White" FontSize="13"/>
+                                    <TextBlock Text="Omite openings y endings de forma automática sin necesidad de hacer clic" FontSize="11" Foreground="#9CA3AF" Margin="0,2,0,0"/>
+                                </StackPanel>
+                                <ToggleButton Grid.Column="1" HorizontalAlignment="Right" Margin="0,0,6,0" IsChecked="{Binding AutoSkipIntroOutro}" Style="{StaticResource MaterialDesignSwitchToggleButton}" VerticalAlignment="Center"/>
                             </Grid>
                         </Border>
 

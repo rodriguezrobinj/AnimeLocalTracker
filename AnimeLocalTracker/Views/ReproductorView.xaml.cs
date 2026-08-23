@@ -131,8 +131,8 @@ namespace AnimeLocalTracker.Views
             if (SubtitlesPopup != null && SubtitlesPopup.IsOpen)
                 return;
 
-            // ...ni mientras el usuario esté arrastrando la barra de progreso...
-            if (DataContext is ReproductorViewModel vm && vm.IsDraggingSlider)
+            // ...ni mientras el usuario esté arrastrando la barra de progreso o esté activa la cuenta regresiva de Auto-Play...
+            if (DataContext is ReproductorViewModel vm && (vm.IsDraggingSlider || vm.MostrarAutoPlayCountdown))
                 return;
 
             // ...ni mientras el mouse esté físicamente sobre los controles.
@@ -170,7 +170,15 @@ namespace AnimeLocalTracker.Views
         {
             if (DataContext is ReproductorViewModel vm)
             {
-                vm.IsDraggingSlider = true;
+                vm.IniciarArrastre();
+            }
+        }
+
+        private void Slider_DragDelta(object sender, DragDeltaEventArgs e)
+        {
+            if (sender is Slider slider && DataContext is ReproductorViewModel vm)
+            {
+                vm.VistaPreviaArrastre(slider.Value);
             }
         }
 
@@ -178,8 +186,7 @@ namespace AnimeLocalTracker.Views
         {
             if (sender is Slider slider && DataContext is ReproductorViewModel vm)
             {
-                vm.IsDraggingSlider = false;
-                vm.SeekCommand.Execute(slider.Value);
+                vm.FinalizarArrastre(slider.Value);
             }
         }
 
@@ -190,7 +197,7 @@ namespace AnimeLocalTracker.Views
             {
                 if (sender is Slider slider)
                 {
-                    vm.SeekCommand.Execute(slider.Value);
+                    vm.FinalizarArrastre(slider.Value);
                 }
             }
         }
@@ -215,6 +222,14 @@ namespace AnimeLocalTracker.Views
                     vm.SeekCommand.Execute(vm.CurrentSeconds - 10);
                     e.Handled = true;
                     RegistrarActividad();
+                    break;
+                case Key.S:
+                    if (vm.MostrarSkipButton || vm.MostrarSkipIntro)
+                    {
+                        vm.SkipIntroOutroCommand.Execute(null);
+                        e.Handled = true;
+                        RegistrarActividad();
+                    }
                     break;
                 case Key.N:
                     if (vm.TieneEpisodioSiguiente)

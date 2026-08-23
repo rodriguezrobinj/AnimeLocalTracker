@@ -58,6 +58,9 @@ public class AniListMedia
     [JsonPropertyName("id")]
     public int Id { get; set; }
 
+    [JsonPropertyName("idMal")]
+    public int? IdMal { get; set; }
+
     [JsonPropertyName("title")]
     public AniListTitle Title { get; set; } = new();
 

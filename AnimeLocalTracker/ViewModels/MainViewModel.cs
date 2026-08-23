@@ -177,7 +177,15 @@ public partial class MainViewModel : ObservableObject,
 
     public void Receive(NavegarMensaje_Calendario message)
     {
-        VistaActual = _serviceProvider.GetRequiredService<CalendarioViewModel>();
+        var calendarioVm = _serviceProvider.GetRequiredService<CalendarioViewModel>();
+        VistaActual = calendarioVm;
+
+        // El calendario es singleton: si la carga inicial falló (red/rate-limit) o está vacío,
+        // reintentar al navegar para que no quede pegado en columnas vacías.
+        if (calendarioVm.EstaVacio && !calendarioVm.EstaCargando)
+        {
+            calendarioVm.CargarCalendarioCommand.Execute(null);
+        }
     }
 
     public void Receive(NavegarMensaje_Descargas message)

@@ -18,28 +18,29 @@
         <!-- Reproductor NATIVO Flyleaf -->
         <fl:FlyleafHost Player="{Binding Player}">
             <Grid>
-                <!-- Subtítulos optimizados: 2 TextBlocks en vez de 9 -->
-                <Viewbox VerticalAlignment="Bottom" Margin="40,40,40,25" StretchDirection="DownOnly" MaxHeight="150" IsHitTestVisible="False">
-                    <Grid MaxWidth="1200">
-                        <Grid.Effect>
-                            <DropShadowEffect Color="Black" BlurRadius="8" ShadowDepth="0" Opacity="0.9"/>
-                        </Grid.Effect>
-                        
-                        <!-- Stroke negro (una sola capa con outline grueso simulado por shadow) -->
-                        <TextBlock Text="{Binding Player.Subtitles.SubsText}" 
-                                   Foreground="Black" FontSize="44" FontFamily="Trebuchet MS, Arial" 
-                                   FontWeight="Bold" TextWrapping="Wrap" TextAlignment="Center">
-                            <TextBlock.Effect>
-                                <BlurEffect Radius="2.5" KernelType="Gaussian"/>
-                            </TextBlock.Effect>
-                        </TextBlock>
-                        
-                        <!-- Texto interior blanco -->
-                        <TextBlock Text="{Binding Player.Subtitles.SubsText}" 
-                                   Foreground="White" FontSize="44" FontFamily="Trebuchet MS, Arial" 
-                                   FontWeight="Bold" TextWrapping="Wrap" TextAlignment="Center" />
-                    </Grid>
-                </Viewbox>
+                        <!-- Subtítulos optimizados: 2 TextBlocks en vez de 9 -->
+                        <!-- Bindings vía ElementName: FlyleafHost sobrescribe el DataContext de su contenido -->
+                        <Viewbox VerticalAlignment="Bottom" Margin="40,40,40,25" StretchDirection="DownOnly" MaxHeight="150" IsHitTestVisible="False">
+                            <Grid MaxWidth="1200">
+                                <Grid.Effect>
+                                    <DropShadowEffect Color="Black" BlurRadius="8" ShadowDepth="0" Opacity="0.9"/>
+                                </Grid.Effect>
+
+                                <!-- Stroke negro (una sola capa con outline grueso simulado por shadow) -->
+                                <TextBlock Text="{Binding DataContext.Player.Subtitles.SubsText, ElementName=RootWindow}"
+                                           Foreground="Black" FontSize="44" FontFamily="Trebuchet MS, Arial"
+                                           FontWeight="Bold" TextWrapping="Wrap" TextAlignment="Center">
+                                    <TextBlock.Effect>
+                                        <BlurEffect Radius="2.5" KernelType="Gaussian"/>
+                                    </TextBlock.Effect>
+                                </TextBlock>
+
+                                <!-- Texto interior blanco -->
+                                <TextBlock Text="{Binding DataContext.Player.Subtitles.SubsText, ElementName=RootWindow}"
+                                           Foreground="White" FontSize="44" FontFamily="Trebuchet MS, Arial"
+                                           FontWeight="Bold" TextWrapping="Wrap" TextAlignment="Center" />
+                            </Grid>
+                        </Viewbox>
 
                 <!-- Controles Overlays -->
                 <Grid x:Name="OverlayControls" Background="Transparent" DataContext="{x:Null}">
@@ -87,14 +88,21 @@
                             <RowDefinition Height="Auto"/> <!-- Botones -->
                         </Grid.RowDefinitions>
 
-                        <!-- Botón Skip Intro (Crunchyroll Style) -->
-                        <Button Grid.Row="0" Command="{Binding SkipIntroCommand}"
-                                Visibility="{Binding MostrarSkipIntro, Converter={StaticResource BooleanToVisibilityConverter}}"
-                                Content="Saltar intro"
-                                HorizontalAlignment="Right" Margin="0,0,0,15"
-                                Background="#99000000" Foreground="White" BorderBrush="White" BorderThickness="1"
-                                Padding="15,5" FontSize="13" FontWeight="SemiBold" Cursor="Hand"
-                                materialDesign:ButtonAssist.CornerRadius="0" />
+                        <!-- Botón Skip Intro / Outro (AniSkip API Crunchyroll / Netflix Style) -->
+                        <Button Grid.Row="0" Command="{Binding SkipIntroOutroCommand}"
+                                Visibility="{Binding MostrarSkipButton, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                HorizontalAlignment="Right" Margin="0,0,0,14"
+                                Background="#E616181F" Foreground="White" BorderBrush="#55FFFFFF" BorderThickness="1"
+                                Padding="16,8" Cursor="Hand" materialDesign:ButtonAssist.CornerRadius="8"
+                                ToolTip="Saltar segmento (Atajo: S)">
+                            <Button.Effect>
+                                <DropShadowEffect Color="Black" BlurRadius="14" ShadowDepth="3" Opacity="0.7"/>
+                            </Button.Effect>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <materialDesign:PackIcon Kind="{Binding SkipButtonIcon}" Width="20" Height="20" VerticalAlignment="Center" Margin="0,0,8,0" Foreground="#A78BFA"/>
+                                <TextBlock Text="{Binding SkipButtonTexto}" FontSize="13" FontWeight="Bold" VerticalAlignment="Center" Foreground="White"/>
+                            </StackPanel>
+                        </Button>
 
                         <!-- Barra de progreso con hover interactivo -->
                         <Grid Grid.Row="1" Margin="0,0,0,15" x:Name="ProgressBarArea" Cursor="Hand">
@@ -129,6 +137,7 @@
                             <Slider Minimum="0" Maximum="{Binding TotalSeconds}" Value="{Binding CurrentSeconds, Mode=TwoWay}"
                                     IsMoveToPointEnabled="True" Foreground="White" Focusable="False"
                                     primitives:Thumb.DragStarted="Slider_DragStarted"
+                                    primitives:Thumb.DragDelta="Slider_DragDelta"
                                     primitives:Thumb.DragCompleted="Slider_DragCompleted"
                                     PreviewMouseLeftButtonUp="Slider_PreviewMouseLeftButtonUp"
                                     Opacity="0.01" Height="20" VerticalAlignment="Center" />
@@ -315,7 +324,88 @@
                     </Grid>
                 </Grid>
             </Grid>
-        </Grid>
-    </fl:FlyleafHost>
-</Grid>
+            </Grid>
+        </fl:FlyleafHost>
+
+        <!-- Overlay Flotante de Auto-Play (Cuenta Regresiva de 5 segundos estilo Netflix / Crunchyroll) -->
+        <!-- NOTA: debe vivir FUERA de FlyleafHost porque este sobrescribe el DataContext de su contenido,
+             lo que rompe los bindings (panel vacío, siempre visible y botones sin comando). -->
+        <Border HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                Margin="0,0,30,110" MaxWidth="440" MinWidth="360"
+                Background="#F2141720" BorderBrush="#3B4858" BorderThickness="1"
+                CornerRadius="16" Padding="22,18"
+                Visibility="{Binding MostrarAutoPlayCountdown, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <Border.Effect>
+                <DropShadowEffect Color="Black" BlurRadius="30" ShadowDepth="6" Opacity="0.85"/>
+            </Border.Effect>
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/> <!-- Header / Countdown -->
+                    <RowDefinition Height="Auto"/> <!-- Titulo siguiente ep -->
+                    <RowDefinition Height="Auto"/> <!-- Barra de progreso 5s -->
+                    <RowDefinition Height="Auto"/> <!-- Botones de acción -->
+                </Grid.RowDefinitions>
+
+                <!-- Header -->
+                <Grid Grid.Row="0" Margin="0,0,0,8">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Border Background="#2A1B4E" CornerRadius="8" Width="30" Height="30" Margin="0,0,10,0" VerticalAlignment="Center">
+                            <materialDesign:PackIcon Kind="MotionPlay" Foreground="#A78BFA" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Siguiente episodio en" FontSize="11" Foreground="#9CA3AF" FontWeight="SemiBold"/>
+                            <TextBlock Text="{Binding AutoPlayCountdownSegundos, StringFormat='{}{0} segundos...'}" FontSize="15" FontWeight="Bold" Foreground="#A78BFA"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- Botón X sutil para cerrar / cancelar -->
+                    <Button Command="{Binding CancelarAutoPlayCommand}" HorizontalAlignment="Right" VerticalAlignment="Top"
+                            Style="{StaticResource MaterialDesignToolButton}" Foreground="#9CA3AF" Width="28" Height="28" Padding="0"
+                            ToolTip="Cancelar reproducción automática">
+                        <materialDesign:PackIcon Kind="Close" Width="18" Height="18"/>
+                    </Button>
+                </Grid>
+
+                <!-- Titulo del siguiente episodio -->
+                <StackPanel Grid.Row="1" Margin="0,2,0,12">
+                    <TextBlock Text="{Binding TituloAnime}" FontSize="14" FontWeight="Bold" Foreground="White" TextTrimming="CharacterEllipsis"/>
+                    <TextBlock Text="{Binding SiguienteEpisodioTitulo}" FontSize="13" Foreground="#D1D5DB" Margin="0,2,0,0"/>
+                </StackPanel>
+
+                <!-- Barra de progreso animada de 5 segundos -->
+                <Grid Grid.Row="2" Margin="0,0,0,14">
+                    <ProgressBar Minimum="0" Maximum="100" Value="{Binding AutoPlayProgress, Mode=OneWay}"
+                                 Height="4" Foreground="#A78BFA" Background="#334155" BorderThickness="0"/>
+                </Grid>
+
+                <!-- Botones de Acción -->
+                <Grid Grid.Row="3">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Botón Reproducir Ahora -->
+                    <Button Grid.Column="0" Command="{Binding ReproducirSiguienteAhoraCommand}"
+                            Background="#7C3AED" BorderBrush="#8B5CF6" BorderThickness="1" Foreground="White"
+                            Height="38" Padding="14,0" Cursor="Hand" materialDesign:ButtonAssist.CornerRadius="8"
+                            FontWeight="Bold" FontSize="13">
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                            <materialDesign:PackIcon Kind="Play" Width="18" Height="18" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                            <TextBlock Text="Reproducir ahora" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
+                    <!-- Botón Cancelar -->
+                    <Button Grid.Column="2" Command="{Binding CancelarAutoPlayCommand}"
+                            Background="#1E293B" BorderBrush="#334155" BorderThickness="1" Foreground="#E2E8F0"
+                            Height="38" Padding="14,0" Cursor="Hand" materialDesign:ButtonAssist.CornerRadius="8"
+                            FontWeight="SemiBold" FontSize="13">
+                        <TextBlock Text="Cancelar" VerticalAlignment="Center"/>
+                    </Button>
+                </Grid>
+            </Grid>
+        </Border>
+    </Grid>
 </UserControl>

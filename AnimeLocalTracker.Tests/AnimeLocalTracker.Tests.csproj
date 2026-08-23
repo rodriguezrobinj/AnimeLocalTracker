@@ -24,6 +24,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\AnimeLocalTracker\AnimeLocalTracker.csproj" />
   </ItemGroup>
 

@@ -129,9 +129,9 @@ public class ViewModelStressAndLifecycleTests
         // Act: Enviar 200 mensajes de progreso concurrentes
         for (int ep = 1; ep <= 50; ep++)
         {
-            sut.Receive(new DescargaProgresoMensaje(10, ep, 0.25, true, false, "", "", "One Piece"));
-            sut.Receive(new DescargaProgresoMensaje(10, ep, 0.75, true, false, "", "", "One Piece"));
-            sut.Receive(new DescargaProgresoMensaje(10, ep, 1.00, false, true, $"C:\\ep_{ep}.mkv", "", "One Piece"));
+            sut.Receive(new DescargaProgresoMensaje(10, ep, 0.25, true, false, false, "", null, "One Piece"));
+            sut.Receive(new DescargaProgresoMensaje(10, ep, 0.75, true, false, false, "", null, "One Piece"));
+            sut.Receive(new DescargaProgresoMensaje(10, ep, 1.00, false, true, false, $"C:\\ep_{ep}.mkv", null, "One Piece"));
         }
 
         // Assert

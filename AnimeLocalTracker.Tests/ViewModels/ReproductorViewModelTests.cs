@@ -368,4 +368,212 @@ public class ReproductorViewModelTests
         item.Visto = true;
         item.TieneProgresoGuardado.Should().BeFalse();
     }
+
+    [Fact]
+    public void SkipIntroOutro_ConSegmentoActivo_DeberiaSaltarAlFinalDelIntervalo()
+    {
+        // Arrange
+        var aniSkipMock = new Mock<IAniSkipService>();
+        var settingsMock = new Mock<ISettingsService>();
+        var sut = new ReproductorViewModel(_dbMock.Object, _trackingMock.Object, _authMock.Object, aniSkipMock.Object, settingsMock.Object);
+
+        sut.CargarVideo("C:\\Anime\\Ep01.mkv", 101, "Frieren", 1);
+        sut.TotalSeconds = 1440;
+        sut.CurrentSeconds = 95;
+
+        // Inyectar manualmente un segmento activo simulado
+        var skip = new AniSkipResult
+        {
+            SkipType = "op",
+            Interval = new AniSkipInterval { StartTime = 90.0, EndTime = 180.0 }
+        };
+        sut.SkipTimes.Add(skip);
+
+        // Act - Simular botón visible y clic
+        sut.SkipIntroOutroCommand.Execute(null);
+
+        // Assert: Salta al final del intervalo (180.0 + 0.2 = 180.2)
+        sut.CurrentSeconds.Should().Be(180.2);
+        sut.MostrarSkipButton.Should().BeFalse();
+
+        sut.Dispose();
+    }
+
+    [Fact]
+    public void SkipIntroOutro_SinSegmentoActivo_DeberiaSaltar85Segundos()
+    {
+        // Arrange
+        var sut = CreateSut();
+        sut.CargarVideo("C:\\Anime\\Ep01.mkv", 101, "Frieren", 1);
+        sut.TotalSeconds = 1440;
+        sut.CurrentSeconds = 30;
+
+        // Act
+        sut.SkipIntroOutroCommand.Execute(null);
+
+        // Assert: 30 + 85 = 115s
+        sut.CurrentSeconds.Should().Be(115);
+        sut.MostrarSkipButton.Should().BeFalse();
+
+        sut.Dispose();
+    }
+
+    [Fact]
+    public void IniciarCuentaRegresivaAutoPlay_DeberiaMostrarCountdownYDatosDelSiguiente()
+    {
+        // Arrange
+        var sut = CreateSut();
+        var lista = new List<EpisodioItem>
+        {
+            new() { NumeroEpisodio = 1, RutaCompleta = "C:\\Anime\\Ep01.mkv" },
+            new() { NumeroEpisodio = 2, RutaCompleta = "C:\\Anime\\Ep02.mkv" }
+        };
+        sut.CargarVideo("C:\\Anime\\Ep01.mkv", 101, "Frieren", 1, lista);
+
+        // Act
+        sut.IniciarCuentaRegresivaAutoPlay();
+
+        // Assert
+        sut.MostrarAutoPlayCountdown.Should().BeTrue();
+        sut.AutoPlayCountdownSegundos.Should().Be(5);
+        sut.SiguienteEpisodioTitulo.Should().Be("Episodio 2");
+
+        sut.Dispose();
+    }
+
+    [Fact]
+    public void CancelarAutoPlay_DeberiaOcultarCountdown()
+    {
+        // Arrange
+        var sut = CreateSut();
+        var lista = new List<EpisodioItem>
+        {
+            new() { NumeroEpisodio = 1, RutaCompleta = "C:\\Anime\\Ep01.mkv" },
+            new() { NumeroEpisodio = 2, RutaCompleta = "C:\\Anime\\Ep02.mkv" }
+        };
+        sut.CargarVideo("C:\\Anime\\Ep01.mkv", 101, "Frieren", 1, lista);
+        sut.IniciarCuentaRegresivaAutoPlay();
+        sut.MostrarAutoPlayCountdown.Should().BeTrue();
+
+        // Act
+        sut.CancelarAutoPlayCommand.Execute(null);
+
+        // Assert
+        sut.MostrarAutoPlayCountdown.Should().BeFalse();
+
+        sut.Dispose();
+    }
+
+    [Fact]
+    public void ReproducirSiguienteAhora_DeberiaCargarSiguienteEpisodioInmediatamente()
+    {
+        // Arrange
+        var sut = CreateSut();
+        var lista = new List<EpisodioItem>
+        {
+            new() { NumeroEpisodio = 1, RutaCompleta = "C:\\Anime\\Ep01.mkv" },
+            new() { NumeroEpisodio = 2, RutaCompleta = "C:\\Anime\\Ep02.mkv" }
+        };
+        sut.CargarVideo("C:\\Anime\\Ep01.mkv", 101, "Frieren", 1, lista);
+        sut.IniciarCuentaRegresivaAutoPlay();
+
+        // Act
+        sut.ReproducirSiguienteAhoraCommand.Execute(null);
+
+        // Assert
+        sut.MostrarAutoPlayCountdown.Should().BeFalse();
+        sut.TituloEpisodio.Should().Be("Episodio 2");
+
+        sut.Dispose();
+    }
+
+    [Fact]
+    public void Scrubbing_CicloCompleto_DeberiaActualizarPosicionYEstados()
+    {
+        // Arrange
+        var sut = CreateSut();
+        sut.CargarVideo("C:\\Anime\\Ep01.mkv", 101, "Frieren", 1);
+        sut.TotalSeconds = 1440;
+
+        // Act: inicio de arrastre
+        sut.IniciarArrastre();
+        sut.IsDraggingSlider.Should().BeTrue();
+
+        // Vista previa dentro de rango
+        sut.VistaPreviaArrastre(600);
+        sut.CurrentSeconds.Should().Be(600);
+        sut.TiempoActualTexto.Should().Be("10:00");
+        sut.TiempoCombinadoTexto.Should().Contain("10:00");
+
+        // Vista previa fuera de rango (debe acotar a la duración)
+        sut.VistaPreviaArrastre(99999);
+        sut.CurrentSeconds.Should().Be(1440);
+
+        // Vista previa negativa (debe acotar a 0)
+        sut.VistaPreviaArrastre(-10);
+        sut.CurrentSeconds.Should().Be(0);
+
+        // Fin de arrastre con movimiento real
+        sut.FinalizarArrastre(720);
+        sut.IsDraggingSlider.Should().BeFalse();
+        sut.CurrentSeconds.Should().Be(720);
+        sut.TiempoActualTexto.Should().Be("12:00");
+
+        sut.Dispose();
+    }
+
+    [Fact]
+    public void VistaPreviaArrastre_SinArrastrePrevio_NoDeberiaAplicarNada()
+    {
+        // Arrange
+        var sut = CreateSut();
+        sut.CargarVideo("C:\\Anime\\Ep01.mkv", 101, "Frieren", 1);
+        sut.CurrentSeconds = 30;
+
+        // Act
+        sut.VistaPreviaArrastre(500);
+
+        // Assert: sin IniciarArrastre la vista previa se ignora
+        sut.CurrentSeconds.Should().Be(30);
+        sut.IsDraggingSlider.Should().BeFalse();
+
+        sut.Dispose();
+    }
+
+    [Fact]
+    public void FinalizarArrastre_ClicDirectoEnPista_DeberiaHacerSeekSinArrastre()
+    {
+        // Arrange
+        var sut = CreateSut();
+        sut.CargarVideo("C:\\Anime\\Ep01.mkv", 101, "Frieren", 1);
+        sut.TotalSeconds = 1440;
+
+        // Act: clic directo (sin arrastre previo)
+        sut.FinalizarArrastre(300);
+
+        // Assert
+        sut.CurrentSeconds.Should().Be(300);
+        sut.TiempoActualTexto.Should().Be("05:00");
+        sut.IsDraggingSlider.Should().BeFalse();
+
+        sut.Dispose();
+    }
+
+    [Fact]
+    public void Seek_ConValoresFueraDeRango_DeberiaAcotar()
+    {
+        // Arrange
+        var sut = CreateSut();
+        sut.CargarVideo("C:\\Anime\\Ep01.mkv", 101, "Frieren", 1);
+
+        // Act & Assert: negativo -> 0
+        sut.SeekCommand.Execute(-25.0);
+        sut.CurrentSeconds.Should().Be(0);
+
+        // Act & Assert: negativo grande -> 0
+        sut.SeekCommand.Execute(-0.001);
+        sut.CurrentSeconds.Should().Be(0);
+
+        sut.Dispose();
+    }
 }

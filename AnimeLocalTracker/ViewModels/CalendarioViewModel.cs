@@ -13,6 +13,7 @@ public partial class CalendarioViewModel : ObservableObject
 {
     private readonly IDatabaseService _databaseService;
     private readonly IAnimeTrackingService _animeTrackingService;
+    private readonly SemaphoreSlim _cargaLock = new(1, 1);
 
     [ObservableProperty] private bool _estaCargando;
     [ObservableProperty] private int _totalAnimesEnEmision;
@@ -36,59 +37,83 @@ public partial class CalendarioViewModel : ObservableObject
     [RelayCommand]
     private async Task CargarCalendarioAsync()
     {
-        EstaCargando = true;
-        LimpiarListas();
+        // Evitar cargas concurrentes (doble click en ACTUALIZAR + navegación)
+        if (!await _cargaLock.WaitAsync(0)) return;
 
-        var animes = await _databaseService.ObtenerTodosLosAnimesAsync();
-        TotalAnimesEnEmision = animes.Count(a => a.Estado.Equals("RELEASING", StringComparison.OrdinalIgnoreCase));
-        
-        var dicPortadas = animes.ToDictionary(a => a.AniListId, a => a.PortadaVisible);
-        var ids = animes.Select(a => a.AniListId).ToList();
-
-        if (ids.Count == 0)
+        try
         {
+            EstaCargando = true;
+            LimpiarListas();
+
+            var animes = await _databaseService.ObtenerTodosLosAnimesAsync();
+            TotalAnimesEnEmision = animes.Count(a => a.Estado.Equals("RELEASING", StringComparison.OrdinalIgnoreCase));
+            
+            // GroupBy: tolera AniListIds duplicados en la BD (ToDictionary lanzaría excepción
+            // y dejaría el calendario cargando para siempre)
+            var dicPortadas = animes
+                .GroupBy(a => a.AniListId)
+                .ToDictionary(g => g.Key, g => g.First().PortadaVisible);
+            var ids = animes.Select(a => a.AniListId).Distinct().ToList();
+
+            if (ids.Count == 0)
+            {
+                return;
+            }
+
+            // Calcular inicio y fin de la semana actual
+            DateTime ahora = DateTime.Now;
+            int diff = (7 + (ahora.DayOfWeek - DayOfWeek.Monday)) % 7;
+            DateTime inicioSemana = ahora.AddDays(-1 * diff).Date;
+            DateTime finSemana = inicioSemana.AddDays(7).AddTicks(-1);
+
+            long timestampInicio = ((DateTimeOffset)inicioSemana).ToUnixTimeSeconds();
+            long timestampFin = ((DateTimeOffset)finSemana).ToUnixTimeSeconds();
+
+            var schedule = await _animeTrackingService.ObtenerCalendarioEmisionAsync(ids, timestampInicio, timestampFin);
+
+            int animesConEmisionSemanal = schedule.Select(e => e.AniListId).Distinct().Count();
+            if (animesConEmisionSemanal > TotalAnimesEnEmision)
+            {
+                TotalAnimesEnEmision = animesConEmisionSemanal;
+            }
+
+            foreach (var eps in schedule.OrderBy(e => e.FechaEmision))
+            {
+                if (dicPortadas.TryGetValue(eps.AniListId, out var portadaLocal) && !string.IsNullOrEmpty(portadaLocal))
+                {
+                    eps.UrlPortada = portadaLocal;
+                }
+
+                switch (eps.DiaSemana)
+                {
+                    case DayOfWeek.Monday: Lunes.Add(eps); break;
+                    case DayOfWeek.Tuesday: Martes.Add(eps); break;
+                    case DayOfWeek.Wednesday: Miercoles.Add(eps); break;
+                    case DayOfWeek.Thursday: Jueves.Add(eps); break;
+                    case DayOfWeek.Friday: Viernes.Add(eps); break;
+                    case DayOfWeek.Saturday: Sabado.Add(eps); break;
+                    case DayOfWeek.Sunday: Domingo.Add(eps); break;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("CalendarioViewModel", "Error al cargar el calendario de emisión", ex);
+        }
+        finally
+        {
+            // Garantizar que el spinner nunca quede pegado
             EstaCargando = false;
-            return;
+            _cargaLock.Release();
         }
-
-        // Calcular inicio y fin de la semana actual
-        DateTime ahora = DateTime.Now;
-        int diff = (7 + (ahora.DayOfWeek - DayOfWeek.Monday)) % 7;
-        DateTime inicioSemana = ahora.AddDays(-1 * diff).Date;
-        DateTime finSemana = inicioSemana.AddDays(7).AddTicks(-1);
-
-        long timestampInicio = ((DateTimeOffset)inicioSemana).ToUnixTimeSeconds();
-        long timestampFin = ((DateTimeOffset)finSemana).ToUnixTimeSeconds();
-
-        var schedule = await _animeTrackingService.ObtenerCalendarioEmisionAsync(ids, timestampInicio, timestampFin);
-
-        int animesConEmisionSemanal = schedule.Select(e => e.AniListId).Distinct().Count();
-        if (animesConEmisionSemanal > TotalAnimesEnEmision)
-        {
-            TotalAnimesEnEmision = animesConEmisionSemanal;
-        }
-
-        foreach (var eps in schedule.OrderBy(e => e.FechaEmision))
-        {
-            if (dicPortadas.TryGetValue(eps.AniListId, out var portadaLocal) && !string.IsNullOrEmpty(portadaLocal))
-            {
-                eps.UrlPortada = portadaLocal;
-            }
-
-            switch (eps.DiaSemana)
-            {
-                case DayOfWeek.Monday: Lunes.Add(eps); break;
-                case DayOfWeek.Tuesday: Martes.Add(eps); break;
-                case DayOfWeek.Wednesday: Miercoles.Add(eps); break;
-                case DayOfWeek.Thursday: Jueves.Add(eps); break;
-                case DayOfWeek.Friday: Viernes.Add(eps); break;
-                case DayOfWeek.Saturday: Sabado.Add(eps); break;
-                case DayOfWeek.Sunday: Domingo.Add(eps); break;
-            }
-        }
-
-        EstaCargando = false;
     }
+
+    /// <summary>
+    /// Indica si el calendario aún no muestra ningún dato (carga inicial fallida o sin datos).
+    /// </summary>
+    public bool EstaVacio =>
+        Lunes.Count == 0 && Martes.Count == 0 && Miercoles.Count == 0 && Jueves.Count == 0 &&
+        Viernes.Count == 0 && Sabado.Count == 0 && Domingo.Count == 0;
 
     private void LimpiarListas()
     {

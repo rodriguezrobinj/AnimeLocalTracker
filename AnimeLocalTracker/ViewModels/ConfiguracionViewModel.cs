@@ -25,6 +25,7 @@ public partial class ConfiguracionViewModel : ObservableObject
 
     // === REPRODUCCIÓN Y DESCARGAS ===
     [ObservableProperty] private bool _autoPlaySiguiente = true;
+    [ObservableProperty] private bool _autoSkipIntroOutro = false;
     [ObservableProperty] private bool _subtitulosPorDefecto = true;
     [ObservableProperty] private int _descargasSimultaneas = 3;
     [ObservableProperty] private int _intervaloSincronizacionMinutos = 5;
@@ -52,6 +53,7 @@ public partial class ConfiguracionViewModel : ObservableObject
         var config = _settingsService?.ObtenerConfiguracion() ?? new AppSettings();
         RutaBaseAnimes = config.RutaBaseAnimes ?? string.Empty;
         AutoPlaySiguiente = config.AutoPlaySiguiente;
+        AutoSkipIntroOutro = config.AutoSkipIntroOutro;
         SubtitulosPorDefecto = config.SubtitulosPorDefecto;
         DescargasSimultaneas = config.DescargasSimultaneas;
         IntervaloSincronizacionMinutos = config.IntervaloSincronizacionMinutos;
@@ -196,6 +198,7 @@ public partial class ConfiguracionViewModel : ObservableObject
         {
             var config = _settingsService.ObtenerConfiguracion();
             config.AutoPlaySiguiente = AutoPlaySiguiente;
+            config.AutoSkipIntroOutro = AutoSkipIntroOutro;
             config.SubtitulosPorDefecto = SubtitulosPorDefecto;
             config.DescargasSimultaneas = DescargasSimultaneas;
             config.IntervaloSincronizacionMinutos = IntervaloSincronizacionMinutos;

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Http;
 using System.Text.Json;
@@ -16,13 +17,15 @@ namespace AnimeLocalTracker.Tests.Services;
 public class AniListTrackingServiceTests
 {
     private readonly Mock<HttpMessageHandler> _httpMessageHandlerMock;
+    private readonly Mock<IAuthService> _authServiceMock;
     private readonly AniListTrackingService _sut; // System Under Test
 
     public AniListTrackingServiceTests()
     {
         _httpMessageHandlerMock = new Mock<HttpMessageHandler>();
+        _authServiceMock = new Mock<IAuthService>();
         var httpClient = new HttpClient(_httpMessageHandlerMock.Object);
-        _sut = new AniListTrackingService(httpClient);
+        _sut = new AniListTrackingService(httpClient, _authServiceMock.Object);
     }
 
     [Fact]
@@ -122,5 +125,120 @@ public class AniListTrackingServiceTests
                 ItExpr.IsAny<HttpRequestMessage>(),
                 ItExpr.IsAny<CancellationToken>()
             );
+    }
+
+    [Fact]
+    public async Task ObtenerAnimePorIdAsync_DeberiaAdjuntarBearerToken_CuandoUsuarioEstaAutenticado()
+    {
+        // Arrange
+        int expectedId = 55544;
+        string token = "test_token_12345";
+        _authServiceMock.Setup(a => a.ObtenerTokenGuardado()).Returns(token);
+
+        HttpRequestMessage? capturedRequest = null;
+
+        var mockResponse = new
+        {
+            data = new
+            {
+                Media = new AniListMedia
+                {
+                    Id = expectedId,
+                    Title = new AniListTitle { Romaji = "Bleach" },
+                    Episodes = 366,
+                    Status = "FINISHED"
+                }
+            }
+        };
+
+        var responseMessage = new HttpResponseMessage
+        {
+            StatusCode = HttpStatusCode.OK,
+            Content = new StringContent(JsonSerializer.Serialize(mockResponse))
+        };
+
+        _httpMessageHandlerMock
+            .Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>()
+            )
+            .Callback<HttpRequestMessage, CancellationToken>((req, _) => capturedRequest = req)
+            .ReturnsAsync(responseMessage);
+
+        // Act
+        var result = await _sut.ObtenerAnimePorIdAsync(expectedId);
+
+        // Assert
+        result.Should().NotBeNull();
+        capturedRequest.Should().NotBeNull();
+        capturedRequest!.Headers.Authorization.Should().NotBeNull();
+        capturedRequest.Headers.Authorization!.Scheme.Should().Be("Bearer");
+        capturedRequest.Headers.Authorization.Parameter.Should().Be(token);
+    }
+
+    [Fact]
+    public async Task BuscarAnimesEnVivoAsync_DeberiaAdjuntarBearerToken_CuandoUsuarioEstaAutenticado()
+    {
+        // Arrange
+        string query = "naruto";
+        string token = "test_bearer_token";
+        _authServiceMock.Setup(a => a.ObtenerTokenGuardado()).Returns(token);
+
+        HttpRequestMessage? capturedRequest = null;
+
+        var mockResponse = new
+        {
+            data = new
+            {
+                Page = new AniListPage
+                {
+                    Media = new List<AniListMedia>
+                    {
+                        new() { Id = 20, Title = new AniListTitle { Romaji = "Naruto" } }
+                    }
+                }
+            }
+        };
+
+        var responseMessage = new HttpResponseMessage
+        {
+            StatusCode = HttpStatusCode.OK,
+            Content = new StringContent(JsonSerializer.Serialize(mockResponse))
+        };
+
+        _httpMessageHandlerMock
+            .Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>()
+            )
+            .Callback<HttpRequestMessage, CancellationToken>((req, _) => capturedRequest = req)
+            .ReturnsAsync(responseMessage);
+
+        // Act
+        var results = await _sut.BuscarAnimesEnVivoAsync(query);
+
+        // Assert
+        results.Should().HaveCount(1);
+        capturedRequest.Should().NotBeNull();
+        capturedRequest!.Headers.Authorization.Should().NotBeNull();
+        capturedRequest.Headers.Authorization!.Parameter.Should().Be(token);
+    }
+
+    [Fact]
+    public async Task ObtenerCalendarioEmisionAsync_DeberiaFiltrarIdsInvalidos_YNoLlamarHttpSiVacio()
+    {
+        // Arrange
+        var invalidIds = new List<int> { 0, -1, -5 };
+
+        // Act
+        var result = await _sut.ObtenerCalendarioEmisionAsync(invalidIds, 1700000000, 1700604800);
+
+        // Assert
+        result.Should().BeEmpty();
+        _httpMessageHandlerMock.Protected().Verify("SendAsync", Times.Never(), ItExpr.IsAny<HttpRequestMessage>(), ItExpr.IsAny<CancellationToken>());
     }
 }

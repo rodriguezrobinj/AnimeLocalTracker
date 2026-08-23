@@ -97,7 +97,6 @@ public class SettingsServiceTests : IDisposable
     {
         // Arrange
         var settingsMock = new Mock<ISettingsService>();
-        var updateMock = new Mock<IUpdateService>();
         var authMock = new Mock<IAuthService>();
         var dbMock = new Mock<IDatabaseService>();
         var dialogMock = new Mock<IDialogService>();
@@ -106,17 +105,16 @@ public class SettingsServiceTests : IDisposable
         {
             RutaBaseAnimes = @"D:\AnimesTest",
             AutoPlaySiguiente = true,
+            AutoSkipIntroOutro = true,
             SubtitulosPorDefecto = false,
             DescargasSimultaneas = 2
         });
 
-        updateMock.Setup(u => u.ObtenerVersionActual()).Returns("v1.2.3");
         authMock.Setup(a => a.EstaAutenticado()).Returns(true);
 
         // Act
         var vm = new ConfiguracionViewModel(
             settingsMock.Object, 
-            updateMock.Object, 
             authMock.Object, 
             dbMock.Object, 
             dialogMock.Object);
@@ -124,9 +122,9 @@ public class SettingsServiceTests : IDisposable
         // Assert
         vm.RutaBaseAnimes.Should().Be(@"D:\AnimesTest");
         vm.AutoPlaySiguiente.Should().BeTrue();
+        vm.AutoSkipIntroOutro.Should().BeTrue();
         vm.SubtitulosPorDefecto.Should().BeFalse();
         vm.DescargasSimultaneas.Should().Be(2);
-        vm.VersionAppTexto.Should().Be("v1.2.3");
         vm.EstaAutenticadoAniList.Should().BeTrue();
     }
 }

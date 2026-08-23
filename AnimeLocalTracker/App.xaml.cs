@@ -1,4 +1,5 @@
 using System;
+using System.Net.Http;
 using System.Threading.Tasks;
 using System.Windows;
 using AnimeLocalTracker.ViewModels;
@@ -86,6 +87,9 @@ public partial class App : Application
         services.AddHttpClient<IAnimeTrackingService, AniListTrackingService>()
             .AddPolicyHandler(GetRetryPolicy());
         
+        services.AddHttpClient<IAniSkipService, AniSkipService>()
+            .AddPolicyHandler(GetRetryPolicy());
+        
         // Lo registramos como Singleton porque queremos que haya una sola conexión a la BD en toda la app
         services.AddSingleton<IDatabaseService, DatabaseService>();
 
@@ -94,6 +98,17 @@ public partial class App : Application
 
         // Servicio de actualizaciones automáticas con Velopack y GitHub Releases
         services.AddSingleton<IUpdateService, UpdateService>();
+
+        // Persistencia del progreso de reproducción (reanudar, guardar, auto-tracking)
+        services.AddSingleton<IPlaybackStateService, PlaybackStateService>();
+
+        // Orquestación de skip-times (resolución MAL ID + reglas de evaluación)
+        services.AddSingleton<ISkipTimesCoordinator, SkipTimesCoordinator>();
+
+        // Persistencia del estado de descargas segmentadas (.state) y resolución de fuentes de video
+        services.AddSingleton<IDownloadStateStore, DownloadStateStore>();
+        services.AddSingleton<IVideoSourceResolver>(sp =>
+            new AnimeAv1VideoSourceResolver(sp.GetRequiredService<IHttpClientFactory>().CreateClient("Downloader")));
 
         // Servicio de caché y precarga de imágenes optimizadas para 60fps
         services.AddSingleton<IImageCacheService, ImageCacheService>();

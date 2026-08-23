@@ -9,6 +9,9 @@ public partial class AnimeItem : ObservableObject
     public int AniListId { get; set; } 
     
     [ObservableProperty]
+    private int? _malId;
+
+    [ObservableProperty]
     private string _titulo = string.Empty;
 
     [ObservableProperty]
