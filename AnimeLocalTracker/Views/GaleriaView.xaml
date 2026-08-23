@@ -278,22 +278,22 @@
 
             <!-- Chips de Estado -->
             <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                <RadioButton Content="Todos" Margin="0,0,10,0" IsChecked="True" GroupName="FiltroEstado"
+                <RadioButton Content="Todos" Margin="0,0,10,0" IsChecked="{Binding EsFiltroTodos, Mode=OneWay}" GroupName="FiltroEstado"
                              Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="Todos"
                              Style="{StaticResource MaterialDesignTabRadioButton}" 
                              Height="32" Padding="16,0" FontSize="13" FontWeight="SemiBold"/>
                 
-                <RadioButton Content="Viendo" Margin="0,0,10,0" GroupName="FiltroEstado"
+                <RadioButton Content="Viendo" Margin="0,0,10,0" IsChecked="{Binding EsFiltroViendo, Mode=OneWay}" GroupName="FiltroEstado"
                              Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="Viendo"
                              Style="{StaticResource MaterialDesignTabRadioButton}" 
                              Height="32" Padding="16,0" FontSize="13" FontWeight="SemiBold"/>
                              
-                <RadioButton Content="Completados" Margin="0,0,10,0" GroupName="FiltroEstado"
+                <RadioButton Content="Completados" Margin="0,0,10,0" IsChecked="{Binding EsFiltroCompletados, Mode=OneWay}" GroupName="FiltroEstado"
                              Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="Completados"
                              Style="{StaticResource MaterialDesignTabRadioButton}" 
                              Height="32" Padding="16,0" FontSize="13" FontWeight="SemiBold"/>
                              
-                <RadioButton Content="Planeando" Margin="0,0,0,0" GroupName="FiltroEstado"
+                <RadioButton Content="Planeando" Margin="0,0,0,0" IsChecked="{Binding EsFiltroPlaneando, Mode=OneWay}" GroupName="FiltroEstado"
                              Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="Planeando"
                              Style="{StaticResource MaterialDesignTabRadioButton}" 
                              Height="32" Padding="16,0" FontSize="13" FontWeight="SemiBold"/>
@@ -367,7 +367,7 @@
         </StackPanel>
 
         <!-- Lista virtualizada y acelerada por hardware (60fps+) -->
-        <ListBox Grid.Row="2" ItemsSource="{Binding BibliotecaFiltrada}" Margin="-14,0,-14,0" Padding="0"
+        <ListBox x:Name="ListaGaleria" Grid.Row="2" ItemsSource="{Binding BibliotecaFiltrada}" Margin="-14,0,-14,0" Padding="0"
                  Visibility="{Binding BibliotecaVacia, Converter={StaticResource InverseBoolToVis}}"
                  Background="Transparent" BorderThickness="0" 
                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"

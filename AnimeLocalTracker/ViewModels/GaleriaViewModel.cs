@@ -45,7 +45,18 @@ public partial class GaleriaViewModel : ObservableObject,
     private string _textoBusqueda = string.Empty;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(EsFiltroTodos))]
+    [NotifyPropertyChangedFor(nameof(EsFiltroViendo))]
+    [NotifyPropertyChangedFor(nameof(EsFiltroCompletados))]
+    [NotifyPropertyChangedFor(nameof(EsFiltroPlaneando))]
     private string _filtroEstado = "Todos"; // Todos, Viendo, Completados, Planeando
+
+    public bool EsFiltroTodos => FiltroEstado == "Todos";
+    public bool EsFiltroViendo => FiltroEstado == "Viendo";
+    public bool EsFiltroCompletados => FiltroEstado == "Completados";
+    public bool EsFiltroPlaneando => FiltroEstado == "Planeando";
+
+    public double UltimoScrollOffset { get; set; } = 0;
 
     partial void OnTextoBusquedaChanged(string value)
     {

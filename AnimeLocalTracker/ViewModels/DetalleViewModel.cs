@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -44,10 +45,58 @@ public partial class DetalleViewModel : ObservableObject,
     [ObservableProperty] private string _mensajeSinEpisodios = "No hay episodios para mostrar";
     [ObservableProperty] private string _subtituloSinEpisodios = "El filtro actual no encontró coincidencias.";
 
+    // === ACCIONES HERO Y DETALLES ===
+    [ObservableProperty] private bool _sinopsisExpandida = false;
+    [ObservableProperty] private bool _esFavoritoAnime = false;
+    [ObservableProperty] private bool _tieneCapituloEnProgreso = false;
+
+    public bool TieneEpisodios => EpisodiosDelAnime.Count > 0;
+
     // === EDITOR DE SEGUIMIENTO ===
     [ObservableProperty] private bool _mostrandoEditorSeguimiento;
     [ObservableProperty] private string _editEstado = "CURRENT";
     [ObservableProperty] private int _editProgreso;
+    [ObservableProperty] private string _editProgresoTexto = "0";
+
+    partial void OnEditProgresoTextoChanged(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            _editProgreso = 0;
+            return;
+        }
+
+        string soloDigitos = new string(value.Where(char.IsDigit).ToArray());
+        if (string.IsNullOrEmpty(soloDigitos))
+        {
+            _editProgreso = 0;
+            EditProgresoTexto = "0";
+            return;
+        }
+
+        if (int.TryParse(soloDigitos, out int num))
+        {
+            int max = ObtenerMaximoEpisodiosEmitidos();
+            if (num < 0) num = 0;
+            if (max > 0 && num > max) num = max;
+
+            _editProgreso = num;
+            if (num.ToString() != value)
+            {
+                EditProgresoTexto = num.ToString();
+            }
+        }
+    }
+
+    public int ObtenerMaximoEpisodiosEmitidos()
+    {
+        if (AnimeSeleccionado == null) return 9999;
+        if (AnimeSeleccionado.TotalEpisodios > 0) return AnimeSeleccionado.TotalEpisodios;
+        if (_todosLosEpisodios.Count > 0) return _todosLosEpisodios.Count;
+        if (EpisodiosDelAnime.Count > 0) return EpisodiosDelAnime.Count;
+        return 9999;
+    }
+
     [ObservableProperty] private float _editPuntaje;
     [ObservableProperty] private DateTime? _editFechaInicio;
     [ObservableProperty] private DateTime? _editFechaFin;
@@ -148,6 +197,7 @@ public partial class DetalleViewModel : ObservableObject,
 
     public async Task InicializarAsync(AnimeItem anime)
     {
+        EstaConectado = _authService.EstaAutenticado();
         AnimeSeleccionado = anime;
         _todosLosEpisodios.Clear();
         EpisodiosDelAnime.Clear();
@@ -260,6 +310,8 @@ public partial class DetalleViewModel : ObservableObject,
             MensajeSinEpisodios = "No hay episodios con este filtro";
             SubtituloSinEpisodios = $"No se encontraron episodios en la categoría '{FiltroEpisodios}'.";
         }
+
+        TieneCapituloEnProgreso = _todosLosEpisodios != null && _todosLosEpisodios.Any(e => e.TieneProgresoGuardado);
     }
 
     [RelayCommand]
@@ -273,7 +325,11 @@ public partial class DetalleViewModel : ObservableObject,
     {
         if (AnimeSeleccionado == null) return;
 
-        bool confirmacion = await _dialogService.MostrarDialogoAsync("Confirmar Eliminación", $"¿Estás seguro de que deseas eliminar '{AnimeSeleccionado.Titulo}' de tu biblioteca?", true, "AlertCircleOutline", "#E53935");
+        bool confirmacion = await _dialogService.MostrarDialogoAsync(
+            "Eliminar de la biblioteca", 
+            $"¿Deseas eliminar '{AnimeSeleccionado.Titulo}' de tu biblioteca local?", 
+            true, "HeartBrokenOutline", "#EF4444");
+
         if (confirmacion)
         {
             await _databaseService.EliminarAnimeAsync(AnimeSeleccionado);
@@ -342,11 +398,62 @@ public partial class DetalleViewModel : ObservableObject,
     }
     
     [RelayCommand]
-    private async Task MarcarVistosAsync(System.Collections.IList episodiosSeleccionados)
+    private void AlternarSinopsis()
     {
-        if (episodiosSeleccionados == null || episodiosSeleccionados.Count == 0 || AnimeSeleccionado == null) return;
+        SinopsisExpandida = !SinopsisExpandida;
+    }
 
-        var episodios = episodiosSeleccionados.Cast<EpisodioItem>().ToList();
+    [RelayCommand]
+    private void AlternarFavoritoAnime()
+    {
+        EsFavoritoAnime = !EsFavoritoAnime;
+    }
+
+    [RelayCommand]
+    private void AbrirWebView()
+    {
+        if (AnimeSeleccionado == null) return;
+        string url = $"https://anilist.co/anime/{AnimeSeleccionado.AniListId}";
+        try
+        {
+            Process.Start(new ProcessStartInfo { FileName = url, UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("DetalleViewModel", "Error abriendo WebView de AniList", ex);
+        }
+    }
+
+    [RelayCommand]
+    private async Task ReanudarAsync()
+    {
+        if (_todosLosEpisodios.Count == 0) return;
+
+        // Reproducir el episodio que se dejó a medias con progreso guardado
+        var epEnCurso = _todosLosEpisodios.FirstOrDefault(e => e.TieneProgresoGuardado);
+        if (epEnCurso != null)
+        {
+            await ReproducirEpisodio(epEnCurso);
+        }
+    }
+
+    [RelayCommand]
+    private async Task MarcarVistosAsync(System.Collections.IList? episodiosSeleccionados)
+    {
+        if (AnimeSeleccionado == null) return;
+
+        List<EpisodioItem> episodios;
+        if (episodiosSeleccionados != null && episodiosSeleccionados.Count > 0)
+        {
+            episodios = episodiosSeleccionados.Cast<EpisodioItem>().ToList();
+        }
+        else
+        {
+            episodios = EpisodiosDelAnime.Where(e => !e.Visto).ToList();
+        }
+
+        if (episodios.Count == 0) return;
+
         var listaRegistros = new List<RegistroEpisodio>(episodios.Count);
         foreach (var ep in episodios)
         {
@@ -356,18 +463,34 @@ public partial class DetalleViewModel : ObservableObject,
                 AniListId = AnimeSeleccionado.AniListId,
                 NumeroEpisodio = ep.NumeroEpisodio,
                 VistoLocal = true,
+                FavoritoLocal = ep.Favorito,
                 RutaArchivo = ep.RutaCompleta ?? string.Empty
             });
         }
         await _databaseService.GuardarRegistrosEpisodioBulkAsync(listaRegistros);
+        AnimeSeleccionado.EpisodiosVistos = _todosLosEpisodios.Count(e => e.Visto);
+        await _databaseService.ActualizarAnimeAsync(AnimeSeleccionado);
+        WeakReferenceMessenger.Default.Send(new EpisodioActualizadoMensaje(AnimeSeleccionado.AniListId, 0, false, 0, 0));
+        AplicarFiltrosYOrdenamiento();
     }
 
     [RelayCommand]
-    private async Task MarcarNoVistosAsync(System.Collections.IList episodiosSeleccionados)
+    private async Task MarcarNoVistosAsync(System.Collections.IList? episodiosSeleccionados)
     {
-        if (episodiosSeleccionados == null || episodiosSeleccionados.Count == 0 || AnimeSeleccionado == null) return;
+        if (AnimeSeleccionado == null) return;
 
-        var episodios = episodiosSeleccionados.Cast<EpisodioItem>().ToList();
+        List<EpisodioItem> episodios;
+        if (episodiosSeleccionados != null && episodiosSeleccionados.Count > 0)
+        {
+            episodios = episodiosSeleccionados.Cast<EpisodioItem>().ToList();
+        }
+        else
+        {
+            episodios = EpisodiosDelAnime.Where(e => e.Visto).ToList();
+        }
+
+        if (episodios.Count == 0) return;
+
         var listaRegistros = new List<RegistroEpisodio>(episodios.Count);
         foreach (var ep in episodios)
         {
@@ -377,10 +500,15 @@ public partial class DetalleViewModel : ObservableObject,
                 AniListId = AnimeSeleccionado.AniListId,
                 NumeroEpisodio = ep.NumeroEpisodio,
                 VistoLocal = false,
+                FavoritoLocal = ep.Favorito,
                 RutaArchivo = ep.RutaCompleta ?? string.Empty
             });
         }
         await _databaseService.GuardarRegistrosEpisodioBulkAsync(listaRegistros);
+        AnimeSeleccionado.EpisodiosVistos = _todosLosEpisodios.Count(e => e.Visto);
+        await _databaseService.ActualizarAnimeAsync(AnimeSeleccionado);
+        WeakReferenceMessenger.Default.Send(new EpisodioActualizadoMensaje(AnimeSeleccionado.AniListId, 0, false, 0, 0));
+        AplicarFiltrosYOrdenamiento();
     }
 
     [RelayCommand]
@@ -443,7 +571,8 @@ public partial class DetalleViewModel : ObservableObject,
         if (AnimeSeleccionado == null) return;
         
         EditEstado = "CURRENT";
-        EditProgreso = 0;
+        EditProgreso = AnimeSeleccionado.EpisodiosVistos;
+        EditProgresoTexto = EditProgreso.ToString();
         EditPuntaje = 0;
         EditFechaInicio = null;
         EditFechaFin = null;
@@ -456,7 +585,9 @@ public partial class DetalleViewModel : ObservableObject,
         if (datos != null)
         {
             EditEstadoVisual = ConvertirEstadoAEspanol(datos.Status ?? "CURRENT");
-            EditProgreso = datos.Progress;
+            int max = ObtenerMaximoEpisodiosEmitidos();
+            EditProgreso = Math.Clamp(datos.Progress, 0, max > 0 ? max : 9999);
+            EditProgresoTexto = EditProgreso.ToString();
             EditPuntaje = datos.Score;
             
             if (datos.StartedAt != null && datos.StartedAt.Year.HasValue)
@@ -479,14 +610,17 @@ public partial class DetalleViewModel : ObservableObject,
             return;
         }
 
+        int max = ObtenerMaximoEpisodiosEmitidos();
+        int progresoFinal = Math.Clamp(EditProgreso, 0, max > 0 ? max : 9999);
         string estadoEnIngles = ConvertirEstadoAIngles(EditEstadoVisual);
         bool exito = await _animeTrackingService.GuardarSeguimientoUsuarioAsync(
-            AnimeSeleccionado.AniListId, estadoEnIngles, EditProgreso, EditPuntaje, EditFechaInicio, EditFechaFin, token);
+            AnimeSeleccionado.AniListId, estadoEnIngles, progresoFinal, EditPuntaje, EditFechaInicio, EditFechaFin, token);
             
         if (exito)
         {
             MostrandoEditorSeguimiento = false;
             AnimeSeleccionado.EstadoUsuario = estadoEnIngles;
+            AnimeSeleccionado.EpisodiosVistos = progresoFinal;
             await _databaseService.ActualizarAnimeAsync(AnimeSeleccionado);
             await _dialogService.MostrarDialogoAsync("Nube Sincronizada", "¡Seguimiento actualizado en AniList con éxito!", false, "CloudCheck", "#4CAF50");
         }

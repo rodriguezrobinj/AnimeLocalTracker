@@ -5,13 +5,13 @@
              TextElement.Foreground="{DynamicResource MaterialDesignBody}"
              Background="Transparent">
     
-    <Grid ClipToBounds="True" MaxWidth="1248">
+    <Grid ClipToBounds="True" MaxWidth="1200">
         <Grid.Style>
             <Style TargetType="Grid">
-                <Setter Property="Margin" Value="95,55,30,20"/>
+                <Setter Property="Margin" Value="95,65,30,25"/>
                 <Style.Triggers>
                     <DataTrigger Binding="{Binding Topmost, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
-                        <Setter Property="Margin" Value="95,25,30,20"/>
+                        <Setter Property="Margin" Value="95,35,30,25"/>
                     </DataTrigger>
                 </Style.Triggers>
             </Style>
@@ -25,25 +25,25 @@
         </Grid.RowDefinitions>
 
         <!-- ENCABEZADO FIJO DE LA VISTA -->
-        <Grid Grid.Row="0" Margin="0,0,0,20">
+        <Grid Grid.Row="0" Margin="0,0,0,24">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <Border Background="#FFA726" CornerRadius="12" Width="44" Height="44" Margin="0,0,16,0">
-                    <materialDesign:PackIcon Kind="InformationOutline" Width="26" Height="26" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                <Border Background="#1E293B" CornerRadius="12" Width="48" Height="48" Margin="0,0,16,0">
+                    <materialDesign:PackIcon Kind="InformationOutline" Width="26" Height="26" Foreground="#60A5FA" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
                 <StackPanel VerticalAlignment="Center">
-                    <TextBlock Text="Acerca de AnimeLocalTracker" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource MaterialDesignBodyLight}"/>
-                    <TextBlock Text="Información del sistema, actualizaciones y novedades de la versión instalada" 
-                               FontSize="13" Foreground="#9E9E9E" Margin="0,2,0,0"/>
+                    <TextBlock Text="Acerca de AnimeLocalTracker" FontSize="22" FontWeight="Bold" Foreground="White"/>
+                    <TextBlock Text="Información del sistema, novedades de versiones y detalles del proyecto" 
+                               FontSize="12" Foreground="#9CA3AF" Margin="0,3,0,0"/>
                 </StackPanel>
             </StackPanel>
         </Grid>
 
         <!-- CONTENIDO DESPLAZABLE -->
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-            <StackPanel Margin="0,0,32,20" HorizontalAlignment="Stretch">
+            <StackPanel Margin="0,0,24,20" HorizontalAlignment="Stretch">
 
-                <!-- 1. TARJETA DE IDENTIDAD DE LA APP -->
-                <materialDesign:Card Background="#1E1E1E" UniformCornerRadius="14" Margin="0,0,0,20" Padding="22" materialDesign:ElevationAssist.Elevation="Dp2">
+                <!-- 1. TARJETA HERO DE IDENTIDAD DE LA APP -->
+                <materialDesign:Card Background="#121212" BorderBrush="#262D37" BorderThickness="1" UniformCornerRadius="16" Margin="0,0,0,20" Padding="24" materialDesign:ElevationAssist.Elevation="Dp0">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
@@ -51,64 +51,74 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
 
-                        <Border Grid.Column="0" Background="#3F51B5" CornerRadius="12" Width="52" Height="52" Margin="0,0,16,0">
-                            <materialDesign:PackIcon Kind="PlayCircle" Width="32" Height="32" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <Border Grid.Column="0" Background="#1E293B" BorderBrush="#3B82F6" BorderThickness="1" CornerRadius="16" Width="64" Height="64" Margin="0,0,18,0">
+                            <materialDesign:PackIcon Kind="PlayCircle" Width="36" Height="36" Foreground="#60A5FA" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
 
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="AnimeLocalTracker" FontSize="18" FontWeight="Bold" Foreground="White"/>
-                                <Border Background="#1E88E5" CornerRadius="6" Padding="8,2" Margin="10,0,0,0" VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding VersionAppTexto, StringFormat='v{0}'}" FontSize="11" FontWeight="Bold" Foreground="White"/>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="AnimeLocalTracker" FontSize="20" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
+                                <Border Background="#1E293B" BorderBrush="#3B82F6" BorderThickness="1" CornerRadius="8" Padding="8,3" Margin="12,0,0,0" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding VersionAppTexto, StringFormat='v{0}'}" FontSize="11" FontWeight="Bold" Foreground="#93C5FD"/>
                                 </Border>
                             </StackPanel>
-                            <TextBlock Text="Gestor y reproductor nativo multimedia para colecciones de anime locales con sincronización automática" 
-                                       FontSize="12" Foreground="#B0BEC5" Margin="0,4,0,0"/>
+                            <TextBlock Text="Gestor y reproductor nativo multimedia para colecciones de anime locales con sincronización inteligente en AniList." 
+                                       FontSize="12" Foreground="#9CA3AF" Margin="0,5,0,0" TextWrapping="Wrap"/>
                         </StackPanel>
 
                         <Button Grid.Column="2" Command="{Binding BuscarActualizacionesCommand}"
                                 Style="{StaticResource MaterialDesignRaisedButton}"
-                                Background="#2E7D32" BorderBrush="#1B5E20" Foreground="White"
-                                Height="38" Padding="14,0" VerticalAlignment="Center"
-                                ToolTip="Comprobar si hay una nueva versión disponible y actualizar notas">
+                                Background="#059669" BorderBrush="#047857" Foreground="White"
+                                Height="42" Padding="18,0" VerticalAlignment="Center"
+                                materialDesign:ButtonAssist.CornerRadius="8"
+                                ToolTip="Comprobar si hay una nueva versión disponible en GitHub">
                             <StackPanel Orientation="Horizontal">
-                                <materialDesign:PackIcon Kind="Update" Width="18" Height="18" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                <TextBlock Text="Buscar Actualizaciones" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                                <materialDesign:PackIcon Kind="Update" Width="18" Height="18" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <TextBlock Text="Buscar Actualizaciones" VerticalAlignment="Center" FontWeight="Bold" FontSize="12"/>
                             </StackPanel>
                         </Button>
                     </Grid>
                 </materialDesign:Card>
 
                 <!-- 2. NOVEDADES DE LA VERSIÓN (DINÁMICAS DESDE GITHUB) -->
-                <materialDesign:Card Background="#1E1E1E" UniformCornerRadius="14" Margin="0,0,0,20" Padding="22" materialDesign:ElevationAssist.Elevation="Dp2">
+                <materialDesign:Card Background="#121212" BorderBrush="#262D37" BorderThickness="1" UniformCornerRadius="16" Margin="0,0,0,20" Padding="24" materialDesign:ElevationAssist.Elevation="Dp0">
                     <StackPanel>
-                        <Grid Margin="0,0,0,14">
+                        <Grid Margin="0,0,0,16">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
+                            
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <materialDesign:PackIcon Kind="FileDocumentOutline" Foreground="#64B5F6" Width="20" Height="20" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                <TextBlock Text="{Binding TituloVersionTexto, StringFormat='Novedades: {0}'}" FontSize="16" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
+                                <Border Background="#1E293B" CornerRadius="8" Width="34" Height="34" Margin="0,0,10,0" VerticalAlignment="Center">
+                                    <materialDesign:PackIcon Kind="FileDocumentOutline" Foreground="#60A5FA" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding TituloVersionTexto, StringFormat='Novedades: {0}'}" FontSize="16" FontWeight="Bold" Foreground="White"/>
+                                    <TextBlock Text="Registro de cambios y mejoras publicadas" FontSize="11" Foreground="#9CA3AF"/>
+                                </StackPanel>
                             </StackPanel>
-                            <TextBlock Grid.Column="1" Text="{Binding FechaVersionTexto}" FontSize="12" Foreground="#90A4AE" VerticalAlignment="Center"/>
+
+                            <Border Grid.Column="1" Background="#181D24" BorderBrush="#2D3748" BorderThickness="1" CornerRadius="6" Padding="8,4" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding FechaVersionTexto}" FontSize="11" Foreground="#9CA3AF" FontWeight="Medium"/>
+                            </Border>
                         </Grid>
 
-                        <Border Background="#262626" CornerRadius="8" Padding="16,14">
+                        <Border Background="#181D24" BorderBrush="#262E39" BorderThickness="1" CornerRadius="12" Padding="18,16">
                             <StackPanel>
                                 <ProgressBar IsIndeterminate="True" 
                                              Visibility="{Binding IsCargandoNovedades, Converter={StaticResource BoolToVis}}" 
-                                             Height="3" VerticalAlignment="Top" Foreground="#42A5F5" Margin="0,0,0,10"
+                                             Height="3" VerticalAlignment="Top" Foreground="#60A5FA" Margin="0,0,0,12"
                                              materialDesign:TransitionAssist.DisableTransitions="True"/>
                                 <TextBlock Text="{Binding NovedadesTexto}" 
-                                           Foreground="#ECEFF1" FontSize="13" LineHeight="22" TextWrapping="Wrap" />
+                                           Foreground="#D1D5DB" FontSize="13" LineHeight="22" TextWrapping="Wrap" />
                             </StackPanel>
                         </Border>
                     </StackPanel>
                 </materialDesign:Card>
 
                 <!-- 3. REPOSITORIO GITHUB Y LICENCIAS -->
-                <materialDesign:Card Background="#1E1E1E" UniformCornerRadius="14" Margin="0,0,0,20" Padding="22" materialDesign:ElevationAssist.Elevation="Dp2">
+                <materialDesign:Card Background="#121212" BorderBrush="#262D37" BorderThickness="1" UniformCornerRadius="16" Margin="0,0,0,20" Padding="24" materialDesign:ElevationAssist.Elevation="Dp0">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
@@ -116,19 +126,24 @@
                         </Grid.ColumnDefinitions>
 
                         <StackPanel VerticalAlignment="Center">
-                            <TextBlock Text="Proyecto de Código Abierto (Open Source)" FontWeight="SemiBold" Foreground="White" FontSize="14"/>
-                            <TextBlock Text="Desarrollado con .NET 8, WPF, Flyleaf, SQLite-net, MaterialDesign y Velopack" FontSize="12" Foreground="#9E9E9E" Margin="0,4,0,0"/>
-                            <TextBlock Text="{Binding LicenciaTexto}" FontSize="11" Foreground="#78909C" Margin="0,2,0,0"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                <materialDesign:PackIcon Kind="Github" Width="20" Height="20" Foreground="White" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <TextBlock Text="Proyecto de Código Abierto (Open Source)" FontWeight="Bold" Foreground="White" FontSize="15" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            
+                            <TextBlock Text="Desarrollado con .NET 8, C#, WPF, Flyleaf, SQLite-net, MaterialDesign y Velopack." FontSize="12" Foreground="#9CA3AF" Margin="0,2,0,0"/>
+                            <TextBlock Text="{Binding LicenciaTexto}" FontSize="11" Foreground="#6B7280" Margin="0,4,0,0"/>
                         </StackPanel>
 
                         <Button Grid.Column="1" Command="{Binding AbrirRepositorioGitHubCommand}"
                                 Style="{StaticResource MaterialDesignOutlinedButton}"
-                                BorderBrush="#90CAF9" Foreground="#90CAF9"
-                                Height="38" Padding="16,0" VerticalAlignment="Center"
-                                ToolTip="Visitar repositorio en GitHub">
+                                BorderBrush="#3B82F6" Foreground="#93C5FD"
+                                Height="40" Padding="18,0" VerticalAlignment="Center"
+                                materialDesign:ButtonAssist.CornerRadius="8"
+                                ToolTip="Abrir repositorio en GitHub">
                             <StackPanel Orientation="Horizontal">
-                                <materialDesign:PackIcon Kind="OpenInNew" Width="18" Height="18" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                <TextBlock Text="Repositorio en GitHub" VerticalAlignment="Center" FontWeight="Medium"/>
+                                <materialDesign:PackIcon Kind="OpenInNew" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <TextBlock Text="Ver en GitHub" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="12"/>
                             </StackPanel>
                         </Button>
                     </Grid>

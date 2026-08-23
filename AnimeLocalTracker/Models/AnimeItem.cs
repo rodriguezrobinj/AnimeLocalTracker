@@ -21,6 +21,8 @@ public partial class AnimeItem : ObservableObject
     private string _urlPortada = string.Empty;
     
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SinopsisLimpia))]
+    [NotifyPropertyChangedFor(nameof(TieneSinopsisLarga))]
     private string _sinopsis = string.Empty;
     
     [ObservableProperty]
@@ -82,6 +84,20 @@ public partial class AnimeItem : ObservableObject
     [Ignore] 
     public string ColorEstado => Estado == "RELEASING" ? "#4CAF50" : "#9E9E9E";
     
+    [Ignore]
+    public string SinopsisLimpia
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(Sinopsis)) return string.Empty;
+            string clean = Sinopsis.Replace("<br>", "\n").Replace("<br/>", "\n").Replace("<br />", "\n");
+            return System.Text.RegularExpressions.Regex.Replace(clean, "<.*?>", string.Empty).Trim();
+        }
+    }
+
+    [Ignore]
+    public bool TieneSinopsisLarga => !string.IsNullOrWhiteSpace(SinopsisLimpia) && (SinopsisLimpia.Length > 150 || SinopsisLimpia.Contains('\n'));
+
     [Ignore]
     public string[] GenerosLista => string.IsNullOrWhiteSpace(Generos) ? [] : Generos.Split(", ");
     
