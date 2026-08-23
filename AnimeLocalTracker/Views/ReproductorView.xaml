@@ -146,17 +146,16 @@
                         <!-- Controles -->
                         <Grid Grid.Row="2" Margin="0,0,0,0">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/> <!-- Anterior -->
-                                <ColumnDefinition Width="Auto"/> <!-- Play -->
-                                <ColumnDefinition Width="Auto"/> <!-- Siguiente -->
-                                <ColumnDefinition Width="Auto"/> <!-- Volumen -->
-                                <ColumnDefinition Width="Auto"/> <!-- Tiempo -->
-                                <ColumnDefinition Width="*"/>    <!-- Espacio -->
-                                <ColumnDefinition Width="Auto"/> <!-- Retroceder -->
-                                <ColumnDefinition Width="Auto"/> <!-- Adelantar -->
-                                <ColumnDefinition Width="Auto"/> <!-- AutoPlay Siguiente -->
-                                <ColumnDefinition Width="Auto"/> <!-- Subtítulos -->
-                                <ColumnDefinition Width="Auto"/> <!-- Fullscreen -->
+                                <ColumnDefinition Width="Auto"/> <!-- 0: Anterior -->
+                                <ColumnDefinition Width="Auto"/> <!-- 1: Play -->
+                                <ColumnDefinition Width="Auto"/> <!-- 2: Siguiente -->
+                                <ColumnDefinition Width="Auto"/> <!-- 3: Volumen -->
+                                <ColumnDefinition Width="Auto"/> <!-- 4: Tiempo -->
+                                <ColumnDefinition Width="*"/>    <!-- 5: Espacio -->
+                                <ColumnDefinition Width="Auto"/> <!-- 6: Retroceder -->
+                                <ColumnDefinition Width="Auto"/> <!-- 7: Adelantar -->
+                                <ColumnDefinition Width="Auto"/> <!-- 8: Subtítulos -->
+                                <ColumnDefinition Width="Auto"/> <!-- 9: Fullscreen -->
                             </Grid.ColumnDefinitions>
 
                             <!-- Episodio Anterior -->
@@ -238,15 +237,8 @@
                                 <materialDesign:PackIcon Kind="FastForward10" Width="26" Height="26" />
                             </Button>
 
-                            <!-- AutoPlay Siguiente -->
-                            <Button Grid.Column="8" Command="{Binding ToggleAutoPlayCommand}"
-                                    ToolTip="Reproducción automática del siguiente capítulo"
-                                    Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,5,0">
-                                <materialDesign:PackIcon Kind="{Binding AutoPlayIcon}" Width="24" Height="24" />
-                            </Button>
-
                             <!-- Subtítulos (Menú Manual) -->
-                            <ToggleButton x:Name="SubtitlesToggle" Grid.Column="9"
+                            <ToggleButton x:Name="SubtitlesToggle" Grid.Column="8"
                                     ToolTip="Subtítulos"
                                     Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,5,0">
                                 <materialDesign:PackIcon Kind="{Binding SubtitulosIcon}" Width="26" Height="26" />
@@ -315,7 +307,7 @@
                             </Popup>
                             
                             <!-- Fullscreen con ícono dinámico -->
-                            <Button Grid.Column="10" Command="{Binding ToggleFullscreenCommand}" 
+                            <Button Grid.Column="9" Command="{Binding ToggleFullscreenCommand}" 
                                     ToolTip="Pantalla completa (F11)"
                                     Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,0,0">
                                 <materialDesign:PackIcon Kind="{Binding FullscreenIcon}" Width="26" Height="26" />
@@ -326,86 +318,5 @@
             </Grid>
             </Grid>
         </fl:FlyleafHost>
-
-        <!-- Overlay Flotante de Auto-Play (Cuenta Regresiva de 5 segundos estilo Netflix / Crunchyroll) -->
-        <!-- NOTA: debe vivir FUERA de FlyleafHost porque este sobrescribe el DataContext de su contenido,
-             lo que rompe los bindings (panel vacío, siempre visible y botones sin comando). -->
-        <Border HorizontalAlignment="Right" VerticalAlignment="Bottom"
-                Margin="0,0,30,110" MaxWidth="440" MinWidth="360"
-                Background="#F2141720" BorderBrush="#3B4858" BorderThickness="1"
-                CornerRadius="16" Padding="22,18"
-                Visibility="{Binding MostrarAutoPlayCountdown, Converter={StaticResource BooleanToVisibilityConverter}}">
-            <Border.Effect>
-                <DropShadowEffect Color="Black" BlurRadius="30" ShadowDepth="6" Opacity="0.85"/>
-            </Border.Effect>
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/> <!-- Header / Countdown -->
-                    <RowDefinition Height="Auto"/> <!-- Titulo siguiente ep -->
-                    <RowDefinition Height="Auto"/> <!-- Barra de progreso 5s -->
-                    <RowDefinition Height="Auto"/> <!-- Botones de acción -->
-                </Grid.RowDefinitions>
-
-                <!-- Header -->
-                <Grid Grid.Row="0" Margin="0,0,0,8">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <Border Background="#2A1B4E" CornerRadius="8" Width="30" Height="30" Margin="0,0,10,0" VerticalAlignment="Center">
-                            <materialDesign:PackIcon Kind="MotionPlay" Foreground="#A78BFA" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <StackPanel VerticalAlignment="Center">
-                            <TextBlock Text="Siguiente episodio en" FontSize="11" Foreground="#9CA3AF" FontWeight="SemiBold"/>
-                            <TextBlock Text="{Binding AutoPlayCountdownSegundos, StringFormat='{}{0} segundos...'}" FontSize="15" FontWeight="Bold" Foreground="#A78BFA"/>
-                        </StackPanel>
-                    </StackPanel>
-
-                    <!-- Botón X sutil para cerrar / cancelar -->
-                    <Button Command="{Binding CancelarAutoPlayCommand}" HorizontalAlignment="Right" VerticalAlignment="Top"
-                            Style="{StaticResource MaterialDesignToolButton}" Foreground="#9CA3AF" Width="28" Height="28" Padding="0"
-                            ToolTip="Cancelar reproducción automática">
-                        <materialDesign:PackIcon Kind="Close" Width="18" Height="18"/>
-                    </Button>
-                </Grid>
-
-                <!-- Titulo del siguiente episodio -->
-                <StackPanel Grid.Row="1" Margin="0,2,0,12">
-                    <TextBlock Text="{Binding TituloAnime}" FontSize="14" FontWeight="Bold" Foreground="White" TextTrimming="CharacterEllipsis"/>
-                    <TextBlock Text="{Binding SiguienteEpisodioTitulo}" FontSize="13" Foreground="#D1D5DB" Margin="0,2,0,0"/>
-                </StackPanel>
-
-                <!-- Barra de progreso animada de 5 segundos -->
-                <Grid Grid.Row="2" Margin="0,0,0,14">
-                    <ProgressBar Minimum="0" Maximum="100" Value="{Binding AutoPlayProgress, Mode=OneWay}"
-                                 Height="4" Foreground="#A78BFA" Background="#334155" BorderThickness="0"/>
-                </Grid>
-
-                <!-- Botones de Acción -->
-                <Grid Grid.Row="3">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="10"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-
-                    <!-- Botón Reproducir Ahora -->
-                    <Button Grid.Column="0" Command="{Binding ReproducirSiguienteAhoraCommand}"
-                            Background="#7C3AED" BorderBrush="#8B5CF6" BorderThickness="1" Foreground="White"
-                            Height="38" Padding="14,0" Cursor="Hand" materialDesign:ButtonAssist.CornerRadius="8"
-                            FontWeight="Bold" FontSize="13">
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                            <materialDesign:PackIcon Kind="Play" Width="18" Height="18" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                            <TextBlock Text="Reproducir ahora" VerticalAlignment="Center"/>
-                        </StackPanel>
-                    </Button>
-
-                    <!-- Botón Cancelar -->
-                    <Button Grid.Column="2" Command="{Binding CancelarAutoPlayCommand}"
-                            Background="#1E293B" BorderBrush="#334155" BorderThickness="1" Foreground="#E2E8F0"
-                            Height="38" Padding="14,0" Cursor="Hand" materialDesign:ButtonAssist.CornerRadius="8"
-                            FontWeight="SemiBold" FontSize="13">
-                        <TextBlock Text="Cancelar" VerticalAlignment="Center"/>
-                    </Button>
-                </Grid>
-            </Grid>
-        </Border>
     </Grid>
 </UserControl>

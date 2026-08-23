@@ -16,5 +16,6 @@ public interface IAnimeTrackingService
     Task<bool> GuardarSeguimientoUsuarioAsync(int mediaId, string estado, int progreso, float puntaje, System.DateTime? fechaInicio, System.DateTime? fechaFin, string token);
     Task<AniListUser?> ObtenerPerfilUsuarioAsync(string token);
     Task<List<AniListMedia>> BuscarAnimesEnVivoAsync(string busqueda, System.Threading.CancellationToken cancellationToken = default);
+    Task<List<AniListMedia>> ObtenerAnimesTendenciaAsync(System.Threading.CancellationToken cancellationToken = default);
     Task<List<AiringEpisode>> ObtenerCalendarioEmisionAsync(List<int> mediaIds, long inicioSemana, long finSemana);
 }

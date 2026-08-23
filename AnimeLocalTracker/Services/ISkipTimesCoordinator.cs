@@ -7,7 +7,7 @@ namespace AnimeLocalTracker.Services;
 
 /// <summary>
 /// Orquesta la lógica de skip-times: resolución del MAL ID, carga de segmentos de AniSkip
-/// y reglas puras de evaluación (skip activo, ventana genérica de intro).
+/// y reglas de evaluación del skip activo.
 /// </summary>
 public interface ISkipTimesCoordinator
 {
@@ -22,9 +22,4 @@ public interface ISkipTimesCoordinator
     /// <paramref name="margenFinalSegundos"/> acorta el final del intervalo (p.ej. 0.5s en el bucle de tracking).
     /// </summary>
     AniSkipResult? ObtenerSkipActivo(double currentSeconds, IReadOnlyList<AniSkipResult> skipTimes, double margenFinalSegundos = 0);
-
-    /// <summary>
-    /// Fallback genérico cuando AniSkip no tiene datos: ventana estimada de intro [30s, 180s].
-    /// </summary>
-    bool EstaEnVentanaIntroGenerica(double currentSeconds);
 }

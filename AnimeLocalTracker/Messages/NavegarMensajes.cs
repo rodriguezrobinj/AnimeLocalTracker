@@ -4,6 +4,7 @@ namespace AnimeLocalTracker.Messages;
 
 // === Mensajes de Navegación ===
 public record NavegarMensaje_Galeria();
+public record NavegarMensaje_AgregarAnime();
 public record NavegarMensaje_Detalle(AnimeItem AnimeSeleccionado);
 public record NavegarMensaje_Calendario();
 public record NavegarMensaje_Descargas();

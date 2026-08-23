@@ -385,8 +385,8 @@ public class AniListTrackingService : IAnimeTrackingService
         {
             var query = @"
             query ($search: String) {
-                Page (page: 1, perPage: 8) {
-                    media (search: $search, type: ANIME) {
+                Page (page: 1, perPage: 24) {
+                    media (search: $search, type: ANIME, sort: SEARCH_MATCH) {
                         id
                         idMal
                         title { romaji english native userPreferred }
@@ -435,6 +435,72 @@ public class AniListTrackingService : IAnimeTrackingService
         catch (Exception ex)
         {
             AppLogger.Error("AniListTrackingService", $"Error al buscar animes en vivo para '{busqueda}'", ex);
+            return [];
+        }
+    }
+
+    public async Task<List<AniListMedia>> ObtenerAnimesTendenciaAsync(System.Threading.CancellationToken cancellationToken = default)
+    {
+        const string cacheKey = "tendencias_anilist";
+        if (TryGetFromCache<List<AniListMedia>>(cacheKey, out var cachedList))
+        {
+            return cachedList!;
+        }
+
+        try
+        {
+            var query = @"
+            query {
+                Page (page: 1, perPage: 24) {
+                    media (type: ANIME, sort: TRENDING_DESC) {
+                        id
+                        idMal
+                        title { romaji english native userPreferred }
+                        synonyms
+                        coverImage { extraLarge }
+                        status
+                        description
+                        genres
+                        episodes
+                        startDate { year month day }
+                        nextAiringEpisode { episode }
+                    }
+                }
+            }";
+
+            var payload = new { query };
+            var jsonContent = JsonSerializer.Serialize(payload, JsonOptions);
+
+            var request = CrearRequest(jsonContent);
+            var response = await _httpClient.SendAsync(request, cancellationToken);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync(cancellationToken);
+                if (content.Contains("\"errors\""))
+                {
+                    AppLogger.Error("AniListTrackingService", $"AniList devolvió errores GraphQL obteniendo tendencias: {Truncar(content)}", null);
+                    return [];
+                }
+                var result = JsonSerializer.Deserialize<AniListResponse>(content, JsonOptions);
+                var mediaList = result?.Data?.Page?.Media ?? [];
+                if (mediaList.Count > 0)
+                {
+                    SetInCache(cacheKey, mediaList, TimeSpan.FromMinutes(15));
+                }
+                return mediaList;
+            }
+
+            AppLogger.Warn("AniListTrackingService", $"Obtener tendencias falló con HTTP {(int)response.StatusCode}.");
+            return [];
+        }
+        catch (OperationCanceledException)
+        {
+            return [];
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("AniListTrackingService", "Error al obtener animes en tendencia", ex);
             return [];
         }
     }

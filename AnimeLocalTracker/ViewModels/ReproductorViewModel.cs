@@ -1,18 +1,19 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
-using AnimeLocalTracker.Models;
-using AnimeLocalTracker.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using FlyleafLib;
 using FlyleafLib.MediaPlayer;
 using AnimeLocalTracker.Messages;
+using AnimeLocalTracker.Models;
+using AnimeLocalTracker.Services;
 
 namespace AnimeLocalTracker.ViewModels;
 
@@ -55,21 +56,6 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
     private readonly HashSet<string> _skipAutoEjecutados = new();
 
-    // Auto-Play Cuenta Regresiva (5 segundos)
-    [ObservableProperty]
-    private bool _mostrarAutoPlayCountdown;
-
-    [ObservableProperty]
-    private int _autoPlayCountdownSegundos = 5;
-
-    [ObservableProperty]
-    private string _siguienteEpisodioTitulo = string.Empty;
-
-    [ObservableProperty]
-    private double _autoPlayProgress = 0.0;
-
-    private CancellationTokenSource? _autoPlayCts;
-
     // Propiedades para controles de medios
     [ObservableProperty] private double _currentSeconds;
     [ObservableProperty] private double _totalSeconds;
@@ -79,7 +65,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string _playPauseIcon = "Pause";
     [ObservableProperty] private bool _isDraggingSlider = false;
     
-    // Navegación entre episodios y AutoPlay
+    // Navegación entre episodios
     private bool _tieneEpisodioAnterior;
     public bool TieneEpisodioAnterior
     {
@@ -92,20 +78,6 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     {
         get => _tieneEpisodioSiguiente;
         set => SetProperty(ref _tieneEpisodioSiguiente, value);
-    }
-
-    private bool _autoPlaySiguiente = true;
-    public bool AutoPlaySiguiente
-    {
-        get => _autoPlaySiguiente;
-        set => SetProperty(ref _autoPlaySiguiente, value);
-    }
-
-    private string _autoPlayIcon = "MotionPlay";
-    public string AutoPlayIcon
-    {
-        get => _autoPlayIcon;
-        set => SetProperty(ref _autoPlayIcon, value);
     }
 
     private string _episodioAnteriorTooltip = "Episodio anterior (P)";
@@ -123,7 +95,6 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     }
 
     private List<EpisodioItem> _episodiosDisponibles = new();
-    private bool _autoPlayDisparado = false;
 
     private string _fullscreenIcon = "Fullscreen";
     public string FullscreenIcon
@@ -132,14 +103,14 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         set => SetProperty(ref _fullscreenIcon, value);
     }
     
-    private string _subtitulosIcon = "Subtitles";
+    private string _subtitulosIcon = "SubtitlesOutline";
     public string SubtitulosIcon
     {
         get => _subtitulosIcon;
         set => SetProperty(ref _subtitulosIcon, value);
     }
     
-    private bool _subtitulosHabilitados = true;
+    private bool _subtitulosHabilitados = false;
     public bool SubtitulosHabilitados
     {
         get => _subtitulosHabilitados;
@@ -183,8 +154,9 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             var config = _settingsService.ObtenerConfiguracion();
             if (config != null)
             {
-                _autoPlaySiguiente = config.AutoPlaySiguiente;
                 _autoSkipIntroOutro = config.AutoSkipIntroOutro;
+                _subtitulosHabilitados = config.SubtitulosPorDefecto;
+                _subtitulosIcon = config.SubtitulosPorDefecto ? "Subtitles" : "SubtitlesOutline";
             }
         }
     }
@@ -234,13 +206,14 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                 config.Player.SeekAccurate = false;
             }
             
-            // Subtítulos habilitados por defecto
             if (config.Subtitles != null)
             {
                 config.Subtitles.Enabled = SubtitulosHabilitados;
             }
             
-            return new Player(config);
+            var player = new Player(config);
+            player.OpenCompleted += (s, e) => EvaluarSubtitulosPorDefecto();
+            return player;
         }
         catch (Exception ex)
         {
@@ -369,103 +342,56 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         CurrentSeconds = segundos;
         ActualizarTextosTiempo(segundos);
 
-        // Scrub en vivo: seek por keyframe como máximo cada 250ms para preview fluida sin saturar el decoder
-        if (Player != null && !Player.IsDisposed && Player.Status == Status.Playing)
+        // Throttle del seek en vivo a ~4 fps para no saturar el demuxer/decodificador
+        long ahoraTicks = Stopwatch.GetTimestamp();
+        if (Stopwatch.GetElapsedTime(_ultimoScrubSeekTicks) >= IntervaloScrubEnVivo)
         {
-            long ahora = DateTime.UtcNow.Ticks;
-            if (ahora - _ultimoScrubSeekTicks >= IntervaloScrubEnVivo.Ticks)
+            _ultimoScrubSeekTicks = ahoraTicks;
+            if (Player != null && !Player.IsDisposed)
             {
-                _ultimoScrubSeekTicks = ahora;
                 try
                 {
                     Player.CurTime = TimeSpan.FromSeconds(segundos).Ticks;
                 }
                 catch (Exception ex)
                 {
-                    AppLogger.Warn("ReproductorViewModel", $"Excepción en scrub en vivo: {ex.Message}");
+                    AppLogger.Debug("ReproductorViewModel", $"Scrub seek throttling catch: {ex.Message}");
                 }
             }
         }
     }
 
     /// <summary>
-    /// Fin de arrastre (o clic directo en la pista): aplica el seek final solo si hubo movimiento real.
+    /// Fin de arrastre: aplica el seek final garantizado, actualiza UI y descongela el bucle.
     /// </summary>
     public void FinalizarArrastre(double segundos)
     {
         segundos = AcotarPosicion(segundos);
         if (TotalSeconds > 0 && segundos > TotalSeconds) segundos = TotalSeconds;
 
-        if (!IsDraggingSlider)
-        {
-            // Clic directo en la pista (IsMoveToPointEnabled): buscar sin umbral
-            Seek(segundos);
-            return;
-        }
-
         IsDraggingSlider = false;
 
-        // Arrastre sin movimiento apreciable: evitar un re-seek innecesario (mini-congelón)
+        // Si la posición apenas cambió respecto a antes de arrastrar, restauramos sin seek extra
         if (Math.Abs(segundos - _posicionAntesArrastre) < 0.25)
         {
-            CurrentSeconds = segundos;
-            ActualizarTextosTiempo(segundos);
+            CurrentSeconds = _posicionAntesArrastre;
+            ActualizarTextosTiempo(_posicionAntesArrastre);
             return;
         }
 
         Seek(segundos);
     }
 
-    [ObservableProperty] private int _volumen = 100;
-    [ObservableProperty] private string _volumenIcon = "VolumeHigh";
-
-    partial void OnVolumenChanged(int value)
-    {
-        if (Player != null)
-        {
-            try 
-            {
-                Player.Audio.Volume = value;
-            } 
-            catch (Exception ex) 
-            {
-                AppLogger.Warn("ReproductorViewModel", $"Excepción al cambiar volumen nativo: {ex.Message}");
-            }
-        }
-        
-        if (value == 0) VolumenIcon = "VolumeMute";
-        else if (value < 30) VolumenIcon = "VolumeLow";
-        else if (value < 70) VolumenIcon = "VolumeMedium";
-        else VolumenIcon = "VolumeHigh";
-    }
-
-    private int _volumenAnterior = 100;
-
-    [RelayCommand]
-    public void ToggleMute()
-    {
-        if (Volumen > 0)
-        {
-            _volumenAnterior = Volumen;
-            Volumen = 0;
-        }
-        else
-        {
-            Volumen = _volumenAnterior > 0 ? _volumenAnterior : 100;
-        }
-    }
-
     [RelayCommand]
     public void ToggleFullscreen()
     {
-        if (System.Windows.Application.Current?.MainWindow is AnimeLocalTracker.Views.MainWindow mainWindow)
+        var mainWindow = System.Windows.Application.Current?.MainWindow as AnimeLocalTracker.Views.MainWindow;
+        if (mainWindow != null)
         {
             mainWindow.TogglePantallaCompleta();
-            
-            // Actualizar ícono según el estado actual
             FullscreenIcon = mainWindow.IsFullScreen ? "FullscreenExit" : "Fullscreen";
-            
-            // Forzar foco de vuelta a la ventana para que F11 siga funcionando
+
+            // Devolver foco a MainWindow para que las teclas sigan respondiendo
             System.Windows.Application.Current?.Dispatcher?.BeginInvoke(
                 System.Windows.Threading.DispatcherPriority.Input,
                 () =>
@@ -481,27 +407,68 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     {
         if (Player == null || stream == null) return;
         
-        SubtitulosHabilitados = true;
-        Player.Config.Subtitles.Enabled = true;
+        HabilitarSubtitulos();
         Player.OpenAsync((dynamic)stream);
-        SubtitulosIcon = "Subtitles";
     }
 
     [RelayCommand]
     public void TurnOffSubtitles()
     {
-        if (Player == null) return;
-        
-        SubtitulosHabilitados = false;
-        Player.Config.Subtitles.Enabled = false;
-        SubtitulosIcon = "SubtitlesOutline";
+        DeshabilitarSubtitulos();
     }
 
-    [RelayCommand]
-    public void ToggleAutoPlay()
+    public void EvaluarSubtitulosPorDefecto()
     {
-        AutoPlaySiguiente = !AutoPlaySiguiente;
-        AutoPlayIcon = AutoPlaySiguiente ? "MotionPlay" : "MotionPlayOff";
+        try
+        {
+            bool permitirSubtitulos = true;
+            if (_settingsService != null)
+            {
+                var config = _settingsService.ObtenerConfiguracion();
+                if (config != null)
+                {
+                    permitirSubtitulos = config.SubtitulosPorDefecto;
+                }
+            }
+
+            if (!permitirSubtitulos)
+            {
+                DeshabilitarSubtitulos();
+                return;
+            }
+
+            if (Player?.Subtitles?.Streams == null || Player.Subtitles.Streams.Count == 0)
+            {
+                DeshabilitarSubtitulos();
+                return;
+            }
+
+            HabilitarSubtitulos();
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("ReproductorViewModel", $"Error al evaluar subtítulos por defecto: {ex.Message}");
+        }
+    }
+
+    public void DeshabilitarSubtitulos()
+    {
+        SubtitulosHabilitados = false;
+        SubtitulosIcon = "SubtitlesOutline";
+        if (Player?.Config?.Subtitles != null)
+        {
+            Player.Config.Subtitles.Enabled = false;
+        }
+    }
+
+    public void HabilitarSubtitulos()
+    {
+        SubtitulosHabilitados = true;
+        SubtitulosIcon = "Subtitles";
+        if (Player?.Config?.Subtitles != null)
+        {
+            Player.Config.Subtitles.Enabled = true;
+        }
     }
 
     public EpisodioItem? ObtenerSiguienteEpisodio()
@@ -604,13 +571,6 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     {
         _ = GuardarProgresoActualAsync();
 
-        _autoPlayCts?.Cancel();
-        _autoPlayCts?.Dispose();
-        _autoPlayCts = null;
-        MostrarAutoPlayCountdown = false;
-        AutoPlayCountdownSegundos = 5;
-        AutoPlayProgress = 0.0;
-
         _skipTimes.Clear();
         _skipAutoEjecutados.Clear();
         _currentActiveSkip = null;
@@ -622,8 +582,9 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             var config = _settingsService.ObtenerConfiguracion();
             if (config != null)
             {
-                AutoPlaySiguiente = config.AutoPlaySiguiente;
                 AutoSkipIntroOutro = config.AutoSkipIntroOutro;
+                SubtitulosHabilitados = config.SubtitulosPorDefecto;
+                SubtitulosIcon = config.SubtitulosPorDefecto ? "Subtitles" : "SubtitlesOutline";
             }
         }
 
@@ -637,7 +598,6 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         _lastNotifiedSeconds = -1;
         _lastSavedSeconds = -1;
         _resumingPositionSeconds = 0;
-        _autoPlayDisparado = false;
 
         if (listaEpisodios != null)
         {
@@ -889,25 +849,11 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                     }
                     else
                     {
-                        // Fallback genérico cuando no hay datos en AniSkip (entre 0:30 y 3:00)
-                        if (_skipCoordinator.EstaEnVentanaIntroGenerica(curSeconds))
+                        if (MostrarSkipButton)
                         {
-                            SkipButtonTexto = "Saltar intro (S)";
-                            SkipButtonIcon = "FastForward";
+                            MostrarSkipButton = false;
+                            MostrarSkipIntro = false;
                             _currentActiveSkip = null;
-                            if (!MostrarSkipButton)
-                            {
-                                MostrarSkipButton = true;
-                                MostrarSkipIntro = true;
-                            }
-                        }
-                        else
-                        {
-                            if (MostrarSkipButton)
-                            {
-                                MostrarSkipButton = false;
-                                MostrarSkipIntro = false;
-                            }
                         }
                     }
                 }
@@ -915,18 +861,9 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                 {
                     // Al finalizar, resetear progreso a 0
                     _ = GuardarProgresoActualAsync(forzarProgresoCero: true);
-
-                    // Auto-Play siguiente episodio con cuenta regresiva de 5 segundos
-                    if (AutoPlaySiguiente && TieneEpisodioSiguiente && !_autoPlayDisparado)
+                    if (!_fueMarcadoComoVisto)
                     {
-                        _autoPlayDisparado = true;
-                        
-                        if (!_fueMarcadoComoVisto)
-                        {
-                            await RealizarAutoTrackingAsync();
-                        }
-
-                        IniciarCuentaRegresivaAutoPlay();
+                        await RealizarAutoTrackingAsync();
                     }
                 }
 
@@ -946,101 +883,6 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         }
     }
 
-    public void IniciarCuentaRegresivaAutoPlay()
-    {
-        try
-        {
-            _autoPlayCts?.Cancel();
-        }
-        catch { }
-        _autoPlayCts = new CancellationTokenSource();
-        var ct = _autoPlayCts.Token;
-
-        var siguiente = ObtenerSiguienteEpisodio();
-        if (siguiente == null)
-        {
-            MostrarAutoPlayCountdown = false;
-            return;
-        }
-
-        SiguienteEpisodioTitulo = $"Episodio {siguiente.NumeroEpisodio}";
-        AutoPlayCountdownSegundos = 5;
-        AutoPlayProgress = 0.0;
-        MostrarAutoPlayCountdown = true;
-
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                const int duracionTotalMs = 5000;
-                const int stepMs = 100;
-                int transcurridoMs = 0;
-
-                while (transcurridoMs < duracionTotalMs && !ct.IsCancellationRequested)
-                {
-                    await Task.Delay(stepMs, ct);
-                    transcurridoMs += stepMs;
-
-                    int segRestantes = Math.Max(0, (int)Math.Ceiling((duracionTotalMs - transcurridoMs) / 1000.0));
-                    double progreso = Math.Min(100.0, (transcurridoMs / (double)duracionTotalMs) * 100.0);
-
-                    var app = System.Windows.Application.Current;
-                    if (app != null && app.Dispatcher != null && !app.Dispatcher.HasShutdownStarted)
-                    {
-                        _ = app.Dispatcher.BeginInvoke(() =>
-                        {
-                            AutoPlayCountdownSegundos = segRestantes;
-                            AutoPlayProgress = progreso;
-                        });
-                    }
-                    else
-                    {
-                        AutoPlayCountdownSegundos = segRestantes;
-                        AutoPlayProgress = progreso;
-                    }
-                }
-
-                if (!ct.IsCancellationRequested)
-                {
-                    var app = System.Windows.Application.Current;
-                    if (app != null && app.Dispatcher != null && !app.Dispatcher.HasShutdownStarted)
-                    {
-                        _ = app.Dispatcher.BeginInvoke(() =>
-                        {
-                            MostrarAutoPlayCountdown = false;
-                            SiguienteEpisodio();
-                        });
-                    }
-                    else
-                    {
-                        MostrarAutoPlayCountdown = false;
-                        SiguienteEpisodio();
-                    }
-                }
-            }
-            catch (OperationCanceledException) { }
-            catch (Exception ex)
-            {
-                AppLogger.Debug("ReproductorViewModel", $"Excepción en timer de Auto-Play: {ex.Message}");
-            }
-        }, ct);
-    }
-
-    [RelayCommand]
-    public void ReproducirSiguienteAhora()
-    {
-        _autoPlayCts?.Cancel();
-        MostrarAutoPlayCountdown = false;
-        SiguienteEpisodio();
-    }
-
-    [RelayCommand]
-    public void CancelarAutoPlay()
-    {
-        _autoPlayCts?.Cancel();
-        MostrarAutoPlayCountdown = false;
-    }
-
     [RelayCommand]
     public void SkipIntro()
     {
@@ -1058,13 +900,6 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             if (TotalSeconds > 0 && destino > TotalSeconds) destino = TotalSeconds;
             Seek(destino);
         }
-        else
-        {
-            // Adelantar 85 segundos (fallback)
-            double destino = CurrentSeconds + 85;
-            if (TotalSeconds > 0 && destino > TotalSeconds) destino = TotalSeconds;
-            Seek(destino);
-        }
 
         MostrarSkipButton = false;
         MostrarSkipIntro = false;
@@ -1074,8 +909,6 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     [RelayCommand]
     public void Cerrar()
     {
-        _autoPlayCts?.Cancel();
-        MostrarAutoPlayCountdown = false;
         _ = GuardarProgresoActualAsync();
         Dispose();
         
@@ -1098,13 +931,6 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
-        try
-        {
-            _autoPlayCts?.Cancel();
-        }
-        catch { }
-        _autoPlayCts = null;
-
         _ = GuardarProgresoActualAsync();
 
         try

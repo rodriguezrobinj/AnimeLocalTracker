@@ -310,8 +310,7 @@ public partial class GaleriaViewModel : ObservableObject,
     [RelayCommand]
     private void AñadirAnimeManual()
     {
-        // Enviar mensaje al MainViewModel para que abra el diálogo de búsqueda
-        WeakReferenceMessenger.Default.Send(new AbrirBuscadorMensaje());
+        WeakReferenceMessenger.Default.Send(new NavegarMensaje_AgregarAnime());
     }
 
     private bool _menuUsuarioAbierto;

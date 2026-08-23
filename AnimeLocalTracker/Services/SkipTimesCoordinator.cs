@@ -10,10 +10,6 @@ namespace AnimeLocalTracker.Services;
 
 public class SkipTimesCoordinator : ISkipTimesCoordinator
 {
-    // Ventana del fallback genérico de intro cuando AniSkip no tiene datos
-    public const double VentanaIntroGenericaInicio = 30;
-    public const double VentanaIntroGenericaFin = 180;
-
     private readonly IAniSkipService? _aniSkipService;
 
     // Memoización del mapeo AniListId -> MAL ID durante la vida del reproductor
@@ -65,10 +61,5 @@ public class SkipTimesCoordinator : ISkipTimesCoordinator
         return skipTimes.FirstOrDefault(s =>
             currentSeconds >= s.Interval.StartTime &&
             currentSeconds < s.Interval.EndTime - margenFinalSegundos);
-    }
-
-    public bool EstaEnVentanaIntroGenerica(double currentSeconds)
-    {
-        return currentSeconds >= VentanaIntroGenericaInicio && currentSeconds <= VentanaIntroGenericaFin;
     }
 }

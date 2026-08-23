@@ -455,8 +455,8 @@
                                 <!-- Fondo estático oscuro para carga instantánea sin animación infinita -->
                                 <Border Background="#1C1C1E" CornerRadius="10" />
 
-                                <!-- Portada precargada y congelada en memoria con escalado acelerado por GPU -->
-                                <Image Source="{Binding PortadaImagen}" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="LowQuality" />
+                                <!-- Portada precargada y congelada en memoria con escalado de alta definición -->
+                                <Image Source="{Binding PortadaImagen}" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" SnapsToDevicePixels="True" />
                                 
                                 <!-- OVERLAY DE SELECCIÓN -->
                                 <Border Background="#66000000" Visibility="{Binding EstaSeleccionado, Converter={StaticResource BoolToVis}}"/>

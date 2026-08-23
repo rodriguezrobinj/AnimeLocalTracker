@@ -13,6 +13,7 @@ namespace AnimeLocalTracker.ViewModels;
 
 public partial class MainViewModel : ObservableObject, 
     IRecipient<NavegarMensaje_Galeria>,
+    IRecipient<NavegarMensaje_AgregarAnime>,
     IRecipient<NavegarMensaje_Detalle>,
     IRecipient<NavegarMensaje_Calendario>,
     IRecipient<NavegarMensaje_Descargas>,
@@ -36,6 +37,7 @@ public partial class MainViewModel : ObservableObject,
     // === NAVEGACIÓN (ViewModel-First) ===
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(EsGaleriaActiva))]
+    [NotifyPropertyChangedFor(nameof(EsAgregarAnimeActivo))]
     [NotifyPropertyChangedFor(nameof(EsCalendarioActivo))]
     [NotifyPropertyChangedFor(nameof(EsDescargasActivas))]
     [NotifyPropertyChangedFor(nameof(EsConfiguracionActiva))]
@@ -43,6 +45,7 @@ public partial class MainViewModel : ObservableObject,
     private ObservableObject _vistaActual = null!;
 
     public bool EsGaleriaActiva => VistaActual is GaleriaViewModel || VistaActual is DetalleViewModel;
+    public bool EsAgregarAnimeActivo => VistaActual is AgregarAnimeViewModel;
     public bool EsCalendarioActivo => VistaActual is CalendarioViewModel;
     public bool EsDescargasActivas => VistaActual is DescargasViewModel;
     public bool EsConfiguracionActiva => VistaActual is ConfiguracionViewModel;
@@ -226,6 +229,17 @@ public partial class MainViewModel : ObservableObject,
     }
 
     [RelayCommand]
+    private void NavegarAgregarAnime()
+    {
+        VistaActual = _serviceProvider.GetRequiredService<AgregarAnimeViewModel>();
+    }
+
+    public void Receive(NavegarMensaje_AgregarAnime message)
+    {
+        NavegarAgregarAnime();
+    }
+
+    [RelayCommand]
     private void NavegarCalendario()
     {
         VistaActual = _serviceProvider.GetRequiredService<CalendarioViewModel>();
@@ -276,12 +290,7 @@ public partial class MainViewModel : ObservableObject,
 
     public void Receive(AbrirBuscadorMensaje message)
     {
-        CancelarBusquedaPendiente();
-        TextoBusqueda = string.Empty;
-        ResultadosBusqueda.Clear();
-        BusquedaSinResultados = false;
-        IsSearching = false;
-        IsDialogOpen = true;
+        NavegarAgregarAnime();
     }
 
     public void Receive(MostrarDialogoRequestMessage message)

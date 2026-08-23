@@ -166,63 +166,29 @@ public class ReproductorViewModelTests
     }
 
     [Fact]
-    public void ToggleAutoPlay_DeberiaAlternarEstadoEIcono()
-    {
-        // Arrange
-        var sut = CreateSut();
-        sut.AutoPlaySiguiente.Should().BeTrue();
-        sut.AutoPlayIcon.Should().Be("MotionPlay");
-
-        // Act & Assert 1: Desactivar
-        sut.ToggleAutoPlayCommand.Execute(null);
-        sut.AutoPlaySiguiente.Should().BeFalse();
-        sut.AutoPlayIcon.Should().Be("MotionPlayOff");
-
-        // Act & Assert 2: Reactivar
-        sut.ToggleAutoPlayCommand.Execute(null);
-        sut.AutoPlaySiguiente.Should().BeTrue();
-        sut.AutoPlayIcon.Should().Be("MotionPlay");
-
-        sut.Dispose();
-    }
-
-    [Theory]
-    [InlineData(0, "VolumeMute")]
-    [InlineData(15, "VolumeLow")]
-    [InlineData(50, "VolumeMedium")]
-    [InlineData(85, "VolumeHigh")]
-    public void Volumen_CambioDeValor_DeberiaCalcularIconoCorrecto(int nuevoVolumen, string iconoEsperado)
+    public void Subtitulos_DeshabilitarYHabilitar_DeberianActualizarEstadoEIcono()
     {
         // Arrange
         var sut = CreateSut();
 
-        // Act
-        sut.Volumen = nuevoVolumen;
+        // Act: Deshabilitar
+        sut.TurnOffSubtitlesCommand.Execute(null);
 
         // Assert
-        sut.VolumenIcon.Should().Be(iconoEsperado);
+        sut.SubtitulosHabilitados.Should().BeFalse();
+        sut.SubtitulosIcon.Should().Be("SubtitlesOutline");
+
+        // Act: Habilitar
+        sut.HabilitarSubtitulos();
+
+        // Assert
+        sut.SubtitulosHabilitados.Should().BeTrue();
+        sut.SubtitulosIcon.Should().Be("Subtitles");
 
         sut.Dispose();
     }
 
-    [Fact]
-    public void ToggleMute_DeberiaSilenciarYRestaurarVolumenPrevio()
-    {
-        // Arrange
-        var sut = CreateSut();
-        sut.Volumen = 75;
 
-        // Act: Silenciar
-        sut.ToggleMuteCommand.Execute(null);
-        sut.Volumen.Should().Be(0);
-        sut.VolumenIcon.Should().Be("VolumeMute");
-
-        // Act: Desmutear
-        sut.ToggleMuteCommand.Execute(null);
-        sut.Volumen.Should().Be(75);
-
-        sut.Dispose();
-    }
 
     [Fact]
     public async Task RealizarAutoTrackingAsync_DeberiaGuardarEnBdYEnviarNotificaciones()
@@ -400,7 +366,7 @@ public class ReproductorViewModelTests
     }
 
     [Fact]
-    public void SkipIntroOutro_SinSegmentoActivo_DeberiaSaltar85Segundos()
+    public void SkipIntroOutro_SinSegmentoActivo_NoDeberiaAlterarPosicion()
     {
         // Arrange
         var sut = CreateSut();
@@ -411,78 +377,28 @@ public class ReproductorViewModelTests
         // Act
         sut.SkipIntroOutroCommand.Execute(null);
 
-        // Assert: 30 + 85 = 115s
-        sut.CurrentSeconds.Should().Be(115);
+        // Assert: Sin segmento en AniSkip, la posición no cambia
+        sut.CurrentSeconds.Should().Be(30);
         sut.MostrarSkipButton.Should().BeFalse();
 
         sut.Dispose();
     }
 
     [Fact]
-    public void IniciarCuentaRegresivaAutoPlay_DeberiaMostrarCountdownYDatosDelSiguiente()
+    public void EvaluarSubtitulosPorDefecto_ConConfiguracionDeshabilitada_DeberiaMantenerSubtitulosApagados()
     {
         // Arrange
-        var sut = CreateSut();
-        var lista = new List<EpisodioItem>
-        {
-            new() { NumeroEpisodio = 1, RutaCompleta = "C:\\Anime\\Ep01.mkv" },
-            new() { NumeroEpisodio = 2, RutaCompleta = "C:\\Anime\\Ep02.mkv" }
-        };
-        sut.CargarVideo("C:\\Anime\\Ep01.mkv", 101, "Frieren", 1, lista);
+        var settingsMock = new Mock<ISettingsService>();
+        settingsMock.Setup(s => s.ObtenerConfiguracion()).Returns(new AppSettings { SubtitulosPorDefecto = false });
+
+        var sut = new ReproductorViewModel(_dbMock.Object, _trackingMock.Object, _authMock.Object, null, settingsMock.Object);
 
         // Act
-        sut.IniciarCuentaRegresivaAutoPlay();
+        sut.EvaluarSubtitulosPorDefecto();
 
         // Assert
-        sut.MostrarAutoPlayCountdown.Should().BeTrue();
-        sut.AutoPlayCountdownSegundos.Should().Be(5);
-        sut.SiguienteEpisodioTitulo.Should().Be("Episodio 2");
-
-        sut.Dispose();
-    }
-
-    [Fact]
-    public void CancelarAutoPlay_DeberiaOcultarCountdown()
-    {
-        // Arrange
-        var sut = CreateSut();
-        var lista = new List<EpisodioItem>
-        {
-            new() { NumeroEpisodio = 1, RutaCompleta = "C:\\Anime\\Ep01.mkv" },
-            new() { NumeroEpisodio = 2, RutaCompleta = "C:\\Anime\\Ep02.mkv" }
-        };
-        sut.CargarVideo("C:\\Anime\\Ep01.mkv", 101, "Frieren", 1, lista);
-        sut.IniciarCuentaRegresivaAutoPlay();
-        sut.MostrarAutoPlayCountdown.Should().BeTrue();
-
-        // Act
-        sut.CancelarAutoPlayCommand.Execute(null);
-
-        // Assert
-        sut.MostrarAutoPlayCountdown.Should().BeFalse();
-
-        sut.Dispose();
-    }
-
-    [Fact]
-    public void ReproducirSiguienteAhora_DeberiaCargarSiguienteEpisodioInmediatamente()
-    {
-        // Arrange
-        var sut = CreateSut();
-        var lista = new List<EpisodioItem>
-        {
-            new() { NumeroEpisodio = 1, RutaCompleta = "C:\\Anime\\Ep01.mkv" },
-            new() { NumeroEpisodio = 2, RutaCompleta = "C:\\Anime\\Ep02.mkv" }
-        };
-        sut.CargarVideo("C:\\Anime\\Ep01.mkv", 101, "Frieren", 1, lista);
-        sut.IniciarCuentaRegresivaAutoPlay();
-
-        // Act
-        sut.ReproducirSiguienteAhoraCommand.Execute(null);
-
-        // Assert
-        sut.MostrarAutoPlayCountdown.Should().BeFalse();
-        sut.TituloEpisodio.Should().Be("Episodio 2");
+        sut.SubtitulosHabilitados.Should().BeFalse();
+        sut.SubtitulosIcon.Should().Be("SubtitlesOutline");
 
         sut.Dispose();
     }

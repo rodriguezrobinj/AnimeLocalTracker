@@ -131,8 +131,8 @@ namespace AnimeLocalTracker.Views
             if (SubtitlesPopup != null && SubtitlesPopup.IsOpen)
                 return;
 
-            // ...ni mientras el usuario esté arrastrando la barra de progreso o esté activa la cuenta regresiva de Auto-Play...
-            if (DataContext is ReproductorViewModel vm && (vm.IsDraggingSlider || vm.MostrarAutoPlayCountdown))
+            // ...ni mientras el usuario esté arrastrando la barra de progreso...
+            if (DataContext is ReproductorViewModel vm && vm.IsDraggingSlider)
                 return;
 
             // ...ni mientras el mouse esté físicamente sobre los controles.

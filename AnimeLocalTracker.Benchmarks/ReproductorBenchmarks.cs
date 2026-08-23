@@ -124,6 +124,7 @@ public class ReproductorBenchmarks
         public Task<bool> GuardarSeguimientoUsuarioAsync(int mediaId, string estado, int progreso, float puntaje, DateTime? fechaInicio, DateTime? fechaFin, string token) => Task.FromResult(true);
         public Task<AniListUser?> ObtenerPerfilUsuarioAsync(string token) => Task.FromResult<AniListUser?>(null);
         public Task<List<AniListMedia>> BuscarAnimesEnVivoAsync(string busqueda, System.Threading.CancellationToken cancellationToken = default) => Task.FromResult(new List<AniListMedia>());
+        public Task<List<AniListMedia>> ObtenerAnimesTendenciaAsync(System.Threading.CancellationToken cancellationToken = default) => Task.FromResult(new List<AniListMedia>());
         public Task<List<AiringEpisode>> ObtenerCalendarioEmisionAsync(List<int> mediaIds, long inicioSemana, long finSemana) => Task.FromResult(new List<AiringEpisode>());
     }
 

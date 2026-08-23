@@ -60,6 +60,7 @@ public partial class App : Application
     {
         // 1. Registramos las Vistas (Ventanas)
         services.AddTransient<MainWindow>();
+        services.AddTransient<AgregarAnimeView>();
         services.AddTransient<ReproductorView>();
         services.AddTransient<DescargasView>();
         services.AddTransient<ConfiguracionView>();
@@ -68,6 +69,7 @@ public partial class App : Application
         // 2. Registramos los ViewModels (Vistas principales como Singleton para preservar estado y no repetir queries al cambiar de pestaña)
         services.AddTransient<MainViewModel>();
         services.AddSingleton<GaleriaViewModel>();
+        services.AddSingleton<AgregarAnimeViewModel>();
         services.AddTransient<DetalleViewModel>();
         services.AddSingleton<CalendarioViewModel>();
         services.AddTransient<ReproductorViewModel>();

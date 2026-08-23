@@ -25,6 +25,9 @@
         <DataTemplate DataType="{x:Type viewmodels:GaleriaViewModel}">
             <local:GaleriaView />
         </DataTemplate>
+        <DataTemplate DataType="{x:Type viewmodels:AgregarAnimeViewModel}">
+            <local:AgregarAnimeView />
+        </DataTemplate>
         <DataTemplate DataType="{x:Type viewmodels:DetalleViewModel}">
             <local:DetalleView />
         </DataTemplate>
@@ -50,175 +53,7 @@
     <Grid x:Name="RootLayout">
         <materialDesign:DialogHost IsOpen="{Binding IsDialogOpen}" CloseOnClickAway="True">
             <materialDesign:DialogHost.DialogContent>
-                <Border Width="640" MaxHeight="680" Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="18" Padding="24">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="*"/>
-                        </Grid.RowDefinitions>
-
-                        <!-- Cabecera moderna -->
-                        <Grid Grid.Row="0" Margin="0,0,0,18">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-
-                            <Border Grid.Column="0" Background="#1E293B" CornerRadius="10" Width="40" Height="40" Margin="0,0,14,0" VerticalAlignment="Center">
-                                <materialDesign:PackIcon Kind="Magnify" Width="22" Height="22" Foreground="#60A5FA" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            </Border>
-
-                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                <TextBlock Text="Buscar y Añadir Anime" FontSize="18" FontWeight="Bold" Foreground="White"/>
-                                <TextBlock Text="Explora y añade títulos desde la base de datos de AniList" FontSize="12" Foreground="#9CA3AF" Margin="0,2,0,0"/>
-                            </StackPanel>
-
-                            <Button Grid.Column="2" Command="{Binding CerrarDialogoBusquedaCommand}" 
-                                    Style="{StaticResource MaterialDesignIconButton}" Width="34" Height="34" Padding="0"
-                                    ToolTip="Cerrar búsqueda">
-                                <materialDesign:PackIcon Kind="Close" Width="18" Height="18" Foreground="#9CA3AF"/>
-                            </Button>
-                        </Grid>
-
-                        <!-- Barra de búsqueda dinámica -->
-                        <Grid Grid.Row="1" Margin="0,0,0,16">
-                            <TextBox Text="{Binding TextoBusqueda, UpdateSourceTrigger=PropertyChanged}"
-                                     materialDesign:HintAssist.Hint="Escribe el nombre del anime (ej. Frieren, Solo Leveling)..."
-                                     materialDesign:HintAssist.IsFloating="False"
-                                     Style="{StaticResource MaterialDesignOutlinedTextBox}"
-                                     materialDesign:TextFieldAssist.HasClearButton="True"
-                                     materialDesign:TextFieldAssist.LeadingIcon="Magnify"
-                                     materialDesign:TextFieldAssist.LeadingIconSize="20"
-                                     Height="46" Padding="12,10"
-                                     FontSize="14" Foreground="White"
-                                     Background="#1F242C" BorderBrush="#2D3748"
-                                     materialDesign:TextFieldAssist.UnderlineBrush="#3B82F6"/>
-                        </Grid>
-
-                        <!-- Spinner de carga -->
-                        <StackPanel Grid.Row="2" Visibility="{Binding IsSearching, Converter={StaticResource BoolToVis}}" 
-                                    HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,40,0,40" Panel.ZIndex="10">
-                            <ProgressBar Style="{StaticResource MaterialDesignCircularProgressBar}" 
-                                         Value="0" IsIndeterminate="True" 
-                                         Foreground="#60A5FA" Width="42" Height="42"/>
-                            <TextBlock Text="Buscando en AniList..." Foreground="#9CA3AF" FontSize="13" Margin="0,12,0,0" HorizontalAlignment="Center"/>
-                        </StackPanel>
-
-                        <!-- Estado Vacío / Sin Resultados -->
-                        <StackPanel Grid.Row="2" Visibility="{Binding BusquedaSinResultados, Converter={StaticResource BoolToVis}}" 
-                                    VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,40,0,40">
-                            <materialDesign:PackIcon Kind="MagnifyClose" Width="56" Height="56" Foreground="#4B5563" HorizontalAlignment="Center"/>
-                            <TextBlock Text="No se encontraron resultados" FontSize="16" Foreground="#E5E7EB" FontWeight="Bold" Margin="0,12,0,0" HorizontalAlignment="Center"/>
-                            <TextBlock Text="Intenta escribir el título en Romaji o en inglés" FontSize="13" Foreground="#9CA3AF" HorizontalAlignment="Center" Margin="0,4,0,0"/>
-                        </StackPanel>
-
-                        <!-- Lista de Resultados -->
-                        <ListBox Grid.Row="2" ItemsSource="{Binding ResultadosBusqueda}" 
-                                 ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                 Background="Transparent" BorderThickness="0" Padding="0,0,4,0"
-                                 HorizontalContentAlignment="Stretch">
-                            <ListBox.ItemContainerStyle>
-                                <Style TargetType="ListBoxItem" BasedOn="{StaticResource MaterialDesignListBoxItem}">
-                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                                    <Setter Property="Padding" Value="0" />
-                                    <Setter Property="Margin" Value="0,0,0,8" />
-                                    <Setter Property="Template">
-                                        <Setter.Value>
-                                            <ControlTemplate TargetType="ListBoxItem">
-                                                <Border Background="Transparent" Name="ItemBorder">
-                                                    <ContentPresenter />
-                                                </Border>
-                                                <ControlTemplate.Triggers>
-                                                    <Trigger Property="IsMouseOver" Value="True">
-                                                        <Setter TargetName="ItemBorder" Property="Background" Value="Transparent" />
-                                                    </Trigger>
-                                                </ControlTemplate.Triggers>
-                                            </ControlTemplate>
-                                        </Setter.Value>
-                                    </Setter>
-                                </Style>
-                            </ListBox.ItemContainerStyle>
-                            
-                            <ListBox.ItemTemplate>
-                                <DataTemplate>
-                                    <Border BorderThickness="1" CornerRadius="12" Padding="12" Cursor="Hand">
-                                        <Border.InputBindings>
-                                            <MouseBinding Gesture="LeftClick" 
-                                                          Command="{Binding DataContext.SeleccionarYCrearAnimeCommand, RelativeSource={RelativeSource AncestorType=materialDesign:DialogHost}}" 
-                                                          CommandParameter="{Binding}" />
-                                        </Border.InputBindings>
-                                        
-                                        <Border.Style>
-                                            <Style TargetType="Border">
-                                                <Setter Property="Background" Value="#1A1F26" />
-                                                <Setter Property="BorderBrush" Value="#262E39" />
-                                                <Style.Triggers>
-                                                    <Trigger Property="IsMouseOver" Value="True">
-                                                        <Setter Property="Background" Value="#222933" />
-                                                        <Setter Property="BorderBrush" Value="#3B82F6" />
-                                                    </Trigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Border.Style>
-
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            
-                                            <!-- Mini portada -->
-                                            <materialDesign:Card Grid.Column="0" Width="55" Height="80" UniformCornerRadius="8" 
-                                                                 materialDesign:ElevationAssist.Elevation="Dp2" Background="#121212" VerticalAlignment="Center">
-                                                <Grid>
-                                                    <Border Style="{StaticResource ShimmerEffectStyle}" CornerRadius="8" />
-                                                    <Image Source="{Binding CoverImage.ExtraLarge, IsAsync=True, TargetNullValue={x:Null}, FallbackValue={x:Null}}" 
-                                                           Stretch="UniformToFill" RenderOptions.BitmapScalingMode="LowQuality"/>
-                                                </Grid>
-                                            </materialDesign:Card>
-                                            
-                                            <!-- Información del Anime -->
-                                            <StackPanel Grid.Column="1" Margin="14,0,10,0" VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding Title.Romaji}" FontWeight="Bold" FontSize="14" Foreground="White"
-                                                           TextWrapping="Wrap" MaxHeight="38" TextTrimming="CharacterEllipsis"/>
-                                                
-                                                <!-- Metadatos: Estado, Año, Episodios -->
-                                                <StackPanel Orientation="Horizontal" Margin="0,6,0,0" VerticalAlignment="Center">
-                                                    <!-- Estado con fondo coloreado -->
-                                                    <Border Background="{Binding StatusColorBrush}" CornerRadius="6" Padding="6,2" Margin="0,0,8,0">
-                                                        <TextBlock Text="{Binding FormattedStatus}" FontSize="10" FontWeight="Bold" Foreground="White"/>
-                                                    </Border>
-                                                    
-                                                    <materialDesign:PackIcon Kind="CalendarBlank" Width="13" Height="13" Foreground="#9CA3AF" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                                                    <TextBlock Text="{Binding FormattedYear}" FontSize="11" Foreground="#9CA3AF" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                                                    
-                                                    <materialDesign:PackIcon Kind="FormatListNumbered" Width="13" Height="13" Foreground="#9CA3AF" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                                                    <TextBlock Text="{Binding FormattedEpisodes}" FontSize="11" Foreground="#9CA3AF" VerticalAlignment="Center"/>
-                                                </StackPanel>
-                                                
-                                                <!-- Géneros -->
-                                                <TextBlock Text="{Binding FormattedGenres}" FontSize="11" Foreground="#6B7280" Margin="0,4,0,0" TextTrimming="CharacterEllipsis"/>
-                                            </StackPanel>
-
-                                            <!-- Botón Acción Añadir -->
-                                            <Border Grid.Column="2" Background="#1E293B" BorderBrush="#3B82F6" BorderThickness="1" CornerRadius="8" 
-                                                    Padding="10,6" VerticalAlignment="Center">
-                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                    <materialDesign:PackIcon Kind="Plus" Width="16" Height="16" Foreground="#60A5FA" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                                                    <TextBlock Text="Añadir" FontWeight="Bold" FontSize="11" Foreground="#93C5FD" VerticalAlignment="Center"/>
-                                                </StackPanel>
-                                            </Border>
-                                        </Grid>
-                                    </Border>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
-                        </ListBox>
-                    </Grid>
-                </Border>
+                <Border Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="18" Padding="24" />
             </materialDesign:DialogHost.DialogContent>
 
             <Grid>
@@ -264,6 +99,36 @@
                                                 <Setter Property="Foreground" Value="#78909C"/>
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding EsGaleriaActiva}" Value="True">
+                                                        <Setter Property="Foreground" Value="#82B1FF"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </materialDesign:PackIcon.Style>
+                                    </materialDesign:PackIcon>
+                                </Button>
+                            </Grid>
+
+                            <!-- BOTÓN AÑADIR ANIME / EXPLORAR -->
+                            <Grid Margin="0,8">
+                                <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#82B1FF" HorizontalAlignment="Left" Margin="-9,0,0,0"
+                                           Visibility="{Binding EsAgregarAnimeActivo, Converter={StaticResource BoolToVis}}"/>
+                                <Button Command="{Binding NavegarAgregarAnimeCommand}" Width="45" Height="45" ToolTip="Añadir Anime">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
+                                            <Setter Property="Background" Value="Transparent"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding EsAgregarAnimeActivo}" Value="True">
+                                                    <Setter Property="Background" Value="#1A82B1FF"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                    <materialDesign:PackIcon Kind="MagnifyPlus" Width="24" Height="24">
+                                        <materialDesign:PackIcon.Style>
+                                            <Style TargetType="materialDesign:PackIcon">
+                                                <Setter Property="Foreground" Value="#78909C"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding EsAgregarAnimeActivo}" Value="True">
                                                         <Setter Property="Foreground" Value="#82B1FF"/>
                                                     </DataTrigger>
                                                 </Style.Triggers>

@@ -65,7 +65,7 @@
                             <Grid>
                                 <Border Style="{StaticResource ShimmerEffectStyle}" CornerRadius="12" />
                                 <Image Source="{Binding AnimeSeleccionado.PortadaVisible, TargetNullValue={x:Null}, FallbackValue={x:Null}, IsAsync=True}" 
-                                       Stretch="UniformToFill" RenderOptions.BitmapScalingMode="LowQuality"/>
+                                       Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" SnapsToDevicePixels="True"/>
                             </Grid>
                         </materialDesign:Card>
 
