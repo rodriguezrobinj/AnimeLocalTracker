@@ -26,7 +26,10 @@ public partial class App : Application
         this.DispatcherUnhandledException += (s, args) =>
         {
             AppLogger.Error("App", "UI Thread Exception", args.Exception);
-            MessageBox.Show($"Error en la aplicación:\n{args.Exception.Message}", 
+            string detalleError = args.Exception.InnerException != null 
+                ? $"{args.Exception.Message}\n\nDetalle: {args.Exception.InnerException.Message}"
+                : args.Exception.Message;
+            MessageBox.Show($"Error en la aplicación:\n{detalleError}", 
                             "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
             args.Handled = true; // Prevenir cierre inesperado
         };
@@ -59,6 +62,7 @@ public partial class App : Application
         services.AddTransient<ReproductorView>();
         services.AddTransient<DescargasView>();
         services.AddTransient<ConfiguracionView>();
+        services.AddTransient<AcercaDeView>();
 
         // 2. Registramos los ViewModels (Vistas principales como Singleton para preservar estado y no repetir queries al cambiar de pestaña)
         services.AddTransient<MainViewModel>();
@@ -68,6 +72,7 @@ public partial class App : Application
         services.AddTransient<ReproductorViewModel>();
         services.AddSingleton<DescargasViewModel>();
         services.AddSingleton<ConfiguracionViewModel>();
+        services.AddSingleton<AcercaDeViewModel>();
 
         // 3. Aquí registraremos los Servicios
         services.AddSingleton<ISettingsService, SettingsService>();
@@ -120,9 +125,6 @@ public partial class App : Application
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
-
-        // Desactivar aceleración de hardware para evitar crashes nativos de WPF en este equipo
-        System.Windows.Media.RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
 
         // Pedimos la instancia del servicio de base de datos
         var dbService = ServiceProvider.GetRequiredService<IDatabaseService>();

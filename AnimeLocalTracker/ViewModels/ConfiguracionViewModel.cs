@@ -14,7 +14,6 @@ namespace AnimeLocalTracker.ViewModels;
 public partial class ConfiguracionViewModel : ObservableObject
 {
     private readonly ISettingsService _settingsService;
-    private readonly IUpdateService _updateService;
     private readonly IAuthService _authService;
     private readonly IDatabaseService _databaseService;
     private readonly IDialogService _dialogService;
@@ -34,26 +33,13 @@ public partial class ConfiguracionViewModel : ObservableObject
     [ObservableProperty] private bool _estaAutenticadoAniList;
     [ObservableProperty] private string _estadoAutenticacionTexto = "No conectado";
 
-    // === ACERCA DE Y NOVEDADES DESDE GITHUB (CACHÉ LOCAL) ===
-    public string VersionAppTexto => _updateService.ObtenerVersionActual();
-    public string RepositorioUrl => "https://github.com/rodriguezrobinj/AnimeLocalTracker";
-    public string AutorTexto => "Robin Rodriguez";
-    public string LicenciaTexto => "Licencia MIT - Software de Código Abierto";
-
-    [ObservableProperty] private string _tituloVersionTexto = "AnimeLocalTracker";
-    [ObservableProperty] private string _fechaVersionTexto = string.Empty;
-    [ObservableProperty] private string _novedadesTexto = "• Gestor y reproductor nativo multimedia para colecciones de anime locales.\n• Auto-tracking local e integración bidireccional con AniList.\n• Motor acelerado por hardware con Flyleaf y DirectX.\n• Actualizaciones automáticas con Velopack y GitHub Releases.";
-    [ObservableProperty] private bool _isCargandoNovedades = false;
-
     public ConfiguracionViewModel(
         ISettingsService settingsService,
-        IUpdateService updateService,
         IAuthService authService,
         IDatabaseService databaseService,
         IDialogService dialogService)
     {
         _settingsService = settingsService;
-        _updateService = updateService;
         _authService = authService;
         _databaseService = databaseService;
         _dialogService = dialogService;
@@ -73,35 +59,6 @@ public partial class ConfiguracionViewModel : ObservableObject
         CalcularEspacioDisco(RutaBaseAnimes);
         _ = ActualizarEstadisticasBibliotecaAsync();
         ActualizarEstadoAutenticacion();
-        _ = CargarNovedadesAsync();
-    }
-
-    public async Task CargarNovedadesAsync(bool forzar = false)
-    {
-        try
-        {
-            IsCargandoNovedades = true;
-            if (_updateService != null)
-            {
-                var release = await _updateService.ObtenerInfoUltimaVersionAsync(forzarActualizacion: forzar);
-                if (release != null)
-                {
-                    TituloVersionTexto = !string.IsNullOrWhiteSpace(release.Titulo) ? release.Titulo : "AnimeLocalTracker";
-                    NovedadesTexto = !string.IsNullOrWhiteSpace(release.NotasVersion) ? release.NotasVersion : NovedadesTexto;
-                    FechaVersionTexto = release.FechaPublicacion.HasValue
-                        ? $"Publicado: {release.FechaPublicacion.Value:dd/MM/yyyy}"
-                        : string.Empty;
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Debug("ConfiguracionViewModel", $"Error cargando novedades: {ex.Message}");
-        }
-        finally
-        {
-            IsCargandoNovedades = false;
-        }
     }
 
     private void ActualizarEstadoAutenticacion()
@@ -255,30 +212,6 @@ public partial class ConfiguracionViewModel : ObservableObject
         catch (Exception ex)
         {
             AppLogger.Error("ConfiguracionViewModel", "Error guardando preferencias", ex);
-        }
-    }
-
-    [RelayCommand]
-    public async Task BuscarActualizacionesAsync()
-    {
-        await _updateService.ComprobarActualizacionesAsync(esManual: true);
-        await CargarNovedadesAsync(forzar: true);
-    }
-
-    [RelayCommand]
-    public void AbrirRepositorioGitHub()
-    {
-        try
-        {
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = RepositorioUrl,
-                UseShellExecute = true
-            });
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Error("ConfiguracionViewModel", "Error abriendo repositorio en navegador", ex);
         }
     }
 

@@ -366,19 +366,21 @@
             <TextBlock Text="Intenta usar otros términos de búsqueda o cambia el filtro de estado." FontSize="14" Foreground="{DynamicResource MaterialDesignBodyLight}" HorizontalAlignment="Center" Margin="0,10,0,0" Opacity="0.8"/>
         </StackPanel>
 
-        <!-- Lista virtualizada y acelerada por hardware -->
+        <!-- Lista virtualizada y acelerada por hardware (60fps+) -->
         <ListBox Grid.Row="2" ItemsSource="{Binding BibliotecaFiltrada}" Margin="-14,0,-14,0" Padding="0"
                  Visibility="{Binding BibliotecaVacia, Converter={StaticResource InverseBoolToVis}}"
                  Background="Transparent" BorderThickness="0" 
                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                  ScrollViewer.VerticalScrollBarVisibility="Auto"
                  ScrollViewer.CanContentScroll="True"
+                 ScrollViewer.PanningMode="Both"
                  ScrollViewer.IsDeferredScrollingEnabled="False"
                  VirtualizingPanel.IsVirtualizing="True"
                  VirtualizingPanel.VirtualizationMode="Recycling"
                  VirtualizingPanel.ScrollUnit="Pixel"
                  VirtualizingPanel.CacheLengthUnit="Item"
-                 VirtualizingPanel.CacheLength="4,4">
+                 VirtualizingPanel.CacheLength="4,4"
+                 RenderOptions.ClearTypeHint="Enabled">
             <ListBox.ItemsPanel>
                 <ItemsPanelTemplate>
                     <vwp:VirtualizingWrapPanel Orientation="Horizontal" SpacingMode="None" />
@@ -453,8 +455,8 @@
                                 <!-- Fondo estático oscuro para carga instantánea sin animación infinita -->
                                 <Border Background="#1C1C1E" CornerRadius="10" />
 
-                                <!-- Portada precargada y congelada en memoria para 0ms de latencia en scroll -->
-                                <Image Source="{Binding PortadaImagen}" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" />
+                                <!-- Portada precargada y congelada en memoria con escalado acelerado por GPU -->
+                                <Image Source="{Binding PortadaImagen}" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="LowQuality" />
                                 
                                 <!-- OVERLAY DE SELECCIÓN -->
                                 <Border Background="#66000000" Visibility="{Binding EstaSeleccionado, Converter={StaticResource BoolToVis}}"/>

@@ -17,6 +17,7 @@ public partial class MainViewModel : ObservableObject,
     IRecipient<NavegarMensaje_Calendario>,
     IRecipient<NavegarMensaje_Descargas>,
     IRecipient<NavegarMensaje_Configuracion>,
+    IRecipient<NavegarMensaje_AcercaDe>,
     IRecipient<AbrirBuscadorMensaje>,
     IRecipient<MostrarDialogoRequestMessage>,
     IRecipient<NavegarMensaje_Reproductor>,
@@ -38,12 +39,14 @@ public partial class MainViewModel : ObservableObject,
     [NotifyPropertyChangedFor(nameof(EsCalendarioActivo))]
     [NotifyPropertyChangedFor(nameof(EsDescargasActivas))]
     [NotifyPropertyChangedFor(nameof(EsConfiguracionActiva))]
+    [NotifyPropertyChangedFor(nameof(EsAcercaDeActivo))]
     private ObservableObject _vistaActual = null!;
 
     public bool EsGaleriaActiva => VistaActual is GaleriaViewModel || VistaActual is DetalleViewModel;
     public bool EsCalendarioActivo => VistaActual is CalendarioViewModel;
     public bool EsDescargasActivas => VistaActual is DescargasViewModel;
     public bool EsConfiguracionActiva => VistaActual is ConfiguracionViewModel;
+    public bool EsAcercaDeActivo => VistaActual is AcercaDeViewModel;
 
     // === BADGE DE DESCARGAS ===
     [ObservableProperty]
@@ -243,6 +246,24 @@ public partial class MainViewModel : ObservableObject,
     public void Receive(NavegarMensaje_Configuracion message)
     {
         NavegarConfiguracion();
+    }
+
+    [RelayCommand]
+    private void NavegarAcercaDe()
+    {
+        try 
+        {
+            VistaActual = _serviceProvider.GetRequiredService<AcercaDeViewModel>();
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("MainViewModel", "Error navegando a acerca de", ex);
+        }
+    }
+
+    public void Receive(NavegarMensaje_AcercaDe message)
+    {
+        NavegarAcercaDe();
     }
 
     public void Receive(AbrirBuscadorMensaje message)

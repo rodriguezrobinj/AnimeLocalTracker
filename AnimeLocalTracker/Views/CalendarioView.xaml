@@ -19,7 +19,7 @@
                     <Border Grid.Column="0" CornerRadius="8,0,0,8" ClipToBounds="True">
                         <Grid>
                             <Border Style="{StaticResource ShimmerEffectStyle}" />
-                            <Image Source="{Binding UrlPortada, TargetNullValue={x:Null}, FallbackValue={x:Null}, IsAsync=True}" Stretch="UniformToFill" Height="80"/>
+                            <Image Source="{Binding UrlPortada, TargetNullValue={x:Null}, FallbackValue={x:Null}, IsAsync=True}" Stretch="UniformToFill" Height="80" RenderOptions.BitmapScalingMode="LowQuality"/>
                         </Grid>
                     </Border>
                     
