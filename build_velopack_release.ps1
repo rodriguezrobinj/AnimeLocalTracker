@@ -52,7 +52,7 @@ vpk pack `
     --packDir $publishDir `
     --packAuthors "Robin Rodriguez" `
     --packTitle "AnimeLocalTracker" `
-    --mainExename "AnimeLocalTracker.exe" `
+    --mainExe "AnimeLocalTracker.exe" `
     --outputDir $releasesDir `
     --channel $Channel
 
