@@ -113,7 +113,7 @@ public class AgregarAnimeViewModelTests : IDisposable
 
         AnimeAñadidoMensaje? mensajeRecibido = null;
         WeakReferenceMessenger.Default.UnregisterAll(this);
-        WeakReferenceMessenger.Default.Register<AnimeAñadidoMensaje>(this, (r, m) =>
+        WeakReferenceMessenger.Default.Register<AgregarAnimeViewModelTests, AnimeAñadidoMensaje>(this, (r, m) =>
         {
             mensajeRecibido = m;
         });
@@ -127,6 +127,7 @@ public class AgregarAnimeViewModelTests : IDisposable
         mensajeRecibido.Should().NotBeNull();
         mensajeRecibido!.NuevoAnime.AniListId.Should().Be(100);
 
+        GC.KeepAlive(this);
         WeakReferenceMessenger.Default.UnregisterAll(this);
     }
 

@@ -1,0 +1,18 @@
+<Project>
+    <PropertyGroup Condition="$(MSBuildProjectName.EndsWith('_wpftmp'))">
+        <EnableSourceLink>false</EnableSourceLink>
+        <EnableSourceControlManagerQueries>false</EnableSourceControlManagerQueries>
+        <StartupObject></StartupObject>
+        <OutputType>Library</OutputType>
+    </PropertyGroup>
+
+    <!-- Limpieza garantizada de caché de compilación XAML en Clean y Rebuild -->
+    <PropertyGroup>
+        <CleanDependsOn>$(CleanDependsOn);CleanMarkupCompileCache</CleanDependsOn>
+    </PropertyGroup>
+
+    <Target Name="CleanMarkupCompileCache">
+        <Delete Files="$(IntermediateOutputPath)$(TargetName)_MarkupCompile.cache;$(IntermediateOutputPath)$(TargetName)_MarkupCompile.lref" 
+                Condition="Exists('$(IntermediateOutputPath)$(TargetName)_MarkupCompile.cache')" />
+    </Target>
+</Project>

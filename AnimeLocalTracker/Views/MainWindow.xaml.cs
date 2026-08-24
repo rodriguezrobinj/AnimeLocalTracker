@@ -16,6 +16,31 @@ public partial class MainWindow : Window
         InitializeComponent();
         _viewModel = viewModel;
         DataContext = _viewModel; 
+
+        ActualizarVista(_viewModel.VistaActual);
+        _viewModel.PropertyChanged += (s, e) =>
+        {
+            if (e.PropertyName == nameof(MainViewModel.VistaActual))
+            {
+                ActualizarVista(_viewModel.VistaActual);
+            }
+        };
+    }
+
+    private void ActualizarVista(object? viewModel)
+    {
+        ContenedorVistaPrincipal.Content = viewModel switch
+        {
+            GaleriaViewModel vm => new GaleriaView { DataContext = vm },
+            DetalleViewModel vm => new DetalleView { DataContext = vm },
+            AgregarAnimeViewModel vm => new AgregarAnimeView { DataContext = vm },
+            CalendarioViewModel vm => new CalendarioView { DataContext = vm },
+            ReproductorViewModel vm => new ReproductorView { DataContext = vm },
+            DescargasViewModel vm => new DescargasView { DataContext = vm },
+            ConfiguracionViewModel vm => new ConfiguracionView { DataContext = vm },
+            AcercaDeViewModel vm => new AcercaDeView { DataContext = vm },
+            _ => null
+        };
     }
 
     // ═══════════════════════════════════════════════════════════════

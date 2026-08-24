@@ -48,6 +48,7 @@ public partial class AnimeItem : ObservableObject
     [ObservableProperty]
     private string _estadoUsuario = string.Empty;
 
+#pragma warning disable CS0657 // 'property' target is forwarded to the generated property by CommunityToolkit.Mvvm
     // Estado transitorio para la UI de Selección Múltiple
     [property: Ignore]
     [ObservableProperty]
@@ -66,6 +67,7 @@ public partial class AnimeItem : ObservableObject
     [NotifyPropertyChangedFor(nameof(TieneNuevosEpisodios))]
     [NotifyPropertyChangedFor(nameof(ProgresoEpisodiosTexto))]
     private int _episodiosVistos;
+#pragma warning restore CS0657
 
     [Ignore]
     public int NuevosEpisodios => TotalEpisodios > EpisodiosVistos ? (TotalEpisodios - EpisodiosVistos) : 0;

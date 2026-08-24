@@ -12,6 +12,33 @@
         "/consoleloggerparameters:NoSummary",
         "/p:UseSharedCompilation=false"
       ],
+      "problemMatcher": "$msCompile",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    },
+    {
+      "label": "run",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "run",
+        "--project",
+        "${workspaceFolder}/AnimeLocalTracker/AnimeLocalTracker.csproj",
+        "--no-build"
+      ],
+      "dependsOn": "build",
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "clean",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "clean",
+        "${workspaceFolder}/AnimeLocalTracker/AnimeLocalTracker.csproj"
+      ],
       "problemMatcher": "$msCompile"
     }
   ]

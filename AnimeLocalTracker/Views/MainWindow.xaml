@@ -3,8 +3,6 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
-        xmlns:local="clr-namespace:AnimeLocalTracker.Views"
-        xmlns:viewmodels="clr-namespace:AnimeLocalTracker.ViewModels"
         Title="Mi Biblioteca" Height="700" Width="1100"
         WindowStartupLocation="CenterScreen"
         TextElement.Foreground="{DynamicResource MaterialDesignBody}"
@@ -21,32 +19,6 @@
     </WindowChrome.WindowChrome>
 
     <Window.Resources>
-        <!-- DataTemplates para enrutar el ContentControl hacia el View correcto -->
-        <DataTemplate DataType="{x:Type viewmodels:GaleriaViewModel}">
-            <local:GaleriaView />
-        </DataTemplate>
-        <DataTemplate DataType="{x:Type viewmodels:AgregarAnimeViewModel}">
-            <local:AgregarAnimeView />
-        </DataTemplate>
-        <DataTemplate DataType="{x:Type viewmodels:DetalleViewModel}">
-            <local:DetalleView />
-        </DataTemplate>
-        <DataTemplate DataType="{x:Type viewmodels:CalendarioViewModel}">
-            <local:CalendarioView />
-        </DataTemplate>
-        <DataTemplate DataType="{x:Type viewmodels:ReproductorViewModel}">
-            <local:ReproductorView />
-        </DataTemplate>
-        <DataTemplate DataType="{x:Type viewmodels:DescargasViewModel}">
-            <local:DescargasView />
-        </DataTemplate>
-        <DataTemplate DataType="{x:Type viewmodels:ConfiguracionViewModel}">
-            <local:ConfiguracionView />
-        </DataTemplate>
-        <DataTemplate DataType="{x:Type viewmodels:AcercaDeViewModel}">
-            <local:AcercaDeView />
-        </DataTemplate>
-        
         <Style TargetType="ScrollBar" BasedOn="{StaticResource MaterialDesignScrollBarMinimal}" />
     </Window.Resources>
     
@@ -274,9 +246,9 @@
                     </Grid>
                 </Border>
 
-                <!-- CONTENIDO PRINCIPAL: Solo un ContentControl que se actualiza según la propiedad VistaActual -->
+                <!-- CONTENIDO PRINCIPAL: Gestionado directamente por MainWindow.xaml.cs según VistaActual -->
                 <!-- Sin margen superior para que el fondo (ej. desenfoque) cubra toda la ventana detrás de la barra de título -->
-                <ContentControl Grid.Column="0" Grid.ColumnSpan="2" Content="{Binding VistaActual}" />
+                <ContentControl x:Name="ContenedorVistaPrincipal" Grid.Column="0" Grid.ColumnSpan="2" />
                 
                 <!-- BARRA DE TÍTULO CUSTOM -->
                 <Grid Grid.Column="0" Grid.ColumnSpan="2" x:Name="BarraTitulo" Height="45" Background="Transparent" VerticalAlignment="Top" Panel.ZIndex="20">

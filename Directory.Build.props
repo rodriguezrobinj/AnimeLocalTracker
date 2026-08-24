@@ -1,0 +1,6 @@
+<Project>
+    <PropertyGroup>
+        <!-- Evita condiciones de carrera entre proyectos de la solución al compilar proyectos WPF con referencias cruzadas -->
+        <BuildInParallel>false</BuildInParallel>
+    </PropertyGroup>
+</Project>

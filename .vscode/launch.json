@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Launch AnimeLocalTracker (.NET 8 WPF)",
+      "name": "Debug AnimeLocalTracker (NetCoreDbg)",
       "type": "coreclr",
       "request": "launch",
       "preLaunchTask": "build",
@@ -11,7 +11,14 @@
       "cwd": "${workspaceFolder}/AnimeLocalTracker",
       "stopAtEntry": false,
       "console": "internalConsole",
-      "justMyCode": true
+      "pipeTransport": {
+        "pipeProgram": "${env:LOCALAPPDATA}/Microsoft/WinGet/Packages/Samsung.NetCoreDbg_Microsoft.Winget.Source_8wekyb3d8bbwe/netcoredbg/netcoredbg.exe",
+        "pipeArgs": [
+          "--interpreter=vscode"
+        ],
+        "debuggerPath": "${env:LOCALAPPDATA}/Microsoft/WinGet/Packages/Samsung.NetCoreDbg_Microsoft.Winget.Source_8wekyb3d8bbwe/netcoredbg/netcoredbg.exe",
+        "pipeCwd": "${workspaceFolder}"
+      }
     }
   ]
 }

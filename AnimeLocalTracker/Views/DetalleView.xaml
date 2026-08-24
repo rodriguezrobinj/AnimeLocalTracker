@@ -28,8 +28,8 @@
             </Border>
         </Grid>
 
-        <!-- 2. CONTENIDO PRINCIPAL: DISTRIBUCIÓN EN 2 COLUMNAS (INFO IZQUIERDA / EPISODIOS DERECHA) -->
-        <Grid MaxWidth="1400">
+        <!-- 2. CONTENIDO PRINCIPAL: DISTRIBUCIÓN EN 2 COLUMNAS (PORTADA Y METADATOS IZQUIERDA / INFO Y EPISODIOS DERECHA) -->
+        <Grid MaxWidth="1450">
             <Grid.Style>
                 <Style TargetType="Grid">
                     <Setter Property="Margin" Value="95,65,30,25"/>
@@ -42,66 +42,39 @@
             </Grid.Style>
 
             <Grid.ColumnDefinitions>
-                <!-- COLUMNA IZQUIERDA: INFORMACIÓN, PÓSTER, METADATOS Y ACCIONES -->
-                <ColumnDefinition Width="440"/>
-                <!-- COLUMNA DERECHA: LISTA DE EPISODIOS Y CONTROLES VERTICALES -->
+                <!-- COLUMNA IZQUIERDA: PÓSTER DESTACADO, ACCIONES Y BADGES -->
+                <ColumnDefinition Width="285"/>
+                <!-- COLUMNA DERECHA: TÍTULO, SINOPSIS, GÉNEROS Y LISTA DE EPISODIOS -->
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <!-- ================= COLUMNA IZQUIERDA (INFORMACIÓN) ================= -->
-            <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" Margin="0,0,25,0" Padding="0,0,10,0">
-                <StackPanel>
+            <!-- ================= COLUMNA IZQUIERDA (PÓSTER Y ACCIONES) ================= -->
+            <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="0,0,30,0" Padding="0,0,4,0">
+                <StackPanel HorizontalAlignment="Stretch">
                     
-                    <!-- PÓSTER Y DATOS CABECERA -->
-                    <Grid Margin="0,0,0,18">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
+                    <!-- PÓSTER DESTACADO Y GRANDE -->
+                    <materialDesign:Card Width="255" Height="365" UniformCornerRadius="16" 
+                                         materialDesign:ElevationAssist.Elevation="Dp8" Background="#1A1A1A" 
+                                         HorizontalAlignment="Center" Margin="0,0,0,12">
+                        <Grid>
+                            <Border Style="{StaticResource ShimmerEffectStyle}" CornerRadius="16" />
+                            <Image Source="{Binding AnimeSeleccionado.PortadaVisible, TargetNullValue={x:Null}, FallbackValue={x:Null}, IsAsync=True}" 
+                                   Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" SnapsToDevicePixels="True"/>
+                        </Grid>
+                    </materialDesign:Card>
 
-                        <!-- PÓSTER -->
-                        <materialDesign:Card Grid.Column="0" Width="145" Height="210" UniformCornerRadius="12" 
-                                             materialDesign:ElevationAssist.Elevation="Dp6" Background="#1A1A1A" VerticalAlignment="Top">
-                            <Grid>
-                                <Border Style="{StaticResource ShimmerEffectStyle}" CornerRadius="12" />
-                                <Image Source="{Binding AnimeSeleccionado.PortadaVisible, TargetNullValue={x:Null}, FallbackValue={x:Null}, IsAsync=True}" 
-                                       Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" SnapsToDevicePixels="True"/>
-                            </Grid>
-                        </materialDesign:Card>
-
-                        <!-- TÍTULO Y ESTUDIO -->
-                        <StackPanel Grid.Column="1" Margin="18,0,0,0" VerticalAlignment="Top">
-                            <TextBlock Text="{Binding AnimeSeleccionado.Titulo}" 
-                                       FontSize="20" FontWeight="Bold" Foreground="White"
-                                       TextWrapping="Wrap" MaxHeight="60" TextTrimming="CharacterEllipsis"
-                                       ToolTip="{Binding AnimeSeleccionado.Titulo}"/>
-
-                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0" VerticalAlignment="Center">
-                                <materialDesign:PackIcon Kind="AccountOutline" Width="15" Height="15" Foreground="#9CA3AF" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                                <TextBlock Text="{Binding AnimeSeleccionado.NombresAlternativos, FallbackValue='Estudio desconocido', TargetNullValue='Estudio desconocido'}" 
-                                           FontSize="12" Foreground="#9CA3AF" TextTrimming="CharacterEllipsis" MaxWidth="240" VerticalAlignment="Center"/>
-                            </StackPanel>
-
-                            <StackPanel Orientation="Horizontal" Margin="0,6,0,0" VerticalAlignment="Center">
-                                <materialDesign:PackIcon Kind="ClockOutline" Width="14" Height="14" Foreground="{Binding AnimeSeleccionado.ColorEstado}" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                                <TextBlock Text="{Binding AnimeSeleccionado.EstadoVisual}" FontSize="12" Foreground="{Binding AnimeSeleccionado.ColorEstado}" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                <TextBlock Text=" • " Foreground="#6B7280" VerticalAlignment="Center"/>
-                                <TextBlock Text="{Binding AnimeSeleccionado.ProgresoEpisodiosTexto}" FontSize="12" Foreground="#9CA3AF" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </StackPanel>
-                    </Grid>
-
-                    <!-- BARRA DE ACCIONES HORIZONTAL (Botones principales dinámicos según autenticación) -->
-                    <Border Background="#1A1F26" CornerRadius="12" Padding="8,8" Margin="0,0,0,18" BorderBrush="#2D3748" BorderThickness="1">
+                    <!-- BARRA DE ACCIONES ELEGANTE INTEGRADA (BAJO EL PÓSTER) -->
+                    <Border Background="#161B22" CornerRadius="12" Padding="4" Margin="0,0,0,0" BorderBrush="#262D38" BorderThickness="1" HorizontalAlignment="Center" Width="255">
                         <UniformGrid Rows="1" HorizontalAlignment="Stretch">
-                            <!-- 1. EN BIBLIOTECA (Corazón - Clic para eliminar de la biblioteca con confirmación) -->
+                            <!-- 1. EN BIBLIOTECA -->
                             <Button Command="{Binding EliminarAnimeActualCommand}"
                                     Style="{StaticResource MaterialDesignFlatButton}"
-                                    Padding="6,6" Height="Auto"
+                                    Padding="4,8" Height="Auto"
+                                    materialDesign:ButtonAssist.CornerRadius="8"
                                     ToolTip="En biblioteca (Clic para eliminar de la biblioteca)">
                                 <StackPanel HorizontalAlignment="Center">
-                                    <materialDesign:PackIcon Kind="Heart" Width="22" Height="22" HorizontalAlignment="Center" Foreground="#60A5FA"/>
-                                    <TextBlock Text="En biblioteca" FontSize="11" FontWeight="SemiBold" Foreground="#93C5FD" Margin="0,4,0,0" HorizontalAlignment="Center" TextAlignment="Center"/>
+                                    <materialDesign:PackIcon Kind="Heart" Width="20" Height="20" HorizontalAlignment="Center" Foreground="#F43F5E"/>
+                                    <TextBlock Text="Biblioteca" FontSize="11" FontWeight="SemiBold" Foreground="#E2E8F0" Margin="0,4,0,0" HorizontalAlignment="Center" TextAlignment="Center"/>
                                 </StackPanel>
                             </Button>
 
@@ -109,29 +82,104 @@
                             <Button Command="{Binding AbrirEditorSeguimientoCommand}"
                                     Style="{StaticResource MaterialDesignFlatButton}"
                                     Visibility="{Binding EstaConectado, Converter={StaticResource BoolToVis}}"
-                                    Padding="6,6" Height="Auto"
+                                    Padding="4,8" Height="Auto"
+                                    materialDesign:ButtonAssist.CornerRadius="8"
                                     ToolTip="Gestionar seguimiento y progreso en AniList">
                                 <StackPanel HorizontalAlignment="Center">
-                                    <materialDesign:PackIcon Kind="Sync" Width="22" Height="22" HorizontalAlignment="Center" Foreground="#60A5FA"/>
-                                    <TextBlock Text="Seguimiento" FontSize="11" FontWeight="SemiBold" Foreground="#93C5FD" Margin="0,4,0,0" HorizontalAlignment="Center" TextAlignment="Center"/>
+                                    <materialDesign:PackIcon Kind="Sync" Width="20" Height="20" HorizontalAlignment="Center" Foreground="#60A5FA"/>
+                                    <TextBlock Text="Seguimiento" FontSize="11" FontWeight="SemiBold" Foreground="#E2E8F0" Margin="0,4,0,0" HorizontalAlignment="Center" TextAlignment="Center"/>
                                 </StackPanel>
                             </Button>
 
                             <!-- 3. WEBVIEW -->
                             <Button Command="{Binding AbrirWebViewCommand}"
                                     Style="{StaticResource MaterialDesignFlatButton}"
-                                    Padding="6,6" Height="Auto"
+                                    Padding="4,8" Height="Auto"
+                                    materialDesign:ButtonAssist.CornerRadius="8"
                                     ToolTip="Abrir ficha oficial en el navegador web">
                                 <StackPanel HorizontalAlignment="Center">
-                                    <materialDesign:PackIcon Kind="Earth" Width="22" Height="22" HorizontalAlignment="Center" Foreground="#60A5FA"/>
-                                    <TextBlock Text="WebView" FontSize="11" FontWeight="SemiBold" Foreground="#93C5FD" Margin="0,4,0,0" HorizontalAlignment="Center" TextAlignment="Center"/>
+                                    <materialDesign:PackIcon Kind="Earth" Width="20" Height="20" HorizontalAlignment="Center" Foreground="#60A5FA"/>
+                                    <TextBlock Text="WebView" FontSize="11" FontWeight="SemiBold" Foreground="#E2E8F0" Margin="0,4,0,0" HorizontalAlignment="Center" TextAlignment="Center"/>
                                 </StackPanel>
                             </Button>
                         </UniformGrid>
                     </Border>
 
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- ================= COLUMNA DERECHA (INFO PRINCIPAL + EPISODIOS) ================= -->
+            <Grid Grid.Column="1">
+                <Grid.RowDefinitions>
+                    <!-- FILA 0: TÍTULO, SUBTÍTULO, BADGES, SINOPSIS -->
+                    <RowDefinition Height="Auto"/>
+                    <!-- FILA 1: CABECERA Y LISTA DE EPISODIOS -->
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- BLOQUE DE INFORMACIÓN (TÍTULO, METADATOS, BADGES, SINOPSIS) -->
+                <StackPanel Grid.Row="0" Margin="0,0,0,10">
+                    <!-- TÍTULO PRINCIPAL -->
+                    <TextBlock Text="{Binding AnimeSeleccionado.Titulo}" 
+                               FontSize="26" FontWeight="Bold" Foreground="White"
+                               TextWrapping="Wrap" LineHeight="32"
+                               ToolTip="{Binding AnimeSeleccionado.Titulo}"
+                               Margin="0,0,0,4"/>
+
+                    <!-- SUBTÍTULO / NOMBRES ALTERNATIVOS Y ESTUDIO -->
+                    <TextBlock Text="{Binding AnimeSeleccionado.NombresAlternativos}" 
+                               FontSize="12" Foreground="#9CA3AF" 
+                               TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
+                               Margin="0,0,0,10">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Visible"/>
+                                <Style.Triggers>
+                                    <Trigger Property="Text" Value="">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+
+                    <!-- FILA UNIFICADA DE BADGES (ESTADO, PROGRESO Y GÉNEROS) -->
+                    <WrapPanel Orientation="Horizontal" Margin="0,0,0,10">
+                        <!-- Badge Estado (En Emisión / Finalizado) -->
+                        <Border Background="#1A10B981" BorderBrush="#3310B981" BorderThickness="1" CornerRadius="8" Padding="10,4" Margin="0,0,8,6" VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <materialDesign:PackIcon Kind="ClockOutline" Width="13" Height="13" Foreground="{Binding AnimeSeleccionado.ColorEstado}" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                <TextBlock Text="{Binding AnimeSeleccionado.EstadoVisual}" FontSize="11" Foreground="{Binding AnimeSeleccionado.ColorEstado}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Badge Progreso (Episodios vistos) -->
+                        <Border Background="#1A3B82F6" BorderBrush="#333B82F6" BorderThickness="1" CornerRadius="8" Padding="10,4" Margin="0,0,8,6" VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <materialDesign:PackIcon Kind="EyeOutline" Width="13" Height="13" Foreground="#60A5FA" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                <TextBlock Text="{Binding AnimeSeleccionado.ProgresoEpisodiosTexto}" FontSize="11" Foreground="#93C5FD" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Chips de Géneros -->
+                        <ItemsControl ItemsSource="{Binding AnimeSeleccionado.GenerosLista}" VerticalAlignment="Center">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel Orientation="Horizontal" VerticalAlignment="Center"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="#1F242C" BorderBrush="#2D333B" BorderThickness="1" CornerRadius="8" Padding="10,4" Margin="0,0,6,6" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding}" Foreground="#9CA3AF" FontWeight="Medium" FontSize="11"/>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </WrapPanel>
+
                     <!-- SINOPSIS LIMPIA EXPANDIBLE INTELIGENTE -->
-                    <StackPanel Margin="0,0,0,15">
+                    <StackPanel Margin="0,0,0,8">
                         <TextBlock Text="{Binding AnimeSeleccionado.SinopsisLimpia}" 
                                    TextWrapping="Wrap" FontSize="13" LineHeight="20"
                                    Foreground="#D1D5DB" Opacity="0.9">
@@ -140,7 +188,7 @@
                                     <Setter Property="MaxHeight" Value="1000"/>
                                     <Setter Property="TextTrimming" Value="None"/>
                                     <Style.Triggers>
-                                        <!-- Cuando la sinopsis es larga y NO está expandida, limitamos la altura -->
+                                        <!-- Cuando la sinopsis es larga y NO está expandida, limitamos la altura a 3 líneas aprox -->
                                         <MultiDataTrigger>
                                             <MultiDataTrigger.Conditions>
                                                 <Condition Binding="{Binding AnimeSeleccionado.TieneSinopsisLarga}" Value="True"/>
@@ -158,7 +206,7 @@
                         <Button Command="{Binding AlternarSinopsisCommand}"
                                 Style="{StaticResource MaterialDesignFlatButton}"
                                 Visibility="{Binding AnimeSeleccionado.TieneSinopsisLarga, Converter={StaticResource BoolToVis}}"
-                                HorizontalAlignment="Center" Height="22" Padding="6,0" Margin="0,2,0,5">
+                                HorizontalAlignment="Left" Height="22" Padding="6,0" Margin="0,2,0,0">
                             <materialDesign:PackIcon Foreground="#9CA3AF" Width="18" Height="18">
                                 <materialDesign:PackIcon.Style>
                                     <Style TargetType="materialDesign:PackIcon">
@@ -174,98 +222,84 @@
                         </Button>
                     </StackPanel>
 
-                    <!-- GÉNEROS -->
-                    <ItemsControl ItemsSource="{Binding AnimeSeleccionado.GenerosLista}" Margin="0,0,0,10">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <WrapPanel Orientation="Horizontal" />
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Border Background="#1F242C" BorderBrush="#2D333B" BorderThickness="1" CornerRadius="8" Padding="12,5" Margin="0,0,6,6">
-                                    <TextBlock Text="{Binding}" Foreground="#9CA3AF" FontWeight="Medium" FontSize="11"/>
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+                    <!-- DIVISOR ELEGANTE -->
+                    <Border Height="1" Background="#262D38" Margin="0,4,0,12"/>
                 </StackPanel>
-            </ScrollViewer>
 
-            <!-- ================= COLUMNA DERECHA (EPISODIOS Y CONTROLES VERTICALES) ================= -->
-            <Grid Grid.Column="1">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                </Grid.RowDefinitions>
+                <!-- CABECERA Y LISTA DE EPISODIOS VERTICAL -->
+                <Grid Grid.Row="1">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
 
-                <!-- CABECERA DE LA LISTA DE EPISODIOS -->
-                <Grid Grid.Row="0" Margin="0,0,0,15">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
+                    <!-- CABECERA DE LA LISTA DE EPISODIOS -->
+                    <Grid Grid.Row="0" Margin="0,0,0,15">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
 
-                    <!-- CONTEO DE EPISODIOS -->
-                    <TextBlock Grid.Column="0" Text="{Binding EpisodiosDelAnime.Count, StringFormat='{}{0} episodios'}" 
-                               FontSize="17" FontWeight="Bold" Foreground="White" VerticalAlignment="Center" Margin="0,0,15,0"/>
+                        <!-- CONTEO DE EPISODIOS -->
+                        <TextBlock Grid.Column="0" Text="{Binding EpisodiosDelAnime.Count, StringFormat='{}{0} episodios'}" 
+                                   FontSize="17" FontWeight="Bold" Foreground="White" VerticalAlignment="Center" Margin="0,0,15,0"/>
 
-                    <!-- FILTROS Y ORDENACIÓN -->
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                        <ComboBox ItemsSource="{Binding OpcionesFiltro}" SelectedItem="{Binding FiltroEpisodios}" 
-                                  Width="120" materialDesign:TextFieldAssist.HasClearButton="False" 
-                                  Foreground="White"
-                                  Style="{StaticResource MaterialDesignOutlinedComboBox}" Padding="8,5" Margin="0,0,8,0"/>
-                                  
-                        <ToggleButton IsChecked="{Binding OrdenAscendente}" Style="{StaticResource MaterialDesignActionToggleButton}"
-                                      Content="{materialDesign:PackIcon Kind=SortDescending, Size=18}"
-                                      materialDesign:ToggleButtonAssist.OnContent="{materialDesign:PackIcon Kind=SortAscending, Size=18}"
-                                      ToolTip="Cambiar orden ascendente/descendente" Width="34" Height="34" Background="#1F242C" BorderBrush="#2D333B" BorderThickness="1" Foreground="White" />
-                    </StackPanel>
+                        <!-- FILTROS Y ORDENACIÓN -->
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                            <ComboBox ItemsSource="{Binding OpcionesFiltro}" SelectedItem="{Binding FiltroEpisodios}" 
+                                      Width="120" materialDesign:TextFieldAssist.HasClearButton="False" 
+                                      Foreground="White"
+                                      Style="{StaticResource MaterialDesignOutlinedComboBox}" Padding="8,5" Margin="0,0,8,0"/>
+                                      
+                            <ToggleButton IsChecked="{Binding OrdenAscendente}" Style="{StaticResource MaterialDesignActionToggleButton}"
+                                          Content="{materialDesign:PackIcon Kind=SortDescending, Size=18}"
+                                          materialDesign:ToggleButtonAssist.OnContent="{materialDesign:PackIcon Kind=SortAscending, Size=18}"
+                                          ToolTip="Cambiar orden ascendente/descendente" Width="34" Height="34" Background="#1F242C" BorderBrush="#2D333B" BorderThickness="1" Foreground="White" />
+                        </StackPanel>
 
-                    <!-- BOTONES DE ACCIÓN MASIVA (Cápsulas modernas) -->
-                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                        
-                        <!-- BOTÓN MARCAR VISTOS -->
-                        <Button Command="{Binding MarcarVistosCommand}" 
-                                CommandParameter="{Binding SelectedItems, ElementName=ListaEpisodios}" 
-                                Style="{StaticResource MaterialDesignOutlinedButton}"
-                                BorderBrush="#10B981" Foreground="#34D399"
-                                Height="34" Padding="10,0" Margin="0,0,6,0"
-                                ToolTip="Marcar episodios seleccionados (o todos) como vistos">
-                            <StackPanel Orientation="Horizontal">
-                                <materialDesign:PackIcon Kind="CheckAll" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                                <TextBlock Text="Vistos" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="11"/>
-                            </StackPanel>
-                        </Button>
+                        <!-- BOTONES DE ACCIÓN MASIVA (Cápsulas modernas) -->
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                            
+                            <!-- BOTÓN MARCAR VISTOS -->
+                            <Button Command="{Binding MarcarVistosCommand}" 
+                                    CommandParameter="{Binding SelectedItems, ElementName=ListaEpisodios}" 
+                                    Style="{StaticResource MaterialDesignOutlinedButton}"
+                                    BorderBrush="#10B981" Foreground="#34D399"
+                                    Height="34" Padding="10,0" Margin="0,0,6,0"
+                                    ToolTip="Marcar episodios seleccionados (o todos) como vistos">
+                                <StackPanel Orientation="Horizontal">
+                                    <materialDesign:PackIcon Kind="CheckAll" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                    <TextBlock Text="Vistos" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="11"/>
+                                </StackPanel>
+                            </Button>
 
-                        <!-- BOTÓN MARCAR NO VISTOS -->
-                        <Button Command="{Binding MarcarNoVistosCommand}" 
-                                CommandParameter="{Binding SelectedItems, ElementName=ListaEpisodios}" 
-                                Style="{StaticResource MaterialDesignOutlinedButton}"
-                                BorderBrush="#EF4444" Foreground="#F87171"
-                                Height="34" Padding="10,0" Margin="0,0,6,0"
-                                ToolTip="Marcar episodios seleccionados (o todos) como no vistos">
-                            <StackPanel Orientation="Horizontal">
-                                <materialDesign:PackIcon Kind="EyeOffOutline" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                                <TextBlock Text="No vistos" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="11"/>
-                            </StackPanel>
-                        </Button>
+                            <!-- BOTÓN MARCAR NO VISTOS -->
+                            <Button Command="{Binding MarcarNoVistosCommand}" 
+                                    CommandParameter="{Binding SelectedItems, ElementName=ListaEpisodios}" 
+                                    Style="{StaticResource MaterialDesignOutlinedButton}"
+                                    BorderBrush="#EF4444" Foreground="#F87171"
+                                    Height="34" Padding="10,0" Margin="0,0,6,0"
+                                    ToolTip="Marcar episodios seleccionados (o todos) como no vistos">
+                                <StackPanel Orientation="Horizontal">
+                                    <materialDesign:PackIcon Kind="EyeOffOutline" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                    <TextBlock Text="No vistos" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="11"/>
+                                </StackPanel>
+                            </Button>
 
-                        <!-- BOTÓN ACTUALIZAR -->
-                        <Button Command="{Binding ActualizarAnimeActualCommand}" 
-                                Style="{StaticResource MaterialDesignOutlinedButton}"
-                                BorderBrush="#60A5FA" Foreground="#93C5FD"
-                                Height="34" Padding="10,0"
-                                ToolTip="Actualizar información y episodios desde AniList">
-                            <StackPanel Orientation="Horizontal">
-                                <materialDesign:PackIcon Kind="Refresh" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                                <TextBlock Text="Actualizar" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="11"/>
-                            </StackPanel>
-                        </Button>
-                    </StackPanel>
-                </Grid>
+                            <!-- BOTÓN ACTUALIZAR -->
+                            <Button Command="{Binding ActualizarAnimeActualCommand}" 
+                                    Style="{StaticResource MaterialDesignOutlinedButton}"
+                                    BorderBrush="#60A5FA" Foreground="#93C5FD"
+                                    Height="34" Padding="10,0"
+                                    ToolTip="Actualizar información y episodios desde AniList">
+                                <StackPanel Orientation="Horizontal">
+                                    <materialDesign:PackIcon Kind="Refresh" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                    <TextBlock Text="Actualizar" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="11"/>
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </Grid>
 
                 <!-- LISTA DE EPISODIOS VIRTUALIZADA CON DISEÑO VERTICAL COMPLETO -->
                 <Grid Grid.Row="1">
@@ -464,6 +498,7 @@
                     </Button>
                 </Grid>
             </Grid>
+        </Grid>
         </Grid>
         
         <!-- PARTE 3: OVERLAY DEL EDITOR DE SEGUIMIENTO ANILIST (DISEÑO UNIFICADO Y PULIDO) -->
