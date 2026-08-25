@@ -224,24 +224,8 @@ namespace AnimeLocalTracker.Views
 
         private void ReproductorView_PreviewMouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
-            // Si el doble clic fue sobre un botón, slider o popup, no alternar pantalla completa
-            if (e.OriginalSource is DependencyObject dep)
-            {
-                if (FindVisualParent<Button>(dep) != null || 
-                    FindVisualParent<Slider>(dep) != null || 
-                    FindVisualParent<ToggleButton>(dep) != null ||
-                    FindVisualParent<Popup>(dep) != null)
-                {
-                    return;
-                }
-            }
-
-            if (DataContext is ReproductorViewModel vm)
-            {
-                vm.ToggleFullscreenCommand.Execute(null);
-                e.Handled = true;
-                RegistrarActividad();
-            }
+            // Bloquear completamente la alternancia de pantalla completa por doble clic (tanto de Flyleaf como de la ventana)
+            e.Handled = true;
         }
 
         private static T? FindVisualParent<T>(DependencyObject? child) where T : DependencyObject
