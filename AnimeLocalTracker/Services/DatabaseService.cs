@@ -2,6 +2,8 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using SQLite;
 using AnimeLocalTracker.Models;
@@ -12,6 +14,7 @@ public class DatabaseService : IDatabaseService
 {
     private readonly string? _customDbPath;
     private SQLiteAsyncConnection _conexion = null!;
+    private readonly SemaphoreSlim _initLock = new(1, 1);
 
     public DatabaseService(string? customDbPath = null)
     {
@@ -22,34 +25,45 @@ public class DatabaseService : IDatabaseService
     {
         if (_conexion != null) return;
 
-        string rutaBaseDatos;
-        if (!string.IsNullOrEmpty(_customDbPath))
+        // Doble chequeo con lock: App.OnStartup y los tests pueden inicializar concurrentemente
+        await _initLock.WaitAsync();
+        try
         {
-            rutaBaseDatos = _customDbPath;
+            if (_conexion != null) return;
+
+            string rutaBaseDatos;
+            if (!string.IsNullOrEmpty(_customDbPath))
+            {
+                rutaBaseDatos = _customDbPath;
+            }
+            else
+            {
+                var rutaAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                var rutaCarpetaApp = Path.Combine(rutaAppData, "AnimeLocalTracker");
+                Directory.CreateDirectory(rutaCarpetaApp);
+                rutaBaseDatos = Path.Combine(rutaCarpetaApp, "biblioteca.db");
+            }
+
+            var conexion = new SQLiteAsyncConnection(rutaBaseDatos);
+
+            await conexion.ExecuteScalarAsync<string>("PRAGMA journal_mode=WAL;");
+            await conexion.ExecuteAsync("PRAGMA synchronous = NORMAL;");
+            await conexion.ExecuteAsync("PRAGMA temp_store = MEMORY;");
+            await conexion.ExecuteAsync("PRAGMA cache_size = -64000;");
+
+            // Creamos ambas tablas
+            await conexion.CreateTableAsync<AnimeItem>();
+            await conexion.CreateTableAsync<RegistroEpisodio>();
+
+            // ÍNDICE COMPUESTO PARA BÚSQUEDAS RÁPIDAS POR (AniListId, NumeroEpisodio)
+            await conexion.ExecuteAsync("CREATE INDEX IF NOT EXISTS IX_RegistroEpisodio_AnimeEp ON RegistroEpisodio(AniListId, NumeroEpisodio);");
+
+            _conexion = conexion;
         }
-        else
+        finally
         {
-            var rutaAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            var rutaCarpetaApp = Path.Combine(rutaAppData, "AnimeLocalTracker");
-            Directory.CreateDirectory(rutaCarpetaApp); 
-            rutaBaseDatos = Path.Combine(rutaCarpetaApp, "biblioteca.db");
+            _initLock.Release();
         }
-        
-        _conexion = new SQLiteAsyncConnection(rutaBaseDatos);
-
-        await _conexion.ExecuteScalarAsync<string>("PRAGMA journal_mode=WAL;");
-        await _conexion.ExecuteAsync("PRAGMA synchronous = NORMAL;");
-        await _conexion.ExecuteAsync("PRAGMA temp_store = MEMORY;");
-        await _conexion.ExecuteAsync("PRAGMA cache_size = -64000;");
-
-        // Creamos ambas tablas
-        await _conexion.CreateTableAsync<AnimeItem>();
-        
-        // NUEVA TABLA:
-        await _conexion.CreateTableAsync<RegistroEpisodio>(); 
-
-        // ÍNDICE COMPUESTO PARA BÚSQUEDAS RÁPIDAS POR (AniListId, NumeroEpisodio)
-        await _conexion.ExecuteAsync("CREATE INDEX IF NOT EXISTS IX_RegistroEpisodio_AnimeEp ON RegistroEpisodio(AniListId, NumeroEpisodio);");
     }
 
     public async Task GuardarAnimeAsync(AnimeItem anime)
@@ -103,35 +117,51 @@ public class DatabaseService : IDatabaseService
     {
         if (registros == null) return;
 
+        var lista = registros.ToList();
+        if (lista.Count == 0) return;
+
         await _conexion.RunInTransactionAsync(db =>
         {
-            foreach (var registro in registros)
-            {
-                var existente = db.Table<RegistroEpisodio>()
-                    .FirstOrDefault(r => r.AniListId == registro.AniListId && r.NumeroEpisodio == registro.NumeroEpisodio);
+            // 1 SELECT para todos los animes involucrados (antes: 1 SELECT + 1 INSERT/UPDATE POR FILA = N+1)
+            var aniListIds = lista.Select(r => r.AniListId).Distinct().ToList();
+            var existentes = db.Table<RegistroEpisodio>()
+                .Where(r => aniListIds.Contains(r.AniListId))
+                .ToList()
+                .GroupBy(r => (r.AniListId, r.NumeroEpisodio))
+                .ToDictionary(g => g.Key, g => g.First());
 
-                if (existente != null)
+            var ahora = DateTime.UtcNow;
+            var aInsertar = new List<RegistroEpisodio>();
+            var aActualizar = new List<RegistroEpisodio>();
+
+            foreach (var registro in lista)
+            {
+                if (existentes.TryGetValue((registro.AniListId, registro.NumeroEpisodio), out var existente))
                 {
+                    // Mismo merge que GuardarRegistroEpisodioAsync: conservar RutaArchivo si el nuevo viene vacío
                     existente.VistoLocal = registro.VistoLocal;
                     existente.FavoritoLocal = registro.FavoritoLocal;
                     existente.ProgresoSegundos = registro.ProgresoSegundos;
                     existente.TotalSegundos = registro.TotalSegundos;
-                    existente.UltimaReproduccion = registro.UltimaReproduccion ?? DateTime.UtcNow;
+                    existente.UltimaReproduccion = registro.UltimaReproduccion ?? ahora;
                     if (!string.IsNullOrWhiteSpace(registro.RutaArchivo))
                     {
                         existente.RutaArchivo = registro.RutaArchivo;
                     }
-                    db.Update(existente);
+                    aActualizar.Add(existente);
                 }
                 else
                 {
                     if (!registro.UltimaReproduccion.HasValue)
                     {
-                        registro.UltimaReproduccion = DateTime.UtcNow;
+                        registro.UltimaReproduccion = ahora;
                     }
-                    db.Insert(registro);
+                    aInsertar.Add(registro);
                 }
             }
+
+            if (aInsertar.Count > 0) db.InsertAll(aInsertar, runInTransaction: false);
+            if (aActualizar.Count > 0) db.UpdateAll(aActualizar, runInTransaction: false);
         });
     }
 
@@ -162,14 +192,18 @@ public class DatabaseService : IDatabaseService
 
         await _conexion.RunInTransactionAsync(db =>
         {
-            foreach (var id in idList)
+            // 1 SELECT con IN + 1 UPDATE masivo (antes: 1 Find + 1 Update POR ID)
+            var registros = db.Table<RegistroEpisodio>()
+                .Where(r => idList.Contains(r.Id))
+                .ToList();
+
+            foreach (var reg in registros)
             {
-                var reg = db.Find<RegistroEpisodio>(id);
-                if (reg != null)
-                {
-                    reg.SincronizadoEnNube = true;
-                    db.Update(reg);
-                }
+                reg.SincronizadoEnNube = true;
+            }
+            if (registros.Count > 0)
+            {
+                db.UpdateAll(registros, runInTransaction: false);
             }
         });
     }

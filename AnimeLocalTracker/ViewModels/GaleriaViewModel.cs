@@ -121,31 +121,40 @@ public partial class GaleriaViewModel : ObservableObject,
 
     public void Receive(AnimeAñadidoMensaje message)
     {
-        if (!BibliotecaLocales.Any(a => a.AniListId == message.NuevoAnime.AniListId))
+        // Los handlers del messenger NUNCA deben lanzar: una excepción aquí aborta
+        // la entrega del mensaje al resto de receptores suscritos.
+        try
         {
-            message.NuevoAnime.PortadaImagen = _imageCacheService.ObtenerPortada(message.NuevoAnime.AniListId, message.NuevoAnime.UrlPortada);
-            BibliotecaLocales.Add(message.NuevoAnime);
-            OnPropertyChanged(nameof(BibliotecaVacia));
-            OnPropertyChanged(nameof(TotalAnimesBiblioteca));
-            
-            if (message.NuevoAnime.PortadaImagen == null && !string.IsNullOrWhiteSpace(message.NuevoAnime.UrlPortada))
+            if (!BibliotecaLocales.Any(a => a.AniListId == message.NuevoAnime.AniListId))
             {
-                _ = Task.Run(async () =>
+                message.NuevoAnime.PortadaImagen = _imageCacheService.ObtenerPortada(message.NuevoAnime.AniListId, message.NuevoAnime.UrlPortada);
+                BibliotecaLocales.Add(message.NuevoAnime);
+                OnPropertyChanged(nameof(BibliotecaVacia));
+                OnPropertyChanged(nameof(TotalAnimesBiblioteca));
+
+                if (message.NuevoAnime.PortadaImagen == null && !string.IsNullOrWhiteSpace(message.NuevoAnime.UrlPortada))
                 {
-                    try
+                    _ = Task.Run(async () =>
                     {
-                        var img = await _imageCacheService.ObtenerPortadaAsync(message.NuevoAnime.AniListId, message.NuevoAnime.UrlPortada);
-                        if (img != null)
+                        try
                         {
-                            System.Windows.Application.Current?.Dispatcher?.Invoke(() => message.NuevoAnime.PortadaImagen = img);
+                            var img = await _imageCacheService.ObtenerPortadaAsync(message.NuevoAnime.AniListId, message.NuevoAnime.UrlPortada);
+                            if (img != null)
+                            {
+                                System.Windows.Application.Current?.Dispatcher?.Invoke(() => message.NuevoAnime.PortadaImagen = img);
+                            }
                         }
-                    }
-                    catch (Exception ex)
-                    {
-                        AppLogger.Debug("GaleriaViewModel", $"Error cargando portada de nuevo anime: {ex.Message}");
-                    }
-                });
+                        catch (Exception ex)
+                        {
+                            AppLogger.Debug("GaleriaViewModel", $"Error cargando portada de nuevo anime: {ex.Message}");
+                        }
+                    });
+                }
             }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("GaleriaViewModel", "Error al procesar AnimeAñadidoMensaje", ex);
         }
     }
 
@@ -171,66 +180,74 @@ public partial class GaleriaViewModel : ObservableObject,
     
     private async Task CargarBibliotecaAsync()
     {
-        var animes = await _databaseService.ObtenerTodosLosAnimesAsync();
-        var todosRegistros = await _databaseService.ObtenerTodosLosRegistrosAsync();
-        var registrosPorAnime = todosRegistros.GroupBy(r => r.AniListId)
-                                              .ToDictionary(g => g.Key, g => g.ToList());
-        
-        // MIGRACIÓN INTELIGENTE: Recuperar el estado basado en lo que realmente has visto localmente
-        foreach (var a in animes)
+        try
         {
-            if (registrosPorAnime.TryGetValue(a.AniListId, out var registros))
+            var animes = await _databaseService.ObtenerTodosLosAnimesAsync();
+            var todosRegistros = await _databaseService.ObtenerTodosLosRegistrosAsync();
+            var registrosPorAnime = todosRegistros.GroupBy(r => r.AniListId)
+                                                  .ToDictionary(g => g.Key, g => g.ToList());
+
+            // MIGRACIÓN INTELIGENTE: Recuperar el estado basado en lo que realmente has visto localmente
+            foreach (var a in animes)
             {
-                a.EpisodiosVistos = registros.Count(r => r.VistoLocal);
-            }
-            else
-            {
-                a.EpisodiosVistos = 0;
+                if (registrosPorAnime.TryGetValue(a.AniListId, out var registros))
+                {
+                    a.EpisodiosVistos = registros.Count(r => r.VistoLocal);
+                }
+                else
+                {
+                    a.EpisodiosVistos = 0;
+                }
+
+                if (string.IsNullOrEmpty(a.EstadoUsuario) || a.EstadoUsuario == "PLANNING")
+                {
+                    int episodiosVistos = a.EpisodiosVistos;
+
+                    if (episodiosVistos > 0)
+                    {
+                        if (a.TotalEpisodios > 0 && episodiosVistos >= a.TotalEpisodios)
+                        {
+                            a.EstadoUsuario = "COMPLETED";
+                        }
+                        else
+                        {
+                            a.EstadoUsuario = "CURRENT";
+                        }
+                        await _databaseService.ActualizarAnimeAsync(a);
+                    }
+                    else if (string.IsNullOrEmpty(a.EstadoUsuario))
+                    {
+                        a.EstadoUsuario = "PLANNING";
+                        await _databaseService.ActualizarAnimeAsync(a);
+                    }
+                }
+
+                // Precarga ultra-rápida desde caché en memoria o archivo local (0ms en scroll)
+                a.PortadaImagen = _imageCacheService.ObtenerPortada(a.AniListId, a.UrlPortada);
             }
 
-            if (string.IsNullOrEmpty(a.EstadoUsuario) || a.EstadoUsuario == "PLANNING")
-            {
-                int episodiosVistos = a.EpisodiosVistos;
-                
-                if (episodiosVistos > 0)
-                {
-                    if (a.TotalEpisodios > 0 && episodiosVistos >= a.TotalEpisodios)
-                    {
-                        a.EstadoUsuario = "COMPLETED";
-                    }
-                    else
-                    {
-                        a.EstadoUsuario = "CURRENT";
-                    }
-                    await _databaseService.ActualizarAnimeAsync(a);
-                }
-                else if (string.IsNullOrEmpty(a.EstadoUsuario))
-                {
-                    a.EstadoUsuario = "PLANNING";
-                    await _databaseService.ActualizarAnimeAsync(a);
-                }
-            }
+            BibliotecaLocales = new ObservableCollection<AnimeItem>(animes);
 
-            // Precarga ultra-rápida desde caché en memoria o archivo local (0ms en scroll)
-            a.PortadaImagen = _imageCacheService.ObtenerPortada(a.AniListId, a.UrlPortada);
+            BibliotecaFiltrada = CollectionViewSource.GetDefaultView(BibliotecaLocales);
+            BibliotecaFiltrada.Filter = FiltrarAnime;
+
+            // Ordenar alfabéticamente por defecto
+            BibliotecaFiltrada.SortDescriptions.Clear();
+            BibliotecaFiltrada.SortDescriptions.Add(new SortDescription("Titulo", ListSortDirection.Ascending));
+
+            OnPropertyChanged(nameof(BibliotecaFiltrada));
+            OnPropertyChanged(nameof(SinResultados));
+
+            _ = CargarPortadasFaltantesEnSegundoPlanoAsync(animes);
+
+            await CargarPerfilUsuarioAsync();
+            OnPropertyChanged(nameof(BibliotecaVacia));
         }
-        
-        BibliotecaLocales = new ObservableCollection<AnimeItem>(animes);
-        
-        BibliotecaFiltrada = CollectionViewSource.GetDefaultView(BibliotecaLocales);
-        BibliotecaFiltrada.Filter = FiltrarAnime;
-        
-        // Ordenar alfabéticamente por defecto
-        BibliotecaFiltrada.SortDescriptions.Clear();
-        BibliotecaFiltrada.SortDescriptions.Add(new SortDescription("Titulo", ListSortDirection.Ascending));
-        
-        OnPropertyChanged(nameof(BibliotecaFiltrada));
-        OnPropertyChanged(nameof(SinResultados));
-        
-        _ = CargarPortadasFaltantesEnSegundoPlanoAsync(animes);
-        
-        await CargarPerfilUsuarioAsync();
-        OnPropertyChanged(nameof(BibliotecaVacia));
+        catch (Exception ex)
+        {
+            // Sin esto, un fallo de BD al arrancar deja la galería vacía y en silencio
+            AppLogger.Error("GaleriaViewModel", "Error al cargar la biblioteca", ex);
+        }
     }
 
     private async Task CargarPortadasFaltantesEnSegundoPlanoAsync(IEnumerable<AnimeItem> animes)

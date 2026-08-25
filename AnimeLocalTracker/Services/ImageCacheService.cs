@@ -16,6 +16,10 @@ public class ImageCacheService : IImageCacheService
     private readonly SemaphoreSlim _downloadSemaphore = new(6, 6);
     private readonly string _coversDirectory;
 
+    // ~500 portadas a 220px ≈ 135MB. Al superar el tope se limpia el caché completo:
+    // recargar desde disco es barato (sin red) y evita crecimiento sin límite en bibliotecas grandes.
+    private const int MaxEntradasEnMemoria = 500;
+
     public ImageCacheService(IHttpClientFactory httpClientFactory)
     {
         _httpClientFactory = httpClientFactory;
@@ -51,7 +55,7 @@ public class ImageCacheService : IImageCacheService
                 var bitmap = CargarBitmapDesdeArchivo(localPath, decodeWidth);
                 if (bitmap != null)
                 {
-                    _memoryCache[animeId] = bitmap;
+                    GuardarEnCache(animeId, bitmap);
                     return bitmap;
                 }
             }
@@ -62,6 +66,15 @@ public class ImageCacheService : IImageCacheService
         }
 
         return null;
+    }
+
+    private void GuardarEnCache(int animeId, ImageSource bitmap)
+    {
+        if (_memoryCache.Count >= MaxEntradasEnMemoria)
+        {
+            _memoryCache.Clear();
+        }
+        _memoryCache[animeId] = bitmap;
     }
 
     public async Task<ImageSource?> ObtenerPortadaAsync(int animeId, string? urlPortada, int decodeWidth = 220)
@@ -86,7 +99,7 @@ public class ImageCacheService : IImageCacheService
                 var bitmap = CargarBitmapDesdeArchivo(localPath, decodeWidth);
                 if (bitmap != null)
                 {
-                    _memoryCache[animeId] = bitmap;
+                    GuardarEnCache(animeId, bitmap);
                     return bitmap;
                 }
             }
@@ -106,7 +119,7 @@ public class ImageCacheService : IImageCacheService
             var downloadedBitmap = CargarBitmapDesdeBytes(bytes, decodeWidth);
             if (downloadedBitmap != null)
             {
-                _memoryCache[animeId] = downloadedBitmap;
+                GuardarEnCache(animeId, downloadedBitmap);
                 return downloadedBitmap;
             }
         }

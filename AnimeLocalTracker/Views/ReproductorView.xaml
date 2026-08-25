@@ -18,29 +18,29 @@
         <!-- Reproductor NATIVO Flyleaf -->
         <fl:FlyleafHost Player="{Binding Player}">
             <Grid>
-                        <!-- Subtítulos optimizados: 2 TextBlocks en vez de 9 -->
-                        <!-- Bindings vía ElementName: FlyleafHost sobrescribe el DataContext de su contenido -->
-                        <Viewbox VerticalAlignment="Bottom" Margin="40,40,40,25" StretchDirection="DownOnly" MaxHeight="150" IsHitTestVisible="False">
-                            <Grid MaxWidth="1200">
-                                <Grid.Effect>
-                                    <DropShadowEffect Color="Black" BlurRadius="8" ShadowDepth="0" Opacity="0.9"/>
-                                </Grid.Effect>
+                <!-- Subtítulos optimizados: 2 TextBlocks en vez de 9 -->
+                <!-- Bindings vía ElementName: FlyleafHost sobrescribe el DataContext de su contenido -->
+                <Viewbox VerticalAlignment="Bottom" Margin="40,40,40,25" StretchDirection="DownOnly" MaxHeight="150" IsHitTestVisible="False">
+                    <Grid MaxWidth="1200">
+                        <Grid.Effect>
+                            <DropShadowEffect Color="Black" BlurRadius="8" ShadowDepth="0" Opacity="0.9"/>
+                        </Grid.Effect>
 
-                                <!-- Stroke negro (una sola capa con outline grueso simulado por shadow) -->
-                                <TextBlock Text="{Binding DataContext.Player.Subtitles.SubsText, ElementName=RootWindow}"
-                                           Foreground="Black" FontSize="44" FontFamily="Trebuchet MS, Arial"
-                                           FontWeight="Bold" TextWrapping="Wrap" TextAlignment="Center">
-                                    <TextBlock.Effect>
-                                        <BlurEffect Radius="2.5" KernelType="Gaussian"/>
-                                    </TextBlock.Effect>
-                                </TextBlock>
+                        <!-- Stroke negro (una sola capa con outline grueso simulado por shadow) -->
+                        <TextBlock Text="{Binding DataContext.Player.Subtitles.SubsText, ElementName=RootWindow}"
+                                   Foreground="Black" FontSize="44" FontFamily="Trebuchet MS, Arial"
+                                   FontWeight="Bold" TextWrapping="Wrap" TextAlignment="Center">
+                            <TextBlock.Effect>
+                                <BlurEffect Radius="2.5" KernelType="Gaussian"/>
+                            </TextBlock.Effect>
+                        </TextBlock>
 
-                                <!-- Texto interior blanco -->
-                                <TextBlock Text="{Binding DataContext.Player.Subtitles.SubsText, ElementName=RootWindow}"
-                                           Foreground="White" FontSize="44" FontFamily="Trebuchet MS, Arial"
-                                           FontWeight="Bold" TextWrapping="Wrap" TextAlignment="Center" />
-                            </Grid>
-                        </Viewbox>
+                        <!-- Texto interior blanco -->
+                        <TextBlock Text="{Binding DataContext.Player.Subtitles.SubsText, ElementName=RootWindow}"
+                                   Foreground="White" FontSize="44" FontFamily="Trebuchet MS, Arial"
+                                   FontWeight="Bold" TextWrapping="Wrap" TextAlignment="Center" />
+                    </Grid>
+                </Viewbox>
 
                 <!-- Controles Overlays -->
                 <Grid x:Name="OverlayControls" Background="Transparent" DataContext="{x:Null}">

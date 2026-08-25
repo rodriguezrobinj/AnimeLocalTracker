@@ -167,7 +167,12 @@ public partial class DetalleViewModel : ObservableObject,
     {
         if (AnimeSeleccionado == null || AnimeSeleccionado.AniListId != message.AniListId) return;
 
-        System.Windows.Application.Current.Dispatcher.Invoke(() =>
+        // InvokeAsync (no Invoke): los ticks de progreso llegan desde tareas de descarga en
+        // segundo plano; un Invoke síncrono por tick compite con el hilo de UI.
+        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+        if (dispatcher == null || dispatcher.HasShutdownStarted) return;
+
+        _ = dispatcher.InvokeAsync(() =>
         {
             var episodio = _todosLosEpisodios.FirstOrDefault(e => e.NumeroEpisodio == message.NumeroEpisodio);
             if (episodio != null)
@@ -180,15 +185,15 @@ public partial class DetalleViewModel : ObservableObject,
                     episodio.Descargado = true;
                     episodio.RutaCompleta = message.RutaArchivo;
                     episodio.CalcularTamanoArchivo();
-                    _dialogService.MostrarDialogoAsync("Descarga Completada", 
-                        $"El episodio {episodio.NumeroEpisodio} se ha descargado exitosamente.", 
+                    _dialogService.MostrarDialogoAsync("Descarga Completada",
+                        $"El episodio {episodio.NumeroEpisodio} se ha descargado exitosamente.",
                         false, "CheckCircleOutline", "#4CAF50");
                     AplicarFiltrosYOrdenamiento();
                 }
                 else if (!string.IsNullOrEmpty(message.Error))
                 {
-                    _dialogService.MostrarDialogoAsync("Error de descarga", 
-                        $"Error al descargar el episodio {episodio.NumeroEpisodio}:\n{message.Error}", 
+                    _dialogService.MostrarDialogoAsync("Error de descarga",
+                        $"Error al descargar el episodio {episodio.NumeroEpisodio}:\n{message.Error}",
                         false, "AlertCircleOutline", "#E53935");
                 }
             }

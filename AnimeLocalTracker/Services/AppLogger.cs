@@ -3,6 +3,8 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Threading.Channels;
+using System.Threading.Tasks;
 
 namespace AnimeLocalTracker.Services;
 
@@ -13,19 +15,42 @@ public record LogEntry(DateTime Timestamp, string Level, string Source, string M
         (!string.IsNullOrEmpty(ExceptionDetails) ? Environment.NewLine + ExceptionDetails : string.Empty);
 }
 
+/// <summary>
+/// Logger de la aplicación.
+/// - Enqueue es O(1) y nunca bloquea al llamador (el bucle de tracking del reproductor
+///   y los ticks de descarga loguean a alta frecuencia desde el hilo de UI).
+/// - Un único consumidor en segundo plano escribe a disco en lotes.
+/// - Rotación por tamaño para que app.log no crezca sin límite.
+/// </summary>
 public static class AppLogger
 {
     private static readonly string LogDirectory = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AnimeLocalTracker", "Logs");
     private static readonly string LogPath = Path.Combine(LogDirectory, "app.log");
-    private static readonly object LockObj = new();
-    
+
     private const int MaxInMemoryLogs = 500;
+    private const long MaxLogBytes = 5 * 1024 * 1024; // 5 MB por archivo
+    private const int BatchFlushMs = 500;
+    private const int MaxBatchSize = 128;
+
     private static readonly ConcurrentQueue<LogEntry> _recentLogs = new();
+    private static readonly Channel<LogEntry> _cola = Channel.CreateUnbounded<LogEntry>(new UnboundedChannelOptions
+    {
+        SingleReader = true,
+        SingleWriter = false
+    });
 
     public static event Action<LogEntry>? LogEmitted;
 
     public static IReadOnlyCollection<LogEntry> RecentLogs => _recentLogs.ToArray();
+
+    static AppLogger()
+    {
+        _ = Task.Run(ProcesarColaAsync);
+
+        // Intentar vaciar la cola al cerrar la aplicación
+        AppDomain.CurrentDomain.ProcessExit += (s, e) => VaciarColaSincrono();
+    }
 
     public static void Debug(string source, string message) => Log("DEBUG", source, message);
     public static void Info(string source, string message) => Log("INFO", source, message);
@@ -36,7 +61,7 @@ public static class AppLogger
     private static void Log(string level, string source, string message, string? exceptionDetails = null)
     {
         var entry = new LogEntry(DateTime.Now, level, source, message, exceptionDetails);
-        
+
         _recentLogs.Enqueue(entry);
         while (_recentLogs.Count > MaxInMemoryLogs && _recentLogs.TryDequeue(out _)) { }
 
@@ -49,23 +74,126 @@ public static class AppLogger
             System.Diagnostics.Debug.WriteLine($"[AppLogger] Error en suscriptor de LogEmitted: {ex.Message}");
         }
 
-        string formattedLine = entry.ToString();
-        System.Diagnostics.Debug.WriteLine(formattedLine);
+        System.Diagnostics.Debug.WriteLine(entry.ToString());
 
-        lock (LockObj)
+        // Nunca bloquea: si el canal está lleno (imposible con Unbounded, pero por robustez) se descarta
+        _cola.Writer.TryWrite(entry);
+    }
+
+    private static async Task ProcesarColaAsync()
+    {
+        var lote = new List<LogEntry>(MaxBatchSize);
+        var lector = _cola.Reader;
+
+        try
         {
-            try
+            while (await lector.WaitToReadAsync().ConfigureAwait(false))
             {
-                if (!Directory.Exists(LogDirectory))
+                lote.Clear();
+
+                // Drenar lo disponible hasta el tamaño de lote
+                while (lote.Count < MaxBatchSize && lector.TryRead(out var entry))
                 {
-                    Directory.CreateDirectory(LogDirectory);
+                    lote.Add(entry);
                 }
-                File.AppendAllText(LogPath, formattedLine + Environment.NewLine);
+
+                // Si aún queda encolado, escribir inmediatamente; si no, esperar un poco
+                // para agrupar más entradas y minimizar I/O
+                if (lote.Count < MaxBatchSize)
+                {
+                    try
+                    {
+                        using var timeoutCts = new CancellationTokenSource(BatchFlushMs);
+                        if (await lector.WaitToReadAsync(timeoutCts.Token).ConfigureAwait(false))
+                        {
+                            while (lote.Count < MaxBatchSize && lector.TryRead(out var entry))
+                            {
+                                lote.Add(entry);
+                            }
+                        }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        // Timeout del batch: escribir lo acumulado
+                    }
+                }
+
+                EscribirLote(lote);
             }
-            catch (Exception ex)
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[AppLogger] Consumidor de logs terminó inesperadamente: {ex.Message}");
+        }
+    }
+
+    private static void VaciarColaSincrono()
+    {
+        try
+        {
+            var lote = new List<LogEntry>(MaxBatchSize);
+            while (_cola.Reader.TryRead(out var entry))
             {
-                System.Diagnostics.Debug.WriteLine($"[AppLogger] Error al escribir log en disco: {ex.Message}");
+                lote.Add(entry);
+                if (lote.Count >= MaxBatchSize)
+                {
+                    EscribirLote(lote);
+                    lote.Clear();
+                }
             }
+            if (lote.Count > 0) EscribirLote(lote);
+        }
+        catch
+        {
+            // En ProcessExit no hay nada más que hacer
+        }
+    }
+
+    private static void EscribirLote(List<LogEntry> lote)
+    {
+        if (lote.Count == 0) return;
+
+        try
+        {
+            if (!Directory.Exists(LogDirectory))
+            {
+                Directory.CreateDirectory(LogDirectory);
+            }
+
+            RotarSiEsNecesario();
+
+            var sb = new System.Text.StringBuilder(lote.Count * 96);
+            foreach (var entry in lote)
+            {
+                sb.Append(entry.ToString()).AppendLine();
+            }
+            File.AppendAllText(LogPath, sb.ToString());
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[AppLogger] Error al escribir log en disco: {ex.Message}");
+        }
+    }
+
+    private static void RotarSiEsNecesario()
+    {
+        try
+        {
+            if (!File.Exists(LogPath)) return;
+
+            var info = new FileInfo(LogPath);
+            if (info.Length < MaxLogBytes) return;
+
+            string rotado = LogPath + ".1";
+            if (File.Exists(rotado))
+            {
+                File.Delete(rotado);
+            }
+            File.Move(LogPath, rotado);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[AppLogger] No se pudo rotar el log: {ex.Message}");
         }
     }
 }

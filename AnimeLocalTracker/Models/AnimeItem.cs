@@ -94,11 +94,20 @@ public partial class AnimeItem : ObservableObject
     {
         get
         {
+            // Cacheada: los bindings la leen en cada render de la galería/detalle y
+            // el Regex sobre sinopsis largas es caro de repetir
+            if (_sinopsisLimpiaCache != null) return _sinopsisLimpiaCache;
             if (string.IsNullOrWhiteSpace(Sinopsis)) return string.Empty;
+
             string clean = Sinopsis.Replace("<br>", "\n").Replace("<br/>", "\n").Replace("<br />", "\n");
-            return System.Text.RegularExpressions.Regex.Replace(clean, "<.*?>", string.Empty).Trim();
+            _sinopsisLimpiaCache = System.Text.RegularExpressions.Regex.Replace(clean, "<.*?>", string.Empty).Trim();
+            return _sinopsisLimpiaCache;
         }
     }
+
+    private string? _sinopsisLimpiaCache;
+
+    partial void OnSinopsisChanged(string value) => _sinopsisLimpiaCache = null;
 
     [Ignore]
     public bool TieneSinopsisLarga => !string.IsNullOrWhiteSpace(SinopsisLimpia) && (SinopsisLimpia.Length > 150 || SinopsisLimpia.Contains('\n'));

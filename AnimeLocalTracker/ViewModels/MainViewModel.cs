@@ -254,13 +254,14 @@ public partial class MainViewModel : ObservableObject,
     [RelayCommand]
     private void NavegarConfiguracion()
     {
-        try 
+        try
         {
             VistaActual = _serviceProvider.GetRequiredService<ConfiguracionViewModel>();
         }
         catch (Exception ex)
         {
-            System.IO.File.AppendAllText("crash.log", $"[{DateTime.Now:O}] [MainViewModel] Error en NavegarConfiguracion: {ex}\n");
+            // AppLogger escribe en %LocalAppData%: seguro incluso instalado en Program Files.
+            // (Antes se escribía un crash.log relativo al EXE, lo que lanzaba dentro del catch.)
             AppLogger.Error("MainViewModel", "Error navegando a configuración", ex);
         }
     }

@@ -143,31 +143,49 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
-        // Pedimos la instancia del servicio de base de datos
-        var dbService = ServiceProvider.GetRequiredService<IDatabaseService>();
-        
-        // Inicializar reproductor de video nativo (Flyleaf)
-        FlyleafLib.Engine.Start(new FlyleafLib.EngineConfig()
+        try
         {
-            FFmpegPath = ":FFmpeg", // Usa las DLLs del paquete NuGet Flyleaf.FFmpeg
-            UIRefresh = true
-        });
-        
-        // Obligamos a que se cree el archivo y la tabla antes de continuar
-        await dbService.InicializarBaseDatosAsync();
+            // Pedimos la instancia del servicio de base de datos
+            var dbService = ServiceProvider.GetRequiredService<IDatabaseService>();
 
-        // Iniciar sincronización periódica en segundo plano
-        var syncService = ServiceProvider.GetRequiredService<ISyncService>();
-        syncService.IniciarSincronizacionPeriodica(TimeSpan.FromMinutes(5));
+            // Inicializar reproductor de video nativo (Flyleaf).
+            // NO es fatal: si falla, el reproductor degrada gracefully (CreateOptimizedPlayer lo maneja).
+            try
+            {
+                FlyleafLib.Engine.Start(new FlyleafLib.EngineConfig()
+                {
+                    FFmpegPath = ":FFmpeg", // Usa las DLLs del paquete NuGet Flyleaf.FFmpeg
+                    UIRefresh = true
+                });
+            }
+            catch (Exception flyleafEx)
+            {
+                AppLogger.Error("App", "No se pudo iniciar el motor Flyleaf (el reproductor quedará degradado)", flyleafEx);
+            }
 
-        // Iniciar verificación de actualizaciones automáticas en segundo plano
-        var updateService = ServiceProvider.GetRequiredService<IUpdateService>();
-        updateService.IniciarVerificacionSegundoPlano(TimeSpan.FromHours(4));
+            // Obligamos a que se cree el archivo y la tabla antes de continuar
+            await dbService.InicializarBaseDatosAsync();
 
-        // En lugar de que WPF abra la ventana automáticamente (StartupUri),
-        // nosotros le pedimos al contenedor DI que nos construya la ventana
-        // con todas sus dependencias ya inyectadas.
-        var mainWindow = ServiceProvider.GetRequiredService<MainWindow>();
-        mainWindow.Show();
+            // Iniciar sincronización periódica en segundo plano
+            var syncService = ServiceProvider.GetRequiredService<ISyncService>();
+            syncService.IniciarSincronizacionPeriodica(TimeSpan.FromMinutes(5));
+
+            // Iniciar verificación de actualizaciones automáticas en segundo plano
+            var updateService = ServiceProvider.GetRequiredService<IUpdateService>();
+            updateService.IniciarVerificacionSegundoPlano(TimeSpan.FromHours(4));
+
+            // En lugar de que WPF abra la ventana automáticamente (StartupUri),
+            // nosotros le pedimos al contenedor DI que nos construya la ventana
+            // con todas sus dependencias ya inyectadas.
+            var mainWindow = ServiceProvider.GetRequiredService<MainWindow>();
+            mainWindow.Show();
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("App", "Error fatal durante el arranque", ex);
+            MessageBox.Show($"No se pudo iniciar la aplicación:\n{ex.Message}",
+                            "Error de inicio", MessageBoxButton.OK, MessageBoxImage.Error);
+            Shutdown(1);
+        }
     }
 }

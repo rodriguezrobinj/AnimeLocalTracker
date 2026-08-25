@@ -68,11 +68,9 @@ public partial class AgregarAnimeViewModel : ObservableObject,
         _settingsService = settingsService;
         _dialogService = dialogService;
 
-        WeakReferenceMessenger.Default.Register<AnimeAñadidoMensaje>(this, (r, m) =>
-        {
-            _animesEnBibliotecaIds.Add(m.NuevoAnime.AniListId);
-            ActualizarEstadoVisualBiblioteca();
-        });
+        // Registro vía IRecipient<AnimeAñadidoMensaje>: una sola suscripción.
+        // (Antes había un lambda + Receive() duplicando la misma lógica.)
+        WeakReferenceMessenger.Default.Register<AnimeAñadidoMensaje>(this);
 
         _ = CargarInicialAsync();
     }
@@ -347,10 +345,19 @@ public partial class AgregarAnimeViewModel : ObservableObject,
 
     public void Receive(AnimeAñadidoMensaje message)
     {
-        if (message.NuevoAnime != null)
+        // Los handlers del messenger NUNCA deben lanzar: una excepción aquí aborta
+        // la entrega del mensaje al resto de receptores suscritos.
+        try
         {
-            _animesEnBibliotecaIds.Add(message.NuevoAnime.AniListId);
-            ActualizarEstadoVisualBiblioteca();
+            if (message.NuevoAnime != null)
+            {
+                _animesEnBibliotecaIds.Add(message.NuevoAnime.AniListId);
+                ActualizarEstadoVisualBiblioteca();
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("AgregarAnimeViewModel", "Error al procesar AnimeAñadidoMensaje", ex);
         }
     }
 
