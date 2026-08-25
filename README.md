@@ -53,6 +53,10 @@ Olvida los reproductores externos o reproductores web lentos.
 ### 📥 6. Gestor Integrado de Descargas
 * Descarga episodios directamente desde la aplicación con monitoreo de velocidad en vivo, barra de progreso y notificaciones al completar.
 
+### 🛡️ 7. UX Pulida al Milímetro y Estabilidad Inquebrantable
+* **Memoria Visual Infalible:** ¿Dejaste un capítulo a la mitad? El sistema inteligente de tracking local-first recuerda tu posición exacta al milisegundo y lo refleja en la interfaz visualmente, sin errores.
+* **Inmersión sin Fricciones:** Controles de volumen estilizados (sin bordes toscos), gestión rápida de subtítulos de grado cinematográfico, y transiciones fluidas hacia pantalla completa (Double-Click) garantizadas por nuestro control de subprocesos nativo que elimina cualquier "congelamiento" de UI. Todo está diseñado para que te olvides del software y te sumerjas en la historia.
+
 ---
 
 ## 🏗️ Arquitectura e Ingeniería de Alto Rendimiento
