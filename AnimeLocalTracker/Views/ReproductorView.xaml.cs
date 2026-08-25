@@ -50,6 +50,8 @@ namespace AnimeLocalTracker.Views
 
         private void ReproductorView_Loaded(object sender, RoutedEventArgs e)
         {
+            DesactivarDobleClickFullscreenHost();
+
             // Suscribir al pipeline global de input DESPUÉS de que FlyleafHost
             // haya creado su ventana nativa (ocurre durante el layout pass de Loaded).
             InputManager.Current.PreProcessInput += InputManager_PreProcessInput;
@@ -63,11 +65,46 @@ namespace AnimeLocalTracker.Views
             });
         }
 
+        /// <summary>
+        /// FlyleafHost captura el mouse a nivel nativo: su doble-click fullscreen no pasa por el
+        /// routing de WPF y hay que desactivarlo en el propio host. Se asigna por reflexión porque
+        /// como atributo XAML el compilador BAML de FlyleafLib 3.11 lo mapea a la propiedad
+        /// equivocada ("False is not a valid value for AvailableWindows").
+        /// </summary>
+        private void DesactivarDobleClickFullscreenHost()
+        {
+            try
+            {
+                var campo = typeof(FlyleafLib.Controls.WPF.FlyleafHost).GetField(
+                    "ToggleFullScreenOnDoubleClickProperty",
+                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+
+                if (campo?.GetValue(null) is System.Windows.DependencyProperty dp)
+                {
+                    HostFlyleaf.SetValue(dp, false);
+                }
+                else
+                {
+                    AppLogger.Debug("ReproductorView", "FlyleafHost no expone ToggleFullScreenOnDoubleClickProperty; se mantiene solo el bloqueo a nivel WPF.");
+                }
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Debug("ReproductorView", $"No se pudo desactivar el doble-click del host: {ex.Message}");
+            }
+        }
+
         private void ReproductorView_Unloaded(object sender, RoutedEventArgs e)
         {
             InputManager.Current.PreProcessInput -= InputManager_PreProcessInput;
             _fadeTimer.Stop();
             Mouse.OverrideCursor = null;
+
+            // StaysOpen=True: cerrar manualmente al salir del reproductor
+            if (SubtitlesPopup != null)
+            {
+                SubtitlesPopup.IsOpen = false;
+            }
         }
 
         private void InputManager_PreProcessInput(object sender, PreProcessInputEventArgs e)
@@ -190,41 +227,92 @@ namespace AnimeLocalTracker.Views
             }
         }
 
-        private void Slider_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        // === Clic EXACTO en la barra de tiempo ===
+        // IsMoveToPointEnabled del slider alinea el CENTRO del thumb con el clic y lo recorta
+        // dentro de la pista, lo que desplaza hasta ~4% de la duración en los extremos.
+        // Aquí calculamos el valor exacto con corrección por el ancho del thumb.
+        private void ProgressBarArea_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            // Solo buscar si NO estábamos arrastrando el pulgar (clic directo en la pista)
-            if (DataContext is ReproductorViewModel vm && !vm.IsDraggingSlider)
-            {
-                if (sender is Slider slider)
-                {
-                    vm.FinalizarArrastre(slider.Value);
-                }
-            }
-        }
-
-        private DateTime _lastSubtitlesPopupCloseTime = DateTime.MinValue;
-
-        private void SubtitlesPopup_Closed(object sender, EventArgs e)
-        {
-            _lastSubtitlesPopupCloseTime = DateTime.UtcNow;
-        }
-
-        private void SubtitlesButton_Click(object sender, RoutedEventArgs e)
-        {
-            // Si el popup se acaba de cerrar por hacer clic en este mismo botón (u otro lugar)
-            // StaysOpen="False" lo cierra primero, y el Click se dispara justo después.
-            // Con esta verificación ignoramos el clic si ocurrió en los últimos 150ms.
-            if ((DateTime.UtcNow - _lastSubtitlesPopupCloseTime).TotalMilliseconds < 150)
-            {
+            if (DataContext is not ReproductorViewModel vm || vm.TotalSeconds <= 0)
                 return;
-            }
 
-            SubtitlesPopup.IsOpen = true;
+            // No interferir con el arrastre del pulgar (el thumb gestiona su propio drag)
+            if (EsDentroDeThumb(e.OriginalSource as DependencyObject))
+                return;
+
+            double x = e.GetPosition(ProgressBarArea).X;
+            double ancho = Math.Max(1d, ProgressBarArea.ActualWidth);
+            double halfThumb = ObtenerMitadAnchoThumb();
+            double usable = Math.Max(1d, ancho - 2 * halfThumb);
+
+            double ratio = Math.Clamp((x - halfThumb) / usable, 0d, 1d);
+            vm.FinalizarArrastre(vm.TotalSeconds * ratio);
+
+            // Evitar que el slider aplique además su valor impreciso (IsMoveToPointEnabled)
+            e.Handled = true;
+        }
+
+        private static bool EsDentroDeThumb(DependencyObject? source)
+        {
+            while (source != null)
+            {
+                if (source is Thumb) return true;
+                source = System.Windows.Media.VisualTreeHelper.GetParent(source);
+            }
+            return false;
+        }
+
+        private double ObtenerMitadAnchoThumb()
+        {
+            var thumb = EncontrarHijo<Thumb>(SliderTiempo);
+            double ancho = thumb?.ActualWidth ?? 0;
+            if (ancho <= 0) ancho = 12; // ancho típico del thumb de MaterialDesign
+            return ancho / 2;
+        }
+
+        private static T? EncontrarHijo<T>(DependencyObject? parent) where T : DependencyObject
+        {
+            if (parent == null) return null;
+            int count = System.Windows.Media.VisualTreeHelper.GetChildrenCount(parent);
+            for (int i = 0; i < count; i++)
+            {
+                var child = System.Windows.Media.VisualTreeHelper.GetChild(parent, i);
+                if (child is T encontrado) return encontrado;
+                var resultado = EncontrarHijo<T>(child);
+                if (resultado != null) return resultado;
+            }
+            return null;
+        }
+
+        // === Menú de subtítulos (toggle real) ===
+        // El toggle se maneja en PreviewMouseDown (no en Click): con StaysOpen="False" el popup
+        // se cerraba por captura del mouse y el mismo clic lo volvía a abrir.
+        private void SubtitlesButton_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            SubtitlesPopup.IsOpen = !SubtitlesPopup.IsOpen;
+            e.Handled = true;
+            RegistrarActividad();
+        }
+
+        private void SubtitleMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            // Elegir una opción cierra el menú por completo (el Command se ejecuta igualmente)
+            SubtitlesPopup.IsOpen = false;
+        }
+
+        private void ReproductorView_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            // Clic fuera del popup y del botón: cerrar el menú
+            if (SubtitlesPopup.IsOpen && !SubtitlesPopup.IsMouseOver && !SubtitlesButton.IsMouseOver)
+            {
+                SubtitlesPopup.IsOpen = false;
+            }
         }
 
         private void ReproductorView_PreviewMouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
-            // Bloquear completamente la alternancia de pantalla completa por doble clic (tanto de Flyleaf como de la ventana)
+            // Segunda línea de defensa: el fix principal es ToggleFullScreenOnDoubleClick="False"
+            // en FlyleafHost (su captura del mouse es nativa y no pasa por el routing de WPF).
             e.Handled = true;
         }
 

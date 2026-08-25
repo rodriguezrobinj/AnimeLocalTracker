@@ -44,6 +44,128 @@
             <!-- Conversores Globales -->
             <BooleanToVisibilityConverter x:Key="BoolToVis" />
             <materialDesign:BooleanToVisibilityConverter x:Key="InverseBoolToVis" TrueValue="Collapsed" FalseValue="Visible" />
+
+            <!-- ═══════════════════════════════════════════════════════════════ -->
+            <!--  SISTEMA DE DISEÑO (tokens canónicos = paleta de DetalleView)  -->
+            <!--  Superficies slate-oscuro, acento azul, texto en 3 jerarquías.  -->
+            <!-- ═══════════════════════════════════════════════════════════════ -->
+            <SolidColorBrush x:Key="Brush.Surface1" Color="#14181E" />       <!-- tarjetas -->
+            <SolidColorBrush x:Key="Brush.Surface2" Color="#161B22" />       <!-- paneles elevados -->
+            <SolidColorBrush x:Key="Brush.Surface3" Color="#1E293B" />       <!-- chips / hover con acento -->
+            <SolidColorBrush x:Key="Brush.Border" Color="#262D38" />         <!-- bordes sutiles -->
+            <SolidColorBrush x:Key="Brush.BorderStrong" Color="#2D3748" />   <!-- bordes de inputs -->
+            <SolidColorBrush x:Key="Brush.TextPrimary" Color="#E2E8F0" />
+            <SolidColorBrush x:Key="Brush.TextSecondary" Color="#9CA3AF" />
+            <SolidColorBrush x:Key="Brush.TextTertiary" Color="#6B7280" />
+            <SolidColorBrush x:Key="Brush.Accent" Color="#60A5FA" />
+            <SolidColorBrush x:Key="Brush.AccentStrong" Color="#3B82F6" />
+            <SolidColorBrush x:Key="Brush.AccentSoft" Color="#93C5FD" />
+            <SolidColorBrush x:Key="Brush.Success" Color="#34D399" />
+            <SolidColorBrush x:Key="Brush.Danger" Color="#F87171" />
+            <SolidColorBrush x:Key="Brush.Warning" Color="#F59E0B" />
+            <SolidColorBrush x:Key="Brush.Rose" Color="#F43F5E" />
+            <SolidColorBrush x:Key="Brush.Scrim" Color="#99000000" />
+
+            <!-- ── Escala tipográfica (única fuente de verdad para tamaños) ── -->
+            <Style x:Key="AppText.PageTitle" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="26"/>
+                <Setter Property="FontWeight" Value="Bold"/>
+                <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}"/>
+            </Style>
+            <Style x:Key="AppText.Section" TargetType="TextBlock" BasedOn="{StaticResource AppText.PageTitle}">
+                <Setter Property="FontSize" Value="16"/>
+            </Style>
+            <Style x:Key="AppText.Body" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="14"/>
+                <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}"/>
+            </Style>
+            <Style x:Key="AppText.BodyStrong" TargetType="TextBlock" BasedOn="{StaticResource AppText.Body}">
+                <Setter Property="FontWeight" Value="SemiBold"/>
+            </Style>
+            <Style x:Key="AppText.Secondary" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="13"/>
+                <Setter Property="Foreground" Value="{DynamicResource Brush.TextSecondary}"/>
+            </Style>
+            <Style x:Key="AppText.Caption" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="12"/>
+                <Setter Property="Foreground" Value="{DynamicResource Brush.TextSecondary}"/>
+            </Style>
+            <Style x:Key="AppText.Micro" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="11"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="Foreground" Value="{DynamicResource Brush.TextSecondary}"/>
+            </Style>
+
+            <!-- ── Componentes compartidos ── -->
+            <!-- Tarjeta estándar -->
+            <Style x:Key="AppCard" TargetType="Border">
+                <Setter Property="Background" Value="{DynamicResource Brush.Surface1}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="CornerRadius" Value="12"/>
+                <Setter Property="Padding" Value="14"/>
+            </Style>
+            <!-- Chip / badge de conteo -->
+            <Style x:Key="AppBadge" TargetType="Border">
+                <Setter Property="Background" Value="{DynamicResource Brush.Surface3}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource Brush.BorderStrong}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="CornerRadius" Value="12"/>
+                <Setter Property="Height" Value="24"/>
+                <Setter Property="MinWidth" Value="26"/>
+                <Setter Property="Padding" Value="7,0"/>
+            </Style>
+            <!-- Contenedor de página: márgenes + animación de entrada (unificado en todas las vistas) -->
+            <Style x:Key="AppPageRoot" TargetType="Grid">
+                <Setter Property="Margin" Value="95,60,30,30"/>
+                <Setter Property="RenderTransform">
+                    <Setter.Value>
+                        <TranslateTransform Y="0"/>
+                    </Setter.Value>
+                </Setter>
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding Topmost, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                        <Setter Property="Margin" Value="95,30,30,30"/>
+                    </DataTrigger>
+                    <Trigger Property="Visibility" Value="Visible">
+                        <Trigger.EnterActions>
+                            <BeginStoryboard>
+                                <Storyboard>
+                                    <DoubleAnimation Storyboard.TargetProperty="Opacity" From="0" To="1" Duration="0:0:0.2">
+                                        <DoubleAnimation.EasingFunction>
+                                            <QuarticEase EasingMode="EaseOut"/>
+                                        </DoubleAnimation.EasingFunction>
+                                    </DoubleAnimation>
+                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)" From="25" To="0" Duration="0:0:0.2">
+                                        <DoubleAnimation.EasingFunction>
+                                            <QuarticEase EasingMode="EaseOut"/>
+                                        </DoubleAnimation.EasingFunction>
+                                    </DoubleAnimation>
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </Trigger.EnterActions>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+            <!-- Estados vacíos -->
+            <Style x:Key="AppEmptyTitle" TargetType="TextBlock" BasedOn="{StaticResource AppText.BodyStrong}">
+                <Setter Property="FontSize" Value="20"/>
+                <Setter Property="HorizontalAlignment" Value="Center"/>
+            </Style>
+            <Style x:Key="AppEmptyText" TargetType="TextBlock" BasedOn="{StaticResource AppText.Secondary}">
+                <Setter Property="HorizontalAlignment" Value="Center"/>
+                <Setter Property="TextAlignment" Value="Center"/>
+                <Setter Property="Opacity" Value="0.85"/>
+            </Style>
+            <!-- Botones de acción de página -->
+            <Style x:Key="AppPrimaryButton" TargetType="Button" BasedOn="{StaticResource MaterialDesignRaisedButton}">
+                <Setter Property="Background" Value="{DynamicResource Brush.AccentStrong}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource Brush.AccentStrong}"/>
+                <Setter Property="Foreground" Value="White"/>
+            </Style>
+            <Style x:Key="AppOutlinedButton" TargetType="Button" BasedOn="{StaticResource MaterialDesignOutlinedButton}">
+                <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}"/>
+            </Style>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

@@ -45,7 +45,7 @@
             <StackPanel Margin="0,0,24,20" HorizontalAlignment="Stretch">
 
                 <!-- 1. SECCIÓN ALMACENAMIENTO Y BIBLIOTECA -->
-                <materialDesign:Card Background="#121212" BorderBrush="#262D37" BorderThickness="1" UniformCornerRadius="16" Margin="0,0,0,20" Padding="22" materialDesign:ElevationAssist.Elevation="Dp0">
+                <materialDesign:Card Background="#121212" BorderBrush="#262D38" BorderThickness="1" UniformCornerRadius="16" Margin="0,0,0,20" Padding="22" materialDesign:ElevationAssist.Elevation="Dp0">
                     <StackPanel>
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
                             <Border Background="#1E293B" CornerRadius="8" Width="34" Height="34" Margin="0,0,10,0" VerticalAlignment="Center">
@@ -70,7 +70,7 @@
                                      Style="{StaticResource MaterialDesignOutlinedTextBox}"
                                      materialDesign:HintAssist.Hint="Ruta de Almacenamiento"
                                      materialDesign:HintAssist.IsFloating="False"
-                                     FontSize="13" Foreground="White" Background="#181D24" BorderBrush="#2D3748"
+                                     FontSize="13" Foreground="White" Background="#14181E" BorderBrush="#2D3748"
                                      materialDesign:TextFieldAssist.LeadingIcon="FolderOpen"
                                      materialDesign:TextFieldAssist.LeadingIconSize="20"
                                      VerticalContentAlignment="Center"
@@ -78,7 +78,7 @@
 
                             <Button Grid.Column="1" Command="{Binding SeleccionarCarpetaAnimesCommand}"
                                     Style="{StaticResource MaterialDesignRaisedButton}"
-                                    Background="#2563EB" BorderBrush="#1D4ED8" Foreground="White"
+                                    Background="#3B82F6" BorderBrush="#1D4ED8" Foreground="White"
                                     Height="42" Padding="16,0" Margin="0,0,8,0"
                                     materialDesign:ButtonAssist.CornerRadius="8"
                                     ToolTip="Elegir una nueva carpeta de almacenamiento">
@@ -90,7 +90,7 @@
 
                             <Button Grid.Column="2" Command="{Binding AbrirCarpetaEnExploradorCommand}"
                                     Style="{StaticResource MaterialDesignOutlinedButton}"
-                                    BorderBrush="#374151" Foreground="#D1D5DB"
+                                    BorderBrush="#6B7280" Foreground="#E2E8F0"
                                     Height="42" Padding="16,0"
                                     materialDesign:ButtonAssist.CornerRadius="8"
                                     ToolTip="Abrir en el Explorador de Windows">
@@ -108,7 +108,7 @@
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
 
-                            <Border Grid.Column="0" Background="#181D24" BorderBrush="#2D3748" BorderThickness="1" CornerRadius="10" Padding="16,10" MinHeight="56" Margin="0,0,6,0">
+                            <Border Grid.Column="0" Background="#14181E" BorderBrush="#2D3748" BorderThickness="1" CornerRadius="10" Padding="16,10" MinHeight="56" Margin="0,0,6,0">
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                     <materialDesign:PackIcon Kind="Harddisk" Foreground="#34D399" Width="20" Height="20" VerticalAlignment="Center" Margin="0,0,12,0"/>
                                     <StackPanel VerticalAlignment="Center">
@@ -118,9 +118,9 @@
                                 </StackPanel>
                             </Border>
 
-                            <Border Grid.Column="1" Background="#181D24" BorderBrush="#2D3748" BorderThickness="1" CornerRadius="10" Padding="16,10" MinHeight="56" Margin="6,0,0,0">
+                            <Border Grid.Column="1" Background="#14181E" BorderBrush="#2D3748" BorderThickness="1" CornerRadius="10" Padding="16,10" MinHeight="56" Margin="6,0,0,0">
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <materialDesign:PackIcon Kind="AnimationPlay" Foreground="#A78BFA" Width="20" Height="20" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                    <materialDesign:PackIcon Kind="AnimationPlay" Foreground="#93C5FD" Width="20" Height="20" VerticalAlignment="Center" Margin="0,0,12,0"/>
                                     <StackPanel VerticalAlignment="Center">
                                         <TextBlock Text="Colección Total" FontSize="10" Foreground="#9CA3AF" FontWeight="SemiBold"/>
                                         <TextBlock Text="{Binding TotalAnimesBiblioteca, StringFormat='{}{0} animes registrados'}" Foreground="White" FontSize="13" FontWeight="Bold" Margin="0,2,0,0"/>
@@ -132,11 +132,11 @@
                 </materialDesign:Card>
 
                 <!-- 2. SECCIÓN REPRODUCCIÓN Y PREFERENCIAS (FILAS UNIFORMEMENTE ALINEADAS) -->
-                <materialDesign:Card Background="#121212" BorderBrush="#262D37" BorderThickness="1" UniformCornerRadius="16" Margin="0,0,0,20" Padding="22" materialDesign:ElevationAssist.Elevation="Dp0">
+                <materialDesign:Card Background="#121212" BorderBrush="#262D38" BorderThickness="1" UniformCornerRadius="16" Margin="0,0,0,20" Padding="22" materialDesign:ElevationAssist.Elevation="Dp0">
                     <StackPanel>
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
                             <Border Background="#1E293B" CornerRadius="8" Width="34" Height="34" Margin="0,0,10,0" VerticalAlignment="Center">
-                                <materialDesign:PackIcon Kind="TuneVariant" Foreground="#A78BFA" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                <materialDesign:PackIcon Kind="TuneVariant" Foreground="#93C5FD" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <StackPanel VerticalAlignment="Center">
                                 <TextBlock Text="Reproducción y Descargas" FontSize="16" FontWeight="Bold" Foreground="White"/>
@@ -145,7 +145,7 @@
                         </StackPanel>
 
                         <!-- Fila 1: Auto Play -->
-                        <Border Background="#181D24" BorderBrush="#262E39" BorderThickness="1" CornerRadius="10" MinHeight="56" Padding="16,8" Margin="0,0,0,10">
+                        <Border Background="#14181E" BorderBrush="#262D38" BorderThickness="1" CornerRadius="10" MinHeight="56" Padding="16,8" Margin="0,0,0,10">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
@@ -160,7 +160,7 @@
                         </Border>
 
                         <!-- Fila 1.5: Auto-Skip Intro / Outro (AniSkip) -->
-                        <Border Background="#181D24" BorderBrush="#262E39" BorderThickness="1" CornerRadius="10" MinHeight="56" Padding="16,8" Margin="0,0,0,10">
+                        <Border Background="#14181E" BorderBrush="#262D38" BorderThickness="1" CornerRadius="10" MinHeight="56" Padding="16,8" Margin="0,0,0,10">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
@@ -175,7 +175,7 @@
                         </Border>
 
                         <!-- Fila 2: Subtítulos -->
-                        <Border Background="#181D24" BorderBrush="#262E39" BorderThickness="1" CornerRadius="10" MinHeight="56" Padding="16,8" Margin="0,0,0,10">
+                        <Border Background="#14181E" BorderBrush="#262D38" BorderThickness="1" CornerRadius="10" MinHeight="56" Padding="16,8" Margin="0,0,0,10">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
@@ -190,7 +190,7 @@
                         </Border>
 
                         <!-- Fila 3: Descargas Simultáneas -->
-                        <Border Background="#181D24" BorderBrush="#262E39" BorderThickness="1" CornerRadius="10" MinHeight="56" Padding="16,8" Margin="0,0,0,10">
+                        <Border Background="#14181E" BorderBrush="#262D38" BorderThickness="1" CornerRadius="10" MinHeight="56" Padding="16,8" Margin="0,0,0,10">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
@@ -214,7 +214,7 @@
                         </Border>
 
                         <!-- Fila 4: Intervalo AniList -->
-                        <Border Background="#181D24" BorderBrush="#262E39" BorderThickness="1" CornerRadius="10" MinHeight="56" Padding="16,8" Margin="0,0,0,14">
+                        <Border Background="#14181E" BorderBrush="#262D38" BorderThickness="1" CornerRadius="10" MinHeight="56" Padding="16,8" Margin="0,0,0,14">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
@@ -238,7 +238,7 @@
 
                         <Button Command="{Binding GuardarPreferenciasCommand}" 
                                 Style="{StaticResource MaterialDesignRaisedButton}"
-                                Background="#2563EB" BorderBrush="#1D4ED8" Foreground="White"
+                                Background="#3B82F6" BorderBrush="#1D4ED8" Foreground="White"
                                 HorizontalAlignment="Right" Height="40" Padding="20,0"
                                 materialDesign:ButtonAssist.CornerRadius="8">
                             <StackPanel Orientation="Horizontal">
@@ -250,7 +250,7 @@
                 </materialDesign:Card>
 
                 <!-- 3. SECCIÓN CUENTA Y SINCRONIZACIÓN -->
-                <materialDesign:Card Background="#121212" BorderBrush="#262D37" BorderThickness="1" UniformCornerRadius="16" Margin="0,0,0,20" Padding="22" materialDesign:ElevationAssist.Elevation="Dp0">
+                <materialDesign:Card Background="#121212" BorderBrush="#262D38" BorderThickness="1" UniformCornerRadius="16" Margin="0,0,0,20" Padding="22" materialDesign:ElevationAssist.Elevation="Dp0">
                     <StackPanel>
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
                             <Border Background="#1E293B" CornerRadius="8" Width="34" Height="34" Margin="0,0,10,0" VerticalAlignment="Center">
@@ -262,7 +262,7 @@
                             </StackPanel>
                         </StackPanel>
 
-                        <Border Background="#181D24" BorderBrush="#262E39" BorderThickness="1" CornerRadius="10" MinHeight="56" Padding="16,10">
+                        <Border Background="#14181E" BorderBrush="#262D38" BorderThickness="1" CornerRadius="10" MinHeight="56" Padding="16,10">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>

@@ -406,13 +406,20 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
     // === Scrubbing de la línea de tiempo ===
     private double _posicionAntesArrastre;
-    private long _ultimoScrubSeekTicks;
     private DateTime _settleHastaUtc = DateTime.MinValue;
 
     // Tras un seek, el reproductor tarda unos ms en reportar la nueva posición;
     // durante esa ventana el bucle de tracking no repinta la posición para evitar rebotes.
     private static readonly TimeSpan VentanaSettleSeek = TimeSpan.FromMilliseconds(900);
-    private static readonly TimeSpan IntervaloScrubEnVivo = TimeSpan.FromMilliseconds(250);
+
+    // === Coalescing de seeks (último-gana) ===
+    // Enviar CurTime a Flyleaf más rápido de lo que él procesa los seeks los ENCOLA y pueden
+    // aplicarse FUERA DE ORDEN: el video "no se coloca y vuelve donde estaba". Con un intervalo
+    // mínimo entre seeks y aplicando siempre el objetivo MÁS RECIENTE, el orden queda garantizado.
+    private double _seekPendiente = -1;
+    private DateTime _ultimoSeekAplicadoUtc = DateTime.MinValue;
+    private CancellationTokenSource? _seekDebounceCts;
+    private static readonly TimeSpan IntervaloMinimoSeek = TimeSpan.FromMilliseconds(250);
 
     private void ActualizarTextosTiempo(double posicionSegundos)
     {
@@ -429,30 +436,78 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
     /// <summary>
     /// Comando para cuando el usuario suelta el slider (Thumb.DragCompleted), hace clic en la pista
-    /// o usa los atajos de teclado. Aplica el seek y congela el repintado brevemente (anti-rebote).
+    /// o usa los atajos de teclado. Feedback de UI inmediato + seek nativo coalescido (último-gana).
     /// </summary>
     [RelayCommand]
     public void Seek(double seconds)
     {
         seconds = AcotarPosicion(seconds);
 
-        if (Player != null)
-        {
-            try
-            {
-                Player.CurTime = TimeSpan.FromSeconds(seconds).Ticks;
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Warn("ReproductorViewModel", $"Excepción al ajustar posición nativa del reproductor: {ex.Message}");
-            }
-        }
-
         // Actualizar UI inmediatamente para feedback instantáneo
         _settleHastaUtc = DateTime.UtcNow + VentanaSettleSeek;
         _lastNotifiedSeconds = seconds;
         CurrentSeconds = seconds;
         ActualizarTextosTiempo(seconds);
+
+        SolicitarSeekNativo(seconds);
+    }
+
+    /// <summary>
+    /// Punto único de entrada al seek nativo. Aplica de inmediato si pasó el intervalo mínimo;
+    /// si no, guarda el objetivo MÁS RECIENTE y lo aplica al vencer el intervalo (último-gana).
+    /// </summary>
+    private void SolicitarSeekNativo(double segundos)
+    {
+        if (Player == null || Player.IsDisposed) return;
+
+        var transcurrido = DateTime.UtcNow - _ultimoSeekAplicadoUtc;
+        if (transcurrido >= IntervaloMinimoSeek)
+        {
+            AplicarSeekNativo(segundos);
+            return;
+        }
+
+        _seekPendiente = segundos;
+
+        _seekDebounceCts?.Cancel();
+        _seekDebounceCts?.Dispose();
+        _seekDebounceCts = new CancellationTokenSource();
+        var ct = _seekDebounceCts.Token;
+        var restante = IntervaloMinimoSeek - transcurrido;
+        if (restante < TimeSpan.Zero) restante = TimeSpan.Zero;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(restante, ct);
+                double objetivo = Interlocked.Exchange(ref _seekPendiente, -1);
+                if (objetivo >= 0 && !ct.IsCancellationRequested)
+                {
+                    AplicarSeekNativo(objetivo);
+                }
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex)
+            {
+                AppLogger.Debug("ReproductorViewModel", $"Error en seek coalescido: {ex.Message}");
+            }
+        }, ct);
+    }
+
+    private void AplicarSeekNativo(double segundos)
+    {
+        if (Player == null || Player.IsDisposed) return;
+
+        _ultimoSeekAplicadoUtc = DateTime.UtcNow;
+        try
+        {
+            Player.CurTime = TimeSpan.FromSeconds(segundos).Ticks;
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn("ReproductorViewModel", $"Excepción al ajustar posición nativa del reproductor: {ex.Message}");
+        }
     }
 
     /// <summary>
@@ -472,8 +527,8 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
-    /// Durante el arrastre: feedback visual instantáneo (thumb + tiempo) y scrub en vivo con throttling.
-    /// El seek en vivo usa el seek rápido por keyframe de Flyleaf, así que no bloquea la UI.
+    /// Durante el arrastre: feedback visual instantáneo (thumb + tiempo) y scrub en vivo
+    /// a través del mismo coalescing de seeks (último-gana, máx ~4 seeks/seg).
     /// </summary>
     public void VistaPreviaArrastre(double segundos)
     {
@@ -485,23 +540,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         CurrentSeconds = segundos;
         ActualizarTextosTiempo(segundos);
 
-        // Throttle del seek en vivo a ~4 fps para no saturar el demuxer/decodificador
-        long ahoraTicks = Stopwatch.GetTimestamp();
-        if (Stopwatch.GetElapsedTime(_ultimoScrubSeekTicks) >= IntervaloScrubEnVivo)
-        {
-            _ultimoScrubSeekTicks = ahoraTicks;
-            if (Player != null && !Player.IsDisposed)
-            {
-                try
-                {
-                    Player.CurTime = TimeSpan.FromSeconds(segundos).Ticks;
-                }
-                catch (Exception ex)
-                {
-                    AppLogger.Debug("ReproductorViewModel", $"Scrub seek throttling catch: {ex.Message}");
-                }
-            }
-        }
+        SolicitarSeekNativo(segundos);
     }
 
     /// <summary>
@@ -719,6 +758,9 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     {
         _ = GuardarProgresoActualAsync();
 
+        // Descartar seeks coalescidos pendientes del episodio anterior
+        CancelarSeekPendiente();
+
         _skipTimes.Clear();
         _skipAutoEjecutados.Clear();
         _currentActiveSkip = null;
@@ -765,17 +807,37 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         _trackingCts?.Dispose();
         _trackingCts = new CancellationTokenSource();
 
-        // 1. Obtener progreso previo ANTES de abrir/reproducir para que comience de inmediato donde se dejó
+        // 1. CREAR EL PLAYER ANTES DEL PRIMER await DE ESTE MÉTODO.
+        // Si la vista llega a crearse con Player == null (esto es async y MainViewModel ya
+        // asignó VistaActual), FlyleafHost enlaza su superficie nativa vacía y NO la
+        // reconstruye cuando el Player aparece después: el video se oye pero NO se ve.
+        if (Player == null || Player.IsDisposed)
+        {
+            Player = CreateOptimizedPlayer();
+        }
+        else if (Player.Status == Status.Playing)
+        {
+            try
+            {
+                Player.Pause();
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Debug("ReproductorViewModel", $"Player pause antes de cambiar archivo: {ex.Message}");
+            }
+        }
+
+        // 2. Obtener progreso previo ANTES de abrir/reproducir para que comience de inmediato donde se dejó
         await VerificarProgresoPrevioAsync(animeId, episodio);
         _posicionInicioSegundos = _resumingPositionSeconds;
 
-        // 2. Cargar marcas de skip de AniSkip en segundo plano
+        // 3. Cargar marcas de skip de AniSkip en segundo plano
         _ = CargarSkipTimesAsync(animeId, episodio, _trackingCts.Token);
 
-        // 3. Sincronizar ícono de fullscreen con el estado actual de la ventana
+        // 4. Sincronizar ícono de fullscreen con el estado actual de la ventana
         try
         {
-            if (System.Windows.Application.Current != null && 
+            if (System.Windows.Application.Current != null &&
                 System.Windows.Application.Current.Dispatcher.CheckAccess() &&
                 System.Windows.Application.Current.MainWindow is AnimeLocalTracker.Views.MainWindow mainWindow)
             {
@@ -785,26 +847,6 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         catch
         {
             // Entornos de pruebas sin Dispatcher o en subprocesos en segundo plano
-        }
-
-        // Mantener la instancia existente de Player para no destruir la superficie DirectX de FlyleafHost
-        if (Player == null || Player.IsDisposed)
-        {
-            Player = CreateOptimizedPlayer();
-        }
-        else
-        {
-            try
-            {
-                if (Player.Status == Status.Playing)
-                {
-                    Player.Pause();
-                }
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Debug("ReproductorViewModel", $"Player pause antes de cambiar archivo: {ex.Message}");
-            }
         }
 
         if (Player != null)
@@ -1095,9 +1137,17 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             });
     }
 
+    private bool _disposeHecho;
+
     public void Dispose()
     {
+        // Idempotente: Cerrar() dispone y OnVistaActualChanged también dispone al navegar fuera
+        if (_disposeHecho) return;
+        _disposeHecho = true;
+
         _ = GuardarProgresoActualAsync();
+
+        CancelarSeekPendiente();
 
         try
         {
@@ -1122,5 +1172,13 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             }
             Player = null!;
         }
+    }
+
+    private void CancelarSeekPendiente()
+    {
+        Interlocked.Exchange(ref _seekPendiente, -1);
+        try { _seekDebounceCts?.Cancel(); } catch { }
+        _seekDebounceCts?.Dispose();
+        _seekDebounceCts = null;
     }
 }

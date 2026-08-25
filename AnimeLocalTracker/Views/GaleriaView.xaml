@@ -6,38 +6,7 @@
              TextElement.Foreground="{DynamicResource MaterialDesignBody}"
              Background="Transparent">
 
-    <Grid MaxWidth="1248">
-        <Grid.RenderTransform>
-            <TranslateTransform Y="0"/>
-        </Grid.RenderTransform>
-        <Grid.Style>
-            <Style TargetType="Grid">
-                <Setter Property="Margin" Value="95,60,30,30" />
-                <Style.Triggers>
-                    <DataTrigger Binding="{Binding Topmost, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
-                        <Setter Property="Margin" Value="95,30,30,30" />
-                    </DataTrigger>
-                    <Trigger Property="Visibility" Value="Visible">
-                        <Trigger.EnterActions>
-                            <BeginStoryboard>
-                                <Storyboard>
-                                    <DoubleAnimation Storyboard.TargetProperty="Opacity" From="0" To="1" Duration="0:0:0.2">
-                                        <DoubleAnimation.EasingFunction>
-                                            <QuarticEase EasingMode="EaseOut"/>
-                                        </DoubleAnimation.EasingFunction>
-                                    </DoubleAnimation>
-                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)" From="25" To="0" Duration="0:0:0.2">
-                                        <DoubleAnimation.EasingFunction>
-                                            <QuarticEase EasingMode="EaseOut"/>
-                                        </DoubleAnimation.EasingFunction>
-                                    </DoubleAnimation>
-                                </Storyboard>
-                            </BeginStoryboard>
-                        </Trigger.EnterActions>
-                    </Trigger>
-                </Style.Triggers>
-            </Style>
-        </Grid.Style>
+    <Grid MaxWidth="1248" Style="{StaticResource AppPageRoot}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -56,29 +25,29 @@
         <!-- HEADER MODERNO CON ÍCONOS -->
         <Grid Grid.Row="0" Margin="0,0,0,20" Panel.ZIndex="10">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <TextBlock Text="Mi Colección" Style="{StaticResource MaterialDesignHeadline4TextBlock}" FontWeight="Bold" VerticalAlignment="Center"/>
-                
+                <TextBlock Text="Mi Colección" Style="{StaticResource AppText.PageTitle}" VerticalAlignment="Center"/>
+
                 <!-- BADGE CONTEO BIBLIOTECA -->
-                <Border Background="#1E293B" BorderBrush="#334155" BorderThickness="1" 
-                        CornerRadius="12" Height="24" MinWidth="26" Padding="7,0" Margin="14,0,0,0" 
-                        VerticalAlignment="Center">
-                    <TextBlock Text="{Binding TotalAnimesBiblioteca}" FontSize="12" FontWeight="Bold" Foreground="#60A5FA" 
+                <Border Style="{StaticResource AppBadge}" Margin="14,0,0,0" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding TotalAnimesBiblioteca}" Style="{StaticResource AppText.Caption}" FontWeight="Bold"
+                               Foreground="{DynamicResource Brush.Accent}"
                                VerticalAlignment="Center" HorizontalAlignment="Center" TextAlignment="Center"/>
                 </Border>
             </StackPanel>
             
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                <Button Command="{Binding AñadirAnimeManualCommand}" 
-                        Style="{StaticResource MaterialDesignOutlinedButton}" Margin="0,0,15,0" ToolTip="Buscar y añadir un nuevo anime">
+                <Button Command="{Binding AñadirAnimeManualCommand}"
+                        Style="{StaticResource AppOutlinedButton}" Margin="0,0,15,0" ToolTip="Buscar y añadir un nuevo anime">
                     <StackPanel Orientation="Horizontal">
                         <materialDesign:PackIcon Kind="MagnifyPlus" Margin="0,0,8,0" VerticalAlignment="Center" Width="18" Height="18"/>
                         <TextBlock Text="BUSCAR ANIME" VerticalAlignment="Center" FontWeight="SemiBold"/>
                     </StackPanel>
                 </Button>
 
-                <Button Command="{Binding ConectarAniListCommand}" 
+                <Button Command="{Binding ConectarAniListCommand}"
+                        Style="{StaticResource AppPrimaryButton}"
                         Visibility="{Binding EstaConectado, Converter={StaticResource InverseBoolToVis}}"
-                        Background="#3F51B5" BorderBrush="#3F51B5" Foreground="White" Margin="0,0,15,0" ToolTip="Conectar con AniList">
+                        Margin="0,0,15,0" ToolTip="Conectar con AniList">
                     <StackPanel Orientation="Horizontal">
                         <materialDesign:PackIcon Kind="CloudUpload" Margin="0,0,8,0" VerticalAlignment="Center" Width="18" Height="18"/>
                         <TextBlock Text="CONECTAR" VerticalAlignment="Center" FontWeight="SemiBold"/>
@@ -104,7 +73,7 @@
                         <!-- Expandable background that clips contents -->
                         <Border x:Name="UnifiedBackground" 
                                 Width="{Binding ActualWidth, ElementName=UserMenuToggle}"
-                                Background="#252525" CornerRadius="20"
+                                Background="#1E293B" CornerRadius="20"
                                 BorderBrush="#33FFFFFF" BorderThickness="1"
                                 VerticalAlignment="Top" HorizontalAlignment="Left"
                                 ClipToBounds="True">
@@ -120,7 +89,7 @@
                                         </DataTrigger>
                                         <DataTrigger Binding="{Binding MenuUsuarioAbierto}" Value="True">
                                             <Setter Property="Opacity" Value="1"/>
-                                            <Setter Property="Background" Value="#252525"/>
+                                            <Setter Property="Background" Value="#1E293B"/>
                                             <Setter Property="BorderBrush" Value="#33FFFFFF"/>
                                             <!-- Softer bottom corners when open -->
                                             <Setter Property="CornerRadius" Value="20,20,16,16"/>
@@ -182,7 +151,7 @@
                         </Button.Template>
                         
                         <StackPanel Orientation="Horizontal">
-                            <Ellipse Width="28" Height="28" Margin="0,0,10,0" Stroke="#3F51B5" StrokeThickness="1.5">
+                            <Ellipse Width="28" Height="28" Margin="0,0,10,0" Stroke="#3B82F6" StrokeThickness="1.5">
                                 <Ellipse.Fill>
                                     <ImageBrush ImageSource="{Binding AvatarUsuarioAniList, TargetNullValue={x:Null}, FallbackValue={x:Null}, IsAsync=True}" Stretch="UniformToFill"/>
                                 </Ellipse.Fill>
@@ -232,8 +201,10 @@
                     </Button>
                 </Grid>
                 
-                <Button Command="{Binding ActualizarBibliotecaCommand}" 
-                        Background="#4CAF50" BorderBrush="#4CAF50" Foreground="White" ToolTip="Actualizar datos desde la nube">
+                <Button Command="{Binding ActualizarBibliotecaCommand}"
+                        Style="{StaticResource AppPrimaryButton}"
+                        Background="{DynamicResource Brush.Success}" BorderBrush="{DynamicResource Brush.Success}"
+                        ToolTip="Actualizar datos desde la nube">
                     <StackPanel Orientation="Horizontal">
                         <materialDesign:PackIcon Kind="Sync" Margin="0,0,8,0" VerticalAlignment="Center" Width="18" Height="18"/>
                         <TextBlock Text="SINCRONIZAR" VerticalAlignment="Center" FontWeight="SemiBold"/>
@@ -250,15 +221,16 @@
             </Grid.ColumnDefinitions>
 
             <!-- Buscador Local -->
-            <Border Grid.Column="0" Background="#1AFFFFFF" CornerRadius="12" Height="46" VerticalAlignment="Center" Padding="15,0,5,0" Margin="0,0,20,0"
+            <Border Grid.Column="0" Background="{DynamicResource Brush.Surface1}" BorderBrush="{DynamicResource Brush.BorderStrong}" BorderThickness="1"
+                    CornerRadius="12" Height="46" VerticalAlignment="Center" Padding="15,0,5,0" Margin="0,0,20,0"
                     HorizontalAlignment="Left" Width="350" ClipToBounds="True">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-                    
-                    <materialDesign:PackIcon Kind="Magnify" Width="22" Height="22" Foreground="#8A8A8A" VerticalAlignment="Center" Margin="0,0,10,0"/>
+
+                    <materialDesign:PackIcon Kind="Magnify" Width="22" Height="22" Foreground="{DynamicResource Brush.TextSecondary}" VerticalAlignment="Center" Margin="0,0,10,0"/>
                     
                     <TextBox Grid.Column="1" 
                              Text="{Binding TextoBusqueda, UpdateSourceTrigger=PropertyChanged}"
@@ -306,20 +278,20 @@
                              Visibility="{Binding EstaActualizando, Converter={StaticResource BoolToVis}}" 
                              Panel.ZIndex="50" materialDesign:ElevationAssist.Elevation="Dp8">
             <StackPanel Orientation="Horizontal">
-                <materialDesign:PackIcon Kind="CloudSync" Foreground="#4CAF50" Width="24" Height="24" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                <materialDesign:PackIcon Kind="CloudSync" Foreground="#34D399" Width="24" Height="24" VerticalAlignment="Center" Margin="0,0,10,0"/>
                 <TextBlock Text="{Binding TextoProgreso}" 
                            FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,15,0"
                            Foreground="{DynamicResource MaterialDesignBodyLight}" FontSize="14"/>
                 <ProgressBar Minimum="0" Maximum="{Binding ProgresoTotal}" 
                              Value="{Binding ProgresoActual}" 
-                             Width="150" Height="6" VerticalAlignment="Center" Foreground="#4CAF50" 
+                             Width="150" Height="6" VerticalAlignment="Center" Foreground="#34D399" 
                              Background="#404CAF50" materialDesign:TransitionAssist.DisableTransitions="True"/>
             </StackPanel>
         </materialDesign:Card>
 
         <!-- BARRA DE ACCIONES MÚLTIPLES (FLOTANTE) -->
         <Border Grid.Row="2" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,30" 
-                Background="#252525" CornerRadius="24" Padding="20,8"
+                Background="#1E293B" CornerRadius="24" Padding="20,8"
                 Visibility="{Binding ModoSeleccion, Converter={StaticResource BoolToVis}}"
                 Panel.ZIndex="100" BorderBrush="#40FFFFFF" BorderThickness="1">
             <Border.Effect>
@@ -347,13 +319,13 @@
         <!-- ESTADO VACÍO (0 animes guardados) -->
         <StackPanel Grid.Row="2" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,50,0,0"
                     Visibility="{Binding BibliotecaVacia, Converter={StaticResource BoolToVis}}">
-            <materialDesign:PackIcon Kind="ArchiveOutline" Width="80" Height="80" Foreground="{DynamicResource MaterialDesignBodyLight}" HorizontalAlignment="Center" Margin="0,0,0,20" Opacity="0.5"/>
-            <TextBlock Text="Tu biblioteca está vacía" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource MaterialDesignBody}" HorizontalAlignment="Center"/>
-            <TextBlock Text="Añade un anime para empezar tu colección local" FontSize="14" Foreground="{DynamicResource MaterialDesignBodyLight}" HorizontalAlignment="Center" Margin="0,10,0,30" Opacity="0.8"/>
-            <Button Command="{Binding AñadirAnimeManualCommand}" Style="{StaticResource MaterialDesignRaisedButton}" Background="#3F51B5" BorderBrush="#3F51B5" Foreground="White" Padding="20,10" HorizontalAlignment="Center" Height="Auto">
+            <materialDesign:PackIcon Kind="ArchiveOutline" Width="80" Height="80" Foreground="{DynamicResource Brush.TextTertiary}" HorizontalAlignment="Center" Margin="0,0,0,20" Opacity="0.5"/>
+            <TextBlock Text="Tu biblioteca está vacía" Style="{StaticResource AppEmptyTitle}"/>
+            <TextBlock Text="Añade un anime para empezar tu colección local" Style="{StaticResource AppEmptyText}" Margin="0,10,0,30"/>
+            <Button Command="{Binding AñadirAnimeManualCommand}" Style="{StaticResource AppPrimaryButton}" Padding="20,10" HorizontalAlignment="Center" Height="Auto">
                 <StackPanel Orientation="Horizontal">
                     <materialDesign:PackIcon Kind="MagnifyPlus" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                    <TextBlock Text="BUSCAR Y AÑADIR ANIME" VerticalAlignment="Center" FontWeight="Bold" FontSize="16"/>
+                    <TextBlock Text="BUSCAR Y AÑADIR ANIME" VerticalAlignment="Center" FontWeight="Bold" FontSize="14"/>
                 </StackPanel>
             </Button>
         </StackPanel>
@@ -361,9 +333,9 @@
         <!-- SIN RESULTADOS (La búsqueda o filtro no encontró nada) -->
         <StackPanel Grid.Row="2" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,50,0,0"
                     Visibility="{Binding SinResultados, Converter={StaticResource BoolToVis}}">
-            <materialDesign:PackIcon Kind="MagnifyRemoveOutline" Width="80" Height="80" Foreground="{DynamicResource MaterialDesignBodyLight}" HorizontalAlignment="Center" Margin="0,0,0,20" Opacity="0.5"/>
-            <TextBlock Text="No se encontraron animes" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource MaterialDesignBody}" HorizontalAlignment="Center"/>
-            <TextBlock Text="Intenta usar otros términos de búsqueda o cambia el filtro de estado." FontSize="14" Foreground="{DynamicResource MaterialDesignBodyLight}" HorizontalAlignment="Center" Margin="0,10,0,0" Opacity="0.8"/>
+            <materialDesign:PackIcon Kind="MagnifyRemoveOutline" Width="80" Height="80" Foreground="{DynamicResource Brush.TextTertiary}" HorizontalAlignment="Center" Margin="0,0,0,20" Opacity="0.5"/>
+            <TextBlock Text="No se encontraron animes" Style="{StaticResource AppEmptyTitle}"/>
+            <TextBlock Text="Intenta usar otros términos de búsqueda o cambia el filtro de estado." Style="{StaticResource AppEmptyText}" Margin="0,10,0,0"/>
         </StackPanel>
 
         <!-- Lista virtualizada y acelerada por hardware (60fps+) -->
@@ -407,7 +379,7 @@
             <ListBox.ItemTemplate>
                 <DataTemplate>
                     <materialDesign:Card Width="180" Height="265" Margin="14" 
-                                         UniformCornerRadius="10" Background="#161616"
+                                         UniformCornerRadius="10" Background="#14181E"
                                          RenderTransformOrigin="0.5,0.5" ClipToBounds="True">
                         <materialDesign:Card.RenderTransform>
                             <ScaleTransform ScaleX="1" ScaleY="1" />
@@ -453,14 +425,14 @@
                             </Button.Template>
                             <Grid>
                                 <!-- Fondo estático oscuro para carga instantánea sin animación infinita -->
-                                <Border Background="#1C1C1E" CornerRadius="10" />
+                                <Border Background="#1B222C" CornerRadius="10" />
 
                                 <!-- Portada precargada y congelada en memoria con escalado de alta definición -->
                                 <Image Source="{Binding PortadaImagen}" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" SnapsToDevicePixels="True" />
                                 
                                 <!-- OVERLAY DE SELECCIÓN -->
                                 <Border Background="#66000000" Visibility="{Binding EstaSeleccionado, Converter={StaticResource BoolToVis}}"/>
-                                <Border BorderBrush="#3F51B5" BorderThickness="4" CornerRadius="10" Visibility="{Binding EstaSeleccionado, Converter={StaticResource BoolToVis}}"/>
+                                <Border BorderBrush="#3B82F6" BorderThickness="4" CornerRadius="10" Visibility="{Binding EstaSeleccionado, Converter={StaticResource BoolToVis}}"/>
                                 
                                 <!-- CHECKBOX DE SELECCIÓN (Visible solo en ModoSeleccion) -->
                                 <CheckBox IsChecked="{Binding EstaSeleccionado}" 
@@ -478,7 +450,7 @@
                                 </Border>
 
                                 <!-- BADGE NUEVOS EPISODIOS -->
-                                <Border Background="#E53935" CornerRadius="10" Padding="8,4" 
+                                <Border Background="#F43F5E" CornerRadius="10" Padding="8,4" 
                                         HorizontalAlignment="Right" VerticalAlignment="Top" Margin="10"
                                         Visibility="{Binding TieneNuevosEpisodios, Converter={StaticResource BoolToVis}}"
                                         materialDesign:ElevationAssist.Elevation="Dp4"
@@ -500,7 +472,7 @@
                                         
                                         <!-- PROGRESS BAR DIRECTO SIN ANIMACIÓN DE TRANSICIÓN EN SCROLL -->
                                         <ProgressBar Value="{Binding ProgresoPorcentaje, Mode=OneWay}" Height="4" 
-                                                     Background="#44FFFFFF" Foreground="#E53935" 
+                                                     Background="#44FFFFFF" Foreground="#F43F5E" 
                                                      BorderThickness="0" Margin="0,0,0,4"
                                                      materialDesign:TransitionAssist.DisableTransitions="True"/>
                                         

@@ -25,7 +25,7 @@
     <Grid x:Name="RootLayout">
         <materialDesign:DialogHost IsOpen="{Binding IsDialogOpen}" CloseOnClickAway="True">
             <materialDesign:DialogHost.DialogContent>
-                <Border Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="18" Padding="24" />
+                <Border Background="#161B22" BorderBrush="#262D38" BorderThickness="1" CornerRadius="18" Padding="24" />
             </materialDesign:DialogHost.DialogContent>
 
             <Grid>
@@ -52,7 +52,7 @@
 
                             <!-- BOTÓN BIBLIOTECA (GALERÍA) -->
                             <Grid Margin="0,8">
-                                <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#82B1FF" HorizontalAlignment="Left" Margin="-9,0,0,0"
+                                <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"
                                            Visibility="{Binding EsGaleriaActiva, Converter={StaticResource BoolToVis}}"/>
                                 <Button Command="{Binding NavegarGaleriaCommand}" Width="45" Height="45" ToolTip="Biblioteca">
                                     <Button.Style>
@@ -60,7 +60,7 @@
                                             <Setter Property="Background" Value="Transparent"/>
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding EsGaleriaActiva}" Value="True">
-                                                    <Setter Property="Background" Value="#1A82B1FF"/>
+                                                    <Setter Property="Background" Value="#1A60A5FA"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
@@ -68,10 +68,10 @@
                                     <materialDesign:PackIcon Kind="ViewGallery" Width="24" Height="24">
                                         <materialDesign:PackIcon.Style>
                                             <Style TargetType="materialDesign:PackIcon">
-                                                <Setter Property="Foreground" Value="#78909C"/>
+                                                <Setter Property="Foreground" Value="#6B7280"/>
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding EsGaleriaActiva}" Value="True">
-                                                        <Setter Property="Foreground" Value="#82B1FF"/>
+                                                        <Setter Property="Foreground" Value="#60A5FA"/>
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
@@ -82,7 +82,7 @@
 
                             <!-- BOTÓN AÑADIR ANIME / EXPLORAR -->
                             <Grid Margin="0,8">
-                                <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#82B1FF" HorizontalAlignment="Left" Margin="-9,0,0,0"
+                                <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"
                                            Visibility="{Binding EsAgregarAnimeActivo, Converter={StaticResource BoolToVis}}"/>
                                 <Button Command="{Binding NavegarAgregarAnimeCommand}" Width="45" Height="45" ToolTip="Añadir Anime">
                                     <Button.Style>
@@ -90,7 +90,7 @@
                                             <Setter Property="Background" Value="Transparent"/>
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding EsAgregarAnimeActivo}" Value="True">
-                                                    <Setter Property="Background" Value="#1A82B1FF"/>
+                                                    <Setter Property="Background" Value="#1A60A5FA"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
@@ -98,10 +98,10 @@
                                     <materialDesign:PackIcon Kind="MagnifyPlus" Width="24" Height="24">
                                         <materialDesign:PackIcon.Style>
                                             <Style TargetType="materialDesign:PackIcon">
-                                                <Setter Property="Foreground" Value="#78909C"/>
+                                                <Setter Property="Foreground" Value="#6B7280"/>
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding EsAgregarAnimeActivo}" Value="True">
-                                                        <Setter Property="Foreground" Value="#82B1FF"/>
+                                                        <Setter Property="Foreground" Value="#60A5FA"/>
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
@@ -112,7 +112,7 @@
 
                             <!-- BOTÓN CALENDARIO -->
                             <Grid Margin="0,8">
-                                <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#82B1FF" HorizontalAlignment="Left" Margin="-9,0,0,0"
+                                <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"
                                            Visibility="{Binding EsCalendarioActivo, Converter={StaticResource BoolToVis}}"/>
                                 <Button Command="{Binding NavegarCalendarioCommand}" Width="45" Height="45" ToolTip="Calendario de Emisión">
                                     <Button.Style>
@@ -120,7 +120,7 @@
                                             <Setter Property="Background" Value="Transparent"/>
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding EsCalendarioActivo}" Value="True">
-                                                    <Setter Property="Background" Value="#1A82B1FF"/>
+                                                    <Setter Property="Background" Value="#1A60A5FA"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
@@ -128,10 +128,10 @@
                                     <materialDesign:PackIcon Kind="CalendarClock" Width="24" Height="24">
                                         <materialDesign:PackIcon.Style>
                                             <Style TargetType="materialDesign:PackIcon">
-                                                <Setter Property="Foreground" Value="#78909C"/>
+                                                <Setter Property="Foreground" Value="#6B7280"/>
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding EsCalendarioActivo}" Value="True">
-                                                        <Setter Property="Foreground" Value="#82B1FF"/>
+                                                        <Setter Property="Foreground" Value="#60A5FA"/>
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
@@ -142,7 +142,7 @@
 
                             <!-- BOTÓN COLA DE DESCARGAS -->
                             <Grid Margin="0,8">
-                                <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#82B1FF" HorizontalAlignment="Left" Margin="-9,0,0,0"
+                                <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"
                                            Visibility="{Binding EsDescargasActivas, Converter={StaticResource BoolToVis}}"/>
                                 <Button Command="{Binding NavegarDescargasCommand}" Width="45" Height="45" ToolTip="Cola de Descargas">
                                     <Button.Style>
@@ -150,7 +150,7 @@
                                             <Setter Property="Background" Value="Transparent"/>
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding EsDescargasActivas}" Value="True">
-                                                    <Setter Property="Background" Value="#1A82B1FF"/>
+                                                    <Setter Property="Background" Value="#1A60A5FA"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
@@ -158,10 +158,10 @@
                                     <materialDesign:PackIcon Kind="DownloadMultiple" Width="24" Height="24">
                                         <materialDesign:PackIcon.Style>
                                             <Style TargetType="materialDesign:PackIcon">
-                                                <Setter Property="Foreground" Value="#78909C"/>
+                                                <Setter Property="Foreground" Value="#6B7280"/>
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding EsDescargasActivas}" Value="True">
-                                                        <Setter Property="Foreground" Value="#82B1FF"/>
+                                                        <Setter Property="Foreground" Value="#60A5FA"/>
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
@@ -185,7 +185,7 @@
                         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,15">
                             <!-- BOTÓN CONFIGURACIÓN -->
                             <Grid Margin="0,4">
-                                <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#82B1FF" HorizontalAlignment="Left" Margin="-9,0,0,0"
+                                <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"
                                            Visibility="{Binding EsConfiguracionActiva, Converter={StaticResource BoolToVis}}"/>
                                 <Button Command="{Binding NavegarConfiguracionCommand}" Width="45" Height="45" ToolTip="Configuración">
                                     <Button.Style>
@@ -193,7 +193,7 @@
                                             <Setter Property="Background" Value="Transparent"/>
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding EsConfiguracionActiva}" Value="True">
-                                                    <Setter Property="Background" Value="#1A82B1FF"/>
+                                                    <Setter Property="Background" Value="#1A60A5FA"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
@@ -201,10 +201,10 @@
                                     <materialDesign:PackIcon Kind="Cog" Width="24" Height="24">
                                         <materialDesign:PackIcon.Style>
                                             <Style TargetType="materialDesign:PackIcon">
-                                                <Setter Property="Foreground" Value="#78909C"/>
+                                                <Setter Property="Foreground" Value="#6B7280"/>
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding EsConfiguracionActiva}" Value="True">
-                                                        <Setter Property="Foreground" Value="#82B1FF"/>
+                                                        <Setter Property="Foreground" Value="#60A5FA"/>
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
@@ -215,7 +215,7 @@
 
                             <!-- BOTÓN ACERCA DE -->
                             <Grid Margin="0,4">
-                                <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#82B1FF" HorizontalAlignment="Left" Margin="-9,0,0,0"
+                                <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"
                                            Visibility="{Binding EsAcercaDeActivo, Converter={StaticResource BoolToVis}}"/>
                                 <Button Command="{Binding NavegarAcercaDeCommand}" Width="45" Height="45" ToolTip="Acerca de AnimeLocalTracker">
                                     <Button.Style>
@@ -223,7 +223,7 @@
                                             <Setter Property="Background" Value="Transparent"/>
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding EsAcercaDeActivo}" Value="True">
-                                                    <Setter Property="Background" Value="#1A82B1FF"/>
+                                                    <Setter Property="Background" Value="#1A60A5FA"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
@@ -231,10 +231,10 @@
                                     <materialDesign:PackIcon Kind="InformationOutline" Width="24" Height="24">
                                         <materialDesign:PackIcon.Style>
                                             <Style TargetType="materialDesign:PackIcon">
-                                                <Setter Property="Foreground" Value="#78909C"/>
+                                                <Setter Property="Foreground" Value="#6B7280"/>
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding EsAcercaDeActivo}" Value="True">
-                                                        <Setter Property="Foreground" Value="#82B1FF"/>
+                                                        <Setter Property="Foreground" Value="#60A5FA"/>
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
@@ -253,14 +253,14 @@
                 <!-- BARRA DE TÍTULO CUSTOM -->
                 <Grid Grid.Column="0" Grid.ColumnSpan="2" x:Name="BarraTitulo" Height="45" Background="Transparent" VerticalAlignment="Top" Panel.ZIndex="20">
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="15,0,0,0">
-                        <materialDesign:PackIcon Kind="PlayCircle" Foreground="#3F51B5" Width="20" Height="20" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <materialDesign:PackIcon Kind="PlayCircle" Foreground="#3B82F6" Width="20" Height="20" VerticalAlignment="Center" Margin="0,0,8,0"/>
                         <TextBlock Text="AnimeTracker" FontWeight="Bold" Foreground="{DynamicResource MaterialDesignBodyLight}" VerticalAlignment="Center" FontSize="14"/>
                         <Button Command="{Binding BuscarActualizacionesManualCommand}" 
                                 WindowChrome.IsHitTestVisibleInChrome="True"
                                 ToolTip="Comprobar actualizaciones en GitHub"
                                 Style="{StaticResource MaterialDesignFlatButton}" 
                                 Padding="8,2" Height="22" Margin="12,0,0,0"
-                                Background="#2A3B5C" Foreground="#90CAF9" 
+                                Background="#1E293B" Foreground="#93C5FD" 
                                 materialDesign:ButtonAssist.CornerRadius="11">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="Update" Width="13" Height="13" VerticalAlignment="Center" Margin="0,0,4,0"/>
@@ -348,7 +348,7 @@
                             </Style.Triggers>
                         </Style>
                     </Border.Style>
-                    <materialDesign:Card UniformCornerRadius="10" Background="#1E1E1E" Padding="20,15" materialDesign:ElevationAssist.Elevation="Dp8">
+                    <materialDesign:Card UniformCornerRadius="10" Background="#161B22" Padding="20,15" materialDesign:ElevationAssist.Elevation="Dp8">
                         <StackPanel Orientation="Horizontal">
                             <materialDesign:PackIcon Kind="{Binding ToastIcono}" Foreground="{Binding ToastColor}" Width="28" Height="28" VerticalAlignment="Center" Margin="0,0,15,0"/>
                             <StackPanel VerticalAlignment="Center">

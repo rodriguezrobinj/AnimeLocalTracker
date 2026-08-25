@@ -182,8 +182,8 @@ public partial class GaleriaViewModel : ObservableObject,
     {
         try
         {
-            var animes = await _databaseService.ObtenerTodosLosAnimesAsync();
-            var todosRegistros = await _databaseService.ObtenerTodosLosRegistrosAsync();
+            var animes = await _databaseService.ObtenerTodosLosAnimesAsync() ?? new List<Models.AnimeItem>();
+            var todosRegistros = await _databaseService.ObtenerTodosLosRegistrosAsync() ?? new List<Models.RegistroEpisodio>();
             var registrosPorAnime = todosRegistros.GroupBy(r => r.AniListId)
                                                   .ToDictionary(g => g.Key, g => g.ToList());
 

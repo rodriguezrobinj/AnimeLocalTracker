@@ -8,7 +8,7 @@
     <UserControl.Resources>
         <!-- Estilo para las listas de cada día -->
         <DataTemplate x:Key="AiringEpisodeTemplate">
-            <materialDesign:Card Margin="0,0,0,10" Background="#262626" UniformCornerRadius="8" Padding="0">
+            <materialDesign:Card Margin="0,0,0,10" Background="#1B222C" UniformCornerRadius="8" Padding="0">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="60"/>
@@ -25,18 +25,15 @@
                     
                     <!-- Información -->
                     <StackPanel Grid.Column="1" Margin="10,5">
-                        <TextBlock Text="{Binding HoraEmisionFormateada}" FontSize="12" FontWeight="Bold" Foreground="#4CAF50" Margin="0,0,0,2"/>
+                        <TextBlock Text="{Binding HoraEmisionFormateada}" FontSize="12" FontWeight="Bold" Foreground="#34D399" Margin="0,0,0,2"/>
                         <TextBlock Text="{Binding Titulo}" FontSize="12" FontWeight="SemiBold" Foreground="White" TextWrapping="Wrap" MaxHeight="35" TextTrimming="CharacterEllipsis"/>
-                        <TextBlock Text="{Binding NumeroEpisodio, StringFormat='Episodio {0}'}" FontSize="11" Foreground="#9E9E9E" Margin="0,4,0,0"/>
+                        <TextBlock Text="{Binding NumeroEpisodio, StringFormat='Episodio {0}'}" FontSize="11" Foreground="#6B7280" Margin="0,4,0,0"/>
                     </StackPanel>
                 </Grid>
             </materialDesign:Card>
         </DataTemplate>
         
-        <Style TargetType="TextBlock" x:Key="DayHeaderStyle">
-            <Setter Property="FontSize" Value="16"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Foreground" Value="White"/>
+        <Style TargetType="TextBlock" x:Key="DayHeaderStyle" BasedOn="{StaticResource AppText.Section}">
             <Setter Property="HorizontalAlignment" Value="Center"/>
             <Setter Property="Margin" Value="0,0,0,15"/>
         </Style>
@@ -45,17 +42,7 @@
         <Style TargetType="ScrollBar" BasedOn="{StaticResource MaterialDesignScrollBarMinimal}" />
     </UserControl.Resources>
 
-    <Grid>
-        <Grid.Style>
-            <Style TargetType="Grid">
-                <Setter Property="Margin" Value="95,60,30,30"/>
-                <Style.Triggers>
-                    <DataTrigger Binding="{Binding Topmost, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
-                        <Setter Property="Margin" Value="95,30,30,30"/>
-                    </DataTrigger>
-                </Style.Triggers>
-            </Style>
-        </Grid.Style>
+    <Grid Style="{StaticResource AppPageRoot}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
@@ -67,8 +54,7 @@
                 <TextBlock Text="Calendario de Emisión" Style="{StaticResource MaterialDesignHeadline4TextBlock}" FontWeight="Bold" VerticalAlignment="Center"/>
                 
                 <!-- BADGE CONTEO EN EMISIÓN -->
-                <Border Background="#1E293B" BorderBrush="#334155" BorderThickness="1" 
-                        CornerRadius="12" Height="24" MinWidth="26" Padding="7,0" Margin="14,0,0,0" 
+                <Border Style="{StaticResource AppBadge}" Margin="14,0,0,0" 
                         VerticalAlignment="Center">
                     <TextBlock Text="{Binding TotalAnimesEnEmision}" FontSize="12" FontWeight="Bold" Foreground="#60A5FA" 
                                VerticalAlignment="Center" HorizontalAlignment="Center" TextAlignment="Center"/>
@@ -101,7 +87,7 @@
             </Grid.ColumnDefinitions>
 
             <!-- Lunes -->
-            <Border Grid.Column="0" Margin="5" Background="#151515" CornerRadius="10" Padding="10">
+            <Border Grid.Column="0" Margin="5" Background="#14181E" CornerRadius="10" Padding="10">
                 <DockPanel>
                     <TextBlock Text="LUNES" DockPanel.Dock="Top" Style="{StaticResource DayHeaderStyle}"/>
                     <ScrollViewer VerticalScrollBarVisibility="Hidden" PanningMode="VerticalOnly">
@@ -111,7 +97,7 @@
             </Border>
 
             <!-- Martes -->
-            <Border Grid.Column="1" Margin="5" Background="#151515" CornerRadius="10" Padding="10">
+            <Border Grid.Column="1" Margin="5" Background="#14181E" CornerRadius="10" Padding="10">
                 <DockPanel>
                     <TextBlock Text="MARTES" DockPanel.Dock="Top" Style="{StaticResource DayHeaderStyle}"/>
                     <ScrollViewer VerticalScrollBarVisibility="Hidden" PanningMode="VerticalOnly">
@@ -121,7 +107,7 @@
             </Border>
 
             <!-- Miércoles -->
-            <Border Grid.Column="2" Margin="5" Background="#151515" CornerRadius="10" Padding="10">
+            <Border Grid.Column="2" Margin="5" Background="#14181E" CornerRadius="10" Padding="10">
                 <DockPanel>
                     <TextBlock Text="MIÉRCOLES" DockPanel.Dock="Top" Style="{StaticResource DayHeaderStyle}"/>
                     <ScrollViewer VerticalScrollBarVisibility="Hidden" PanningMode="VerticalOnly">
@@ -131,7 +117,7 @@
             </Border>
 
             <!-- Jueves -->
-            <Border Grid.Column="3" Margin="5" Background="#151515" CornerRadius="10" Padding="10">
+            <Border Grid.Column="3" Margin="5" Background="#14181E" CornerRadius="10" Padding="10">
                 <DockPanel>
                     <TextBlock Text="JUEVES" DockPanel.Dock="Top" Style="{StaticResource DayHeaderStyle}"/>
                     <ScrollViewer VerticalScrollBarVisibility="Hidden" PanningMode="VerticalOnly">
@@ -141,7 +127,7 @@
             </Border>
 
             <!-- Viernes -->
-            <Border Grid.Column="4" Margin="5" Background="#151515" CornerRadius="10" Padding="10">
+            <Border Grid.Column="4" Margin="5" Background="#14181E" CornerRadius="10" Padding="10">
                 <DockPanel>
                     <TextBlock Text="VIERNES" DockPanel.Dock="Top" Style="{StaticResource DayHeaderStyle}"/>
                     <ScrollViewer VerticalScrollBarVisibility="Hidden" PanningMode="VerticalOnly">
@@ -151,7 +137,7 @@
             </Border>
 
             <!-- Sábado -->
-            <Border Grid.Column="5" Margin="5" Background="#151515" CornerRadius="10" Padding="10">
+            <Border Grid.Column="5" Margin="5" Background="#14181E" CornerRadius="10" Padding="10">
                 <DockPanel>
                     <TextBlock Text="SÁBADO" DockPanel.Dock="Top" Style="{StaticResource DayHeaderStyle}"/>
                     <ScrollViewer VerticalScrollBarVisibility="Hidden" PanningMode="VerticalOnly">
@@ -161,7 +147,7 @@
             </Border>
 
             <!-- Domingo -->
-            <Border Grid.Column="6" Margin="5" Background="#151515" CornerRadius="10" Padding="10">
+            <Border Grid.Column="6" Margin="5" Background="#14181E" CornerRadius="10" Padding="10">
                 <DockPanel>
                     <TextBlock Text="DOMINGO" DockPanel.Dock="Top" Style="{StaticResource DayHeaderStyle}"/>
                     <ScrollViewer VerticalScrollBarVisibility="Hidden" PanningMode="VerticalOnly">

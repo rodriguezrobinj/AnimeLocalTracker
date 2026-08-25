@@ -29,7 +29,7 @@
                 <TextBlock Text="Cola de descargas" Style="{StaticResource MaterialDesignHeadline4TextBlock}" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
 
                 <!-- BADGE CONTEO -->
-                <Border Background="#1E293B" BorderBrush="#334155" BorderThickness="1" 
+                <Border Background="#1E293B" BorderBrush="#2D3748" BorderThickness="1" 
                         CornerRadius="12" Height="24" MinWidth="26" Padding="7,0" Margin="14,0,0,0" 
                         VerticalAlignment="Center"
                         Visibility="{Binding TieneDescargas, Converter={StaticResource BoolToVis}}">
@@ -47,7 +47,7 @@
                               Visibility="{Binding TieneDescargas, Converter={StaticResource BoolToVis}}">
                     <StackPanel>
                         <!-- ENCABEZADO DE GRUPO (AnimeAv1) -->
-                        <TextBlock Text="AnimeAv1" FontSize="15" FontWeight="SemiBold" Foreground="#9E9E9E" Margin="10,0,0,15"/>
+                        <TextBlock Text="AnimeAv1" FontSize="15" FontWeight="SemiBold" Foreground="#6B7280" Margin="10,0,0,15"/>
 
                         <ItemsControl ItemsSource="{Binding ColaDescargas}"
                                       VirtualizingPanel.IsVirtualizing="True"
@@ -59,7 +59,7 @@
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <Border Background="Transparent" CornerRadius="10" Padding="16,14" Margin="0,0,15,10" BorderBrush="#1F2937" BorderThickness="1">
+                                    <Border Background="Transparent" CornerRadius="10" Padding="16,14" Margin="0,0,15,10" BorderBrush="#14181E" BorderThickness="1">
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <!-- Contenido: Títulos y barra -->
@@ -73,15 +73,15 @@
                                                 <Grid Margin="0,0,0,6">
                                                     <TextBlock Text="{Binding AnimeTitulo}" FontWeight="Bold" FontSize="15" Foreground="White" 
                                                                TextTrimming="CharacterEllipsis" MaxWidth="700" HorizontalAlignment="Left"/>
-                                                    <TextBlock Text="{Binding ProgresoTexto}" FontWeight="Bold" FontSize="14" Foreground="#82B1FF" 
+                                                    <TextBlock Text="{Binding ProgresoTexto}" FontWeight="Bold" FontSize="14" Foreground="#60A5FA" 
                                                                HorizontalAlignment="Right" Margin="0,0,10,0"/>
                                                 </Grid>
 
-                                                <TextBlock Text="{Binding TituloEpisodio}" FontSize="13" Foreground="#8E99A8" Margin="0,0,0,10"/>
+                                                <TextBlock Text="{Binding TituloEpisodio}" FontSize="13" Foreground="#9CA3AF" Margin="0,0,0,10"/>
 
                                                 <!-- BARRA DE PROGRESO (Sin transiciones para 0 lag durante descargas activas) -->
                                                 <ProgressBar Value="{Binding Progreso}" Minimum="0" Maximum="100" 
-                                                             Height="6" Foreground="#448AFF" Background="#263238" 
+                                                             Height="6" Foreground="#60A5FA" Background="#1B222C" 
                                                              IsIndeterminate="{Binding EstaEnEspera}"
                                                              BorderThickness="0" Margin="0,0,10,0"
                                                              materialDesign:TransitionAssist.DisableTransitions="True"/>
@@ -127,9 +127,9 @@
                 <!-- ESTADO VACÍO (Sin descargas) -->
                 <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center"
                             Visibility="{Binding TieneDescargas, Converter={StaticResource InverseBoolToVis}}">
-                    <materialDesign:PackIcon Kind="CloudDownloadOutline" Width="72" Height="72" Foreground="#3A475C" HorizontalAlignment="Center" Margin="0,0,0,15"/>
-                    <TextBlock Text="No hay descargas en curso" FontSize="18" FontWeight="Bold" Foreground="#8E99A8" HorizontalAlignment="Center" Margin="0,0,0,6"/>
-                    <TextBlock Text="Los capítulos que pongas a descargar se mostrarán aquí en tiempo real." FontSize="14" Foreground="#555E6D" HorizontalAlignment="Center"/>
+                    <materialDesign:PackIcon Kind="CloudDownloadOutline" Width="72" Height="72" Foreground="#2D3748" HorizontalAlignment="Center" Margin="0,0,0,15"/>
+                    <TextBlock Text="No hay descargas en curso" FontSize="18" FontWeight="Bold" Foreground="#9CA3AF" HorizontalAlignment="Center" Margin="0,0,0,6"/>
+                    <TextBlock Text="Los capítulos que pongas a descargar se mostrarán aquí en tiempo real." FontSize="14" Foreground="#6B7280" HorizontalAlignment="Center"/>
                 </StackPanel>
 
                 <!-- BOTONES FLOTANTES DE ACCIONES (SEPARADOS) -->
@@ -145,13 +145,13 @@
                             Cursor="Hand">
                         <Button.Style>
                             <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignRaisedButton}">
-                                <Setter Property="Background" Value="#2563EB" />
+                                <Setter Property="Background" Value="#3B82F6" />
                                 <Setter Property="BorderBrush" Value="#3B82F6" />
                                 <Setter Property="Foreground" Value="White" />
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding TodasPausadas}" Value="True">
                                         <Setter Property="Background" Value="#1D4ED8" />
-                                        <Setter Property="BorderBrush" Value="#2563EB" />
+                                        <Setter Property="BorderBrush" Value="#3B82F6" />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
@@ -188,7 +188,7 @@
                     <Grid>
                         <Button x:Name="MenuOpcionesBtn"
                                 Width="44" Height="44"
-                                Background="#1E293B" BorderBrush="#334155" BorderThickness="1"
+                                Background="#1E293B" BorderBrush="#2D3748" BorderThickness="1"
                                 Click="MenuOpcionesBtn_Click"
                                 PreviewMouseLeftButtonDown="MenuOpcionesBtn_PreviewMouseLeftButtonDown"
                                 Cursor="Hand" ToolTip="Más opciones">
@@ -203,17 +203,17 @@
                                             <DropShadowEffect BlurRadius="10" ShadowDepth="2" Direction="270" Opacity="0.3" Color="Black" />
                                         </Border.Effect>
                                         <materialDesign:PackIcon x:Name="icon" Kind="DotsVertical" Width="22" Height="22" 
-                                                                 Foreground="#94A3B8" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                                 Foreground="#9CA3AF" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                     </Border>
                                     <ControlTemplate.Triggers>
                                         <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter TargetName="btnBorder" Property="Background" Value="#334155"/>
-                                            <Setter TargetName="btnBorder" Property="BorderBrush" Value="#475569"/>
+                                            <Setter TargetName="btnBorder" Property="Background" Value="#2D3748"/>
+                                            <Setter TargetName="btnBorder" Property="BorderBrush" Value="#6B7280"/>
                                             <Setter TargetName="icon" Property="Foreground" Value="#FFFFFF"/>
                                         </Trigger>
                                         <Trigger Property="IsPressed" Value="True">
-                                            <Setter TargetName="btnBorder" Property="Background" Value="#2A3447"/>
-                                            <Setter TargetName="btnBorder" Property="BorderBrush" Value="#475569"/>
+                                            <Setter TargetName="btnBorder" Property="Background" Value="#1E293B"/>
+                                            <Setter TargetName="btnBorder" Property="BorderBrush" Value="#6B7280"/>
                                             <Setter TargetName="icon" Property="Foreground" Value="#FFFFFF"/>
                                         </Trigger>
                                     </ControlTemplate.Triggers>
@@ -230,7 +230,7 @@
                                StaysOpen="False"
                                AllowsTransparency="True"
                                PopupAnimation="Fade">
-                            <Border Background="#1E293B" BorderBrush="#334155" BorderThickness="1" 
+                            <Border Background="#1E293B" BorderBrush="#2D3748" BorderThickness="1" 
                                     CornerRadius="10" Padding="4">
                                 <Border.Effect>
                                     <DropShadowEffect BlurRadius="16" ShadowDepth="4" Direction="270" Opacity="0.45" Color="Black" />

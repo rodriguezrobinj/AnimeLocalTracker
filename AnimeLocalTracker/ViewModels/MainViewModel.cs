@@ -196,14 +196,33 @@ public partial class MainViewModel : ObservableObject,
         VistaActual = _serviceProvider.GetRequiredService<DescargasViewModel>();
     }
 
-    public void Receive(NavegarMensaje_Reproductor message)
+    public async void Receive(NavegarMensaje_Reproductor message)
     {
         // Guardar la vista actual antes de navegar al reproductor
         _vistaAnteriorAlReproductor = VistaActual;
 
         var viewModel = _serviceProvider.GetRequiredService<ReproductorViewModel>();
-        viewModel.CargarVideo(message.RutaVideo, message.AnimeId, message.TituloAnime, message.Episodio, message.EpisodiosDisponibles);
+        try
+        {
+            // Esperar a que el Player exista ANTES de crear la vista: FlyleafHost enlaza su
+            // superficie nativa al inicializarse y no la reconstruye si el Player llega después.
+            await viewModel.CargarVideoAsync(message.RutaVideo, message.AnimeId, message.TituloAnime, message.Episodio, message.EpisodiosDisponibles);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("MainViewModel", $"Error al cargar el video '{message.RutaVideo}'", ex);
+        }
         VistaActual = viewModel;
+    }
+
+    partial void OnVistaActualChanged(ObservableObject? oldValue, ObservableObject newValue)
+    {
+        // Al salir del reproductor por CUALQUIER vía (no solo el botón Cerrar), liberar su
+        // player: si queda vivo sigue reproduciendo audio en segundo plano (instancias fantasma).
+        if (oldValue is ReproductorViewModel reproductorAnterior && !ReferenceEquals(reproductorAnterior, newValue))
+        {
+            reproductorAnterior.Dispose();
+        }
     }
 
     // Vista a la que volver al salir del reproductor

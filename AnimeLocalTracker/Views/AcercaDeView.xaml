@@ -43,7 +43,7 @@
             <StackPanel Margin="0,0,24,20" HorizontalAlignment="Stretch">
 
                 <!-- 1. TARJETA HERO DE IDENTIDAD DE LA APP -->
-                <materialDesign:Card Background="#121212" BorderBrush="#262D37" BorderThickness="1" UniformCornerRadius="16" Margin="0,0,0,20" Padding="24" materialDesign:ElevationAssist.Elevation="Dp0">
+                <materialDesign:Card Background="#121212" BorderBrush="#262D38" BorderThickness="1" UniformCornerRadius="16" Margin="0,0,0,20" Padding="24" materialDesign:ElevationAssist.Elevation="Dp0">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
@@ -81,7 +81,7 @@
                 </materialDesign:Card>
 
                 <!-- 2. NOVEDADES DE LA VERSIÓN (DINÁMICAS DESDE GITHUB) -->
-                <materialDesign:Card Background="#121212" BorderBrush="#262D37" BorderThickness="1" UniformCornerRadius="16" Margin="0,0,0,20" Padding="24" materialDesign:ElevationAssist.Elevation="Dp0">
+                <materialDesign:Card Background="#121212" BorderBrush="#262D38" BorderThickness="1" UniformCornerRadius="16" Margin="0,0,0,20" Padding="24" materialDesign:ElevationAssist.Elevation="Dp0">
                     <StackPanel>
                         <Grid Margin="0,0,0,16">
                             <Grid.ColumnDefinitions>
@@ -99,26 +99,26 @@
                                 </StackPanel>
                             </StackPanel>
 
-                            <Border Grid.Column="1" Background="#181D24" BorderBrush="#2D3748" BorderThickness="1" CornerRadius="6" Padding="8,4" VerticalAlignment="Center">
+                            <Border Grid.Column="1" Background="#14181E" BorderBrush="#2D3748" BorderThickness="1" CornerRadius="6" Padding="8,4" VerticalAlignment="Center">
                                 <TextBlock Text="{Binding FechaVersionTexto}" FontSize="11" Foreground="#9CA3AF" FontWeight="Medium"/>
                             </Border>
                         </Grid>
 
-                        <Border Background="#181D24" BorderBrush="#262E39" BorderThickness="1" CornerRadius="12" Padding="18,16">
+                        <Border Background="#14181E" BorderBrush="#262D38" BorderThickness="1" CornerRadius="12" Padding="18,16">
                             <StackPanel>
                                 <ProgressBar IsIndeterminate="True" 
                                              Visibility="{Binding IsCargandoNovedades, Converter={StaticResource BoolToVis}}" 
                                              Height="3" VerticalAlignment="Top" Foreground="#60A5FA" Margin="0,0,0,12"
                                              materialDesign:TransitionAssist.DisableTransitions="True"/>
                                 <TextBlock Text="{Binding NovedadesTexto}" 
-                                           Foreground="#D1D5DB" FontSize="13" LineHeight="22" TextWrapping="Wrap" />
+                                           Foreground="#E2E8F0" FontSize="13" LineHeight="22" TextWrapping="Wrap" />
                             </StackPanel>
                         </Border>
                     </StackPanel>
                 </materialDesign:Card>
 
                 <!-- 3. REPOSITORIO GITHUB Y LICENCIAS -->
-                <materialDesign:Card Background="#121212" BorderBrush="#262D37" BorderThickness="1" UniformCornerRadius="16" Margin="0,0,0,20" Padding="24" materialDesign:ElevationAssist.Elevation="Dp0">
+                <materialDesign:Card Background="#121212" BorderBrush="#262D38" BorderThickness="1" UniformCornerRadius="16" Margin="0,0,0,20" Padding="24" materialDesign:ElevationAssist.Elevation="Dp0">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>

@@ -9,6 +9,7 @@
         Background="Black"
         Focusable="True"
         PreviewMouseDoubleClick="ReproductorView_PreviewMouseDoubleClick"
+        PreviewMouseLeftButtonDown="ReproductorView_PreviewMouseLeftButtonDown"
         PreviewKeyDown="ReproductorView_PreviewKeyDown">
 
     <UserControl.Resources>
@@ -17,7 +18,9 @@
 
     <Grid>
         <!-- Reproductor NATIVO Flyleaf -->
-        <fl:FlyleafHost Player="{Binding Player}">
+        <!-- El doble-click fullscreen del host se desactiva por CÓDIGO (ver Loaded en el code-behind):
+             como atributo XAML el compilador BAML lo mapea a la propiedad equivocada. -->
+        <fl:FlyleafHost Player="{Binding Player}" x:Name="HostFlyleaf">
             <Grid>
                 <!-- Subtítulos optimizados: 2 TextBlocks en vez de 9 -->
                 <!-- Bindings vía ElementName: FlyleafHost sobrescribe el DataContext de su contenido -->
@@ -106,7 +109,9 @@
                         </Button>
 
                         <!-- Barra de progreso con hover interactivo -->
-                        <Grid Grid.Row="1" Margin="0,0,0,15" x:Name="ProgressBarArea" Cursor="Hand">
+                        <Grid Grid.Row="1" Margin="0,0,0,15" x:Name="ProgressBarArea" Cursor="Hand"
+                              Background="Transparent"
+                              PreviewMouseLeftButtonDown="ProgressBarArea_PreviewMouseLeftButtonDown">
                             <!-- Línea de progreso visual -->
                             <ProgressBar Minimum="0" Maximum="{Binding TotalSeconds}" Value="{Binding CurrentSeconds, Mode=OneWay}"
                                          Height="3" Foreground="White" Background="#44FFFFFF" BorderThickness="0" VerticalAlignment="Center">
@@ -133,14 +138,14 @@
                                     </Style>
                                 </ProgressBar.Style>
                             </ProgressBar>
-                            
-                            <!-- Slider transparente encima -->
-                            <Slider Minimum="0" Maximum="{Binding TotalSeconds}" Value="{Binding CurrentSeconds, Mode=TwoWay}"
+
+                            <!-- Slider transparente encima (solo para ARRASTRE del thumb; el clic exacto
+                                 lo calcula ProgressBarArea_PreviewMouseLeftButtonDown con corrección de thumb) -->
+                            <Slider x:Name="SliderTiempo" Minimum="0" Maximum="{Binding TotalSeconds}" Value="{Binding CurrentSeconds, Mode=TwoWay}"
                                     IsMoveToPointEnabled="True" Foreground="White" Focusable="False"
                                     primitives:Thumb.DragStarted="Slider_DragStarted"
                                     primitives:Thumb.DragDelta="Slider_DragDelta"
                                     primitives:Thumb.DragCompleted="Slider_DragCompleted"
-                                    PreviewMouseLeftButtonUp="Slider_PreviewMouseLeftButtonUp"
                                     Opacity="0.01" Height="20" VerticalAlignment="Center" />
                         </Grid>
 
@@ -302,13 +307,15 @@
                             <!-- Subtítulos (Menú Manual) -->
                             <Button x:Name="SubtitlesButton" Grid.Column="8"
                                     ToolTip="Subtítulos"
-                                    Click="SubtitlesButton_Click"
+                                    PreviewMouseLeftButtonDown="SubtitlesButton_PreviewMouseLeftButtonDown"
                                     Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,5,0">
                                 <materialDesign:PackIcon Kind="{Binding SubtitulosIcon}" Width="26" Height="26" />
                             </Button>
-                            
-                            <Popup x:Name="SubtitlesPopup" IsOpen="False" StaysOpen="False" Closed="SubtitlesPopup_Closed"
-                                   PlacementTarget="{Binding Source={x:Reference SubtitlesButton}}" Placement="Top" 
+
+                            <!-- StaysOpen=True: con False, el popup se cierra por captura del mouse y el
+                             mismo clic lo volvía a abrir (toggle imposible). El cierre es manual. -->
+                            <Popup x:Name="SubtitlesPopup" IsOpen="False" StaysOpen="True"
+                                   PlacementTarget="{Binding Source={x:Reference SubtitlesButton}}" Placement="Top"
                                    VerticalOffset="-35" HorizontalOffset="10" PopupAnimation="Fade" AllowsTransparency="True">
                                 <Border Background="#F2141414" BorderThickness="0" CornerRadius="8" Padding="10" MinWidth="200">
                                     <Border.Effect>
@@ -346,19 +353,19 @@
 
                                     <StackPanel>
                                         <TextBlock Text="Subtítulos" Foreground="Gray" FontSize="12" FontWeight="Bold" Margin="15,0,0,10" />
-                                        
+
                                         <!-- Apagar -->
-                                        <Button Content="Apagar" Command="{Binding TurnOffSubtitlesCommand}" Style="{StaticResource MenuItemButton}"/>
-                                        
+                                        <Button Content="Apagar" Command="{Binding TurnOffSubtitlesCommand}" Click="SubtitleMenuItem_Click" Style="{StaticResource MenuItemButton}"/>
+
                                         <!-- Lista de streams disponibles -->
                                         <ItemsControl ItemsSource="{Binding Player.Subtitles.Streams}">
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate>
-                                                    <Button Command="{Binding DataContext.SelectSubtitleStreamCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" 
-                                                            CommandParameter="{Binding}" Style="{StaticResource MenuItemButton}">
+                                                    <Button Command="{Binding DataContext.SelectSubtitleStreamCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                            CommandParameter="{Binding}" Click="SubtitleMenuItem_Click" Style="{StaticResource MenuItemButton}">
                                                         <TextBlock>
-                                                            <Run Text="{Binding Language, Mode=OneWay}" /> 
-                                                            <Run Text="—" Foreground="#888888"/> 
+                                                            <Run Text="{Binding Language, Mode=OneWay}" />
+                                                            <Run Text="—" Foreground="#888888"/>
                                                             <Run Text="{Binding Title, Mode=OneWay}" Foreground="#AAAAAA"/>
                                                         </TextBlock>
                                                     </Button>
