@@ -18,6 +18,10 @@ public partial class CalendarioViewModel : ObservableObject
     [ObservableProperty] private bool _estaCargando;
     [ObservableProperty] private int _totalAnimesEnEmision;
 
+    // Día actual para el badge "HOY" del calendario (formato invariante: LUNES, MARTES, ...)
+    private static readonly string[] NombresDias = { "DOMINGO", "LUNES", "MARTES", "MIÉRCOLES", "JUEVES", "VIERNES", "SÁBADO" };
+    public string DiaActual => NombresDias[(int)DateTime.Now.DayOfWeek];
+
     public ObservableCollection<AiringEpisode> Lunes { get; } = new();
     public ObservableCollection<AiringEpisode> Martes { get; } = new();
     public ObservableCollection<AiringEpisode> Miercoles { get; } = new();

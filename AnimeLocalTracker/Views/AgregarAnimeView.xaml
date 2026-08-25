@@ -31,7 +31,7 @@
                     <materialDesign:PackIcon Kind="MagnifyPlus" Foreground="#93C5FD" Width="24" Height="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
                 <StackPanel VerticalAlignment="Center">
-                    <TextBlock Text="Añadir Anime" Style="{StaticResource MaterialDesignHeadline4TextBlock}" FontWeight="Bold" FontSize="26"/>
+                    <TextBlock Text="Añadir Anime" Style="{StaticResource AppText.PageTitle}"/>
                     <TextBlock Text="Explora tendencias o busca cualquier anime en AniList para tu colección local" FontSize="12" Foreground="#9CA3AF" Margin="0,2,0,0"/>
                 </StackPanel>
             </StackPanel>
@@ -81,7 +81,14 @@
                 <materialDesign:PackIcon Kind="FilterVariant" Width="20" Height="20" Foreground="#60A5FA" 
                                          VerticalAlignment="Center" Margin="0,0,8,0"
                                          Visibility="{Binding MostrandoTendencias, Converter={StaticResource InverseBoolToVis}}"/>
-                <TextBlock Text="{Binding TituloSeccion}" FontSize="18" FontWeight="Bold" Foreground="#E2E8F0" VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding TituloSeccion}" Style="{StaticResource AppText.Section}" VerticalAlignment="Center"/>
+
+                <!-- BADGE CONTEO DE RESULTADOS -->
+                <Border Style="{StaticResource AppBadge}" Margin="12,0,0,0" VerticalAlignment="Center"
+                        Visibility="{Binding BusquedaSinResultados, Converter={StaticResource InverseBoolToVis}}">
+                    <TextBlock Text="{Binding Resultados.Count}" Style="{StaticResource AppText.Caption}" FontWeight="Bold" Foreground="#60A5FA"
+                               VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                </Border>
             </StackPanel>
         </Grid>
 
@@ -161,8 +168,39 @@
 
                 <ListBox.ItemTemplate>
                     <DataTemplate>
-                        <Border Margin="8,8,8,12" Background="#14181E" BorderBrush="#262D38" BorderThickness="1" 
-                                CornerRadius="14" Padding="0" ClipToBounds="True">
+                        <Border Margin="8,8,8,12" Background="#14181E" BorderBrush="#262D38" BorderThickness="1"
+                                CornerRadius="14" Padding="0" ClipToBounds="True" RenderTransformOrigin="0.5,0.5">
+                            <Border.RenderTransform>
+                                <TranslateTransform Y="0"/>
+                            </Border.RenderTransform>
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="BorderBrush" Value="#262D38"/>
+                                    <Style.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="BorderBrush" Value="#3B82F6"/>
+                                            <Trigger.EnterActions>
+                                                <BeginStoryboard>
+                                                    <Storyboard>
+                                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)" To="-4" Duration="0:0:0.12">
+                                                            <DoubleAnimation.EasingFunction>
+                                                                <CubicEase EasingMode="EaseOut"/>
+                                                            </DoubleAnimation.EasingFunction>
+                                                        </DoubleAnimation>
+                                                    </Storyboard>
+                                                </BeginStoryboard>
+                                            </Trigger.EnterActions>
+                                            <Trigger.ExitActions>
+                                                <BeginStoryboard>
+                                                    <Storyboard>
+                                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)" To="0" Duration="0:0:0.12"/>
+                                                    </Storyboard>
+                                                </BeginStoryboard>
+                                            </Trigger.ExitActions>
+                                        </Trigger>
+                                    </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
                             <Border.Effect>
                                 <DropShadowEffect Color="Black" BlurRadius="16" ShadowDepth="4" Opacity="0.5"/>
                             </Border.Effect>

@@ -51,7 +51,7 @@
         <!-- Header -->
         <Grid Grid.Row="0" Margin="0,0,0,20">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <TextBlock Text="Calendario de Emisión" Style="{StaticResource MaterialDesignHeadline4TextBlock}" FontWeight="Bold" VerticalAlignment="Center"/>
+                <TextBlock Text="Calendario de Emisión" Style="{StaticResource AppText.PageTitle}" VerticalAlignment="Center"/>
                 
                 <!-- BADGE CONTEO EN EMISIÓN -->
                 <Border Style="{StaticResource AppBadge}" Margin="14,0,0,0" 
@@ -86,70 +86,154 @@
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <!-- Lunes -->
-            <Border Grid.Column="0" Margin="5" Background="#14181E" CornerRadius="10" Padding="10">
+            <!-- LUNES -->
+            <Border Grid.Column="0" Margin="5" Background="#14181E" BorderBrush="#262D38" BorderThickness="1" CornerRadius="12" Padding="10">
                 <DockPanel>
-                    <TextBlock Text="LUNES" DockPanel.Dock="Top" Style="{StaticResource DayHeaderStyle}"/>
+                    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,4">
+                        <TextBlock Text="LUNES" Style="{StaticResource DayHeaderStyle}" Margin="0"/>
+                        <Border Background="#3B82F6" CornerRadius="6" Padding="6,2" Margin="8,2,0,0" VerticalAlignment="Center"
+                                Visibility="{Binding DiaActual, Converter={StaticResource StringEquals}, ConverterParameter=LUNES}">
+                            <TextBlock Text="HOY" FontSize="10" FontWeight="Bold" Foreground="White"/>
+                        </Border>
+                        <Border Background="#1E293B" CornerRadius="8" Padding="6,2" Margin="6,2,0,0" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding Lunes.Count}" FontSize="10" FontWeight="Bold" Foreground="#60A5FA"/>
+                        </Border>
+                    </StackPanel>
+                    <TextBlock DockPanel.Dock="Top" Text="Sin episodios" FontSize="11" Foreground="#6B7280" Opacity="0.6"
+                               HorizontalAlignment="Center" Margin="0,2,0,8"
+                               Visibility="{Binding Lunes.Count, Converter={StaticResource ZeroToVis}}"/>
                     <ScrollViewer VerticalScrollBarVisibility="Hidden" PanningMode="VerticalOnly">
                         <ItemsControl ItemsSource="{Binding Lunes}" ItemTemplate="{StaticResource AiringEpisodeTemplate}"/>
                     </ScrollViewer>
                 </DockPanel>
             </Border>
 
-            <!-- Martes -->
-            <Border Grid.Column="1" Margin="5" Background="#14181E" CornerRadius="10" Padding="10">
+            <!-- MARTES -->
+            <Border Grid.Column="1" Margin="5" Background="#14181E" BorderBrush="#262D38" BorderThickness="1" CornerRadius="12" Padding="10">
                 <DockPanel>
-                    <TextBlock Text="MARTES" DockPanel.Dock="Top" Style="{StaticResource DayHeaderStyle}"/>
+                    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,4">
+                        <TextBlock Text="MARTES" Style="{StaticResource DayHeaderStyle}" Margin="0"/>
+                        <Border Background="#3B82F6" CornerRadius="6" Padding="6,2" Margin="8,2,0,0" VerticalAlignment="Center"
+                                Visibility="{Binding DiaActual, Converter={StaticResource StringEquals}, ConverterParameter=MARTES}">
+                            <TextBlock Text="HOY" FontSize="10" FontWeight="Bold" Foreground="White"/>
+                        </Border>
+                        <Border Background="#1E293B" CornerRadius="8" Padding="6,2" Margin="6,2,0,0" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding Martes.Count}" FontSize="10" FontWeight="Bold" Foreground="#60A5FA"/>
+                        </Border>
+                    </StackPanel>
+                    <TextBlock DockPanel.Dock="Top" Text="Sin episodios" FontSize="11" Foreground="#6B7280" Opacity="0.6"
+                               HorizontalAlignment="Center" Margin="0,2,0,8"
+                               Visibility="{Binding Martes.Count, Converter={StaticResource ZeroToVis}}"/>
                     <ScrollViewer VerticalScrollBarVisibility="Hidden" PanningMode="VerticalOnly">
                         <ItemsControl ItemsSource="{Binding Martes}" ItemTemplate="{StaticResource AiringEpisodeTemplate}"/>
                     </ScrollViewer>
                 </DockPanel>
             </Border>
 
-            <!-- Miércoles -->
-            <Border Grid.Column="2" Margin="5" Background="#14181E" CornerRadius="10" Padding="10">
+            <!-- MIÉRCOLES -->
+            <Border Grid.Column="2" Margin="5" Background="#14181E" BorderBrush="#262D38" BorderThickness="1" CornerRadius="12" Padding="10">
                 <DockPanel>
-                    <TextBlock Text="MIÉRCOLES" DockPanel.Dock="Top" Style="{StaticResource DayHeaderStyle}"/>
+                    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,4">
+                        <TextBlock Text="MIÉRCOLES" Style="{StaticResource DayHeaderStyle}" Margin="0"/>
+                        <Border Background="#3B82F6" CornerRadius="6" Padding="6,2" Margin="8,2,0,0" VerticalAlignment="Center"
+                                Visibility="{Binding DiaActual, Converter={StaticResource StringEquals}, ConverterParameter=MIÉRCOLES}">
+                            <TextBlock Text="HOY" FontSize="10" FontWeight="Bold" Foreground="White"/>
+                        </Border>
+                        <Border Background="#1E293B" CornerRadius="8" Padding="6,2" Margin="6,2,0,0" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding Miercoles.Count}" FontSize="10" FontWeight="Bold" Foreground="#60A5FA"/>
+                        </Border>
+                    </StackPanel>
+                    <TextBlock DockPanel.Dock="Top" Text="Sin episodios" FontSize="11" Foreground="#6B7280" Opacity="0.6"
+                               HorizontalAlignment="Center" Margin="0,2,0,8"
+                               Visibility="{Binding Miercoles.Count, Converter={StaticResource ZeroToVis}}"/>
                     <ScrollViewer VerticalScrollBarVisibility="Hidden" PanningMode="VerticalOnly">
                         <ItemsControl ItemsSource="{Binding Miercoles}" ItemTemplate="{StaticResource AiringEpisodeTemplate}"/>
                     </ScrollViewer>
                 </DockPanel>
             </Border>
 
-            <!-- Jueves -->
-            <Border Grid.Column="3" Margin="5" Background="#14181E" CornerRadius="10" Padding="10">
+            <!-- JUEVES -->
+            <Border Grid.Column="3" Margin="5" Background="#14181E" BorderBrush="#262D38" BorderThickness="1" CornerRadius="12" Padding="10">
                 <DockPanel>
-                    <TextBlock Text="JUEVES" DockPanel.Dock="Top" Style="{StaticResource DayHeaderStyle}"/>
+                    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,4">
+                        <TextBlock Text="JUEVES" Style="{StaticResource DayHeaderStyle}" Margin="0"/>
+                        <Border Background="#3B82F6" CornerRadius="6" Padding="6,2" Margin="8,2,0,0" VerticalAlignment="Center"
+                                Visibility="{Binding DiaActual, Converter={StaticResource StringEquals}, ConverterParameter=JUEVES}">
+                            <TextBlock Text="HOY" FontSize="10" FontWeight="Bold" Foreground="White"/>
+                        </Border>
+                        <Border Background="#1E293B" CornerRadius="8" Padding="6,2" Margin="6,2,0,0" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding Jueves.Count}" FontSize="10" FontWeight="Bold" Foreground="#60A5FA"/>
+                        </Border>
+                    </StackPanel>
+                    <TextBlock DockPanel.Dock="Top" Text="Sin episodios" FontSize="11" Foreground="#6B7280" Opacity="0.6"
+                               HorizontalAlignment="Center" Margin="0,2,0,8"
+                               Visibility="{Binding Jueves.Count, Converter={StaticResource ZeroToVis}}"/>
                     <ScrollViewer VerticalScrollBarVisibility="Hidden" PanningMode="VerticalOnly">
                         <ItemsControl ItemsSource="{Binding Jueves}" ItemTemplate="{StaticResource AiringEpisodeTemplate}"/>
                     </ScrollViewer>
                 </DockPanel>
             </Border>
 
-            <!-- Viernes -->
-            <Border Grid.Column="4" Margin="5" Background="#14181E" CornerRadius="10" Padding="10">
+            <!-- VIERNES -->
+            <Border Grid.Column="4" Margin="5" Background="#14181E" BorderBrush="#262D38" BorderThickness="1" CornerRadius="12" Padding="10">
                 <DockPanel>
-                    <TextBlock Text="VIERNES" DockPanel.Dock="Top" Style="{StaticResource DayHeaderStyle}"/>
+                    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,4">
+                        <TextBlock Text="VIERNES" Style="{StaticResource DayHeaderStyle}" Margin="0"/>
+                        <Border Background="#3B82F6" CornerRadius="6" Padding="6,2" Margin="8,2,0,0" VerticalAlignment="Center"
+                                Visibility="{Binding DiaActual, Converter={StaticResource StringEquals}, ConverterParameter=VIERNES}">
+                            <TextBlock Text="HOY" FontSize="10" FontWeight="Bold" Foreground="White"/>
+                        </Border>
+                        <Border Background="#1E293B" CornerRadius="8" Padding="6,2" Margin="6,2,0,0" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding Viernes.Count}" FontSize="10" FontWeight="Bold" Foreground="#60A5FA"/>
+                        </Border>
+                    </StackPanel>
+                    <TextBlock DockPanel.Dock="Top" Text="Sin episodios" FontSize="11" Foreground="#6B7280" Opacity="0.6"
+                               HorizontalAlignment="Center" Margin="0,2,0,8"
+                               Visibility="{Binding Viernes.Count, Converter={StaticResource ZeroToVis}}"/>
                     <ScrollViewer VerticalScrollBarVisibility="Hidden" PanningMode="VerticalOnly">
                         <ItemsControl ItemsSource="{Binding Viernes}" ItemTemplate="{StaticResource AiringEpisodeTemplate}"/>
                     </ScrollViewer>
                 </DockPanel>
             </Border>
 
-            <!-- Sábado -->
-            <Border Grid.Column="5" Margin="5" Background="#14181E" CornerRadius="10" Padding="10">
+            <!-- SÁBADO -->
+            <Border Grid.Column="5" Margin="5" Background="#14181E" BorderBrush="#262D38" BorderThickness="1" CornerRadius="12" Padding="10">
                 <DockPanel>
-                    <TextBlock Text="SÁBADO" DockPanel.Dock="Top" Style="{StaticResource DayHeaderStyle}"/>
+                    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,4">
+                        <TextBlock Text="SÁBADO" Style="{StaticResource DayHeaderStyle}" Margin="0"/>
+                        <Border Background="#3B82F6" CornerRadius="6" Padding="6,2" Margin="8,2,0,0" VerticalAlignment="Center"
+                                Visibility="{Binding DiaActual, Converter={StaticResource StringEquals}, ConverterParameter=SÁBADO}">
+                            <TextBlock Text="HOY" FontSize="10" FontWeight="Bold" Foreground="White"/>
+                        </Border>
+                        <Border Background="#1E293B" CornerRadius="8" Padding="6,2" Margin="6,2,0,0" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding Sabado.Count}" FontSize="10" FontWeight="Bold" Foreground="#60A5FA"/>
+                        </Border>
+                    </StackPanel>
+                    <TextBlock DockPanel.Dock="Top" Text="Sin episodios" FontSize="11" Foreground="#6B7280" Opacity="0.6"
+                               HorizontalAlignment="Center" Margin="0,2,0,8"
+                               Visibility="{Binding Sabado.Count, Converter={StaticResource ZeroToVis}}"/>
                     <ScrollViewer VerticalScrollBarVisibility="Hidden" PanningMode="VerticalOnly">
                         <ItemsControl ItemsSource="{Binding Sabado}" ItemTemplate="{StaticResource AiringEpisodeTemplate}"/>
                     </ScrollViewer>
                 </DockPanel>
             </Border>
 
-            <!-- Domingo -->
-            <Border Grid.Column="6" Margin="5" Background="#14181E" CornerRadius="10" Padding="10">
+            <!-- DOMINGO -->
+            <Border Grid.Column="6" Margin="5" Background="#14181E" BorderBrush="#262D38" BorderThickness="1" CornerRadius="12" Padding="10">
                 <DockPanel>
-                    <TextBlock Text="DOMINGO" DockPanel.Dock="Top" Style="{StaticResource DayHeaderStyle}"/>
+                    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,4">
+                        <TextBlock Text="DOMINGO" Style="{StaticResource DayHeaderStyle}" Margin="0"/>
+                        <Border Background="#3B82F6" CornerRadius="6" Padding="6,2" Margin="8,2,0,0" VerticalAlignment="Center"
+                                Visibility="{Binding DiaActual, Converter={StaticResource StringEquals}, ConverterParameter=DOMINGO}">
+                            <TextBlock Text="HOY" FontSize="10" FontWeight="Bold" Foreground="White"/>
+                        </Border>
+                        <Border Background="#1E293B" CornerRadius="8" Padding="6,2" Margin="6,2,0,0" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding Domingo.Count}" FontSize="10" FontWeight="Bold" Foreground="#60A5FA"/>
+                        </Border>
+                    </StackPanel>
+                    <TextBlock DockPanel.Dock="Top" Text="Sin episodios" FontSize="11" Foreground="#6B7280" Opacity="0.6"
+                               HorizontalAlignment="Center" Margin="0,2,0,8"
+                               Visibility="{Binding Domingo.Count, Converter={StaticResource ZeroToVis}}"/>
                     <ScrollViewer VerticalScrollBarVisibility="Hidden" PanningMode="VerticalOnly">
                         <ItemsControl ItemsSource="{Binding Domingo}" ItemTemplate="{StaticResource AiringEpisodeTemplate}"/>
                     </ScrollViewer>

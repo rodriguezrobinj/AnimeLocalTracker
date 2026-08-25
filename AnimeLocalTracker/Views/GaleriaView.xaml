@@ -378,8 +378,9 @@
 
             <ListBox.ItemTemplate>
                 <DataTemplate>
-                    <materialDesign:Card Width="180" Height="265" Margin="14" 
-                                         UniformCornerRadius="10" Background="#14181E"
+                    <materialDesign:Card Width="180" Height="265" Margin="14"
+                                         UniformCornerRadius="14" Background="#14181E"
+                                         BorderBrush="#262D38" BorderThickness="1"
                                          RenderTransformOrigin="0.5,0.5" ClipToBounds="True">
                         <materialDesign:Card.RenderTransform>
                             <ScaleTransform ScaleX="1" ScaleY="1" />
@@ -390,6 +391,7 @@
                                 <Style.Triggers>
                                     <Trigger Property="IsMouseOver" Value="True">
                                         <Setter Property="materialDesign:ElevationAssist.Elevation" Value="Dp8" />
+                                        <Setter Property="BorderBrush" Value="#3B82F6" />
                                         <Trigger.EnterActions>
                                             <BeginStoryboard>
                                                 <Storyboard>
@@ -425,15 +427,15 @@
                             </Button.Template>
                             <Grid>
                                 <!-- Fondo estático oscuro para carga instantánea sin animación infinita -->
-                                <Border Background="#1B222C" CornerRadius="10" />
+                                <Border Background="#1B222C" CornerRadius="14" />
 
                                 <!-- Portada precargada y congelada en memoria con escalado de alta definición -->
                                 <Image Source="{Binding PortadaImagen}" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" SnapsToDevicePixels="True" />
-                                
+
                                 <!-- OVERLAY DE SELECCIÓN -->
                                 <Border Background="#66000000" Visibility="{Binding EstaSeleccionado, Converter={StaticResource BoolToVis}}"/>
-                                <Border BorderBrush="#3B82F6" BorderThickness="4" CornerRadius="10" Visibility="{Binding EstaSeleccionado, Converter={StaticResource BoolToVis}}"/>
-                                
+                                <Border BorderBrush="#3B82F6" BorderThickness="3" CornerRadius="14" Visibility="{Binding EstaSeleccionado, Converter={StaticResource BoolToVis}}"/>
+
                                 <!-- CHECKBOX DE SELECCIÓN (Visible solo en ModoSeleccion) -->
                                 <CheckBox IsChecked="{Binding EstaSeleccionado}" 
                                           Visibility="{Binding DataContext.ModoSeleccion, RelativeSource={RelativeSource AncestorType=ListBox}, Converter={StaticResource BoolToVis}}"
@@ -458,6 +460,48 @@
                                     <TextBlock Text="{Binding NuevosEpisodios, StringFormat='{}{0} Nuevos'}" Foreground="White" FontSize="11" FontWeight="Bold"/>
                                 </Border>
 
+                                <!-- PILL "VER DETALLE" (aparece al hover; el trigger vive en el pill porque
+                                     el storyboard del Card no puede alcanzar elementos de otro namescope) -->
+                                <Border x:Name="PillHover" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,64"
+                                        Background="#E614181E" BorderBrush="#3B82F6" BorderThickness="1" CornerRadius="18" Padding="14,7"
+                                        Opacity="0" IsHitTestVisible="False" Panel.ZIndex="20">
+                                    <Border.RenderTransform>
+                                        <TranslateTransform Y="8"/>
+                                    </Border.RenderTransform>
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=materialDesign:Card}}" Value="True">
+                                                    <DataTrigger.EnterActions>
+                                                        <BeginStoryboard>
+                                                            <Storyboard>
+                                                                <DoubleAnimation Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.15" />
+                                                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)" To="0" Duration="0:0:0.15">
+                                                                    <DoubleAnimation.EasingFunction>
+                                                                        <CubicEase EasingMode="EaseOut"/>
+                                                                    </DoubleAnimation.EasingFunction>
+                                                                </DoubleAnimation>
+                                                            </Storyboard>
+                                                        </BeginStoryboard>
+                                                    </DataTrigger.EnterActions>
+                                                    <DataTrigger.ExitActions>
+                                                        <BeginStoryboard>
+                                                            <Storyboard>
+                                                                <DoubleAnimation Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.15" />
+                                                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)" To="8" Duration="0:0:0.15" />
+                                                            </Storyboard>
+                                                        </BeginStoryboard>
+                                                    </DataTrigger.ExitActions>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <StackPanel Orientation="Horizontal">
+                                        <materialDesign:PackIcon Kind="PlayCircleOutline" Width="16" Height="16" Foreground="#60A5FA" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                        <TextBlock Text="Ver detalle" FontSize="12" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Border>
+
                                 <Border VerticalAlignment="Bottom" Padding="12,25,12,12">
                                     <Border.Background>
                                         <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
@@ -468,7 +512,7 @@
                                     </Border.Background>
                                     <StackPanel>
                                         <TextBlock Text="{Binding Titulo}" Foreground="White" FontWeight="Bold" 
-                                                   FontSize="14" TextTrimming="CharacterEllipsis" MaxHeight="45" TextWrapping="Wrap" Margin="0,0,0,8" />
+                                                   FontSize="13.5" TextTrimming="CharacterEllipsis" MaxHeight="42" TextWrapping="Wrap" Margin="0,0,0,7" />
                                         
                                         <!-- PROGRESS BAR DIRECTO SIN ANIMACIÓN DE TRANSICIÓN EN SCROLL -->
                                         <ProgressBar Value="{Binding ProgresoPorcentaje, Mode=OneWay}" Height="4" 

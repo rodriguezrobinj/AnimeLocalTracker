@@ -54,13 +54,16 @@
                             <Grid Margin="0,8">
                                 <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"
                                            Visibility="{Binding EsGaleriaActiva, Converter={StaticResource BoolToVis}}"/>
-                                <Button Command="{Binding NavegarGaleriaCommand}" Width="45" Height="45" ToolTip="Biblioteca">
+                                <Button Command="{Binding NavegarGaleriaCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="Biblioteca">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
                                             <Setter Property="Background" Value="Transparent"/>
                                             <Style.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter Property="Background" Value="#1B222C"/>
+                                            </Trigger>
                                                 <DataTrigger Binding="{Binding EsGaleriaActiva}" Value="True">
-                                                    <Setter Property="Background" Value="#1A60A5FA"/>
+                                                    <Setter Property="Background" Value="#1E293B"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
@@ -84,13 +87,16 @@
                             <Grid Margin="0,8">
                                 <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"
                                            Visibility="{Binding EsAgregarAnimeActivo, Converter={StaticResource BoolToVis}}"/>
-                                <Button Command="{Binding NavegarAgregarAnimeCommand}" Width="45" Height="45" ToolTip="Añadir Anime">
+                                <Button Command="{Binding NavegarAgregarAnimeCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="Añadir Anime">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
                                             <Setter Property="Background" Value="Transparent"/>
                                             <Style.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter Property="Background" Value="#1B222C"/>
+                                            </Trigger>
                                                 <DataTrigger Binding="{Binding EsAgregarAnimeActivo}" Value="True">
-                                                    <Setter Property="Background" Value="#1A60A5FA"/>
+                                                    <Setter Property="Background" Value="#1E293B"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
@@ -114,13 +120,16 @@
                             <Grid Margin="0,8">
                                 <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"
                                            Visibility="{Binding EsCalendarioActivo, Converter={StaticResource BoolToVis}}"/>
-                                <Button Command="{Binding NavegarCalendarioCommand}" Width="45" Height="45" ToolTip="Calendario de Emisión">
+                                <Button Command="{Binding NavegarCalendarioCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="Calendario de Emisión">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
                                             <Setter Property="Background" Value="Transparent"/>
                                             <Style.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter Property="Background" Value="#1B222C"/>
+                                            </Trigger>
                                                 <DataTrigger Binding="{Binding EsCalendarioActivo}" Value="True">
-                                                    <Setter Property="Background" Value="#1A60A5FA"/>
+                                                    <Setter Property="Background" Value="#1E293B"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
@@ -144,13 +153,16 @@
                             <Grid Margin="0,8">
                                 <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"
                                            Visibility="{Binding EsDescargasActivas, Converter={StaticResource BoolToVis}}"/>
-                                <Button Command="{Binding NavegarDescargasCommand}" Width="45" Height="45" ToolTip="Cola de Descargas">
+                                <Button Command="{Binding NavegarDescargasCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="Cola de Descargas">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
                                             <Setter Property="Background" Value="Transparent"/>
                                             <Style.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter Property="Background" Value="#1B222C"/>
+                                            </Trigger>
                                                 <DataTrigger Binding="{Binding EsDescargasActivas}" Value="True">
-                                                    <Setter Property="Background" Value="#1A60A5FA"/>
+                                                    <Setter Property="Background" Value="#1E293B"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
@@ -171,7 +183,7 @@
 
                                 <!-- BADGE CONTEO DE DESCARGAS -->
                                 <Border HorizontalAlignment="Right" VerticalAlignment="Top" 
-                                        Background="#1565C0" BorderBrush="#0D47A1" BorderThickness="1" 
+                                        Background="#3B82F6" BorderBrush="#1E293B" BorderThickness="1" 
                                         CornerRadius="9" MinWidth="18" Height="18" Padding="4,0" Margin="0,-2,-2,0" 
                                         IsHitTestVisible="False"
                                         Visibility="{Binding TieneDescargasActivas, Converter={StaticResource BoolToVis}}">
@@ -181,19 +193,26 @@
                             </Grid>
                         </StackPanel>
 
+                        <!-- SEPARADOR DE GRUPO -->
+                        <Border HorizontalAlignment="Center" VerticalAlignment="Bottom" Width="28" Height="1"
+                                Background="#262D38" Margin="0,0,0,190" IsHitTestVisible="False"/>
+
                         <!-- BOTONES INFERIORES: CONFIGURACIÓN Y ACERCA DE -->
                         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,15">
                             <!-- BOTÓN CONFIGURACIÓN -->
                             <Grid Margin="0,4">
                                 <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"
                                            Visibility="{Binding EsConfiguracionActiva, Converter={StaticResource BoolToVis}}"/>
-                                <Button Command="{Binding NavegarConfiguracionCommand}" Width="45" Height="45" ToolTip="Configuración">
+                                <Button Command="{Binding NavegarConfiguracionCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="Configuración">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
                                             <Setter Property="Background" Value="Transparent"/>
                                             <Style.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter Property="Background" Value="#1B222C"/>
+                                            </Trigger>
                                                 <DataTrigger Binding="{Binding EsConfiguracionActiva}" Value="True">
-                                                    <Setter Property="Background" Value="#1A60A5FA"/>
+                                                    <Setter Property="Background" Value="#1E293B"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
@@ -217,13 +236,16 @@
                             <Grid Margin="0,4">
                                 <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"
                                            Visibility="{Binding EsAcercaDeActivo, Converter={StaticResource BoolToVis}}"/>
-                                <Button Command="{Binding NavegarAcercaDeCommand}" Width="45" Height="45" ToolTip="Acerca de AnimeLocalTracker">
+                                <Button Command="{Binding NavegarAcercaDeCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="Acerca de AnimeLocalTracker">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
                                             <Setter Property="Background" Value="Transparent"/>
                                             <Style.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter Property="Background" Value="#1B222C"/>
+                                            </Trigger>
                                                 <DataTrigger Binding="{Binding EsAcercaDeActivo}" Value="True">
-                                                    <Setter Property="Background" Value="#1A60A5FA"/>
+                                                    <Setter Property="Background" Value="#1E293B"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>

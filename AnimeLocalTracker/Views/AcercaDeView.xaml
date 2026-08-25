@@ -31,7 +31,7 @@
                     <materialDesign:PackIcon Kind="InformationOutline" Width="26" Height="26" Foreground="#60A5FA" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
                 <StackPanel VerticalAlignment="Center">
-                    <TextBlock Text="Acerca de AnimeLocalTracker" FontSize="22" FontWeight="Bold" Foreground="White"/>
+                    <TextBlock Text="Acerca de AnimeLocalTracker" Style="{StaticResource AppText.PageTitle}"/>
                     <TextBlock Text="Información del sistema, novedades de versiones y detalles del proyecto" 
                                FontSize="12" Foreground="#9CA3AF" Margin="0,3,0,0"/>
                 </StackPanel>

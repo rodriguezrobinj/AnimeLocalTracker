@@ -26,14 +26,12 @@
         <!-- HEADER SUPERIOR -->
         <Grid Grid.Row="0" Margin="0,0,0,20">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <TextBlock Text="Cola de descargas" Style="{StaticResource MaterialDesignHeadline4TextBlock}" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
+                <TextBlock Text="Cola de descargas" Style="{StaticResource AppText.PageTitle}" VerticalAlignment="Center"/>
 
                 <!-- BADGE CONTEO -->
-                <Border Background="#1E293B" BorderBrush="#2D3748" BorderThickness="1" 
-                        CornerRadius="12" Height="24" MinWidth="26" Padding="7,0" Margin="14,0,0,0" 
-                        VerticalAlignment="Center"
+                <Border Style="{StaticResource AppBadge}" Margin="14,0,0,0" VerticalAlignment="Center"
                         Visibility="{Binding TieneDescargas, Converter={StaticResource BoolToVis}}">
-                    <TextBlock Text="{Binding ConteoActivas}" FontSize="12" FontWeight="Bold" Foreground="#60A5FA" 
+                    <TextBlock Text="{Binding ConteoActivas}" Style="{StaticResource AppText.Caption}" FontWeight="Bold" Foreground="#60A5FA"
                                VerticalAlignment="Center" HorizontalAlignment="Center" TextAlignment="Center"/>
                 </Border>
             </StackPanel>
@@ -59,37 +57,60 @@
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <Border Background="Transparent" CornerRadius="10" Padding="16,14" Margin="0,0,15,10" BorderBrush="#14181E" BorderThickness="1">
+                                    <!-- Tarjeta de descarga con barra de estado lateral -->
+                                    <Border Background="#14181E" BorderBrush="#262D38" BorderThickness="1"
+                                            CornerRadius="12" Padding="0" Margin="0,0,15,10" ClipToBounds="True">
                                         <Grid>
                                             <Grid.ColumnDefinitions>
-                                                <!-- Contenido: Títulos y barra -->
+                                                <ColumnDefinition Width="3"/>
                                                 <ColumnDefinition Width="*"/>
-                                                <!-- Botón cancelar -->
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
 
+                                            <!-- BARRA DE ESTADO LATERAL: azul descargando / ámbar en pausa -->
+                                            <Border Grid.Column="0" Background="#60A5FA">
+                                                <Border.Style>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="Background" Value="#60A5FA"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsPaused}" Value="True">
+                                                                <Setter Property="Background" Value="#F59E0B"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                            </Border>
+
                                             <!-- CUERPO CENTRAL -->
-                                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                                <Grid Margin="0,0,0,6">
-                                                    <TextBlock Text="{Binding AnimeTitulo}" FontWeight="Bold" FontSize="15" Foreground="White" 
-                                                               TextTrimming="CharacterEllipsis" MaxWidth="700" HorizontalAlignment="Left"/>
-                                                    <TextBlock Text="{Binding ProgresoTexto}" FontWeight="Bold" FontSize="14" Foreground="#60A5FA" 
-                                                               HorizontalAlignment="Right" Margin="0,0,10,0"/>
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="16,14">
+                                                <Grid Margin="0,0,0,4">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="{Binding AnimeTitulo}" FontWeight="Bold" FontSize="14.5" Foreground="#E2E8F0"
+                                                                   TextTrimming="CharacterEllipsis" MaxWidth="620" HorizontalAlignment="Left"/>
+                                                        <!-- CHIP EN PAUSA -->
+                                                        <Border Background="#33F59E0B" BorderBrush="#66F59E0B" BorderThickness="1" CornerRadius="6"
+                                                                Padding="7,2" Margin="8,0,0,0" VerticalAlignment="Center"
+                                                                Visibility="{Binding IsPaused, Converter={StaticResource BoolToVis}}">
+                                                            <TextBlock Text="En pausa" FontSize="10" FontWeight="Bold" Foreground="#F59E0B"/>
+                                                        </Border>
+                                                    </StackPanel>
+                                                    <TextBlock Text="{Binding ProgresoTexto}" FontWeight="Bold" FontSize="14" Foreground="#60A5FA"
+                                                               HorizontalAlignment="Right" Margin="0,0,0,0"/>
                                                 </Grid>
 
-                                                <TextBlock Text="{Binding TituloEpisodio}" FontSize="13" Foreground="#9CA3AF" Margin="0,0,0,10"/>
+                                                <TextBlock Text="{Binding TituloEpisodio}" FontSize="12.5" Foreground="#9CA3AF" Margin="0,0,0,10"/>
 
                                                 <!-- BARRA DE PROGRESO (Sin transiciones para 0 lag durante descargas activas) -->
-                                                <ProgressBar Value="{Binding Progreso}" Minimum="0" Maximum="100" 
-                                                             Height="6" Foreground="#60A5FA" Background="#1B222C" 
+                                                <ProgressBar Value="{Binding Progreso}" Minimum="0" Maximum="100"
+                                                             Height="6" Foreground="#60A5FA" Background="#1B222C"
                                                              IsIndeterminate="{Binding EstaEnEspera}"
-                                                             BorderThickness="0" Margin="0,0,10,0"
+                                                             BorderThickness="0"
                                                              materialDesign:TransitionAssist.DisableTransitions="True"/>
                                             </StackPanel>
 
                                             <!-- BOTONES DE ACCIÓN -->
-                                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                                                
+                                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
+
                                                 <!-- BOTÓN PAUSA / REANUDAR -->
                                                 <Button Command="{Binding DataContext.AlternarPausaDescargaCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                         CommandParameter="{Binding}"
@@ -113,7 +134,7 @@
                                                         CommandParameter="{Binding}"
                                                         Style="{StaticResource MaterialDesignIconButton}" Width="36" Height="36" 
                                                         ToolTip="Cancelar descarga" Margin="4,0,0,0">
-                                                    <materialDesign:PackIcon Kind="TrashCanOutline" Foreground="#EF4444" Width="20" Height="20"/>
+                                                    <materialDesign:PackIcon Kind="TrashCanOutline" Foreground="#F87171" Width="20" Height="20"/>
                                                 </Button>
                                             </StackPanel>
                                         </Grid>
@@ -127,9 +148,11 @@
                 <!-- ESTADO VACÍO (Sin descargas) -->
                 <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center"
                             Visibility="{Binding TieneDescargas, Converter={StaticResource InverseBoolToVis}}">
-                    <materialDesign:PackIcon Kind="CloudDownloadOutline" Width="72" Height="72" Foreground="#2D3748" HorizontalAlignment="Center" Margin="0,0,0,15"/>
-                    <TextBlock Text="No hay descargas en curso" FontSize="18" FontWeight="Bold" Foreground="#9CA3AF" HorizontalAlignment="Center" Margin="0,0,0,6"/>
-                    <TextBlock Text="Los capítulos que pongas a descargar se mostrarán aquí en tiempo real." FontSize="14" Foreground="#6B7280" HorizontalAlignment="Center"/>
+                    <Border Background="#1E293B" CornerRadius="40" Width="80" Height="80" HorizontalAlignment="Center" Margin="0,0,0,16">
+                        <materialDesign:PackIcon Kind="CloudDownloadOutline" Width="40" Height="40" Foreground="#6B7280" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <TextBlock Text="No hay descargas en curso" Style="{StaticResource AppEmptyTitle}" Margin="0,0,0,6"/>
+                    <TextBlock Text="Los capítulos que pongas a descargar se mostrarán aquí en tiempo real." Style="{StaticResource AppEmptyText}"/>
                 </StackPanel>
 
                 <!-- BOTONES FLOTANTES DE ACCIONES (SEPARADOS) -->
