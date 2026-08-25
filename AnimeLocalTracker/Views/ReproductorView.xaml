@@ -8,6 +8,7 @@
         TextElement.Foreground="{DynamicResource MaterialDesignBody}"
         Background="Black"
         Focusable="True"
+        PreviewMouseDoubleClick="ReproductorView_PreviewMouseDoubleClick"
         PreviewKeyDown="ReproductorView_PreviewKeyDown">
 
     <UserControl.Resources>
@@ -186,12 +187,73 @@
                                 <Button Command="{Binding ToggleMuteCommand}" Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40">
                                     <materialDesign:PackIcon Kind="{Binding VolumenIcon}" Width="24" Height="24" />
                                 </Button>
-                                <Slider Minimum="0" Maximum="100" Value="{Binding Volumen, Mode=TwoWay}" VerticalAlignment="Center" Foreground="White" Focusable="False">
+                                <Slider Minimum="0" Maximum="100" Value="{Binding Volumen, Mode=TwoWay}" 
+                                        VerticalAlignment="Center" Focusable="False" Cursor="Hand"
+                                        IsMoveToPointEnabled="True">
+                                    <Slider.Resources>
+                                        <!-- Thumb limpio sin halo ni ripple circular -->
+                                        <Style x:Key="VolumeSliderThumb" TargetType="{x:Type Thumb}">
+                                            <Setter Property="SnapsToDevicePixels" Value="True" />
+                                            <Setter Property="OverridesDefaultStyle" Value="True" />
+                                            <Setter Property="Height" Value="14" />
+                                            <Setter Property="Width" Value="14" />
+                                            <Setter Property="Cursor" Value="Hand" />
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="{x:Type Thumb}">
+                                                        <Ellipse Fill="White" Width="14" Height="14" />
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                        </Style>
+
+                                        <!-- RepeatButton invisible para el Track -->
+                                        <Style x:Key="VolumeRepeatButtonStyle" TargetType="{x:Type RepeatButton}">
+                                            <Setter Property="OverridesDefaultStyle" Value="True" />
+                                            <Setter Property="IsTabStop" Value="False" />
+                                            <Setter Property="Focusable" Value="False" />
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="{x:Type RepeatButton}">
+                                                        <Border Background="Transparent">
+                                                            <ContentPresenter />
+                                                        </Border>
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                        </Style>
+                                    </Slider.Resources>
                                     <Slider.Style>
-                                        <Style TargetType="Slider" BasedOn="{StaticResource {x:Type Slider}}">
+                                        <Style TargetType="Slider">
+                                            <Setter Property="OverridesDefaultStyle" Value="True" />
+                                            <Setter Property="SnapsToDevicePixels" Value="True" />
                                             <Setter Property="Width" Value="0" />
                                             <Setter Property="Margin" Value="0,0,0,0" />
                                             <Setter Property="Opacity" Value="0" />
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="Slider">
+                                                        <Grid VerticalAlignment="Center" Height="20" Background="Transparent">
+                                                            <!-- Pista inactiva de fondo -->
+                                                            <Border Height="3" CornerRadius="1.5" Background="#55FFFFFF" VerticalAlignment="Center" Margin="7,0,7,0"/>
+                                                            <!-- Track interactivo con thumb y pista activa -->
+                                                            <Track x:Name="PART_Track" VerticalAlignment="Center">
+                                                                <Track.DecreaseRepeatButton>
+                                                                    <RepeatButton Style="{StaticResource VolumeRepeatButtonStyle}" Command="Slider.DecreaseLarge">
+                                                                        <Border Height="3" CornerRadius="1.5" Background="White" Margin="7,0,0,0" />
+                                                                    </RepeatButton>
+                                                                </Track.DecreaseRepeatButton>
+                                                                <Track.Thumb>
+                                                                    <Thumb Style="{StaticResource VolumeSliderThumb}" />
+                                                                </Track.Thumb>
+                                                                <Track.IncreaseRepeatButton>
+                                                                    <RepeatButton Style="{StaticResource VolumeRepeatButtonStyle}" Command="Slider.IncreaseLarge" />
+                                                                </Track.IncreaseRepeatButton>
+                                                            </Track>
+                                                        </Grid>
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=StackPanel}, Path=IsMouseOver}" Value="True">
                                                     <DataTrigger.EnterActions>
@@ -238,14 +300,15 @@
                             </Button>
 
                             <!-- Subtítulos (Menú Manual) -->
-                            <ToggleButton x:Name="SubtitlesToggle" Grid.Column="8"
+                            <Button x:Name="SubtitlesButton" Grid.Column="8"
                                     ToolTip="Subtítulos"
+                                    Click="SubtitlesButton_Click"
                                     Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,5,0">
                                 <materialDesign:PackIcon Kind="{Binding SubtitulosIcon}" Width="26" Height="26" />
-                            </ToggleButton>
+                            </Button>
                             
-                            <Popup x:Name="SubtitlesPopup" IsOpen="{Binding IsChecked, Source={x:Reference SubtitlesToggle}, Mode=TwoWay}" StaysOpen="False" 
-                                   PlacementTarget="{Binding Source={x:Reference SubtitlesToggle}}" Placement="Top" 
+                            <Popup x:Name="SubtitlesPopup" IsOpen="False" StaysOpen="False" Closed="SubtitlesPopup_Closed"
+                                   PlacementTarget="{Binding Source={x:Reference SubtitlesButton}}" Placement="Top" 
                                    VerticalOffset="-35" HorizontalOffset="10" PopupAnimation="Fade" AllowsTransparency="True">
                                 <Border Background="#F2141414" BorderThickness="0" CornerRadius="8" Padding="10" MinWidth="200">
                                     <Border.Effect>

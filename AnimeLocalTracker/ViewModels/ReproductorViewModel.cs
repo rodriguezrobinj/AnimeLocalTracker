@@ -48,6 +48,34 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private bool _autoSkipIntroOutro = false;
 
+    [ObservableProperty]
+    private bool _autoPlaySiguiente = true;
+
+    // Control de volumen y mute
+    private int _volumen = 100;
+    public int Volumen
+    {
+        get => _volumen;
+        set
+        {
+            int clamped = Math.Clamp(value, 0, 100);
+            if (SetProperty(ref _volumen, clamped))
+            {
+                OnVolumenChanged(clamped);
+            }
+        }
+    }
+
+    [ObservableProperty]
+    private bool _isMuted = false;
+
+    [ObservableProperty]
+    private string _volumenIcon = "VolumeHigh";
+
+    private int _volumenPrevioMute = 100;
+    private bool _autoPlayEjecutado = false;
+    private double _posicionInicioSegundos = 0;
+
     private List<AniSkipResult> _skipTimes = new();
     public List<AniSkipResult> SkipTimes => _skipTimes;
 
@@ -155,9 +183,85 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             if (config != null)
             {
                 _autoSkipIntroOutro = config.AutoSkipIntroOutro;
+                _autoPlaySiguiente = config.AutoPlaySiguiente;
                 _subtitulosHabilitados = config.SubtitulosPorDefecto;
                 _subtitulosIcon = config.SubtitulosPorDefecto ? "Subtitles" : "SubtitlesOutline";
             }
+        }
+    }
+
+    private void OnVolumenChanged(int value)
+    {
+        if (Player?.Audio != null)
+        {
+            try
+            {
+                Player.Audio.Volume = value;
+                if (value > 0 && IsMuted)
+                {
+                    IsMuted = false;
+                    Player.Audio.Mute = false;
+                }
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Debug("ReproductorViewModel", $"Error asignando volumen: {ex.Message}");
+            }
+        }
+
+        ActualizarVolumenIcon();
+    }
+
+    [RelayCommand]
+    public void ToggleMute()
+    {
+        if (IsMuted || Volumen == 0)
+        {
+            IsMuted = false;
+            Volumen = _volumenPrevioMute > 0 ? _volumenPrevioMute : 100;
+            if (Player?.Audio != null)
+            {
+                try
+                {
+                    Player.Audio.Mute = false;
+                    Player.Audio.Volume = Volumen;
+                }
+                catch { }
+            }
+        }
+        else
+        {
+            _volumenPrevioMute = Volumen;
+            IsMuted = true;
+            if (Player?.Audio != null)
+            {
+                try
+                {
+                    Player.Audio.Mute = true;
+                }
+                catch { }
+            }
+        }
+        ActualizarVolumenIcon();
+    }
+
+    private void ActualizarVolumenIcon()
+    {
+        if (IsMuted || Volumen == 0)
+        {
+            VolumenIcon = "VolumeOff";
+        }
+        else if (Volumen < 35)
+        {
+            VolumenIcon = "VolumeLow";
+        }
+        else if (Volumen < 70)
+        {
+            VolumenIcon = "VolumeMedium";
+        }
+        else
+        {
+            VolumenIcon = "VolumeHigh";
         }
     }
 
@@ -212,7 +316,46 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             }
             
             var player = new Player(config);
-            player.OpenCompleted += (s, e) => EvaluarSubtitulosPorDefecto();
+            player.OpenCompleted += (s, e) =>
+            {
+                EvaluarSubtitulosPorDefecto();
+
+                if (player.Audio != null)
+                {
+                    try
+                    {
+                        player.Audio.Volume = Volumen;
+                        player.Audio.Mute = IsMuted;
+                    }
+                    catch { }
+                }
+
+                // Si hay posición previa para reanudar, saltar de inmediato antes de reproducir
+                if (_posicionInicioSegundos > 5)
+                {
+                    double pos = _posicionInicioSegundos;
+                    _posicionInicioSegundos = 0;
+                    try
+                    {
+                        player.CurTime = TimeSpan.FromSeconds(pos).Ticks;
+                        _settleHastaUtc = DateTime.UtcNow + VentanaSettleSeek;
+                        _lastNotifiedSeconds = pos;
+                        CurrentSeconds = pos;
+
+                        var tPos = TimeSpan.FromSeconds(pos);
+                        string tiempoFormateado = tPos.ToString(tPos.Hours > 0 ? @"hh\:mm\:ss" : @"mm\:ss");
+
+                        _ = WeakReferenceMessenger.Default.Send(new Messages.MostrarDialogoRequestMessage(
+                            "Reanudar Reproducción",
+                            $"Continuando desde {tiempoFormateado}",
+                            false, "PlaySpeed", "#2196F3"));
+                    }
+                    catch (Exception ex)
+                    {
+                        AppLogger.Debug("ReproductorViewModel", $"Error aplicando seek de reanudación en OpenCompleted: {ex.Message}");
+                    }
+                }
+            };
             return player;
         }
         catch (Exception ex)
@@ -569,6 +712,11 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
     public void CargarVideo(string rutaVideo, int animeId, string tituloAnime, int episodio, List<EpisodioItem>? listaEpisodios = null)
     {
+        _ = CargarVideoAsync(rutaVideo, animeId, tituloAnime, episodio, listaEpisodios);
+    }
+
+    public async Task CargarVideoAsync(string rutaVideo, int animeId, string tituloAnime, int episodio, List<EpisodioItem>? listaEpisodios = null)
+    {
         _ = GuardarProgresoActualAsync();
 
         _skipTimes.Clear();
@@ -576,6 +724,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         _currentActiveSkip = null;
         MostrarSkipButton = false;
         MostrarSkipIntro = false;
+        _autoPlayEjecutado = false;
 
         if (_settingsService != null)
         {
@@ -583,6 +732,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             if (config != null)
             {
                 AutoSkipIntroOutro = config.AutoSkipIntroOutro;
+                AutoPlaySiguiente = config.AutoPlaySiguiente;
                 SubtitulosHabilitados = config.SubtitulosPorDefecto;
                 SubtitulosIcon = config.SubtitulosPorDefecto ? "Subtitles" : "SubtitlesOutline";
             }
@@ -598,6 +748,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         _lastNotifiedSeconds = -1;
         _lastSavedSeconds = -1;
         _resumingPositionSeconds = 0;
+        _posicionInicioSegundos = 0;
 
         if (listaEpisodios != null)
         {
@@ -614,13 +765,14 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         _trackingCts?.Dispose();
         _trackingCts = new CancellationTokenSource();
 
-        // Consultar progreso previo en la base de datos
-        _ = VerificarProgresoPrevioAsync(animeId, episodio);
+        // 1. Obtener progreso previo ANTES de abrir/reproducir para que comience de inmediato donde se dejó
+        await VerificarProgresoPrevioAsync(animeId, episodio);
+        _posicionInicioSegundos = _resumingPositionSeconds;
 
-        // Cargar marcas de skip de AniSkip en segundo plano
+        // 2. Cargar marcas de skip de AniSkip en segundo plano
         _ = CargarSkipTimesAsync(animeId, episodio, _trackingCts.Token);
 
-        // Sincronizar ícono de fullscreen con el estado actual de la ventana
+        // 3. Sincronizar ícono de fullscreen con el estado actual de la ventana
         try
         {
             if (System.Windows.Application.Current != null && 
@@ -739,11 +891,11 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                     double curSeconds = TimeSpan.FromTicks(Player.CurTime).TotalSeconds;
                     double durSeconds = TimeSpan.FromTicks(Player.Duration).TotalSeconds;
 
-                    // Reanudación automática desde última posición guardada
-                    if (_resumingPositionSeconds > 5 && (durSeconds > 0 || curSeconds >= 0))
+                    // Fallback de reanudación si no se aplicó en OpenCompleted
+                    if (_posicionInicioSegundos > 5 && (durSeconds > 0 || curSeconds >= 0))
                     {
-                        double posToSeek = _resumingPositionSeconds;
-                        _resumingPositionSeconds = 0; // Solo una vez
+                        double posToSeek = _posicionInicioSegundos;
+                        _posicionInicioSegundos = 0;
                         
                         try
                         {
@@ -751,14 +903,6 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                             _settleHastaUtc = DateTime.UtcNow + VentanaSettleSeek;
                             _lastNotifiedSeconds = posToSeek;
                             CurrentSeconds = posToSeek;
-                            
-                            var tPos = TimeSpan.FromSeconds(posToSeek);
-                            string tiempoFormateado = tPos.ToString(tPos.Hours > 0 ? @"hh\:mm\:ss" : @"mm\:ss");
-                            
-                            _ = WeakReferenceMessenger.Default.Send(new Messages.MostrarDialogoRequestMessage(
-                                "Reanudar Reproducción", 
-                                $"Continuando desde {tiempoFormateado}", 
-                                false, "PlaySpeed", "#2196F3"));
                         }
                         catch (Exception ex)
                         {
@@ -864,6 +1008,28 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                     if (!_fueMarcadoComoVisto)
                     {
                         await RealizarAutoTrackingAsync();
+                    }
+
+                    // Auto-Play al siguiente episodio
+                    if (AutoPlaySiguiente && TieneEpisodioSiguiente && !_autoPlayEjecutado)
+                    {
+                        _autoPlayEjecutado = true;
+
+                        var siguiente = ObtenerSiguienteEpisodio();
+                        string msg = siguiente != null 
+                            ? $"Reproduciendo Episodio {siguiente.NumeroEpisodio}..." 
+                            : "Reproduciendo siguiente episodio...";
+
+                        _ = WeakReferenceMessenger.Default.Send(new Messages.MostrarDialogoRequestMessage(
+                            "Auto-Play",
+                            msg,
+                            false, "FastForward", "#4CAF50"));
+
+                        await Task.Delay(1500, ct);
+                        if (!ct.IsCancellationRequested)
+                        {
+                            System.Windows.Application.Current?.Dispatcher?.Invoke(() => SiguienteEpisodio());
+                        }
                     }
                 }
 

@@ -492,4 +492,87 @@ public class ReproductorViewModelTests
 
         sut.Dispose();
     }
+
+    [Fact]
+    public void Volumen_CambioYIconos_DeberiaActualizarCorrectamente()
+    {
+        // Arrange
+        var sut = CreateSut();
+
+        // Act & Assert
+        sut.Volumen = 100;
+        sut.VolumenIcon.Should().Be("VolumeHigh");
+
+        sut.Volumen = 50;
+        sut.VolumenIcon.Should().Be("VolumeMedium");
+
+        sut.Volumen = 20;
+        sut.VolumenIcon.Should().Be("VolumeLow");
+
+        sut.Volumen = 0;
+        sut.VolumenIcon.Should().Be("VolumeOff");
+
+        // Clamping
+        sut.Volumen = 150;
+        sut.Volumen.Should().Be(100);
+
+        sut.Volumen = -20;
+        sut.Volumen.Should().Be(0);
+
+        sut.Dispose();
+    }
+
+    [Fact]
+    public void ToggleMute_DeberiaAlternarSilencioYRestaurarVolumen()
+    {
+        // Arrange
+        var sut = CreateSut();
+        sut.Volumen = 75;
+
+        // Act: Silenciar
+        sut.ToggleMuteCommand.Execute(null);
+
+        // Assert
+        sut.IsMuted.Should().BeTrue();
+        sut.VolumenIcon.Should().Be("VolumeOff");
+
+        // Act: Des-silenciar
+        sut.ToggleMuteCommand.Execute(null);
+
+        // Assert
+        sut.IsMuted.Should().BeFalse();
+        sut.Volumen.Should().Be(75);
+        sut.VolumenIcon.Should().Be("VolumeHigh");
+
+        sut.Dispose();
+    }
+
+    [Fact]
+    public async Task CargarVideoAsync_ConProgresoPrevio_DeberiaCargarPosicionInmediatamente()
+    {
+        // Arrange
+        var sut = CreateSut();
+        var previo = new RegistroEpisodio
+        {
+            AniListId = 202,
+            NumeroEpisodio = 5,
+            ProgresoSegundos = 650, // 10:50
+            TotalSegundos = 1440
+        };
+
+        _dbMock.Setup(d => d.ObtenerRegistrosPorAnimeAsync(202))
+            .ReturnsAsync(new List<RegistroEpisodio> { previo });
+
+        // Act
+        await sut.CargarVideoAsync("C:\\Anime\\Ep05.mkv", 202, "Frieren", 5);
+
+        // Assert: la posición y los textos deben estar listos de inmediato
+        sut.CurrentSeconds.Should().Be(650);
+        sut.TiempoActualTexto.Should().Be("10:50");
+        sut.TotalSeconds.Should().Be(1440);
+        sut.TiempoTotalTexto.Should().Be("24:00");
+        sut.ResumingPositionSeconds.Should().Be(650);
+
+        sut.Dispose();
+    }
 }

@@ -202,6 +202,59 @@ namespace AnimeLocalTracker.Views
             }
         }
 
+        private DateTime _lastSubtitlesPopupCloseTime = DateTime.MinValue;
+
+        private void SubtitlesPopup_Closed(object sender, EventArgs e)
+        {
+            _lastSubtitlesPopupCloseTime = DateTime.UtcNow;
+        }
+
+        private void SubtitlesButton_Click(object sender, RoutedEventArgs e)
+        {
+            // Si el popup se acaba de cerrar por hacer clic en este mismo botón (u otro lugar)
+            // StaysOpen="False" lo cierra primero, y el Click se dispara justo después.
+            // Con esta verificación ignoramos el clic si ocurrió en los últimos 150ms.
+            if ((DateTime.UtcNow - _lastSubtitlesPopupCloseTime).TotalMilliseconds < 150)
+            {
+                return;
+            }
+
+            SubtitlesPopup.IsOpen = true;
+        }
+
+        private void ReproductorView_PreviewMouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            // Si el doble clic fue sobre un botón, slider o popup, no alternar pantalla completa
+            if (e.OriginalSource is DependencyObject dep)
+            {
+                if (FindVisualParent<Button>(dep) != null || 
+                    FindVisualParent<Slider>(dep) != null || 
+                    FindVisualParent<ToggleButton>(dep) != null ||
+                    FindVisualParent<Popup>(dep) != null)
+                {
+                    return;
+                }
+            }
+
+            if (DataContext is ReproductorViewModel vm)
+            {
+                vm.ToggleFullscreenCommand.Execute(null);
+                e.Handled = true;
+                RegistrarActividad();
+            }
+        }
+
+        private static T? FindVisualParent<T>(DependencyObject? child) where T : DependencyObject
+        {
+            while (child != null)
+            {
+                if (child is T parent)
+                    return parent;
+                child = System.Windows.Media.VisualTreeHelper.GetParent(child);
+            }
+            return null;
+        }
+
         private void ReproductorView_PreviewKeyDown(object sender, KeyEventArgs e)
         {
             if (DataContext is not ReproductorViewModel vm) return;
@@ -210,6 +263,26 @@ namespace AnimeLocalTracker.Views
             {
                 case Key.Space:
                     vm.TogglePlayPauseCommand.Execute(null);
+                    e.Handled = true;
+                    RegistrarActividad();
+                    break;
+                case Key.F11:
+                    vm.ToggleFullscreenCommand.Execute(null);
+                    e.Handled = true;
+                    RegistrarActividad();
+                    break;
+                case Key.M:
+                    vm.ToggleMuteCommand.Execute(null);
+                    e.Handled = true;
+                    RegistrarActividad();
+                    break;
+                case Key.Up:
+                    vm.Volumen = Math.Min(100, vm.Volumen + 5);
+                    e.Handled = true;
+                    RegistrarActividad();
+                    break;
+                case Key.Down:
+                    vm.Volumen = Math.Max(0, vm.Volumen - 5);
                     e.Handled = true;
                     RegistrarActividad();
                     break;

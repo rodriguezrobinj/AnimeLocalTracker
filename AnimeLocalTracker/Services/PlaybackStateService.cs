@@ -66,6 +66,12 @@ public class PlaybackStateService : IPlaybackStateService
             {
                 registro.RutaArchivo = datos.RutaVideo;
             }
+            // Si el usuario reanuda un capítulo "visto" pero lo deja a medias, 
+            // le quitamos la marca de "visto" para que se vea la barra de progreso.
+            if (progresoAGuardar > 0 && (durSec <= 0 || progresoAGuardar < durSec * UmbralPorcentajeVisto))
+            {
+                registro.VistoLocal = false;
+            }
             await _databaseService.GuardarRegistroEpisodioAsync(registro);
         }
         else if (progresoAGuardar > 0)

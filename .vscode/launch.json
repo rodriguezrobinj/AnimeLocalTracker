@@ -2,23 +2,21 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Debug AnimeLocalTracker (NetCoreDbg)",
+      "name": "Launch AnimeLocalTracker (C# Dev Kit)",
       "type": "coreclr",
       "request": "launch",
       "preLaunchTask": "build",
       "program": "${workspaceFolder}/AnimeLocalTracker/bin/Debug/net8.0-windows/AnimeLocalTracker.dll",
       "args": [],
-      "cwd": "${workspaceFolder}/AnimeLocalTracker",
+      "cwd": "${workspaceFolder}/AnimeLocalTracker/bin/Debug/net8.0-windows",
       "stopAtEntry": false,
-      "console": "internalConsole",
-      "pipeTransport": {
-        "pipeProgram": "${env:LOCALAPPDATA}/Microsoft/WinGet/Packages/Samsung.NetCoreDbg_Microsoft.Winget.Source_8wekyb3d8bbwe/netcoredbg/netcoredbg.exe",
-        "pipeArgs": [
-          "--interpreter=vscode"
-        ],
-        "debuggerPath": "${env:LOCALAPPDATA}/Microsoft/WinGet/Packages/Samsung.NetCoreDbg_Microsoft.Winget.Source_8wekyb3d8bbwe/netcoredbg/netcoredbg.exe",
-        "pipeCwd": "${workspaceFolder}"
-      }
+      "console": "internalConsole"
+    },
+    {
+      "name": "Attach to AnimeLocalTracker (C# Dev Kit)",
+      "type": "coreclr",
+      "request": "attach",
+      "processName": "AnimeLocalTracker.exe"
     }
   ]
 }

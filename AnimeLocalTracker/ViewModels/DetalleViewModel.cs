@@ -245,7 +245,7 @@ public partial class DetalleViewModel : ObservableObject,
                 
                 bool estaDescargando = _downloadService.EstaDescargando(anime.AniListId, i, out double prog);
 
-                temp.Add(new EpisodioItem
+                var ep = new EpisodioItem
                 {
                     NumeroEpisodio = i,
                     Descargado = archivoLocal != null,
@@ -257,7 +257,14 @@ public partial class DetalleViewModel : ObservableObject,
                     TotalSegundos = memoria?.TotalSegundos ?? 0,
                     IsDownloading = estaDescargando,
                     DownloadProgress = prog
-                });
+                };
+                
+                if (ep.ProgresoSegundos > 0)
+                {
+                    AnimeLocalTracker.Services.AppLogger.Debug("DetalleViewModel", $"Cargado Episodio {ep.NumeroEpisodio}: Progreso={ep.ProgresoSegundos}/{ep.TotalSegundos}, Visto={ep.Visto}, TieneProgreso={ep.TieneProgresoGuardado}");
+                }
+                
+                temp.Add(ep);
             }
             return temp;
         });
