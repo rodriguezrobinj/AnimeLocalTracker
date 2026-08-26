@@ -1,0 +1,51 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:AnimeLocalTracker.Core.ViewModels;assembly=AnimeLocalTracker.Core"
+             xmlns:views="clr-namespace:AnimeLocalTracker.Avalonia.Views"
+             mc:Ignorable="d" d:DesignWidth="1248" d:DesignHeight="700"
+             x:Class="AnimeLocalTracker.Avalonia.Views.MainView"
+             x:DataType="vm:MainViewModel">
+
+    <Design.DataContext>
+        <vm:MainViewModel />
+    </Design.DataContext>
+
+    <UserControl.DataTemplates>
+        <!-- Map ViewModels to Views -->
+        <DataTemplate DataType="{x:Type vm:GaleriaViewModel}">
+            <views:GaleriaView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:ReproductorViewModel}">
+            <views:ReproductorView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:AcercaDeViewModel}">
+            <views:AcercaDeView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:AgregarAnimeViewModel}">
+            <views:AgregarAnimeView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:CalendarioViewModel}">
+            <views:CalendarioView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:ConfiguracionViewModel}">
+            <views:ConfiguracionView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:DescargasViewModel}">
+            <views:DescargasView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:DetalleViewModel}">
+            <views:DetalleView />
+        </DataTemplate>
+    </UserControl.DataTemplates>
+
+    <Grid Background="#121212">
+        <TransitioningContentControl Content="{Binding CurrentViewModel}">
+            <TransitioningContentControl.PageTransition>
+                <CrossFade Duration="0:0:0.3" />
+            </TransitioningContentControl.PageTransition>
+        </TransitioningContentControl>
+    </Grid>
+
+</UserControl>

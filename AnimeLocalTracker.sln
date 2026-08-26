@@ -7,6 +7,16 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AnimeLocalTracker.Tests", "
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AnimeLocalTracker.Benchmarks", "AnimeLocalTracker.Benchmarks\AnimeLocalTracker.Benchmarks.csproj", "{821B739B-2029-4491-902D-8233F290291C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AnimeLocalTracker.Core", "AnimeLocalTracker.Core\AnimeLocalTracker.Core.csproj", "{8648A14D-BC80-4A3C-998F-C886FEE4384B}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "AnimeLocalTracker.Avalonia", "AnimeLocalTracker.Avalonia", "{AE95037E-6F40-4D77-B88F-699CDC4B2FB1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AnimeLocalTracker.Avalonia", "AnimeLocalTracker.Avalonia\AnimeLocalTracker.Avalonia\AnimeLocalTracker.Avalonia.csproj", "{620379F2-8DA9-4845-A7A6-2BF00A8CB90A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AnimeLocalTracker.Avalonia.Desktop", "AnimeLocalTracker.Avalonia\AnimeLocalTracker.Avalonia.Desktop\AnimeLocalTracker.Avalonia.Desktop.csproj", "{6445AEB1-DF8F-4CA6-8ED2-DF39C4337BAB}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AnimeLocalTracker.Avalonia.Android", "AnimeLocalTracker.Avalonia\AnimeLocalTracker.Avalonia.Android\AnimeLocalTracker.Avalonia.Android.csproj", "{769DD37F-ADD8-499B-B833-7AB09FF1C79D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -25,5 +35,26 @@ Global
 		{821B739B-2029-4491-902D-8233F290291C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{821B739B-2029-4491-902D-8233F290291C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{821B739B-2029-4491-902D-8233F290291C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8648A14D-BC80-4A3C-998F-C886FEE4384B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8648A14D-BC80-4A3C-998F-C886FEE4384B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8648A14D-BC80-4A3C-998F-C886FEE4384B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8648A14D-BC80-4A3C-998F-C886FEE4384B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{620379F2-8DA9-4845-A7A6-2BF00A8CB90A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{620379F2-8DA9-4845-A7A6-2BF00A8CB90A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{620379F2-8DA9-4845-A7A6-2BF00A8CB90A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{620379F2-8DA9-4845-A7A6-2BF00A8CB90A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6445AEB1-DF8F-4CA6-8ED2-DF39C4337BAB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6445AEB1-DF8F-4CA6-8ED2-DF39C4337BAB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6445AEB1-DF8F-4CA6-8ED2-DF39C4337BAB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6445AEB1-DF8F-4CA6-8ED2-DF39C4337BAB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{769DD37F-ADD8-499B-B833-7AB09FF1C79D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{769DD37F-ADD8-499B-B833-7AB09FF1C79D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{769DD37F-ADD8-499B-B833-7AB09FF1C79D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{769DD37F-ADD8-499B-B833-7AB09FF1C79D}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{620379F2-8DA9-4845-A7A6-2BF00A8CB90A} = {AE95037E-6F40-4D77-B88F-699CDC4B2FB1}
+		{6445AEB1-DF8F-4CA6-8ED2-DF39C4337BAB} = {AE95037E-6F40-4D77-B88F-699CDC4B2FB1}
+		{769DD37F-ADD8-499B-B833-7AB09FF1C79D} = {AE95037E-6F40-4D77-B88F-699CDC4B2FB1}
 	EndGlobalSection
 EndGlobal

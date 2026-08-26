@@ -5,8 +5,8 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
-using AnimeLocalTracker.Services;
-using AnimeLocalTracker.ViewModels;
+using AnimeLocalTracker.Core.Services;
+using AnimeLocalTracker.Core.ViewModels;
 
 namespace AnimeLocalTracker.Views
 {

@@ -1,0 +1,290 @@
+using AnimeLocalTracker.Core.Services;
+using System;
+using System.Diagnostics;
+using System.IO;
+using System.Net;
+using System.Security.Cryptography;
+using System.Text;
+using System.Threading.Tasks;
+
+using CommunityToolkit.Mvvm.Messaging;
+using AnimeLocalTracker.Core.Messages;
+
+namespace AnimeLocalTracker.Core.Services;
+
+public class AuthService : IAuthService
+{
+    // 1. PEGA TU NÚMERO DE CLIENTE AQUÍ:
+    private const string ClientId = "48217";
+    
+    private const string ArchivoToken = "token.txt";
+    public string? Token { get; private set; }
+    
+    // Ruta donde guardaremos el token para que no inicies sesión cada vez que abras la app
+    private readonly string _rutaToken = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AnimeLocalTracker", "anilist_token.txt");
+
+    public bool EstaAutenticado() => File.Exists(_rutaToken) && ObtenerTokenGuardado() != string.Empty;
+    
+    private byte[] GetEncryptionKey()
+    {
+        string salt = "AnimeLocalTracker_CrossPlatform_Salt_2026";
+        string password = Environment.MachineName + Environment.UserName;
+        using var deriveBytes = new Rfc2898DeriveBytes(password, Encoding.UTF8.GetBytes(salt), 50000, HashAlgorithmName.SHA256);
+        return deriveBytes.GetBytes(32);
+    }
+
+    private byte[] EncryptAes(byte[] plaintext)
+    {
+        using var aes = Aes.Create();
+        aes.Key = GetEncryptionKey();
+        aes.GenerateIV();
+        using var encryptor = aes.CreateEncryptor();
+        using var ms = new MemoryStream();
+        ms.Write(aes.IV, 0, aes.IV.Length);
+        using (var cs = new CryptoStream(ms, encryptor, CryptoStreamMode.Write))
+        {
+            cs.Write(plaintext, 0, plaintext.Length);
+        }
+        return ms.ToArray();
+    }
+
+    private byte[] DecryptAes(byte[] ciphertext)
+    {
+        using var aes = Aes.Create();
+        aes.Key = GetEncryptionKey();
+        using var ms = new MemoryStream(ciphertext);
+        byte[] iv = new byte[aes.BlockSize / 8];
+        ms.Read(iv, 0, iv.Length);
+        aes.IV = iv;
+        using var decryptor = aes.CreateDecryptor();
+        using var cs = new CryptoStream(ms, decryptor, CryptoStreamMode.Read);
+        using var resultStream = new MemoryStream();
+        cs.CopyTo(resultStream);
+        return resultStream.ToArray();
+    }
+
+    public string ObtenerTokenGuardado()
+    {
+        if (!File.Exists(_rutaToken)) return string.Empty;
+        
+        try
+        {
+            byte[] ciphertext = File.ReadAllBytes(_rutaToken);
+            byte[] plaintext = DecryptAes(ciphertext);
+            return Encoding.UTF8.GetString(plaintext);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn("AuthService", $"No se pudo desencriptar el token con AES ({ex.Message}), intentando fallback en texto plano.");
+            // Podría ser un token viejo en texto plano o DPAPI, si falla fallará todo.
+            try 
+            {
+                string plain = File.ReadAllText(_rutaToken);
+                if (!string.IsNullOrWhiteSpace(plain) && plain.Length > 20 && plain.StartsWith("eyJ")) // JWT simple check
+                {
+                    byte[] plaintext = Encoding.UTF8.GetBytes(plain);
+                    File.WriteAllBytes(_rutaToken, EncryptAes(plaintext));
+                    return plain;
+                }
+            } 
+            catch { }
+        }
+        
+        return string.Empty;
+    }
+
+    public async Task<bool> IniciarSesionAsync()
+    {
+        if (EstaAutenticado()) return true;
+
+        using var listener = new HttpListener();
+        try
+        {
+            listener.Prefixes.Add("http://localhost:5050/");
+            listener.Start();
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("AuthService", "No se pudo iniciar el listener local en el puerto 5050. Puede que el puerto esté ocupado por otra instancia.", ex);
+            return false;
+        }
+
+        string expectedState = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+
+        // Lanzamos el navegador web del usuario pidiendo permisos con state criptográfico
+        var url = $"https://anilist.co/api/v2/oauth/authorize?client_id={ClientId}&response_type=token&state={expectedState}";
+        try
+        {
+            Process.Start(new ProcessStartInfo { FileName = url, UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("AuthService", "No se pudo abrir el navegador web para la autenticación OAuth", ex);
+        }
+
+        string? tokenCapturado = null;
+        using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromMinutes(2));
+
+        try
+        {
+            while (tokenCapturado == null && !cts.Token.IsCancellationRequested)
+            {
+                var contextTask = listener.GetContextAsync();
+                var completedTask = await Task.WhenAny(contextTask, Task.Delay(Timeout.Infinite, cts.Token));
+
+                if (completedTask != contextTask)
+                {
+                    AppLogger.Warn("AuthService", "Tiempo de espera de autenticación OAuth expirado (timeout de 2 minutos).");
+                    break;
+                }
+
+                var context = await contextTask;
+                var request = context.Request;
+                var response = context.Response;
+
+                if (request.Url?.AbsolutePath == "/callback")
+                {
+                    string html = @"
+                        <html>
+                        <head><meta charset='UTF-8'><title>Conectando...</title></head>
+                        <body style='font-family: sans-serif; text-align: center; padding: 50px; background: #121212; color: white;'>
+                            <h2 id='mensaje'>Completando autenticación...</h2>
+                            <script>
+                                var hash = window.location.hash;
+                                if (hash.includes('access_token')) {
+                                    var params = new URLSearchParams(hash.substring(1));
+                                    var token = params.get('access_token');
+                                    var state = params.get('state') || '';
+                                    
+                                    fetch('/token', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ token: token, state: state })
+                                    })
+                                    .then(r => {
+                                        if (r.ok) {
+                                            document.getElementById('mensaje').innerText = '¡Éxito! Ya puedes cerrar esta pestaña y volver a la aplicación.';
+                                        } else {
+                                            document.getElementById('mensaje').innerText = 'Error de seguridad: el parámetro de estado no coincide.';
+                                        }
+                                    })
+                                    .catch(() => document.getElementById('mensaje').innerText = 'Error interno de comunicación.');
+                                } else {
+                                    document.getElementById('mensaje').innerText = 'Autorización denegada.';
+                                }
+                            </script>
+                        </body>
+                        </html>";
+                    
+                    byte[] buffer = Encoding.UTF8.GetBytes(html);
+                    response.ContentType = "text/html; charset=utf-8";
+                    response.ContentLength64 = buffer.Length;
+                    await response.OutputStream.WriteAsync(buffer, 0, buffer.Length);
+                    response.OutputStream.Close();
+                }
+                else if (request.Url?.AbsolutePath == "/token" && request.HttpMethod == "POST")
+                {
+                    try
+                    {
+                        using var reader = new StreamReader(request.InputStream, Encoding.UTF8);
+                        var body = await reader.ReadToEndAsync();
+                        using var doc = System.Text.Json.JsonDocument.Parse(body);
+                        var root = doc.RootElement;
+                        
+                        string? receivedState = root.TryGetProperty("state", out var sProp) ? sProp.GetString() : null;
+                        string? receivedToken = root.TryGetProperty("token", out var tProp) ? tProp.GetString() : null;
+
+                        if (!string.IsNullOrEmpty(receivedState) && receivedState == expectedState && !string.IsNullOrWhiteSpace(receivedToken))
+                        {
+                            tokenCapturado = receivedToken;
+                            response.StatusCode = 200;
+                            byte[] okMsg = Encoding.UTF8.GetBytes("{\"success\":true}");
+                            response.ContentType = "application/json";
+                            response.ContentLength64 = okMsg.Length;
+                            await response.OutputStream.WriteAsync(okMsg, 0, okMsg.Length);
+                            response.OutputStream.Close();
+                            break;
+                        }
+                        else
+                        {
+                            AppLogger.Warn("AuthService", "Fallo de validación de seguridad (state no coincide o token vacío).");
+                            response.StatusCode = 400;
+                            response.OutputStream.Close();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        AppLogger.Error("AuthService", "Error al procesar payload de token POST", ex);
+                        response.StatusCode = 500;
+                        response.OutputStream.Close();
+                    }
+                }
+                else
+                {
+                    response.StatusCode = 404;
+                    response.OutputStream.Close();
+                }
+            }
+            
+            if (!string.IsNullOrEmpty(tokenCapturado))
+            {
+                byte[] plaintext = Encoding.UTF8.GetBytes(tokenCapturado);
+                byte[] ciphertext = EncryptAes(plaintext);
+                File.WriteAllBytes(_rutaToken, ciphertext);
+                
+                WeakReferenceMessenger.Default.Send(new UsuarioLogeadoMensaje());
+                AppLogger.Info("AuthService", "Sesión iniciada y token guardado correctamente.");
+                return true;
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("AuthService", "Error durante el flujo de autenticación", ex);
+        }
+        finally
+        {
+            try
+            {
+                listener.Stop();
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Debug("AuthService", $"Listener stop no-op: {ex.Message}");
+            }
+        }
+
+        return false;
+    }
+    
+    public string? ObtenerToken()
+    {
+        // 1. Si ya lo tenemos en memoria, lo usamos
+        if (!string.IsNullOrEmpty(Token))
+            return Token;
+
+        // 2. Si no está en memoria, buscamos en el disco duro cifrado (sesión guardada)
+        if (System.IO.File.Exists(_rutaToken))
+        {
+            Token = ObtenerTokenGuardado();
+            if (!string.IsNullOrEmpty(Token)) return Token;
+        }
+
+        // 3. Si no existe, el usuario no está conectado
+        return null; 
+    }
+
+    public void CerrarSesion()
+    {
+        Token = null;
+        if (System.IO.File.Exists(_rutaToken))
+        {
+            System.IO.File.Delete(_rutaToken);
+        }
+        if (System.IO.File.Exists(ArchivoToken))
+        {
+            System.IO.File.Delete(ArchivoToken);
+        }
+        
+        WeakReferenceMessenger.Default.Send(new UsuarioDesconectadoMensaje());
+    }
+}

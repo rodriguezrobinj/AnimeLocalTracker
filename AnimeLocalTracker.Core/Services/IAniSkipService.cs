@@ -1,0 +1,13 @@
+using AnimeLocalTracker.Core.Services;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+using AnimeLocalTracker.Core.Models;
+
+namespace AnimeLocalTracker.Core.Services;
+
+public interface IAniSkipService
+{
+    Task<List<AniSkipResult>> ObtenerSkipTimesAsync(int malId, int episodio, double duracionSegundos = 0, CancellationToken ct = default);
+    Task<int?> ObtenerMalIdDesdeAniListAsync(int aniListId, CancellationToken ct = default);
+}

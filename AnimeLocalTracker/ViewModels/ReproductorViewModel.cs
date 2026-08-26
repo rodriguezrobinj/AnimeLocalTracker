@@ -1,3 +1,4 @@
+using AnimeLocalTracker.Core.Services;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -11,13 +12,13 @@ using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using FlyleafLib;
 using FlyleafLib.MediaPlayer;
-using AnimeLocalTracker.Messages;
-using AnimeLocalTracker.Models;
+using AnimeLocalTracker.Core.Messages;
+using AnimeLocalTracker.Core.Models;
 using AnimeLocalTracker.Services;
 
 namespace AnimeLocalTracker.ViewModels;
 
-public partial class ReproductorViewModel : ObservableObject, IDisposable
+public partial class ReproductorViewModel : ObservableObject, AnimeLocalTracker.Core.ViewModels.IReproductorViewModel, IDisposable
 {
     private readonly ISettingsService? _settingsService;
     private readonly IPlaybackStateService _playbackState;

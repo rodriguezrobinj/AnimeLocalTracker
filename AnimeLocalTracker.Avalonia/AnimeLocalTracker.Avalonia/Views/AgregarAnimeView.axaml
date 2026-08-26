@@ -1,0 +1,264 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             xmlns:vm="clr-namespace:AnimeLocalTracker.Core.ViewModels;assembly=AnimeLocalTracker.Core"
+             mc:Ignorable="d" d:DesignWidth="1280" d:DesignHeight="800"
+             x:DataType="vm:AgregarAnimeViewModel"
+             x:Class="AnimeLocalTracker.Avalonia.Views.AgregarAnimeView"
+             Background="Transparent">
+
+    <Grid MaxWidth="1280" Margin="95,65,30,25">
+
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" /> <!-- Header & Search Bar -->
+            <RowDefinition Height="Auto" /> <!-- Section Title -->
+            <RowDefinition Height="*" />    <!-- Content Grid -->
+        </Grid.RowDefinitions>
+
+        <!-- HEADER & BARRA DE BÚSQUEDA -->
+        <Grid Grid.Row="0" Margin="0,0,0,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Título Principal -->
+            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,24,0">
+                <Border Background="#1E293B" CornerRadius="12" Width="42" Height="42" Margin="0,0,14,0" VerticalAlignment="Center">
+                    <materialIcons:MaterialIcon Kind="MagnifyPlus" Foreground="#93C5FD" Width="24" Height="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="Añadir Anime" FontSize="28" FontWeight="Bold" Foreground="White" />
+                    <TextBlock Text="Explora tendencias o busca cualquier anime en AniList para tu colección local" FontSize="12" Foreground="#9CA3AF" Margin="0,2,0,0"/>
+                </StackPanel>
+            </StackPanel>
+
+            <!-- Barra de Búsqueda Moderna -->
+            <Border Grid.Column="1" Background="#14181E" BorderBrush="#2D3748" BorderThickness="1" 
+                    CornerRadius="14" Height="46" Padding="14,0" HorizontalAlignment="Stretch" MaxWidth="600"
+                    VerticalAlignment="Center">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <materialIcons:MaterialIcon Grid.Column="0" Kind="Magnify" Width="22" Height="22" 
+                                             Foreground="#60A5FA" VerticalAlignment="Center" Margin="0,0,10,0"/>
+
+                    <TextBox Grid.Column="1" Text="{Binding TextoBusqueda}" 
+                             VerticalAlignment="Center" FontSize="14" Foreground="White"
+                             BorderThickness="0" Background="Transparent" 
+                             CaretBrush="#60A5FA" Watermark="Buscar por título (ej. Frieren, Solo Leveling)..." />
+
+                    <!-- Botón Limpiar Búsqueda -->
+                    <Button Grid.Column="2" Command="{Binding LimpiarBusquedaCommand}" 
+                            Background="Transparent" BorderThickness="0"
+                            Foreground="#9CA3AF" Width="28" Height="28" Padding="0" CornerRadius="14"
+                            ToolTip.Tip="Limpiar búsqueda"
+                            IsVisible="{Binding TieneTextoBusqueda}">
+                        <materialIcons:MaterialIcon Kind="Close" Width="18" Height="18"/>
+                    </Button>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- TÍTULO DE SECCIÓN DINÁMICO -->
+        <Grid Grid.Row="1" Margin="0,8,0,16">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <materialIcons:MaterialIcon Kind="Fire" Width="20" Height="20" Foreground="#F59E0B" 
+                                         VerticalAlignment="Center" Margin="0,0,8,0"
+                                         IsVisible="{Binding MostrandoTendencias}"/>
+                <materialIcons:MaterialIcon Kind="FilterVariant" Width="20" Height="20" Foreground="#60A5FA" 
+                                         VerticalAlignment="Center" Margin="0,0,8,0"
+                                         IsVisible="{Binding !MostrandoTendencias}"/>
+                <TextBlock Text="{Binding TituloSeccion}" FontSize="18" FontWeight="SemiBold" Foreground="White" VerticalAlignment="Center"/>
+
+                <!-- BADGE CONTEO DE RESULTADOS -->
+                <Border Background="#1E3A8A" CornerRadius="10" Padding="8,2" Margin="12,0,0,0" VerticalAlignment="Center"
+                        IsVisible="{Binding !BusquedaSinResultados}">
+                    <TextBlock Text="{Binding Resultados.Count}" FontSize="11" FontWeight="Bold" Foreground="#60A5FA"
+                               VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                </Border>
+            </StackPanel>
+        </Grid>
+
+        <!-- CONTENIDO PRINCIPAL -->
+        <Grid Grid.Row="2">
+            <!-- Spinner de Carga -->
+            <StackPanel IsVisible="{Binding IsSearching}" 
+                        HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,60,0,60" ZIndex="10">
+                <ProgressBar IsIndeterminate="True" Foreground="#60A5FA" Width="48" Height="48"/>
+                <TextBlock Text="Cargando animes desde AniList..." Foreground="#9CA3AF" FontSize="14" Margin="0,16,0,0" HorizontalAlignment="Center" FontWeight="SemiBold"/>
+            </StackPanel>
+
+            <!-- Estado Vacío / Sin Resultados -->
+            <StackPanel IsVisible="{Binding BusquedaSinResultados}" 
+                        VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,60,0,60">
+                <Border Background="#1E293B" CornerRadius="40" Width="80" Height="80" HorizontalAlignment="Center" Margin="0,0,0,16">
+                    <materialIcons:MaterialIcon Kind="MagnifyClose" Width="40" Height="40" Foreground="#6B7280" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+                <TextBlock Text="No se encontraron resultados" FontSize="18" Foreground="#E2E8F0" FontWeight="Bold" HorizontalAlignment="Center"/>
+                <TextBlock Text="Prueba escribiendo el título en Romaji, inglés o con menos palabras clave." 
+                           FontSize="13" Foreground="#9CA3AF" HorizontalAlignment="Center" Margin="0,6,0,0" TextAlignment="Center"/>
+                <Button Command="{Binding CargarTendenciasCommand}" 
+                        Background="Transparent" BorderBrush="#3B82F6" BorderThickness="1" Foreground="#60A5FA" Margin="0,18,0,0"
+                        HorizontalAlignment="Center" CornerRadius="8" Padding="12,8">
+                    <StackPanel Orientation="Horizontal">
+                        <materialIcons:MaterialIcon Kind="Fire" Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="Ver tendencias populares" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+
+            <ListBox ItemsSource="{Binding Resultados}"
+                     Background="Transparent" BorderThickness="0"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto"
+                     Padding="0,0,8,20"
+                     IsVisible="{Binding !BusquedaSinResultados}">
+                <ListBox.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel Orientation="Horizontal" />
+                    </ItemsPanelTemplate>
+                </ListBox.ItemsPanel>
+
+                <ListBox.Styles>
+                    <Style Selector="ListBoxItem">
+                        <Setter Property="Padding" Value="0"/>
+                        <Setter Property="Margin" Value="0"/>
+                        <Setter Property="Background" Value="Transparent"/>
+                        <Setter Property="BorderThickness" Value="0"/>
+                    </Style>
+                    <Style Selector="ListBoxItem:selected /template/ ContentPresenter">
+                        <Setter Property="Background" Value="Transparent" />
+                    </Style>
+                </ListBox.Styles>
+
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <Border Margin="8,8,8,12" Background="#14181E" BorderBrush="#262D38" BorderThickness="1"
+                                CornerRadius="14" Padding="0" ClipToBounds="True" Width="200" Height="360" BoxShadow="0 4 10 0 #40000000">
+                            
+                            <Border.Transitions>
+                                <Transitions>
+                                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.15" Easing="CubicEaseOut" />
+                                </Transitions>
+                            </Border.Transitions>
+
+                            <Border.Styles>
+                                <Style Selector="Border">
+                                    <Setter Property="RenderTransform" Value="scale(1)" />
+                                </Style>
+                                <Style Selector="Border:pointerover">
+                                    <Setter Property="RenderTransform" Value="scale(1.02)" />
+                                    <Setter Property="BorderBrush" Value="#3B82F6" />
+                                </Style>
+                            </Border.Styles>
+
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="210"/> <!-- Portada -->
+                                    <RowDefinition Height="*"/>   <!-- Información y Acciones -->
+                                </Grid.RowDefinitions>
+
+                                <!-- PORTADA CON BADGES -->
+                                <Grid Grid.Row="0">
+                                    <Image Source="{Binding PortadaUrl}" 
+                                           Stretch="UniformToFill" />
+
+                                    <!-- Degradado inferior para contraste -->
+                                    <Border VerticalAlignment="Bottom" Height="80">
+                                        <Border.Background>
+                                            <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%">
+                                                <GradientStop Color="#00000000" Offset="0"/>
+                                                <GradientStop Color="#E614181E" Offset="1"/>
+                                            </LinearGradientBrush>
+                                        </Border.Background>
+                                    </Border>
+
+                                    <!-- Badge de Estado -->
+                                    <Border Background="{Binding EstadoColor}" 
+                                            CornerRadius="6" Padding="7,3" 
+                                            HorizontalAlignment="Left" VerticalAlignment="Top" 
+                                            Margin="10,10,0,0">
+                                        <TextBlock Text="{Binding EstadoTexto}" FontSize="10" FontWeight="Bold" Foreground="White"/>
+                                    </Border>
+
+                                    <!-- Badge de Año y Episodios -->
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom" HorizontalAlignment="Left" Margin="10,0,0,8">
+                                        <Border Background="#99000000" CornerRadius="4" Padding="5,2" Margin="0,0,6,0">
+                                            <TextBlock Text="{Binding EpisodiosTexto}" FontSize="10" FontWeight="SemiBold" Foreground="#E2E8F0"/>
+                                        </Border>
+                                        <Border Background="#99000000" CornerRadius="4" Padding="5,2"
+                                                IsVisible="{Binding TieneAño}">
+                                            <TextBlock Text="{Binding AñoTexto}" FontSize="10" FontWeight="SemiBold" Foreground="#9CA3AF"/>
+                                        </Border>
+                                    </StackPanel>
+                                </Grid>
+
+                                <!-- INFORMACIÓN Y ACCIONES -->
+                                <Grid Grid.Row="1" Margin="12,10,12,12">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/> <!-- Título -->
+                                        <RowDefinition Height="Auto"/> <!-- Géneros -->
+                                        <RowDefinition Height="*"/>    <!-- Espaciador -->
+                                        <RowDefinition Height="Auto"/> <!-- Botón -->
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock Grid.Row="0" Text="{Binding TituloPrincipal}" 
+                                               FontWeight="Bold" FontSize="13" Foreground="White" 
+                                               TextTrimming="CharacterEllipsis" TextWrapping="Wrap"
+                                               ToolTip.Tip="{Binding TituloPrincipal}" Height="34"/>
+
+                                    <TextBlock Grid.Row="1" Text="{Binding GenerosTexto}" 
+                                               FontSize="10.5" Foreground="#9CA3AF" 
+                                               TextTrimming="CharacterEllipsis" Margin="0,2,0,8"/>
+
+                                    <Grid Grid.Row="3" Margin="0,2,0,0">
+                                        <!-- Botón AÑADIR A BIBLIOTECA -->
+                                        <Button Command="{Binding DataContext.AñadirAnimeCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" 
+                                                CommandParameter="{Binding}"
+                                                IsVisible="{Binding !EstaEnBiblioteca}"
+                                                Background="#3B82F6" BorderBrush="#60A5FA" BorderThickness="1" Foreground="White"
+                                                Height="34" Padding="10,0" CornerRadius="8"
+                                                Cursor="Hand" ToolTip.Tip="Añadir a mi biblioteca local"
+                                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Center">
+                                            <Grid>
+                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center"
+                                                            IsVisible="{Binding !EstaGuardando}">
+                                                    <materialIcons:MaterialIcon Kind="PlusCircleOutline" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                                    <TextBlock Text="Añadir a biblioteca" FontSize="11.5" FontWeight="Bold" VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                                
+                                                <ProgressBar IsIndeterminate="True" Width="18" Height="18" Foreground="White"
+                                                             IsVisible="{Binding EstaGuardando}"/>
+                                            </Grid>
+                                        </Button>
+
+                                        <!-- Botón EN BIBLIOTECA -->
+                                        <Button Command="{Binding DataContext.VerEnBibliotecaCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" 
+                                                CommandParameter="{Binding}"
+                                                IsVisible="{Binding EstaEnBiblioteca}"
+                                                Background="#132E22" BorderBrush="#10B981" BorderThickness="1" Foreground="#34D399"
+                                                Height="34" Padding="10,0" CornerRadius="8"
+                                                Cursor="Hand" ToolTip.Tip="Ver detalles en tu biblioteca"
+                                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Center">
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <materialIcons:MaterialIcon Kind="CheckCircle" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0" Foreground="#34D399"/>
+                                                <TextBlock Text="En tu biblioteca" FontSize="11.5" FontWeight="Bold" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
+                                    </Grid>
+                                </Grid>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </Grid>
+    </Grid>
+</UserControl>

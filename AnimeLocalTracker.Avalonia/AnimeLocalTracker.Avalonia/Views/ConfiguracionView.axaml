@@ -1,0 +1,283 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             xmlns:vm="clr-namespace:AnimeLocalTracker.Core.ViewModels;assembly=AnimeLocalTracker.Core"
+             mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
+             x:DataType="vm:ConfiguracionViewModel"
+             x:Class="AnimeLocalTracker.Avalonia.Views.ConfiguracionView"
+             Background="Transparent">
+    
+    <Grid ClipToBounds="True" MaxWidth="1200" Margin="95,65,30,25">
+        <Grid.RowDefinitions>
+            <!-- Fila 0: ENCABEZADO FIJO -->
+            <RowDefinition Height="Auto"/>
+            <!-- Fila 1: CONTENIDO DESPLAZABLE -->
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- ENCABEZADO FIJO DE LA VISTA -->
+        <Grid Grid.Row="0" Margin="0,0,0,24">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <Border Background="#1E293B" CornerRadius="12" Width="48" Height="48" Margin="0,0,16,0">
+                    <materialIcons:MaterialIcon Kind="Cog" Width="26" Height="26" Foreground="#60A5FA" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="Configuración y Preferencias" FontSize="28" FontWeight="Bold" Foreground="White" />
+                    <TextBlock Text="Personaliza el almacenamiento de tus animes, reproducción multimedia y sincronización con AniList" 
+                               FontSize="12" Foreground="#9CA3AF" Margin="0,3,0,0"/>
+                </StackPanel>
+            </StackPanel>
+        </Grid>
+
+        <!-- CONTENIDO DESPLAZABLE -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Margin="0,0,24,20" HorizontalAlignment="Stretch">
+
+                <!-- 1. SECCIÓN ALMACENAMIENTO Y BIBLIOTECA -->
+                <Border Background="#121212" BorderBrush="#262D38" BorderThickness="1" CornerRadius="16" Margin="0,0,0,20" Padding="22" BoxShadow="0 4 10 0 #40000000">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
+                            <Border Background="#1E293B" CornerRadius="8" Width="34" Height="34" Margin="0,0,10,0" VerticalAlignment="Center">
+                                <materialIcons:MaterialIcon Kind="FolderMultiple" Foreground="#60A5FA" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="Almacenamiento de Animes" FontSize="16" FontWeight="Bold" Foreground="White"/>
+                                <TextBlock Text="Carpeta principal donde se escanean y organizan tus episodios descargados" FontSize="11" Foreground="#9CA3AF"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- Selector de Ruta -->
+                        <Grid Margin="0,8,0,14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBox Text="{Binding RutaBaseAnimes, Mode=OneWay}" 
+                                     IsReadOnly="True" 
+                                     Watermark="Ruta de Almacenamiento"
+                                     FontSize="13" Foreground="White" Background="#14181E" BorderBrush="#2D3748"
+                                     VerticalContentAlignment="Center"
+                                     Height="42" Padding="10,6" Margin="0,0,10,0">
+                                <TextBox.InnerLeftContent>
+                                    <materialIcons:MaterialIcon Kind="FolderOpen" Width="20" Height="20" Margin="10,0,5,0" Foreground="#60A5FA"/>
+                                </TextBox.InnerLeftContent>
+                            </TextBox>
+
+                            <Button Grid.Column="1" Command="{Binding SeleccionarCarpetaAnimesCommand}"
+                                    Background="#3B82F6" BorderBrush="#1D4ED8" Foreground="White"
+                                    Height="42" Padding="16,0" Margin="0,0,8,0" CornerRadius="8"
+                                    ToolTip.Tip="Elegir una nueva carpeta de almacenamiento">
+                                <StackPanel Orientation="Horizontal">
+                                    <materialIcons:MaterialIcon Kind="FolderEditOutline" Width="18" Height="18" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <TextBlock Text="Cambiar Carpeta" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="12"/>
+                                </StackPanel>
+                            </Button>
+
+                            <Button Grid.Column="2" Command="{Binding AbrirCarpetaEnExploradorCommand}"
+                                    Background="Transparent" BorderBrush="#6B7280" Foreground="#E2E8F0" BorderThickness="1"
+                                    Height="42" Padding="16,0" CornerRadius="8"
+                                    ToolTip.Tip="Abrir en el Explorador de Windows">
+                                <StackPanel Orientation="Horizontal">
+                                    <materialIcons:MaterialIcon Kind="OpenInNew" Width="18" Height="18" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <TextBlock Text="Explorador" VerticalAlignment="Center" FontWeight="Medium" FontSize="12"/>
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+
+                        <!-- Estadísticas de la Carpeta en 2 Tarjetas Alineadas -->
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <Border Grid.Column="0" Background="#14181E" BorderBrush="#2D3748" BorderThickness="1" CornerRadius="10" Padding="16,10" MinHeight="56" Margin="0,0,6,0">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <materialIcons:MaterialIcon Kind="Harddisk" Foreground="#34D399" Width="20" Height="20" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Espacio en Disco" FontSize="10" Foreground="#9CA3AF" FontWeight="SemiBold"/>
+                                        <TextBlock Text="{Binding EspacioLibreTexto}" Foreground="White" FontSize="13" FontWeight="Bold" Margin="0,2,0,0"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Grid.Column="1" Background="#14181E" BorderBrush="#2D3748" BorderThickness="1" CornerRadius="10" Padding="16,10" MinHeight="56" Margin="6,0,0,0">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <materialIcons:MaterialIcon Kind="AnimationPlay" Foreground="#93C5FD" Width="20" Height="20" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Colección Total" FontSize="10" Foreground="#9CA3AF" FontWeight="SemiBold"/>
+                                        <TextBlock Text="{Binding TotalAnimesBiblioteca, StringFormat='{}{0} animes registrados'}" Foreground="White" FontSize="13" FontWeight="Bold" Margin="0,2,0,0"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- 2. SECCIÓN REPRODUCCIÓN Y PREFERENCIAS -->
+                <Border Background="#121212" BorderBrush="#262D38" BorderThickness="1" CornerRadius="16" Margin="0,0,0,20" Padding="22" BoxShadow="0 4 10 0 #40000000">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                            <Border Background="#1E293B" CornerRadius="8" Width="34" Height="34" Margin="0,0,10,0" VerticalAlignment="Center">
+                                <materialIcons:MaterialIcon Kind="TuneVariant" Foreground="#93C5FD" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="Reproducción y Descargas" FontSize="16" FontWeight="Bold" Foreground="White"/>
+                                <TextBlock Text="Ajustes de comportamiento del reproductor y concurrencia" FontSize="11" Foreground="#9CA3AF"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- Fila 1: Auto Play -->
+                        <Border Background="#14181E" BorderBrush="#262D38" BorderThickness="1" CornerRadius="10" MinHeight="56" Padding="16,8" Margin="0,0,0,10">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="Auto-Play del siguiente episodio" FontWeight="SemiBold" Foreground="White" FontSize="13"/>
+                                    <TextBlock Text="Muestra cuenta regresiva de 5s y reproduce automáticamente el siguiente capítulo" FontSize="11" Foreground="#9CA3AF" Margin="0,2,0,0"/>
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1" HorizontalAlignment="Right" Margin="0,0,6,0" IsChecked="{Binding AutoPlaySiguiente}" VerticalAlignment="Center" OnContent="" OffContent="" />
+                            </Grid>
+                        </Border>
+
+                        <!-- Fila 1.5: Auto-Skip Intro / Outro (AniSkip) -->
+                        <Border Background="#14181E" BorderBrush="#262D38" BorderThickness="1" CornerRadius="10" MinHeight="56" Padding="16,8" Margin="0,0,0,10">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="Saltar Intro / Outro automáticamente (AniSkip)" FontWeight="SemiBold" Foreground="White" FontSize="13"/>
+                                    <TextBlock Text="Omite openings y endings de forma automática sin necesidad de hacer clic" FontSize="11" Foreground="#9CA3AF" Margin="0,2,0,0"/>
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1" HorizontalAlignment="Right" Margin="0,0,6,0" IsChecked="{Binding AutoSkipIntroOutro}" VerticalAlignment="Center" OnContent="" OffContent="" />
+                            </Grid>
+                        </Border>
+
+                        <!-- Fila 2: Subtítulos -->
+                        <Border Background="#14181E" BorderBrush="#262D38" BorderThickness="1" CornerRadius="10" MinHeight="56" Padding="16,8" Margin="0,0,0,10">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="Subtítulos activados por defecto" FontWeight="SemiBold" Foreground="White" FontSize="13"/>
+                                    <TextBlock Text="Carga pistas de subtítulos automáticamente al iniciar un video" FontSize="11" Foreground="#9CA3AF" Margin="0,2,0,0"/>
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1" HorizontalAlignment="Right" Margin="0,0,6,0" IsChecked="{Binding SubtitulosPorDefecto}" VerticalAlignment="Center" OnContent="" OffContent="" />
+                            </Grid>
+                        </Border>
+
+                        <!-- Fila 3: Descargas Simultáneas -->
+                        <Border Background="#14181E" BorderBrush="#262D38" BorderThickness="1" CornerRadius="10" MinHeight="56" Padding="16,8" Margin="0,0,0,10">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="140"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="Descargas simultáneas máximas" FontWeight="SemiBold" Foreground="White" FontSize="13"/>
+                                    <TextBlock Text="Cantidad de episodios descargándose en paralelo (1 a 5)" FontSize="11" Foreground="#9CA3AF" Margin="0,2,0,0"/>
+                                </StackPanel>
+                                <ComboBox Grid.Column="1" Width="130" HorizontalAlignment="Right" SelectedValue="{Binding DescargasSimultaneas}" 
+                                          Foreground="White" Background="#14181E" BorderBrush="#2D3748"
+                                          Padding="10,6" Height="38" VerticalContentAlignment="Center" HorizontalContentAlignment="Center"
+                                          SelectedValueBinding="{Binding Content, RelativeSource={RelativeSource Mode=Self}}">
+                                    <ComboBoxItem Content="1"/>
+                                    <ComboBoxItem Content="2"/>
+                                    <ComboBoxItem Content="3"/>
+                                    <ComboBoxItem Content="4"/>
+                                    <ComboBoxItem Content="5"/>
+                                </ComboBox>
+                            </Grid>
+                        </Border>
+
+                        <!-- Fila 4: Intervalo AniList -->
+                        <Border Background="#14181E" BorderBrush="#262D38" BorderThickness="1" CornerRadius="10" MinHeight="56" Padding="16,8" Margin="0,0,0,14">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="140"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="Intervalo de sincronización con AniList" FontWeight="SemiBold" Foreground="White" FontSize="13"/>
+                                    <TextBlock Text="Frecuencia en segundo plano para sincronizar el historial de visualización" FontSize="11" Foreground="#9CA3AF" Margin="0,2,0,0"/>
+                                </StackPanel>
+                                <ComboBox Grid.Column="1" Width="130" HorizontalAlignment="Right" SelectedValue="{Binding IntervaloSincronizacionMinutos}" 
+                                          Foreground="White" Background="#14181E" BorderBrush="#2D3748"
+                                          Padding="10,6" Height="38" VerticalContentAlignment="Center" HorizontalContentAlignment="Center"
+                                          SelectedValueBinding="{Binding Tag, RelativeSource={RelativeSource Mode=Self}}">
+                                    <ComboBoxItem Content="2 minutos" Tag="2"/>
+                                    <ComboBoxItem Content="5 minutos" Tag="5"/>
+                                    <ComboBoxItem Content="10 minutos" Tag="10"/>
+                                    <ComboBoxItem Content="30 minutos" Tag="30"/>
+                                </ComboBox>
+                            </Grid>
+                        </Border>
+
+                        <Button Command="{Binding GuardarPreferenciasCommand}" 
+                                Background="#3B82F6" BorderBrush="#1D4ED8" Foreground="White"
+                                HorizontalAlignment="Right" Height="40" Padding="20,0" CornerRadius="8">
+                            <StackPanel Orientation="Horizontal">
+                                <materialIcons:MaterialIcon Kind="ContentSave" Width="18" Height="18" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <TextBlock Text="Guardar Preferencias" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="12"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Border>
+
+                <!-- 3. SECCIÓN CUENTA Y SINCRONIZACIÓN -->
+                <Border Background="#121212" BorderBrush="#262D38" BorderThickness="1" CornerRadius="16" Margin="0,0,0,20" Padding="22" BoxShadow="0 4 10 0 #40000000">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                            <Border Background="#1E293B" CornerRadius="8" Width="34" Height="34" Margin="0,0,10,0" VerticalAlignment="Center">
+                                <materialIcons:MaterialIcon Kind="AccountSync" Foreground="#34D399" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="Cuenta AniList y Sincronización" FontSize="16" FontWeight="Bold" Foreground="White"/>
+                                <TextBlock Text="Estado de enlace para sincronizar progreso con tu perfil en la nube" FontSize="11" Foreground="#9CA3AF"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <Border Background="#14181E" BorderBrush="#262D38" BorderThickness="1" CornerRadius="10" MinHeight="56" Padding="16,10">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel VerticalAlignment="Center">
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                        <Ellipse Width="8" Height="8" Fill="#34D399" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <TextBlock Text="{Binding EstadoAutenticacionTexto}" FontWeight="Bold" Foreground="White" FontSize="13"/>
+                                    </StackPanel>
+                                    <TextBlock Text="Los episodios marcados como vistos se sincronizan automáticamente con tu perfil online de AniList" 
+                                               FontSize="11" Foreground="#9CA3AF"/>
+                                </StackPanel>
+
+                                <Button Grid.Column="1" Command="{Binding CerrarSesionAniListCommand}"
+                                        IsVisible="{Binding EstaAutenticadoAniList}"
+                                        Background="Transparent" BorderBrush="#EF4444" Foreground="#F87171" BorderThickness="1"
+                                        Height="38" Padding="14,0" VerticalAlignment="Center" CornerRadius="8">
+                                    <StackPanel Orientation="Horizontal">
+                                        <materialIcons:MaterialIcon Kind="Logout" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                        <TextBlock Text="Cerrar Sesión" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="12"/>
+                                    </StackPanel>
+                                </Button>
+                            </Grid>
+                        </Border>
+                    </StackPanel>
+                </Border>
+
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

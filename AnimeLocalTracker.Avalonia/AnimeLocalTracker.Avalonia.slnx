@@ -1,0 +1,11 @@
+﻿<Solution>
+  <Project Path="AnimeLocalTracker.Avalonia.Android/AnimeLocalTracker.Avalonia.Android.csproj">
+    <Deploy />
+  </Project>
+  <Project Path="AnimeLocalTracker.Avalonia.Browser/AnimeLocalTracker.Avalonia.Browser.csproj" />
+  <Project Path="AnimeLocalTracker.Avalonia.Desktop/AnimeLocalTracker.Avalonia.Desktop.csproj" />
+  <Project Path="AnimeLocalTracker.Avalonia.iOS/AnimeLocalTracker.Avalonia.iOS.csproj">
+    <Deploy />
+  </Project>
+  <Project Path="AnimeLocalTracker.Avalonia/AnimeLocalTracker.Avalonia.csproj" />
+</Solution>

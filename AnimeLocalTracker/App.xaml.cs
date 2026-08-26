@@ -2,10 +2,10 @@ using System;
 using System.Net.Http;
 using System.Threading.Tasks;
 using System.Windows;
-using AnimeLocalTracker.ViewModels;
+using AnimeLocalTracker.Core.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 using AnimeLocalTracker.Views; // Asegúrate de que este namespace exista
-using AnimeLocalTracker.Services;
+using AnimeLocalTracker.Core.Services;
 using Polly;
 
 namespace AnimeLocalTracker;

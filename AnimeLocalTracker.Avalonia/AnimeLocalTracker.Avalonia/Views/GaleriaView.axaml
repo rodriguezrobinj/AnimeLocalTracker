@@ -1,0 +1,133 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:AnimeLocalTracker.Core.ViewModels;assembly=AnimeLocalTracker.Core"
+             xmlns:material="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             mc:Ignorable="d" d:DesignWidth="1248" d:DesignHeight="700"
+             x:Class="AnimeLocalTracker.Avalonia.Views.GaleriaView"
+             x:DataType="vm:GaleriaViewModel"
+             Background="Transparent">
+
+    <Grid MaxWidth="1248">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- HEADER MODERNO CON ÍCONOS -->
+        <Border Grid.Row="0" Margin="0,0,0,20" CornerRadius="12" Background="#11FFFFFF">
+            <Grid ColumnDefinitions="*, Auto" Margin="20">
+                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                    <material:MaterialIcon Kind="PlayCircle" Width="32" Height="32" Foreground="#E50914" VerticalAlignment="Center" Margin="0,0,10,0" />
+                    <TextBlock Text="Mi Biblioteca" FontSize="28" FontWeight="Bold" Foreground="White" VerticalAlignment="Center" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
+                    <Button Classes="iconButton" Background="Transparent" ToolTip.Tip="Añadir Anime" BorderThickness="0">
+                        <material:MaterialIcon Kind="Plus" Width="24" Height="24" Foreground="White" />
+                    </Button>
+                    <Button Classes="iconButton" Background="Transparent" ToolTip.Tip="Configuración" BorderThickness="0">
+                        <material:MaterialIcon Kind="Cog" Width="24" Height="24" Foreground="White" />
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- CONTROLES Y BÚSQUEDA -->
+        <Grid Grid.Row="1" ColumnDefinitions="Auto, *, Auto" Margin="0,0,0,20">
+            
+            <!-- Buscador -->
+            <Border Grid.Column="1" CornerRadius="20" Background="#22FFFFFF" Height="40" Margin="20,0">
+                <Grid ColumnDefinitions="Auto, *">
+                    <material:MaterialIcon Kind="Magnify" Width="20" Height="20" Foreground="#AAAAAA" Margin="15,0,10,0" />
+                    <TextBox Grid.Column="1" 
+                             Text="{Binding TextoBusqueda, Mode=TwoWay}" 
+                             Watermark="Buscar anime..." 
+                             Background="Transparent"
+                             BorderThickness="0"
+                             Foreground="White"
+                             VerticalAlignment="Center" />
+                </Grid>
+            </Border>
+            
+            <!-- Filtros -->
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10">
+                <Button Content="Todos" Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="Todos" Classes.activo="{Binding EsFiltroTodos}" />
+                <Button Content="Viendo" Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="Viendo" Classes.activo="{Binding EsFiltroViendo}" />
+                <Button Content="Completados" Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="Completados" Classes.activo="{Binding EsFiltroCompletados}" />
+            </StackPanel>
+        </Grid>
+
+        <!-- GALERÍA DE ANIMES -->
+        <ListBox Grid.Row="2" 
+                 ItemsSource="{Binding BibliotecaFiltrada}" 
+                 Background="Transparent"
+                 BorderThickness="0"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+            
+            <!-- Usar WrapPanel para las tarjetas -->
+            <ListBox.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <WrapPanel Orientation="Horizontal" />
+                </ItemsPanelTemplate>
+            </ListBox.ItemsPanel>
+
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <!-- Tarjeta de Anime -->
+                    <Border Width="200" Height="300" Margin="10" CornerRadius="8" Background="#222222" ClipToBounds="True">
+                        <!-- Transición de Hover -->
+                        <Border.Transitions>
+                            <Transitions>
+                                <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.2" />
+                            </Transitions>
+                        </Border.Transitions>
+                        <!-- Todo: Hover animation using pseudo-classes -->
+
+                        <Grid>
+                            <!-- Imagen Cover -->
+                            <Image Source="{Binding RutaImagenCoverLocal}" Stretch="UniformToFill" />
+                            
+                            <!-- Gradiente Inferior -->
+                            <Border VerticalAlignment="Bottom" Height="100">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%">
+                                        <GradientStop Color="#00000000" Offset="0" />
+                                        <GradientStop Color="#CC000000" Offset="1" />
+                                    </LinearGradientBrush>
+                                </Border.Background>
+                            </Border>
+
+                            <!-- Textos -->
+                            <StackPanel VerticalAlignment="Bottom" Margin="10">
+                                <TextBlock Text="{Binding Titulo}" FontWeight="Bold" Foreground="White" TextTrimming="CharacterEllipsis" FontSize="14" />
+                                <TextBlock Text="{Binding EpisodiosVistos, StringFormat='Vistos: {0}'}" Foreground="#AAAAAA" FontSize="12" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+            
+            <ListBox.Styles>
+                <!-- Estilo de selección invisible -->
+                <Style Selector="ListBoxItem">
+                    <Setter Property="Padding" Value="0" />
+                    <Setter Property="Background" Value="Transparent" />
+                    <Setter Property="Template">
+                        <ControlTemplate>
+                            <ContentPresenter Content="{TemplateBinding Content}"
+                                              ContentTemplate="{TemplateBinding ContentTemplate}" />
+                        </ControlTemplate>
+                    </Setter>
+                </Style>
+                
+                <!-- Animación Hover en Tarjetas -->
+                <Style Selector="Border:pointerover">
+                    <Setter Property="RenderTransform" Value="scale(1.05)" />
+                </Style>
+            </ListBox.Styles>
+        </ListBox>
+    </Grid>
+</UserControl>

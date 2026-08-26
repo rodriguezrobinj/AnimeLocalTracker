@@ -1,0 +1,206 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             xmlns:vm="clr-namespace:AnimeLocalTracker.Core.ViewModels;assembly=AnimeLocalTracker.Core"
+             mc:Ignorable="d" d:DesignWidth="1248" d:DesignHeight="800"
+             x:DataType="vm:DescargasViewModel"
+             x:Class="AnimeLocalTracker.Avalonia.Views.DescargasView"
+             Background="Transparent">
+
+    <Grid MaxWidth="1248" Margin="95,60,30,30">
+        <Grid.RowDefinitions>
+            <!-- Fila 0: Header / Título -->
+            <RowDefinition Height="Auto"/>
+            <!-- Fila 1: Lista de descargas -->
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- HEADER SUPERIOR -->
+        <Grid Grid.Row="0" Margin="0,0,0,20">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="Cola de descargas" FontSize="28" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
+
+                <!-- BADGE CONTEO -->
+                <Border Background="#1E3A8A" CornerRadius="10" Padding="8,2" Margin="14,0,0,0" VerticalAlignment="Center"
+                        IsVisible="{Binding TieneDescargas}">
+                    <TextBlock Text="{Binding ConteoActivas}" FontSize="12" FontWeight="Bold" Foreground="#60A5FA"
+                               VerticalAlignment="Center" HorizontalAlignment="Center" TextAlignment="Center"/>
+                </Border>
+            </StackPanel>
+        </Grid>
+
+        <!-- LISTA DE DESCARGAS ACTIVAS -->
+        <Grid Grid.Row="1">
+            <!-- VISTA CON DESCARGAS -->
+            <ScrollViewer VerticalScrollBarVisibility="Auto" 
+                          Padding="0,0,20,0"
+                          IsVisible="{Binding TieneDescargas}">
+                <StackPanel>
+                    <ListBox ItemsSource="{Binding ColaDescargas}" 
+                             Background="Transparent" BorderThickness="0"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             ScrollViewer.VerticalScrollBarVisibility="Disabled">
+                        
+                        <ListBox.Styles>
+                            <Style Selector="ListBoxItem">
+                                <Setter Property="Padding" Value="0"/>
+                                <Setter Property="Margin" Value="0,0,0,10"/>
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="BorderThickness" Value="0"/>
+                            </Style>
+                            <Style Selector="ListBoxItem:selected /template/ ContentPresenter">
+                                <Setter Property="Background" Value="Transparent" />
+                            </Style>
+                        </ListBox.Styles>
+
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <!-- Tarjeta de descarga con barra de estado lateral -->
+                                <Border Background="#14181E" BorderBrush="#262D38" BorderThickness="1"
+                                        CornerRadius="12" Padding="0" ClipToBounds="True">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="3"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <!-- BARRA DE ESTADO LATERAL: azul descargando / ámbar en pausa -->
+                                        <Border Grid.Column="0">
+                                            <Border.Styles>
+                                                <Style Selector="Border">
+                                                    <Setter Property="Background" Value="#60A5FA"/>
+                                                </Style>
+                                                <Style Selector="Border[IsVisible=True]">
+                                                </Style>
+                                            </Border.Styles>
+                                            <!-- Fix: binding inside Style is not well supported without class selectors in Avalonia easily in inline, 
+                                                 so we use a panel with two borders and toggle visibility -->
+                                            <Grid>
+                                                <Border Background="#60A5FA" IsVisible="{Binding !IsPaused}"/>
+                                                <Border Background="#F59E0B" IsVisible="{Binding IsPaused}"/>
+                                            </Grid>
+                                        </Border>
+
+                                        <!-- CUERPO CENTRAL -->
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="16,14">
+                                            <Grid Margin="0,0,0,4">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="{Binding AnimeTitulo}" FontWeight="Bold" FontSize="14.5" Foreground="#E2E8F0"
+                                                               TextTrimming="CharacterEllipsis" MaxWidth="620" HorizontalAlignment="Left"/>
+                                                    <!-- CHIP EN PAUSA -->
+                                                    <Border Background="#33F59E0B" BorderBrush="#66F59E0B" BorderThickness="1" CornerRadius="6"
+                                                            Padding="7,2" Margin="8,0,0,0" VerticalAlignment="Center"
+                                                            IsVisible="{Binding IsPaused}">
+                                                        <TextBlock Text="En pausa" FontSize="10" FontWeight="Bold" Foreground="#F59E0B"/>
+                                                    </Border>
+                                                </StackPanel>
+                                                <TextBlock Text="{Binding ProgresoTexto}" FontWeight="Bold" FontSize="14" Foreground="#60A5FA"
+                                                           HorizontalAlignment="Right" Margin="0,0,0,0"/>
+                                            </Grid>
+
+                                            <TextBlock Text="{Binding TituloEpisodio}" FontSize="12.5" Foreground="#9CA3AF" Margin="0,0,0,10"/>
+
+                                            <!-- BARRA DE PROGRESO -->
+                                            <ProgressBar Value="{Binding Progreso}" Minimum="0" Maximum="100"
+                                                         Height="6" Foreground="#60A5FA" Background="#1B222C"
+                                                         IsIndeterminate="{Binding EstaEnEspera}"/>
+                                        </StackPanel>
+
+                                        <!-- BOTONES DE ACCIÓN -->
+                                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
+
+                                            <!-- BOTÓN PAUSA / REANUDAR -->
+                                            <Button Command="{Binding DataContext.AlternarPausaDescargaCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}"
+                                                    Background="Transparent" BorderThickness="0" Width="36" Height="36" CornerRadius="18"
+                                                    ToolTip.Tip="Pausar/Reanudar">
+                                                <Grid>
+                                                    <materialIcons:MaterialIcon Kind="Pause" Foreground="#60A5FA" Width="22" Height="22" IsVisible="{Binding !IsPaused}"/>
+                                                    <materialIcons:MaterialIcon Kind="Play" Foreground="#60A5FA" Width="22" Height="22" IsVisible="{Binding IsPaused}"/>
+                                                </Grid>
+                                            </Button>
+
+                                            <!-- BOTÓN CANCELAR -->
+                                            <Button Command="{Binding DataContext.CancelarDescargaCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}"
+                                                    Background="Transparent" BorderThickness="0" Width="36" Height="36" CornerRadius="18"
+                                                    ToolTip.Tip="Cancelar descarga" Margin="4,0,0,0">
+                                                <materialIcons:MaterialIcon Kind="TrashCanOutline" Foreground="#F87171" Width="20" Height="20"/>
+                                            </Button>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- ESTADO VACÍO (Sin descargas) -->
+            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center"
+                        IsVisible="{Binding !TieneDescargas}">
+                <Border Background="#1E293B" CornerRadius="40" Width="80" Height="80" HorizontalAlignment="Center" Margin="0,0,0,16">
+                    <materialIcons:MaterialIcon Kind="CloudDownloadOutline" Width="40" Height="40" Foreground="#6B7280" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+                <TextBlock Text="No hay descargas en curso" FontSize="18" Foreground="#E2E8F0" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,0,0,6"/>
+                <TextBlock Text="Los capítulos que pongas a descargar se mostrarán aquí en tiempo real." 
+                           FontSize="13" Foreground="#9CA3AF" HorizontalAlignment="Center"/>
+            </StackPanel>
+
+            <!-- BOTONES FLOTANTES DE ACCIONES (SEPARADOS) -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Bottom" 
+                        Margin="0,0,10,10"
+                        IsVisible="{Binding TieneDescargas}">
+
+                <!-- BOTÓN 1: PAUSAR / REANUDAR TODAS -->
+                <Button Command="{Binding AlternarPausaTodasCommand}"
+                        Height="44" Padding="20,0" Margin="0,0,10,0" CornerRadius="10"
+                        Cursor="Hand">
+                    <Button.Styles>
+                        <Style Selector="Button">
+                            <Setter Property="Background" Value="#3B82F6" />
+                            <Setter Property="BorderBrush" Value="#3B82F6" />
+                            <Setter Property="Foreground" Value="White" />
+                        </Style>
+                        <!-- In Avalonia it's harder to style based on DataContext inside Style without classes, 
+                             so we just use dynamic content -->
+                    </Button.Styles>
+                    <Grid>
+                        <StackPanel Orientation="Horizontal" IsVisible="{Binding !TodasPausadas}">
+                            <materialIcons:MaterialIcon Kind="Pause" Width="20" Height="20" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBlock Text="Pausar todas" FontWeight="Bold" FontSize="14" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" IsVisible="{Binding TodasPausadas}">
+                            <materialIcons:MaterialIcon Kind="Play" Width="20" Height="20" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBlock Text="Reanudar todas" FontWeight="Bold" FontSize="14" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Grid>
+                </Button>
+
+                <!-- BOTÓN 2: MENÚ DE 3 PUNTOS CON FLYOUT -->
+                <Button Width="44" Height="44" CornerRadius="10"
+                        Background="#1E293B" BorderBrush="#2D3748" BorderThickness="1"
+                        Cursor="Hand" ToolTip.Tip="Más opciones">
+                    <materialIcons:MaterialIcon Kind="DotsVertical" Width="22" Height="22" 
+                                             Foreground="#9CA3AF" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    <Button.Flyout>
+                        <Flyout Placement="TopEdgeAlignedRight">
+                            <Button Command="{Binding CancelarTodasCommand}"
+                                    Height="38" Padding="14,0"
+                                    Background="Transparent" BorderThickness="0" CornerRadius="8"
+                                    Cursor="Hand">
+                                <StackPanel Orientation="Horizontal">
+                                    <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="18" Height="18" Foreground="#EF4444" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Cancelar todas las descargas" Foreground="#EF4444" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                        </Flyout>
+                    </Button.Flyout>
+                </Button>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</UserControl>

@@ -1,0 +1,87 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:AnimeLocalTracker.Core.ViewModels;assembly=AnimeLocalTracker.Core"
+             xmlns:vlc="clr-namespace:LibVLCSharp.Avalonia;assembly=LibVLCSharp.Avalonia"
+             xmlns:material="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="AnimeLocalTracker.Avalonia.Views.ReproductorView"
+             x:DataType="vm:ReproductorViewModel">
+
+    <Grid Background="Black">
+        <!-- Reproductor NATIVO LibVLC -->
+        <vlc:VideoView x:Name="VideoViewControl" MediaPlayer="{Binding MediaPlayer}" DoubleTapped="VideoViewControl_OnDoubleTapped" />
+
+        <!-- Overlay de Controles (Glassmorphism) -->
+        <Border Background="#99000000" 
+                VerticalAlignment="Bottom" 
+                CornerRadius="12" 
+                Margin="20"
+                Padding="16,10"
+                BoxShadow="0 8 32 0 #55000000">
+            <Border.Transitions>
+                <Transitions>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.3" />
+                </Transitions>
+            </Border.Transitions>
+
+            <Grid RowDefinitions="Auto, Auto">
+                
+                <!-- Barra de progreso -->
+                <Slider Grid.Row="0"
+                        Minimum="0" Maximum="1"
+                        Value="{Binding Position, Mode=TwoWay}"
+                        Foreground="#E50914" />
+                
+                <Grid Grid.Row="1" ColumnDefinitions="Auto, *, Auto, Auto" Margin="0,10,0,0">
+                    <!-- Botón Play/Pause -->
+                    <Button Grid.Column="0" 
+                            Command="{Binding PlayPauseCommand}"
+                            Background="Transparent"
+                            BorderThickness="0">
+                        <material:MaterialIcon Kind="{Binding IsPlaying, Converter={x:Static ObjectConverters.IsNull}}" Width="32" Height="32" Foreground="White" />
+                        <!-- Converter will need to be fixed later, just placeholder for now -->
+                    </Button>
+                    
+                    <!-- Información (Título y Episodio) -->
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="16,0">
+                        <TextBlock Text="{Binding TituloAnime}" FontWeight="Bold" Foreground="White" FontSize="16" />
+                        <TextBlock Text="{Binding EpisodioActual, StringFormat='Episodio {0}'}" Foreground="#BBBBBB" FontSize="12" />
+                    </StackPanel>
+
+                    <!-- Volumen -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0">
+                        <Button Command="{Binding ToggleMuteCommand}" Background="Transparent" BorderThickness="0">
+                            <material:MaterialIcon Kind="VolumeHigh" Width="24" Height="24" Foreground="White" />
+                        </Button>
+                        <Slider Width="100" Minimum="0" Maximum="100" Value="{Binding Volume, Mode=TwoWay}" Foreground="#E50914" />
+                    </StackPanel>
+                    
+                    <!-- Botones extra (Fullscreen, Subtitulos) -->
+                    <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                        <!-- Botón Subtítulos -->
+                        <Button Background="Transparent" BorderThickness="0" Margin="0,0,10,0">
+                            <Button.Flyout>
+                                <Flyout Placement="TopEdgeAlignedRight" ShowMode="TransientWithDismissOnPointerMoveAway">
+                                    <StackPanel MinWidth="150">
+                                        <TextBlock Text="Subtítulos" FontWeight="Bold" Margin="0,0,0,10" Foreground="White"/>
+                                        <!-- Placeholder items -->
+                                        <RadioButton Content="Desactivado" GroupName="Subs" IsChecked="True" Foreground="White" Margin="0,5"/>
+                                        <RadioButton Content="Pista 1 (Español)" GroupName="Subs" Foreground="White" Margin="0,5"/>
+                                        <RadioButton Content="Pista 2 (Inglés)" GroupName="Subs" Foreground="White" Margin="0,5"/>
+                                    </StackPanel>
+                                </Flyout>
+                            </Button.Flyout>
+                            <material:MaterialIcon Kind="Subtitles" Width="24" Height="24" Foreground="White" />
+                        </Button>
+
+                        <Button Background="Transparent" BorderThickness="0">
+                            <material:MaterialIcon Kind="Fullscreen" Width="28" Height="28" Foreground="White" />
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

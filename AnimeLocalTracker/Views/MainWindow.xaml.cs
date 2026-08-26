@@ -1,6 +1,6 @@
 using System.Windows;
 using System.Runtime.InteropServices;
-using AnimeLocalTracker.ViewModels;
+using AnimeLocalTracker.Core.ViewModels;
 
 namespace AnimeLocalTracker.Views;
 

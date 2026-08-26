@@ -1,6 +1,6 @@
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.Messaging;
-using AnimeLocalTracker.Messages;
+using AnimeLocalTracker.Core.Messages;
 
 namespace AnimeLocalTracker.Services;
 
