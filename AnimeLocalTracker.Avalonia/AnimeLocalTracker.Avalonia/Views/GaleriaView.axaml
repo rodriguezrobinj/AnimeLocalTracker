@@ -4,130 +4,205 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="clr-namespace:AnimeLocalTracker.Core.ViewModels;assembly=AnimeLocalTracker.Core"
              xmlns:material="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             xmlns:converters="clr-namespace:AnimeLocalTracker.Avalonia.Converters"
              mc:Ignorable="d" d:DesignWidth="1248" d:DesignHeight="700"
              x:Class="AnimeLocalTracker.Avalonia.Views.GaleriaView"
              x:DataType="vm:GaleriaViewModel"
              Background="Transparent">
 
-    <Grid MaxWidth="1248">
+    <UserControl.Resources>
+        <converters:ZeroToBoolConverter x:Key="ZeroToBool" />
+    </UserControl.Resources>
+
+    <!-- ESTILOS INTERNOS -->
+    <UserControl.Styles>
+        <Style Selector="Button.headerBtn">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Foreground" Value="#A0A0A0" />
+            <Setter Property="Padding" Value="10,5" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style Selector="Button.headerBtn:pointerover">
+            <Setter Property="Background" Value="#22FFFFFF" />
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+        <Style Selector="Button.headerBtn.activo">
+            <Setter Property="Background" Value="#E50914" />
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+
+        <!-- Efecto Hover para el Pill -->
+        <Style Selector="Border.PlayPill">
+            <Setter Property="Opacity" Value="0" />
+            <Setter Property="RenderTransform" Value="translateY(10px)" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.2" Easing="CircularEaseOut" />
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.2" Easing="CircularEaseOut" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Border.CardBorder:pointerover Border.PlayPill">
+            <Setter Property="Opacity" Value="1" />
+            <Setter Property="RenderTransform" Value="translateY(0px)" />
+        </Style>
+        
+        <!-- Borde Brillante Hover -->
+        <Style Selector="Border.CardBorder">
+            <Setter Property="BorderBrush" Value="#262D38" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="BorderBrush" Duration="0:0:0.2" />
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.2" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Border.CardBorder:pointerover">
+            <Setter Property="BorderBrush" Value="#3B82F6" />
+            <Setter Property="RenderTransform" Value="scale(1.03)" />
+        </Style>
+    </UserControl.Styles>
+
+    <Grid MaxWidth="1400" Margin="20,20,20,0">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- HEADER MODERNO CON ÍCONOS -->
-        <Border Grid.Row="0" Margin="0,0,0,20" CornerRadius="12" Background="#11FFFFFF">
-            <Grid ColumnDefinitions="*, Auto" Margin="20">
-                <StackPanel Grid.Column="0" Orientation="Horizontal">
-                    <material:MaterialIcon Kind="PlayCircle" Width="32" Height="32" Foreground="#E50914" VerticalAlignment="Center" Margin="0,0,10,0" />
-                    <TextBlock Text="Mi Biblioteca" FontSize="28" FontWeight="Bold" Foreground="White" VerticalAlignment="Center" />
-                </StackPanel>
+        <!-- TOP BAR (HEADER & FILTROS) -->
+        <Grid Grid.Row="0" Margin="0,0,0,20">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
 
-                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
-                    <Button Classes="iconButton" Background="Transparent" ToolTip.Tip="Añadir Anime" BorderThickness="0">
-                        <material:MaterialIcon Kind="Plus" Width="24" Height="24" Foreground="White" />
-                    </Button>
-                    <Button Classes="iconButton" Background="Transparent" ToolTip.Tip="Configuración" BorderThickness="0">
-                        <material:MaterialIcon Kind="Cog" Width="24" Height="24" Foreground="White" />
-                    </Button>
-                </StackPanel>
-            </Grid>
-        </Border>
+            <!-- Título -->
+            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                <material:MaterialIcon Kind="PlayBoxMultiple" Width="36" Height="36" Foreground="#E50914" Margin="0,0,12,0"/>
+                <TextBlock Text="Mi Biblioteca" FontSize="26" FontWeight="ExtraBold" Foreground="White" VerticalAlignment="Center" />
+            </StackPanel>
 
-        <!-- CONTROLES Y BÚSQUEDA -->
-        <Grid Grid.Row="1" ColumnDefinitions="Auto, *, Auto" Margin="0,0,0,20">
-            
-            <!-- Buscador -->
-            <Border Grid.Column="1" CornerRadius="20" Background="#22FFFFFF" Height="40" Margin="20,0">
+            <!-- Barra de Búsqueda -->
+            <Border Grid.Column="1" MaxWidth="500" HorizontalAlignment="Center" Height="40" Background="#161B22" 
+                    BorderBrush="#30363D" BorderThickness="1" CornerRadius="20">
                 <Grid ColumnDefinitions="Auto, *">
-                    <material:MaterialIcon Kind="Magnify" Width="20" Height="20" Foreground="#AAAAAA" Margin="15,0,10,0" />
-                    <TextBox Grid.Column="1" 
-                             Text="{Binding TextoBusqueda, Mode=TwoWay}" 
-                             Watermark="Buscar anime..." 
-                             Background="Transparent"
-                             BorderThickness="0"
-                             Foreground="White"
-                             VerticalAlignment="Center" />
+                    <material:MaterialIcon Kind="Magnify" Width="20" Height="20" Foreground="#8B949E" Margin="15,0,10,0"/>
+                    <TextBox Grid.Column="1" Text="{Binding TextoBusqueda, Mode=TwoWay}" 
+                             Watermark="Buscar anime..." Background="Transparent" BorderThickness="0" 
+                             Foreground="White" VerticalAlignment="Center"/>
                 </Grid>
             </Border>
-            
-            <!-- Filtros -->
-            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10">
-                <Button Content="Todos" Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="Todos" Classes.activo="{Binding EsFiltroTodos}" />
-                <Button Content="Viendo" Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="Viendo" Classes.activo="{Binding EsFiltroViendo}" />
-                <Button Content="Completados" Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="Completados" Classes.activo="{Binding EsFiltroCompletados}" />
+
+            <!-- Filtros & Controles -->
+            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Spacing="5">
+                <Button Content="Todos" Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="Todos" 
+                        Classes="headerBtn" Classes.activo="{Binding EsFiltroTodos}" />
+                <Button Content="Viendo" Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="Viendo" 
+                        Classes="headerBtn" Classes.activo="{Binding EsFiltroViendo}" />
+                <Button Content="Completados" Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="Completados" 
+                        Classes="headerBtn" Classes.activo="{Binding EsFiltroCompletados}" />
+                <Border Width="1" Height="20" Background="#333333" Margin="10,0" />
+                
+                <Button Background="Transparent" BorderThickness="0" ToolTip.Tip="Modo Selección" Command="{Binding AlternarModoSeleccionCommand}">
+                    <material:MaterialIcon Kind="CheckboxMultipleMarkedOutline" Width="24" Height="24" Foreground="{Binding ModoSeleccion, Converter={StaticResource ZeroToBool}, FallbackValue=#A0A0A0}"/>
+                </Button>
             </StackPanel>
         </Grid>
 
-        <!-- GALERÍA DE ANIMES -->
-        <ListBox Grid.Row="2" 
-                 ItemsSource="{Binding BibliotecaFiltrada}" 
-                 Background="Transparent"
-                 BorderThickness="0"
-                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-            
-            <!-- Usar WrapPanel para las tarjetas -->
-            <ListBox.ItemsPanel>
-                <ItemsPanelTemplate>
-                    <WrapPanel Orientation="Horizontal" />
-                </ItemsPanelTemplate>
-            </ListBox.ItemsPanel>
+        <!-- CONTENIDO PRINCIPAL: GALERÍA -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding BibliotecaFiltrada}" Margin="0,0,0,20">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel Orientation="Horizontal" HorizontalAlignment="Left" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
 
-            <ListBox.ItemTemplate>
-                <DataTemplate>
-                    <!-- Tarjeta de Anime -->
-                    <Border Width="200" Height="300" Margin="10" CornerRadius="8" Background="#222222" ClipToBounds="True">
-                        <!-- Transición de Hover -->
-                        <Border.Transitions>
-                            <Transitions>
-                                <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.2" />
-                            </Transitions>
-                        </Border.Transitions>
-                        <!-- Todo: Hover animation using pseudo-classes -->
-
-                        <Grid>
-                            <!-- Imagen Cover -->
-                            <Image Source="{Binding RutaImagenCoverLocal}" Stretch="UniformToFill" />
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <!-- Tarjeta Premium -->
+                        <Border Classes="CardBorder" Width="200" Height="290" Margin="12,12,12,20" 
+                                CornerRadius="14" Background="#14181E" BorderThickness="1" 
+                                BoxShadow="0 8 16 0 #33000000" ClipToBounds="True">
                             
-                            <!-- Gradiente Inferior -->
-                            <Border VerticalAlignment="Bottom" Height="100">
-                                <Border.Background>
-                                    <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%">
-                                        <GradientStop Color="#00000000" Offset="0" />
-                                        <GradientStop Color="#CC000000" Offset="1" />
-                                    </LinearGradientBrush>
-                                </Border.Background>
-                            </Border>
+                            <!-- Acción al clickear la tarjeta -->
+                            <Button Background="Transparent" BorderThickness="0" Padding="0"
+                                    Command="{Binding DataContext.AbrirDetalleCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                    CommandParameter="{Binding}">
+                                <Grid>
+                                    <!-- Imagen de Portada -->
+                                    <Image Source="{Binding RutaImagenCoverLocal}" Stretch="UniformToFill" />
 
-                            <!-- Textos -->
-                            <StackPanel VerticalAlignment="Bottom" Margin="10">
-                                <TextBlock Text="{Binding Titulo}" FontWeight="Bold" Foreground="White" TextTrimming="CharacterEllipsis" FontSize="14" />
-                                <TextBlock Text="{Binding EpisodiosVistos, StringFormat='Vistos: {0}'}" Foreground="#AAAAAA" FontSize="12" />
-                            </StackPanel>
-                        </Grid>
-                    </Border>
-                </DataTemplate>
-            </ListBox.ItemTemplate>
-            
-            <ListBox.Styles>
-                <!-- Estilo de selección invisible -->
-                <Style Selector="ListBoxItem">
-                    <Setter Property="Padding" Value="0" />
-                    <Setter Property="Background" Value="Transparent" />
-                    <Setter Property="Template">
-                        <ControlTemplate>
-                            <ContentPresenter Content="{TemplateBinding Content}"
-                                              ContentTemplate="{TemplateBinding ContentTemplate}" />
-                        </ControlTemplate>
-                    </Setter>
-                </Style>
-                
-                <!-- Animación Hover en Tarjetas -->
-                <Style Selector="Border:pointerover">
-                    <Setter Property="RenderTransform" Value="scale(1.05)" />
-                </Style>
-            </ListBox.Styles>
-        </ListBox>
+                                    <!-- Etiqueta de Estado -->
+                                    <Border Background="{Binding ColorEstado}" Padding="8,4" CornerRadius="6" 
+                                            HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12"
+                                            IsVisible="{Binding !EstaSeleccionado}">
+                                        <TextBlock Text="{Binding EstadoVisual}" Foreground="White" FontSize="11" FontWeight="Bold"/>
+                                    </Border>
+
+                                    <!-- Badge Nuevos Episodios -->
+                                    <Border Background="#F43F5E" Padding="8,4" CornerRadius="10" 
+                                            HorizontalAlignment="Right" VerticalAlignment="Top" Margin="12"
+                                            IsVisible="{Binding TieneNuevosEpisodios}">
+                                        <TextBlock Text="{Binding NuevosEpisodios, StringFormat='{}{0} Nuevos'}" Foreground="White" FontSize="11" FontWeight="Bold"/>
+                                    </Border>
+
+                                    <!-- CheckBox Modo Selección -->
+                                    <CheckBox IsChecked="{Binding EstaSeleccionado}"
+                                              IsVisible="{Binding DataContext.ModoSeleccion, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                              HorizontalAlignment="Right" VerticalAlignment="Top" Margin="12" 
+                                              IsHitTestVisible="False"/>
+                                    
+                                    <!-- Overlay si está seleccionado -->
+                                    <Border Background="#66000000" IsVisible="{Binding EstaSeleccionado}" />
+                                    <Border BorderBrush="#3B82F6" BorderThickness="4" CornerRadius="14" IsVisible="{Binding EstaSeleccionado}" />
+
+                                    <!-- Play Pill Hover -->
+                                    <Border Classes="PlayPill" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,70"
+                                            Background="#E614181E" BorderBrush="#3B82F6" BorderThickness="1" CornerRadius="18" Padding="14,8"
+                                            IsHitTestVisible="False">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <material:MaterialIcon Kind="PlayCircleOutline" Width="18" Height="18" Foreground="#60A5FA"/>
+                                            <TextBlock Text="Ver detalle" FontSize="12" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- Gradiente Inferior y Textos -->
+                                    <Border VerticalAlignment="Bottom" Height="120" Padding="12,0,12,12">
+                                        <Border.Background>
+                                            <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%">
+                                                <GradientStop Color="#00000000" Offset="0" />
+                                                <GradientStop Color="#E6000000" Offset="0.6" />
+                                                <GradientStop Color="#FF000000" Offset="1" />
+                                            </LinearGradientBrush>
+                                        </Border.Background>
+                                        
+                                        <StackPanel VerticalAlignment="Bottom">
+                                            <!-- Titulo -->
+                                            <TextBlock Text="{Binding Titulo}" Foreground="White" FontWeight="Bold" 
+                                                       FontSize="14" TextTrimming="CharacterEllipsis" MaxHeight="42" 
+                                                       TextWrapping="Wrap" Margin="0,0,0,8" />
+                                            
+                                            <!-- Barra de Progreso -->
+                                            <ProgressBar Value="{Binding ProgresoPorcentaje}" Minimum="0" Maximum="100" 
+                                                         Height="4" Background="#44FFFFFF" Foreground="#F43F5E" 
+                                                         Margin="0,0,0,4" CornerRadius="2"/>
+                                            
+                                            <!-- Texto Progreso -->
+                                            <TextBlock Text="{Binding ProgresoEpisodiosTexto}" Foreground="#B3FFFFFF" 
+                                                       FontSize="11" FontWeight="SemiBold" />
+                                        </StackPanel>
+                                    </Border>
+
+                                </Grid>
+                            </Button>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
     </Grid>
 </UserControl>
