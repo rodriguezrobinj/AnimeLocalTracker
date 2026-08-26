@@ -24,7 +24,7 @@
                     <materialIcons:MaterialIcon Kind="InformationOutline" Width="26" Height="26" Foreground="#60A5FA" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
                 <StackPanel VerticalAlignment="Center">
-                    <TextBlock Text="Acerca de AnimeLocalTracker" FontSize="28" FontWeight="Bold" Foreground="White" />
+                    <TextBlock Text="Acerca de AnimeLocalTracker" FontSize="26" FontWeight="Bold" Foreground="#E2E8F0" />
                     <TextBlock Text="Información del sistema, novedades de versiones y detalles del proyecto" 
                                FontSize="12" Foreground="#9CA3AF" Margin="0,3,0,0"/>
                 </StackPanel>

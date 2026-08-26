@@ -150,8 +150,8 @@ public partial class MainViewModel : ObservableObject,
     {
         AnimeLocalTracker.Core.Services.CoreDispatcher.Invoke(() =>
         {
-            var activas = _downloadService.ObtenerDescargasActivas();
-            ConteoDescargasActivas = System.Linq.Enumerable.Count(activas, d => d.IsDownloading);
+            var activas = _downloadService.ObtenerDescargasActivas() ?? [];
+            ConteoDescargasActivas = activas.Count(d => d.IsDownloading);
             TieneDescargasActivas = ConteoDescargasActivas > 0;
         });
     }

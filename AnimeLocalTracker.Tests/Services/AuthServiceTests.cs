@@ -1,6 +1,6 @@
 using System;
-using AnimeLocalTracker.Messages;
-using AnimeLocalTracker.Services;
+using AnimeLocalTracker.Core.Messages;
+using AnimeLocalTracker.Core.Services;
 using CommunityToolkit.Mvvm.Messaging;
 using FluentAssertions;
 using Xunit;

@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using AnimeLocalTracker.Models;
-using AnimeLocalTracker.Services;
+using AnimeLocalTracker.Core.Models;
+using AnimeLocalTracker.Core.Services;
 using FluentAssertions;
 using Xunit;
 

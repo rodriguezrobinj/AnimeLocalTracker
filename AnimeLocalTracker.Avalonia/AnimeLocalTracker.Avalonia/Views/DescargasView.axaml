@@ -20,10 +20,10 @@
         <!-- HEADER SUPERIOR -->
         <Grid Grid.Row="0" Margin="0,0,0,20">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <TextBlock Text="Cola de descargas" FontSize="28" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
+                <TextBlock Text="Cola de descargas" FontSize="26" FontWeight="Bold" Foreground="#E2E8F0" VerticalAlignment="Center"/>
 
                 <!-- BADGE CONTEO -->
-                <Border Background="#1E3A8A" CornerRadius="10" Padding="8,2" Margin="14,0,0,0" VerticalAlignment="Center"
+                <Border Background="#1E293B" BorderBrush="#2D3748" BorderThickness="1" CornerRadius="12" Height="24" MinWidth="26" Padding="7,0" Margin="14,0,0,0" VerticalAlignment="Center"
                         IsVisible="{Binding TieneDescargas}">
                     <TextBlock Text="{Binding ConteoActivas}" FontSize="12" FontWeight="Bold" Foreground="#60A5FA"
                                VerticalAlignment="Center" HorizontalAlignment="Center" TextAlignment="Center"/>

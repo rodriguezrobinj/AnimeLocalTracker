@@ -4,9 +4,16 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:views="using:AnimeLocalTracker.Avalonia.Views"
-        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        mc:Ignorable="d" d:DesignWidth="1248" d:DesignHeight="700"
         x:Class="AnimeLocalTracker.Avalonia.Views.MainWindow"
-        Icon="/Assets/avalonia-logo.ico"
-        Title="AnimeLocalTracker.Avalonia">
-        <views:MainView />
+        Title="AnimeTracker"
+        Background="#121212"
+        TransparencyLevelHint="None"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaChromeHints="NoChrome"
+        ExtendClientAreaTitleBarHeightHint="45"
+        MinWidth="800" MinHeight="600"
+        WindowState="Maximized"
+        FontFamily="Segoe UI, Noto Sans, sans-serif">
+    <views:MainView />
 </Window>

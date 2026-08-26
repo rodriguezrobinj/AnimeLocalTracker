@@ -30,7 +30,7 @@
                     <materialIcons:MaterialIcon Kind="MagnifyPlus" Foreground="#93C5FD" Width="24" Height="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
                 <StackPanel VerticalAlignment="Center">
-                    <TextBlock Text="Añadir Anime" FontSize="28" FontWeight="Bold" Foreground="White" />
+                    <TextBlock Text="Añadir Anime" FontSize="26" FontWeight="Bold" Foreground="#E2E8F0" />
                     <TextBlock Text="Explora tendencias o busca cualquier anime en AniList para tu colección local" FontSize="12" Foreground="#9CA3AF" Margin="0,2,0,0"/>
                 </StackPanel>
             </StackPanel>
@@ -75,7 +75,7 @@
                 <materialIcons:MaterialIcon Kind="FilterVariant" Width="20" Height="20" Foreground="#60A5FA" 
                                          VerticalAlignment="Center" Margin="0,0,8,0"
                                          IsVisible="{Binding !MostrandoTendencias}"/>
-                <TextBlock Text="{Binding TituloSeccion}" FontSize="18" FontWeight="SemiBold" Foreground="White" VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding TituloSeccion}" FontSize="16" FontWeight="Bold" Foreground="#E2E8F0" VerticalAlignment="Center"/>
 
                 <!-- BADGE CONTEO DE RESULTADOS -->
                 <Border Background="#1E3A8A" CornerRadius="10" Padding="8,2" Margin="12,0,0,0" VerticalAlignment="Center"

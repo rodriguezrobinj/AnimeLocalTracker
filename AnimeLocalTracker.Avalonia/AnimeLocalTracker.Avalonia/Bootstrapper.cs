@@ -19,9 +19,15 @@ public static class Bootstrapper
         services.AddTransient<MainViewModel>();
         services.AddSingleton<GaleriaViewModel>();
         services.AddTransient<ReproductorViewModel>();
-        // Add others as we migrate...
+        services.AddSingleton<AgregarAnimeViewModel>();
+        services.AddTransient<DetalleViewModel>();
+        services.AddSingleton<CalendarioViewModel>();
+        services.AddSingleton<DescargasViewModel>();
+        services.AddSingleton<ConfiguracionViewModel>();
+        services.AddSingleton<AcercaDeViewModel>();
 
         // Services
+        services.AddSingleton<IDispatcherService, AvaloniaDispatcherService>();
         services.AddSingleton<ISettingsService, SettingsService>();
         services.AddSingleton<IDialogService, Services.DialogService>();
         services.AddSingleton<IAuthService, AuthService>();

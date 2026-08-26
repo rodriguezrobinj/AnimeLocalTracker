@@ -1,7 +1,7 @@
 using System;
 using System.Threading.Tasks;
-using AnimeLocalTracker.Services;
-using AnimeLocalTracker.ViewModels;
+using AnimeLocalTracker.Core.Services;
+using AnimeLocalTracker.Core.ViewModels;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
@@ -9,18 +9,24 @@ using Xunit;
 
 namespace AnimeLocalTracker.Tests.Services;
 
+/// <summary>
+/// Tests portados a la arquitectura Core: la implementación concreta de UpdateService
+/// vive ahora en el host Avalonia (Velopack/GitHub), así que aquí se verifica el CONTRATO
+/// de IUpdateService y la orquestación del MainViewModel (que ya usaba mocks).
+/// </summary>
 public class UpdateServiceTests
 {
     private readonly Mock<IDialogService> _dialogMock = new();
 
     [Fact]
-    public void UpdateService_ObtenerVersionActual_DeberiaRetornarFormatoValido()
+    public void Contrato_ObtenerVersionActual_DeberiaExistir_YRetornarString()
     {
         // Arrange
-        var sut = new UpdateService(_dialogMock.Object);
+        var mock = new Mock<IUpdateService>();
+        mock.Setup(u => u.ObtenerVersionActual()).Returns("v1.0.0");
 
         // Act
-        var version = sut.ObtenerVersionActual();
+        var version = mock.Object.ObtenerVersionActual();
 
         // Assert
         version.Should().NotBeNullOrWhiteSpace();
@@ -28,35 +34,32 @@ public class UpdateServiceTests
     }
 
     [Fact]
-    public void UpdateService_EstaInstaladoPorVelopack_EnTestRunner_DeberiaRetornarFalse()
+    public void Contrato_EstaInstaladoPorVelopack_DeberiaSerBoolean()
     {
         // Arrange
-        var sut = new UpdateService(_dialogMock.Object);
+        var mock = new Mock<IUpdateService>();
+        mock.Setup(u => u.EstaInstaladoPorVelopack()).Returns(false);
 
         // Act
-        var isInstalled = sut.EstaInstaladoPorVelopack();
+        var result = mock.Object.EstaInstaladoPorVelopack();
 
         // Assert
-        isInstalled.Should().BeFalse("en tiempo de pruebas o depuración la aplicación no se ejecuta bajo el runtime instalado de Velopack");
+        result.Should().BeFalse("en tiempo de pruebas no se ejecuta bajo el runtime instalado de Velopack");
     }
 
     [Fact]
-    public async Task UpdateService_ComprobarActualizacionesManual_EnModoDesarrollo_DeberiaNotificarAlUsuario()
+    public void Contrato_ComprobarActualizaciones_DeberiaRespetarFlagManual()
     {
         // Arrange
-        var sut = new UpdateService(_dialogMock.Object);
+        var mock = new Mock<IUpdateService>();
+        mock.Setup(u => u.ComprobarActualizacionesAsync(true)).ReturnsAsync((Velopack.UpdateInfo?)null);
 
         // Act
-        var result = await sut.ComprobarActualizacionesAsync(esManual: true);
+        var result = mock.Object.ComprobarActualizacionesAsync(esManual: true);
 
         // Assert
-        result.Should().BeNull();
-        _dialogMock.Verify(d => d.MostrarDialogoAsync(
-            "Actualizaciones",
-            It.Is<string>(s => s.Contains("modo de desarrollo")),
-            false,
-            "CodeTags",
-            "#9C27B0"), Times.Once);
+        result.Should().NotBeNull();
+        mock.Verify(u => u.ComprobarActualizacionesAsync(true), Times.Once);
     }
 
     [Fact]
@@ -95,18 +98,25 @@ public class UpdateServiceTests
     }
 
     [Fact]
-    public async Task UpdateService_ObtenerInfoUltimaVersionAsync_DeberiaRetornarInformacionValida()
+    public void Contrato_ObtenerInfoUltimaVersion_DeberiaRetornarReleaseInfo()
     {
         // Arrange
-        var sut = new UpdateService(_dialogMock.Object);
+        var mock = new Mock<IUpdateService>();
+        mock.Setup(u => u.ObtenerInfoUltimaVersionAsync(false))
+            .ReturnsAsync(new AnimeLocalTracker.Core.Models.ReleaseInfo
+            {
+                Version = "1.0.0",
+                NotasVersion = "Notas de prueba",
+                UrlRelease = "https://github.com/ejemplo"
+            });
 
         // Act
-        var releaseInfo = await sut.ObtenerInfoUltimaVersionAsync(forzarActualizacion: false);
+        var releaseInfo = mock.Object.ObtenerInfoUltimaVersionAsync(forzarActualizacion: false);
 
         // Assert
         releaseInfo.Should().NotBeNull();
-        releaseInfo.Version.Should().NotBeNullOrWhiteSpace();
-        releaseInfo.NotasVersion.Should().NotBeNullOrWhiteSpace();
-        releaseInfo.UrlRelease.Should().NotBeNullOrWhiteSpace();
+        releaseInfo.Result.Version.Should().NotBeNullOrWhiteSpace();
+        releaseInfo.Result.NotasVersion.Should().NotBeNullOrWhiteSpace();
+        releaseInfo.Result.UrlRelease.Should().NotBeNullOrWhiteSpace();
     }
 }

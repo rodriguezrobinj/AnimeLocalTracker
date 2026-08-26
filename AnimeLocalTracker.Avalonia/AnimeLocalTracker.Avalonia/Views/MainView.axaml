@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="clr-namespace:AnimeLocalTracker.Core.ViewModels;assembly=AnimeLocalTracker.Core"
              xmlns:views="clr-namespace:AnimeLocalTracker.Avalonia.Views"
+             xmlns:material="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
              mc:Ignorable="d" d:DesignWidth="1248" d:DesignHeight="700"
              x:Class="AnimeLocalTracker.Avalonia.Views.MainView"
              x:DataType="vm:MainViewModel">
@@ -13,7 +14,6 @@
     </Design.DataContext>
 
     <UserControl.DataTemplates>
-        <!-- Map ViewModels to Views -->
         <DataTemplate DataType="{x:Type vm:GaleriaViewModel}">
             <views:GaleriaView />
         </DataTemplate>
@@ -40,12 +40,209 @@
         </DataTemplate>
     </UserControl.DataTemplates>
 
-    <Grid Background="#121212">
-        <TransitioningContentControl Content="{Binding VistaActual}">
+    <UserControl.Styles>
+        <!-- Botones de ventana (title bar) -->
+        <Style Selector="Button.titleBarBtn">
+            <Setter Property="Width" Value="45" />
+            <Setter Property="Height" Value="45" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="CornerRadius" Value="0" />
+        </Style>
+        <Style Selector="Button.titleBarBtn:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#22FFFFFF" />
+        </Style>
+        <Style Selector="Button.titleBarBtn:pointerover">
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+        <Style Selector="Button.titleBarBtn">
+            <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}" />
+        </Style>
+    </UserControl.Styles>
+
+    <Grid Background="{DynamicResource Brush.WindowBg}">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="65" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- ═══════════ SIDEBAR (65px) ═══════════ -->
+        <Border Grid.Column="0" Background="Transparent" BorderBrush="#1AFFFFFF" BorderThickness="0,0,1,0" ZIndex="10">
+            <Grid>
+                <!-- NAVEGACIÓN PRINCIPAL -->
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,60,0,0">
+                    <!-- BIBLIOTECA -->
+                    <Grid Margin="0,8">
+                        <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"
+                                   IsVisible="{Binding EsGaleriaActiva}" />
+                        <Button Classes="appNav" Classes.activo="{Binding EsGaleriaActiva}"
+                                Command="{Binding NavegarGaleriaCommand}" ToolTip.Tip="Biblioteca">
+                            <material:MaterialIcon Classes="actIcon" Kind="ViewGallery" Width="24" Height="24" />
+                        </Button>
+                    </Grid>
+
+                    <!-- AÑADIR ANIME -->
+                    <Grid Margin="0,8">
+                        <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"
+                                   IsVisible="{Binding EsAgregarAnimeActiva}" />
+                        <Button Classes="appNav" Classes.activo="{Binding EsAgregarAnimeActiva}"
+                                Command="{Binding NavegarAgregarAnimeCommand}" ToolTip.Tip="Añadir Anime">
+                            <material:MaterialIcon Classes="actIcon" Kind="MagnifyPlus" Width="24" Height="24" />
+                        </Button>
+                    </Grid>
+
+                    <!-- CALENDARIO -->
+                    <Grid Margin="0,8">
+                        <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"
+                                   IsVisible="{Binding EsCalendarioActiva}" />
+                        <Button Classes="appNav" Classes.activo="{Binding EsCalendarioActiva}"
+                                Command="{Binding NavegarCalendarioCommand}" ToolTip.Tip="Calendario de Emisión">
+                            <material:MaterialIcon Classes="actIcon" Kind="CalendarClock" Width="24" Height="24" />
+                        </Button>
+                    </Grid>
+
+                    <!-- DESCARGAS -->
+                    <Grid Margin="0,8">
+                        <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"
+                                   IsVisible="{Binding EsDescargasActivas}" />
+                        <Button Classes="appNav" Classes.activo="{Binding EsDescargasActivas}"
+                                Command="{Binding NavegarDescargasCommand}" ToolTip.Tip="Cola de Descargas">
+                            <material:MaterialIcon Classes="actIcon" Kind="DownloadMultiple" Width="24" Height="24" />
+                        </Button>
+
+                        <!-- BADGE CONTEO DE DESCARGAS -->
+                        <Border HorizontalAlignment="Right" VerticalAlignment="Top"
+                                Background="#3B82F6" BorderBrush="#1E293B" BorderThickness="1"
+                                CornerRadius="9" MinWidth="18" Height="18" Padding="4,0" Margin="0,-2,-2,0"
+                                IsHitTestVisible="False"
+                                IsVisible="{Binding TieneDescargasActivas}">
+                            <TextBlock Text="{Binding ConteoDescargasActivas}" FontSize="10" FontWeight="Bold" Foreground="White"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                    </Grid>
+                </StackPanel>
+
+                <!-- SEPARADOR DE GRUPO -->
+                <Border HorizontalAlignment="Center" VerticalAlignment="Bottom" Width="28" Height="1"
+                        Background="#262D38" Margin="0,0,0,190" IsHitTestVisible="False" />
+
+                <!-- NAVEGACIÓN INFERIOR -->
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,15">
+                    <!-- CONFIGURACIÓN -->
+                    <Grid Margin="0,4">
+                        <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"
+                                   IsVisible="{Binding EsConfiguracionActiva}" />
+                        <Button Classes="appNav" Classes.activo="{Binding EsConfiguracionActiva}"
+                                Command="{Binding NavegarConfiguracionCommand}" ToolTip.Tip="Configuración">
+                            <material:MaterialIcon Classes="actIcon" Kind="Cog" Width="24" Height="24" />
+                        </Button>
+                    </Grid>
+
+                    <!-- ACERCA DE -->
+                    <Grid Margin="0,4">
+                        <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"
+                                   IsVisible="{Binding EsAcercaDeActivo}" />
+                        <Button Classes="appNav" Classes.activo="{Binding EsAcercaDeActivo}"
+                                Command="{Binding NavegarAcercaDeCommand}" ToolTip.Tip="Acerca de AnimeLocalTracker">
+                            <material:MaterialIcon Classes="actIcon" Kind="InformationOutline" Width="24" Height="24" />
+                        </Button>
+                    </Grid>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- CONTENIDO PRINCIPAL -->
+        <TransitioningContentControl Grid.Column="0" Grid.ColumnSpan="2" Content="{Binding VistaActual}">
             <TransitioningContentControl.PageTransition>
-                <CrossFade Duration="0:0:0.3" />
+                <CrossFade Duration="0:0:0.2" />
             </TransitioningContentControl.PageTransition>
         </TransitioningContentControl>
+
+        <!-- ═══════════ BARRA DE TÍTULO CUSTOM (45px) ═══════════ -->
+        <Grid Grid.Column="0" Grid.ColumnSpan="2" Height="45" Background="Transparent" VerticalAlignment="Top" ZIndex="20">
+            <!-- Zona de arrastre -->
+            <Border Background="Transparent" PointerPressed="TitleBar_PointerPressed" />
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="15,0,0,0">
+                <material:MaterialIcon Kind="PlayCircle" Foreground="#3B82F6" Width="20" Height="20" VerticalAlignment="Center" Margin="0,0,8,0" />
+                <TextBlock Text="AnimeTracker" FontWeight="Bold" Foreground="{DynamicResource Brush.TextPrimary}" VerticalAlignment="Center" FontSize="14" />
+                <!-- Chip de versión -->
+                <Button Command="{Binding BuscarActualizacionesManualCommand}"
+                        ToolTip.Tip="Comprobar actualizaciones en GitHub"
+                        Background="#1E293B" BorderThickness="0" Padding="8,2" Height="22" Margin="12,0,0,0"
+                        CornerRadius="11" VerticalContentAlignment="Center">
+                    <StackPanel Orientation="Horizontal">
+                        <material:MaterialIcon Kind="Update" Width="13" Height="13" VerticalAlignment="Center" Margin="0,0,4,0" Foreground="#93C5FD" />
+                        <TextBlock Text="{Binding VersionAppTexto}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="#93C5FD" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+
+            <!-- Botones de ventana (derecha) -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
+                <Button Classes="titleBarBtn" Click="BtnPantallaCompleta_Click" ToolTip.Tip="Pantalla Completa (F11)">
+                    <material:MaterialIcon Kind="Fullscreen" />
+                </Button>
+                <Button Classes="titleBarBtn" Click="BtnMinimizar_Click">
+                    <material:MaterialIcon Kind="WindowMinimize" />
+                </Button>
+                <Button Classes="titleBarBtn" Click="BtnMaximizar_Click" IsEnabled="False">
+                    <material:MaterialIcon Kind="WindowMaximize" />
+                </Button>
+                <Button Classes="titleBarBtn" Click="BtnCerrar_Click">
+                    <material:MaterialIcon Kind="Close" />
+                </Button>
+            </StackPanel>
+        </Grid>
+
+        <!-- ═══════════ DIÁLOGO CUSTOM ═══════════ -->
+        <Grid IsVisible="{Binding DialogoVisible}" Grid.Column="0" Grid.ColumnSpan="2"
+              Background="#B2000000" ZIndex="2000">
+            <Border Width="400" VerticalAlignment="Center" HorizontalAlignment="Center"
+                    Background="{DynamicResource Brush.Surface2}" BorderBrush="{DynamicResource Brush.Border}"
+                    BorderThickness="1" CornerRadius="14" Padding="25"
+                    BoxShadow="0 8 24 0 #66000000">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,15" Spacing="10">
+                        <material:MaterialIcon Kind="InformationOutline" Width="28" Height="28"
+                                               Foreground="{DynamicResource Brush.Accent}" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding DialogoTitulo}" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource Brush.TextPrimary}" />
+                    </StackPanel>
+                    <TextBlock Text="{Binding DialogoMensaje}" TextWrapping="Wrap" FontSize="14" Margin="0,0,0,25" Opacity="0.8"
+                               Foreground="{DynamicResource Brush.TextPrimary}" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
+                        <Button Content="CANCELAR" Command="{Binding CancelarDialogoCommand}"
+                                Background="Transparent" BorderThickness="0" Foreground="{DynamicResource Brush.TextSecondary}"
+                                IsVisible="{Binding DialogoEsConfirmacion}" />
+                        <Button Content="ACEPTAR" Command="{Binding AceptarDialogoCommand}"
+                                Background="{DynamicResource Brush.AccentStrong}" Foreground="White"
+                                CornerRadius="4" Padding="16,8" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- ═══════════ TOAST NOTIFICATION ═══════════ -->
+        <Border Grid.Column="0" Grid.ColumnSpan="2" HorizontalAlignment="Center" VerticalAlignment="Bottom" ZIndex="3000" IsHitTestVisible="False">
+            <Border.Background>
+                <SolidColorBrush Color="Transparent" />
+            </Border.Background>
+            <Border IsVisible="{Binding ToastVisible}"
+                    Background="#161B22" CornerRadius="10" Padding="20,15" BoxShadow="0 8 24 0 #66000000">
+                <StackPanel Orientation="Horizontal" Spacing="15">
+                    <material:MaterialIcon Width="28" Height="28" VerticalAlignment="Center"
+                                           Foreground="{DynamicResource Brush.Accent}" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="{Binding ToastTitulo}" FontWeight="Bold" FontSize="15" Foreground="White" />
+                        <TextBlock Text="{Binding ToastMensaje}" TextWrapping="Wrap" MaxWidth="450" Foreground="#CCCCCC" FontSize="13" Margin="0,4,0,0" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Border>
     </Grid>
 
 </UserControl>

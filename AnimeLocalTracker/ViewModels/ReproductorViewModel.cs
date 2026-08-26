@@ -755,7 +755,7 @@ public partial class ReproductorViewModel : ObservableObject, AnimeLocalTracker.
         _ = CargarVideoAsync(rutaVideo, animeId, tituloAnime, episodio, listaEpisodios);
     }
 
-    public async Task CargarVideoAsync(string rutaVideo, int animeId, string tituloAnime, int episodio, List<EpisodioItem>? listaEpisodios = null)
+    public async Task CargarVideoAsync(string rutaVideo, int animeId, string tituloAnime, int episodio, IEnumerable<EpisodioItem>? episodiosDisponibles = null)
     {
         _ = GuardarProgresoActualAsync();
 
@@ -793,9 +793,9 @@ public partial class ReproductorViewModel : ObservableObject, AnimeLocalTracker.
         _resumingPositionSeconds = 0;
         _posicionInicioSegundos = 0;
 
-        if (listaEpisodios != null)
+        if (episodiosDisponibles != null)
         {
-            _episodiosDisponibles = listaEpisodios
+            _episodiosDisponibles = episodiosDisponibles
                 .Where(e => !string.IsNullOrWhiteSpace(e.RutaCompleta))
                 .OrderBy(e => e.NumeroEpisodio)
                 .ToList();

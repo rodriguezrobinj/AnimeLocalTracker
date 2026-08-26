@@ -24,7 +24,7 @@
                     <materialIcons:MaterialIcon Kind="Cog" Width="26" Height="26" Foreground="#60A5FA" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
                 <StackPanel VerticalAlignment="Center">
-                    <TextBlock Text="Configuración y Preferencias" FontSize="28" FontWeight="Bold" Foreground="White" />
+                    <TextBlock Text="Configuración y Preferencias" FontSize="26" FontWeight="Bold" Foreground="#E2E8F0" />
                     <TextBlock Text="Personaliza el almacenamiento de tus animes, reproducción multimedia y sincronización con AniList" 
                                FontSize="12" Foreground="#9CA3AF" Margin="0,3,0,0"/>
                 </StackPanel>

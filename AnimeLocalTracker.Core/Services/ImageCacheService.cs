@@ -18,7 +18,7 @@ public class ImageCacheService : IImageCacheService
     public ImageCacheService(IHttpClientFactory httpClientFactory)
     {
         _httpClientFactory = httpClientFactory;
-        _coversDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "AnimeLocalTracker", "Covers");
+        _coversDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AnimeLocalTracker", "Covers");
         _memoryCache = new ConcurrentDictionary<int, byte[]>();
 
         if (!Directory.Exists(_coversDirectory))
@@ -34,7 +34,7 @@ public class ImageCacheService : IImageCacheService
             return cached;
         }
 
-        string localPath = Path.Combine(_coversDirectory, $".jpg");
+        string localPath = Path.Combine(_coversDirectory, $"{animeId}.jpg");
         if (File.Exists(localPath))
         {
             try
@@ -80,7 +80,7 @@ public class ImageCacheService : IImageCacheService
 
         if (string.IsNullOrWhiteSpace(urlPortada)) return null;
 
-        string localPath = Path.Combine(_coversDirectory, $".jpg");
+        string localPath = Path.Combine(_coversDirectory, $"{animeId}.jpg");
 
         await _downloadSemaphore.WaitAsync();
         try

@@ -4,205 +4,285 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="clr-namespace:AnimeLocalTracker.Core.ViewModels;assembly=AnimeLocalTracker.Core"
              xmlns:material="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
-             xmlns:converters="clr-namespace:AnimeLocalTracker.Avalonia.Converters"
              mc:Ignorable="d" d:DesignWidth="1248" d:DesignHeight="700"
              x:Class="AnimeLocalTracker.Avalonia.Views.GaleriaView"
              x:DataType="vm:GaleriaViewModel"
              Background="Transparent">
 
-    <UserControl.Resources>
-        <converters:ZeroToBoolConverter x:Key="ZeroToBool" />
-    </UserControl.Resources>
-
-    <!-- ESTILOS INTERNOS -->
-    <UserControl.Styles>
-        <Style Selector="Button.headerBtn">
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Foreground" Value="#A0A0A0" />
-            <Setter Property="Padding" Value="10,5" />
-            <Setter Property="CornerRadius" Value="8" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-        </Style>
-        <Style Selector="Button.headerBtn:pointerover">
-            <Setter Property="Background" Value="#22FFFFFF" />
-            <Setter Property="Foreground" Value="White" />
-        </Style>
-        <Style Selector="Button.headerBtn.activo">
-            <Setter Property="Background" Value="#E50914" />
-            <Setter Property="Foreground" Value="White" />
-        </Style>
-
-        <!-- Efecto Hover para el Pill -->
-        <Style Selector="Border.PlayPill">
-            <Setter Property="Opacity" Value="0" />
-            <Setter Property="RenderTransform" Value="translateY(10px)" />
-            <Setter Property="Transitions">
-                <Transitions>
-                    <DoubleTransition Property="Opacity" Duration="0:0:0.2" Easing="CircularEaseOut" />
-                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.2" Easing="CircularEaseOut" />
-                </Transitions>
-            </Setter>
-        </Style>
-        <Style Selector="Border.CardBorder:pointerover Border.PlayPill">
-            <Setter Property="Opacity" Value="1" />
-            <Setter Property="RenderTransform" Value="translateY(0px)" />
-        </Style>
-        
-        <!-- Borde Brillante Hover -->
-        <Style Selector="Border.CardBorder">
-            <Setter Property="BorderBrush" Value="#262D38" />
-            <Setter Property="Transitions">
-                <Transitions>
-                    <BrushTransition Property="BorderBrush" Duration="0:0:0.2" />
-                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.2" />
-                </Transitions>
-            </Setter>
-        </Style>
-        <Style Selector="Border.CardBorder:pointerover">
-            <Setter Property="BorderBrush" Value="#3B82F6" />
-            <Setter Property="RenderTransform" Value="scale(1.03)" />
-        </Style>
-    </UserControl.Styles>
-
-    <Grid MaxWidth="1400" Margin="20,20,20,0">
+    <Grid MaxWidth="1400" Margin="95,60,30,30">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- TOP BAR (HEADER & FILTROS) -->
-        <Grid Grid.Row="0" Margin="0,0,0,20">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
+        <!-- ═══════════ HEADER: TÍTULO + ACCIONES ═══════════ -->
+        <Grid Grid.Row="0" Margin="0,0,0,20" ZIndex="10">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="Mi Colección" Theme="{StaticResource AppText.PageTitle}" VerticalAlignment="Center" />
 
-            <!-- Título -->
-            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                <material:MaterialIcon Kind="PlayBoxMultiple" Width="36" Height="36" Foreground="#E50914" Margin="0,0,12,0"/>
-                <TextBlock Text="Mi Biblioteca" FontSize="26" FontWeight="ExtraBold" Foreground="White" VerticalAlignment="Center" />
+                <!-- BADGE CONTEO BIBLIOTECA -->
+                <Border Theme="{StaticResource AppBadge}" Margin="14,0,0,0" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding TotalAnimesBiblioteca}" Theme="{StaticResource AppText.Caption}" FontWeight="Bold"
+                               Foreground="{DynamicResource Brush.Accent}"
+                               VerticalAlignment="Center" HorizontalAlignment="Center" />
+                </Border>
             </StackPanel>
 
-            <!-- Barra de Búsqueda -->
-            <Border Grid.Column="1" MaxWidth="500" HorizontalAlignment="Center" Height="40" Background="#161B22" 
-                    BorderBrush="#30363D" BorderThickness="1" CornerRadius="20">
-                <Grid ColumnDefinitions="Auto, *">
-                    <material:MaterialIcon Kind="Magnify" Width="20" Height="20" Foreground="#8B949E" Margin="15,0,10,0"/>
-                    <TextBox Grid.Column="1" Text="{Binding TextoBusqueda, Mode=TwoWay}" 
-                             Watermark="Buscar anime..." Background="Transparent" BorderThickness="0" 
-                             Foreground="White" VerticalAlignment="Center"/>
-                </Grid>
-            </Border>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Spacing="12">
+                <!-- BUSCAR ANIME -->
+                <Button Classes="appOutlined" Command="{Binding AñadirAnimeManualCommand}" ToolTip.Tip="Buscar y añadir un nuevo anime">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <material:MaterialIcon Kind="MagnifyPlus" Width="18" Height="18" VerticalAlignment="Center" />
+                        <TextBlock Text="BUSCAR ANIME" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
 
-            <!-- Filtros & Controles -->
-            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Spacing="5">
-                <Button Content="Todos" Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="Todos" 
-                        Classes="headerBtn" Classes.activo="{Binding EsFiltroTodos}" />
-                <Button Content="Viendo" Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="Viendo" 
-                        Classes="headerBtn" Classes.activo="{Binding EsFiltroViendo}" />
-                <Button Content="Completados" Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="Completados" 
-                        Classes="headerBtn" Classes.activo="{Binding EsFiltroCompletados}" />
-                <Border Width="1" Height="20" Background="#333333" Margin="10,0" />
-                
-                <Button Background="Transparent" BorderThickness="0" ToolTip.Tip="Modo Selección" Command="{Binding AlternarModoSeleccionCommand}">
-                    <material:MaterialIcon Kind="CheckboxMultipleMarkedOutline" Width="24" Height="24" Foreground="{Binding ModoSeleccion, Converter={StaticResource ZeroToBool}, FallbackValue=#A0A0A0}"/>
+                <!-- CONECTAR (solo desconectado) -->
+                <Button Classes="appPrimary" Command="{Binding ConectarAniListCommand}"
+                        IsVisible="{Binding !EstaConectado}" ToolTip.Tip="Conectar con AniList">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <material:MaterialIcon Kind="CloudUpload" Width="18" Height="18" VerticalAlignment="Center" />
+                        <TextBlock Text="CONECTAR" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+
+                <!-- MODO SELECCIÓN -->
+                <Button Classes="appNav" Classes.activo="{Binding ModoSeleccion}"
+                        Command="{Binding ToggleModoSeleccionCommand}" ToolTip.Tip="Selección múltiple">
+                    <material:MaterialIcon Classes="actIcon" Kind="CheckboxMultipleMarkedOutline" Width="22" Height="22" />
+                </Button>
+
+                <!-- USUARIO (solo conectado) -->
+                <Button Classes="appNav" MinWidth="40" Padding="10,6"
+                        Command="{Binding ToggleMenuUsuarioCommand}"
+                        IsVisible="{Binding EstaConectado}"
+                        ToolTip.Tip="Cuenta sincronizada con AniList">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Border Width="26" Height="26" CornerRadius="13" BorderBrush="#3B82F6" BorderThickness="1.5" ClipToBounds="True">
+                            <Image Source="{Binding AvatarUsuarioAniList}" Stretch="UniformToFill" />
+                        </Border>
+                        <TextBlock Text="{Binding NombreUsuarioAniList}" FontWeight="Bold" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource Brush.TextPrimary}" />
+                    </StackPanel>
+                </Button>
+
+                <!-- MENÚ USUARIO DESPLEGABLE -->
+                <Popup IsOpen="{Binding MenuUsuarioAbierto, Mode=TwoWay}" PlacementTarget="{Binding ElementName=MenuAncla}"
+                       Placement="Bottom">
+                    <Border Background="{DynamicResource Brush.Surface2}" BorderBrush="{DynamicResource Brush.Border}"
+                            BorderThickness="1" CornerRadius="12" Width="200" Padding="4">
+                        <Button Background="Transparent" BorderThickness="0" Padding="14,10" HorizontalContentAlignment="Left"
+                                Command="{Binding DesconectarAniListCommand}" CommandParameter="{Binding}"
+                                HorizontalAlignment="Stretch">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <material:MaterialIcon Kind="Logout" Width="20" Height="20" Foreground="#F87171" />
+                                <TextBlock Text="Cerrar Sesión" Foreground="#F87171" FontWeight="Bold" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                    </Border>
+                </Popup>
+                <Border x:Name="MenuAncla" Width="0" />
+
+                <!-- SINCRONIZAR -->
+                <Button Background="{DynamicResource Brush.Success}" Foreground="White" FontWeight="SemiBold"
+                        CornerRadius="8" Padding="16,8" MinHeight="36"
+                        Command="{Binding ActualizarBibliotecaCommand}" ToolTip.Tip="Actualizar datos desde la nube">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <material:MaterialIcon Kind="Sync" Width="18" Height="18" VerticalAlignment="Center" />
+                        <TextBlock Text="SINCRONIZAR" VerticalAlignment="Center" />
+                    </StackPanel>
                 </Button>
             </StackPanel>
         </Grid>
 
-        <!-- CONTENIDO PRINCIPAL: GALERÍA -->
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-            <ItemsControl ItemsSource="{Binding BibliotecaFiltrada}" Margin="0,0,0,20">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <WrapPanel Orientation="Horizontal" HorizontalAlignment="Left" />
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
+        <!-- ═══════════ BARRA DE BÚSQUEDA Y FILTROS ═══════════ -->
+        <Grid Grid.Row="1" Margin="0,0,0,20" IsVisible="{Binding !BibliotecaVacia}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
 
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <!-- Tarjeta Premium -->
-                        <Border Classes="CardBorder" Width="200" Height="290" Margin="12,12,12,20" 
-                                CornerRadius="14" Background="#14181E" BorderThickness="1" 
-                                BoxShadow="0 8 16 0 #33000000" ClipToBounds="True">
-                            
-                            <!-- Acción al clickear la tarjeta -->
-                            <Button Background="Transparent" BorderThickness="0" Padding="0"
-                                    Command="{Binding DataContext.AbrirDetalleCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                    CommandParameter="{Binding}">
-                                <Grid>
-                                    <!-- Imagen de Portada -->
-                                    <Image Source="{Binding RutaImagenCoverLocal}" Stretch="UniformToFill" />
+            <!-- Buscador local (350px, izquierda) -->
+            <Border Grid.Column="0" Width="350" Height="46" VerticalAlignment="Center" Margin="0,0,20,0"
+                    Background="{DynamicResource Brush.Surface1}" BorderBrush="{DynamicResource Brush.BorderStrong}"
+                    BorderThickness="1" CornerRadius="12" Padding="15,0,10,0">
+                <Grid ColumnDefinitions="Auto, *">
+                    <material:MaterialIcon Kind="Magnify" Width="22" Height="22" Foreground="{DynamicResource Brush.TextSecondary}"
+                                           VerticalAlignment="Center" Margin="0,0,10,0" />
+                    <TextBox Grid.Column="1" Text="{Binding TextoBusqueda, Mode=TwoWay}"
+                             Watermark="Buscar anime guardado..."
+                             Background="Transparent" BorderThickness="0" VerticalAlignment="Center"
+                             FontSize="14" Foreground="White" Margin="0,0,10,0" />
+                </Grid>
+            </Border>
 
-                                    <!-- Etiqueta de Estado -->
-                                    <Border Background="{Binding ColorEstado}" Padding="8,4" CornerRadius="6" 
-                                            HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12"
-                                            IsVisible="{Binding !EstaSeleccionado}">
-                                        <TextBlock Text="{Binding EstadoVisual}" Foreground="White" FontSize="11" FontWeight="Bold"/>
-                                    </Border>
+            <!-- Chips de estado (derecha) -->
+            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Spacing="10">
+                <Button Content="Todos" Classes="appHeaderBtn" Classes.activo="{Binding EsFiltroTodos}"
+                        Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="Todos" />
+                <Button Content="Viendo" Classes="appHeaderBtn" Classes.activo="{Binding EsFiltroViendo}"
+                        Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="Viendo" />
+                <Button Content="Completados" Classes="appHeaderBtn" Classes.activo="{Binding EsFiltroCompletados}"
+                        Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="Completados" />
+                <Button Content="Planeando" Classes="appHeaderBtn" Classes.activo="{Binding EsFiltroPlaneando}"
+                        Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="Planeando" />
+            </StackPanel>
+        </Grid>
 
-                                    <!-- Badge Nuevos Episodios -->
-                                    <Border Background="#F43F5E" Padding="8,4" CornerRadius="10" 
-                                            HorizontalAlignment="Right" VerticalAlignment="Top" Margin="12"
-                                            IsVisible="{Binding TieneNuevosEpisodios}">
-                                        <TextBlock Text="{Binding NuevosEpisodios, StringFormat='{}{0} Nuevos'}" Foreground="White" FontSize="11" FontWeight="Bold"/>
-                                    </Border>
+        <!-- ═══════════ CONTENIDO ═══════════ -->
+        <Panel Grid.Row="2">
 
-                                    <!-- CheckBox Modo Selección -->
-                                    <CheckBox IsChecked="{Binding EstaSeleccionado}"
-                                              IsVisible="{Binding DataContext.ModoSeleccion, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                              HorizontalAlignment="Right" VerticalAlignment="Top" Margin="12" 
-                                              IsHitTestVisible="False"/>
-                                    
-                                    <!-- Overlay si está seleccionado -->
-                                    <Border Background="#66000000" IsVisible="{Binding EstaSeleccionado}" />
-                                    <Border BorderBrush="#3B82F6" BorderThickness="4" CornerRadius="14" IsVisible="{Binding EstaSeleccionado}" />
+            <!-- ESTADO VACÍO -->
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,50,0,0"
+                        IsVisible="{Binding BibliotecaVacia}">
+                <material:MaterialIcon Kind="ArchiveOutline" Width="80" Height="80" Foreground="#6B7280"
+                                       HorizontalAlignment="Center" Margin="0,0,0,20" Opacity="0.5" />
+                <TextBlock Text="Tu biblioteca está vacía" FontSize="20" FontWeight="SemiBold"
+                           Foreground="{DynamicResource Brush.TextPrimary}" HorizontalAlignment="Center" />
+                <TextBlock Text="Añade un anime para empezar tu colección local" Theme="{StaticResource AppText.Secondary}"
+                           HorizontalAlignment="Center" Margin="0,10,0,30" Opacity="0.85" />
+                <Button Classes="appPrimary" Command="{Binding AñadirAnimeManualCommand}" HorizontalAlignment="Center" Padding="20,10">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <material:MaterialIcon Kind="MagnifyPlus" VerticalAlignment="Center" />
+                        <TextBlock Text="BUSCAR Y AÑADIR ANIME" VerticalAlignment="Center" FontWeight="Bold" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
 
-                                    <!-- Play Pill Hover -->
-                                    <Border Classes="PlayPill" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,70"
-                                            Background="#E614181E" BorderBrush="#3B82F6" BorderThickness="1" CornerRadius="18" Padding="14,8"
-                                            IsHitTestVisible="False">
-                                        <StackPanel Orientation="Horizontal" Spacing="6">
-                                            <material:MaterialIcon Kind="PlayCircleOutline" Width="18" Height="18" Foreground="#60A5FA"/>
-                                            <TextBlock Text="Ver detalle" FontSize="12" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
-                                        </StackPanel>
-                                    </Border>
+            <!-- SIN RESULTADOS -->
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,50,0,0"
+                        IsVisible="{Binding SinResultados}">
+                <material:MaterialIcon Kind="MagnifyRemoveOutline" Width="80" Height="80" Foreground="#6B7280"
+                                       HorizontalAlignment="Center" Margin="0,0,0,20" Opacity="0.5" />
+                <TextBlock Text="No se encontraron animes" FontSize="20" FontWeight="SemiBold"
+                           Foreground="{DynamicResource Brush.TextPrimary}" HorizontalAlignment="Center" />
+                <TextBlock Text="Intenta usar otros términos de búsqueda o cambia el filtro de estado."
+                           Theme="{StaticResource AppText.Secondary}" HorizontalAlignment="Center" Margin="0,10,0,0" Opacity="0.85" />
+            </StackPanel>
 
-                                    <!-- Gradiente Inferior y Textos -->
-                                    <Border VerticalAlignment="Bottom" Height="120" Padding="12,0,12,12">
-                                        <Border.Background>
-                                            <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%">
-                                                <GradientStop Color="#00000000" Offset="0" />
-                                                <GradientStop Color="#E6000000" Offset="0.6" />
-                                                <GradientStop Color="#FF000000" Offset="1" />
-                                            </LinearGradientBrush>
-                                        </Border.Background>
-                                        
-                                        <StackPanel VerticalAlignment="Bottom">
-                                            <!-- Titulo -->
-                                            <TextBlock Text="{Binding Titulo}" Foreground="White" FontWeight="Bold" 
-                                                       FontSize="14" TextTrimming="CharacterEllipsis" MaxHeight="42" 
-                                                       TextWrapping="Wrap" Margin="0,0,0,8" />
-                                            
-                                            <!-- Barra de Progreso -->
-                                            <ProgressBar Value="{Binding ProgresoPorcentaje}" Minimum="0" Maximum="100" 
-                                                         Height="4" Background="#44FFFFFF" Foreground="#F43F5E" 
-                                                         Margin="0,0,0,4" CornerRadius="2"/>
-                                            
-                                            <!-- Texto Progreso -->
-                                            <TextBlock Text="{Binding ProgresoEpisodiosTexto}" Foreground="#B3FFFFFF" 
-                                                       FontSize="11" FontWeight="SemiBold" />
-                                        </StackPanel>
-                                    </Border>
+            <!-- PROGRESO DE SINCRONIZACIÓN (flotante) -->
+            <Border VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,40"
+                    Background="#1E1E1E" CornerRadius="25" Padding="25,12" BoxShadow="0 8 16 0 #66000000"
+                    IsVisible="{Binding EstaActualizando}" ZIndex="50">
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                    <material:MaterialIcon Kind="CloudSync" Foreground="#34D399" Width="24" Height="24" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding TextoProgreso}" FontWeight="Bold" VerticalAlignment="Center"
+                               Foreground="{DynamicResource Brush.TextPrimary}" FontSize="14" Margin="0,0,15,0" />
+                    <ProgressBar Minimum="0" Maximum="{Binding ProgresoTotal}" Value="{Binding ProgresoActual}"
+                                 Width="150" Height="6" VerticalAlignment="Center" Foreground="#34D399"
+                                 Background="#4034D399" CornerRadius="3" />
+                </StackPanel>
+            </Border>
 
-                                </Grid>
-                            </Button>
-                        </Border>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </ScrollViewer>
+            <!-- BARRA DE ACCIONES MÚLTIPLES (flotante) -->
+            <Border VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,30"
+                    Background="#1E293B" CornerRadius="24" Padding="20,8" BorderBrush="#40FFFFFF" BorderThickness="1"
+                    IsVisible="{Binding ModoSeleccion}" ZIndex="100"
+                    BoxShadow="0 4 20 0 #80000000">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="Mover a:" Foreground="White" VerticalAlignment="Center" Margin="0,0,15,0" FontWeight="Bold" FontSize="14" />
+                    <Button Content="Viendo" Command="{Binding CategorizarSeleccionadosCommand}" CommandParameter="CURRENT"
+                            Background="Transparent" BorderThickness="0" Foreground="#64B5F6" FontWeight="Bold" />
+                    <Button Content="Completados" Command="{Binding CategorizarSeleccionadosCommand}" CommandParameter="COMPLETED"
+                            Background="Transparent" BorderThickness="0" Foreground="#81C784" FontWeight="Bold" />
+                    <Button Content="Planeando" Command="{Binding CategorizarSeleccionadosCommand}" CommandParameter="PLANNING"
+                            Background="Transparent" BorderThickness="0" Foreground="#E0E0E0" FontWeight="Bold" />
+                    <Border Width="1" Background="#40FFFFFF" Margin="10,5" />
+                    <Button Content="Cancelar" Command="{Binding ToggleModoSeleccionCommand}"
+                            Background="Transparent" BorderThickness="0" Foreground="#E57373" FontWeight="Bold" />
+                </StackPanel>
+            </Border>
+
+            <!-- GALERÍA DE TARJETAS -->
+            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                          IsVisible="{Binding !BibliotecaVacia}">
+                <ItemsControl ItemsSource="{Binding BibliotecaFiltrada}" Margin="0,0,8,20">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel Orientation="Horizontal" HorizontalAlignment="Left" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Classes="CardBorder" Width="180" Height="265" Margin="14"
+                                    CornerRadius="14" Background="#14181E" BorderThickness="1"
+                                    BoxShadow="0 8 16 0 #33000000" ClipToBounds="True">
+
+                                <Button Background="Transparent" BorderThickness="0" Padding="0"
+                                        Command="{Binding DataContext.AbrirDetalleCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                        CommandParameter="{Binding}">
+                                    <Panel>
+                                        <!-- Fondo estático -->
+                                        <Border Background="#1B222C" CornerRadius="14" />
+
+                                        <!-- Portada -->
+                                        <Image Source="{Binding PortadaVisible}" Stretch="UniformToFill"
+                                               RenderOptions.BitmapInterpolationMode="HighQuality" />
+
+                                        <!-- OVERLAY DE SELECCIÓN -->
+                                        <Border Background="#66000000" IsVisible="{Binding EstaSeleccionado}" />
+                                        <Border BorderBrush="#3B82F6" BorderThickness="3" CornerRadius="14" IsVisible="{Binding EstaSeleccionado}" />
+
+                                        <!-- CHECKBOX MODO SELECCIÓN -->
+                                        <CheckBox IsChecked="{Binding EstaSeleccionado}"
+                                                  IsVisible="{Binding DataContext.ModoSeleccion, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                  HorizontalAlignment="Right" VerticalAlignment="Top" Margin="8"
+                                                  IsHitTestVisible="False" ZIndex="10" />
+
+                                        <!-- CHIP DE ESTADO -->
+                                        <Border Background="{Binding ColorEstado}" Padding="8,4" CornerRadius="6"
+                                                HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10"
+                                                IsVisible="{Binding !EstaSeleccionado}">
+                                            <TextBlock Text="{Binding EstadoVisual}" Foreground="White" FontSize="11" FontWeight="Bold" />
+                                        </Border>
+
+                                        <!-- BADGE NUEVOS EPISODIOS -->
+                                        <Border Background="#F43F5E" CornerRadius="10" Padding="8,4"
+                                                HorizontalAlignment="Right" VerticalAlignment="Top" Margin="10"
+                                                IsVisible="{Binding TieneNuevosEpisodios}" ZIndex="15"
+                                                BoxShadow="0 2 6 0 #66000000">
+                                            <TextBlock Text="{Binding NuevosEpisodios, StringFormat='{}{0} Nuevos'}" Foreground="White" FontSize="11" FontWeight="Bold" />
+                                        </Border>
+
+                                        <!-- PILL VER DETALLE (hover) -->
+                                        <Border Classes="PlayPill" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,64"
+                                                Background="#E614181E" BorderBrush="#3B82F6" BorderThickness="1" CornerRadius="18" Padding="14,7"
+                                                IsHitTestVisible="False" ZIndex="20">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <material:MaterialIcon Kind="PlayCircleOutline" Width="16" Height="16" Foreground="#60A5FA" />
+                                                <TextBlock Text="Ver detalle" FontSize="12" FontWeight="Bold" Foreground="White" VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </Border>
+
+                                        <!-- GRADIENTE INFERIOR + TÍTULO + PROGRESO -->
+                                        <Border VerticalAlignment="Bottom" Padding="12,25,12,12">
+                                            <Border.Background>
+                                                <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%">
+                                                    <GradientStop Color="#00000000" Offset="0" />
+                                                    <GradientStop Color="#CC000000" Offset="0.5" />
+                                                    <GradientStop Color="#FF000000" Offset="1" />
+                                                </LinearGradientBrush>
+                                            </Border.Background>
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding Titulo}" Foreground="White" FontWeight="Bold"
+                                                           FontSize="13.5" TextTrimming="CharacterEllipsis" MaxHeight="42"
+                                                           TextWrapping="Wrap" Margin="0,0,0,7" />
+                                                <ProgressBar Value="{Binding ProgresoPorcentaje}" Minimum="0" Maximum="100"
+                                                             Height="4" Background="#44FFFFFF" Foreground="#F43F5E"
+                                                             CornerRadius="2" Margin="0,0,0,4" />
+                                                <TextBlock Text="{Binding ProgresoEpisodiosTexto}" Foreground="#B3FFFFFF"
+                                                           FontSize="11" FontWeight="SemiBold" />
+                                            </StackPanel>
+                                        </Border>
+                                    </Panel>
+                                </Button>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Panel>
     </Grid>
 </UserControl>

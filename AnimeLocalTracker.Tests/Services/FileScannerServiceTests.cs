@@ -1,7 +1,7 @@
 using System;
 using Xunit;
 using FluentAssertions;
-using AnimeLocalTracker.Services;
+using AnimeLocalTracker.Core.Services;
 
 namespace AnimeLocalTracker.Tests.Services;
 

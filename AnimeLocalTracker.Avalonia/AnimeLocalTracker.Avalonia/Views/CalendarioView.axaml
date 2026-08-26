@@ -50,10 +50,12 @@
         <!-- Header -->
         <Grid Grid.Row="0" Margin="0,0,0,20">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <TextBlock Text="Calendario de Emisión" FontSize="28" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
+                <TextBlock Text="Calendario de Emisión" Theme="{StaticResource AppText.PageTitle}" VerticalAlignment="Center"/>
                 
                 <!-- BADGE CONTEO EN EMISIÓN -->
-                <Border Background="#1E3A8A" CornerRadius="10" Padding="8,2" Margin="14,0,0,0" VerticalAlignment="Center">
+                <Border Background="#1E293B" BorderBrush="#2D3748" BorderThickness="1"
+                        CornerRadius="12" Height="24" MinWidth="26" Padding="7,0" Margin="14,0,0,0" 
+                        VerticalAlignment="Center">
                     <TextBlock Text="{Binding TotalAnimesEnEmision}" FontSize="12" FontWeight="Bold" Foreground="#60A5FA" 
                                VerticalAlignment="Center" HorizontalAlignment="Center" TextAlignment="Center"/>
                 </Border>
@@ -89,7 +91,7 @@
             <Border Grid.Column="0" Margin="5" Background="#14181E" BorderBrush="#262D38" BorderThickness="1" CornerRadius="12" Padding="10">
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,4">
-                        <TextBlock Text="LUNES" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center" Margin="0"/>
+                        <TextBlock Text="LUNES" FontSize="16" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center" Margin="0"/>
                         <Border Background="#3B82F6" CornerRadius="6" Padding="6,2" Margin="8,2,0,0" VerticalAlignment="Center"
                                 IsVisible="{Binding DiaActual, Converter={StaticResource StringEqualsConverter}, ConverterParameter=LUNES}">
                             <TextBlock Text="HOY" FontSize="10" FontWeight="Bold" Foreground="White"/>
@@ -111,7 +113,7 @@
             <Border Grid.Column="1" Margin="5" Background="#14181E" BorderBrush="#262D38" BorderThickness="1" CornerRadius="12" Padding="10">
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,4">
-                        <TextBlock Text="MARTES" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center" Margin="0"/>
+                        <TextBlock Text="MARTES" FontSize="16" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center" Margin="0"/>
                         <Border Background="#3B82F6" CornerRadius="6" Padding="6,2" Margin="8,2,0,0" VerticalAlignment="Center"
                                 IsVisible="{Binding DiaActual, Converter={StaticResource StringEqualsConverter}, ConverterParameter=MARTES}">
                             <TextBlock Text="HOY" FontSize="10" FontWeight="Bold" Foreground="White"/>
@@ -133,7 +135,7 @@
             <Border Grid.Column="2" Margin="5" Background="#14181E" BorderBrush="#262D38" BorderThickness="1" CornerRadius="12" Padding="10">
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,4">
-                        <TextBlock Text="MIÉRCOLES" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center" Margin="0"/>
+                        <TextBlock Text="MIÉRCOLES" FontSize="16" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center" Margin="0"/>
                         <Border Background="#3B82F6" CornerRadius="6" Padding="6,2" Margin="8,2,0,0" VerticalAlignment="Center"
                                 IsVisible="{Binding DiaActual, Converter={StaticResource StringEqualsConverter}, ConverterParameter=MIÉRCOLES}">
                             <TextBlock Text="HOY" FontSize="10" FontWeight="Bold" Foreground="White"/>
@@ -155,7 +157,7 @@
             <Border Grid.Column="3" Margin="5" Background="#14181E" BorderBrush="#262D38" BorderThickness="1" CornerRadius="12" Padding="10">
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,4">
-                        <TextBlock Text="JUEVES" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center" Margin="0"/>
+                        <TextBlock Text="JUEVES" FontSize="16" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center" Margin="0"/>
                         <Border Background="#3B82F6" CornerRadius="6" Padding="6,2" Margin="8,2,0,0" VerticalAlignment="Center"
                                 IsVisible="{Binding DiaActual, Converter={StaticResource StringEqualsConverter}, ConverterParameter=JUEVES}">
                             <TextBlock Text="HOY" FontSize="10" FontWeight="Bold" Foreground="White"/>
@@ -177,7 +179,7 @@
             <Border Grid.Column="4" Margin="5" Background="#14181E" BorderBrush="#262D38" BorderThickness="1" CornerRadius="12" Padding="10">
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,4">
-                        <TextBlock Text="VIERNES" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center" Margin="0"/>
+                        <TextBlock Text="VIERNES" FontSize="16" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center" Margin="0"/>
                         <Border Background="#3B82F6" CornerRadius="6" Padding="6,2" Margin="8,2,0,0" VerticalAlignment="Center"
                                 IsVisible="{Binding DiaActual, Converter={StaticResource StringEqualsConverter}, ConverterParameter=VIERNES}">
                             <TextBlock Text="HOY" FontSize="10" FontWeight="Bold" Foreground="White"/>
@@ -199,7 +201,7 @@
             <Border Grid.Column="5" Margin="5" Background="#14181E" BorderBrush="#262D38" BorderThickness="1" CornerRadius="12" Padding="10">
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,4">
-                        <TextBlock Text="SÁBADO" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center" Margin="0"/>
+                        <TextBlock Text="SÁBADO" FontSize="16" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center" Margin="0"/>
                         <Border Background="#3B82F6" CornerRadius="6" Padding="6,2" Margin="8,2,0,0" VerticalAlignment="Center"
                                 IsVisible="{Binding DiaActual, Converter={StaticResource StringEqualsConverter}, ConverterParameter=SÁBADO}">
                             <TextBlock Text="HOY" FontSize="10" FontWeight="Bold" Foreground="White"/>
@@ -221,7 +223,7 @@
             <Border Grid.Column="6" Margin="5" Background="#14181E" BorderBrush="#262D38" BorderThickness="1" CornerRadius="12" Padding="10">
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,4">
-                        <TextBlock Text="DOMINGO" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center" Margin="0"/>
+                        <TextBlock Text="DOMINGO" FontSize="16" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center" Margin="0"/>
                         <Border Background="#3B82F6" CornerRadius="6" Padding="6,2" Margin="8,2,0,0" VerticalAlignment="Center"
                                 IsVisible="{Binding DiaActual, Converter={StaticResource StringEqualsConverter}, ConverterParameter=DOMINGO}">
                             <TextBlock Text="HOY" FontSize="10" FontWeight="Bold" Foreground="White"/>

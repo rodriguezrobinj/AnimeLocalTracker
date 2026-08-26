@@ -3,15 +3,183 @@
              xmlns:local="using:AnimeLocalTracker.Avalonia"
              xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
              x:Class="AnimeLocalTracker.Avalonia.App"
-             RequestedThemeVariant="Default">
-             <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
+             RequestedThemeVariant="Dark">
 
     <Application.DataTemplates>
         <local:ViewLocator />
     </Application.DataTemplates>
 
+    <Application.Resources>
+        <!-- ═══════════════════════════════════════════════════════════════ -->
+        <!--  SISTEMA DE DISEÑO (portado 1:1 desde WPF App.xaml)             -->
+        <!--  Nota Avalonia: los estilos con clave califican sus propiedades -->
+        <!--  con el tipo (TextBlock.FontSize) porque Style no tiene         -->
+        <!--  TargetType en Avalonia 11.                                     -->
+        <!-- ═══════════════════════════════════════════════════════════════ -->
+        <SolidColorBrush x:Key="Brush.Surface1" Color="#14181E" />
+        <SolidColorBrush x:Key="Brush.Surface2" Color="#161B22" />
+        <SolidColorBrush x:Key="Brush.Surface3" Color="#1E293B" />
+        <SolidColorBrush x:Key="Brush.Border" Color="#262D38" />
+        <SolidColorBrush x:Key="Brush.BorderStrong" Color="#2D3748" />
+        <SolidColorBrush x:Key="Brush.TextPrimary" Color="#E2E8F0" />
+        <SolidColorBrush x:Key="Brush.TextSecondary" Color="#9CA3AF" />
+        <SolidColorBrush x:Key="Brush.TextTertiary" Color="#6B7280" />
+        <SolidColorBrush x:Key="Brush.Accent" Color="#60A5FA" />
+        <SolidColorBrush x:Key="Brush.AccentStrong" Color="#3B82F6" />
+        <SolidColorBrush x:Key="Brush.AccentSoft" Color="#93C5FD" />
+        <SolidColorBrush x:Key="Brush.Success" Color="#34D399" />
+        <SolidColorBrush x:Key="Brush.Danger" Color="#F87171" />
+        <SolidColorBrush x:Key="Brush.Warning" Color="#F59E0B" />
+        <SolidColorBrush x:Key="Brush.Rose" Color="#F43F5E" />
+        <SolidColorBrush x:Key="Brush.WindowBg" Color="#121212" />
+
+        <!-- ── Escala tipográfica (ControlTheme: aplicar con Theme="{StaticResource ...}") ── -->
+        <ControlTheme x:Key="AppText.PageTitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="26" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}" />
+        </ControlTheme>
+        <ControlTheme x:Key="AppText.Section" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}" />
+        </ControlTheme>
+        <ControlTheme x:Key="AppText.Body" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}" />
+        </ControlTheme>
+        <ControlTheme x:Key="AppText.Secondary" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="{DynamicResource Brush.TextSecondary}" />
+        </ControlTheme>
+        <ControlTheme x:Key="AppText.Caption" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{DynamicResource Brush.TextSecondary}" />
+        </ControlTheme>
+
+        <!-- ── Componentes compartidos (ControlTheme) ── -->
+        <ControlTheme x:Key="AppBadge" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource Brush.Surface3}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Brush.BorderStrong}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="12" />
+            <Setter Property="Height" Value="24" />
+            <Setter Property="MinWidth" Value="26" />
+            <Setter Property="Padding" Value="7,0" />
+        </ControlTheme>
+    </Application.Resources>
+
     <Application.Styles>
         <FluentTheme />
         <materialIcons:MaterialIconStyles />
+
+        <!-- ── Navegación lateral (pills) ── -->
+        <Style Selector="Button.appNav">
+            <Setter Property="Width" Value="45" />
+            <Setter Property="Height" Value="45" />
+            <Setter Property="CornerRadius" Value="12" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.appNav /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="Button.appNav:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Brush.Surface1}" />
+        </Style>
+        <Style Selector="Button.appNav.activo /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Brush.Surface3}" />
+        </Style>
+        <Style Selector="Button.appNav .actIcon" x:SetterTargetType="TemplatedControl">
+            <Setter Property="Foreground" Value="{DynamicResource Brush.TextTertiary}" />
+        </Style>
+        <Style Selector="Button.appNav:pointerover .actIcon" x:SetterTargetType="TemplatedControl">
+            <Setter Property="Foreground" Value="{DynamicResource Brush.TextSecondary}" />
+        </Style>
+        <Style Selector="Button.appNav.activo .actIcon" x:SetterTargetType="TemplatedControl">
+            <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}" />
+        </Style>
+
+        <!-- ── Chips de filtro del header ── -->
+        <Style Selector="Button.appHeaderBtn">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Foreground" Value="{DynamicResource Brush.TextSecondary}" />
+            <Setter Property="Padding" Value="14,6" />
+            <Setter Property="CornerRadius" Value="16" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="MinHeight" Value="32" />
+        </Style>
+        <Style Selector="Button.appHeaderBtn /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="Button.appHeaderBtn:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#22FFFFFF" />
+        </Style>
+        <Style Selector="Button.appHeaderBtn:pointerover">
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+        <Style Selector="Button.appHeaderBtn.activo /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Brush.AccentStrong}" />
+        </Style>
+        <Style Selector="Button.appHeaderBtn.activo">
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+
+        <!-- ── Hover de botones del sistema ── -->
+        <Style Selector="Button.appPrimary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#2563EB" />
+        </Style>
+        <Style Selector="Button.appOutlined:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#1A60A5FA" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Brush.Accent}" />
+        </Style>
+
+        <!-- ── Tarjetas de galería: hover premium ── -->
+        <Style Selector="Border.CardBorder">
+            <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="BorderBrush" Duration="0:0:0.2" />
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.15" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Border.CardBorder:pointerover">
+            <Setter Property="BorderBrush" Value="{DynamicResource Brush.AccentStrong}" />
+            <Setter Property="RenderTransform" Value="scale(1.03)" />
+        </Style>
+        <Style Selector="Border.PlayPill">
+            <Setter Property="Opacity" Value="0" />
+            <Setter Property="RenderTransform" Value="translateY(10px)" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.2" Easing="CircularEaseOut" />
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.2" Easing="CircularEaseOut" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Border.CardBorder:pointerover Border.PlayPill">
+            <Setter Property="Opacity" Value="1" />
+            <Setter Property="RenderTransform" Value="translateY(0px)" />
+        </Style>
+
+        <!-- ── ScrollBars finas oscuras ── -->
+        <Style Selector="ScrollBar:vertical">
+            <Setter Property="Width" Value="8" />
+        </Style>
+        <Style Selector="ScrollBar:horizontal">
+            <Setter Property="Height" Value="8" />
+        </Style>
+        <Style Selector="ScrollBar /template/ Thumb#thumb">
+            <Setter Property="MinHeight" Value="30" />
+            <Setter Property="Background" Value="#3D4450" />
+        </Style>
+        <Style Selector="ScrollBar /template/ Thumb#thumb:pointerover">
+            <Setter Property="Background" Value="#5560A5FA" />
+        </Style>
     </Application.Styles>
 </Application>

@@ -28,7 +28,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\AnimeLocalTracker\AnimeLocalTracker.csproj" />
+    <ProjectReference Include="..\AnimeLocalTracker.Core\AnimeLocalTracker.Core.csproj" />
   </ItemGroup>
 
 </Project>

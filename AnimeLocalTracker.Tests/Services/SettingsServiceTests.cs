@@ -1,9 +1,9 @@
 using System;
 using System.IO;
 using System.Threading.Tasks;
-using AnimeLocalTracker.Models;
-using AnimeLocalTracker.Services;
-using AnimeLocalTracker.ViewModels;
+using AnimeLocalTracker.Core.Models;
+using AnimeLocalTracker.Core.Services;
+using AnimeLocalTracker.Core.ViewModels;
 using FluentAssertions;
 using Moq;
 using Xunit;
