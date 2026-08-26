@@ -41,7 +41,7 @@
     </UserControl.DataTemplates>
 
     <Grid Background="#121212">
-        <TransitioningContentControl Content="{Binding CurrentViewModel}">
+        <TransitioningContentControl Content="{Binding VistaActual}">
             <TransitioningContentControl.PageTransition>
                 <CrossFade Duration="0:0:0.3" />
             </TransitioningContentControl.PageTransition>
