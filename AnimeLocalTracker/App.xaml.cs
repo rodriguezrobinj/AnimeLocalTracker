@@ -6,6 +6,7 @@ using AnimeLocalTracker.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 using AnimeLocalTracker.Views; // Asegúrate de que este namespace exista
 using AnimeLocalTracker.Services;
+using AnimeLocalTracker.Services.Python;
 using Polly;
 
 namespace AnimeLocalTracker;
@@ -17,6 +18,15 @@ public partial class App : Application
 
     public App()
     {
+        try
+        {
+            Velopack.VelopackApp.Build().Run();
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn("Velopack", $"Aviso en inicialización de Velopack: {ex.Message}");
+        }
+
         var services = new ServiceCollection();
         ConfigureServices(services);
         ServiceProvider = services.BuildServiceProvider();
@@ -107,10 +117,13 @@ public partial class App : Application
         // Orquestación de skip-times (resolución MAL ID + reglas de evaluación)
         services.AddSingleton<ISkipTimesCoordinator, SkipTimesCoordinator>();
 
-        // Persistencia del estado de descargas segmentadas (.state) y resolución de fuentes de video
+        // 4. Integración del Ecosistema de Automatización Python (Zero-Setup & Clean Architecture)
+        services.AddSingleton<IPythonBridgeService, PythonBridgeService>();
+        services.AddTransient<IFileScannerService, PythonFileScannerService>();
+        services.AddSingleton<IVideoSourceResolver, PythonVideoSourceResolver>();
+
+        // Persistencia del estado de descargas segmentadas (.state)
         services.AddSingleton<IDownloadStateStore, DownloadStateStore>();
-        services.AddSingleton<IVideoSourceResolver>(sp =>
-            new AnimeAv1VideoSourceResolver(sp.GetRequiredService<IHttpClientFactory>().CreateClient("Downloader")));
 
         // Servicio de caché y precarga de imágenes optimizadas para 60fps
         services.AddSingleton<IImageCacheService, ImageCacheService>();

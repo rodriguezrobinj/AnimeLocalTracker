@@ -11,6 +11,15 @@ AnimeLocalTracker/Tools/
 publish/
 installer_output/
 
+# Python Virtual Environments & PyInstaller artifacts
+.venv/
+tools/python/.venv/
+__pycache__/
+*.pyc
+tools/python/build/
+tools/python/dist/
+*.spec
+
 # dotenv files
 .env
 
