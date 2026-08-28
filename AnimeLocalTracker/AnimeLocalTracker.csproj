@@ -11,6 +11,8 @@
     </PropertyGroup>
 
     <ItemGroup>
+      <ApplicationDefinition Remove="App.xaml" />
+      <Page Include="App.xaml" />
       <Folder Include="Core\" />
     </ItemGroup>
 
