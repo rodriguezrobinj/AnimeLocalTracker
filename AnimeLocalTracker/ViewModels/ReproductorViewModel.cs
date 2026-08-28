@@ -737,7 +737,9 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     {
         try
         {
-            var results = await _skipCoordinator.CargarSkipTimesAsync(animeId, episodio, TotalSeconds, ct);
+            // AniSkip API como fuente primaria; si no hay datos, detección local por escenas (Python/ffmpeg)
+            // usando la ruta del video local actual (requiere un archivo en disco).
+            var results = await _skipCoordinator.CargarSkipTimesAsync(animeId, episodio, TotalSeconds, ct, RutaVideo);
             if (results.Count > 0)
             {
                 _skipTimes = new List<AniSkipResult>(results);

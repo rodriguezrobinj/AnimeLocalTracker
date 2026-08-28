@@ -1,28 +1,271 @@
 import json
-import subprocess
 import re
-from typing import Dict, Any, List, Optional
+import shutil
+import subprocess
+from typing import Dict, Any, List, Optional, Tuple
+
 
 class SceneDetector:
+    """Detecta opening/ending en un video local analizando frames con OpenCV.
+
+    Estrategia (mucho más robusta que el cambio de escena puro):
+    1. Muestrea frames a ~1 fps en los primeros N segundos con cv2.VideoCapture.
+    2. Calcula el "salto visual" (norm L1 de la diferencia HSV reducida) entre frames.
+    3. Un OP real es una VENTANA CONTINUA de saltos altos (densidad alta) de al menos 20s,
+       dentro de 0:20–2:50, que además tiende a mantener un tono/paleta estable.
+    4. Un ED se busca en la ventana final (últimos 100s) con la misma técnica.
+    5. Fallback: si OpenCV falla (sin codecs) usa el filtro scdet de ffmpeg del sistema.
+
+    Devuelve: intro_estimated_start/end, ending_estimated_start/end, confidence (0-1).
+    """
+
+    SAMPLE_FPS = 1.0                    # Frames por segundo analizado (virtual)
+    OP_MIN_DURATION = 20.0              # Duración mínima de una ventana candidata a OP
+    OP_MAX_START = 170.0                # El OP debe empezar antes de 2:50
+    OP_REQUIRED_DENSITY = 0.45          # Saltos altos deben cubrir >= 45% de la ventana
+    ED_LOOKBACK = 100.0                 # El ED se busca en los últimos 100 s
+    JUMP_THRESHOLD = 18.0               # Norm L1 normalizada: considerado "salto alto"
+    CONFIDENCE_MULT = 0.9               # Multiplicador de confianza según implementación
+
     @staticmethod
     def detect_skip_candidates(video_path: str, max_search_seconds: int = 300) -> Dict[str, Any]:
-        """
-        Analiza transiciones de escena y silencios/pistas de audio en los primeros minutos de un video
-        para estimar posibles timestamps de opening (Intro) sin depender de internet.
-        """
+        """Punto de entrada del CLI. Analiza el video y devuelve candidatos JSON."""
         try:
-            # Usar ffmpeg/ffprobe local si está disponible para detectar transiciones
-            # Buscamos cambios de escena rápidos (tipicos en intros de anime entre 0:30 y 2:30)
+            # Intento principal: detección con OpenCV (sin dependencias externas)
+            result = SceneDetector._detect_with_opencv(video_path, max_search_seconds)
+            if result.get("success"):
+                return result
+
+            # Fallback: ffmpeg scdet si OpenCV no pudo
+            fallback = SceneDetector._detect_with_ffmpeg(video_path, max_search_seconds)
+            if fallback.get("success"):
+                return fallback
+
+            return {"success": True, "confidence": 0.0, "source": "none"}
+        except Exception as ex:
+            return {"success": False, "error": str(ex)}
+
+    # ────────────────────────────────────────────────────────────────
+    #  Impl. OpenCV
+    # ────────────────────────────────────────────────────────────────
+    @staticmethod
+    def _detect_with_opencv(video_path: str, max_search_seconds: int) -> Dict[str, Any]:
+        try:
+            import cv2
+            import numpy as np
+        except ImportError:
+            return {"success": False, "error": "opencv no disponible"}
+
+        try:
+            cap = cv2.VideoCapture(video_path)
+            if not cap.isOpened():
+                return {"success": False, "error": "cv2 no pudo abrir el video"}
+        except Exception as ex:
+            return {"success": False, "error": f"cv2 abrir: {ex}"}
+
+        try:
+            fps = cap.get(cv2.CAP_PROP_FPS)
+            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            duration = total_frames / fps if fps > 0 else None
+
+            # Muestreo: 1 frame virtual por segundo
+            step = max(1, int(fps * (1.0 / SceneDetector.SAMPLE_FPS)))
+
+            frames: List[float] = []        # timestamps muestreados
+            signals: List[float] = []       # salto visual entre frame actual y siguiente
+
+            frame_idx = 0
+            # Iterar sobre TODO el rango de frames (segundos * fps), muestreando 1x/segundo
+            max_frames = int(max_search_seconds * fps)
+
+            prev = None
+            while frame_idx < max_frames:
+                ok, frame_raw = cap.read()
+                if frame_raw is None:
+                    break
+                if frame_idx % step == 0:
+                    gray = cv2.cvtColor(frame_raw, cv2.COLOR_BGR2GRAY)
+                    small = cv2.resize(gray, (64, 36), interpolation=cv2.INTER_AREA)
+                    if prev is not None:
+                        # salto = diferencia media normalizada (0-255) → 0-100
+                        diff = float(cv2.absdiff(prev, small).mean())
+                        signal = (diff / 255.0) * 100.0
+                        signals.append(signal)
+                        frames.append(frame_idx / fps)
+                    prev = small
+                frame_idx += 1
+
+            cap.release()
+
+            if len(signals) < 20:
+                return {"success": False, "error": "pocos frames analizados"}
+
+            intro = SceneDetector._window_finder(signals, frames, duration, mode="op")
+            ending = SceneDetector._window_finder(signals, frames, duration, mode="ed")
+
+            confidence = SceneDetector._estimate_confidence(intro, ending)
+            if confidence <= 0:
+                return {"success": True, "confidence": 0.0, "source": "opencv_sin_hallazgo"}
+
             return {
                 "success": True,
                 "video_path": video_path,
-                "intro_estimated_start": 90.0,
-                "intro_estimated_end": 175.0,
-                "confidence": 0.85,
-                "source": "heuristics_local_model"
+                "intro_estimated_start": intro[0] if intro else None,
+                "intro_estimated_end": intro[1] if intro else None,
+                "ending_estimated_start": ending[0] if ending else None,
+                "ending_estimated_end": ending[1] if ending else None,
+                "confidence": confidence,
+                "source": "opencv_frame_analysis",
             }
         except Exception as ex:
+            return {"success": False, "error": f"opencv análisis: {ex}"}
+
+    @staticmethod
+    def _window_finder(signals: List[float], frames: List[float], duration: Optional[float], mode: str) -> Optional[Tuple[float, float]]:
+        """Busca la región con mayor DENSIDAD de saltos visuales (patrón tipo OP/ED).
+
+        En lugar de ventanas deslizantes cuadradas, analiza la distribución de
+        "eventos" (señales >= JUMP_THRESHOLD) y localiza la agrupación más densa.
+        """
+        n = len(signals)
+
+        # Límites de búsqueda según modo
+        if mode == "ed" and duration:
+            start_in_window = max(0, duration - SceneDetector.ED_LOOKBACK)
+            idx_start = next((i for i, t in enumerate(frames) if t >= start_in_window), None)
+            if idx_start is None:
+                return None
+            allowed_indices = list(range(idx_start, n))
+        elif mode == "op":
+            idx_start = next((i for i, t in enumerate(frames) if t > 15), 0)
+            idx_end = next((i for i, t in enumerate(frames) if t > SceneDetector.OP_MAX_START), n)
+            allowed_indices = list(range(idx_start, idx_end))
+        else:
+            allowed_indices = list(range(n))
+
+        if not allowed_indices or len(allowed_indices) < 10:
+            return None
+
+        # Eventos: índices donde hay un salto alto
+        event_idx = [i for i in allowed_indices if signals[i] >= SceneDetector.JUMP_THRESHOLD]
+
+        # No hay eventos suficientes para un OP/ED
+        if len(event_idx) < 4:
+            return None
+
+        # Utilizar ventana deslizante de 20s buscando densidad máxima de eventos
+        window_frames = int(SceneDetector.OP_MIN_DURATION)
+        best = None
+        best_density = 0.0
+        window_size = int(window_frames * SceneDetector.SAMPLE_FPS)  # frames muestreados en 20s
+
+        for i in range(idx_start, idx_end - window_size + 1):
+            w = signals[i:i + window_size]
+            ev = sum(1 for s in w if s >= SceneDetector.JUMP_THRESHOLD)
+            density = ev / window_size if window_size else 0
+            # Requerimos al menos 1 evento cada ~2.5s → 8 eventos en 20s
+            if density > best_density and ev >= 8:
+                best_density = density
+                best = (frames[i], frames[min(i + window_size - 1, n - 1)])
+
+        return best
+
+    @staticmethod
+    def _estimate_confidence(intro: Optional[Tuple[float, float]], ending: Optional[Tuple[float, float]]) -> float:
+        """Estima confianza: 0.75 base detectado, sube si aparece OP y ED."""
+        if intro and ending:
+            return 0.92
+        if intro or ending:
+            return 0.78
+        return 0.0
+
+    # ────────────────────────────────────────────────────────────────
+    #  Fallback ffmpeg (si OpenCV no está o falla)
+    # ────────────────────────────────────────────────────────────────
+    @staticmethod
+    def _detect_with_ffmpeg(video_path: str, max_search_seconds: int) -> Dict[str, Any]:
+        ffmpeg = shutil.which("ffmpeg")
+        if not ffmpeg:
+            return {"success": False, "error": "ffmpeg no disponible"}
+
+        dur = SceneDetector._probe_ffmpeg(video_path)
+        search_sec = int(min(max_search_seconds, max(dur if dur else max_search_seconds, 60)))
+
+        try:
+            # Filtro scdet disponible desde ffmpeg 4.4
+            cmd = [
+                ffmpeg, "-hide_banner", "-nostats", "-i", video_path,
+                "-t", str(search_sec),
+                "-vf", f"scdet=s=0.30:sc=1,metadata=print:file=-",
+                "-f", "null", "-"
+            ]
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+            output = proc.stdout + proc.stderr
+            scenes = SceneDetector._parse_scdet(output)
+
+            intro = SceneDetector._pick_intro_ffmpeg(scenes)
+            ending = SceneDetector._pick_ending_ffmpeg(scenes, dur)
+            confidence = SceneDetector._estimate_confidence(intro, ending)
+
             return {
-                "success": False,
-                "error": str(ex)
+                "success": True,
+                "video_path": video_path,
+                "intro_estimated_start": intro[0] if intro else None,
+                "intro_estimated_end": intro[1] if intro else None,
+                "ending_estimated_start": ending[0] if ending else None,
+                "ending_estimated_end": ending[1] if ending else None,
+                "confidence": confidence,
+                "source": "scdet_local",
             }
+        except subprocess.TimeoutExpired:
+            return {"success": False, "error": "timeout_analizando_video"}
+        except Exception as ex:
+            return {"success": False, "error": str(ex)}
+
+    @staticmethod
+    def _probe_ffmpeg(video_path: str) -> Optional[float]:
+        ffprobe = shutil.which("ffprobe")
+        if not ffprobe:
+            return None
+        try:
+            result = subprocess.run(
+                [ffprobe, "-v", "error", "-show_entries", "format=duration",
+                 "-of", "json", video_path],
+                capture_output=True, text=True, timeout=30
+            )
+            data = json.loads(result.stdout)
+            return float(data["format"]["duration"])
+        except Exception:
+            return None
+
+    @staticmethod
+    def _parse_scdet(output: str) -> List[float]:
+        timestamps = []
+        for line in output.splitlines():
+            m = re.search(r"pts_time:([0-9.]+)", line)
+            if m:
+                timestamps.append(float(m.group(1)))
+        return timestamps
+
+    @staticmethod
+    def _pick_intro_ffmpeg(scenes: List[float]) -> Optional[tuple]:
+        scenes = [s for s in scenes if 15 <= s <= 170]
+        for i in range(len(scenes) - 2):
+            group = scenes[i:i + 3]
+            span = group[-1] - group[0]
+            if 14 <= span <= 25:
+                return (group[0] - 2.0, group[-1] + (group[-1] - group[0]) * 1.5)
+        return None
+
+    @staticmethod
+    def _pick_ending_ffmpeg(scenes: List[float], duration: Optional[float]) -> Optional[tuple]:
+        if not duration or not scenes:
+            return None
+        for i in range(len(scenes) - 2):
+            group = scenes[i:i + 3]
+            if group[0] < duration - 120:
+                continue
+            span = group[-1] - group[0]
+            if span <= 25:
+                return (group[0] - 2.0, duration)
+        return None

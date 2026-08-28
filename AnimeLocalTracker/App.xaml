@@ -47,6 +47,7 @@
             <materialDesign:BooleanToVisibilityConverter x:Key="InverseBoolToVis" TrueValue="Collapsed" FalseValue="Visible" />
             <conv:StringEqualsConverter x:Key="StringEquals" />
             <conv:ZeroToVisibilityConverter x:Key="ZeroToVis" />
+            <conv:NullToCollapsedConverter x:Key="NullToCollapsed" />
 
             <!-- ═══════════════════════════════════════════════════════════════ -->
             <!--  SISTEMA DE DISEÑO (tokens canónicos = paleta de DetalleView)  -->

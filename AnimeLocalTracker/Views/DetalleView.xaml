@@ -230,11 +230,23 @@
                 <Grid Grid.Row="1">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
+                    <!-- BANNER PRÓXIMOS EPISODIOS (temporalidad AniList vs local) -->
+                    <Border Grid.Row="0" CornerRadius="8" Background="#111827" BorderBrush="#1D4ED8" BorderThickness="1"
+                            Padding="12,8" Margin="0,0,0,10"
+                            Visibility="{Binding TieneProximosEpisodios, Converter={StaticResource BoolToVis}}">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="CalendarClock" Width="16" Height="16" Foreground="#60A5FA" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBlock Text="{Binding ProximosEpisodiosTexto}" Foreground="#93C5FD" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+
                     <!-- CABECERA DE LA LISTA DE EPISODIOS -->
-                    <Grid Grid.Row="0" Margin="0,0,0,15">
+                    <Grid Grid.Row="1" Margin="0,0,0,15">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
@@ -298,11 +310,27 @@
                                     <TextBlock Text="Actualizar" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="11"/>
                                 </StackPanel>
                             </Button>
+
+                            <!-- BOTÓN ANALIZAR DUPLICADOS (hash perceptual vía Python) -->
+                            <Button Command="{Binding AnalizarDuplicadosCommand}" 
+                                    Style="{StaticResource MaterialDesignOutlinedButton}"
+                                    BorderBrush="#F59E0B" Foreground="#FBBF24"
+                                    Height="34" Padding="10,0" Margin="6,0,0,0"
+                                    ToolTip="Detectar archivos duplicados por hash perceptual">
+                                <StackPanel Orientation="Horizontal">
+                                    <materialDesign:PackIcon Kind="ContentDuplicate" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                    <TextBlock Text="Duplicados" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="11"/>
+                                </StackPanel>
+                            </Button>
                         </StackPanel>
                     </Grid>
 
+                    <!-- ESTADO DEL ANÁLISIS DE DUPLICADOS -->
+                    <TextBlock Grid.Row="2" Text="{Binding EstadoDuplicados}" Foreground="#FBBF24" FontSize="11" FontWeight="Medium"
+                               Margin="0,0,0,10" HorizontalAlignment="Left"/>
+
                 <!-- LISTA DE EPISODIOS VIRTUALIZADA CON DISEÑO VERTICAL COMPLETO -->
-                <Grid Grid.Row="1">
+                <Grid Grid.Row="3">
                     <ListBox x:Name="ListaEpisodios" ItemsSource="{Binding EpisodiosDelAnime}" 
                              Background="Transparent" BorderThickness="0"
                              ScrollViewer.VerticalScrollBarVisibility="Auto" Padding="0,0,10,60"
@@ -345,11 +373,13 @@
                                         <Grid.ColumnDefinitions>
                                             <!-- Columna 0: Punto no visto + Marcador Bookmark -->
                                             <ColumnDefinition Width="Auto"/>
-                                            <!-- Columna 1: Título y subtítulo -->
-                                            <ColumnDefinition Width="*"/>
-                                            <!-- Columna 2: Tamaño de archivo -->
+                                            <!-- Columna 1: Miniatura del episodio -->
                                             <ColumnDefinition Width="Auto"/>
-                                            <!-- Columna 3: Acción Descargar / Progreso / Reproducir -->
+                                            <!-- Columna 2: Título y subtítulo -->
+                                            <ColumnDefinition Width="*"/>
+                                            <!-- Columna 3: Tamaño de archivo -->
+                                            <ColumnDefinition Width="Auto"/>
+                                            <!-- Columna 4: Acción Descargar / Progreso / Reproducir -->
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
 
@@ -366,8 +396,20 @@
                                             </Button>
                                         </StackPanel>
 
+                                        <!-- MINIATURA DEL EPISODIO (generada vía Python/ffmpeg) -->
+                                        <Border Grid.Column="1" Width="72" Height="40" CornerRadius="5" Margin="0,0,10,0"
+                                                Background="#1F2937" BorderBrush="#2D333B" BorderThickness="1" VerticalAlignment="Center"
+                                                Visibility="{Binding RutaMiniatura, Converter={StaticResource NullToCollapsed}}">
+                                            <Image Source="{Binding RutaMiniatura}" Stretch="UniformToFill" 
+                                                   RenderOptions.BitmapScalingMode="HighQuality">
+                                                <Image.Clip>
+                                                    <RectangleGeometry Rect="0,0,72,40" RadiusX="5" RadiusY="5"/>
+                                                </Image.Clip>
+                                            </Image>
+                                        </Border>
+
                                         <!-- TÍTULO Y SUBTÍTULO / PROGRESO -->
-                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <StackPanel Grid.Column="2" VerticalAlignment="Center">
                                             <TextBlock x:Name="TextoTitulo" Text="{Binding TituloVisual}" 
                                                        Foreground="White" FontSize="14" FontWeight="SemiBold"/>
                                             
@@ -379,16 +421,23 @@
                                                              materialDesign:TransitionAssist.DisableTransitions="True"/>
                                                 <TextBlock Text="{Binding ProgresoFormateado}" Foreground="#93C5FD" FontSize="11" FontWeight="Medium" VerticalAlignment="Center"/>
                                             </StackPanel>
+
+                                            <!-- BADGE TÉCNICO (metadata ffprobe vía Python) -->
+                                            <Border CornerRadius="4" Background="#1F2937" BorderBrush="#2D333B" BorderThickness="1"
+                                                    Padding="6,2" Margin="0,4,0,0" HorizontalAlignment="Left"
+                                                    Visibility="{Binding BadgeTecnico, Converter={StaticResource NullToCollapsed}}">
+                                                <TextBlock Text="{Binding BadgeTecnico}" Foreground="#9CA3AF" FontSize="10" FontWeight="Medium"/>
+                                            </Border>
                                         </StackPanel>
 
                                         <!-- TAMAÑO DE ARCHIVO -->
-                                        <TextBlock Grid.Column="2" Text="{Binding TamanoArchivoFormateado}" 
+                                        <TextBlock Grid.Column="3" Text="{Binding TamanoArchivoFormateado}" 
                                                    Foreground="#9CA3AF" FontSize="12" FontWeight="Medium" 
                                                    VerticalAlignment="Center" Margin="0,0,12,0"
                                                    Visibility="{Binding Descargado, Converter={StaticResource BoolToVis}}"/>
 
                                         <!-- ACCIÓN: DESCARGAR / REPRODUCIR / DESCARGANDO -->
-                                        <Grid Grid.Column="3" Width="34" Height="34" VerticalAlignment="Center">
+                                        <Grid Grid.Column="4" Width="34" Height="34" VerticalAlignment="Center">
                                             
                                             <!-- 1. DESCARGADO: BOTÓN DE REPRODUCIR -->
                                             <Button Command="{Binding DataContext.ReproducirEpisodioCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"

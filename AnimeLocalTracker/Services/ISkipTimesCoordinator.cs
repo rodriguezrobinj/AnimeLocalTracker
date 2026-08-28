@@ -13,9 +13,10 @@ public interface ISkipTimesCoordinator
 {
     /// <summary>
     /// Resuelve el MAL ID del anime (memoizado) y obtiene los segmentos de skip para el episodio.
+    /// Fuentes en orden: AniSkip API → detección local por escenas (Python/ffmpeg) si se pasa <paramref name="rutaVideoLocal"/>.
     /// Devuelve lista vacía si no hay datos.
     /// </summary>
-    Task<IReadOnlyList<AniSkipResult>> CargarSkipTimesAsync(int animeId, int episodio, double duracionSegundos, CancellationToken ct = default);
+    Task<IReadOnlyList<AniSkipResult>> CargarSkipTimesAsync(int animeId, int episodio, double duracionSegundos, CancellationToken ct = default, string? rutaVideoLocal = null);
 
     /// <summary>
     /// Devuelve el segmento activo en <paramref name="currentSeconds"/>, o null.

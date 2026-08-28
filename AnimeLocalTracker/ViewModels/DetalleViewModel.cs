@@ -10,6 +10,7 @@ using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using AnimeLocalTracker.Models;
 using AnimeLocalTracker.Services;
+using AnimeLocalTracker.Services.Python;
 using AnimeLocalTracker.Messages;
 
 namespace AnimeLocalTracker.ViewModels;
@@ -26,6 +27,7 @@ public partial class DetalleViewModel : ObservableObject,
     private readonly IFileScannerService _fileScannerService;
     private readonly IDialogService _dialogService;
     private readonly IDownloadService _downloadService;
+    private readonly PythonEpisodeEnricher? _enricher;
     
     [ObservableProperty]
     private AnimeItem? _animeSeleccionado;
@@ -111,7 +113,8 @@ public partial class DetalleViewModel : ObservableObject,
         IAuthService authService, 
         IFileScannerService fileScannerService,
         IDialogService dialogService,
-        IDownloadService downloadService)
+        IDownloadService downloadService,
+        PythonEpisodeEnricher? enricher = null)
     {
         _animeTrackingService = animeTrackingService;
         _databaseService = databaseService;
@@ -119,6 +122,7 @@ public partial class DetalleViewModel : ObservableObject,
         _fileScannerService = fileScannerService;
         _dialogService = dialogService;
         _downloadService = downloadService;
+        _enricher = enricher;
         
         WeakReferenceMessenger.Default.Register<UsuarioLogeadoMensaje>(this);
         WeakReferenceMessenger.Default.Register<UsuarioDesconectadoMensaje>(this);
@@ -271,6 +275,115 @@ public partial class DetalleViewModel : ObservableObject,
 
         _todosLosEpisodios.AddRange(episodiosGenerados);
         AplicarFiltrosYOrdenamiento();
+
+        // Enriquecimiento Python (metadata ffprobe + miniaturas) en segundo plano
+        _ = EnriquecerEpisodiosEnSegundoPlanoAsync(AplicarFiltrosYOrdenamiento);
+        _ = CargarProximosEpisodiosDeAniListAsync();
+    }
+
+    /// <summary>
+    /// Enriquecer los episodios locales con metadata técnica y miniaturas vía
+    /// el bridge Python (daemon persistente, sin bloquear la UI).
+    /// </summary>
+    private async Task EnriquecerEpisodiosEnSegundoPlanoAsync(Action alTerminar)
+    {
+        try
+        {
+            if (_enricher == null || !await _enricher.EstáDisponibleAsync()) return;
+
+            var descargados = _todosLosEpisodios
+                .Where(e => e.Descargado && !string.IsNullOrWhiteSpace(e.RutaCompleta) && System.IO.File.Exists(e.RutaCompleta))
+                .ToList();
+
+            foreach (var ep in descargados)
+            {
+                await _enricher.EnriquecerEpisodioAsync(ep);
+                await _enricher.GenerarMiniaturaAsync(ep);
+                if (ep.BadgeTecnico != null || ep.RutaMiniatura != null)
+                {
+                    alTerminar();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("DetalleViewModel", $"Error en enriquecimiento Python: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Consulta AniList para informar de próximos episodios aún no emitidos/localizados.
+    /// (Integración #6: temporalidad AniList vs episodios locales.)
+    /// </summary>
+    [ObservableProperty]
+    private string _proximosEpisodiosTexto = string.Empty;
+
+    [ObservableProperty]
+    private bool _tieneProximosEpisodios;
+
+    // ── Análisis de duplicados (perceptual hash vía Python) ──
+    [ObservableProperty]
+    private string _estadoDuplicados = string.Empty;
+
+    [ObservableProperty]
+    private bool _estaAnalizandoDuplicados;
+
+    [RelayCommand]
+    private async Task AnalizarDuplicadosAsync()
+    {
+        if (EstaAnalizandoDuplicados || _enricher == null) return;
+
+        try
+        {
+            EstaAnalizandoDuplicados = true;
+            EstadoDuplicados = "Analizando episodios...";
+            var duplicados = await _enricher.EncontrarDuplicadosAsync(_todosLosEpisodios);
+            if (duplicados.Count > 0)
+            {
+                EstadoDuplicados = $"{duplicados.Count} episodio(s) duplicado(s) detectados";
+                await _dialogService.MostrarDialogoAsync(
+                    "Duplicados encontrados",
+                    $"Se detectaron {duplicados.Count} archivos duplicados:\n\n{string.Join("\n", duplicados.Select(d => System.IO.Path.GetFileName(d)).Take(10))}",
+                    false, "ContentDuplicate", "#F59E0B");
+            }
+            else
+            {
+                EstadoDuplicados = "Sin duplicados detectados";
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("DetalleViewModel", $"Error analizando duplicados: {ex.Message}");
+            EstadoDuplicados = "No se pudo analizar";
+        }
+        finally
+        {
+            EstaAnalizandoDuplicados = false;
+        }
+    }
+
+    private async Task CargarProximosEpisodiosDeAniListAsync()
+    {
+        try
+        {
+            if (AnimeSeleccionado == null) return;
+            var datos = await _animeTrackingService.ObtenerAnimePorIdAsync(AnimeSeleccionado.AniListId);
+            if (datos?.NextAiringEpisode == null) return;
+
+            int proximo = datos.NextAiringEpisode.Episode;
+            int maxLocal = _todosLosEpisodios.Count;
+            int faltantes = Math.Max(0, proximo - 1 - maxLocal);
+
+            if (faltantes > 0)
+            {
+                ProximosEpisodiosTexto = $"Episodio {proximo} confirmado en AniList — faltan {faltantes} por localizar";
+                TieneProximosEpisodios = true;
+            }
+        }
+        catch
+        {
+            // Fallo de red: no bloquear la vista
+        }
     }
 
     partial void OnOrdenAscendenteChanged(bool value) => AplicarFiltrosYOrdenamiento();

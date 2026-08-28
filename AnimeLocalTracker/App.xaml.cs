@@ -119,6 +119,7 @@ public partial class App : Application
 
         // 4. Integración del Ecosistema de Automatización Python (Zero-Setup & Clean Architecture)
         services.AddSingleton<IPythonBridgeService, PythonBridgeService>();
+        services.AddSingleton<PythonEpisodeEnricher>();
         services.AddTransient<IFileScannerService, PythonFileScannerService>();
         services.AddSingleton<IVideoSourceResolver, PythonVideoSourceResolver>();
 

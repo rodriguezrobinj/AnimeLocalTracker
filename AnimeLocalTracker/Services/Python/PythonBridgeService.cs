@@ -54,6 +54,11 @@ namespace AnimeLocalTracker.Services.Python
                 return default;
             }
 
+            // 1. Intentar con el DAEMON persistente (evita el coste de arranque de Python/imports)
+            var viaDaemon = await ExecuteViaDaemonAsync<TRequest, TResponse>(command, payload, ct);
+            if (viaDaemon != null) return viaDaemon;
+
+            // 2. Fallback: spawn de proceso one-shot (como antes)
             try
             {
                 var psi = new ProcessStartInfo
@@ -117,6 +122,145 @@ namespace AnimeLocalTracker.Services.Python
                 AppLogger.Error("PythonBridge", $"Error ejecutando comando Python '{command}': {ex.Message}", ex);
                 return default;
             }
+        }
+
+        // ────────────────────────────────────────────────────────────────
+        //  DAEMON persistente (JSON-lines por stdin/stdout)
+        // ────────────────────────────────────────────────────────────────
+        private const string DaemonGreeting = "daemon";
+        private static readonly object DaemonLock = new();
+        private static readonly SemaphoreSlim DaemonSemaphore = new(1, 1);
+        private static Process? _daemonProcess;
+        private static StreamReader? _daemonOut;
+        private static StreamWriter? _daemonIn;
+
+        /// <summary>
+        /// Ejecuta un comando a través del proceso daemon persistente. Devuelve default
+        /// si el daemon no está disponible (cae al path one-shot).
+        /// </summary>
+        private async Task<TResponse?> ExecuteViaDaemonAsync<TRequest, TResponse>(string command, TRequest payload, CancellationToken ct)
+        {
+            // El protocolo es una sola línea por comando en un stream compartido:
+            // serializa send+receive para evitar respuestas cruzadas entre llamadas.
+            await DaemonSemaphore.WaitAsync(ct);
+            try
+            {
+                lock (DaemonLock)
+                {
+                    EnsureDaemonStarted();
+                    if (_daemonProcess == null || _daemonProcess.HasExited)
+                        return default;
+                }
+
+                try
+                {
+                    string jsonInput = JsonSerializer.Serialize(payload, JsonOptions);
+                    string send = JsonSerializer.Serialize(new { command, payload = System.Text.Json.Nodes.JsonNode.Parse(jsonInput) }, JsonOptions);
+
+                    lock (DaemonLock)
+                    {
+                        if (_daemonIn == null || _daemonOut == null)
+                            return default;
+
+                        _daemonIn.WriteLine(send);
+                        _daemonIn.Flush();
+                    }
+
+                    // Leer la línea de respuesta (el daemon responde una línea JSON por comando)
+                    string? output = await _daemonOut.ReadLineAsync(ct).AsTask();
+                    if (string.IsNullOrWhiteSpace(output))
+                        return default;
+
+                    var res = JsonSerializer.Deserialize<TResponse>(output, SnakeCaseOptions);
+                    return res ?? JsonSerializer.Deserialize<TResponse>(output, JsonOptions);
+                }
+                catch
+                {
+                    // Si el daemon murió, cae al one-shot
+                    return default;
+                }
+            }
+            finally
+            {
+                DaemonSemaphore.Release();
+            }
+        }
+
+        /// <summary>
+        /// Arranca el proceso daemon si no está vivo (una única instancia compartida).
+        /// Hereda el PATH completo (usuario + sistema) para que el daemon encuentre
+        /// herramientas como ffmpeg instaladas por winget en WinGet\Links.
+        /// </summary>
+        private void EnsureDaemonStarted()
+        {
+            if (_daemonProcess != null && !_daemonProcess.HasExited)
+                return;
+
+            string path = !string.IsNullOrEmpty(_cachedExecutablePath) ? _cachedExecutablePath
+                : throw new InvalidOperationException("Daemon requiere el ejecutable compilado.");
+
+            try
+            {
+                // PATH combinado: usuario primero (incluye WinGet\Links), luego sistema
+                string userPath = Environment.GetEnvironmentVariable("Path", EnvironmentVariableTarget.User) ?? "";
+                string machinePath = Environment.GetEnvironmentVariable("Path", EnvironmentVariableTarget.Machine) ?? "";
+                string fullPath = string.Join(";", userPath, machinePath);
+
+                var psi = new ProcessStartInfo
+                {
+                    FileName = path,
+                    Arguments = "--daemon",
+                    UseShellExecute = false,
+                    RedirectStandardInput = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true,
+                    StandardOutputEncoding = Encoding.UTF8,
+                    // ¡Sin BOM! Encoding.UTF8 (estático) sí lo emite, y el primer
+                    // comando llegaba como \ufeff{...} → "JSON inválido".
+                    StandardInputEncoding = new UTF8Encoding(false)
+                };
+                psi.Environment["PATH"] = fullPath;
+
+                var proc = new Process { StartInfo = psi };
+                proc.Start();
+                _daemonProcess = proc;
+                _daemonOut = proc.StandardOutput;
+                _daemonIn = proc.StandardInput;
+
+                // Consumir el saludo SÍNCRONAMENTE ANTES de que se envíe el primer
+                // comando (la extracción de PyInstaller onefile puede tardar ~4s en
+                // arrancar; leerlo asíncronamente con Task.Run causaba que el lector
+                // de saludo robara la respuesta de un comando posterior → respuestas
+                // cruzadas del daemon).
+                try
+                {
+                    _ = _daemonOut.ReadLineAsync().Wait(TimeSpan.FromSeconds(20));
+                }
+                catch
+                {
+                    CleanupDaemon();
+                }
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Debug("PythonBridge", $"No se pudo iniciar el daemon Python: {ex.Message}");
+                _daemonProcess = null;
+                _daemonOut = null;
+                _daemonIn = null;
+            }
+        }
+
+        private void CleanupDaemon()
+        {
+            try
+            {
+                _daemonProcess?.Kill(entireProcessTree: true);
+            }
+            catch { }
+            _daemonProcess = null;
+            _daemonOut = null;
+            _daemonIn = null;
         }
 
         private void ResolveExecutable()

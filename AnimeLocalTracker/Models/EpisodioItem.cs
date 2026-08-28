@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using SQLite;
 
 namespace AnimeLocalTracker.Models;
 
@@ -45,6 +46,67 @@ public partial class EpisodioItem : ObservableObject
     [NotifyPropertyChangedFor(nameof(TieneProgresoGuardado))]
     [NotifyPropertyChangedFor(nameof(ProgresoFormateado))]
     private double _totalSegundos;
+
+    // === Metadata técnica (ffprobe vía Python bridge) ===
+    private string _resolucion = string.Empty;
+    [Ignore]
+    public string Resolucion
+    {
+        get => _resolucion;
+        set => SetProperty(ref _resolucion, value);
+    }
+
+    private string _codecVideo = string.Empty;
+    [Ignore]
+    public string CodecVideo
+    {
+        get => _codecVideo;
+        set => SetProperty(ref _codecVideo, value);
+    }
+
+    private string _fps = string.Empty;
+    [Ignore]
+    public string Fps
+    {
+        get => _fps;
+        set => SetProperty(ref _fps, value);
+    }
+
+    private bool _es10Bit;
+    [Ignore]
+    public bool Es10Bit
+    {
+        get => _es10Bit;
+        set => SetProperty(ref _es10Bit, value);
+    }
+
+    private string? _rutaMiniatura;
+    [Ignore]
+    public string? RutaMiniatura
+    {
+        get => _rutaMiniatura;
+        set => SetProperty(ref _rutaMiniatura, value);
+    }
+
+    // Badge técnico para la UI: "1080p · HEVC · 10bit · 23.98fps"
+    [Ignore]
+    public string? BadgeTecnico
+    {
+        get
+        {
+            var partes = new List<string>();
+            if (!string.IsNullOrWhiteSpace(Resolucion)) partes.Add(Resolucion);
+            if (!string.IsNullOrWhiteSpace(CodecVideo)) partes.Add(CodecVideo.ToUpperInvariant());
+            if (Es10Bit) partes.Add("10bit");
+            if (!string.IsNullOrWhiteSpace(Fps))
+            {
+                var fpsNum = Fps.Split('/')[0];
+                if (double.TryParse(fpsNum, out var fpsVal) && fpsVal > 0)
+                    partes.Add($"{fpsVal:0.##}fps");
+            }
+            return partes.Count > 0 ? string.Join(" · ", partes) : null;
+        }
+    }
 
     public bool EstaEnEspera => IsDownloading && DownloadProgress <= 0.0;
     public bool ProgresoDescargaActivo => IsDownloading && DownloadProgress > 0.0;
