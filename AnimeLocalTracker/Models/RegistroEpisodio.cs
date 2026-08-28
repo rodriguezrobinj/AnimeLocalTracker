@@ -24,4 +24,11 @@ public class RegistroEpisodio
     public double ProgresoSegundos { get; set; }
     public double TotalSegundos { get; set; }
     public System.DateTime? UltimaReproduccion { get; set; }
+
+    // Metadatos técnicos persistentes (ffprobe + miniaturas locales)
+    public string? Resolucion { get; set; }
+    public string? CodecVideo { get; set; }
+    public string? Fps { get; set; }
+    public bool Es10Bit { get; set; }
+    public string? RutaMiniatura { get; set; }
 }

@@ -100,6 +100,12 @@ public class DatabaseService : IDatabaseService
             {
                 existente.RutaArchivo = registro.RutaArchivo;
             }
+            if (!string.IsNullOrWhiteSpace(registro.Resolucion)) existente.Resolucion = registro.Resolucion;
+            if (!string.IsNullOrWhiteSpace(registro.CodecVideo)) existente.CodecVideo = registro.CodecVideo;
+            if (!string.IsNullOrWhiteSpace(registro.Fps)) existente.Fps = registro.Fps;
+            if (registro.Es10Bit) existente.Es10Bit = registro.Es10Bit;
+            if (!string.IsNullOrWhiteSpace(registro.RutaMiniatura)) existente.RutaMiniatura = registro.RutaMiniatura;
+
             await _conexion.UpdateAsync(existente);
         }
         else
@@ -148,6 +154,12 @@ public class DatabaseService : IDatabaseService
                     {
                         existente.RutaArchivo = registro.RutaArchivo;
                     }
+                    if (!string.IsNullOrWhiteSpace(registro.Resolucion)) existente.Resolucion = registro.Resolucion;
+                    if (!string.IsNullOrWhiteSpace(registro.CodecVideo)) existente.CodecVideo = registro.CodecVideo;
+                    if (!string.IsNullOrWhiteSpace(registro.Fps)) existente.Fps = registro.Fps;
+                    if (registro.Es10Bit) existente.Es10Bit = registro.Es10Bit;
+                    if (!string.IsNullOrWhiteSpace(registro.RutaMiniatura)) existente.RutaMiniatura = registro.RutaMiniatura;
+
                     aActualizar.Add(existente);
                 }
                 else

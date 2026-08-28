@@ -57,6 +57,32 @@ public class PythonEpisodeEnricher
     }
 
     /// <summary>
+    /// Calcula la ruta esperada de la miniatura de forma determinista y persistente (MD5 de la ruta).
+    /// </summary>
+    public static string ObtenerRutaMiniaturaEsperada(string rutaCompleta)
+    {
+        if (string.IsNullOrWhiteSpace(rutaCompleta)) return string.Empty;
+        var thumbsDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "AnimeLocalTracker", "Thumbnails");
+        
+        using var md5 = System.Security.Cryptography.MD5.Create();
+        byte[] hash = md5.ComputeHash(System.Text.Encoding.UTF8.GetBytes(rutaCompleta.ToLowerInvariant()));
+        string hex = Convert.ToHexString(hash).ToLowerInvariant();
+        return Path.Combine(thumbsDir, $"{hex}.jpg");
+    }
+
+    /// <summary>
+    /// Devuelve la ruta de la miniatura si ya existe en disco, de lo contrario null.
+    /// </summary>
+    public static string? ObtenerRutaMiniaturaSiExiste(string rutaCompleta)
+    {
+        if (string.IsNullOrWhiteSpace(rutaCompleta)) return null;
+        string path = ObtenerRutaMiniaturaEsperada(rutaCompleta);
+        return File.Exists(path) ? path : null;
+    }
+
+    /// <summary>
     /// Genera la miniatura del episodio si no existe (caché en LocalAppData/Thumbnails).
     /// </summary>
     public async Task GenerarMiniaturaAsync(AniSkipModels.EpisodioItem episodio, CancellationToken ct = default)
@@ -70,11 +96,13 @@ public class PythonEpisodeEnricher
                 "AnimeLocalTracker", "Thumbnails");
             Directory.CreateDirectory(thumbsDir);
 
-            // Nombre de caché: hash del ancho de ruta para no colisionar
-            int idStable = episodio.RutaCompleta.GetHashCode();
-            string thumbPath = Path.Combine(thumbsDir, $"{idStable:x8}.jpg");
+            string thumbPath = ObtenerRutaMiniaturaEsperada(episodio.RutaCompleta);
 
-            if (File.Exists(thumbPath)) { episodio.RutaMiniatura = thumbPath; return; }
+            if (File.Exists(thumbPath))
+            {
+                episodio.RutaMiniatura = thumbPath;
+                return;
+            }
 
             var result = await _pythonBridge.ExecuteCommandAsync<object, ThumbResult>(
                 "generate-thumbnail",

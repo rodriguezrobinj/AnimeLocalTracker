@@ -249,6 +249,25 @@ public partial class DetalleViewModel : ObservableObject,
                 
                 bool estaDescargando = _downloadService.EstaDescargando(anime.AniListId, i, out double prog);
 
+                // Recuperar miniatura y metadata técnica si ya existen en caché local / SQLite
+                string? thumbCache = null;
+                string resolucionCache = string.Empty;
+                string codecCache = string.Empty;
+                string fpsCache = string.Empty;
+                bool es10BitCache = false;
+
+                if (archivoLocal != null && !string.IsNullOrWhiteSpace(archivoLocal.RutaCompleta))
+                {
+                    thumbCache = (!string.IsNullOrEmpty(memoria?.RutaMiniatura) && System.IO.File.Exists(memoria.RutaMiniatura))
+                        ? memoria.RutaMiniatura
+                        : PythonEpisodeEnricher.ObtenerRutaMiniaturaSiExiste(archivoLocal.RutaCompleta);
+
+                    resolucionCache = memoria?.Resolucion ?? string.Empty;
+                    codecCache = memoria?.CodecVideo ?? string.Empty;
+                    fpsCache = memoria?.Fps ?? string.Empty;
+                    es10BitCache = memoria?.Es10Bit ?? false;
+                }
+
                 var ep = new EpisodioItem
                 {
                     NumeroEpisodio = i,
@@ -260,7 +279,12 @@ public partial class DetalleViewModel : ObservableObject,
                     ProgresoSegundos = memoria?.ProgresoSegundos ?? 0,
                     TotalSegundos = memoria?.TotalSegundos ?? 0,
                     IsDownloading = estaDescargando,
-                    DownloadProgress = prog
+                    DownloadProgress = prog,
+                    Resolucion = resolucionCache,
+                    CodecVideo = codecCache,
+                    Fps = fpsCache,
+                    Es10Bit = es10BitCache,
+                    RutaMiniatura = thumbCache
                 };
                 
                 if (ep.ProgresoSegundos > 0)
@@ -276,31 +300,67 @@ public partial class DetalleViewModel : ObservableObject,
         _todosLosEpisodios.AddRange(episodiosGenerados);
         AplicarFiltrosYOrdenamiento();
 
-        // Enriquecimiento Python (metadata ffprobe + miniaturas) en segundo plano
-        _ = EnriquecerEpisodiosEnSegundoPlanoAsync(AplicarFiltrosYOrdenamiento);
+        // Enriquecimiento Python (metadata ffprobe + miniaturas) en segundo plano solo para los que falten
+        _ = EnriquecerEpisodiosEnSegundoPlanoAsync(anime.AniListId, AplicarFiltrosYOrdenamiento);
         _ = CargarProximosEpisodiosDeAniListAsync();
     }
 
     /// <summary>
-    /// Enriquecer los episodios locales con metadata técnica y miniaturas vía
-    /// el bridge Python (daemon persistente, sin bloquear la UI).
+    /// Enriquecer los episodios locales que aún no tienen metadata técnica o miniatura vía
+    /// el bridge Python y guardar el resultado en SQLite para visitas instantáneas futuras.
     /// </summary>
-    private async Task EnriquecerEpisodiosEnSegundoPlanoAsync(Action alTerminar)
+    private async Task EnriquecerEpisodiosEnSegundoPlanoAsync(int aniListId, Action alTerminar)
     {
         try
         {
             if (_enricher == null || !await _enricher.EstáDisponibleAsync()) return;
 
-            var descargados = _todosLosEpisodios
-                .Where(e => e.Descargado && !string.IsNullOrWhiteSpace(e.RutaCompleta) && System.IO.File.Exists(e.RutaCompleta))
+            var pendientes = _todosLosEpisodios
+                .Where(e => e.Descargado && !string.IsNullOrWhiteSpace(e.RutaCompleta) && System.IO.File.Exists(e.RutaCompleta) &&
+                            (string.IsNullOrEmpty(e.RutaMiniatura) || string.IsNullOrEmpty(e.Resolucion)))
                 .ToList();
 
-            foreach (var ep in descargados)
+            if (pendientes.Count == 0) return;
+
+            foreach (var ep in pendientes)
             {
-                await _enricher.EnriquecerEpisodioAsync(ep);
-                await _enricher.GenerarMiniaturaAsync(ep);
-                if (ep.BadgeTecnico != null || ep.RutaMiniatura != null)
+                bool cambio = false;
+
+                if (string.IsNullOrEmpty(ep.Resolucion))
                 {
+                    await _enricher.EnriquecerEpisodioAsync(ep);
+                    if (!string.IsNullOrEmpty(ep.Resolucion)) cambio = true;
+                }
+
+                if (string.IsNullOrEmpty(ep.RutaMiniatura))
+                {
+                    await _enricher.GenerarMiniaturaAsync(ep);
+                    if (!string.IsNullOrEmpty(ep.RutaMiniatura)) cambio = true;
+                }
+
+                if (cambio)
+                {
+                    try
+                    {
+                        var registro = new RegistroEpisodio
+                        {
+                            AniListId = aniListId,
+                            NumeroEpisodio = ep.NumeroEpisodio,
+                            RutaArchivo = ep.RutaCompleta,
+                            Resolucion = ep.Resolucion,
+                            CodecVideo = ep.CodecVideo,
+                            Fps = ep.Fps,
+                            Es10Bit = ep.Es10Bit,
+                            RutaMiniatura = ep.RutaMiniatura,
+                            VistoLocal = ep.Visto,
+                            FavoritoLocal = ep.Favorito,
+                            ProgresoSegundos = ep.ProgresoSegundos,
+                            TotalSegundos = ep.TotalSegundos
+                        };
+                        await _databaseService.GuardarRegistroEpisodioAsync(registro);
+                    }
+                    catch { }
+
                     alTerminar();
                 }
             }
