@@ -19,19 +19,18 @@ class SceneDetector:
     Devuelve: intro_estimated_start/end, ending_estimated_start/end, confidence (0-1).
     """
 
-    SAMPLE_FPS = 1.0                    # Frames por segundo analizado (virtual)
-    OP_MIN_DURATION = 20.0              # Duración mínima de una ventana candidata a OP
-    OP_MAX_START = 170.0                # El OP debe empezar antes de 2:50
-    OP_REQUIRED_DENSITY = 0.45          # Saltos altos deben cubrir >= 45% de la ventana
-    ED_LOOKBACK = 100.0                 # El ED se busca en los últimos 100 s
-    JUMP_THRESHOLD = 18.0               # Norm L1 normalizada: considerado "salto alto"
-    CONFIDENCE_MULT = 0.9               # Multiplicador de confianza según implementación
+    SAMPLE_INTERVAL = 1.5               # Muestrear cada 1.5 segundos (suficiente y ultra rápido)
+    OP_MIN_DURATION = 18.0              # Duración mínima de una ventana candidata a OP
+    OP_MAX_START = 140.0                # El OP empieza antes de 2:20
+    ED_LOOKBACK = 80.0                  # El ED se busca en los últimos 80 s
+    JUMP_THRESHOLD = 16.0               # Norm L1 normalizada: considerado salto visual
+    CONFIDENCE_MULT = 0.9
 
     @staticmethod
-    def detect_skip_candidates(video_path: str, max_search_seconds: int = 300) -> Dict[str, Any]:
+    def detect_skip_candidates(video_path: str, max_search_seconds: int = 140) -> Dict[str, Any]:
         """Punto de entrada del CLI. Analiza el video y devuelve candidatos JSON."""
         try:
-            # Intento principal: detección con OpenCV (sin dependencias externas)
+            # Intento principal: detección ultra-rápida con OpenCV
             result = SceneDetector._detect_with_opencv(video_path, max_search_seconds)
             if result.get("success"):
                 return result
@@ -46,10 +45,10 @@ class SceneDetector:
             return {"success": False, "error": str(ex)}
 
     # ────────────────────────────────────────────────────────────────
-    #  Impl. OpenCV
+    #  Impl. OpenCV (Seek muestreado ultraligero)
     # ────────────────────────────────────────────────────────────────
     @staticmethod
-    def _detect_with_opencv(video_path: str, max_search_seconds: int) -> Dict[str, Any]:
+    def _detect_with_opencv(video_path: str, max_search_seconds: int = 140) -> Dict[str, Any]:
         try:
             import cv2
             import numpy as np
@@ -65,39 +64,56 @@ class SceneDetector:
 
         try:
             fps = cap.get(cv2.CAP_PROP_FPS)
+            if fps <= 0:
+                fps = 24.0
             total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-            duration = total_frames / fps if fps > 0 else None
+            duration = total_frames / fps if (fps > 0 and total_frames > 0) else None
 
-            # Muestreo: 1 frame virtual por segundo
-            step = max(1, int(fps * (1.0 / SceneDetector.SAMPLE_FPS)))
+            frames: List[float] = []
+            signals: List[float] = []
 
-            frames: List[float] = []        # timestamps muestreados
-            signals: List[float] = []       # salto visual entre frame actual y siguiente
-
-            frame_idx = 0
-            # Iterar sobre TODO el rango de frames (segundos * fps), muestreando 1x/segundo
-            max_frames = int(max_search_seconds * fps)
-
+            # 1. Muestrear ventana de Opening (0s a máx 140s) mediante seeks rápidos
+            max_op = min(max_search_seconds, 140)
             prev = None
-            while frame_idx < max_frames:
+            t = 0.0
+
+            while t < max_op:
+                cap.set(cv2.CAP_PROP_POS_MSEC, t * 1000.0)
                 ok, frame_raw = cap.read()
-                if frame_raw is None:
+                if not ok or frame_raw is None:
                     break
-                if frame_idx % step == 0:
+                gray = cv2.cvtColor(frame_raw, cv2.COLOR_BGR2GRAY)
+                small = cv2.resize(gray, (32, 18), interpolation=cv2.INTER_AREA)
+                if prev is not None:
+                    diff = float(cv2.absdiff(prev, small).mean())
+                    signal = (diff / 255.0) * 100.0
+                    signals.append(signal)
+                    frames.append(t)
+                prev = small
+                t += SceneDetector.SAMPLE_INTERVAL
+
+            # 2. Muestrear ventana de Ending (últimos 80s si hay duración conocida)
+            if duration and duration > 120:
+                t_ed = max(0.0, duration - SceneDetector.ED_LOOKBACK)
+                prev_ed = None
+                while t_ed < duration:
+                    cap.set(cv2.CAP_PROP_POS_MSEC, t_ed * 1000.0)
+                    ok, frame_raw = cap.read()
+                    if not ok or frame_raw is None:
+                        break
                     gray = cv2.cvtColor(frame_raw, cv2.COLOR_BGR2GRAY)
-                    small = cv2.resize(gray, (64, 36), interpolation=cv2.INTER_AREA)
-                    if prev is not None:
-                        # salto = diferencia media normalizada (0-255) → 0-100
-                        diff = float(cv2.absdiff(prev, small).mean())
+                    small = cv2.resize(gray, (32, 18), interpolation=cv2.INTER_AREA)
+                    if prev_ed is not None:
+                        diff = float(cv2.absdiff(prev_ed, small).mean())
                         signal = (diff / 255.0) * 100.0
                         signals.append(signal)
-                        frames.append(frame_idx / fps)
-                    prev = small
-                frame_idx += 1
+                        frames.append(t_ed)
+                    prev_ed = small
+                    t_ed += SceneDetector.SAMPLE_INTERVAL
 
             cap.release()
 
-            if len(signals) < 20:
+            if len(signals) < 10:
                 return {"success": False, "error": "pocos frames analizados"}
 
             intro = SceneDetector._window_finder(signals, frames, duration, mode="op")
@@ -132,41 +148,41 @@ class SceneDetector:
         # Límites de búsqueda según modo
         if mode == "ed" and duration:
             start_in_window = max(0, duration - SceneDetector.ED_LOOKBACK)
-            idx_start = next((i for i, t in enumerate(frames) if t >= start_in_window), None)
-            if idx_start is None:
-                return None
-            allowed_indices = list(range(idx_start, n))
+            idx_start = next((i for i, t in enumerate(frames) if t >= start_in_window), 0)
+            idx_end = n
         elif mode == "op":
             idx_start = next((i for i, t in enumerate(frames) if t > 15), 0)
             idx_end = next((i for i, t in enumerate(frames) if t > SceneDetector.OP_MAX_START), n)
-            allowed_indices = list(range(idx_start, idx_end))
         else:
-            allowed_indices = list(range(n))
+            idx_start = 0
+            idx_end = n
 
-        if not allowed_indices or len(allowed_indices) < 10:
+        allowed_indices = list(range(idx_start, idx_end))
+        if not allowed_indices or len(allowed_indices) < 6:
             return None
 
         # Eventos: índices donde hay un salto alto
         event_idx = [i for i in allowed_indices if signals[i] >= SceneDetector.JUMP_THRESHOLD]
 
         # No hay eventos suficientes para un OP/ED
-        if len(event_idx) < 4:
+        if len(event_idx) < 3:
             return None
 
-        # Utilizar ventana deslizante de 20s buscando densidad máxima de eventos
-        window_frames = int(SceneDetector.OP_MIN_DURATION)
+        # Utilizar ventana deslizante buscando densidad máxima de eventos
+        window_size = max(4, int(SceneDetector.OP_MIN_DURATION / SceneDetector.SAMPLE_INTERVAL))
         best = None
         best_density = 0.0
-        window_size = int(window_frames * SceneDetector.SAMPLE_FPS)  # frames muestreados en 20s
 
-        for i in range(idx_start, idx_end - window_size + 1):
-            w = signals[i:i + window_size]
+        for i in range(idx_start, max(idx_start + 1, idx_end - window_size + 1)):
+            end_idx = min(i + window_size, n)
+            w = signals[i:end_idx]
+            if not w:
+                continue
             ev = sum(1 for s in w if s >= SceneDetector.JUMP_THRESHOLD)
-            density = ev / window_size if window_size else 0
-            # Requerimos al menos 1 evento cada ~2.5s → 8 eventos en 20s
-            if density > best_density and ev >= 8:
+            density = ev / len(w)
+            if density > best_density and ev >= 3:
                 best_density = density
-                best = (frames[i], frames[min(i + window_size - 1, n - 1)])
+                best = (frames[i], frames[min(end_idx - 1, n - 1)])
 
         return best
 

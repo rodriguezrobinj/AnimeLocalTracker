@@ -36,6 +36,27 @@
             </StackPanel>
             
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                <Button Command="{Binding ElegirQueVerHoyCommand}"
+                        Style="{StaticResource AppOutlinedButton}" Margin="0,0,15,0"
+                        ToolTip="Elegir el siguiente episodio no visto de un anime al azar">
+                    <Grid>
+                        <!-- Estado Normal -->
+                        <StackPanel Orientation="Horizontal" Visibility="{Binding EstaBuscandoQueVer, Converter={StaticResource InverseBoolToVis}}">
+                            <materialDesign:PackIcon Kind="DiceMultiple" Margin="0,0,8,0" VerticalAlignment="Center" Width="18" Height="18"/>
+                            <TextBlock Text="QUÉ VEO HOY" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                        </StackPanel>
+
+                        <!-- Estado Buscando / Cargando -->
+                        <StackPanel Orientation="Horizontal" Visibility="{Binding EstaBuscandoQueVer, Converter={StaticResource BoolToVis}}">
+                            <ProgressBar Style="{StaticResource MaterialDesignCircularProgressBar}"
+                                         Width="16" Height="16" Margin="0,0,8,0" IsIndeterminate="True" Value="0"
+                                         Foreground="{DynamicResource Brush.Accent}"/>
+                            <TextBlock Text="BUSCANDO..." VerticalAlignment="Center" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource Brush.Accent}"/>
+                        </StackPanel>
+                    </Grid>
+                </Button>
+
                 <Button Command="{Binding AñadirAnimeManualCommand}"
                         Style="{StaticResource AppOutlinedButton}" Margin="0,0,15,0" ToolTip="Buscar y añadir un nuevo anime">
                     <StackPanel Orientation="Horizontal">

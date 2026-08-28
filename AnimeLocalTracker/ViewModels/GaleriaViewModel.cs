@@ -26,6 +26,7 @@ public partial class GaleriaViewModel : ObservableObject,
     private readonly IDialogService _dialogService;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IImageCacheService _imageCacheService;
+    private readonly IFileScannerService _fileScannerService;
     
     public bool BibliotecaVacia => BibliotecaLocales.Count == 0;
 
@@ -37,6 +38,8 @@ public partial class GaleriaViewModel : ObservableObject,
     [NotifyPropertyChangedFor(nameof(BibliotecaVacia))]
     [NotifyPropertyChangedFor(nameof(SinResultados))]
     [NotifyPropertyChangedFor(nameof(TotalAnimesBiblioteca))]
+    [NotifyPropertyChangedFor(nameof(SePuedeAyudarAverQueVer))]
+    [NotifyCanExecuteChangedFor(nameof(ElegirQueVerHoyCommand))]
     private ObservableCollection<AnimeItem> _bibliotecaLocales = [];
     
     public ICollectionView? BibliotecaFiltrada { get; private set; }
@@ -90,7 +93,8 @@ public partial class GaleriaViewModel : ObservableObject,
         IAuthService authService, 
         IDialogService dialogService, 
         IHttpClientFactory httpClientFactory,
-        IImageCacheService imageCacheService)
+        IImageCacheService imageCacheService,
+        IFileScannerService? fileScannerService = null)
     {
         _animeTrackingService = animeTrackingService;
         _databaseService = databaseService;
@@ -98,6 +102,7 @@ public partial class GaleriaViewModel : ObservableObject,
         _dialogService = dialogService;
         _httpClientFactory = httpClientFactory;
         _imageCacheService = imageCacheService;
+        _fileScannerService = fileScannerService ?? new FileScannerService();
         
         WeakReferenceMessenger.Default.Register<UsuarioLogeadoMensaje>(this);
         WeakReferenceMessenger.Default.Register<AnimeAñadidoMensaje>(this);
@@ -158,17 +163,26 @@ public partial class GaleriaViewModel : ObservableObject,
         }
     }
 
-    public async void Receive(EpisodioActualizadoMensaje message)
+    public void Receive(EpisodioActualizadoMensaje message)
     {
         try
         {
             var anime = BibliotecaLocales.FirstOrDefault(a => a.AniListId == message.AnimeId);
             if (anime != null)
             {
-                var registros = await _databaseService.ObtenerRegistrosPorAnimeAsync(anime.AniListId);
-                System.Windows.Application.Current?.Dispatcher?.Invoke(() =>
+                _ = Task.Run(async () =>
                 {
-                    anime.EpisodiosVistos = registros.Count(r => r.VistoLocal);
+                    try
+                    {
+                        var registros = await _databaseService.ObtenerRegistrosPorAnimeAsync(anime.AniListId);
+                        int vistos = registros.Count(r => r.VistoLocal);
+                        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+                        if (dispatcher != null && !dispatcher.HasShutdownStarted)
+                        {
+                            _ = dispatcher.InvokeAsync(() => anime.EpisodiosVistos = vistos);
+                        }
+                    }
+                    catch { }
                 });
             }
         }
@@ -269,6 +283,148 @@ public partial class GaleriaViewModel : ObservableObject,
                     anime.PortadaImagen = img;
                 }
             }
+        }
+    }
+
+    // ── "QUÉ VEO HOY": episodio no visto aleatorio de la biblioteca ──
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SePuedeAyudarAverQueVer))]
+    [NotifyCanExecuteChangedFor(nameof(ElegirQueVerHoyCommand))]
+    private bool _estaBuscandoQueVer;
+
+    public bool SePuedeAyudarAverQueVer => !EstaBuscandoQueVer && !BibliotecaVacia;
+    /// <summary>
+    /// "Qué veo hoy": elige un anime al azar entre los que tienen episodios locales pendientes
+    /// (priorizando animes en curso "CURRENT") y reproduce su SIGUIENTE episodio no visto
+    /// en orden cronológico para mantener la continuidad de la trama.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(SePuedeAyudarAverQueVer))]
+    private async Task ElegirQueVerHoyAsync()
+    {
+        if (EstaBuscandoQueVer) return;
+        EstaBuscandoQueVer = true;
+
+        try
+        {
+            var animes = BibliotecaLocales
+                .Where(a => !string.IsNullOrWhiteSpace(a.RutaCarpeta))
+                .ToList();
+
+            if (animes.Count == 0)
+            {
+                EstaBuscandoQueVer = false;
+                await _dialogService.MostrarDialogoAsync(
+                    "Qué veo hoy",
+                    "No tienes animes con carpeta local en la biblioteca.\n\nAgrega un anime con su carpeta de episodios para usar esta función.",
+                    false, "Dice", "#60A5FA");
+                return;
+            }
+
+            // Escaneo en hilo de fondo para no bloquear la UI
+            var elegido = await Task.Run(async () =>
+            {
+                var enCurso = animes.Where(a =>
+                    !string.IsNullOrEmpty(a.EstadoUsuario) && a.EstadoUsuario == "CURRENT").ToList();
+                var candidatos = enCurso.Count > 0 ? enCurso : animes;
+
+                var animesConSiguienteEpisodio = new List<(AnimeItem Anime, EpisodioItem SiguienteEpisodio, List<EpisodioItem> TodosDisponibles)>();
+
+                foreach (var anime in candidatos)
+                {
+                    try
+                    {
+                        var episodios = (await _fileScannerService.EscanearEpisodiosAsync(anime.RutaCarpeta!))
+                            .Where(e => !string.IsNullOrWhiteSpace(e.RutaCompleta))
+                            .OrderBy(e => e.NumeroEpisodio)
+                            .ToList();
+
+                        if (episodios.Count == 0) continue;
+
+                        var registros = await _databaseService.ObtenerRegistrosPorAnimeAsync(anime.AniListId);
+                        var vistos = new HashSet<int>(registros.Where(r => r.VistoLocal).Select(r => r.NumeroEpisodio));
+
+                        var siguiente = episodios.FirstOrDefault(ep => !vistos.Contains(ep.NumeroEpisodio));
+                        if (siguiente != null)
+                        {
+                            animesConSiguienteEpisodio.Add((anime, siguiente, episodios));
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        AppLogger.Debug("GaleriaViewModel", $"Qué veo hoy: error escaneando {anime.Titulo}: {ex.Message}");
+                    }
+                }
+
+                // Fallback a toda la biblioteca si los de en curso ya fueron vistos por completo
+                if (animesConSiguienteEpisodio.Count == 0 && enCurso.Count > 0 && candidatos == enCurso)
+                {
+                    var otrosAnimes = animes.Where(a => a.EstadoUsuario != "CURRENT").ToList();
+                    foreach (var anime in otrosAnimes)
+                    {
+                        try
+                        {
+                            var episodios = (await _fileScannerService.EscanearEpisodiosAsync(anime.RutaCarpeta!))
+                                .Where(e => !string.IsNullOrWhiteSpace(e.RutaCompleta))
+                                .OrderBy(e => e.NumeroEpisodio)
+                                .ToList();
+
+                            if (episodios.Count == 0) continue;
+
+                            var registros = await _databaseService.ObtenerRegistrosPorAnimeAsync(anime.AniListId);
+                            var vistos = new HashSet<int>(registros.Where(r => r.VistoLocal).Select(r => r.NumeroEpisodio));
+
+                            var siguiente = episodios.FirstOrDefault(ep => !vistos.Contains(ep.NumeroEpisodio));
+                            if (siguiente != null)
+                            {
+                                animesConSiguienteEpisodio.Add((anime, siguiente, episodios));
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            AppLogger.Debug("GaleriaViewModel", $"Qué veo hoy: error escaneando {anime.Titulo}: {ex.Message}");
+                        }
+                    }
+                }
+
+                if (animesConSiguienteEpisodio.Count == 0)
+                    return ((AnimeItem Anime, EpisodioItem SiguienteEpisodio, List<EpisodioItem> TodosDisponibles)?)null;
+
+                var random = new Random();
+                return animesConSiguienteEpisodio[random.Next(animesConSiguienteEpisodio.Count)];
+            });
+
+            EstaBuscandoQueVer = false;
+
+            if (elegido == null)
+            {
+                await _dialogService.MostrarDialogoAsync(
+                    "Qué veo hoy",
+                    "No se encontraron episodios sin ver en tu biblioteca local. ¡Disfruta de tu maratón!",
+                    false, "EmoticonHappyOutline", "#4CAF50");
+                return;
+            }
+
+            var seleccion = elegido.Value;
+
+            // Navegar al reproductor en el hilo principal de la UI
+            WeakReferenceMessenger.Default.Send(new NavegarMensaje_Reproductor(
+                seleccion.SiguienteEpisodio.RutaCompleta,
+                seleccion.Anime.AniListId,
+                seleccion.Anime.Titulo,
+                seleccion.SiguienteEpisodio.NumeroEpisodio,
+                EpisodiosDisponibles: seleccion.TodosDisponibles
+            ));
+        }
+        catch (Exception ex)
+        {
+            EstaBuscandoQueVer = false;
+            AppLogger.Error("GaleriaViewModel", "Error en Qué veo hoy", ex);
+            await _dialogService.MostrarDialogoAsync(
+                "Qué veo hoy", "Ocurrió un error al buscar episodios.", false, "AlertCircleOutline", "#E53935");
+        }
+        finally
+        {
+            EstaBuscandoQueVer = false;
         }
     }
     
