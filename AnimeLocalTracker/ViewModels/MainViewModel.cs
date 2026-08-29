@@ -198,21 +198,30 @@ public partial class MainViewModel : ObservableObject,
 
     public async void Receive(NavegarMensaje_Reproductor message)
     {
-        // Guardar la vista actual antes de navegar al reproductor
-        _vistaAnteriorAlReproductor = VistaActual;
-
-        var viewModel = _serviceProvider.GetRequiredService<ReproductorViewModel>();
         try
         {
-            // Esperar a que el Player exista ANTES de crear la vista: FlyleafHost enlaza su
-            // superficie nativa al inicializarse y no la reconstruye si el Player llega después.
-            await viewModel.CargarVideoAsync(message.RutaVideo, message.AnimeId, message.TituloAnime, message.Episodio, message.EpisodiosDisponibles);
+            // Guardar la vista actual antes de navegar al reproductor
+            _vistaAnteriorAlReproductor = VistaActual;
+
+            var viewModel = _serviceProvider.GetService<ReproductorViewModel>();
+            if (viewModel == null) return;
+
+            try
+            {
+                // Esperar a que el Player exista ANTES de crear la vista: FlyleafHost enlaza su
+                // superficie nativa al inicializarse y no la reconstruye si el Player llega después.
+                await viewModel.CargarVideoAsync(message.RutaVideo, message.AnimeId, message.TituloAnime, message.Episodio, message.EpisodiosDisponibles);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Error("MainViewModel", $"Error al cargar el video '{message.RutaVideo}'", ex);
+            }
+            VistaActual = viewModel;
         }
         catch (Exception ex)
         {
-            AppLogger.Error("MainViewModel", $"Error al cargar el video '{message.RutaVideo}'", ex);
+            AppLogger.Error("MainViewModel", "Error al procesar NavegarMensaje_Reproductor", ex);
         }
-        VistaActual = viewModel;
     }
 
     partial void OnVistaActualChanged(ObservableObject? oldValue, ObservableObject newValue)

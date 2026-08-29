@@ -194,15 +194,14 @@
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="140"/>
+                                    <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <StackPanel VerticalAlignment="Center">
+                                <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
                                     <TextBlock Text="Descargas simultáneas máximas" FontWeight="SemiBold" Foreground="White" FontSize="13"/>
                                     <TextBlock Text="Cantidad de episodios descargándose en paralelo (1 a 5)" FontSize="11" Foreground="#9CA3AF" Margin="0,2,0,0"/>
                                 </StackPanel>
-                                <ComboBox Grid.Column="1" Width="130" HorizontalAlignment="Right" SelectedValue="{Binding DescargasSimultaneas}" 
-                                          Style="{StaticResource MaterialDesignOutlinedComboBox}" Foreground="White" Background="#14181E" BorderBrush="#2D3748"
-                                          Padding="10,6" Height="38" VerticalContentAlignment="Center" HorizontalContentAlignment="Center"
+                                <ComboBox Grid.Column="1" HorizontalAlignment="Right" SelectedValue="{Binding DescargasSimultaneas}" 
+                                          Height="38" MinWidth="75"
                                           SelectedValuePath="Content">
                                     <ComboBoxItem Content="1"/>
                                     <ComboBoxItem Content="2"/>
@@ -218,15 +217,14 @@
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="140"/>
+                                    <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <StackPanel VerticalAlignment="Center">
+                                <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
                                     <TextBlock Text="Intervalo de sincronización con AniList" FontWeight="SemiBold" Foreground="White" FontSize="13"/>
                                     <TextBlock Text="Frecuencia en segundo plano para sincronizar el historial de visualización" FontSize="11" Foreground="#9CA3AF" Margin="0,2,0,0"/>
                                 </StackPanel>
-                                <ComboBox Grid.Column="1" Width="130" HorizontalAlignment="Right" SelectedValue="{Binding IntervaloSincronizacionMinutos}" 
-                                          Style="{StaticResource MaterialDesignOutlinedComboBox}" Foreground="White" Background="#14181E" BorderBrush="#2D3748"
-                                          Padding="10,6" Height="38" VerticalContentAlignment="Center" HorizontalContentAlignment="Center"
+                                <ComboBox Grid.Column="1" HorizontalAlignment="Right" SelectedValue="{Binding IntervaloSincronizacionMinutos}" 
+                                          Height="38" MinWidth="130"
                                           SelectedValuePath="Tag">
                                     <ComboBoxItem Content="2 minutos" Tag="2"/>
                                     <ComboBoxItem Content="5 minutos" Tag="5"/>

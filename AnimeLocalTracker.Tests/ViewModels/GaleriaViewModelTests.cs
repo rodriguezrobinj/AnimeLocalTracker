@@ -22,7 +22,7 @@ public class GaleriaViewModelTests
     private readonly Mock<IImageCacheService> _imageCacheServiceMock = new();
     private readonly Mock<IFileScannerService> _fileScannerServiceMock = new();
 
-    private GaleriaViewModel CreateSut(List<AnimeItem>? animes = null)
+    private GaleriaViewModel CreateSut(List<AnimeItem>? animes = null, List<RegistroEpisodio>? registros = null)
     {
         _databaseServiceMock
             .Setup(d => d.ObtenerTodosLosAnimesAsync())
@@ -30,7 +30,7 @@ public class GaleriaViewModelTests
 
         _databaseServiceMock
             .Setup(d => d.ObtenerTodosLosRegistrosAsync())
-            .ReturnsAsync(new List<RegistroEpisodio>());
+            .ReturnsAsync(registros ?? new List<RegistroEpisodio>());
 
         return new GaleriaViewModel(
             _trackingServiceMock.Object,
@@ -233,6 +233,245 @@ public class GaleriaViewModelTests
         {
             WeakReferenceMessenger.Default.UnregisterAll(recipient);
         }
+    }
+
+    [Fact]
+    public async Task ActualizarGenerosDisponibles_DeberiaExtraerGenerosUnicosOrdenados()
+    {
+        // Arrange
+        var animes = new List<AnimeItem>
+        {
+            new() { AniListId = 1, Titulo = "Frieren", Generos = "Aventura, Fantasía, Drama" },
+            new() { AniListId = 2, Titulo = "Jujutsu Kaisen", Generos = "Acción, Fantasía, Sobrenatural" },
+            new() { AniListId = 3, Titulo = "Bocchi the Rock!", Generos = "Comedia, Música" }
+        };
+
+        // Act
+        var sut = CreateSut(animes);
+        await Task.Delay(100);
+
+        // Assert
+        sut.GenerosDisponibles.Should().Contain("Todos los géneros");
+        sut.GenerosDisponibles.Should().Contain(new[] { "Acción", "Aventura", "Comedia", "Drama", "Fantasía", "Música", "Sobrenatural" });
+        sut.GenerosDisponibles[0].Should().Be("Todos los géneros");
+    }
+
+    [Fact]
+    public async Task FiltrarPorGenero_DeberiaMostrarSoloAnimesConEseGenero()
+    {
+        // Arrange
+        var animes = new List<AnimeItem>
+        {
+            new() { AniListId = 1, Titulo = "Frieren", Generos = "Aventura, Fantasía" },
+            new() { AniListId = 2, Titulo = "Kaguya-sama", Generos = "Comedia, Romance" },
+            new() { AniListId = 3, Titulo = "Jujutsu Kaisen", Generos = "Acción, Fantasía" }
+        };
+
+        var sut = CreateSut(animes);
+        await Task.Delay(100);
+
+        // Act
+        sut.GeneroSeleccionado = "Romance";
+
+        // Assert
+        var filtrados = sut.BibliotecaFiltrada!.Cast<AnimeItem>().ToList();
+        filtrados.Should().HaveCount(1);
+        filtrados.Should().ContainSingle(a => a.Titulo == "Kaguya-sama");
+        sut.HayFiltrosActivos.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task FiltrarPorTexto_DeberiaBuscarEnTituloYSinonimos()
+    {
+        // Arrange
+        var animes = new List<AnimeItem>
+        {
+            new() { AniListId = 1, Titulo = "Attack on Titan", NombresAlternativos = "Shingeki no Kyojin" },
+            new() { AniListId = 2, Titulo = "Demon Slayer", NombresAlternativos = "Kimetsu no Yaiba" }
+        };
+
+        var sut = CreateSut(animes);
+        await Task.Delay(100);
+
+        // Act: Búsqueda por nombre alternativo
+        sut.TextoBusqueda = "Shingeki";
+
+        // Assert
+        var filtrados = sut.BibliotecaFiltrada!.Cast<AnimeItem>().ToList();
+        filtrados.Should().HaveCount(1);
+        filtrados[0].Titulo.Should().Be("Attack on Titan");
+    }
+
+    [Fact]
+    public async Task FiltrarPorSoloPendientes_DeberiaExcluirCompletados()
+    {
+        // Arrange
+        var animes = new List<AnimeItem>
+        {
+            new() { AniListId = 1, Titulo = "Frieren", TotalEpisodios = 28, EstadoUsuario = "CURRENT" },
+            new() { AniListId = 2, Titulo = "Death Note", TotalEpisodios = 1, EstadoUsuario = "COMPLETED" }
+        };
+
+        var registros = new List<RegistroEpisodio>
+        {
+            new() { AniListId = 2, NumeroEpisodio = 1, VistoLocal = true }
+        };
+
+        var sut = CreateSut(animes, registros);
+        await Task.Delay(100);
+
+        // Act
+        sut.SoloConEpisodiosPendientes = true;
+
+        // Assert
+        var filtrados = sut.BibliotecaFiltrada!.Cast<AnimeItem>().ToList();
+        filtrados.Should().HaveCount(1);
+        filtrados[0].Titulo.Should().Be("Frieren");
+    }
+
+    [Fact]
+    public async Task FiltrarPorSoloConCarpetaLocal_DeberiaExcluirAnimesSinRuta()
+    {
+        // Arrange
+        var animes = new List<AnimeItem>
+        {
+            new() { AniListId = 1, Titulo = "Frieren", RutaCarpeta = "C:\\Anime\\Frieren" },
+            new() { AniListId = 2, Titulo = "One Piece", RutaCarpeta = "" }
+        };
+
+        var sut = CreateSut(animes);
+        await Task.Delay(100);
+
+        // Act
+        sut.SoloConCarpetaLocal = true;
+
+        // Assert
+        var filtrados = sut.BibliotecaFiltrada!.Cast<AnimeItem>().ToList();
+        filtrados.Should().HaveCount(1);
+        filtrados[0].Titulo.Should().Be("Frieren");
+    }
+
+    [Fact]
+    public async Task AplicarOrdenacion_PorTitulo_DeberiaOrdenarCorrectamente()
+    {
+        // Arrange
+        var animes = new List<AnimeItem>
+        {
+            new() { AniListId = 1, Titulo = "Bleach" },
+            new() { AniListId = 2, Titulo = "Zom 100" },
+            new() { AniListId = 3, Titulo = "Attack on Titan" }
+        };
+
+        var sut = CreateSut(animes);
+        await Task.Delay(100);
+
+        // Act 1: Título Descendente (Z - A)
+        sut.CriterioOrdenSeleccionado = "Título (Z - A)";
+        var desc = sut.BibliotecaFiltrada!.Cast<AnimeItem>().ToList();
+        desc[0].Titulo.Should().Be("Zom 100");
+        desc[1].Titulo.Should().Be("Bleach");
+        desc[2].Titulo.Should().Be("Attack on Titan");
+
+        // Act 2: Título Ascendente (A - Z)
+        sut.CriterioOrdenSeleccionado = "Título (A - Z)";
+        var asc = sut.BibliotecaFiltrada!.Cast<AnimeItem>().ToList();
+        asc[0].Titulo.Should().Be("Attack on Titan");
+        asc[1].Titulo.Should().Be("Bleach");
+        asc[2].Titulo.Should().Be("Zom 100");
+    }
+
+    [Fact]
+    public async Task AplicarOrdenacion_PorTotalEpisodios_DeberiaOrdenarCorrectamente()
+    {
+        // Arrange
+        var animes = new List<AnimeItem>
+        {
+            new() { AniListId = 1, Titulo = "Película", TotalEpisodios = 1 },
+            new() { AniListId = 2, Titulo = "Serie Larga", TotalEpisodios = 100 },
+            new() { AniListId = 3, Titulo = "Serie Media", TotalEpisodios = 24 }
+        };
+
+        var sut = CreateSut(animes);
+        await Task.Delay(100);
+
+        // Act: Más Episodios
+        sut.CriterioOrdenSeleccionado = "Más Episodios";
+        var ordenados = sut.BibliotecaFiltrada!.Cast<AnimeItem>().ToList();
+        ordenados[0].Titulo.Should().Be("Serie Larga");
+        ordenados[1].Titulo.Should().Be("Serie Media");
+        ordenados[2].Titulo.Should().Be("Película");
+    }
+
+    [Fact]
+    public async Task LimpiarFiltros_DeberiaRestablecerTodosLosFiltrosYOrden()
+    {
+        // Arrange
+        var animes = new List<AnimeItem>
+        {
+            new() { AniListId = 1, Titulo = "Frieren", Generos = "Aventura" },
+            new() { AniListId = 2, Titulo = "Bleach", Generos = "Acción" }
+        };
+
+        var sut = CreateSut(animes);
+        await Task.Delay(100);
+
+        sut.TextoBusqueda = "Frieren";
+        sut.FiltroEstado = "Viendo";
+        sut.GeneroSeleccionado = "Aventura";
+        sut.SoloConEpisodiosPendientes = true;
+        sut.SoloConCarpetaLocal = true;
+        sut.CriterioOrdenSeleccionado = "Título (Z - A)";
+
+        sut.HayFiltrosActivos.Should().BeTrue();
+
+        // Act
+        sut.LimpiarFiltrosCommand.Execute(null);
+
+        // Assert
+        sut.TextoBusqueda.Should().BeEmpty();
+        sut.FiltroEstado.Should().Be("Todos");
+        sut.GeneroSeleccionado.Should().Be("Todos los géneros");
+        sut.SoloConEpisodiosPendientes.Should().BeFalse();
+        sut.SoloConCarpetaLocal.Should().BeFalse();
+        sut.CriterioOrdenSeleccionado.Should().Be("Título (A - Z)");
+        sut.HayFiltrosActivos.Should().BeFalse();
+        sut.CantidadFiltrosAvanzadosActivos.Should().Be(0);
+        sut.TieneFiltrosAvanzadosActivos.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task CantidadFiltrosAvanzadosActivos_DeberiaContarFiltrosCorrectamente()
+    {
+        // Arrange
+        var animes = new List<AnimeItem>
+        {
+            new() { AniListId = 1, Titulo = "Frieren", Generos = "Aventura" }
+        };
+
+        var sut = CreateSut(animes);
+        await Task.Delay(100);
+
+        sut.CantidadFiltrosAvanzadosActivos.Should().Be(0);
+        sut.TieneFiltrosAvanzadosActivos.Should().BeFalse();
+
+        // Act & Assert progresivo
+        sut.GeneroSeleccionado = "Aventura";
+        sut.CantidadFiltrosAvanzadosActivos.Should().Be(1);
+        sut.TieneFiltrosAvanzadosActivos.Should().BeTrue();
+
+        sut.SoloConEpisodiosPendientes = true;
+        sut.CantidadFiltrosAvanzadosActivos.Should().Be(2);
+
+        sut.CriterioOrdenSeleccionado = "Más Recientes";
+        sut.CantidadFiltrosAvanzadosActivos.Should().Be(3);
+
+        sut.SoloConCarpetaLocal = true;
+        sut.CantidadFiltrosAvanzadosActivos.Should().Be(4);
+
+        // Toggle panel
+        sut.PanelFiltrosVisible.Should().BeFalse();
+        sut.TogglePanelFiltrosCommand.Execute(null);
+        sut.PanelFiltrosVisible.Should().BeTrue();
     }
 
     public class Recipient : IRecipient<NavegarMensaje_Reproductor>

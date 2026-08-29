@@ -260,9 +260,8 @@
                         <!-- FILTROS Y ORDENACIÓN -->
                         <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                             <ComboBox ItemsSource="{Binding OpcionesFiltro}" SelectedItem="{Binding FiltroEpisodios}" 
-                                      Width="120" materialDesign:TextFieldAssist.HasClearButton="False" 
-                                      Foreground="White"
-                                      Style="{StaticResource MaterialDesignOutlinedComboBox}" Padding="8,5" Margin="0,0,8,0"/>
+                                      Height="34" Margin="0,0,8,0"
+                                      VerticalAlignment="Center"/>
                                       
                             <ToggleButton IsChecked="{Binding OrdenAscendente}" Style="{StaticResource MaterialDesignActionToggleButton}"
                                           Content="{materialDesign:PackIcon Kind=SortDescending, Size=18}"
@@ -653,10 +652,7 @@
                             <TextBlock Text="Estado" FontSize="11" FontWeight="SemiBold" Foreground="#9CA3AF" Margin="0,0,0,5"/>
                             <ComboBox ItemsSource="{Binding OpcionesEstadoVisual}" 
                                       SelectedItem="{Binding EditEstadoVisual}"
-                                      Style="{StaticResource MaterialDesignOutlinedComboBox}"
-                                      materialDesign:TextFieldAssist.UnderlineBrush="#3B82F6"
-                                      VerticalContentAlignment="Center"
-                                      Foreground="White" Background="#14181E" BorderBrush="#2D3748"/>
+                                      Height="38"/>
                         </StackPanel>
 
                         <!-- EPISODIOS VISTOS (VALIDADO) -->

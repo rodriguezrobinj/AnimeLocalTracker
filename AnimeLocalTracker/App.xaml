@@ -14,6 +14,9 @@
                 
                 <!-- Barra de Desplazamiento Ultra-Fina Personalizada (Sobrescribe MaterialDesign) -->
                 <ResourceDictionary Source="/Themes/MinimalScrollBar.xaml" />
+
+                <!-- Estilo Global de ComboBox Moderno y Glassmorphic -->
+                <ResourceDictionary Source="/Themes/CustomComboBox.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
             <!-- Estilo Shimmer Global para imágenes cargando -->

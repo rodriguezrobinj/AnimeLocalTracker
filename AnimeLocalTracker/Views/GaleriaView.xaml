@@ -36,14 +36,15 @@
             </StackPanel>
             
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                <!-- Botón Qué Veo Hoy -->
                 <Button Command="{Binding ElegirQueVerHoyCommand}"
-                        Style="{StaticResource AppOutlinedButton}" Margin="0,0,15,0"
+                        Style="{StaticResource AppOutlinedButton}" Margin="0,0,10,0" Height="40" Padding="14,0"
                         ToolTip="Elegir el siguiente episodio no visto de un anime al azar">
                     <Grid>
                         <!-- Estado Normal -->
                         <StackPanel Orientation="Horizontal" Visibility="{Binding EstaBuscandoQueVer, Converter={StaticResource InverseBoolToVis}}">
                             <materialDesign:PackIcon Kind="DiceMultiple" Margin="0,0,8,0" VerticalAlignment="Center" Width="18" Height="18"/>
-                            <TextBlock Text="QUÉ VEO HOY" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                            <TextBlock Text="QUÉ VEO HOY" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="12.5"/>
                         </StackPanel>
 
                         <!-- Estado Buscando / Cargando -->
@@ -51,42 +52,47 @@
                             <ProgressBar Style="{StaticResource MaterialDesignCircularProgressBar}"
                                          Width="16" Height="16" Margin="0,0,8,0" IsIndeterminate="True" Value="0"
                                          Foreground="{DynamicResource Brush.Accent}"/>
-                            <TextBlock Text="BUSCANDO..." VerticalAlignment="Center" FontWeight="SemiBold"
+                            <TextBlock Text="BUSCANDO..." VerticalAlignment="Center" FontWeight="SemiBold" FontSize="12.5"
                                        Foreground="{DynamicResource Brush.Accent}"/>
                         </StackPanel>
                     </Grid>
                 </Button>
 
-                <Button Command="{Binding AñadirAnimeManualCommand}"
-                        Style="{StaticResource AppOutlinedButton}" Margin="0,0,15,0" ToolTip="Buscar y añadir un nuevo anime">
-                    <StackPanel Orientation="Horizontal">
-                        <materialDesign:PackIcon Kind="MagnifyPlus" Margin="0,0,8,0" VerticalAlignment="Center" Width="18" Height="18"/>
-                        <TextBlock Text="BUSCAR ANIME" VerticalAlignment="Center" FontWeight="SemiBold"/>
-                    </StackPanel>
-                </Button>
-
-                <Button Command="{Binding ConectarAniListCommand}"
-                        Style="{StaticResource AppPrimaryButton}"
-                        Visibility="{Binding EstaConectado, Converter={StaticResource InverseBoolToVis}}"
-                        Margin="0,0,15,0" ToolTip="Conectar con AniList">
-                    <StackPanel Orientation="Horizontal">
-                        <materialDesign:PackIcon Kind="CloudUpload" Margin="0,0,8,0" VerticalAlignment="Center" Width="18" Height="18"/>
-                        <TextBlock Text="CONECTAR" VerticalAlignment="Center" FontWeight="SemiBold"/>
-                    </StackPanel>
-                </Button>
-                
+                <!-- Botón Selección Múltiple -->
                 <ToggleButton Command="{Binding ToggleModoSeleccionCommand}" 
                               IsChecked="{Binding ModoSeleccion, Mode=OneWay}"
                               Style="{StaticResource MaterialDesignActionToggleButton}"
-                              Background="#2A2A2A" BorderThickness="0" Margin="0,0,15,0"
+                              Background="{DynamicResource Brush.Surface1}" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1"
+                              Margin="0,0,10,0"
                               ToolTip="Selección múltiple" Width="40" Height="40">
                     <materialDesign:ToggleButtonAssist.OnContent>
-                        <materialDesign:PackIcon Kind="Close" Width="20" Height="20" Foreground="White"/>
+                        <materialDesign:PackIcon Kind="Close" Width="18" Height="18" Foreground="White"/>
                     </materialDesign:ToggleButtonAssist.OnContent>
-                    <materialDesign:PackIcon Kind="CheckAll" Width="20" Height="20" Foreground="{DynamicResource MaterialDesignBody}"/>
+                    <materialDesign:PackIcon Kind="CheckAll" Width="18" Height="18" Foreground="{DynamicResource Brush.TextSecondary}"/>
                 </ToggleButton>
 
-                <Grid Margin="0,0,15,0" Visibility="{Binding EstaConectado, Converter={StaticResource BoolToVis}}" VerticalAlignment="Top">
+                <!-- Botón Sincronizar -->
+                <Button Command="{Binding ActualizarBibliotecaCommand}"
+                        Style="{StaticResource MaterialDesignFloatingActionMiniLightButton}"
+                        Background="{DynamicResource Brush.Surface1}" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1"
+                        Width="40" Height="40" Padding="0" Margin="0,0,10,0"
+                        ToolTip="Actualizar datos desde la nube">
+                    <materialDesign:PackIcon Kind="Sync" Width="18" Height="18" Foreground="{DynamicResource Brush.Success}"/>
+                </Button>
+
+                <!-- Botón Conectar (si no está autenticado) -->
+                <Button Command="{Binding ConectarAniListCommand}"
+                        Style="{StaticResource AppPrimaryButton}" Height="40" Padding="14,0"
+                        Visibility="{Binding EstaConectado, Converter={StaticResource InverseBoolToVis}}"
+                        ToolTip="Conectar con AniList">
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon Kind="CloudUpload" Margin="0,0,8,0" VerticalAlignment="Center" Width="18" Height="18"/>
+                        <TextBlock Text="CONECTAR" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="12.5"/>
+                    </StackPanel>
+                </Button>
+
+                <!-- Menú Usuario (si está autenticado) -->
+                <Grid Margin="0,0,0,0" Visibility="{Binding EstaConectado, Converter={StaticResource BoolToVis}}" VerticalAlignment="Top">
                     <!-- Idle state background -->
                     <Border Background="#1AFFFFFF" CornerRadius="20" Height="40" VerticalAlignment="Top" IsHitTestVisible="False"/>
 
@@ -221,76 +227,208 @@
                         </StackPanel>
                     </Button>
                 </Grid>
-                
-                <Button Command="{Binding ActualizarBibliotecaCommand}"
-                        Style="{StaticResource AppPrimaryButton}"
-                        Background="{DynamicResource Brush.Success}" BorderBrush="{DynamicResource Brush.Success}"
-                        ToolTip="Actualizar datos desde la nube">
-                    <StackPanel Orientation="Horizontal">
-                        <materialDesign:PackIcon Kind="Sync" Margin="0,0,8,0" VerticalAlignment="Center" Width="18" Height="18"/>
-                        <TextBlock Text="SINCRONIZAR" VerticalAlignment="Center" FontWeight="SemiBold"/>
-                    </StackPanel>
-                </Button>
             </StackPanel>
         </Grid>
 
         <!-- BARRA DE BÚSQUEDA Y FILTROS -->
         <Grid Grid.Row="1" Margin="0,0,0,20" Visibility="{Binding BibliotecaVacia, Converter={StaticResource InverseBoolToVis}}">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
 
-            <!-- Buscador Local -->
-            <Border Grid.Column="0" Background="{DynamicResource Brush.Surface1}" BorderBrush="{DynamicResource Brush.BorderStrong}" BorderThickness="1"
-                    CornerRadius="12" Height="46" VerticalAlignment="Center" Padding="15,0,5,0" Margin="0,0,20,0"
-                    HorizontalAlignment="Left" Width="350" ClipToBounds="True">
+            <!-- Fila Principal (Limpia y Compacta en 1 Sola Línea) -->
+            <Grid Grid.Row="0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Buscador Local -->
+                <Border Grid.Column="0" Background="{DynamicResource Brush.Surface1}" BorderBrush="{DynamicResource Brush.BorderStrong}" BorderThickness="1"
+                        CornerRadius="12" Height="44" VerticalAlignment="Center" Padding="14,0,5,0" Margin="0,0,10,0"
+                        HorizontalAlignment="Left" Width="330" ClipToBounds="True">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <materialDesign:PackIcon Kind="Magnify" Width="20" Height="20" Foreground="{DynamicResource Brush.TextSecondary}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        
+                        <TextBox Grid.Column="1" 
+                                 Text="{Binding TextoBusqueda, UpdateSourceTrigger=PropertyChanged}"
+                                 materialDesign:HintAssist.Hint="Buscar anime guardado..."
+                                 materialDesign:HintAssist.IsFloating="False"
+                                 materialDesign:TextFieldAssist.DecorationVisibility="Hidden"
+                                 materialDesign:TextFieldAssist.HasClearButton="True"
+                                 BorderThickness="0"
+                                 Background="Transparent"
+                                 VerticalAlignment="Center"
+                                 FontSize="13.5"
+                                 Foreground="White"
+                                 Margin="0,0,10,0"/>
+                    </Grid>
+                </Border>
+
+                <!-- Botón Desplegable de Filtros y Ordenación -->
+                <ToggleButton Grid.Column="1" IsChecked="{Binding PanelFiltrosVisible}"
+                              Height="44" Padding="14,0" Cursor="Hand" VerticalAlignment="Center"
+                              ToolTip="Filtros por género, ordenación y más">
+                    <ToggleButton.Style>
+                        <Style TargetType="ToggleButton" BasedOn="{StaticResource MaterialDesignOutlinedButton}">
+                            <Setter Property="BorderBrush" Value="{DynamicResource Brush.BorderStrong}"/>
+                            <Setter Property="Background" Value="{DynamicResource Brush.Surface1}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource Brush.TextSecondary}"/>
+                            <Style.Triggers>
+                                <Trigger Property="IsChecked" Value="True">
+                                    <Setter Property="BorderBrush" Value="{DynamicResource Brush.AccentStrong}"/>
+                                    <Setter Property="Background" Value="{DynamicResource Brush.Surface3}"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}"/>
+                                </Trigger>
+                                <DataTrigger Binding="{Binding TieneFiltrosAvanzadosActivos}" Value="True">
+                                    <Setter Property="BorderBrush" Value="{DynamicResource Brush.AccentStrong}"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ToggleButton.Style>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <materialDesign:PackIcon Kind="TuneVariant" Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="Filtros" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        
+                        <!-- Badge de conteo de filtros activos -->
+                        <Border Background="{DynamicResource Brush.AccentStrong}" CornerRadius="9" Height="18" MinWidth="18" Padding="5,0" Margin="8,0,0,0"
+                                VerticalAlignment="Center" Visibility="{Binding TieneFiltrosAvanzadosActivos, Converter={StaticResource BoolToVis}}">
+                            <TextBlock Text="{Binding CantidadFiltrosAvanzadosActivos}" FontSize="10.5" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </StackPanel>
+                </ToggleButton>
+
+                <!-- Chips de Estado a la derecha -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <RadioButton Content="Todos" Margin="0,0,6,0" IsChecked="{Binding EsFiltroTodos, Mode=OneWay}" GroupName="FiltroEstado"
+                                 Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="Todos"
+                                 Style="{StaticResource MaterialDesignTabRadioButton}" 
+                                 Height="34" Padding="14,0" FontSize="13" FontWeight="SemiBold"/>
+                    
+                    <RadioButton Content="Viendo" Margin="0,0,6,0" IsChecked="{Binding EsFiltroViendo, Mode=OneWay}" GroupName="FiltroEstado"
+                                 Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="Viendo"
+                                 Style="{StaticResource MaterialDesignTabRadioButton}" 
+                                 Height="34" Padding="14,0" FontSize="13" FontWeight="SemiBold"/>
+                                 
+                    <RadioButton Content="Completados" Margin="0,0,6,0" IsChecked="{Binding EsFiltroCompletados, Mode=OneWay}" GroupName="FiltroEstado"
+                                 Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="Completados"
+                                 Style="{StaticResource MaterialDesignTabRadioButton}" 
+                                 Height="34" Padding="14,0" FontSize="13" FontWeight="SemiBold"/>
+                                 
+                    <RadioButton Content="Planeando" Margin="0,0,0,0" IsChecked="{Binding EsFiltroPlaneando, Mode=OneWay}" GroupName="FiltroEstado"
+                                 Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="Planeando"
+                                 Style="{StaticResource MaterialDesignTabRadioButton}" 
+                                 Height="34" Padding="14,0" FontSize="13" FontWeight="SemiBold"/>
+                </StackPanel>
+            </Grid>
+
+            <!-- Panel Expansible de Filtros Avanzados (Desplegable) -->
+            <Border Grid.Row="1" Margin="0,12,0,0" Padding="16,10" 
+                    Background="{DynamicResource Brush.Surface1}" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1"
+                    CornerRadius="14" Visibility="{Binding PanelFiltrosVisible, Converter={StaticResource BoolToVis}}">
                 <Grid>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
-                    <materialDesign:PackIcon Kind="Magnify" Width="22" Height="22" Foreground="{DynamicResource Brush.TextSecondary}" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                    
-                    <TextBox Grid.Column="1" 
-                             Text="{Binding TextoBusqueda, UpdateSourceTrigger=PropertyChanged}"
-                             materialDesign:HintAssist.Hint="Buscar anime guardado..."
-                             materialDesign:HintAssist.IsFloating="False"
-                             materialDesign:TextFieldAssist.DecorationVisibility="Hidden"
-                             materialDesign:TextFieldAssist.HasClearButton="True"
-                             BorderThickness="0"
-                             Background="Transparent"
-                             VerticalAlignment="Center"
-                             FontSize="15"
-                             Foreground="White"
-                             Margin="0,0,10,0">
-                    </TextBox>
+                    <!-- Izquierda: Selectores y Toggles -->
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                        <!-- Selector de Género -->
+                        <ComboBox ItemsSource="{Binding GenerosDisponibles}" 
+                                  SelectedItem="{Binding GeneroSeleccionado}"
+                                  Height="36" Margin="0,0,10,0"
+                                  VerticalAlignment="Center"/>
+
+                        <!-- Selector de Ordenación -->
+                        <ComboBox ItemsSource="{Binding ListaOpcionesOrdenacion}" 
+                                  SelectedItem="{Binding CriterioOrdenSeleccionado}"
+                                  Height="36" Margin="0,0,12,0"
+                                  VerticalAlignment="Center"/>
+
+                        <!-- Toggle: Solo con episodios pendientes -->
+                        <ToggleButton IsChecked="{Binding SoloConEpisodiosPendientes}"
+                                      Height="36" Margin="0,0,8,0" Padding="12,0"
+                                      ToolTip="Mostrar solo animes con episodios pendientes por ver"
+                                      Cursor="Hand">
+                            <ToggleButton.Style>
+                                <Style TargetType="ToggleButton" BasedOn="{StaticResource MaterialDesignOutlinedButton}">
+                                    <Setter Property="Foreground" Value="{DynamicResource Brush.TextSecondary}"/>
+                                    <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}"/>
+                                    <Setter Property="Background" Value="Transparent"/>
+                                    <Style.Triggers>
+                                        <Trigger Property="IsChecked" Value="True">
+                                            <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}"/>
+                                            <Setter Property="BorderBrush" Value="{DynamicResource Brush.AccentStrong}"/>
+                                            <Setter Property="Background" Value="{DynamicResource Brush.Surface3}"/>
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ToggleButton.Style>
+                            <StackPanel Orientation="Horizontal">
+                                <materialDesign:PackIcon Kind="ClockAlertOutline" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="Pendientes" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </ToggleButton>
+
+                        <!-- Toggle: Solo con carpeta local asociada -->
+                        <ToggleButton IsChecked="{Binding SoloConCarpetaLocal}"
+                                      Height="36" Margin="0,0,8,0" Padding="12,0"
+                                      ToolTip="Mostrar solo animes que tienen una carpeta de archivos asignada"
+                                      Cursor="Hand">
+                            <ToggleButton.Style>
+                                <Style TargetType="ToggleButton" BasedOn="{StaticResource MaterialDesignOutlinedButton}">
+                                    <Setter Property="Foreground" Value="{DynamicResource Brush.TextSecondary}"/>
+                                    <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}"/>
+                                    <Setter Property="Background" Value="Transparent"/>
+                                    <Style.Triggers>
+                                        <Trigger Property="IsChecked" Value="True">
+                                            <Setter Property="Foreground" Value="{DynamicResource Brush.Success}"/>
+                                            <Setter Property="BorderBrush" Value="{DynamicResource Brush.Success}"/>
+                                            <Setter Property="Background" Value="{DynamicResource Brush.Surface3}"/>
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ToggleButton.Style>
+                            <StackPanel Orientation="Horizontal">
+                                <materialDesign:PackIcon Kind="FolderCheckOutline" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="Con carpeta local" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </ToggleButton>
+                    </StackPanel>
+
+                    <!-- Derecha: Limpiar y Conteo -->
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <!-- Botón Limpiar Filtros -->
+                        <Button Command="{Binding LimpiarFiltrosCommand}"
+                                Visibility="{Binding HayFiltrosActivos, Converter={StaticResource BoolToVis}}"
+                                Style="{StaticResource MaterialDesignFlatButton}"
+                                Foreground="{DynamicResource Brush.Rose}"
+                                Height="36" Padding="10,0" Margin="0,0,10,0"
+                                ToolTip="Restablecer todos los filtros y búsqueda">
+                            <StackPanel Orientation="Horizontal">
+                                <materialDesign:PackIcon Kind="FilterRemoveOutline" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="Limpiar filtros" FontSize="12" FontWeight="Bold" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+
+                        <!-- Badge Conteo Filtrados -->
+                        <Border Background="{DynamicResource Brush.Surface2}" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1"
+                                CornerRadius="8" Height="36" Padding="12,0" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding ConteoFiltradosTexto}" Style="{StaticResource AppText.Caption}"
+                                       FontWeight="SemiBold" Foreground="{DynamicResource Brush.TextSecondary}" VerticalAlignment="Center"/>
+                        </Border>
+                    </StackPanel>
                 </Grid>
             </Border>
-
-            <!-- Chips de Estado -->
-            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                <RadioButton Content="Todos" Margin="0,0,10,0" IsChecked="{Binding EsFiltroTodos, Mode=OneWay}" GroupName="FiltroEstado"
-                             Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="Todos"
-                             Style="{StaticResource MaterialDesignTabRadioButton}" 
-                             Height="32" Padding="16,0" FontSize="13" FontWeight="SemiBold"/>
-                
-                <RadioButton Content="Viendo" Margin="0,0,10,0" IsChecked="{Binding EsFiltroViendo, Mode=OneWay}" GroupName="FiltroEstado"
-                             Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="Viendo"
-                             Style="{StaticResource MaterialDesignTabRadioButton}" 
-                             Height="32" Padding="16,0" FontSize="13" FontWeight="SemiBold"/>
-                             
-                <RadioButton Content="Completados" Margin="0,0,10,0" IsChecked="{Binding EsFiltroCompletados, Mode=OneWay}" GroupName="FiltroEstado"
-                             Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="Completados"
-                             Style="{StaticResource MaterialDesignTabRadioButton}" 
-                             Height="32" Padding="16,0" FontSize="13" FontWeight="SemiBold"/>
-                             
-                <RadioButton Content="Planeando" Margin="0,0,0,0" IsChecked="{Binding EsFiltroPlaneando, Mode=OneWay}" GroupName="FiltroEstado"
-                             Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="Planeando"
-                             Style="{StaticResource MaterialDesignTabRadioButton}" 
-                             Height="32" Padding="16,0" FontSize="13" FontWeight="SemiBold"/>
-            </StackPanel>
         </Grid>
 
         <!-- Panel de progreso FLOTANTE -->

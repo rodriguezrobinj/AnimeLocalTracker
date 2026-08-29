@@ -39,12 +39,15 @@ public partial class GaleriaViewModel : ObservableObject,
     [NotifyPropertyChangedFor(nameof(SinResultados))]
     [NotifyPropertyChangedFor(nameof(TotalAnimesBiblioteca))]
     [NotifyPropertyChangedFor(nameof(SePuedeAyudarAverQueVer))]
+    [NotifyPropertyChangedFor(nameof(ConteoFiltradosTexto))]
     [NotifyCanExecuteChangedFor(nameof(ElegirQueVerHoyCommand))]
     private ObservableCollection<AnimeItem> _bibliotecaLocales = [];
     
     public ICollectionView? BibliotecaFiltrada { get; private set; }
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HayFiltrosActivos))]
+    [NotifyPropertyChangedFor(nameof(ConteoFiltradosTexto))]
     private string _textoBusqueda = string.Empty;
 
     [ObservableProperty]
@@ -52,6 +55,8 @@ public partial class GaleriaViewModel : ObservableObject,
     [NotifyPropertyChangedFor(nameof(EsFiltroViendo))]
     [NotifyPropertyChangedFor(nameof(EsFiltroCompletados))]
     [NotifyPropertyChangedFor(nameof(EsFiltroPlaneando))]
+    [NotifyPropertyChangedFor(nameof(HayFiltrosActivos))]
+    [NotifyPropertyChangedFor(nameof(ConteoFiltradosTexto))]
     private string _filtroEstado = "Todos"; // Todos, Viendo, Completados, Planeando
 
     public bool EsFiltroTodos => FiltroEstado == "Todos";
@@ -59,20 +64,162 @@ public partial class GaleriaViewModel : ObservableObject,
     public bool EsFiltroCompletados => FiltroEstado == "Completados";
     public bool EsFiltroPlaneando => FiltroEstado == "Planeando";
 
+    // --- FILTROS AVANZADOS Y ORDENACIÓN ---
+    [ObservableProperty]
+    private ObservableCollection<string> _generosDisponibles = ["Todos los géneros"];
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HayFiltrosActivos))]
+    [NotifyPropertyChangedFor(nameof(ConteoFiltradosTexto))]
+    [NotifyPropertyChangedFor(nameof(CantidadFiltrosAvanzadosActivos))]
+    [NotifyPropertyChangedFor(nameof(TieneFiltrosAvanzadosActivos))]
+    private string _generoSeleccionado = "Todos los géneros";
+
+    public static readonly string[] OpcionesOrdenacion =
+    [
+        "Título (A - Z)",
+        "Título (Z - A)",
+        "Mayor Progreso",
+        "Menor Progreso",
+        "Más Episodios",
+        "Menos Episodios",
+        "Más Recientes"
+    ];
+
+    public string[] ListaOpcionesOrdenacion => OpcionesOrdenacion;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CantidadFiltrosAvanzadosActivos))]
+    [NotifyPropertyChangedFor(nameof(TieneFiltrosAvanzadosActivos))]
+    private string _criterioOrdenSeleccionado = "Título (A - Z)";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HayFiltrosActivos))]
+    [NotifyPropertyChangedFor(nameof(ConteoFiltradosTexto))]
+    [NotifyPropertyChangedFor(nameof(CantidadFiltrosAvanzadosActivos))]
+    [NotifyPropertyChangedFor(nameof(TieneFiltrosAvanzadosActivos))]
+    private bool _soloConEpisodiosPendientes;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HayFiltrosActivos))]
+    [NotifyPropertyChangedFor(nameof(ConteoFiltradosTexto))]
+    [NotifyPropertyChangedFor(nameof(CantidadFiltrosAvanzadosActivos))]
+    [NotifyPropertyChangedFor(nameof(TieneFiltrosAvanzadosActivos))]
+    private bool _soloConCarpetaLocal;
+
+    [ObservableProperty]
+    private bool _panelFiltrosVisible = false;
+
+    public bool HayFiltrosActivos =>
+        !string.IsNullOrWhiteSpace(TextoBusqueda) ||
+        FiltroEstado != "Todos" ||
+        (GeneroSeleccionado != "Todos los géneros" && GeneroSeleccionado != "Todos") ||
+        SoloConEpisodiosPendientes ||
+        SoloConCarpetaLocal;
+
+    public int CantidadFiltrosAvanzadosActivos
+    {
+        get
+        {
+            int count = 0;
+            if (!string.IsNullOrWhiteSpace(GeneroSeleccionado) && GeneroSeleccionado != "Todos los géneros" && GeneroSeleccionado != "Todos")
+                count++;
+            if (CriterioOrdenSeleccionado != "Título (A - Z)")
+                count++;
+            if (SoloConEpisodiosPendientes)
+                count++;
+            if (SoloConCarpetaLocal)
+                count++;
+            return count;
+        }
+    }
+
+    public bool TieneFiltrosAvanzadosActivos => CantidadFiltrosAvanzadosActivos > 0;
+
+    public string ConteoFiltradosTexto
+    {
+        get
+        {
+            int total = BibliotecaLocales.Count;
+            if (total == 0) return "0 animes";
+
+            if (BibliotecaFiltrada == null || !HayFiltrosActivos)
+            {
+                return total == 1 ? "1 anime" : $"{total} animes";
+            }
+
+            int visibles = BibliotecaFiltrada.Cast<object>().Count();
+            return $"Mostrando {visibles} de {total} animes";
+        }
+    }
+
     public double UltimoScrollOffset { get; set; } = 0;
 
     partial void OnTextoBusquedaChanged(string value)
     {
         BibliotecaFiltrada?.Refresh();
         OnPropertyChanged(nameof(SinResultados));
+        OnPropertyChanged(nameof(ConteoFiltradosTexto));
     }
-    
+
+    partial void OnGeneroSeleccionadoChanged(string value)
+    {
+        BibliotecaFiltrada?.Refresh();
+        OnPropertyChanged(nameof(SinResultados));
+        OnPropertyChanged(nameof(ConteoFiltradosTexto));
+    }
+
+    partial void OnCriterioOrdenSeleccionadoChanged(string value)
+    {
+        AplicarOrdenacion(value);
+    }
+
+    partial void OnSoloConEpisodiosPendientesChanged(bool value)
+    {
+        BibliotecaFiltrada?.Refresh();
+        OnPropertyChanged(nameof(SinResultados));
+        OnPropertyChanged(nameof(ConteoFiltradosTexto));
+    }
+
+    partial void OnSoloConCarpetaLocalChanged(bool value)
+    {
+        BibliotecaFiltrada?.Refresh();
+        OnPropertyChanged(nameof(SinResultados));
+        OnPropertyChanged(nameof(ConteoFiltradosTexto));
+    }
+
     [RelayCommand]
     private void CambiarFiltroEstado(string nuevoFiltro)
     {
         FiltroEstado = nuevoFiltro;
         BibliotecaFiltrada?.Refresh();
         OnPropertyChanged(nameof(SinResultados));
+        OnPropertyChanged(nameof(ConteoFiltradosTexto));
+    }
+
+    [RelayCommand]
+    private void TogglePanelFiltros()
+    {
+        PanelFiltrosVisible = !PanelFiltrosVisible;
+    }
+
+    [RelayCommand]
+    public void LimpiarFiltros()
+    {
+        TextoBusqueda = string.Empty;
+        FiltroEstado = "Todos";
+        GeneroSeleccionado = "Todos los géneros";
+        SoloConEpisodiosPendientes = false;
+        SoloConCarpetaLocal = false;
+        CriterioOrdenSeleccionado = "Título (A - Z)";
+
+        BibliotecaFiltrada?.Refresh();
+        AplicarOrdenacion("Título (A - Z)");
+        OnPropertyChanged(nameof(SinResultados));
+        OnPropertyChanged(nameof(HayFiltrosActivos));
+        OnPropertyChanged(nameof(ConteoFiltradosTexto));
+        OnPropertyChanged(nameof(CantidadFiltrosAvanzadosActivos));
+        OnPropertyChanged(nameof(TieneFiltrosAvanzadosActivos));
     }
     
     [ObservableProperty] private bool _estaConectado;
@@ -134,8 +281,10 @@ public partial class GaleriaViewModel : ObservableObject,
             {
                 message.NuevoAnime.PortadaImagen = _imageCacheService.ObtenerPortada(message.NuevoAnime.AniListId, message.NuevoAnime.UrlPortada);
                 BibliotecaLocales.Add(message.NuevoAnime);
+                ActualizarGenerosDisponibles();
                 OnPropertyChanged(nameof(BibliotecaVacia));
                 OnPropertyChanged(nameof(TotalAnimesBiblioteca));
+                OnPropertyChanged(nameof(ConteoFiltradosTexto));
 
                 if (message.NuevoAnime.PortadaImagen == null && !string.IsNullOrWhiteSpace(message.NuevoAnime.UrlPortada))
                 {
@@ -241,16 +390,17 @@ public partial class GaleriaViewModel : ObservableObject,
             }
 
             BibliotecaLocales = new ObservableCollection<AnimeItem>(animes);
+            ActualizarGenerosDisponibles();
 
             BibliotecaFiltrada = CollectionViewSource.GetDefaultView(BibliotecaLocales);
             BibliotecaFiltrada.Filter = FiltrarAnime;
 
-            // Ordenar alfabéticamente por defecto
-            BibliotecaFiltrada.SortDescriptions.Clear();
-            BibliotecaFiltrada.SortDescriptions.Add(new SortDescription("Titulo", ListSortDirection.Ascending));
+            AplicarOrdenacion(CriterioOrdenSeleccionado);
 
             OnPropertyChanged(nameof(BibliotecaFiltrada));
             OnPropertyChanged(nameof(SinResultados));
+            OnPropertyChanged(nameof(HayFiltrosActivos));
+            OnPropertyChanged(nameof(ConteoFiltradosTexto));
 
             _ = CargarPortadasFaltantesEnSegundoPlanoAsync(animes);
 
@@ -428,14 +578,85 @@ public partial class GaleriaViewModel : ObservableObject,
         }
     }
     
+    public void ActualizarGenerosDisponibles()
+    {
+        var generosUnicos = BibliotecaLocales
+            .SelectMany(a => a.GenerosLista)
+            .Where(g => !string.IsNullOrWhiteSpace(g))
+            .Select(g => g.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(g => g)
+            .ToList();
+
+        var nuevaLista = new List<string> { "Todos los géneros" };
+        nuevaLista.AddRange(generosUnicos);
+
+        string prevSeleccion = GeneroSeleccionado;
+        GenerosDisponibles = new ObservableCollection<string>(nuevaLista);
+
+        if (nuevaLista.Contains(prevSeleccion))
+        {
+            GeneroSeleccionado = prevSeleccion;
+        }
+        else
+        {
+            GeneroSeleccionado = "Todos los géneros";
+        }
+    }
+
+    public void AplicarOrdenacion(string? criterio = null)
+    {
+        if (BibliotecaFiltrada == null) return;
+        criterio ??= CriterioOrdenSeleccionado;
+
+        using (BibliotecaFiltrada.DeferRefresh())
+        {
+            BibliotecaFiltrada.SortDescriptions.Clear();
+            switch (criterio)
+            {
+                case "Título (A - Z)":
+                    BibliotecaFiltrada.SortDescriptions.Add(new SortDescription(nameof(AnimeItem.Titulo), ListSortDirection.Ascending));
+                    break;
+                case "Título (Z - A)":
+                    BibliotecaFiltrada.SortDescriptions.Add(new SortDescription(nameof(AnimeItem.Titulo), ListSortDirection.Descending));
+                    break;
+                case "Mayor Progreso":
+                    BibliotecaFiltrada.SortDescriptions.Add(new SortDescription(nameof(AnimeItem.ProgresoPorcentaje), ListSortDirection.Descending));
+                    BibliotecaFiltrada.SortDescriptions.Add(new SortDescription(nameof(AnimeItem.Titulo), ListSortDirection.Ascending));
+                    break;
+                case "Menor Progreso":
+                    BibliotecaFiltrada.SortDescriptions.Add(new SortDescription(nameof(AnimeItem.ProgresoPorcentaje), ListSortDirection.Ascending));
+                    BibliotecaFiltrada.SortDescriptions.Add(new SortDescription(nameof(AnimeItem.Titulo), ListSortDirection.Ascending));
+                    break;
+                case "Más Episodios":
+                    BibliotecaFiltrada.SortDescriptions.Add(new SortDescription(nameof(AnimeItem.TotalEpisodios), ListSortDirection.Descending));
+                    BibliotecaFiltrada.SortDescriptions.Add(new SortDescription(nameof(AnimeItem.Titulo), ListSortDirection.Ascending));
+                    break;
+                case "Menos Episodios":
+                    BibliotecaFiltrada.SortDescriptions.Add(new SortDescription(nameof(AnimeItem.TotalEpisodios), ListSortDirection.Ascending));
+                    BibliotecaFiltrada.SortDescriptions.Add(new SortDescription(nameof(AnimeItem.Titulo), ListSortDirection.Ascending));
+                    break;
+                case "Más Recientes":
+                    BibliotecaFiltrada.SortDescriptions.Add(new SortDescription(nameof(AnimeItem.AniListId), ListSortDirection.Descending));
+                    break;
+                default:
+                    BibliotecaFiltrada.SortDescriptions.Add(new SortDescription(nameof(AnimeItem.Titulo), ListSortDirection.Ascending));
+                    break;
+            }
+        }
+    }
+
     private bool FiltrarAnime(object obj)
     {
         if (obj is not AnimeItem anime) return false;
 
-        // 1. Filtro por texto
+        // 1. Filtro por texto (título o nombres alternativos)
         if (!string.IsNullOrWhiteSpace(TextoBusqueda))
         {
-            if (!anime.Titulo.Contains(TextoBusqueda, StringComparison.OrdinalIgnoreCase))
+            bool coincideTitulo = anime.Titulo.Contains(TextoBusqueda, StringComparison.OrdinalIgnoreCase);
+            bool coincideAlt = !string.IsNullOrWhiteSpace(anime.NombresAlternativos) && 
+                               anime.NombresAlternativos.Contains(TextoBusqueda, StringComparison.OrdinalIgnoreCase);
+            if (!coincideTitulo && !coincideAlt)
             {
                 return false;
             }
@@ -453,6 +674,36 @@ public partial class GaleriaViewModel : ObservableObject,
             };
             
             if (!string.IsNullOrEmpty(estadoEsperado) && anime.EstadoUsuario != estadoEsperado)
+            {
+                return false;
+            }
+        }
+
+        // 3. Filtro por género
+        if (!string.IsNullOrWhiteSpace(GeneroSeleccionado) && 
+            GeneroSeleccionado != "Todos los géneros" && 
+            GeneroSeleccionado != "Todos")
+        {
+            if (string.IsNullOrWhiteSpace(anime.Generos) || 
+                !anime.GenerosLista.Any(g => g.Equals(GeneroSeleccionado, StringComparison.OrdinalIgnoreCase)))
+            {
+                return false;
+            }
+        }
+
+        // 4. Filtro: solo con episodios pendientes
+        if (SoloConEpisodiosPendientes)
+        {
+            if (anime.TotalEpisodios > 0 && anime.EpisodiosVistos >= anime.TotalEpisodios)
+            {
+                return false;
+            }
+        }
+
+        // 5. Filtro: solo con carpeta local asociada
+        if (SoloConCarpetaLocal)
+        {
+            if (string.IsNullOrWhiteSpace(anime.RutaCarpeta))
             {
                 return false;
             }

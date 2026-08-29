@@ -113,7 +113,9 @@ public partial class AnimeItem : ObservableObject
     public bool TieneSinopsisLarga => !string.IsNullOrWhiteSpace(SinopsisLimpia) && (SinopsisLimpia.Length > 150 || SinopsisLimpia.Contains('\n'));
 
     [Ignore]
-    public string[] GenerosLista => string.IsNullOrWhiteSpace(Generos) ? [] : Generos.Split(", ");
+    public string[] GenerosLista => string.IsNullOrWhiteSpace(Generos) 
+        ? [] 
+        : Generos.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
     
     // === LÓGICA DE CACHÉ DE PORTADAS OFFLINE ===
     private string? _portadaCacheada;
