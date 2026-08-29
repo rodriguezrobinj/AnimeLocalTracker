@@ -18,12 +18,19 @@ public class DownloadService : IDownloadService
 {
     private const string UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
     private const int SegmentosParalelos = 6;
+    private const int LimiteDescargasPorDefecto = 3;
 
     private readonly HttpClient _httpClient;
     private readonly IDownloadStateStore _stateStore;
     private readonly IVideoSourceResolver _sourceResolver;
     private readonly ConcurrentDictionary<string, DownloadState> _activeDownloads = new();
-    private readonly SemaphoreSlim _downloadLock = new(1, 1);
+
+    // Gestor de slots de concurrencia (redimensionable en caliente según DescargasSimultaneas)
+    private readonly object _slotLock = new();
+    private Queue<TaskCompletionSource<bool>> _slotWaiters = new();
+    private int _slotsActivos;
+    private int _limiteDescargas = LimiteDescargasPorDefecto;
+
     private long _ordenCounter = 0;
 
     private class DownloadState
@@ -45,11 +52,120 @@ public class DownloadService : IDownloadService
     public DownloadService(
         IHttpClientFactory httpClientFactory,
         IDownloadStateStore? stateStore = null,
-        IVideoSourceResolver? sourceResolver = null)
+        IVideoSourceResolver? sourceResolver = null,
+        ISettingsService? settingsService = null)
     {
         _httpClient = httpClientFactory.CreateClient("Downloader");
         _stateStore = stateStore ?? new DownloadStateStore();
         _sourceResolver = sourceResolver ?? new AnimeAv1VideoSourceResolver(_httpClient);
+
+        if (settingsService != null)
+        {
+            var config = settingsService.ObtenerConfiguracion();
+            if (config != null && config.DescargasSimultaneas > 0)
+            {
+                ActualizarLimiteDescargas(config.DescargasSimultaneas);
+            }
+
+            settingsService.ConfiguracionModificada += configNueva =>
+            {
+                if (configNueva?.DescargasSimultaneas > 0)
+                {
+                    ActualizarLimiteDescargas(configNueva.DescargasSimultaneas);
+                }
+            };
+        }
+    }
+
+    /// <summary>
+    /// Ajusta el número máximo de descargas simultáneas. Redimensiona el gestor
+    /// de slots en caliente: las descargas activas no se interrumpen y los
+    /// pendientes en cola se liberan si el nuevo límite permite más concurrentes.
+    /// </summary>
+    public void ActualizarLimiteDescargas(int nuevoLimite)
+    {
+        int limite = Math.Max(1, nuevoLimite);
+
+        TaskCompletionSource<bool>[] liberar;
+        lock (_slotLock)
+        {
+            _limiteDescargas = limite;
+            liberar = DespacharSlotsPendientesLocked();
+        }
+
+        foreach (var tcs in liberar)
+        {
+            tcs.TrySetResult(true);
+        }
+    }
+
+    /// <summary>
+    /// Dentro del lock: concede slots a los waiters en orden FIFO mientras
+    /// haya huecos disponibles. Devuelve los TCS que deben completarse FUERA
+    /// del lock (para no ejecutar continuaciones bajo exclusión mutua).
+    /// </summary>
+    private TaskCompletionSource<bool>[] DespacharSlotsPendientesLocked()
+    {
+        var concedidos = new List<TaskCompletionSource<bool>>();
+        while (_slotWaiters.Count > 0 && _slotsActivos < _limiteDescargas)
+        {
+            var waiter = _slotWaiters.Dequeue();
+            _slotsActivos++;
+            concedidos.Add(waiter);
+        }
+        return concedidos.ToArray();
+    }
+
+    /// <summary>
+    /// Espera un slot de descarga (bloquea si ya hay el máximo simultáneo).
+    /// Respetuoso con la cancelación: si el token se cancela mientras espera,
+    /// el slot no se consume y el waiter se descarta de la cola.
+    /// </summary>
+    private async Task<bool> AdquirirSlotAsync(CancellationToken ct)
+    {
+        TaskCompletionSource<bool>? tcs = null;
+        lock (_slotLock)
+        {
+            if (_slotsActivos < _limiteDescargas)
+            {
+                _slotsActivos++;
+                return true;
+            }
+
+            tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            _slotWaiters.Enqueue(tcs);
+        }
+
+        using var reg = ct.Register(() => tcs.TrySetCanceled());
+        try
+        {
+            await tcs.Task;
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            // Si se canceló mientras esperaba, retirar de la cola para no perder un slot futuro
+            lock (_slotLock)
+            {
+                _slotWaiters = new Queue<TaskCompletionSource<bool>>(_slotWaiters.Where(w => !ReferenceEquals(w, tcs)));
+            }
+            throw;
+        }
+    }
+
+    private void LiberarSlot()
+    {
+        TaskCompletionSource<bool>[] liberar;
+        lock (_slotLock)
+        {
+            if (_slotsActivos > 0) _slotsActivos--;
+            liberar = DespacharSlotsPendientesLocked();
+        }
+
+        foreach (var tcs in liberar)
+        {
+            tcs.TrySetResult(true);
+        }
     }
 
     public bool EstaDescargando(int aniListId, int numeroEpisodio, out double progreso)
@@ -208,11 +324,11 @@ public class DownloadService : IDownloadService
 
         _ = Task.Run(async () =>
         {
-            bool acquired = false;
+            bool slotAdquirido = false;
             try
             {
-                await _downloadLock.WaitAsync(state.Cts.Token);
-                acquired = true;
+                await AdquirirSlotAsync(state.Cts.Token);
+                slotAdquirido = true;
 
                 if (state.Cts.IsCancellationRequested || state.IsPaused) return;
 
@@ -271,9 +387,9 @@ public class DownloadService : IDownloadService
             }
             finally
             {
-                if (acquired)
+                if (slotAdquirido)
                 {
-                    _downloadLock.Release();
+                    LiberarSlot();
                 }
             }
         });

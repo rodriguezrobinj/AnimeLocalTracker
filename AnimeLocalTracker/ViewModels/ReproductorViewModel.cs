@@ -304,12 +304,20 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
             var config = new Config();
             
-            // Seeking rápido por keyframe (no frame-accurate)
+            // 1. Seeking rápido instantáneo por Keyframe (no frame-accurate) -> 0 ms seek latency
             if (config.Player != null)
             {
                 config.Player.SeekAccurate = false;
             }
-            
+
+            // 2. Buffer de Demuxer en RAM (30 segundos precargados en memoria para reproducción sin tirones)
+            if (config.Demuxer != null)
+            {
+                // BufferDuration en ticks (1 tick = 100ns -> 30 segundos = 300,000,000 ticks)
+                config.Demuxer.BufferDuration = 300_000_000L;
+            }
+
+            // 3. Subtítulos
             if (config.Subtitles != null)
             {
                 config.Subtitles.Enabled = SubtitulosHabilitados;

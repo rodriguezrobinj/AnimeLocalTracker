@@ -19,4 +19,9 @@ public interface IDownloadService
     void ReanudarDescarga(int aniListId, int numeroEpisodio);
     void ReanudarTodas();
     IReadOnlyList<DescargaItem> ObtenerDescargasActivas();
+
+    /// <summary>
+    /// Ajusta en caliente el número máximo de descargas simultáneas.
+    /// </summary>
+    void ActualizarLimiteDescargas(int nuevoLimite);
 }
