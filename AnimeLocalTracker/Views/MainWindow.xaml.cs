@@ -27,20 +27,44 @@ public partial class MainWindow : Window
         };
     }
 
+    private readonly System.Collections.Generic.Dictionary<System.Type, System.Windows.Controls.UserControl> _viewCache = new();
+
     private void ActualizarVista(object? viewModel)
     {
-        ContenedorVistaPrincipal.Content = viewModel switch
+        if (viewModel == null)
         {
-            GaleriaViewModel vm => new GaleriaView { DataContext = vm },
-            DetalleViewModel vm => new DetalleView { DataContext = vm },
-            AgregarAnimeViewModel vm => new AgregarAnimeView { DataContext = vm },
-            CalendarioViewModel vm => new CalendarioView { DataContext = vm },
-            ReproductorViewModel vm => new ReproductorView { DataContext = vm },
-            DescargasViewModel vm => new DescargasView { DataContext = vm },
-            ConfiguracionViewModel vm => new ConfiguracionView { DataContext = vm },
-            AcercaDeViewModel vm => new AcercaDeView { DataContext = vm },
-            _ => null
-        };
+            ContenedorVistaPrincipal.Content = null;
+            return;
+        }
+
+        var vmType = viewModel.GetType();
+        if (!_viewCache.TryGetValue(vmType, out var view))
+        {
+            view = viewModel switch
+            {
+                GaleriaViewModel => new GaleriaView(),
+                DetalleViewModel => new DetalleView(),
+                AgregarAnimeViewModel => new AgregarAnimeView(),
+                CalendarioViewModel => new CalendarioView(),
+                ReproductorViewModel => new ReproductorView(),
+                DescargasViewModel => new DescargasView(),
+                ConfiguracionViewModel => new ConfiguracionView(),
+                AcercaDeViewModel => new AcercaDeView(),
+                _ => null
+            };
+
+            if (view != null)
+            {
+                _viewCache[vmType] = view;
+            }
+        }
+
+        if (view != null)
+        {
+            view.DataContext = viewModel;
+        }
+
+        ContenedorVistaPrincipal.Content = view;
     }
 
     // ═══════════════════════════════════════════════════════════════

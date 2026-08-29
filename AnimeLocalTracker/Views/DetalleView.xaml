@@ -231,7 +231,6 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
@@ -317,19 +316,32 @@
                                     Height="34" Padding="10,0" Margin="6,0,0,0"
                                     ToolTip="Detectar archivos duplicados por hash perceptual">
                                 <StackPanel Orientation="Horizontal">
-                                    <materialDesign:PackIcon Kind="ContentDuplicate" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                                    <TextBlock Text="Duplicados" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="11"/>
+                                    <materialDesign:PackIcon Kind="ContentDuplicate" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,5,0"
+                                                             Visibility="{Binding EstaAnalizandoDuplicados, Converter={StaticResource InverseBoolToVis}}"/>
+                                    <ProgressBar Style="{StaticResource MaterialDesignCircularProgressBar}"
+                                                 Width="13" Height="13" IsIndeterminate="True"
+                                                 Foreground="#FBBF24"
+                                                 VerticalAlignment="Center" Margin="0,0,6,0"
+                                                 Visibility="{Binding EstaAnalizandoDuplicados, Converter={StaticResource BoolToVis}}"/>
+                                    <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" FontSize="11">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Text" Value="Duplicados"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding EstaAnalizandoDuplicados}" Value="True">
+                                                        <Setter Property="Text" Value="Analizando..."/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
                                 </StackPanel>
                             </Button>
                         </StackPanel>
                     </Grid>
 
-                    <!-- ESTADO DEL ANÁLISIS DE DUPLICADOS -->
-                    <TextBlock Grid.Row="2" Text="{Binding EstadoDuplicados}" Foreground="#FBBF24" FontSize="11" FontWeight="Medium"
-                               Margin="0,0,0,10" HorizontalAlignment="Left"/>
-
                 <!-- LISTA DE EPISODIOS VIRTUALIZADA CON DISEÑO VERTICAL COMPLETO -->
-                <Grid Grid.Row="3">
+                <Grid Grid.Row="2">
                     <ListBox x:Name="ListaEpisodios" ItemsSource="{Binding EpisodiosDelAnime}" 
                              Background="Transparent" BorderThickness="0"
                              ScrollViewer.VerticalScrollBarVisibility="Auto" Padding="0,0,10,60"

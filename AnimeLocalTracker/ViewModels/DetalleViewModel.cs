@@ -396,25 +396,33 @@ public partial class DetalleViewModel : ObservableObject,
         try
         {
             EstaAnalizandoDuplicados = true;
-            EstadoDuplicados = "Analizando episodios...";
+            EstadoDuplicados = string.Empty;
             var duplicados = await _enricher.EncontrarDuplicadosAsync(_todosLosEpisodios);
             if (duplicados.Count > 0)
             {
-                EstadoDuplicados = $"{duplicados.Count} episodio(s) duplicado(s) detectados";
+                EstadoDuplicados = $"{duplicados.Count} duplicado(s)";
                 await _dialogService.MostrarDialogoAsync(
                     "Duplicados encontrados",
-                    $"Se detectaron {duplicados.Count} archivos duplicados:\n\n{string.Join("\n", duplicados.Select(d => System.IO.Path.GetFileName(d)).Take(10))}",
+                    $"Se detectaron {duplicados.Count} archivos duplicados por hash perceptual:\n\n{string.Join("\n", duplicados.Select(d => System.IO.Path.GetFileName(d)).Take(10))}",
                     false, "ContentDuplicate", "#F59E0B");
             }
             else
             {
-                EstadoDuplicados = "Sin duplicados detectados";
+                EstadoDuplicados = string.Empty;
+                await _dialogService.MostrarDialogoAsync(
+                    "Análisis de duplicados",
+                    "¡Excelente! No se encontraron episodios duplicados en esta serie.",
+                    false, "CheckCircleOutline", "#10B981");
             }
         }
         catch (Exception ex)
         {
             AppLogger.Debug("DetalleViewModel", $"Error analizando duplicados: {ex.Message}");
-            EstadoDuplicados = "No se pudo analizar";
+            EstadoDuplicados = string.Empty;
+            await _dialogService.MostrarDialogoAsync(
+                "Error en análisis",
+                $"No se pudo completar el análisis de duplicados: {ex.Message}",
+                false, "AlertCircleOutline", "#EF4444");
         }
         finally
         {

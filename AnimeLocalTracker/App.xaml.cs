@@ -188,6 +188,20 @@ public partial class App : Application
             var updateService = ServiceProvider.GetRequiredService<IUpdateService>();
             updateService.IniciarVerificacionSegundoPlano(TimeSpan.FromHours(4));
 
+            // Pre-calentar el demonio de Python en segundo plano (Zero-Lag en primera entrada a un anime)
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var pythonBridge = ServiceProvider.GetService<IPythonBridgeService>();
+                    if (pythonBridge != null)
+                    {
+                        await pythonBridge.IsAvailableAsync();
+                    }
+                }
+                catch { }
+            });
+
             // En lugar de que WPF abra la ventana automáticamente (StartupUri),
             // nosotros le pedimos al contenedor DI que nos construya la ventana
             // con todas sus dependencias ya inyectadas.
