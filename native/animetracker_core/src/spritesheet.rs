@@ -11,6 +11,10 @@ use std::os::windows::process::CommandExt;
 
 /// Número máximo de procesos ffmpeg simultáneos para spritesheet.
 const FFMPEG_PARALLEL_LIMIT: usize = 2;
+/// Límite de procesos ffmpeg simultáneos para la extracción en lote de miniaturas:
+/// con Rayon global se lanzaba un ffmpeg por núcleo (saturación de CPU); acotarlo
+/// acelera el lote completo al no competir los procesos por los núcleos.
+const THUMBNAIL_PARALLEL_LIMIT: usize = 4;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SpritesheetResult {
@@ -88,7 +92,7 @@ pub fn extract_frame(
         "-dn",
         "-vframes", "1",
         "-vf", &scale_filter,
-        "-threads", "1",
+        "-threads", "0",
         "-q:v", "3",
         out_path,
     ]);
@@ -104,21 +108,28 @@ pub fn extract_frame(
     }
 }
 
-/// Extrae un lote de fotogramas en paralelo utilizando todos los núcleos de la CPU con Rayon (<50ms).
+/// Extrae un lote de fotogramas en paralelo (pool acotado a THUMBNAIL_PARALLEL_LIMIT
+/// procesos ffmpeg; con el pool global de Rayon se lanzaba uno por núcleo y los
+/// procesos competían por la CPU, volviendo el lote más lento en lugar de más rápido).
 pub fn extract_frames_batch(requests: Vec<FrameExtractionRequest>) -> Vec<FrameExtractionResult> {
-    requests
-        .into_par_iter()
-        .map(|req| {
-            let ok = catch_unwind(AssertUnwindSafe(|| {
-                extract_frame(&req.video_path, &req.out_path, req.timestamp, req.width)
-            })).unwrap_or(false);
+    let extraer = |req: FrameExtractionRequest| {
+        let ok = catch_unwind(AssertUnwindSafe(|| {
+            extract_frame(&req.video_path, &req.out_path, req.timestamp, req.width)
+        })).unwrap_or(false);
 
-            FrameExtractionResult {
-                out_path: req.out_path,
-                success: ok,
-            }
-        })
-        .collect()
+        FrameExtractionResult {
+            out_path: req.out_path,
+            success: ok,
+        }
+    };
+
+    match rayon::ThreadPoolBuilder::new()
+        .num_threads(THUMBNAIL_PARALLEL_LIMIT)
+        .build()
+    {
+        Ok(pool) => pool.install(|| requests.into_par_iter().map(extraer).collect()),
+        Err(_) => requests.into_par_iter().map(extraer).collect(),
+    }
 }
 
 /// Genera una tira completa (Sprite Sheet mosaico) extrayendo fotogramas clave en paralelo con Rayon (<1s).
@@ -192,7 +203,7 @@ pub fn generate_spritesheet(
                 "-dn",
                 "-vframes", "1",
                 "-vf", "scale=160:90",
-                "-threads", "1",
+                "-threads", "0",
                 "-f", "image2pipe",
                 "-vcodec", "mjpeg",
                 "-q:v", "4",

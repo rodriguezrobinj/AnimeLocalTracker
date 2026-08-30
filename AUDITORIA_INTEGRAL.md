@@ -104,6 +104,7 @@
 | RND-03 | `Dispatcher.InvokeAsync` en el hot path de portadas (no bloquea el thread pool) | `GaleriaViewModel.cs:429` |
 | INT-02 | `yt-dlp==2026.8.19` fijado exacto (antes rango abierto) | `tools/python/pyproject.toml:9` |
 | DEV-01 | CI: acciones pineadas a SHA, caché Cargo/NuGet, auditoría NuGet añadida (informacional) | `.github/workflows/ci.yml` |
+| PERF-01 | **Fix de rendimiento de miniaturas**: la pestaña de detalle ya no espera a generar TODAS las miniaturas para mostrar la lista (antes `ExtractFramesBatch` bloqueante previo a construir los episodios, hasta horas con muchos episodios). Ahora: lista inmediata + extracción por chunks de 16 en segundo plano con refresco progresivo de UI. En Rust: `-threads 1`→`-threads 0` (decode multihilo, 4-8× más rápido en HEVC/4K) y paralelismo de batch acotado a 4 ffmpeg (antes uno por núcleo → saturación) | `DetalleViewModel.cs` (InicializarAsync, EnriquecerEpisodiosEnSegundoPlanoAsync, PersistirRegistrosAsync), `spritesheet.rs` (extract_frame, extract_frames_batch) |
 
 ---
 

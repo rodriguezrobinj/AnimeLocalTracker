@@ -304,29 +304,12 @@ public partial class DetalleViewModel : ObservableObject,
         const int LimiteSeguridadEpisodios = 3000;
         int episodiosACargar = Math.Min(maxEpisodio, LimiteSeguridadEpisodios);
 
-        // USAMOS TASK.RUN PARA NO CONGELAR LA UI Y EXTRAER MINIATURAS EN LOTE (<40ms)
-        var episodiosGenerados = await Task.Run(() => 
+        // CARGA RÁPIDA: construimos la lista de episodios INMEDIATAMENTE sin esperar a
+        // generar miniaturas (antes se extraían todas en lote antes de mostrar la lista:
+        // con muchos episodios la pestaña quedaba bloqueada minutos/horas). Las miniaturas
+        // faltantes se generan en segundo plano y aparecen progresivamente.
+        var episodiosGenerados = await Task.Run(() =>
         {
-            // Extracción PARALELA con Rust de todas las miniaturas que falten antes de construir los items
-            var faltantesThumbs = encontrados
-                .Where(e => !string.IsNullOrWhiteSpace(e.RutaCompleta) &&
-                            System.IO.File.Exists(e.RutaCompleta) &&
-                            PythonEpisodeEnricher.ObtenerRutaMiniaturaSiExiste(e.RutaCompleta) == null)
-                .ToList();
-
-            if (faltantesThumbs.Count > 0 && NativeMethods.IsAvailable)
-            {
-                var requests = faltantesThumbs.Select(ep => new NativeFrameRequest
-                {
-                    VideoPath = ep.RutaCompleta,
-                    OutPath = PythonEpisodeEnricher.ObtenerRutaMiniaturaEsperada(ep.RutaCompleta),
-                    Timestamp = 30.0,
-                    Width = 320
-                }).ToList();
-
-                NativeMethods.ExtractFramesBatch(requests);
-            }
-
             var archivosPorEp = encontrados.GroupBy(e => e.NumeroEpisodio)
                                            .ToDictionary(g => g.Key, g => g.First());
             var registrosPorEp = registrosGuardados.GroupBy(r => r.NumeroEpisodio)
@@ -424,7 +407,10 @@ public partial class DetalleViewModel : ObservableObject,
 
                 bool pythonDisponible = _enricher != null && await _enricher.EstáDisponibleAsync().ConfigureAwait(false);
 
-                // ── FASE 1: Extracción PARALELA de miniaturas con Rust FFI (<50ms para todo el anime) ──
+                // ── FASE 1: Extracción PARALELA de miniaturas con Rust FFI, por chunks
+                //    progresivos: cada chunk completado se persiste y se refleja en la UI
+                //    antes de seguir, para que las miniaturas aparezcan de inmediato
+                //    (no todas al final del lote completo). ──
                 var sinMiniatura = pendientes.Where(e => string.IsNullOrEmpty(e.RutaMiniatura)).ToList();
                 if (sinMiniatura.Count > 0)
                 {
@@ -432,35 +418,54 @@ public partial class DetalleViewModel : ObservableObject,
 
                     if (NativeMethods.IsAvailable)
                     {
-                        var requests = sinMiniatura.Select(ep => new NativeFrameRequest
+                        const int TamanoChunk = 16;
+                        foreach (var chunk in sinMiniatura.Chunk(TamanoChunk))
                         {
-                            VideoPath = ep.RutaCompleta,
-                            OutPath = PythonEpisodeEnricher.ObtenerRutaMiniaturaEsperada(ep.RutaCompleta),
-                            Timestamp = 30.0,
-                            Width = 320
-                        }).ToList();
-
-                        var batchResults = NativeMethods.ExtractFramesBatch(requests);
-                        if (batchResults != null)
-                        {
-                            foreach (var res in batchResults)
+                            var requests = chunk.Select(ep => new NativeFrameRequest
                             {
-                                if (res.Success && File.Exists(res.OutPath) && new FileInfo(res.OutPath).Length > 0)
-                                {
-                                    string resNorm = Path.GetFullPath(res.OutPath);
-                                    var ep = sinMiniatura.FirstOrDefault(e =>
-                                        string.Equals(
-                                            Path.GetFullPath(PythonEpisodeEnricher.ObtenerRutaMiniaturaEsperada(e.RutaCompleta)),
-                                            resNorm,
-                                            StringComparison.OrdinalIgnoreCase));
+                                VideoPath = ep.RutaCompleta,
+                                OutPath = PythonEpisodeEnricher.ObtenerRutaMiniaturaEsperada(ep.RutaCompleta),
+                                Timestamp = 30.0,
+                                Width = 320
+                            }).ToList();
 
-                                    if (ep != null)
+                            var batchResults = NativeMethods.ExtractFramesBatch(requests);
+                            if (batchResults != null)
+                            {
+                                foreach (var res in batchResults)
+                                {
+                                    if (res.Success && File.Exists(res.OutPath) && new FileInfo(res.OutPath).Length > 0)
                                     {
-                                        ep.RutaMiniatura = res.OutPath;
-                                        huboCambiosMiniatura = true;
+                                        string resNorm = Path.GetFullPath(res.OutPath);
+                                        var ep = sinMiniatura.FirstOrDefault(e =>
+                                            string.Equals(
+                                                Path.GetFullPath(PythonEpisodeEnricher.ObtenerRutaMiniaturaEsperada(e.RutaCompleta)),
+                                                resNorm,
+                                                StringComparison.OrdinalIgnoreCase));
+
+                                        if (ep != null)
+                                        {
+                                            ep.RutaMiniatura = res.OutPath;
+                                            huboCambiosMiniatura = true;
+                                        }
                                     }
                                 }
                             }
+
+                            // Persistir y refrescar la UI con el chunk ya terminado
+                            var conMiniatura = chunk.Where(e => !string.IsNullOrEmpty(e.RutaMiniatura)).ToList();
+                            if (conMiniatura.Count > 0)
+                            {
+                                await PersistirRegistrosAsync(aniListId, conMiniatura).ConfigureAwait(false);
+                                var disp = System.Windows.Application.Current?.Dispatcher;
+                                if (disp != null && !disp.HasShutdownStarted)
+                                {
+                                    _ = disp.InvokeAsync(() => alTerminar());
+                                }
+                            }
+
+                            // Dejar respirar a la UI/otros hilos entre chunks
+                            await Task.Delay(30).ConfigureAwait(false);
                         }
                     }
 
@@ -472,39 +477,15 @@ public partial class DetalleViewModel : ObservableObject,
                             await _enricher.GenerarMiniaturaAsync(ep).ConfigureAwait(false);
                             if (!string.IsNullOrEmpty(ep.RutaMiniatura)) huboCambiosMiniatura = true;
                         }
-                    }
 
-                    // Refrescar UI inmediatamente y persistir en base de datos: ¡todas las miniaturas aparecen al instante!
-                    if (huboCambiosMiniatura)
-                    {
-                        foreach (var ep in sinMiniatura.Where(e => !string.IsNullOrEmpty(e.RutaMiniatura)))
+                        if (huboCambiosMiniatura)
                         {
-                            try
+                            await PersistirRegistrosAsync(aniListId, sinMiniatura).ConfigureAwait(false);
+                            var disp = System.Windows.Application.Current?.Dispatcher;
+                            if (disp != null && !disp.HasShutdownStarted)
                             {
-                                var registro = new RegistroEpisodio
-                                {
-                                    AniListId = aniListId,
-                                    NumeroEpisodio = ep.NumeroEpisodio,
-                                    RutaArchivo = ep.RutaCompleta,
-                                    Resolucion = ep.Resolucion,
-                                    CodecVideo = ep.CodecVideo,
-                                    Fps = ep.Fps,
-                                    Es10Bit = ep.Es10Bit,
-                                    RutaMiniatura = ep.RutaMiniatura,
-                                    VistoLocal = ep.Visto,
-                                    FavoritoLocal = ep.Favorito,
-                                    ProgresoSegundos = ep.ProgresoSegundos,
-                                    TotalSegundos = ep.TotalSegundos
-                                };
-                                await _databaseService.GuardarRegistroEpisodioAsync(registro).ConfigureAwait(false);
+                                _ = disp.InvokeAsync(() => alTerminar());
                             }
-                            catch { }
-                        }
-
-                        var disp = System.Windows.Application.Current?.Dispatcher;
-                        if (disp != null && !disp.HasShutdownStarted)
-                        {
-                            _ = disp.InvokeAsync(() => alTerminar());
                         }
                     }
                 }
@@ -519,26 +500,7 @@ public partial class DetalleViewModel : ObservableObject,
 
                         if (!string.IsNullOrEmpty(ep.Resolucion))
                         {
-                            try
-                            {
-                                var registro = new RegistroEpisodio
-                                {
-                                    AniListId = aniListId,
-                                    NumeroEpisodio = ep.NumeroEpisodio,
-                                    RutaArchivo = ep.RutaCompleta,
-                                    Resolucion = ep.Resolucion,
-                                    CodecVideo = ep.CodecVideo,
-                                    Fps = ep.Fps,
-                                    Es10Bit = ep.Es10Bit,
-                                    RutaMiniatura = ep.RutaMiniatura,
-                                    VistoLocal = ep.Visto,
-                                    FavoritoLocal = ep.Favorito,
-                                    ProgresoSegundos = ep.ProgresoSegundos,
-                                    TotalSegundos = ep.TotalSegundos
-                                };
-                                await _databaseService.GuardarRegistroEpisodioAsync(registro).ConfigureAwait(false);
-                            }
-                            catch { }
+                            await PersistirRegistrosAsync(aniListId, new[] { ep }).ConfigureAwait(false);
 
                             var disp = System.Windows.Application.Current?.Dispatcher;
                             if (disp != null && !disp.HasShutdownStarted)
@@ -560,6 +522,37 @@ public partial class DetalleViewModel : ObservableObject,
         finally
         {
             _enriquecimientoGate.Release();
+        }
+    }
+
+    /// <summary>
+    /// Persiste los episodios con miniatura/metadata recién generada en SQLite para
+    /// que las siguientes visitas al anime sean instantáneas (sin regenerar).
+    /// </summary>
+    private async Task PersistirRegistrosAsync(int aniListId, IEnumerable<EpisodioItem> episodios)
+    {
+        foreach (var ep in episodios)
+        {
+            try
+            {
+                var registro = new RegistroEpisodio
+                {
+                    AniListId = aniListId,
+                    NumeroEpisodio = ep.NumeroEpisodio,
+                    RutaArchivo = ep.RutaCompleta,
+                    Resolucion = ep.Resolucion,
+                    CodecVideo = ep.CodecVideo,
+                    Fps = ep.Fps,
+                    Es10Bit = ep.Es10Bit,
+                    RutaMiniatura = ep.RutaMiniatura,
+                    VistoLocal = ep.Visto,
+                    FavoritoLocal = ep.Favorito,
+                    ProgresoSegundos = ep.ProgresoSegundos,
+                    TotalSegundos = ep.TotalSegundos
+                };
+                await _databaseService.GuardarRegistroEpisodioAsync(registro).ConfigureAwait(false);
+            }
+            catch { }
         }
     }
 
