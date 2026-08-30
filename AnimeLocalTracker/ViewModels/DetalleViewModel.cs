@@ -206,7 +206,7 @@ public partial class DetalleViewModel : ObservableObject,
                                 bool extraido = false;
                                 if (NativeMethods.IsAvailable)
                                 {
-                                    extraido = NativeMethods.ExtractFrame(episodio.RutaCompleta, thumbPath, 8.0, 320);
+                                    extraido = NativeMethods.ExtractFrame(episodio.RutaCompleta, thumbPath, 2.0, 320);
                                 }
                                 if (!extraido && _enricher != null)
                                 {
@@ -428,9 +428,10 @@ public partial class DetalleViewModel : ObservableObject,
                             {
                                 VideoPath = ep.RutaCompleta,
                                 OutPath = PythonEpisodeEnricher.ObtenerRutaMiniaturaEsperada(ep.RutaCompleta),
-                                // Timestamp corto (8s): decodificar desde el keyframe anterior
-                                // hasta 8s es 4× más rápido que hasta 30s en HEVC/4K.
-                                Timestamp = 8.0,
+                                // Timestamp corto (2s): el keyframe previo cae en los primeros
+                                // segundos del video, así el decode intermedio (frames entre el
+                                // keyframe y el punto exacto) es mínimo → miniatura casi instantánea.
+                                Timestamp = 2.0,
                                 Width = 320
                             }).ToList();
 

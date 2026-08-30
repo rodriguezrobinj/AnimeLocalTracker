@@ -107,17 +107,6 @@ public class RustNativeTests
     }
 
     [Fact]
-    public void NativeMethods_GenerateSpritesheet_ArchivoInexistente_RetornaFalloControlado()
-    {
-        if (!NativeMethods.IsAvailable) return;
-
-        var result = NativeMethods.GenerateSpritesheet("C:\\RutaInexistente\\Video.mkv", "C:\\Temp\\out.jpg", 1440, 60);
-        result.Should().NotBeNull();
-        result!.Success.Should().BeFalse();
-        result.Error.Should().NotBeNullOrWhiteSpace();
-    }
-
-    [Fact]
     public void NativeMethods_ConFfmpegEmbebido_DeberiaExtraerFrameSinFfmpegEnPathDelSistema()
     {
         // Verifica el fix de distribución de ffmpeg: en una máquina SIN ffmpeg en el PATH

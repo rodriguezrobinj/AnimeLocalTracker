@@ -24,15 +24,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     private readonly ISettingsService? _settingsService;
     private readonly IPlaybackStateService _playbackState;
     private readonly ISkipTimesCoordinator _skipCoordinator;
-    private readonly IHoverThumbnailService? _hoverThumbnailService;
-    private CancellationTokenSource? _hoverCts;
     private CancellationTokenSource? _skipCts;
-
-    // Hover Thumbnail Preview
-    [ObservableProperty] private bool _mostrarHoverPreview = false;
-    [ObservableProperty] private string _hoverPreviewTexto = "00:00";
-    [ObservableProperty] private ImageSource? _hoverPreviewImage = null;
-    [ObservableProperty] private double _hoverPreviewX = 0;
 
     [ObservableProperty]
     private Player _player = null!;
@@ -175,7 +167,6 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     private double _resumingPositionSeconds = 0;
     public double ResumingPositionSeconds => _resumingPositionSeconds;
     private bool _durationCached = false;
-    private bool _spritesheetPreparado = false;
 
     public ReproductorViewModel(
         IDatabaseService databaseService,
@@ -184,11 +175,9 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         IAniSkipService? aniSkipService = null,
         ISettingsService? settingsService = null,
         IPlaybackStateService? playbackStateService = null,
-        ISkipTimesCoordinator? skipTimesCoordinator = null,
-        IHoverThumbnailService? hoverThumbnailService = null)
+        ISkipTimesCoordinator? skipTimesCoordinator = null)
     {
         _settingsService = settingsService;
-        _hoverThumbnailService = hoverThumbnailService;
 
         _playbackState = playbackStateService ?? new PlaybackStateService(databaseService, animeTrackingService, authService);
         _skipCoordinator = skipTimesCoordinator ?? new SkipTimesCoordinator(aniSkipService);
@@ -604,21 +593,6 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         Seek(segundos);
     }
 
-    // === Previsualización flotante al pasar el mouse (Hover Thumbnail Preview) ===
-    public void ActualizarHoverPreview(double segundos, double posX)
-    {
-        // Timeline Hover desactivado
-        MostrarHoverPreview = false;
-    }
-
-    public void OcultarHoverPreview()
-    {
-        MostrarHoverPreview = false;
-        _hoverCts?.Cancel();
-        _hoverCts?.Dispose();
-        _hoverCts = null;
-    }
-
     [RelayCommand]
     public void ToggleFullscreen()
     {
@@ -857,8 +831,6 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         _posicionInicioSegundos = 0;
         _haCompletadoOpen = false;
         _seekPendienteAlAbrir = -1;
-        HoverPreviewImage = null;
-        MostrarHoverPreview = false;
 
         if (listaEpisodios != null)
         {
@@ -1036,16 +1008,6 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                             TiempoTotalTexto = tDur.ToString(tDur.Hours > 0 ? @"hh\:mm\:ss" : @"mm\:ss");
                             _durationCached = true;
                             TiempoCombinadoTexto = $"{TiempoActualTexto} / {TiempoTotalTexto}";
-
-                            // Sprite Sheet de hover: aquí YA tenemos la duración real y el
-                            // video decodificando; lanzarlo antes (OpenCompleted) generaba
-                            // el sheet con duración 0/desconocida y competía con la
-                            // inicialización del decoder.
-                            if (!_spritesheetPreparado && !string.IsNullOrWhiteSpace(_rutaVideo))
-                            {
-                                _spritesheetPreparado = true;
-                                _hoverThumbnailService?.PrepararSpritesheet(_rutaVideo, durSeconds);
-                            }
                         }
 
                         // Durante la ventana de settle tras un seek, el reproductor aún reporta la
@@ -1232,14 +1194,6 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         _ = GuardarProgresoActualAsync();
 
         CancelarSeekPendiente();
-
-        try
-        {
-            _hoverCts?.Cancel();
-            _hoverCts?.Dispose();
-            _hoverCts = null;
-        }
-        catch { }
 
         try
         {

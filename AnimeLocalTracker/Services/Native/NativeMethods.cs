@@ -23,9 +23,6 @@ public static class NativeMethods
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, EntryPoint = "compute_file_fingerprint")]
     private static extern IntPtr NativeComputeFingerprint(IntPtr videoPath);
 
-    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, EntryPoint = "anitomy_generate_spritesheet")]
-    private static extern IntPtr NativeGenerateSpritesheet(IntPtr videoPath, IntPtr outPath, double totalSeconds, int count);
-
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, EntryPoint = "anitomy_extract_frame")]
     [return: MarshalAs(UnmanagedType.I1)]
     private static extern bool NativeExtractFrame(IntPtr videoPath, IntPtr outPath, double timestamp, int width);
@@ -192,35 +189,6 @@ public static class NativeMethods
         }
     }
 
-    public static SpritesheetResult? GenerateSpritesheet(string videoPath, string outPath, double totalSeconds, int count = 60)
-    {
-        if (!IsAvailable || string.IsNullOrWhiteSpace(videoPath) || string.IsNullOrWhiteSpace(outPath)) return null;
-
-        IntPtr videoPtr = IntPtr.Zero;
-        IntPtr outPtr = IntPtr.Zero;
-        IntPtr resultPtr = IntPtr.Zero;
-        try
-        {
-            videoPtr = StringToUtf8Ptr(videoPath);
-            outPtr = StringToUtf8Ptr(outPath);
-            resultPtr = NativeGenerateSpritesheet(videoPtr, outPtr, totalSeconds, count);
-            string? json = MarshalStringAndFree(resultPtr);
-            if (string.IsNullOrEmpty(json)) return null;
-
-            return JsonSerializer.Deserialize<SpritesheetResult>(json);
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Debug("NativeMethods", $"Error en anitomy_generate_spritesheet nativo: {ex.Message}");
-            return null;
-        }
-        finally
-        {
-            if (videoPtr != IntPtr.Zero) Marshal.FreeHGlobal(videoPtr);
-            if (outPtr != IntPtr.Zero) Marshal.FreeHGlobal(outPtr);
-        }
-    }
-
     public static bool ExtractFrame(string videoPath, string outPath, double timestamp, int width = 240)
     {
         if (!IsAvailable || string.IsNullOrWhiteSpace(videoPath) || string.IsNullOrWhiteSpace(outPath)) return false;
@@ -373,36 +341,6 @@ public class FingerprintResult
 
     [JsonPropertyName("file_size")]
     public ulong FileSize { get; set; }
-
-    [JsonPropertyName("error")]
-    public string? Error { get; set; }
-}
-
-public class SpritesheetResult
-{
-    [JsonPropertyName("success")]
-    public bool Success { get; set; }
-
-    [JsonPropertyName("spritesheet_path")]
-    public string? SpritesheetPath { get; set; }
-
-    [JsonPropertyName("columns")]
-    public uint Columns { get; set; }
-
-    [JsonPropertyName("rows")]
-    public uint Rows { get; set; }
-
-    [JsonPropertyName("thumb_width")]
-    public uint ThumbWidth { get; set; }
-
-    [JsonPropertyName("thumb_height")]
-    public uint ThumbHeight { get; set; }
-
-    [JsonPropertyName("total_thumbs")]
-    public uint TotalThumbs { get; set; }
-
-    [JsonPropertyName("interval_seconds")]
-    public double IntervalSeconds { get; set; }
 
     [JsonPropertyName("error")]
     public string? Error { get; set; }

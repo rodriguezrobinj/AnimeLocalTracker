@@ -127,9 +127,6 @@ public partial class App : Application
 
         // Servicio de caché y precarga de imágenes optimizadas para 60fps
         services.AddSingleton<IImageCacheService, ImageCacheService>();
-
-        // Servicio de miniaturas de previsualización en hover para la línea de tiempo
-        services.AddSingleton<IHoverThumbnailService, HoverThumbnailService>();
     }
 
     private static Polly.IAsyncPolicy<System.Net.Http.HttpResponseMessage> GetRetryPolicy()

@@ -280,23 +280,6 @@ namespace AnimeLocalTracker.Views
             return ancho / 2;
         }
 
-        // === Previsualización en miniatura (Hover Thumbnail Preview desactivado) ===
-        private void ProgressBarArea_MouseEnter(object sender, MouseEventArgs e)
-        {
-        }
-
-        private void ProgressBarArea_MouseMove(object sender, MouseEventArgs e)
-        {
-        }
-
-        private void ProgressBarArea_MouseLeave(object sender, MouseEventArgs e)
-        {
-        }
-
-        private void ActualizarPosicionHoverPreview(Point p)
-        {
-        }
-
         private static T? EncontrarHijo<T>(DependencyObject? parent) where T : DependencyObject
         {
             if (parent == null) return null;

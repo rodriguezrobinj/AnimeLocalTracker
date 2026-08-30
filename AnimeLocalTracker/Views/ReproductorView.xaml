@@ -262,57 +262,10 @@
                             </StackPanel>
                         </Button>
 
-                        <!-- Barra de progreso interactiva con Bolita Scrubber y Hover Thumbnail Preview (YouTube / Netflix Style) -->
+                        <!-- Barra de progreso interactiva con Bolita Scrubber -->
                         <Grid Grid.Row="1" Margin="0,0,0,15">
-                            <!-- Pop-up flotante de previsualización de miniatura en hover -->
-                            <Canvas x:Name="HoverPreviewCanvas" Height="0" VerticalAlignment="Top" ClipToBounds="False" IsHitTestVisible="False">
-                                <Border x:Name="HoverPreviewCard"
-                                        Canvas.Left="{Binding HoverPreviewX}"
-                                        Canvas.Top="-130"
-                                        Width="180" Height="118"
-                                        Background="#E612141A"
-                                        BorderBrush="#44FFFFFF"
-                                        BorderThickness="1"
-                                        CornerRadius="8"
-                                        Visibility="{Binding MostrarHoverPreview, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                    <Border.Effect>
-                                        <DropShadowEffect Color="Black" BlurRadius="16" ShadowDepth="4" Opacity="0.8"/>
-                                    </Border.Effect>
-                                    <Grid Margin="4">
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="*"/>
-                                            <RowDefinition Height="Auto"/>
-                                        </Grid.RowDefinitions>
-
-                                        <!-- Miniatura del video (16:9) -->
-                                        <Border Grid.Row="0" CornerRadius="6" ClipToBounds="True" Background="#FF1A1C23">
-                                            <Grid>
-                                                <!-- Placeholder / Ícono mientras carga -->
-                                                <materialDesign:PackIcon Kind="MoviePlayOutline" Width="32" Height="32"
-                                                                         Foreground="#55FFFFFF"
-                                                                         HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                                
-                                                <!-- Imagen real de la miniatura extraída -->
-                                                <Image Source="{Binding HoverPreviewImage}" Stretch="UniformToFill" />
-                                            </Grid>
-                                        </Border>
-
-                                        <!-- Badge de tiempo exacto -->
-                                        <Border Grid.Row="1" Margin="0,4,0,0" HorizontalAlignment="Center"
-                                                Background="#CC000000" CornerRadius="4" Padding="6,2">
-                                            <TextBlock Text="{Binding HoverPreviewTexto}"
-                                                       Foreground="White" FontWeight="Bold" FontSize="11"
-                                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                        </Border>
-                                    </Grid>
-                                </Border>
-                            </Canvas>
-
                             <Grid x:Name="ProgressBarArea" Cursor="Hand" Background="Transparent"
-                                  PreviewMouseLeftButtonDown="ProgressBarArea_PreviewMouseLeftButtonDown"
-                                  MouseEnter="ProgressBarArea_MouseEnter"
-                                  MouseMove="ProgressBarArea_MouseMove"
-                                  MouseLeave="ProgressBarArea_MouseLeave">
+                                  PreviewMouseLeftButtonDown="ProgressBarArea_PreviewMouseLeftButtonDown">
                                 <Slider x:Name="SliderTiempo" Minimum="0" Maximum="{Binding TotalSeconds}" Value="{Binding CurrentSeconds, Mode=TwoWay}"
                                         Style="{StaticResource TimelineSliderStyle}"
                                         IsMoveToPointEnabled="True" Focusable="False"

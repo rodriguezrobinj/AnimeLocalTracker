@@ -19,54 +19,6 @@ fn ffi_catch<T>(f: impl FnOnce() -> T, fallback: T) -> T {
     }
 }
 
-/// Genera una tira de miniaturas (Sprite Sheet mosaico) de un video en segundo plano.
-#[no_mangle]
-pub extern "C" fn anitomy_generate_spritesheet(
-    video_path: *const c_char,
-    out_path: *const c_char,
-    total_seconds: f64,
-    count: i32,
-) -> *mut c_char {
-    ffi_catch(
-        || anitomy_generate_spritesheet_inner(video_path, out_path, total_seconds, count),
-        std::ptr::null_mut(),
-    )
-}
-
-fn anitomy_generate_spritesheet_inner(
-    video_path: *const c_char,
-    out_path: *const c_char,
-    total_seconds: f64,
-    count: i32,
-) -> *mut c_char {
-    if video_path.is_null() || out_path.is_null() {
-        return std::ptr::null_mut();
-    }
-
-    let c_video = unsafe { CStr::from_ptr(video_path) };
-    let c_out = unsafe { CStr::from_ptr(out_path) };
-
-    let video_str = match c_video.to_str() {
-        Ok(s) => s,
-        Err(_) => return std::ptr::null_mut(),
-    };
-    let out_str = match c_out.to_str() {
-        Ok(s) => s,
-        Err(_) => return std::ptr::null_mut(),
-    };
-
-    let result = spritesheet::generate_spritesheet(video_str, out_str, total_seconds, count.max(0) as u32);
-    let json = match serde_json::to_string(&result) {
-        Ok(j) => j,
-        Err(_) => return std::ptr::null_mut(),
-    };
-
-    match CString::new(json) {
-        Ok(cs) => cs.into_raw(),
-        Err(_) => std::ptr::null_mut(),
-    }
-}
-
 /// Extrae un fotograma único en un timestamp de forma ultrarrápida (<20ms).
 #[no_mangle]
 pub extern "C" fn anitomy_extract_frame(
