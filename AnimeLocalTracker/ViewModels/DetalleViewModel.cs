@@ -206,7 +206,7 @@ public partial class DetalleViewModel : ObservableObject,
                                 bool extraido = false;
                                 if (NativeMethods.IsAvailable)
                                 {
-                                    extraido = NativeMethods.ExtractFrame(episodio.RutaCompleta, thumbPath, 30.0, 320);
+                                    extraido = NativeMethods.ExtractFrame(episodio.RutaCompleta, thumbPath, 8.0, 320);
                                 }
                                 if (!extraido && _enricher != null)
                                 {
@@ -405,7 +405,10 @@ public partial class DetalleViewModel : ObservableObject,
 
                 if (pendientes.Count == 0) return;
 
-                bool pythonDisponible = _enricher != null && await _enricher.EstáDisponibleAsync().ConfigureAwait(false);
+                // Importante: NO esperar aquí el ping al daemon Python (si está frío puede
+                // tardar 2-8 s). La extracción Rust de miniaturas no depende de Python:
+                // se resuelve pythonDisponible de forma diferida, solo si se necesita.
+                bool pythonDisponible = false;
 
                 // ── FASE 1: Extracción PARALELA de miniaturas con Rust FFI, por chunks
                 //    progresivos: cada chunk completado se persiste y se refleja en la UI
@@ -425,7 +428,9 @@ public partial class DetalleViewModel : ObservableObject,
                             {
                                 VideoPath = ep.RutaCompleta,
                                 OutPath = PythonEpisodeEnricher.ObtenerRutaMiniaturaEsperada(ep.RutaCompleta),
-                                Timestamp = 30.0,
+                                // Timestamp corto (8s): decodificar desde el keyframe anterior
+                                // hasta 8s es 4× más rápido que hasta 30s en HEVC/4K.
+                                Timestamp = 8.0,
                                 Width = 320
                             }).ToList();
 
@@ -469,22 +474,27 @@ public partial class DetalleViewModel : ObservableObject,
                         }
                     }
 
-                    // Fallback individual si Rust no estuvo disponible
-                    if (!huboCambiosMiniatura && _enricher != null && pythonDisponible)
+                    // Fallback individual SOLO si Rust no estuvo disponible (resolver el ping
+                    // de Python aquí, de forma diferida, sin bloquear la extracción Rust)
+                    if (!huboCambiosMiniatura)
                     {
-                        foreach (var ep in sinMiniatura)
+                        pythonDisponible = _enricher != null && await _enricher.EstáDisponibleAsync().ConfigureAwait(false);
+                        if (pythonDisponible)
                         {
-                            await _enricher.GenerarMiniaturaAsync(ep).ConfigureAwait(false);
-                            if (!string.IsNullOrEmpty(ep.RutaMiniatura)) huboCambiosMiniatura = true;
-                        }
-
-                        if (huboCambiosMiniatura)
-                        {
-                            await PersistirRegistrosAsync(aniListId, sinMiniatura).ConfigureAwait(false);
-                            var disp = System.Windows.Application.Current?.Dispatcher;
-                            if (disp != null && !disp.HasShutdownStarted)
+                            foreach (var ep in sinMiniatura)
                             {
-                                _ = disp.InvokeAsync(() => alTerminar());
+                                await _enricher.GenerarMiniaturaAsync(ep).ConfigureAwait(false);
+                                if (!string.IsNullOrEmpty(ep.RutaMiniatura)) huboCambiosMiniatura = true;
+                            }
+
+                            if (huboCambiosMiniatura)
+                            {
+                                await PersistirRegistrosAsync(aniListId, sinMiniatura).ConfigureAwait(false);
+                                var disp = System.Windows.Application.Current?.Dispatcher;
+                                if (disp != null && !disp.HasShutdownStarted)
+                                {
+                                    _ = disp.InvokeAsync(() => alTerminar());
+                                }
                             }
                         }
                     }
@@ -492,11 +502,15 @@ public partial class DetalleViewModel : ObservableObject,
 
                 // ── FASE 2: Metadata técnica (ffprobe vía daemon Python) en segundo plano diferido ──
                 var sinMetadata = pendientes.Where(e => string.IsNullOrEmpty(e.Resolucion)).ToList();
-                if (sinMetadata.Count > 0 && pythonDisponible)
+                if (sinMetadata.Count > 0)
                 {
-                    foreach (var ep in sinMetadata)
+                    if (!pythonDisponible)
+                        pythonDisponible = _enricher != null && await _enricher.EstáDisponibleAsync().ConfigureAwait(false);
+                    if (pythonDisponible)
                     {
-                        await _enricher!.EnriquecerEpisodioAsync(ep).ConfigureAwait(false);
+                        foreach (var ep in sinMetadata)
+                        {
+                            await _enricher!.EnriquecerEpisodioAsync(ep).ConfigureAwait(false);
 
                         if (!string.IsNullOrEmpty(ep.Resolucion))
                         {
@@ -511,6 +525,7 @@ public partial class DetalleViewModel : ObservableObject,
 
                         // Pausa de cortesía para no saturar CPU en segundo plano
                         await Task.Delay(20).ConfigureAwait(false);
+                        }
                     }
                 }
             }).ConfigureAwait(false);
