@@ -17,6 +17,7 @@ using AnimeLocalTracker.Services;
 
 namespace AnimeLocalTracker.ViewModels;
 
+[System.Runtime.Versioning.SupportedOSPlatform("windows7.0")]
 public partial class ReproductorViewModel : ObservableObject, IDisposable
 {
     private readonly ISettingsService? _settingsService;
