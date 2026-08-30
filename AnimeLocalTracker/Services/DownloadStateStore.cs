@@ -19,12 +19,20 @@ public class DownloadStateStore : IDownloadStateStore
             try
             {
                 string json = await File.ReadAllTextAsync(statePath);
-                stateInfo = JsonSerializer.Deserialize<DownloadStateInfo>(json) ?? new DownloadStateInfo();
-                if (stateInfo.TotalBytes != totalBytes) throw new Exception("TotalBytes mismatch");
+                var deserialized = JsonSerializer.Deserialize<DownloadStateInfo>(json);
+                if (EsEstadoValido(deserialized, totalBytes, segmentCount))
+                {
+                    stateInfo = deserialized!;
+                }
+                else
+                {
+                    AppLogger.Warn("DownloadStateStore", $"Archivo de estado '{statePath}' corrupto o no coincidente. Reiniciando descarga limpia.");
+                    stateInfo = new DownloadStateInfo { TotalBytes = totalBytes };
+                }
             }
-            catch
+            catch (Exception ex)
             {
-                // Estado corrupto o de otra descarga distinta: empezar de cero
+                AppLogger.Warn("DownloadStateStore", $"Error leyendo estado '{statePath}': {ex.Message}. Reiniciando.");
                 stateInfo = new DownloadStateInfo { TotalBytes = totalBytes };
             }
         }
@@ -45,6 +53,27 @@ public class DownloadStateStore : IDownloadStateStore
         }
 
         return stateInfo;
+    }
+
+    private static bool EsEstadoValido(DownloadStateInfo? info, long totalBytes, int segmentCount)
+    {
+        if (info == null) return false;
+        if (info.TotalBytes != totalBytes || info.TotalBytes <= 0) return false;
+        if (info.Segments.Count != segmentCount) return false;
+
+        long expectedStart = 0;
+        for (int i = 0; i < info.Segments.Count; i++)
+        {
+            var seg = info.Segments[i];
+            if (seg.Start != expectedStart) return false;
+            if (seg.End < seg.Start || seg.End >= totalBytes) return false;
+            if (seg.CurrentOffset < seg.Start || seg.CurrentOffset > seg.End + 1) return false;
+            if (i == info.Segments.Count - 1 && seg.End != totalBytes - 1) return false;
+
+            expectedStart = seg.End + 1;
+        }
+
+        return expectedStart == totalBytes;
     }
 
     public async Task GuardarAsync(string statePath, DownloadStateInfo info)

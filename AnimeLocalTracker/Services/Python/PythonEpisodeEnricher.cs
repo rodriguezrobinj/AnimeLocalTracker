@@ -57,7 +57,7 @@ public class PythonEpisodeEnricher
     }
 
     /// <summary>
-    /// Calcula la ruta esperada de la miniatura de forma determinista y persistente (MD5 de la ruta).
+    /// Calcula la ruta esperada de la miniatura de forma determinista y persistente (SHA-256 de la ruta).
     /// </summary>
     public static string ObtenerRutaMiniaturaEsperada(string rutaCompleta)
     {

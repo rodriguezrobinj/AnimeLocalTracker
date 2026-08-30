@@ -143,7 +143,7 @@ pub fn generate_spritesheet(
         };
     }
 
-    let target_count = if count == 0 { 60 } else { count };
+    let target_count = if count == 0 { 60 } else { count.clamp(1, 1000) };
     let cols = 10u32;
     let rows = (target_count + cols - 1) / cols;
     let total_thumbs = cols * rows;
@@ -152,6 +152,23 @@ pub fn generate_spritesheet(
     let interval = dur / total_thumbs as f64;
     let thumb_w = 160u32;
     let thumb_h = 90u32;
+
+    let sheet_w = cols * thumb_w;
+    let sheet_h = rows * thumb_h;
+    let total_pixels = sheet_w as u64 * sheet_h as u64;
+    if total_pixels > 64_000_000 {
+        return SpritesheetResult {
+            success: false,
+            path: String::new(),
+            cols,
+            rows,
+            thumb_width: thumb_w,
+            thumb_height: thumb_h,
+            total_thumbs: 0,
+            interval_seconds: 0.0,
+            error: Some("Dimensiones de spritesheet exceden el límite de seguridad".to_string()),
+        };
+    }
 
     if let Some(parent) = Path::new(out_path).parent() {
         let _ = std::fs::create_dir_all(parent);
@@ -209,8 +226,6 @@ pub fn generate_spritesheet(
         Err(_) => indices.par_iter().map(|&idx| extraer(idx)).collect(),
     };
 
-    let sheet_w = cols * thumb_w;
-    let sheet_h = rows * thumb_h;
     let mut sheet = RgbImage::new(sheet_w, sheet_h);
 
     let mut successful_frames = 0;

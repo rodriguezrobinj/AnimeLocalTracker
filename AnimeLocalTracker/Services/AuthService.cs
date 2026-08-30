@@ -35,17 +35,9 @@ public class AuthService : IAuthService
         }
         catch (Exception ex)
         {
-            AppLogger.Warn("AuthService", $"No se pudo desencriptar el token con DPAPI ({ex.Message}), intentando fallback en texto plano.");
-            // Podría ser un token viejo en texto plano, intentamos leerlo.
-            string plain = File.ReadAllText(_rutaToken);
-            if (!string.IsNullOrWhiteSpace(plain) && plain.Length > 20)
-            {
-                // Es un token viejo, vamos a cifrarlo para el futuro
-                byte[] plaintext = Encoding.UTF8.GetBytes(plain);
-                byte[] ciphertext = ProtectedData.Protect(plaintext, null, DataProtectionScope.CurrentUser);
-                File.WriteAllBytes(_rutaToken, ciphertext);
-                return plain;
-            }
+            // SEC-07: nunca leer el token en claro. Si DPAPI falla (token corrupto/manipulado),
+            // se pide re-login: el flujo OAuth es barato y evita exponer credenciales en disco.
+            AppLogger.Warn("AuthService", $"No se pudo desencriptar el token con DPAPI ({ex.Message}). Se requiere iniciar sesión de nuevo.");
         }
         
         return string.Empty;
@@ -142,6 +134,22 @@ public class AuthService : IAuthService
                 }
                 else if (request.Url?.AbsolutePath == "/token" && request.HttpMethod == "POST")
                 {
+                    // SEC-01 (defensa en profundidad): solo aceptar POST provenientes de la
+                    // propia página de callback servida en http://localhost:5050. Los navegadores
+                    // envían el header Origin en todo POST (mismo o cross-origin); sin Origin ni
+                    // Referer válidos (p.ej. script local, DNS rebinding) se rechaza.
+                    string origin = request.Headers["Origin"] ?? string.Empty;
+                    string referer = request.Headers["Referer"] ?? string.Empty;
+                    bool origenValido = origin.Equals("http://localhost:5050", StringComparison.OrdinalIgnoreCase)
+                                        || referer.StartsWith("http://localhost:5050", StringComparison.OrdinalIgnoreCase);
+                    if (!origenValido)
+                    {
+                        AppLogger.Warn("AuthService", "POST /token rechazado: Origin/Referer no coincide con el listener local.");
+                        response.StatusCode = 403;
+                        response.OutputStream.Close();
+                        continue;
+                    }
+
                     try
                     {
                         using var reader = new StreamReader(request.InputStream, Encoding.UTF8);

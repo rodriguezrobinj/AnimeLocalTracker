@@ -37,10 +37,9 @@ public partial class App : Application
         this.DispatcherUnhandledException += (s, args) =>
         {
             AppLogger.Error("App", "UI Thread Exception", args.Exception);
-            string detalleError = args.Exception.InnerException != null 
-                ? $"{args.Exception.Message}\n\nDetalle: {args.Exception.InnerException.Message}"
-                : args.Exception.Message;
-            MessageBox.Show($"Error en la aplicación:\n{detalleError}", 
+            // SEC-12: no exponer mensajes internos (rutas, versiones, drivers) en la UI;
+            // el detalle completo queda en el log de la aplicación.
+            MessageBox.Show("Ocurrió un error inesperado.\nEl detalle técnico se ha guardado en el registro de la aplicación.",
                             "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
             args.Handled = true; // Prevenir cierre inesperado
         };

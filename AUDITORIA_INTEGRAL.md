@@ -34,6 +34,42 @@
 
 ---
 
+## 0b. Estado de implementación de la auditoría (actualizado)
+
+> **Última actualización:** 2026-08-30 (segunda pasada). Varios hallazgos ya se encontraban resueltos en el repo (el audit inicial corrió contra una fotografía parcial) y el resto se ha implementado en esta iteración. **Validación: build OK (build.ps1 doble pasada) + 132/132 tests en verde.**
+
+### Implementado en esta iteración
+
+| ID | Cambio | Archivo | Estado |
+|---|---|---|---|
+| SEC-01 | Validación de `Origin`/`Referer` en el endpoint local `POST /token` (defensa en profundidad; el flujo PKCE completo no es viable porque AniList exige `client_secret` + `redirect_uri` registrada para el flujo `response_type=code` — ver doc oficial) | `AuthService.cs:143` | ✅ |
+| SEC-07 | Eliminado el fallback que leía el token en texto plano si DPAPI falla; ahora se pide re-login | `AuthService.cs:36-42` | ✅ |
+| SEC-12 | MessageBox global de errores UI con mensaje genérico (el detalle queda en el log) | `App.xaml.cs:37-46` | ✅ |
+| SEC-09 | Comentario de caché actualizado a SHA-256 (el código ya usaba SHA256) | `PythonEpisodeEnricher.cs:60` | ✅ |
+| DEV-03 | Añadido `.github/dependabot.yml` (NuGet, Cargo, pip, GitHub Actions con grupos) | `.github/dependabot.yml` | ✅ |
+| FUN-01b | **Fix de CI**: el daemon Python lanzaba `InvalidOperationException` (y rompía el fallback one-shot) cuando el ejecutable compilado `AnimeTrackerTools.exe` no existe (p.ej. CI, donde está gitignored). Ahora `EnsureDaemonStartedAsync` devuelve `false` en vez de lanzar, `ExecuteViaDaemonAsync` captura cualquier fallo de daemon, y se descarta el daemon por sesión tras un arranque/saludo fallido para evitar stalls de 8 s repetidos. **Validado simulando CI (sin el exe): 3/3 tests Python en verde por el camino one-shot; suite completa 132/132** | `PythonBridgeService.cs:144-162,209-274` | ✅ |
+
+### Ya resuelto antes de esta iteración (verificado en repo)
+
+| ID | Hallazgo | Evidencia |
+|---|---|---|
+| FUN-01 | Daemon Python arrancado 100% async con timeout de 8 s (sin `Wait()` bloqueante) | `PythonBridgeService.cs:195-246` |
+| FUN-02 | Receptores del Messenger con try/catch completos | `MainViewModel.cs:167-229` |
+| FUN-03 | Ruta del token absoluta en `%LocalAppData%` | `AuthService.cs:22` |
+| FUN-04 | Single-instance con Mutex global | `App.xaml.cs:159-179` |
+| FUN-07 | Publicación atómica de skip times con `Interlocked.Exchange` | `ReproductorViewModel.cs:800,828` |
+| SEC-02 | Portadas: validación de esquema + límite 10 MB con lectura streamed | `ImageCacheService.cs:118-149` |
+| SEC-03 | Validación de hostname exacta (`Uri.TryCreate` + host) en vez de `Contains` | `AnimeAv1VideoSourceResolver.cs:96-107` |
+| SEC-04 | URLs de streaming saneadas con `SanitizarUrlParaLog` antes de loguear | `PythonVideoSourceResolver.cs:43`, `DownloadService.cs` |
+| SEC-10 | Validación de offsets/continuidad del `.state` de descargas (working tree, sin commit) | `DownloadStateStore.cs` |
+| SEC-15 | Rust: `count.clamp(1,1000)` + límite de píxeles del spritesheet (working tree, sin commit) | `spritesheet.rs` |
+
+### Pendiente (Fases 2-3 de la matriz)
+
+SEC-05 (firma Velopack/instalador), SEC-06 (pre-asignación de disco), FUN-05 (graceful shutdown), FUN-06 (`ignoreversion`), ARQ-01/02/03 (god-objects y duplicaciones), ARQ-04/RND-04 (cachés LRU), RND-01 (portadas fuera del UI thread), RND-02 (batching AniList), INT-01/02 (contrato scraping y pin yt-dlp), DEV-01 (SCA bloqueante + pinning SHA + caché CI), DEV-02 (release pipeline + firma), DEV-04 (licencia FluentAssertions), DEV-06 (coverage en CI).
+
+---
+
 ## 1. Resumen ejecutivo
 
 ### 1.1 Conclusiones clave

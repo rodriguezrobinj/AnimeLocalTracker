@@ -148,7 +148,18 @@ namespace AnimeLocalTracker.Services.Python
             await DaemonSemaphore.WaitAsync(ct).ConfigureAwait(false);
             try
             {
-                await EnsureDaemonStartedAsync(ct).ConfigureAwait(false);
+                try
+                {
+                    // Daemon indisponible (sin ejecutable compilado, arranque fallido o saludo
+                    // con timeout): devolver default para caer al modo one-shot (nunca lanzar).
+                    if (!await EnsureDaemonStartedAsync(ct).ConfigureAwait(false))
+                        return default;
+                }
+                catch (Exception ex)
+                {
+                    AppLogger.Debug("PythonBridge", $"Daemon no disponible ({ex.Message}); se usará el modo one-shot.");
+                    return default;
+                }
                 if (_daemonProcess == null || _daemonProcess.HasExited)
                     return default;
 
@@ -188,23 +199,33 @@ namespace AnimeLocalTracker.Services.Python
 
         /// <summary>
         /// Arranca el proceso daemon de forma 100% asíncrona si no está vivo (una única instancia compartida).
-        /// Hereda el PATH completo (usuario + sistema + FFmpeg embebido de la app) para que
-        /// el daemon encuentre herramientas como ffmpeg instaladas por winget en WinGet\Links
-        /// o los binarios ffmpeg.exe/ffprobe.exe distribuidos en la carpeta FFmpeg/ de la app.
+        /// Devuelve false (sin lanzar) si el daemon no puede usarse, para que los llamadores
+        /// degraden al modo one-shot. Hereda el PATH completo (usuario + sistema + FFmpeg embebido
+        /// de la app) para que el daemon encuentre herramientas como ffmpeg instaladas por winget
+        /// en WinGet\Links o los binarios ffmpeg.exe/ffprobe.exe distribuidos en la carpeta FFmpeg/ de la app.
         /// </summary>
-        private async Task EnsureDaemonStartedAsync(CancellationToken ct)
-        {
-            if (_daemonProcess != null && !_daemonProcess.HasExited)
-                return;
+        private static bool _daemonDescartado;
 
-            string path = !string.IsNullOrEmpty(_cachedExecutablePath) ? _cachedExecutablePath
-                : throw new InvalidOperationException("Daemon requiere el ejecutable compilado.");
+        private async Task<bool> EnsureDaemonStartedAsync(CancellationToken ct)
+        {
+            if (_daemonDescartado) return false;
+            if (_daemonProcess != null && !_daemonProcess.HasExited)
+                return true;
+
+            // El daemon requiere el ejecutable compilado (PyInstaller). Sin él (p.ej. CI sin el
+            // binario embebido) degradar al modo one-shot en lugar de lanzar una excepción.
+            if (string.IsNullOrEmpty(_cachedExecutablePath))
+            {
+                AppLogger.Debug("PythonBridge", "Daemon no disponible (sin ejecutable compilado); se usará el modo one-shot.");
+                _daemonDescartado = true;
+                return false;
+            }
 
             try
             {
                 var psi = new ProcessStartInfo
                 {
-                    FileName = path,
+                    FileName = _cachedExecutablePath!,
                     Arguments = "--daemon",
                     UseShellExecute = false,
                     RedirectStandardInput = true,
@@ -230,18 +251,24 @@ namespace AnimeLocalTracker.Services.Python
                 try
                 {
                     _ = await _daemonOut.ReadLineAsync(linkedCts.Token).ConfigureAwait(false);
+                    return true;
                 }
                 catch
                 {
+                    // El daemon no saludó a tiempo: descartarlo para esta sesión y usar one-shot.
+                    _daemonDescartado = true;
                     CleanupDaemon();
+                    return false;
                 }
             }
             catch (Exception ex)
             {
                 AppLogger.Debug("PythonBridge", $"No se pudo iniciar el daemon Python: {ex.Message}");
+                _daemonDescartado = true;
                 _daemonProcess = null;
                 _daemonOut = null;
                 _daemonIn = null;
+                return false;
             }
         }
 
