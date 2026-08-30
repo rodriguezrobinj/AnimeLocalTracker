@@ -159,8 +159,8 @@ pub fn generate_spritesheet(
     if total_pixels > 64_000_000 {
         return SpritesheetResult {
             success: false,
-            path: String::new(),
-            cols,
+            spritesheet_path: None,
+            columns: cols,
             rows,
             thumb_width: thumb_w,
             thumb_height: thumb_h,
