@@ -19,6 +19,8 @@ __pycache__/
 tools/python/build/
 tools/python/dist/
 *.spec
+*.egg-info/
+*.egg
 
 # Rust Cargo target build directory
 native/**/target/
