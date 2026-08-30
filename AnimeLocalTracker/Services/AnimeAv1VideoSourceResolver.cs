@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace AnimeLocalTracker.Services;
 
-public class AnimeAv1VideoSourceResolver : IVideoSourceResolver
+public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
 {
     private const string UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
@@ -61,7 +61,7 @@ public class AnimeAv1VideoSourceResolver : IVideoSourceResolver
                         var html = await res.Content.ReadAsStringAsync(cancellationToken);
 
                         // Extraer slugs de los enlaces /media/{slug} o de JSON slug:"{slug}"
-                        var matches = Regex.Matches(html, @"(?:/media/|slug:\s*""?)([a-zA-Z0-9_-]+)");
+                        var matches = SlugsRegex().Matches(html);
                         foreach (Match match in matches)
                         {
                             string discoveredSlug = match.Groups[1].Value.Trim('"', '\'');
@@ -117,7 +117,7 @@ public class AnimeAv1VideoSourceResolver : IVideoSourceResolver
                 var html = await res.Content.ReadAsStringAsync(cancellationToken);
 
                 // 1. Buscar enlace de MP4Upload en los embeds o descargas
-                var mp4UploadMatch = Regex.Match(html, @"https?://(?:www\.)?mp4upload\.com/(?:embed-)?([a-zA-Z0-9]+)(?:\.html)?");
+                var mp4UploadMatch = Mp4UploadRegex().Match(html);
                 if (mp4UploadMatch.Success)
                 {
                     string mp4Id = mp4UploadMatch.Groups[1].Value;
@@ -157,7 +157,7 @@ public class AnimeAv1VideoSourceResolver : IVideoSourceResolver
             var html = await res.Content.ReadAsStringAsync(cancellationToken);
 
             // Extraer enlace directo .mp4 de player.src
-            var srcMatch = Regex.Match(html, @"src:\s*""(https?://[^""]+?\.(?:mp4|mkv)[^""]*)""", RegexOptions.IgnoreCase);
+            var srcMatch = DirectVideoSrcRegex().Match(html);
             if (srcMatch.Success)
             {
                 return srcMatch.Groups[1].Value;
@@ -300,4 +300,13 @@ public class AnimeAv1VideoSourceResolver : IVideoSourceResolver
 
         return terminos;
     }
+
+    [GeneratedRegex(@"(?:/media/|slug:\s*""?)([a-zA-Z0-9_-]+)")]
+    private static partial Regex SlugsRegex();
+
+    [GeneratedRegex(@"https?://(?:www\.)?mp4upload\.com/(?:embed-)?([a-zA-Z0-9]+)(?:\.html)?")]
+    private static partial Regex Mp4UploadRegex();
+
+    [GeneratedRegex(@"src:\s*""(https?://[^""]+?\.(?:mp4|mkv)[^""]*)""", RegexOptions.IgnoreCase)]
+    private static partial Regex DirectVideoSrcRegex();
 }

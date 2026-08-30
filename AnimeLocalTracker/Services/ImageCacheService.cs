@@ -79,14 +79,25 @@ public class ImageCacheService : IImageCacheService
 
     public async Task<ImageSource?> ObtenerPortadaAsync(int animeId, string? urlPortada, int decodeWidth = 220)
     {
-        var existing = ObtenerPortada(animeId, urlPortada, decodeWidth);
-        if (existing != null) return existing;
+        if (_memoryCache.TryGetValue(animeId, out var cachedMem))
+        {
+            return cachedMem;
+        }
+
+        string localPath = Path.Combine(_coversDirectory, $"{animeId}.jpg");
+        if (File.Exists(localPath))
+        {
+            var diskBitmap = await Task.Run(() => CargarBitmapDesdeArchivo(localPath, decodeWidth)).ConfigureAwait(false);
+            if (diskBitmap != null)
+            {
+                GuardarEnCache(animeId, diskBitmap);
+                return diskBitmap;
+            }
+        }
 
         if (string.IsNullOrWhiteSpace(urlPortada)) return null;
 
-        string localPath = Path.Combine(_coversDirectory, $"{animeId}.jpg");
-
-        await _downloadSemaphore.WaitAsync();
+        await _downloadSemaphore.WaitAsync().ConfigureAwait(false);
         try
         {
             if (_memoryCache.TryGetValue(animeId, out var cached))
@@ -96,7 +107,7 @@ public class ImageCacheService : IImageCacheService
 
             if (File.Exists(localPath))
             {
-                var bitmap = CargarBitmapDesdeArchivo(localPath, decodeWidth);
+                var bitmap = await Task.Run(() => CargarBitmapDesdeArchivo(localPath, decodeWidth)).ConfigureAwait(false);
                 if (bitmap != null)
                 {
                     GuardarEnCache(animeId, bitmap);
@@ -104,8 +115,40 @@ public class ImageCacheService : IImageCacheService
                 }
             }
 
+            if (!Uri.TryCreate(urlPortada, UriKind.Absolute, out var uri) ||
+                (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+            {
+                return null;
+            }
+
             using var client = _httpClientFactory.CreateClient();
-            var bytes = await client.GetByteArrayAsync(urlPortada);
+            using var response = await client.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead);
+            if (!response.IsSuccessStatusCode) return null;
+
+            const long maxBytes = 10L * 1024 * 1024; // 10 MB máximo para una portada
+            if (response.Content.Headers.ContentLength is long declaredLen && declaredLen > maxBytes)
+            {
+                AppLogger.Warn("ImageCacheService", $"Portada rechazada para anime {animeId}: tamaño excesivo ({declaredLen} bytes).");
+                return null;
+            }
+
+            using var responseStream = await response.Content.ReadAsStreamAsync();
+            using var ms = new MemoryStream();
+            byte[] buffer = new byte[81920];
+            int bytesRead;
+            long totalRead = 0;
+            while ((bytesRead = await responseStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+            {
+                totalRead += bytesRead;
+                if (totalRead > maxBytes)
+                {
+                    AppLogger.Warn("ImageCacheService", $"Descarga de portada cancelada para {animeId}: superó el límite de 10 MB.");
+                    return null;
+                }
+                ms.Write(buffer, 0, bytesRead);
+            }
+
+            byte[] bytes = ms.ToArray();
 
             try
             {

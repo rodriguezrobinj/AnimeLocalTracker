@@ -1,9 +1,10 @@
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace AnimeLocalTracker.Services.Python
 {
-    public interface IPythonBridgeService
+    public interface IPythonBridgeService : IDisposable
     {
         /// <summary>
         /// Verifica si el motor de Python (ejecutable compilado o script local) está disponible.

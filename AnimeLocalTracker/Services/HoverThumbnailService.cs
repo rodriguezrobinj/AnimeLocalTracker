@@ -18,6 +18,7 @@ public class HoverThumbnailService : IHoverThumbnailService
     private readonly IPythonBridgeService _pythonBridge;
     private readonly ConcurrentDictionary<string, ImageSource> _memoryCache = new();
     private readonly SemaphoreSlim _extractionLock = new(2, 2);
+    private readonly string _tempDirectory;
     private const int MaxMemoryItems = 500;
 
     // Sprite Sheet en memoria RAM para navegación instantánea a 0 ms (60 FPS)
@@ -36,6 +37,12 @@ public class HoverThumbnailService : IHoverThumbnailService
     public HoverThumbnailService(IPythonBridgeService pythonBridge)
     {
         _pythonBridge = pythonBridge;
+        _tempDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AnimeLocalTracker", "Temp");
+        try
+        {
+            Directory.CreateDirectory(_tempDirectory);
+        }
+        catch { }
     }
 
     public void PrepararSpritesheet(string rutaVideo, double duracionTotalSegundos)
@@ -191,7 +198,7 @@ public class HoverThumbnailService : IHoverThumbnailService
                 return instantFrame2;
             }
 
-            string tempPath = Path.Combine(Path.GetTempPath(), $"alt_hover_{videoHash}_{bucketSec}.jpg");
+            string tempPath = Path.Combine(_tempDirectory, $"hover_{videoHash}_{bucketSec}.jpg");
             try
             {
                 bool extraido = false;

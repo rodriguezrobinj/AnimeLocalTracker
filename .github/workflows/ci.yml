@@ -31,6 +31,11 @@ jobs:
         python-version: '3.11'
         cache: 'pip'
 
+    - name: Install Python Tools and Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install -e tools/python
+
     - name: Cargo Security Audit (Rust SCA)
       run: |
         cargo install cargo-audit --locked
@@ -39,9 +44,7 @@ jobs:
 
     - name: Python SCA Audit (pip-audit)
       run: |
-        python -m pip install --upgrade pip
-        pip install pip-audit
-        pip install -e tools/python
+        python -m pip install pip-audit
         pip-audit
       continue-on-error: true
 

@@ -484,6 +484,28 @@ public class DownloadService : IDownloadService
         string statePath = destinationPath + ".state";
         DownloadStateInfo stateInfo = await _stateStore.CargarOInicializarAsync(statePath, totalBytes, SegmentosParalelos);
 
+        const long MaxPreallocLimitBytes = 35L * 1024 * 1024 * 1024; // 35 GB por archivo de episodio
+        if (totalBytes > MaxPreallocLimitBytes)
+        {
+            throw new InvalidOperationException($"El tamaño declarado del video ({totalBytes / (1024 * 1024)} MB) supera el límite de seguridad de 35 GB.");
+        }
+
+        // Verificar espacio libre en la unidad de destino
+        try
+        {
+            var driveRoot = Path.GetPathRoot(Path.GetFullPath(destinationPath)) ?? "C:\\";
+            var driveInfo = new DriveInfo(driveRoot);
+            if (driveInfo.IsReady && driveInfo.AvailableFreeSpace < totalBytes + 100 * 1024 * 1024)
+            {
+                throw new IOException($"Espacio insuficiente en disco para descargar el archivo. Se requieren {totalBytes / (1024 * 1024)} MB y solo hay {driveInfo.AvailableFreeSpace / (1024 * 1024)} MB libres.");
+            }
+        }
+        catch (IOException) { throw; }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("DownloadService", $"Comprobación de espacio libre omitida: {ex.Message}");
+        }
+
         bool shouldPreAlloc = !File.Exists(destinationPath);
         using (var preAlloc = new FileStream(destinationPath, FileMode.OpenOrCreate, FileAccess.Write, FileShare.ReadWrite, 4096, useAsync: true))
         {

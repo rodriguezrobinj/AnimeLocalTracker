@@ -66,8 +66,7 @@ public class PythonEpisodeEnricher
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "AnimeLocalTracker", "Thumbnails");
         
-        using var md5 = System.Security.Cryptography.MD5.Create();
-        byte[] hash = md5.ComputeHash(System.Text.Encoding.UTF8.GetBytes(rutaCompleta.ToLowerInvariant()));
+        byte[] hash = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(rutaCompleta.ToLowerInvariant()));
         string hex = Convert.ToHexString(hash).ToLowerInvariant();
         return Path.Combine(thumbsDir, $"{hex}.jpg");
     }

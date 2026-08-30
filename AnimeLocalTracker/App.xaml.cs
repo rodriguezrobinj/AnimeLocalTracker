@@ -156,8 +156,28 @@ public partial class App : Application
                 });
     }
 
+    private static System.Threading.Mutex? _singleInstanceMutex;
+
     protected override async void OnStartup(StartupEventArgs e)
     {
+        // 0. Instancia única: Evitar colisiones de puertos (OAuth 5050), locks de base de datos y settings
+        const string mutexName = "Global\\AnimeLocalTracker_SingleInstance_Mutex";
+        try
+        {
+            _singleInstanceMutex = new System.Threading.Mutex(true, mutexName, out bool esPrimeraInstancia);
+            if (!esPrimeraInstancia)
+            {
+                _singleInstanceMutex?.Dispose();
+                _singleInstanceMutex = null;
+                Shutdown(0);
+                return;
+            }
+        }
+        catch
+        {
+            // Si la creación del Mutex global falla por permisos, continuar sin bloquear el arranque
+        }
+
         base.OnStartup(e);
 
         try
@@ -218,5 +238,29 @@ public partial class App : Application
                             "Error de inicio", MessageBoxButton.OK, MessageBoxImage.Error);
             Shutdown(1);
         }
+    }
+
+    protected override void OnExit(ExitEventArgs e)
+    {
+        try
+        {
+            // Graceful shutdown: limpiar y terminar procesos secundarios daemon
+            var pythonBridge = ServiceProvider?.GetService<IPythonBridgeService>();
+            pythonBridge?.Dispose();
+        }
+        catch { }
+
+        try
+        {
+            if (_singleInstanceMutex != null)
+            {
+                _singleInstanceMutex.ReleaseMutex();
+                _singleInstanceMutex.Dispose();
+                _singleInstanceMutex = null;
+            }
+        }
+        catch { }
+
+        base.OnExit(e);
     }
 }

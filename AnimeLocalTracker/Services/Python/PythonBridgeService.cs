@@ -257,6 +257,11 @@ namespace AnimeLocalTracker.Services.Python
             _daemonIn = null;
         }
 
+        public void Dispose()
+        {
+            CleanupDaemon();
+        }
+
         private void ResolveExecutable()
         {
             if (!string.IsNullOrEmpty(_cachedExecutablePath) || !string.IsNullOrEmpty(_cachedScriptPath))
@@ -282,39 +287,46 @@ namespace AnimeLocalTracker.Services.Python
                 }
             }
 
-            // 2. Buscar script cli.py en directorio tools/python/
-            string[] possibleScriptPaths =
+            // 2. Buscar script cli.py en directorio tools/python/ recursivamente hacia arriba
+            var searchDir = new DirectoryInfo(baseDir);
+            for (int i = 0; i < 6 && searchDir != null; i++)
             {
-                Path.Combine(baseDir, "tools", "python", "cli.py"),
-                Path.Combine(Directory.GetCurrentDirectory(), "tools", "python", "cli.py"),
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "tools", "python", "cli.py")
-            };
-
-            foreach (var path in possibleScriptPaths)
-            {
-                string fullPath = Path.GetFullPath(path);
-                if (File.Exists(fullPath))
+                string candidate = Path.Combine(searchDir.FullName, "tools", "python", "cli.py");
+                if (File.Exists(candidate))
                 {
-                    _cachedScriptPath = fullPath;
-                    AppLogger.Info("PythonBridge", $"Script Python detectado: {fullPath}");
+                    _cachedScriptPath = candidate;
+                    AppLogger.Info("PythonBridge", $"Script Python detectado: {candidate}");
                     return;
                 }
+                searchDir = searchDir.Parent;
+            }
+
+            string cwdCandidate = Path.Combine(Directory.GetCurrentDirectory(), "tools", "python", "cli.py");
+            if (File.Exists(cwdCandidate))
+            {
+                _cachedScriptPath = Path.GetFullPath(cwdCandidate);
+                AppLogger.Info("PythonBridge", $"Script Python detectado en CWD: {_cachedScriptPath}");
+                return;
             }
         }
 
         private static string GetPythonCommand()
         {
-            // Si existe el entorno virtual local, usarlo
-            string[] venvPythons =
+            // 1. Si GitHub Actions o el sistema tiene pythonLocation definido
+            var pyLoc = Environment.GetEnvironmentVariable("pythonLocation");
+            if (!string.IsNullOrEmpty(pyLoc))
             {
-                Path.Combine(Directory.GetCurrentDirectory(), "tools", "python", ".venv", "Scripts", "python.exe"),
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "tools", "python", ".venv", "Scripts", "python.exe")
-            };
+                var pyExe = Path.Combine(pyLoc, "python.exe");
+                if (File.Exists(pyExe)) return pyExe;
+            }
 
-            foreach (var venv in venvPythons)
+            // 2. Si existe el entorno virtual local, buscarlo
+            var searchDir = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
+            for (int i = 0; i < 6 && searchDir != null; i++)
             {
-                string full = Path.GetFullPath(venv);
-                if (File.Exists(full)) return full;
+                string venv = Path.Combine(searchDir.FullName, "tools", "python", ".venv", "Scripts", "python.exe");
+                if (File.Exists(venv)) return venv;
+                searchDir = searchDir.Parent;
             }
 
             return "python";
