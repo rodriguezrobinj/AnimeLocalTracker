@@ -133,6 +133,46 @@ public class PythonEpisodeEnricher
 
         if (rutas.Count < 2) return [];
 
+        // 1. Detección ultrarrápida en Rust FFI (muestreo SIMD a velocidad de disco NVMe)
+        if (Native.NativeMethods.IsAvailable)
+        {
+            try
+            {
+                var fingerprints = new System.Collections.Concurrent.ConcurrentDictionary<string, List<string>>();
+                Parallel.ForEach(rutas, ruta =>
+                {
+                    var fp = Native.NativeMethods.ComputeFingerprint(ruta);
+                    if (fp != null && fp.Success && !string.IsNullOrEmpty(fp.Fingerprint))
+                    {
+                        string key = $"{fp.Fingerprint}_{fp.FileSize}";
+                        fingerprints.AddOrUpdate(
+                            key,
+                            _ => new List<string> { ruta },
+                            (_, list) => { lock (list) { list.Add(ruta); } return list; });
+                    }
+                });
+
+                var duplicadosNativos = new List<string>();
+                foreach (var list in fingerprints.Values)
+                {
+                    if (list.Count > 1)
+                    {
+                        duplicadosNativos.AddRange(list.Skip(1));
+                    }
+                }
+
+                if (duplicadosNativos.Count > 0 || fingerprints.Count == rutas.Count)
+                {
+                    return duplicadosNativos;
+                }
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Debug("PythonEpisodeEnricher", $"Fallo en fingerprint nativo Rust: {ex.Message}");
+            }
+        }
+
+        // 2. Fallback a Python Bridge (perceptual hashing)
         try
         {
             var result = await _pythonBridge.ExecuteCommandAsync<object, DuplicatesResult>(

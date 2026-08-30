@@ -76,24 +76,53 @@ namespace AnimeLocalTracker.Services.Python
                         }
                     }
 
-                    // 2. Si quedaron archivos con nombres crípticos o complejos sin número detectado,
-                    // enviamos una ÚNICA llamada batch a Python/Anitopy para resolverlos de golpe
-                    if (noReconocidos.Count > 0 && await _pythonBridge.IsAvailableAsync())
+                    // 2. Si quedaron archivos con nombres crípticos o complejos sin número detectado:
+                    // Prioridad 1: Motor nativo Rust FFI (0.001 ms, 0 MB RAM)
+                    // Prioridad 2: Demonio Python Anitopy (Fallback)
+                    if (noReconocidos.Count > 0)
                     {
                         var filenames = noReconocidos.Select(x => x.File.Name).ToList();
-                        var batchResult = await _pythonBridge.ExecuteCommandAsync<object, BatchParseResult>(
-                            "parse-batch",
-                            new { filenames, directory_context = dirInfo.Name }
-                        );
 
-                        if (batchResult != null && batchResult.Success && batchResult.Results != null)
+                        if (Native.NativeMethods.IsAvailable)
                         {
-                            for (int i = 0; i < Math.Min(noReconocidos.Count, batchResult.Results.Count); i++)
+                            try
                             {
-                                var parsed = batchResult.Results[i];
-                                if (parsed.EpisodeNumber.HasValue && parsed.EpisodeNumber.Value > 0)
+                                var rustResults = Native.NativeMethods.ParseBatch(filenames);
+                                for (int i = 0; i < Math.Min(noReconocidos.Count, rustResults.Count); i++)
                                 {
-                                    noReconocidos[i].Item.NumeroEpisodio = parsed.EpisodeNumber.Value;
+                                    var r = rustResults[i];
+                                    if (!string.IsNullOrWhiteSpace(r.EpisodeNumber) &&
+                                        int.TryParse(r.EpisodeNumber, out int epNum) && epNum > 0)
+                                    {
+                                        noReconocidos[i].Item.NumeroEpisodio = epNum;
+                                    }
+                                }
+                            }
+                            catch (Exception rustEx)
+                            {
+                                AppLogger.Debug("PythonFileScanner", $"Fallo en parser Rust nativo, intentando fallback Python: {rustEx.Message}");
+                            }
+                        }
+
+                        // Reintentar con Python para los que aún sigan con episodio 0
+                        var aunNoReconocidos = noReconocidos.Where(x => x.Item.NumeroEpisodio == 0).ToList();
+                        if (aunNoReconocidos.Count > 0 && await _pythonBridge.IsAvailableAsync())
+                        {
+                            var pendingNames = aunNoReconocidos.Select(x => x.File.Name).ToList();
+                            var batchResult = await _pythonBridge.ExecuteCommandAsync<object, BatchParseResult>(
+                                "parse-batch",
+                                new { filenames = pendingNames, directory_context = dirInfo.Name }
+                            );
+
+                            if (batchResult != null && batchResult.Success && batchResult.Results != null)
+                            {
+                                for (int i = 0; i < Math.Min(aunNoReconocidos.Count, batchResult.Results.Count); i++)
+                                {
+                                    var parsed = batchResult.Results[i];
+                                    if (parsed.EpisodeNumber.HasValue && parsed.EpisodeNumber.Value > 0)
+                                    {
+                                        aunNoReconocidos[i].Item.NumeroEpisodio = parsed.EpisodeNumber.Value;
+                                    }
                                 }
                             }
                         }

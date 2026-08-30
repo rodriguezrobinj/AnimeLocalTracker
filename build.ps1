@@ -38,6 +38,12 @@ if (-not $pasada2) {
     exit 1
 }
 
+# Copiar librerías nativas si existen
+if (Test-Path "$root\native\animetracker_core\target\release\animetracker_core.dll") {
+    Copy-Item "$root\native\animetracker_core\target\release\animetracker_core.dll" "$root\AnimeLocalTracker\bin\$Configuration\net8.0-windows\" -Force -ErrorAction SilentlyContinue
+    Copy-Item "$root\native\animetracker_core\target\release\animetracker_core.dll" "$root\AnimeLocalTracker.Tests\bin\$Configuration\net8.0-windows\" -Force -ErrorAction SilentlyContinue
+}
+
 Write-Host "[build] OK ($Configuration)" -ForegroundColor Green
 
 if ($RunTests) {

@@ -20,6 +20,9 @@ tools/python/build/
 tools/python/dist/
 *.spec
 
+# Rust Cargo target build directory
+native/**/target/
+
 # dotenv files
 .env
 
