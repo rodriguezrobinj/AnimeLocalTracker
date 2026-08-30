@@ -66,7 +66,8 @@ def process_command(command: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         video_path = payload.get("video_path", "")
         output_path = payload.get("output_path", "")
         timestamp = float(payload.get("timestamp", 30.0))
-        return Thumbnail.generate_thumbnail(video_path, output_path, timestamp)
+        width = int(payload.get("width", 240))
+        return Thumbnail.generate_thumbnail(video_path, output_path, timestamp, width)
 
     elif command == "mock-db":
         db_path = payload.get("db_path", "mock_anime.db")

@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
@@ -23,6 +24,15 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     private readonly ISettingsService? _settingsService;
     private readonly IPlaybackStateService _playbackState;
     private readonly ISkipTimesCoordinator _skipCoordinator;
+    private readonly IHoverThumbnailService? _hoverThumbnailService;
+    private CancellationTokenSource? _hoverCts;
+    private double _ultimoHoverSolicitadoSec = -1;
+
+    // Hover Thumbnail Preview
+    [ObservableProperty] private bool _mostrarHoverPreview = false;
+    [ObservableProperty] private string _hoverPreviewTexto = "00:00";
+    [ObservableProperty] private ImageSource? _hoverPreviewImage = null;
+    [ObservableProperty] private double _hoverPreviewX = 0;
 
     [ObservableProperty]
     private Player _player = null!;
@@ -173,9 +183,11 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         IAniSkipService? aniSkipService = null,
         ISettingsService? settingsService = null,
         IPlaybackStateService? playbackStateService = null,
-        ISkipTimesCoordinator? skipTimesCoordinator = null)
+        ISkipTimesCoordinator? skipTimesCoordinator = null,
+        IHoverThumbnailService? hoverThumbnailService = null)
     {
         _settingsService = settingsService;
+        _hoverThumbnailService = hoverThumbnailService;
 
         _playbackState = playbackStateService ?? new PlaybackStateService(databaseService, animeTrackingService, authService);
         _skipCoordinator = skipTimesCoordinator ?? new SkipTimesCoordinator(aniSkipService);
@@ -594,6 +606,72 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         Seek(segundos);
     }
 
+    // === Previsualización flotante al pasar el mouse (Hover Thumbnail Preview) ===
+    public void ActualizarHoverPreview(double segundos, double posX)
+    {
+        if (TotalSeconds <= 0 || string.IsNullOrWhiteSpace(_rutaVideo)) return;
+
+        segundos = Math.Clamp(segundos, 0, TotalSeconds);
+        var t = TimeSpan.FromSeconds(segundos);
+        HoverPreviewTexto = t.ToString(t.Hours > 0 ? @"hh\:mm\:ss" : @"mm\:ss");
+        HoverPreviewX = posX;
+        MostrarHoverPreview = true;
+
+        if (_hoverThumbnailService == null) return;
+
+        int bucketSec = ((int)segundos / _hoverThumbnailService.BucketIntervaloSegundos) * _hoverThumbnailService.BucketIntervaloSegundos;
+        if (Math.Abs(bucketSec - _ultimoHoverSolicitadoSec) < 0.1 && HoverPreviewImage != null)
+        {
+            return; // Ya tenemos el fotograma del bucket actual en pantalla
+        }
+
+        _ultimoHoverSolicitadoSec = bucketSec;
+        _hoverCts?.Cancel();
+        _hoverCts?.Dispose();
+        _hoverCts = new CancellationTokenSource();
+        var ct = _hoverCts.Token;
+
+        string ruta = _rutaVideo;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var img = await _hoverThumbnailService.ObtenerMiniaturaHoverAsync(ruta, bucketSec, ct).ConfigureAwait(false);
+                if (img != null && !ct.IsCancellationRequested && ruta == _rutaVideo)
+                {
+                    if (System.Windows.Application.Current?.Dispatcher != null &&
+                        !System.Windows.Application.Current.Dispatcher.CheckAccess())
+                    {
+                        _ = System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+                        {
+                            if (!ct.IsCancellationRequested && MostrarHoverPreview)
+                            {
+                                HoverPreviewImage = img;
+                            }
+                        });
+                    }
+                    else if (MostrarHoverPreview)
+                    {
+                        HoverPreviewImage = img;
+                    }
+                }
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex)
+            {
+                AppLogger.Debug("ReproductorViewModel", $"Error obteniendo miniatura hover: {ex.Message}");
+            }
+        }, ct);
+    }
+
+    public void OcultarHoverPreview()
+    {
+        MostrarHoverPreview = false;
+        _hoverCts?.Cancel();
+        _hoverCts?.Dispose();
+        _hoverCts = null;
+    }
+
     [RelayCommand]
     public void ToggleFullscreen()
     {
@@ -825,6 +903,9 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         _posicionInicioSegundos = 0;
         _haCompletadoOpen = false;
         _seekPendienteAlAbrir = -1;
+        HoverPreviewImage = null;
+        MostrarHoverPreview = false;
+        _ultimoHoverSolicitadoSec = -1;
 
         if (listaEpisodios != null)
         {
@@ -1182,6 +1263,14 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         _ = GuardarProgresoActualAsync();
 
         CancelarSeekPendiente();
+
+        try
+        {
+            _hoverCts?.Cancel();
+            _hoverCts?.Dispose();
+            _hoverCts = null;
+        }
+        catch { }
 
         try
         {
