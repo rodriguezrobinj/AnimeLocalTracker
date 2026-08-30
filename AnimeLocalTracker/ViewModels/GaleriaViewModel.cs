@@ -385,8 +385,10 @@ public partial class GaleriaViewModel : ObservableObject,
                     }
                 }
 
-                // Precarga ultra-rápida desde caché en memoria o archivo local (0ms en scroll)
-                a.PortadaImagen = _imageCacheService.ObtenerPortada(a.AniListId, a.UrlPortada);
+                // Precarga ultra-rápida desde caché en memoria (0ms en scroll).
+                // RND-01: los hits de disco/red se cargan en segundo plano por
+                // CargarPortadasFaltantesEnSegundoPlanoAsync para no bloquear la UI.
+                a.PortadaImagen = _imageCacheService.ObtenerPortadaEnMemoria(a.AniListId);
             }
 
             BibliotecaLocales = new ObservableCollection<AnimeItem>(animes);
@@ -426,7 +428,8 @@ public partial class GaleriaViewModel : ObservableObject,
             {
                 if (System.Windows.Application.Current?.Dispatcher != null && !System.Windows.Application.Current.Dispatcher.CheckAccess())
                 {
-                    System.Windows.Application.Current.Dispatcher.Invoke(() => anime.PortadaImagen = img);
+                    // RND-03: InvokeAsync para no bloquear el hilo de pool contra la UI
+                    _ = System.Windows.Application.Current.Dispatcher.InvokeAsync(() => anime.PortadaImagen = img);
                 }
                 else
                 {

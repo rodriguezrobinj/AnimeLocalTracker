@@ -38,7 +38,9 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 ; Todos los binarios y dependencias publicados (incluyendo la carpeta FFmpeg con las DLLs)
-Source: "publish\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+; Sin ignoreversion: en reinstalaciones los binarios (yt-dlp, FFmpeg, tools) se sobrescriben
+; siempre, evitando que persistan versiones viejas con CVEs conocidas.
+Source: "publish\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"

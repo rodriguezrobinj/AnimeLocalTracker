@@ -511,7 +511,15 @@ public class DownloadService : IDownloadService
         {
             if (shouldPreAlloc || preAlloc.Length != totalBytes)
             {
-                preAlloc.SetLength(totalBytes);
+                // SEC-06: el tamaño declarado proviene del servidor remoto (Content-Length/Content-Range).
+                // Acotarlo evita que un servidor malicioso fuerce la reserva de todo el disco.
+                const long MaxPreallocBytes = 50L * 1024 * 1024 * 1024; // 50 GB por archivo (4K remux)
+                long preallocSize = totalBytes > MaxPreallocBytes ? 0 : totalBytes;
+                if (totalBytes > MaxPreallocBytes)
+                {
+                    AppLogger.Warn("DownloadService", $"Tamaño declarado excesivo ({totalBytes} bytes): descarga incremental sin pre-asignación.");
+                }
+                preAlloc.SetLength(preallocSize);
             }
         }
 

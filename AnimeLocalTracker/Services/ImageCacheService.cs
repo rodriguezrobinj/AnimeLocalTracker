@@ -68,11 +68,22 @@ public class ImageCacheService : IImageCacheService
         return null;
     }
 
+    public ImageSource? ObtenerPortadaEnMemoria(int animeId)
+    {
+        return _memoryCache.TryGetValue(animeId, out var cached) ? cached : null;
+    }
+
     private void GuardarEnCache(int animeId, ImageSource bitmap)
     {
+        // ARQ-04b: al superar el tope se expulsan solo algunas entradas (no el caché completo),
+        // evitando invalidar toda la galería a la vez (recargar desde disco es barato, pero el
+        // Clear() total provocaba re-decode masivo en el arranque de bibliotecas grandes).
         if (_memoryCache.Count >= MaxEntradasEnMemoria)
         {
-            _memoryCache.Clear();
+            foreach (var kv in _memoryCache.Take(16))
+            {
+                _memoryCache.TryRemove(kv.Key, out _);
+            }
         }
         _memoryCache[animeId] = bitmap;
     }

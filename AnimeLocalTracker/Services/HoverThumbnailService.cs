@@ -265,9 +265,13 @@ public class HoverThumbnailService : IHoverThumbnailService
 
     private void GuardarEnCacheMemoria(string key, ImageSource img)
     {
+        // ARQ-04b: evicción parcial (16 entradas) en lugar de Clear() total del caché.
         if (_memoryCache.Count >= MaxMemoryItems)
         {
-            _memoryCache.Clear();
+            foreach (var kv in _memoryCache.Take(16))
+            {
+                _memoryCache.TryRemove(kv.Key, out _);
+            }
         }
         _memoryCache[key] = img;
     }

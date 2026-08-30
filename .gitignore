@@ -506,3 +506,6 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# Artefacto de build (regenerado por build.ps1 desde native\animetracker_core\target\release)
+animetracker_core.dll
