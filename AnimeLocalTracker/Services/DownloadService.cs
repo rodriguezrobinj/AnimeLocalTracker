@@ -428,7 +428,7 @@ public class DownloadService : IDownloadService
             }
             catch (Exception ex)
             {
-                AppLogger.Warn("DownloadService", $"Error en sondeo HEAD para '{videoUrl}': {ex.Message}");
+                AppLogger.Warn("DownloadService", $"Error en sondeo HEAD para '{SanitizarUrlParaLog(videoUrl)}': {ex.Message}");
             }
         }
 
@@ -458,7 +458,7 @@ public class DownloadService : IDownloadService
             }
             catch (Exception ex)
             {
-                AppLogger.Warn("DownloadService", $"Error en sondeo GET Range(0,0) para '{videoUrl}': {ex.Message}");
+                AppLogger.Warn("DownloadService", $"Error en sondeo GET Range(0,0) para '{SanitizarUrlParaLog(videoUrl)}': {ex.Message}");
             }
         }
 
@@ -625,5 +625,12 @@ public class DownloadService : IDownloadService
         {
             progress.Report(100.0);
         }
+    }
+
+    private static string SanitizarUrlParaLog(string url)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return "(vacía)";
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)) return "(url no parseable)";
+        return $"{uri.Scheme}://{uri.Authority}{uri.AbsolutePath}";
     }
 }

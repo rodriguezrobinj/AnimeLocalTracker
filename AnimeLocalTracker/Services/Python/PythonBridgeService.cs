@@ -145,15 +145,12 @@ namespace AnimeLocalTracker.Services.Python
         {
             // El protocolo es una sola línea por comando en un stream compartido:
             // serializa send+receive para evitar respuestas cruzadas entre llamadas.
-            await DaemonSemaphore.WaitAsync(ct);
+            await DaemonSemaphore.WaitAsync(ct).ConfigureAwait(false);
             try
             {
-                lock (DaemonLock)
-                {
-                    EnsureDaemonStarted();
-                    if (_daemonProcess == null || _daemonProcess.HasExited)
-                        return default;
-                }
+                await EnsureDaemonStartedAsync(ct).ConfigureAwait(false);
+                if (_daemonProcess == null || _daemonProcess.HasExited)
+                    return default;
 
                 try
                 {
@@ -170,7 +167,7 @@ namespace AnimeLocalTracker.Services.Python
                     }
 
                     // Leer la línea de respuesta (el daemon responde una línea JSON por comando)
-                    string? output = await _daemonOut.ReadLineAsync(ct).AsTask();
+                    string? output = await _daemonOut.ReadLineAsync(ct).AsTask().ConfigureAwait(false);
                     if (string.IsNullOrWhiteSpace(output))
                         return default;
 
@@ -190,12 +187,12 @@ namespace AnimeLocalTracker.Services.Python
         }
 
         /// <summary>
-        /// Arranca el proceso daemon si no está vivo (una única instancia compartida).
+        /// Arranca el proceso daemon de forma 100% asíncrona si no está vivo (una única instancia compartida).
         /// Hereda el PATH completo (usuario + sistema + FFmpeg embebido de la app) para que
         /// el daemon encuentre herramientas como ffmpeg instaladas por winget en WinGet\Links
         /// o los binarios ffmpeg.exe/ffprobe.exe distribuidos en la carpeta FFmpeg/ de la app.
         /// </summary>
-        private void EnsureDaemonStarted()
+        private async Task EnsureDaemonStartedAsync(CancellationToken ct)
         {
             if (_daemonProcess != null && !_daemonProcess.HasExited)
                 return;
@@ -227,14 +224,12 @@ namespace AnimeLocalTracker.Services.Python
                 _daemonOut = proc.StandardOutput;
                 _daemonIn = proc.StandardInput;
 
-                // Consumir el saludo SÍNCRONAMENTE ANTES de que se envíe el primer
-                // comando (la extracción de PyInstaller onefile puede tardar ~4s en
-                // arrancar; leerlo asíncronamente con Task.Run causaba que el lector
-                // de saludo robara la respuesta de un comando posterior → respuestas
-                // cruzadas del daemon).
+                // Consumir el saludo de forma no bloqueante antes del primer comando
+                using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                linkedCts.CancelAfter(TimeSpan.FromSeconds(8));
                 try
                 {
-                    _ = _daemonOut.ReadLineAsync().Wait(TimeSpan.FromSeconds(20));
+                    _ = await _daemonOut.ReadLineAsync(linkedCts.Token).ConfigureAwait(false);
                 }
                 catch
                 {

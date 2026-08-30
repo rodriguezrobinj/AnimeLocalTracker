@@ -93,9 +93,18 @@ public class AnimeAv1VideoSourceResolver : IVideoSourceResolver
         return null;
     }
 
+    private static bool EsDominioPermitido(string url, string dominioEsperado)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return false;
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)) return false;
+        if (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps) return false;
+        return uri.Host.Equals(dominioEsperado, StringComparison.OrdinalIgnoreCase) ||
+               uri.Host.EndsWith("." + dominioEsperado, StringComparison.OrdinalIgnoreCase);
+    }
+
     public async Task<string?> GetVideoUrlAsync(string pageUrl, CancellationToken cancellationToken = default)
     {
-        if (pageUrl.Contains("animeav1.com"))
+        if (EsDominioPermitido(pageUrl, "animeav1.com"))
         {
             try
             {
@@ -125,7 +134,7 @@ public class AnimeAv1VideoSourceResolver : IVideoSourceResolver
                 return null;
             }
         }
-        else if (pageUrl.Contains("mp4upload.com"))
+        else if (EsDominioPermitido(pageUrl, "mp4upload.com"))
         {
             return await ExtractFromMp4UploadAsync(pageUrl, cancellationToken);
         }
@@ -135,6 +144,7 @@ public class AnimeAv1VideoSourceResolver : IVideoSourceResolver
 
     private async Task<string?> ExtractFromMp4UploadAsync(string embedUrl, CancellationToken cancellationToken)
     {
+        if (!EsDominioPermitido(embedUrl, "mp4upload.com")) return null;
         try
         {
             using var req = new HttpRequestMessage(HttpMethod.Get, embedUrl);

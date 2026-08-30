@@ -16,7 +16,6 @@ public class AuthService : IAuthService
     // 1. PEGA TU NÚMERO DE CLIENTE AQUÍ:
     private const string ClientId = "48217";
     
-    private const string ArchivoToken = "token.txt";
     public string? Token { get; private set; }
     
     // Ruta donde guardaremos el token para que no inicies sesión cada vez que abras la app
@@ -237,11 +236,14 @@ public class AuthService : IAuthService
         Token = null;
         if (System.IO.File.Exists(_rutaToken))
         {
-            System.IO.File.Delete(_rutaToken);
-        }
-        if (System.IO.File.Exists(ArchivoToken))
-        {
-            System.IO.File.Delete(ArchivoToken);
+            try
+            {
+                System.IO.File.Delete(_rutaToken);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("AuthService", $"No se pudo eliminar el archivo de token: {ex.Message}");
+            }
         }
         
         WeakReferenceMessenger.Default.Send(new UsuarioDesconectadoMensaje());

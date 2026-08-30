@@ -1,574 +1,947 @@
-# 🔐 Auditoría Integral — AnimeLocalTracker
-### Informe Ejecutivo y Técnico · Equipo multidisciplinario (Seguridad, Arquitectura, Full-Stack, SRE, QA)
+# Auditoría Integral — AnimeLocalTracker
 
-**Proyecto:** AnimeLocalTracker  
-**Stack:** .NET 8 (C# 12) · WPF · MaterialDesignInXaml · CommunityToolkit.Mvvm 8.4.2 · FlyleafLib 3.11.0 · SQLite (sqlite-net-pcl 1.11.285, WAL) · Velopack 1.2.0 · Rust (animetracker_core, cdylib) · Python 3.10+ (daemon PyInstaller)  
-**Repositorio:** https://github.com/rodriguezrobinj/AnimeLocalTracker  
-**Entorno objetivo:** Producción (instalador Velopack para Windows 10/11 x64)  
-**Arquitectura:** Monolito WPF desktop · MVVM · Inyección de dependencias (Microsoft.Extensions.DependencyInjection) · SQLite local-first · FFI Rust para parsing/fingerprint/miniaturas · daemon Python JSON-lines para ffprobe/escenas/yt-dlp  
-**Fecha de auditoría:** 30/08/2026 · **Método:** Revisión de código fuente, configuración, scripts de build, dependencias, pruebas unitarias y benchmarks ejecutados en vivo (máquina de referencia: i5-7300U 2C/4T, Windows 10 22H2).
-
-> **Estado de la sesión:** los hallazgos 1, 2, 3, 4, 5 y 20 de la iteración anterior de este informe ya fueron **corregidos en el working tree** (catch_unwind FFI, distribución de ffmpeg, hover preview, pantalla negra, lag de enriquecimiento, FPS fraccionario). Este informe los registra como **resueltos** y añade la auditoría completa pendiente.
+> **Proyecto:** AnimeLocalTracker · App de escritorio WPF para gestión de colecciones locales de anime
+> **Stack:** .NET 8 (C# 12, WPF, MVVM Toolkit) · SQLite (WAL, sqlite-net-pcl) · FlyleafLib 3.11.3 (FFmpeg 9) · Rust `animetracker_core` (FFI cdylib, anitomy-pure, rayon, SIMD) · Python daemon (PyInstaller, yt-dlp, anitopy, opencv) · MaterialDesignThemes 5.2.1 · Velopack 1.2.0 · OAuth2 AniList · GraphQL
+> **Repositorio:** local (`origin/main` @ `4ef2e89`) · **Entorno objetivo:** producción (instalador por-usuario, `win-x64`, Velopack)
+> **Fecha:** 2026-08-30 · **Método:** revisión estática manual + SCA (cargo-audit/pip-audit en CI) + análisis heurístico de rendimiento/concurrencia. Sin cambios de código (solo propuestas).
 
 ---
 
-# ✅ 0. Checklist de verificación (punto de partida)
+## 0. Checklist de verificación y metadatos de la auditoría
 
-| # | Ítem | Estado | Evidencia |
+| # | Verificación | Estado | Evidencia |
 |---|---|---|---|
-| C1 | Compilación Debug/Release | ✅ OK | `build.ps1` doble pasada OK |
-| C2 | Suite de pruebas (132) | ✅ 132/132 | 13–47 s, 0 fallos |
-| C3 | Benchmarks ejecutables | ⚠️ Parcial | Requiere `--buildTimeout 900` (timeout 120s del build WPF) |
-| C4 | SAST / `dotnet list package --vulnerable` | ✅ 0 paquetes vulnerables | verificado hoy |
-| C5 | `cargo audit` | ❌ No ejecutado | `cargo-audit` no instalado (recomendado) |
-| C6 | Dependencias desactualizadas | ⚠️ 2 menores | FlyleafLib 3.11.0→3.11.3, Controls.WPF 1.7.0→1.7.3 |
-| C7 | CI/CD (GitHub Actions) | ❌ **No existe** | `Test-Path .github\workflows` = False |
-| C8 | Secretos en código | ✅ Sin secretos | grep sin resultados; ClientId OAuth es público por diseño |
-| C9 | Backups de base de datos | ❌ No existe | `biblioteca.db` sin backup automático |
-| C10 | Manejo global de excepciones | ✅ | DispatcherUnhandled + UnhandledException + UnobservedTask |
-| C11 | Tokens cifrados | ✅ | DPAPI CurrentUser + migración legacy |
-| C12 | Validación de entrada OAuth | ✅ | `state` criptográfico 32 bytes verificado |
-| C13 | ffmpeg distribuido con la app | ✅ (corregido hoy) | `FFmpeg/ffmpeg.exe + ffprobe.exe` + PATH injection |
-| C14 | Panics Rust a través de FFI | ✅ (corregido hoy) | `catch_unwind` en los 7 exports |
-| C15 | Hover preview / pantalla negra / lag detalle | ✅ (corregido hoy) | ver sección 2.3 |
+| V1 | Compilación del proyecto (build.ps1 doble pasada anti-flake) | ✅ OK | Último commit CI verde; 3 proyectos compilan |
+| V2 | Suite de tests ejecutándose | ✅ 120 tests | `AnimeLocalTracker.Tests` (xUnit, 22 archivos) |
+| V3 | Escaneo SAST manual (C#, Python, Rust, PS, YAML, ISS) | ✅ Realizado | Informe §3 |
+| V4 | Análisis SCA .NET (`dotnet list package --vulnerable`) | ⚠️ No configurado | No hay paso en CI ni `packages.lock.json` |
+| V5 | SCA Rust (`cargo audit`) | ⚠️ Informativo | `ci.yml:38` con `continue-on-error: true` |
+| V6 | SCA Python (`pip-audit`) | ⚠️ Informativo | `ci.yml:46` con `continue-on-error: true` |
+| V7 | Búsqueda de secretos (grep token/password/secret/api_key) | ✅ Sin secretos reales | Solo literales de tests |
+| V8 | DAST dinámico (pruebas contra instancia en ejecución) | ❌ No realizado | Requiere build + app corriendo; cubierto por revisión estática de flujos |
+| V9 | Pruebas de carga (k6/JMeter/Locust) | ❌ No aplica a app de escritorio | BenchmarkDotNet ya cubre lógica pura (§9) |
+| V10 | Revisión de pipeline CI/CD | ✅ Realizado | §8.1 — sin release pipeline |
+| V11 | Revisión de instalador | ✅ Realizado | `installer.iss` (sin firma, `ignoreversion`) |
+| V12 | Revisión de dependencias (versiones, licencias) | ✅ Realizado | §8.3 |
+| V13 | Revisión FFI Rust (memoria, panics) | ✅ Realizado | §3.10 — defensivo, bien hecho |
+| V14 | Cobertura de tests en CI | ❌ No se mide | coverlet instalado pero nunca invocado |
+
+**Supuestos declarados** (el prompt pedía llenar los campos `[...]`):
+- **Nombre:** AnimeLocalTracker (repo local, sin URL pública).
+- **Requisitos funcionales/NFR:** README (HEAD) — "colección local elevada a estándar streaming", local-first, sync AniList 90%, auto-skip AniSkip, descargas, calendario, actualizaciones Velopack silenciosas.
+- **El working tree tiene 5 archivos borrados sin commit** (`README.md`, `ABOUT.md`, `AUDITORIA_INTEGRAL.md`, `INFORME_EJECUTIVO.md`, `installer.iss`). El informe se basa en el HEAD del repo. Si el borrado fue intencional, ignorar esta nota.
+- No hay `http://` en tráfico de red salvo el callback OAuth local (§3.2).
 
 ---
 
-# 📄 1. Resumen Ejecutivo
+## 1. Resumen ejecutivo
 
-**Veredicto general: madurez BUENA para una v1 de escritorio local-first, con riesgos concentrados en 3 frentes: (A) flujo OAuth legacy, (B) dependencia de scraping no autorizado, (C) ausencia total de CI/CD y backups.**
+### 1.1 Conclusiones clave
 
-### Top 5 riesgos (resumen)
+1. **La base es sólida y por encima de la media en apps de escritorio personales.** No hay inyección SQL (ORM parametrizado), no hay inyección de comandos (args arrays sin shell en Rust/Python), no hay deserializadores peligrosos, TLS por defecto en todos los `HttpClient`, el token OAuth está cifrado con DPAPI, el FFI Rust usa `catch_unwind` en el borde, y hay 120 tests + benchmarks con historial. El trabajo previo en mitigar `_wpftmp`/races WPF es genuino.
+2. **Ninguna vulnerabilidad crítica o alta confirmada.** Los riesgos más serios son de severidad **Media** y están localizados en 3 zonas: el flujo OAuth local (token en fragmento URL + callback HTTP en loopback), el logging de URLs firmadas de streaming, y el control de tamaño de descargas (SSRF/pre-asignación de disco).
+3. **El defecto de calidad más grave es funcional, no de seguridad:** `PythonBridgeService.cs:237` bloquea la UI hasta **20 s** en el primer uso del daemon Python (`ReadLineAsync().Wait()`), y los receptores `async void` del Messenger (`MainViewModel.cs:167,199`) pueden derrumbar el proceso si una excepción escapa del try/catch.
+4. **Deuda arquitectónica concentrada en god-objects:** `ReproductorViewModel` (1.112 líneas), `DetalleViewModel` (959), `MainViewModel` (527, 13 interfaces `IRecipient`) y duplicación de lógica de creación de anime (~70 líneas) y de búsqueda en vivo (~55 líneas) entre `MainViewModel` y `AgregarAnimeViewModel`.
+5. **DevOps es el eslabón más débil:** sin release pipeline (100% manual), sin firma de código del instalador ni de paquetes Velopack, SCA con `continue-on-error: true` (informativo), sin dependabot, sin pinning de acciones CI a SHA, sin cachés de build, y dependencias de test con problemas de licencia (`FluentAssertions` 8.x) y mantenimiento (`Moq`).
+
+### 1.2 Top 5 riesgos
 
 | # | Riesgo | Severidad | Impacto |
 |---|---|---|---|
-| R1 | **OAuth implicit flow + listener localhost:5050** sin PKCE ni verificación de origen | 🔴 Crítico | Robo de token de sesión AniList |
-| R2 | **Scraping de animeav1.com/mp4upload.com** (regex HTML, sin throttling, sin tests) | 🔴 Alto | Bloqueo de IP, incumplimiento ToS, rotura de funcionalidad |
-| R3 | **Sin CI/CD ni SCA automático** (cargo-audit, NuGet audit) | 🟠 Alto | Regresiones y CVEs en producción sin detección |
-| R4 | **Sin backup de SQLite + escrituras no atómicas** (`.state`, `release_info.json`) | 🟠 Alto | Pérdida irreversible del historial del usuario |
-| R5 | **Instalador ~400 MB** y sin firma de código | 🟡 Medio | Fricción de adopción, SmartScreen |
+| 1 | Congelación de UI hasta 20 s por `Wait()` bloqueante al arrancar el daemon Python (FUN-01) | **Alto (disponibilidad/UX)** | La primera operación Python (parseo, thumbnails) congela la app; con daemon lento, el usuario percibe el app "colgada" |
+| 2 | Muerte del proceso por excepciones en `async void` del Messenger (FUN-02) | **Alto (estabilidad)** | Navegación rápida Detalle↔Reproductor puede disparar excepción no capturada y matar la app |
+| 3 | Exposición de tokens de streaming firmados en logs locales (SEC-04) | **Medio (confidencialidad)** | URLs de CDN con query params de firma quedan en `app.log`; un usuario local con acceso puede reutilizarlas |
+| 4 | SSRF sin límite de tamaño en descarga de portadas + validación de hostname evasible (SEC-02/SEC-03) | **Medio (integridad/DoS)** | `GetByteArrayAsync(urlPortada)` fetchea cualquier URL y sin tope de bytes; `Contains("animeav1.com")` es bypassable |
+| 5 | Cadena de actualización sin firma + release manual (SEC-05/DEV-02) | **Medio (supply chain)** | Si el repositorio GitHub o la release se comprometen, el payload se instala sin verificación de firma (Velopack verifica solo hashes SHA1 de `RELEASES`) |
 
-### Nivel de madurez (ISO/IEC 25010 + DevSecOps)
+### 1.3 Nivel de madurez por dominio (0–5)
+
+| Dominio | Madurez | Comentario |
+|---|---|---|
+| Seguridad de código | 4.0 | Prácticas correctas de base; faltan firma, PKCE y saneo de logs |
+| Funcionalidad/estabilidad | 3.5 | 120 tests y buena disciplina de errores, pero `async void` + `Wait()` bloqueante |
+| Arquitectura | 3.0 | MVVM + DI + interfaces limpios, pero god-objects y duplicación |
+| Rendimiento | 3.5 | Optimizaciones reales (bulk DB, cachés, Rust FFI); hot paths en UI thread |
+| Integraciones | 3.5 | Polly con Retry-After correcto; scraping frágil sin contrato |
+| DevOps | 2.5 | CI con audits pero no bloqueantes; sin release automatizado ni firma |
+| Testing | 3.5 | Buen coverage de VMs y servicios críticos; huecos en Main/Descargas/scrapers y 0% coverage en CI |
+| **Media global** | **3.4 / 5** | Sólida para app personal; lejos de "enterprise" por DevOps y firma |
 
 ```
-Seguridad           ████████░░ 8/10  (buena higiene local; flujo OAuth legacy)
-Rendimiento         ████████░░ 8/10  (benchmarks excelentes en HW modesto)
-Funcionalidad       █████████░ 9/10  (132 tests, features completas)
-Arquitectura        ███████░░░ 7/10  (MVVM+DI sólido; deuda en modelos de presentación)
-Mantenibilidad      ██████░░░░ 6/10  (fire-and-forget, código duplicado, sin linters)
-Portabilidad        ██████░░░░ 6/10  (solo Windows; scraping frágil)
-DevOps/CI           ██░░░░░░░░ 2/10  (sin CI/CD, sin IaC, sin backups)
-Seguridad de la cadena (SCA) █████░░░ 5/10  (NuGet OK, Rust/Python sin auditoría)
+Seguridad    ████████░░ 4.0
+Funcional    ███████░░░ 3.5
+Arquitectura ██████░░░░ 3.0
+Rendimiento  ███████░░░ 3.5
+Integración  ███████░░░ 3.5
+DevOps       █████░░░░░ 2.5
+Testing      ███████░░░ 3.5
 ```
-
-**Conclusión de 1 párrafo:** El producto funciona bien, es rápido (seeking lógico 328 ns/op, 500 upserts en 21,8 ms en un i5 de 2 núcleos), está bien probado (132 tests) y tiene una base MVVM/DI honesta. El mayor riesgo no es el código sino el **modelo de confianza externa**: un flujo OAuth deprecado, un scraper frágil sin autorización y una cadena de build 100% manual. Las 3 inversiones con mayor retorno son: (1) CI/CD con análisis de seguridad automático, (2) backups atómicos de SQLite + migración del scraper a una fuente estable, (3) migrar a PKCE/authorization-code cuando AniList lo permita.
 
 ---
 
-# 🎯 2. Matriz de Riesgos Priorizada y Plan de Remediación
+## 2. Matriz de riesgos priorizada y plan de remediación
 
-## 2.1 Matriz (probabilidad × impacto)
+### 2.1 Matriz completa (hallazgos → fases)
 
-| ID | Hallazgo | Categoría | Prob. | Impacto | CVSS 3.1 | Fase |
-|---|---|---|---|---|---|---|
-| SEC-01 | Token OAuth en historial del navegador (implicit flow) | Seguridad | Alta | Alto | **7.5** | F1 |
-| SEC-02 | Port squatting `localhost:5050` (sin verificación de origen del listener) | Seguridad | Baja | Alto | 5.3 | F1 |
-| SEC-03 | Scraper animeav1 sin throttle/retry y regex sobre HTML | Seguridad/Disponibilidad | Alta | Medio | 5.0 | F1 |
-| SEC-04 | `Debug.WriteLine` como logging en `AnimeAv1VideoSourceResolver` | Observabilidad | Alta | Bajo | 2.0 | F1 |
-| SEC-05 | Panic Rust cruzando FFI (sin catch_unwind) — **✅ RESUELTO hoy** | Seguridad/Estabilidad | — | — | — | — |
-| SEC-06 | Carpeta de thumbnails con nombres hash; sin limpieza de caché antigua | Privacidad/Disco | Media | Bajo | 2.6 | F2 |
-| SEC-07 | AppId de Inno Setup malformado (`{{...` sin `}}`) | Distribución | Alta | Bajo | 3.1 | F1 |
-| SEC-08 | Instalador sin firma de código (Authenticode) | Distribución | Media | Medio | 4.0 | F3 |
-| FUNC-01 | `EpisodioItem.BadgeTecnico` FPS fraccionario — **✅ RESUELTO hoy** | Funcional | — | — | — | — |
-| FUNC-02 | `DescargasViewModel` `FirstOrDefault` O(n) por tick de progreso | Perf | Media | Bajo | — | F2 |
-| FUNC-03 | `_isUpdating` en UpdateService sin lock (race) | Funcional | Baja | Medio | — | F2 |
-| FUNC-04 | `DownloadStateStore` escritura no atómica | Fiabilidad | Media | Alto | — | F1 |
-| FUNC-05 | `_ = Task...` fire-and-forget (10+) sin observación | Fiabilidad | Media | Medio | — | F2 |
-| ARQ-01 | Carga de 4 fuentes de parsing distintas (C#, Rust, Python, scraper) | Arquitectura | — | Medio | — | F3 |
-| ARQ-02 | Modelos con lógica de presentación (AniListMedia, AnimeBusquedaItem) | Arquitectura | — | Bajo | — | F3 |
-| PERF-01 | Formateo de tiempo con `TimeSpan.ToString` → 80 B/tick de GC | Perf | Alta | Bajo | — | F1 |
-| PERF-02 | `AplicarFiltrosYOrdenamiento` reconstruye colección O(n²) | Perf | Alta | Medio | — | F1 |
-| PERF-03 | Spritesheet con 60 procesos ffmpeg sin tope — **✅ RESUELTO hoy** (pool=2) | Perf | — | — | — | — |
-| PERF-04 | Caché de portadas limpia TODO al superar 500 (sin LRU) | Perf | Media | Bajo | — | F2 |
-| INT-01 | yt-dlp `direct_stream_url` elige `formats[-1]` (no el mejor) | Integración | Media | Bajo | — | F2 |
-| INT-02 | `db_mock_generator.py` esquema SQL desincronizado de sqlite-net | Integración | Media | Bajo | — | F2 |
-| DEV-01 | No existe CI/CD (badge README vs realidad) | DevOps | Alta | Alto | — | F1 |
-| DEV-02 | No hay `cargo-audit` ni audit de dependencias Python | SCA | Media | Medio | — | F2 |
-| DEV-03 | Tests condicionales que pasan "vacíos" (RustNativeTests, ImageCache) | QA | Media | Medio | — | F2 |
-| DEV-04 | `pydantic` dependencia muerta (~30 MB) + `yt-dlp.exe` huérfano | Distribución | Alta | Bajo | — | F2 |
-| DEV-05 | `BuildInParallel=false` global ralentiza builds | DevOps | Media | Bajo | — | F3 |
+| ID | Hallazgo | Sev. | Prob. | Impacto | Fase |
+|---|---|---|---|---|---|
+| FUN-01 | `ReadLineAsync().Wait(20s)` bloquea UI en arranque del daemon Python | **Alto** | Alta | Alta | **Fase 1** |
+| FUN-02 | `async void` en receptores del Messenger (MainViewModel:167,199) | **Alto** | Media | Alta | **Fase 1** |
+| SEC-01 | OAuth implícito + callback HTTP localhost:5050 sin check Origin | Medio | Baja | Alta | Fase 1 |
+| SEC-02 | SSRF sin límite de tamaño en `GetByteArrayAsync(urlPortada)` | Medio | Baja | Media | Fase 1 |
+| SEC-03 | Validación hostname con `Contains()` (bypassable) | Medio | Baja | Media | Fase 1 |
+| SEC-04 | Logging de URLs firmadas de streaming | Medio | Alta | Media | Fase 1 |
+| SEC-05 | Velopack e instalador sin firma de código | Medio | Baja | Alta | Fase 2 |
+| SEC-06 | Pre-asignación de disco con tamaño controlado por el servidor | Medio | Baja | Media | Fase 2 |
+| FUN-03 | `CerrarSesion()` borra `token.txt` del CWD (cualquier archivo) | Medio | Baja | Baja | Fase 1 |
+| FUN-04 | Sin single-instance (colisión puerto 5050, settings last-writer-wins) | Medio | Media | Baja | Fase 2 |
+| FUN-05 | Shutdown sin cancelar CTS de loops de Sync/Update/daemon | Medio | Media | Baja | Fase 2 |
+| FUN-06 | `Flags: ignoreversion` en instalador (binarios viejos persisten) | Medio | Media | Media | Fase 2 |
+| FUN-07 | Carrera `_skipTimes.Clear()` vs `CargarSkipTimesAsync` fire-and-forget | Medio | Baja | Media | Fase 1 |
+| ARQ-01 | God-objects: ReproductorViewModel (1.112), DetalleViewModel (959) | Alto | Alta | Media | Fase 3 |
+| ARQ-02 | Duplicación creación de anime (Main↔AgregarAnime, ~70 líneas) | Alto | Alta | Media | Fase 2 |
+| ARQ-03 | Duplicación búsqueda en vivo (debounce+CTS) | Medio | Alta | Baja | Fase 2 |
+| ARQ-04 | Cachés estáticos sin límite + `Clear()` total no-LRU | Medio | Media | Media | Fase 2 |
+| ARQ-05 | Dos motores de parsing (Rust anitomy-pure y Python anitopy) | Medio | Alta | Baja | Fase 3 |
+| RND-01 | `ObtenerPortada()` síncrono (File.ReadAllBytes + decode WPF) en UI thread | Medio | Alta | Media | Fase 2 |
+| RND-02 | N+1 de red secuencial en `ActualizarBibliotecaAsync` (100 llamadas seriales) | Medio | Alta | Media | Fase 3 |
+| RND-03 | `Dispatcher.Invoke` síncrono en hot path de carga de portadas | Bajo | Media | Baja | Fase 2 |
+| INT-01 | Scraping animeav1.com con regex sobre HTML sin contrato | Medio | Alta | Media | Fase 3 |
+| INT-02 | `yt-dlp>=2025.1.15` rango abierto (supply chain) | Medio | Baja | Media | Fase 2 |
+| DEV-01 | CI: SCA no bloqueante, sin pinning SHA, sin caché, sin coverage | Medio | Alta | Media | Fase 1 |
+| DEV-02 | Sin release pipeline, sin signing, versión hardcodeada 1.0.0 | Alto | Alta | Media | Fase 2 |
+| DEV-03 | Sin dependabot, sin `packages.lock.json` | Medio | Media | Baja | Fase 1 |
+| DEV-04 | FluentAssertions 8.x: licencia comercial para uso de pago | Medio | — | Legal | Fase 2 |
+| DEV-05 | `Microsoft.Extensions.* 10.0.11` sobre TFM net8.0 (drift) | Bajo | Baja | Baja | Fase 3 |
+| DEV-06 | Sin tests de MainViewModel/Configuración/Descargas/scrapers; 0% coverage en CI | Medio | Media | Media | Fase 2 |
 
-## 2.2 Plan de remediación por fases
+### 2.2 Plan de remediación por fases
 
-| Fase | Ventana | Entregables | Esfuerzo |
-|---|---|---|---|
-| **F1 — Quick wins (0–2 semanas)** | Inmediato | SEC-03/04, SEC-07, FUNC-04, PERF-01/02, DEV-01 (workflow básico) | ~5 días |
-| **F2 — Corto (2–6 semanas)** | Próximo sprint | SEC-01/02, SEC-06, FUNC-02/03/05, INT-01/02, DEV-02/03/04, PERF-04 | ~3 semanas |
-| **F3 — Mediano (1–3 meses)** | Q3 | SEC-08, ARQ-01/02, DEV-05, migración del scraper a fuente estable (Nyaa RSS), PKCE | ~1 mes |
-| **F4 — Largo (3–6 meses)** | Q4 | Multiplataforma (Avalonia), telemetría opcional opt-in, módulo de plugins | 2–3 meses |
-
----
-
-# 🔬 3. Informe Técnico por Área
+**Fase 1 — Quick wins críticos (1–2 semanas):** FUN-01, FUN-02, FUN-07, SEC-02, SEC-03, SEC-04, FUN-03, DEV-01 (dependabot + audits bloqueantes), DEV-03.
+**Fase 2 — Higiene de producción (2–4 semanas):** SEC-01 (PKCE), SEC-05 (firma), SEC-06, FUN-04 (single-instance), FUN-05 (graceful shutdown), FUN-06 (installer), ARQ-02/ARQ-03 (extracción de servicios), ARQ-04 (LRU), RND-01, INT-02, DEV-02 (release pipeline), DEV-04, DEV-06 (coverage + tests faltantes).
+**Fase 3 — Evolución arquitectónica (1–2 trimestres):** ARQ-01 (split de god-objects), ARQ-05 (unificar motor de parsing), RND-02 (batching AniList), INT-01 (contrato de scraping), DEV-05.
 
 ---
 
-## 3.1 Seguridad (OWASP Top 10 2021 / ASVS / CWE Top 25)
+## 3. Seguridad (SAST estático, OWASP Top 10 2021 / ASVS / CWE/SANS)
 
-### SEC-01 · [CRÍTICO] OAuth implicit flow — token expuesto en historial del navegador
-- **Archivo:** `AnimeLocalTracker/Services/AuthService.cs:74`
-- **Fragmento:**
-```csharp
-var url = $"https://anilist.co/api/v2/oauth/authorize?client_id={ClientId}&response_type=token&state={expectedState}";
-```
-- **Causa raíz:** `response_type=token` (implicit) deja el access token en la URL de redirección → queda en historial, extensiones y capturas de tráfico local. ASVS 3.1.1, 3.1.6.
-- **Severidad:** CVSS 3.1 **7.5** (AV:N/AC:H/PR:N/UI:R/S:U/C:H/I:H/A:N) — el token otorga lectura+escritura del perfil AniList del usuario.
-- **Evidencia:** token visible en `http://localhost:5050/...#access_token=...` (fragment); el listener local lo captura por POST (AuthService.cs:106-121).
-- **Mitigación parcial existente:** `state` criptográfico de 32 bytes verificado (AuthService.cs:71,156) — bloquea CSRF, pero NO el historial.
-- **Corrección propuesta (cuando AniList lo soporte):**
-```csharp
-// ANTES
-var url = $"...authorize?client_id={ClientId}&response_type=token&state={expectedState}";
+### 3.1 Resumen
 
-// DESPUÉS — authorization code + PKCE (S256), intercambio del code por token vía servidor propio o
-// client-side con code_verifier; el token NUNCA viaja por URL ni queda en historial.
-var verifier = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
-    .TrimEnd('=').Replace('+', '-').Replace('/', '_');
-var challenge = Convert.ToBase64String(SHA256.HashData(Encoding.ASCII.GetBytes(verifier)))
-    .TrimEnd('=').Replace('+', '-').Replace('/', '_');
-var url = $"{AniListAuthorize}?client_id={ClientId}&response_type=code"
-        + $"&code_challenge={challenge}&code_challenge_method=S256&state={expectedState}";
-// ... el listener recibe ?code=...&state=... → POST a AniList con code+verifier → token en memoria/DPAPI
-```
-- **Validación:** test de integración con listener local simulado + verificación de que ningún `access_token` aparezca en la URL.
+No se encontraron **Críticos** ni **Altos** confirmados. 9 hallazgos **Medios** y 14 **Bajos**. Los controles positivos de base son destacables (ver §3.12).
 
-### SEC-02 · [MEDIO] Port squatting en localhost:5050
-- **Archivo:** `AuthService.cs:62`
-- **Causa raíz:** `listener.Prefixes.Add("http://localhost:5050/")` — un proceso malicioso local podría escuchar antes en el puerto y capturar el code/token. El `state` mitiga CSRF pero no la suplantación del listener.
-- **Severidad:** CVSS **5.3** (AV:L/AC:L/PR:N/UI:R/S:U/C:H/I:N/A:N).
-- **Corrección:**
+---
+
+### SEC-01 · OAuth: flujo implícito + callback HTTP en loopback sin validación de Origin
+
+- **Categoría:** A01 Broken Access Control / A02 Cryptographic Failures · OWASP API: OAuth2 misconfiguration
+- **Severidad:** Medio · **CVSS 3.1:** 6.1 (AV:N/AC:L/PR:N/UI:R/S:U/C:H/I:N/A:N)
+- **Probabilidad:** Baja · **Impacto:** Alto (robo de token de AniList del usuario)
+
+**Evidencia** — `AnimeLocalTracker\Services\AuthService.cs:62,74,144`:
+
 ```csharp
-// ANTES
+// :62  — callback en HTTP plano
 listener.Prefixes.Add("http://localhost:5050/");
-
-// DESPUÉS — puerto aleatorio efímero + verificación de que nadie más escucha
-var rnd = RandomNumberGenerator.GetInt32(49152, 65535);
-listener.Prefixes.Add($"http://127.0.0.1:{rnd}/");
-listener.Start();
-// (el puerto se pasa por URL a AniList en redirect_uri)
+// :74  — flujo implícito: el token viaja en el FRAGMENTO de la URL del navegador
+var url = $"https://anilist.co/api/v2/oauth/authorize?client_id={ClientId}&response_type=token&state={expectedState}";
+// :144 — endpoint local POST /token sin verificar header Origin/Referer
+if (!payload.TryGetValue("state", out var state) || state != expectedState) { ... }
 ```
-- **Validación:** test que lanza dos listeners y verifica que el segundo falla con otro puerto.
 
-### SEC-03 · [ALTO] Scraper animeav1.com sin throttling, retry ni tests
-- **Archivo:** `AnimeLocalTracker/Services/AnimeAv1VideoSourceResolver.cs` (Fase 2, L47-91)
-- **Causa raíz:** decenas de requests HTTP secuenciales con variaciones de slug, sin `SemaphoreSlim`, sin backoff, con regex sobre HTML (L64, L111, L150) y `Debug.WriteLine` (L88, L124, L158).
-- **Impacto:** bloqueo de IP del sitio, rotura silenciosa de la descarga, violación ToS. CWE-799 (rate limit), CWE-1104.
-- **Corrección propuesta:**
+**Causa raíz:** el flujo `response_type=token` deja el access token en el fragmento de URL (historial del navegador, extensiones, sincronización de marcadores). El endpoint local no comprueba quién envía el POST (solo el `state`), y un proceso local puede sondear `http://localhost:5050` o el puerto puede estar ya ocupado por un atacante (`listener.Start()` falla sin reintento, :64-69).
+
+**Corrección propuesta — PKCE + validación de Origin:**
+
 ```csharp
 // ANTES
-foreach (var variante in variantes) { await _httpClient.GetAsync(url); ... }
+var url = $"https://anilist.co/api/v2/oauth/authorize?client_id={ClientId}&response_type=token&state={expectedState}";
+
+// DESPUÉS (authorization code + PKCE)
+var verifier = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64))
+    .TrimEnd('=').Replace('+', '-').Replace('/', '_');
+var challenge = Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(verifier)))
+    .TrimEnd('=').Replace('+', '-').Replace('/', '_');
+var url = $"https://anilist.co/api/v2/oauth/authorize?client_id={ClientId}" +
+          $"&response_type=code&state={expectedState}&code_challenge={challenge}&code_challenge_method=S256";
+// ... en POST /token:
+if (!string.Equals(ctx.Request.Headers["Origin"], "http://localhost:5050",
+        StringComparison.OrdinalIgnoreCase)) { ctx.Response.StatusCode = 403; return; }
+```
+
+**Validación:** test de flujo OAuth completo con servidor local simulado; verificar que el token ya no aparece en ninguna URL (`grep response_type=token` → 0 resultados). **Referencia:** RFC 7636, OWASP ASVS V3.x, AniList docs (soporta code+PKCE).
+
+---
+
+### SEC-02 · SSRF sin límite de tamaño en descarga de portadas
+
+- **Categoría:** A10 SSRF (CWE-918) + A04 Insecure Design (CWE-400)
+- **Severidad:** Medio · **CVSS 3.1:** 6.5 (AV:N/AC:L/PR:N/UI:R/S:U/C:L/I:N/A:H)
+- **Probabilidad:** Baja · **Impacto:** Medio (fetch de recursos internos; agotamiento de memoria/disco)
+
+**Evidencia** — `AnimeLocalTracker\Services\ImageCacheService.cs:108`:
+
+```csharp
+var bytes = await client.GetByteArrayAsync(urlPortada);
+```
+
+`urlPortada` proviene de metadatos AniList (controlables por el servidor o un sync manipulado). No hay validación de esquema/host ni tope de tamaño: un servidor que responda indefinidamente agota RAM y el disco de `%LocalAppData%\AnimeLocalTracker\Covers`.
+
+**Corrección propuesta:**
+
+```csharp
+// ANTES
+var bytes = await client.GetByteArrayAsync(urlPortada);
 
 // DESPUÉS
-private static readonly SemaphoreSlim _throttle = new(2, 2); // máx 2 peticiones concurrentes
-private static readonly TimeSpan MinInterval = TimeSpan.FromMilliseconds(800);
-foreach (var variante in variantes) {
-    await _throttle.WaitAsync();
-    try {
-        await Task.Delay(MinInterval);              // respeto al servidor
-        using var res = await _httpClient.GetAsync(url, ct);
-        if (res.StatusCode == HttpStatusCode.TooManyRequests) {
-            var retryAfter = res.Headers.RetryAfter?.Delta ?? TimeSpan.FromSeconds(30);
-            AppLogger.Warn("AnimeAv1Resolver", $"429 al probar {url}; esperando {retryAfter}...");
-            await Task.Delay(retryAfter, ct);
-        }
-        ...
-    } finally { _throttle.Release(); }
+var uri = new Uri(urlPortada);
+if (uri.Scheme != Uri.UriSchemeHttps || !EsHostPermitido(uri.Host)) { AppLogger.Warn(...); return null; }
+using var res = await client.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead);
+res.EnsureSuccessStatusCode();
+if (res.Content.Headers.ContentLength is long len && len > 10_000_000) { AppLogger.Warn(...); return null; }
+using var stream = await res.Content.ReadAsStreamAsync();
+using var outBuf = new MemoryStream();
+await stream.CopyToAsync(outBuf, 81920);   // CopyToAsync con buffer finito
+return outBuf.ToArray();
+```
+
+**Validación:** test con `HttpMessageHandler` falso que devuelva `Content-Length` enorme y otro que streamee infinito (timeout de cancelación). **Referencia:** OWASP SSRF, CWE-400.
+
+---
+
+### SEC-03 · Validación de hostname evasible con `Contains()`
+
+- **Categoría:** A10 SSRF (CWE-918)
+- **Severidad:** Medio · **CVSS 3.1:** 5.3 (AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N)
+- **Probabilidad:** Baja · **Impacto:** Media (un `pageUrl` con `animeav1.com.evil.com` o query `?x=animeav1.com` pasa el filtro y se fetchea)
+
+**Evidencia** — `AnimeLocalTracker\Services\AnimeAv1VideoSourceResolver.cs:98,128`:
+
+```csharp
+if (pageUrl.Contains("animeav1.com")) { ... }        // :98
+else if (pageUrl.Contains("mp4upload.com")) { ... }  // :128
+```
+
+**Corrección propuesta:**
+
+```csharp
+// ANTES
+if (pageUrl.Contains("animeav1.com"))
+
+// DESPUÉS
+private static bool EsDominioPermitido(string url, string dominio)
+{
+    return Uri.TryCreate(url, UriKind.Absolute, out var uri)
+        && uri.Scheme == Uri.UriSchemeHttps
+        && string.Equals(uri.Host, dominio, StringComparison.OrdinalIgnoreCase);
+}
+if (EsDominioPermitido(pageUrl, "animeav1.com"))
+```
+
+**Validación:** tests parametrizados con `https://animeav1.com.evil.com/`, `https://evil.com/?x=animeav1.com`, `http://animeav1.com` (deben rechazarse). **Referencia:** CWE-918, OWASP SSRF Prevention Cheat Sheet.
+
+---
+
+### SEC-04 · Tokens de streaming firmados en logs locales
+
+- **Categoría:** A01 Broken Access Control / A09 Logging failures (CWE-532)
+- **Severidad:** Medio · **CVSS 3.1:** 3.7 (AV:L/AC:H/PR:L/UI:N/S:U/C:H/I:N/A:N)
+- **Probabilidad:** Alta · **Impacto:** Media (las URLs directas de mp4upload/CDN llevan query params de firma; cualquiera con acceso al equipo las reutiliza)
+
+**Evidencia:**
+
+```csharp
+// PythonVideoSourceResolver.cs:43
+AppLogger.Info("PythonVideoResolver", $"Stream resuelto exitosamente con yt-dlp: {result.DirectUrl}");
+// DownloadService.cs:431,461
+AppLogger.Warn("DownloadService", $"Error en sondeo HEAD para '{videoUrl}': {ex.Message}");
+```
+
+**Corrección propuesta — sanitizar query params antes de loguear:**
+
+```csharp
+// ANTES
+AppLogger.Info("PythonVideoResolver", $"Stream resuelto: {result.DirectUrl}");
+
+// DESPUÉS
+AppLogger.Info("PythonVideoResolver", $"Stream resuelto: {SanitizarUrlParaLog(result.DirectUrl)}");
+
+static string SanitizarUrlParaLog(string url)
+{
+    if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)) return "(url inválida)";
+    var sinQuery = new UriBuilder(uri) { Query = string.Empty, Fragment = string.Empty }.Uri;
+    return sinQuery.AbsoluteUri;
 }
 ```
-- **Validación:** tests con `HttpMessageHandler` simulado (respuestas 429/200/HTML), fixture de HTML congelado.
 
-### SEC-04 · [BAJO] `Debug.WriteLine` en lugar de AppLogger
-- **Archivo:** `AnimeAv1VideoSourceResolver.cs:88,124,158`; `DownloadService.cs:342,368,383`
-- **Causa raíz:** logging perdido en Release → imposible diagnosticar fallos de descarga en campo.
-- **Corrección:** sustituir por `AppLogger.Debug/Warn` con contexto (`AnimeTitulo`, `Ep`, `URL`, `HTTP code`).
-- **Validación:** grep `Debug.WriteLine` en el proyecto = 0.
-
-### SEC-05 · [RESUELTO HOY] Panics Rust a través de FFI → UB
-- **Fix aplicado:** `native/animetracker_core/src/lib.rs` — `ffi_catch(AssertUnwindSafe(...))` en los 7 exports + `catch_unwind` por frame en `spritesheet.rs`.
-- **Validación:** smoke test real (spritesheet 30 frames OK) + 132/132 tests.
-
-### SEC-06 · [BAJO] Caché de thumbnails sin limpieza
-- **Archivo:** `HoverThumbnailService.cs` / `PythonEpisodeEnricher.cs`
-- **Causa raíz:** los spritesheets por video (`Thumbnails/Spritesheets/{hash}.jpg`) se acumulan para siempre; los frames temporales ya no persisten (fix de hoy), pero los sheets de videos eliminados quedan.
-- **Corrección:** al `LimpiarCacheMemoria()` o al eliminar un anime, borrar sheets huérfanos; opcionalmente un barrido por antigüedad (> 90 días) al arrancar.
-- **Validación:** test que crea un sheet, "elimina el video" y verifica purga.
-
-### SEC-07 · [MEDIO] AppId de Inno Setup malformado
-- **Archivo:** `installer.iss:12`
-```ini
-AppId={{D8C3E5A4-7B2F-4D1E-9C8A-3E5F7A1B2C3D}
-```
-- **Causa raíz:** el doble `{{` escapa la llave y falta `}}` de cierre → Inno lo trata como literal; la identificación del instalador y la lógica de actualización se rompen.
-- **Corrección:**
-```ini
-AppId={{D8C3E5A4-7B2F-4D1E-9C8A-3E5F7A1B2C3D}
-```
-→
-```ini
-AppId={D8C3E5A4-7B2F-4D1E-9C8A-3E5F7A1B2C3D}
-```
-(En Inno Setup, `AppId` con llaves simples es el formato correcto; si se quiere el formato GUID con doble llave es `{{GUID}` en Inno 6+... se verifica compilando con `ISCC`.)
-- **Validación:** `iscc installer.iss` sin warnings de AppId.
-
-### SEC-08 · [MEDIO] Sin firma Authenticode
-- **Causa raíz:** instalador y binario sin firma → SmartScreen/Defender alertas, riesgo de manipulación en tránsito (el manifiesto Velopack usa SHA-256, mitiga parte del riesgo).
-- **Corrección (F3):** firmar con certificado OV/EV (ej. Azure Trusted Signing) `signtool sign /fd SHA256` en el pipeline.
-
-### Otros puntos de seguridad evaluados (sin hallazgo crítico)
-- **SQLi:** sqlite-net genera SQL parametrizado; consultas LINQ seguras. ✅
-- **Command injection:** Rust usa `Command::new("ffmpeg").args([...])` (sin shell); Python usa listas; PowerShell scripts de build usan rutas fijas. ✅
-- **XSS/SSTI:** no hay renderizado web embebido; el WebView de AniList se abre en el navegador del usuario. ✅
-- **SSRF:** la app descarga URLs de portadas desde AniList y URLs de video del scraper; el riesgo es acotado (desktop local, sin datos corporativos), pero un scraper comprometido podría entregar URLs maliciosas → añadir validación de esquema `https:` en `DownloadService` y rechazo de `localhost/127.0.0.1/0.0.0.0` (CWE-918, severidad baja en este contexto).
-- **Secretos:** sin API keys ni tokens en el repo. `ClientId` OAuth es público por diseño. ✅
-- **Criptografía:** DPAPI CurrentUser para el token (correcto); MD5 solo como key de caché (no criptográfico, aceptable); SHA256 para hash de rutas. ✅
-- **Manejo de errores:** triple handler global + AppLogger. ✅ (mejora: `Exception.Data` contextual en logs de red).
+**Validación:** test que asegura que el query string nunca aparece en la salida del logger (mock de `AppLogger` o captura del archivo). **Referencia:** CWE-532, OWASP Logging Cheat Sheet (nunca loguear secretos o tokens).
 
 ---
 
-## 3.2 Funcionalidad y Correcciones (bugs, casos límite, races)
+### SEC-05 · Cadena de actualización e instalador sin firma
 
-### FUNC-01 · [RESUELTO HOY] BadgeTecnico FPS fraccionario
-`24000/1001` → ahora resuelve la fracción y muestra `23.98fps` (`EpisodioItem.cs`). Validado con test.
+- **Categoría:** A08 Software & Data Integrity Failures (CWE-494/353)
+- **Severidad:** Medio · **CVSS 3.1:** 6.8 (AV:N/AC:H/PR:N/UI:R/S:C/C:H/I:L/A:L)
+- **Probabilidad:** Baja · **Impacto:** Alta (si el repo de releases se compromete, el update se instala sin verificación)
 
-### FUNC-02 · [PERF] DescargasViewModel O(n) por tick
-- **Archivo:** `DescargasViewModel.cs:52` — `FirstOrDefault` por cada `DescargaProgresoMensaje` (4 ticks/s × N descargas).
-- **Corrección:**
-```csharp
-// ANTES
-var item = Descargas.FirstOrDefault(d => d.AniListId == msg.AniListId && d.NumeroEpisodio == msg.NumeroEpisodio);
+**Evidencia:** `UpdateService.cs:45` — `new GithubSource(RepoUrl, null, false)` (sin clave de firma de paquetes Velopack); `installer.iss` sin bloque `[Setup] SignTool`; `build_velopack_release.ps1` ejecuta `vpk pack` sin `--signTemplate`.
 
-// DESPUÉS
-private readonly Dictionary<(int, int), DescargaItem> _porClave = new();
-// en Receive: _porClave.TryGetValue((msg.AniListId, msg.NumeroEpisodio), out var item)
-```
-- **Validación:** test con 200 mensajes de progreso (ya existe patrón en ViewModelStressAndLifecycleTests) verificando tiempo.
+**Corrección propuesta:**
 
-### FUNC-03 · [MEDIO] Race en UpdateService
-- **Archivo:** `UpdateService.cs:26,155` — `_isUpdating` sin lock ni volatile; dos llamadas concurrentes pueden iniciar dos descargas.
-- **Corrección:** `Interlocked.CompareExchange(ref _isUpdating, 1, 0)` + `Interlocked.Exchange(0)` al terminar, con `finally`.
-
-### FUNC-04 · [ALTO] Escrituras no atómicas en DownloadStateStore y release_info.json
-- **Archivo:** `DownloadStateStore.cs:53`, `UpdateService.cs:338`
-- **Causa raíz:** `File.WriteAllTextAsync` directo: un crash a mitad de escritura corrompe `.state` (pierde progreso de descargas reanudables) o `release_info.json` (rompe caché offline).
-- **Corrección (patrón temp + move atómico):**
-```csharp
-// ANTES
-await File.WriteAllTextAsync(statePath, json, ct);
-
-// DESPUÉS
-string tmp = statePath + ".tmp";
-await File.WriteAllTextAsync(tmp, json, ct);
-File.Move(tmp, statePath, overwrite: true);   // replace atómico en NTFS
-```
-- **Validación:** test que escribe, simula fallo a mitad (corta el tmp) y verifica que el estado original sigue válido.
-
-### FUNC-05 · [MEDIO] Fire-and-forget sin observación
-- **Archivo:** `UpdateService.cs:93,100,120,138,164,167`; `GaleriaViewModel.cs:322`; `AgregarAnimeViewModel.cs:152` (async void en setter).
-- **Riesgo:** excepciones no observadas (mitigadas por `TaskScheduler.UnobservedTaskException` global, pero sin contexto).
-- **Corrección:** helper `ObservarTarea(Task t, string origen)` que hace `t.ContinueWith(ct => AppLogger.Error(origen, ct.Exception), TaskContinuationOptions.OnlyOnFaulted)`; en el setter de búsqueda, refactor a `async Task` con try/catch (patrón ya usado en `MainViewModel.EjecutarBusquedaEnVivoAsyncCore`).
-
-### FUNC-06 · [INFO] Estado inconsistente en "Reanudar" (playback)
-- Tras el fix de hoy, si el seek diferido se aplica pero `durSeconds` tardó, el toast de reanudación se muestra correctamente. Caso límite: archivo con duración 0 (streams rotos) → `durSeconds > 0` nunca se cumple y no hay reanudación. Aceptable (documentado), opcional: fallback de 2 ticks.
-
----
-
-## 3.3 Arquitectura (C4 · SOLID · AS-IS/TO-BE)
-
-### 3.3.1 Diagrama AS-IS (C4 — Contenedores)
-
-```mermaid
-flowchart LR
-    subgraph Cliente
-        UI["WPF UI<br/>MaterialDesignInXaml"]
-        VMs["ViewModels<br/>CommunityToolkit.Mvvm"]
-        SVC["Servicios C#<br/>Database, Sync, Download,<br/>Playback, Skip, Cache"]
-    end
-    subgraph Local
-        DB[(SQLite WAL<br/>biblioteca.db)]
-        FFM["FFmpeg 7.1 DLLs + exe<br/>(embebido)"]
-        RUST["animetracker_core.dll<br/>(Rust FFI)"]
-        PY["AnimeTrackerTools.exe<br/>(daemon Python)"]
-        SET[(settings.json<br/>+ token DPAPI)]
-        CACHE[("Caché portadas/sheets<br/>LocalAppData")]
-    end
-    subgraph Externo
-        ANI["AniList GraphQL"]
-        SKIP["AniSkip API"]
-        AV1["animeav1.com"]
-        MP4["mp4upload.com"]
-        GIT["GitHub Releases<br/>(Velopack)"]
-    end
-    UI --> VMs --> SVC
-    SVC --> DB
-    SVC --> RUST --> FFM
-    SVC --> PY --> FFM
-    SVC --> ANI & SKIP
-    SVC --> AV1 --> MP4
-    SVC --> GIT
-    UI --> CACHE
-```
-
-**Puntos únicos de fallo (SPOF):**
-1. `biblioteca.db` — sin backup, sin WAL checkpoint controlado, sin protección multi-instancia.
-2. `AnimeAv1VideoSourceResolver` — única fuente de descargas reales.
-3. `AnimeTrackerTools.exe` (165 MB) — único puente ffprobe/escenas/yt-dlp; si el binario PyInstaller no se empaqueta bien, el enriquecimiento cae (ya mitigado: degradación elegante).
-4. `AniList` — auth y sincronización dependen de un solo proveedor.
-
-### 3.3.2 Evaluación de principios
-| Principio | Nota | Ejemplo |
-|---|---|---|
-| SRP | ✅ Mayormente | Servicios pequeños y enfocados |
-| OCP | ✅ | `IVideoSourceResolver`, `ISkipTimesCoordinator`, fallbacks |
-| LSP/DIP | ✅ | DI real en `App.xaml.cs`; interfaces limpias |
-| ISP | ⚠️ | `IAnimeTrackingService` es una interfaz "gorda" (12 métodos) → dividir en `IAnimeQueryService`/`IAnimeMutationService` |
-| DDD | ⚠️ | Modelos anémicos; lógica de presentación en modelos (`AniListMedia.FormattedStatus`, `AnimeBusquedaItem`) |
-| CQRS | N/A | No aplica (local-first, sin escrituras distribuidas) |
-| Event sourcing | N/A | — |
-
-### 3.3.3 Deuda arquitectónica priorizada
-1. **ARQ-01 — 4 fuentes de parsing de nombres** (`FileScannerService` regex, Rust anitomy, Python anitopy, slugs animeav1) con resultados inconsistentes. → **TO-BE:** el Rust FFI es la fuente canónica; C# regex como fallback rápido; eliminar el parsing Python.
-2. **ARQ-02 — Presentación en modelos** (`AniListMedia`, `AnimeBusquedaItem`, `DescargaItem`) → mover a ViewModels/Converters.
-3. **ARQ-03 — `MainViewModel` orquesta demasiado** (diálogos, búsqueda, navegación, descargas, actualizaciones) → extraer `IDialogCoordinator`, `ISearchService`.
-
-### 3.3.4 Diagrama TO-BE (evolución)
-
-```mermaid
-flowchart LR
-    subgraph App
-        UI2["WPF UI"]
-        VM2["ViewModels (puros)"]
-        SRV["Servicios (Split: Query/Mutation)"]
-        INFRA["Infra: Cache LRU,<br/>BackupService,<br/>Telemetría opt-in"]
-    end
-    subgraph Local
-        DB2[(SQLite + backups<br/>WAL + checkpoint)]
-        CORE["Rust Core (canónico:<br/>parsing, fingerprint,<br/>spritesheets, frames)"]
-    end
-    subgraph Externo2
-        GQL["AniList (PKCE)"]
-        SKIP2["AniSkip"]
-        SRC["Fuente estable de streams<br/>(Nyaa RSS / API oficial)"]
-        GH["CI/CD: build + test +<br/>audit + sign + vpk"]
-    end
-    UI2 --> VM2 --> SRV
-    SRV --> DB2 & CORE
-    SRV --> GQL & SKIP2
-    SRV --> SRC
-    GH -. publica .-> App
-```
-
-**Justificación:** el monolito local-first es correcto para un tracker personal; no se recomienda microservicios. La evolución es de **fortalecimiento**: fuentes canónicas únicas, cachés con política de desalojo, backups automáticos y una integración de descargas reemplazable.
-
----
-
-## 3.4 Rendimiento y Optimización
-
-### 3.4.1 Pruebas ejecutadas (BenchmarkDotNet, Release, i5-7300U 2C/4T, power plan Alto rendimiento)
-
-| Benchmark | Resultado | Memoria/op | Nota |
-|---|---|---|---|
-| Seeking lógico continuo (1440 seeks) | **472 µs total ≈ 328 ns/op** | 172,8 KB | Excelente |
-| Prev/Siguiente (100 episodios) | 31,2 µs | 8,2 KB | — |
-| Prev/Siguiente (1.000 episodios) | 222,7 µs | 41,5 KB | Sub-lineal ✅ |
-| Formateo de tiempo (1.000 ticks) | 149,9 µs | **80 KB** | 80 B/tick de GC → PERF-01 |
-| Auto-tracking umbral 90 % (1.000 ticks) | 1,43 µs | 0 B | ✅ |
-| Bulk 500 registros SQLite (1 transacción) | **21,8 ms ≈ 22.900 upsert/s** | 2,6 MB | ✅ |
-| Consulta completa 500 registros | 116,8 µs | 18,1 KB | ✅ |
-| `ExtraerNumeroEpisodio` (12 formatos) | 6,4 µs | 5,4 KB | ≈ 535 ns/archivo ✅ |
-
-**Tests de estrés (xUnit, 13–47 s):** 1440 seeks < 500 ms ✅ · 1000 seeks aleatorios < 150 ms ✅ · 500 cambios de episodio < 5 s ✅ · maratón 24 eps ✅ · 50 consultas SQLite concurrentes ✅ · 200 mensajes de progreso ✅.
-
-**Hallazgo infra:** los benchmarks Database/FileScanner fallan con el timeout por defecto de BenchmarkDotNet (120 s) al recompilar el proyecto WPF; se resuelve con `--buildTimeout 900` → **DEV-06**: parametrizarlo en `run_benchmarks_and_reports.ps1`.
-
-### 3.4.2 Optimizaciones propuestas
-
-| ID | Optimización | Estado | Impacto estimado |
-|---|---|---|---|
-| PERF-01 | Formateo de tiempo sin asignación (`TimeSpan.TryFormat` + `string.Create`) | Propuesto | −80 B/tick en bucle de tracking (≈ −100 % GC del hot path) |
-| PERF-02 | `AplicarFiltrosYOrdenamiento` incremental (ICollectionView.Refresh en vez de Clear+Add) | Propuesto | O(n²) → O(n) en listas de 3.000 episodios |
-| PERF-03 | Spritesheet pool acotado | ✅ Resuelto hoy | 60→2 procesos ffmpeg simultáneos; CPU liberada para el decoder |
-| PERF-04 | Caché de portadas LRU (desalojo por antigüedad) en vez de Clear total | Propuesto | Evita recarga completa de galerías grandes |
-| PERF-05 | `DescargasViewModel` diccionario por clave | Propuesto (FUNC-02) | O(n) → O(1) por tick |
-| PERF-06 | Pool acotado en Rust también para `ParseBatch` (hoy usa el global) | Propuesto | Evita competir con la UI en máquinas de 2 núcleos |
-
-### 3.4.3 Consultas SQL de referencia
-```sql
--- Índice compuesto existente (correcto)
-CREATE INDEX IF NOT EXISTS IX_RegistroEpisodio_AnimeEp ON RegistroEpisodio(AniListId, NumeroEpisodio);
-
--- Consulta N+1 detectada y ya resuelta (bulk upsert):
--- ANTES: 1 SELECT + 1 UPDATE/INSERT por fila → N+1
--- DESPUÉS: 1 SELECT + 1 UPDATE masivo + 1 INSERT masivo en 1 transacción (DatabaseService.GuardarRegistrosEpisodioBulkAsync)
-
--- Sugerencia: estadísticas para monitoreo
-PRAGMA optimize;
-```
-⚠️ **Falta:** `VACUUM` periódico y `PRAGMA wal_checkpoint(TRUNCATE)` al salir — la BD WAL crece sin límite en escrituras altas.
-
----
-
-## 3.5 Integraciones
-
-| Integración | Contrato | Idempotencia | Reintentos | Observabilidad | Riesgo |
-|---|---|---|---|---|---|
-| AniList GraphQL | Query/mutation versionada (API v2) | Mutaciones idempotentes por naturaleza (upsert) | ✅ Polly 3× con Retry-After (429) | Logs + caché con invalidation | Medio (rate limit 90/min) |
-| AniSkip REST | `/v2/skip-times/{malId}/{ep}?types=...` | GET — cache 2 h | ✅ Polly | Logs | Bajo |
-| animeav1 + mp4upload | HTML scraping | No aplica | ❌ Sin retry | ❌ `Debug.WriteLine` | **Alto** (SEC-03) |
-| yt-dlp (daemon Python) | JSON-lines por stdin/stdout | Parcial | Fallback one-shot | Logs del bridge | Medio |
-| Rust FFI | 7 exports `extern "C"` + JSON | Sí | N/A | `AppLogger.Debug` | Medio (ya blindado) |
-| Velopack | Manifiesto + nupkg | Sí (versionado semver) | 3 niveles de caché offline | Logs | Bajo |
-
-**Recomendaciones de integración:**
-1. **INT-01:** yt-dlp `direct_stream_url` elige `formats_list[-1]` (no garantiza la mejor calidad) → ordenar por `height`/`bitrate` o pedir `format: "best[ext=mp4]/best"`.
-2. **INT-02:** `db_mock_generator.py` usa un esquema que no coincide con sqlite-net (`Id` vs `AniListId`) → alinear o eliminar (los benchmarks ya generan sus propios datos).
-3. **INT-03 (nueva):** como mitigación de SEC-03, implementar `INyaaRssResolver` (RSS de Nyaa.si, estable y legítimo) detrás de `IVideoSourceResolver`, manteniendo animeav1 como secundario.
-4. **INT-04 (nueva):** `FileSystemWatcher` sobre `RutaBaseAnimes` para auto-refresco de la biblioteca (los usuarios copian archivos mientras la app está abierta).
-
----
-
-## 3.6 Calidad de Código y DevOps
-
-### 3.6.1 Calidad
-- **Cobertura:** 132 tests / 21 archivos; cobertura realista ~55-65 % (sin coverlet instalado — sugerencia DEV-07: `coverlet.collector` + umbral 70 % en CI).
-- **Estándares:** nullable habilitado, `ImplicitUsings`, `GeneratedRegex` ✅. Sin `.editorconfig` ni analyzers de estilo → DEV-08: añadir `StyleCop`/`Roslyn analyzers` + `TreatWarningsAsErrors` en CI.
-- **Patrones repetidos:** limpieza de residuales `.downloading` duplicada (FileScannerService y PythonFileScannerService); defaults de release duplicados en 3 sitios; parsing de nombres en 4 sitios (ARQ-01).
-- **Documentación:** README/ABOUT excelentes; comentarios con lecciones aprendidas (BOM daemon, settle de seeks, etc.) — muy por encima del promedio.
-
-### 3.6.2 DevOps
-| Aspecto | Estado | Hallazgo |
-|---|---|---|
-| CI | ❌ | No existe `.github/workflows` — **DEV-01**: el badge del README ("Tests Passing") no corresponde a ningún pipeline |
-| CD | ⚠️ | Manual: `build_velopack_release.ps1` + release de GitHub a mano |
-| SCA automático | ❌ | Solo manual (`dotnet list package --vulnerable`) |
-| Firmado | ❌ | SEC-08 |
-| Backups | ❌ | FUNC-04 |
-| Logs | ✅ | Channel + rotación 5 MB, `%LocalAppData%` |
-| Alertas | ❌ | Sin telemetría/errores centralizados (no deseado por privacidad — justificado, pero al menos exportar log al reportar bugs) |
-| IaC | N/A | Desktop app; se aplica a infra de CI |
-
-**DEV-01 · [ALTO] Workflow CI/CD propuesto (`.github/workflows/ci.yml`):**
-```yaml
-name: CI
-on: [push, pull_request]
-jobs:
-  build:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
-        with: { dotnet-version: 8.0.x }
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Build Rust core (release)
-        run: cargo build --release --manifest-path native/animetracker_core/Cargo.toml
-      - name: NuGet audit
-        run: dotnet list AnimeLocalTracker.sln package --vulnerable
-      - name: Build + Tests
-        run: .\build.ps1 -RunTests
-      - name: Benchmarks (sanity)
-        run: dotnet run --project AnimeLocalTracker.Benchmarks -c Release -- 1 --buildTimeout 900
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with: { name: app, path: AnimeLocalTracker/bin/Release/net8.0-windows/ }
-```
-
----
-
-# 🧪 4. Informe de Pruebas de Rendimiento (resumen ejecutable)
-
-Escenarios cubiertos hoy: benchmarks de micro-latencia (Reproductor, DB, FileScanner), estrés de UI (xUnit), smoke test FFI real (spritesheet 30 frames: 8,3 s en i5-7300U — aceptable en background, cacheado).
-
-**Recomendación de escenarios futuros (k6/JMeter NO aplican a desktop):** usar **BenchmarkDotNet** (ya integrado) + **PerfView/`dotnet-counters`** para:
-1. **Carga real de biblioteca:** 1.000 animes × 24 episodios → medir arranque, navegación, scroll (hoy: OK por virtualización).
-2. **Rendimiento de escaneo:** 5.000 archivos → objetivo < 2 s (hoy ~6 ms de regex por 1.000 + I/O).
-3. **GC:** pico de memoria en galería con 500 portadas en RAM ≈ 135 MB (documentado); objetivo < 300 MB en biblioteca de 1.000 animes.
-4. **Consultas DB objetivo (p50/p95):** bulk 500 < 25 ms (hoy 21,8 ms) · query 500 filas < 200 µs (hoy 116,8 µs) · todo por debajo del objetivo.
-
----
-
-# 🛠️ 5. Plan de Acción Priorizado
-
-| Prioridad | Acción | Esfuerzo | Impacto |
-|---|---|---|---|
-| ⚡ Quick win (hoy) | PERF-01 (string.Create en tiempos) · PERF-02 (refresh incremental) · SEC-04 (Debug→AppLogger) | 0,5 d | Bajo coste, UX notable |
-| ⚡ Quick win (hoy) | DEV-06 (`--buildTimeout` en script) · SEC-07 (AppId) · DEV-04 (quitar pydantic + yt-dlp.exe) | 0,5 d | Higiene + −30 MB |
-| 🔴 Corto (1–2 sem) | DEV-01 (CI con audit + tests) · FUNC-04 (escrituras atómicas) · SEC-03 (throttle scraper) · backups SQLite (VACUUM/checkpoint + copia diaria) | 3–5 d | Riesgo top 5 cubierto |
-| 🟠 Mediano (2–6 sem) | SEC-01/02 (PKCE + puerto efímero) · FUNC-02/03/05 · INT-01/02 · DEV-02 (cargo-audit en CI) · DEV-03 (tests no-vacíos) · PERF-04 (LRU) | 2–3 sem | Madurez de seguridad |
-| 🟡 Largo (3+ meses) | SEC-08 (firma) · ARQ-01/02/03 · INT-03 (Nyaa RSS) · INT-04 (FileSystemWatcher) · multiplataforma | 1–3 meses | Diferenciación |
-
----
-
-# ✅ 6. Checklist de Cumplimiento (estándares y buenas prácticas)
-
-| Estándar | Cumple | Observación |
-|---|---|---|
-| OWASP ASVS L1 (App de escritorio local) | 8/12 | Falla: OAuth legacy (3.1), rate-limit scraper (13.1), verificación de origen (3.4) |
-| OWASP Top 10 2021 | 7/10 | A01/A02/A03/A05/A07/A09/A10 OK; A01(03) scraping, A04(07) AppId, A08(05) integridad datos |
-| CWE/SANS Top 25 | 22/25 | Riesgos: CWE-311 (token en historial), CWE-1104, CWE-352 mitigado |
-| NIST 800-53 (controles aplicables) | Parcial | AC-3 (local), SC-28 (DPAPI ✅), CP-9 (backups ❌) |
-| ISO/IEC 25010 | — | Evaluado en radar (sección 1) |
-| SOLID / MVVM / DI | ✅ | — |
-| 12-Factor (aplicable a desktop) | Parcial | Config externalizada (settings.json ✅), logs a stdout → archivo ✅, build/release unificado ❌ |
-| SemVer + changelog | ⚠️ | Velopack versiona; sin CHANGELOG.md |
-
----
-
-# 📎 7. Anexos
-
-## 7.1 Dependencias (SCA)
-- **NuGet:** 0 vulnerabilidades conocidas (verificado). Desactualizadas menores: `FlyleafLib` 3.11.0→3.11.3, `FlyleafLib.Controls.WPF` 1.7.0→1.7.3. Nota: `MaterialDesignThemes 5.3.3-ci1443` es una **pre-release** → fijar a release estable cuando exista.
-- **Cargo:** `rayon 1.10`, `image 0.25`, `serde`, `anitomy-pure 0.1` — **ejecutar `cargo install cargo-audit && cargo audit`** (DEV-02) y añadirlo al CI.
-- **Python:** `yt-dlp` se actualiza solo (vulnerabilidades conocidas de yt-dlp se parchean frecuentemente → **fijar mínimo y actualizar en cada release**, `pip-audit` en CI).
-
-## 7.2 Comandos de reproducción / verificación
 ```powershell
-# SCA
-dotnet list AnimeLocalTracker.sln package --vulnerable --include-transitive
-cargo install cargo-audit && cargo audit   # en native/animetracker_core
-pip install pip-audit && pip-audit         # en tools/python
+# build_velopack_release.ps1 — ANTES
+vpk pack -u https://github.com/USUARIO/AnimeLocalTracker -p $publishDir -e AnimeLocalTracker.exe -o $releaseDir
 
-# Build + tests + benchmarks
-.\build.ps1 -RunTests
-dotnet run --project AnimeLocalTracker.Benchmarks -c Release -- 4 --buildTimeout 900
-
-# Validar instalador
-iscc installer.iss
+# DESPUÉS (certificado EV + clave privada en secretos del CI)
+vpk pack -u https://github.com/USUARIO/AnimeLocalTracker -p $publishDir -e AnimeLocalTracker.exe -o $releaseDir `
+    --signTemplate "signtool sign /fd SHA256 /f `"$env:CERT_PATH`" /p `"$env:CERT_PASSWORD`" `$file"
 ```
 
-## 7.3 Diagrama de seguridad del flujo OAuth actual
+Y en `installer.iss` añadir:
+
+```ini
+[Setup]
+SignTool=signtool /f {#CertPath} /p {#CertPass} /fd SHA256 /t http://timestamp.digicert.com $f
+SignedUninstaller=yes
+```
+
+**Validación:** `vpk pack` produce paquetes con firma verificable (`Get-AuthenticodeSignature` → Valid). **Referencia:** OWASP ASVS V7.x, Velopack docs (signing), CWE-494.
+
+---
+
+### SEC-06 · Pre-asignación de disco con tamaño controlado por el servidor
+
+- **Categoría:** A04 Insecure Design (CWE-400, disk exhaustion)
+- **Severidad:** Medio · **CVSS 3.1:** 5.5 (AV:N/AC:L/PR:N/UI:R/S:U/C:N/I:N/A:L → disco lleno)
+- **Probabilidad:** Baja · **Impacto:** Media
+
+**Evidencia** — `DownloadService.cs:415-486`:
+
+```csharp
+// ContentLength/ContentRange.Length provienen del servidor (remoto)
+preAlloc.SetLength(totalBytes);   // :486 — reserva el disco ANTES de descargar
+```
+
+**Corrección propuesta:**
+
+```csharp
+// ANTES
+preAlloc.SetLength(totalBytes);
+
+// DESPUÉS
+const long MaxPreallocBytes = 50L * 1024 * 1024 * 1024; // 50 GB por archivo (4K remux)
+if (totalBytes > MaxPreallocBytes)
+{
+    AppLogger.Warn("DownloadService", $"Tamaño declarado excesivo ({totalBytes}): abortando pre-asignación y descargando incremental.");
+    preAlloc.SetLength(Math.Min(totalBytes, MaxPreallocBytes));
+}
+// Y verificar de nuevo tras el GET real; cancelar si el servidor se desvía >20% del Content-Length
+```
+
+**Validación:** test con mock que declare `Content-Length = long.MaxValue`. **Referencia:** CWE-400.
+
+---
+
+### SEC-07 · Fallback de token en texto plano si DPAPI falla
+
+- **Categoría:** A02 Cryptographic Failures (CWE-311)
+- **Severidad:** Bajo · **Probabilidad:** Baja · **Impacto:** Baja
+
+**Evidencia** — `AuthService.cs:37-50`: si `ProtectedData.Unprotect` lanza, se lee `File.ReadAllText(_rutaToken)` (token en claro). Además el token vive como `string` inmutable en memoria.
+
+**Corrección:** eliminar el fallback; si el token no puede desprotegerse, pedir re-login (el flujo OAuth es barato). Si se mantiene el fallback por compatibilidad, emitir `AppLogger.Warn` y migrar el archivo al formato cifrado en el siguiente login. **Referencia:** CWE-311, DPAPI docs.
+
+---
+
+### SEC-08 · Archivos temporales con nombre predecible (planting)
+
+- **Categoría:** A01/A05 (CWE-377 unsafe temp file)
+- **Severidad:** Bajo · **Probabilidad:** Baja · **Impacto:** Baja
+
+**Evidencia** — `HoverThumbnailService.cs:194`: `alt_hover_{sha256(ruta)}_{bucketSec}.jpg` en `Path.GetTempPath()`. Un atacante local puede pre-colocar un JPEG malicioso (decode con `BitmapImage` en :222).
+
+**Corrección:** crear los temporales en `%LocalAppData%\AnimeLocalTracker\Temp\` (directorio privado del usuario) en lugar de `Path.GetTempPath()` compartido, y borrarlos con `FileOptions.DeleteOnClose`. **Referencia:** CWE-377.
+
+---
+
+### SEC-09 · MD5 para naming de caché
+
+- **Categoría:** A02 (CWE-327 uso de hash débil)
+- **Severidad:** Bajo · **Probabilidad:** Baja · **Impacto:** Baja (colisión → miniatura de otro video)
+
+**Evidencia** — `PythonEpisodeEnricher.cs:69` (`MD5.Create()`). `HoverThumbnailService.cs:279` ya usa SHA256 correctamente.
+
+**Corrección:** unificar a `SHA256.HashData` (el naming de `HoverThumbnailService` ya es SHA256; consistencia). **Referencia:** CWE-327.
+
+---
+
+### SEC-10 · Estado de descarga `.state` deserializado sin validar offsets
+
+- **Categoría:** A04 (CWE-502-ish local tampering)
+- **Severidad:** Bajo · **Probabilidad:** Baja · **Impacto:** Baja
+
+**Evidencia** — `DownloadStateStore.cs:13-48` + `DownloadService.cs:524`: solo se compara `TotalBytes`; un `.state` manipulado con offsets negativos/descomunales produce `RandomAccess.WriteAsync` en offsets arbitrarios (falla capturada, impacto local).
+
+**Corrección:** validar `0 <= offset < TotalBytes` y que los 6 segmentos cubran `[0, TotalBytes)` sin solaparse antes de reanudar; descartar el `.state` si no pasa la validación (reiniciar descarga). **Referencia:** CWE-20.
+
+---
+
+### SEC-11 · Base de datos y caches en claro en LocalAppData
+
+- **Categoría:** A02 (CWE-312)
+- **Severidad:** Bajo · **Probabilidad:** Baja · **Impacto:** Baja
+
+**Evidencia:** `biblioteca.db` (WAL) contiene historial de visionado, rutas locales y URLs remotas; covers/thumbnails en claro. **Mitigación existente:** el token sí está cifrado (DPAPI).
+
+**Corrección (opcional, perfil bajo):** limitar el historial retenido (`PRAGMA secure_delete=ON`), o cifrar la DB con SQLCipher si el requisito de privacidad sube. Sin acción requerida para el perfil actual de app local.
+
+---
+
+### SEC-12 · MessageBox con `InnerException.Message` (fuga de detalle interno)
+
+- **Categoría:** A09 Logging/Info exposure
+- **Severidad:** Bajo · **Probabilidad:** Baja · **Impacto:** Baja
+
+**Evidencia** — `App.xaml.cs:40-44`: `DispatcherUnhandledException` muestra `args.Exception.InnerException.Message` (puede incluir rutas/versiones de driver).
+
+**Corrección:** mostrar un mensaje genérico localizado y loguear el detalle completo: `"Ocurrió un error inesperado. El detalle se guardó en el log."` **Referencia:** OWASP Logging Cheat Sheet.
+
+---
+
+### SEC-13 · `ClientId` OAuth hardcodeado
+
+- **Categoría:** Info
+- **Severidad:** Bajo · **Probabilidad:** — · **Impacto:** Baja
+
+**Evidencia** — `AuthService.cs:17`: `private const string ClientId = "48217";` con comentario "PEGA TU NÚMERO DE CLIENTE AQUÍ". El Client ID de OAuth público no es un secreto (la defensa es el `state`/PKCE), pero compartir el mismo entre todos los usuarios impide revocación selectiva y limita el rate limit.
+
+**Corrección:** dejar como está o mover a settings con fallback; al migrar a PKCE (SEC-01) el riesgo residual desaparece.
+
+---
+
+### SEC-14 · Build descarga ffmpeg sin verificación de integridad
+
+- **Categoría:** A08 (CWE-494 supply chain de build)
+- **Severidad:** Bajo · **Probabilidad:** Baja · **Impacto:** Baja
+
+**Evidencia** — `build.ps1:32`: `https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip` sin hash.
+
+**Corrección:** fijar versión + SHA256 en el script (o usar el paquete NuGet `Flyleaf.FFmpeg` que ya incluye binarios, que es lo que ocurre en la práctica) y fallar si no coincide. **Referencia:** CWE-494.
+
+---
+
+### SEC-15 · Rust: `count` de spritesheet sin tope superior
+
+- **Categoría:** A04 (CWE-400 memory exhaustion en FFI)
+- **Severidad:** Bajo · **Probabilidad:** Baja · **Impacto:** Baja (local)
+
+**Evidencia** — `native\animetracker_core\src\spritesheet.rs:58,146,212`: `count.max(0)` solo acota por abajo; `cols*rows*160*90*3` bytes por frame. El valor llega desde C# sin validar en el borde FFI.
+
+**Corrección:** acotar en el borde FFI: `let count = count.clamp(1, 4096)` y validar `cols*rows*count` contra un límite de ~256 MB antes de alojar `RgbImage`. **Referencia:** CWE-400.
+
+---
+
+### 3.12 Controles positivos verificados (a mantener)
+
+| Control | Evidencia |
+|---|---|
+| Sin SQLi: ORM parametrizado en todas las consultas | `DatabaseService.cs` (0 `CommandText`), GraphQL con variables |
+| Sin command injection: args arrays sin shell en Rust y Python | `spritesheet.rs:79-94`, `episode_metadata.py:12-15`, `scene_detector.py:212` |
+| Sin deserializadores peligrosos | 0 `BinaryFormatter`/`XmlSerializer`/Newtonsoft; todo `System.Text.Json` |
+| TLS por defecto: 0 `ServerCertificateValidationCallback` custom | todo el repo |
+| Token cifrado con DPAPI CurrentUser | `AuthService.cs:34,46,191` |
+| `state` OAuth de 32 bytes aleatorios (`RandomNumberGenerator`) | `AuthService.cs:71` |
+| `catch_unwind` en todo el borde FFI Rust | `lib.rs:15-20` (todas las funciones exportadas) |
+| Sanitización de nombres de carpeta (`Path.GetInvalidFileNameChars`) | `AgregarAnimeViewModel.cs:240`, `MainViewModel.cs:528` |
+| SQLite WAL + synchronous=NORMAL + índices compuestos | `DatabaseService.cs:47-59` |
+| HTTP client factory con Polly (Retry-After respetado) | `App.xaml.cs:95-103,136-157` |
+| Logger async con Channel + rotación por tamaño | `AppLogger.cs` |
+| CI sin secrets, sin logs de variables de entorno | `ci.yml` |
+
+---
+
+## 4. Funcionalidad y correcciones
+
+### FUN-01 · [Alto] La UI se congela hasta 20 s en el primer uso del daemon Python
+
+- **Categoría:** bug crítico de UX/estabilidad · **Probabilidad:** Alta (depende de velocidad del arranque PyInstaller) · **Impacto:** Alta
+
+**Evidencia** — `PythonBridgeService.cs:237`:
+
+```csharp
+_ = _daemonOut.ReadLineAsync().Wait(TimeSpan.FromSeconds(20));
+```
+
+`ExecuteViaDaemonAsync` se llama desde la UI sin `ConfigureAwait(false)`; el `Wait()` bloquea el hilo UI. Además, si el semáforo del daemon se retiene mientras se espera, otros llamadores se encolan → bloqueo amplificado. Reproducción: primera acción que usa Python (p.ej. resolver stream o enriquecer episodio) con daemon frío → ventana "No responde" hasta 20 s.
+
+**Corrección propuesta — asíncrono con timeout no bloqueante:**
+
+```csharp
+// ANTES
+_ = _daemonOut.ReadLineAsync().Wait(TimeSpan.FromSeconds(20));
+
+// DESPUÉS
+using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+var saludo = await _daemonOut.ReadLineAsync(cts.Token).ConfigureAwait(false);
+```
+
+Y añadir un estado `DaemonArrancando` para que los llamadores concurrentes esperen la misma tarea (`Task` única compartida con `TaskCompletionSource` en vez de abrir N daemons).
+
+**Validación:** test que arranca el daemon con saludo retardado artificialmente y verifica que `EnsureDaemonStartedAsync` retorna sin bloquear el hilo de llamada (assert de elapsed < 1 s en hilo simulado UI). Benchmark: primer `ping` con daemon frío.
+
+### FUN-02 · [Alto] `async void` en receptores del Messenger puede derrumbar el proceso
+
+- **Categoría:** estabilidad (CWE-248 uncaught exception) · **Probabilidad:** Media · **Impacto:** Alta
+
+**Evidencia** — `MainViewModel.cs:167,199`:
+
+```csharp
+public async void Receive(NavegarMensaje_Detalle m)   // :167
+public async void Receive(NavegarMensaje_Reproductor m) // :199
+```
+
+Una excepción fuera del try/catch interno (p.ej. `detalleVm.InicializarAsync` lanza en un path no cubierto) propaga al dispatcher y, aunque `DispatcherUnhandledException` marca `Handled=true`, la secuencia de inicialización queda a medias; y si ocurre en hilo de pool (continuación sin contexto), es fatal. La navegación rápida Detalle→Reproductor→Detalle dispara dos `InicializarAsync` concurrentes sin cancelación (condición de carrera de estado).
+
+**Corrección propuesta — patrón try/catch-catch centralizado + cancelación:**
+
+```csharp
+// ANTES
+public async void Receive(NavegarMensaje_Detalle m)
+{
+    await _navegacionService.NavegarADetalleAsync(m.AnimeId);
+}
+
+// DESPUÉS
+public async void Receive(NavegarMensaje_Detalle m)
+{
+    try { await _navegacionService.NavegarADetalleAsync(m.AnimeId); }
+    catch (Exception ex) { AppLogger.Error("MainViewModel", ex.ToString()); }
+}
+```
+
+Mejor aún: extraer la navegación a `NavigationService` con `SemaphoreSlim` que serializa navegaciones (descarta/encola la nueva) y cancela la inicialización anterior (`CancellationTokenSource` por navegación).
+
+**Validación:** test que dispara N navegaciones concurrentes y verifica estado final consistente (el propio `ViewModelStressAndLifecycleTests` es el molde).
+
+### FUN-03 · [Medio] `CerrarSesion()` borra `token.txt` del directorio de trabajo
+
+- **Categoría:** bug destructivo (CWE-22 path ambiguity)
+- **Probabilidad:** Baja · **Impacto:** Baja (puede borrar un archivo del usuario llamado `token.txt` en el CWD)
+
+**Evidencia** — `AuthService.cs:19,242-244`:
+
+```csharp
+ArchivoToken = "token.txt";   // ruta relativa al CWD
+// :242
+if (File.Exists(ArchivoToken)) File.Delete(ArchivoToken);
+```
+
+**Corrección:** resolver la ruta del token bajo `%LocalAppData%\AnimeLocalTracker\` (misma carpeta que el resto de datos) y borrar siempre esa ruta absoluta. **Validación:** test que garantiza que con CWD en `C:\` se borra `%LocalAppData%\AnimeLocalTracker\anilist_token.txt` y nada más.
+
+### FUN-04 · [Medio] Sin single-instance
+
+- **Probabilidad:** Media · **Impacto:** Baja (colisión en `HttpListener` :5050 con error visible, `settings.json` last-writer-wins, sync duplicada)
+
+**Corrección:** `Mutex` con nombre global (`Global\AnimeLocalTracker`) + `eventWaitHandle` para "bring-to-front"; en segunda instancia, enviar señal y salir. **Validación:** test manual lanzando 2 instancias; opcional test automatizado con `Process.Start`.
+
+### FUN-05 · [Medio] Shutdown sin cancelación de loops y daemon
+
+- **Probabilidad:** Media · **Impacto:** Baja
+
+**Evidencia:** los loops de `SyncService` (5 min) y `UpdateService` (4 h) corren en `Task.Run` infinitos; `App.OnExit` no existe; el daemon Python queda huérfano hasta que el proceso muere.
+
+**Corrección:** implementar `App.OnExit` que dispare los `CancellationTokenSource` de Sync/Update/Download/Python (inyectados via DI) y espere con timeout corto. El flush de logs ya está resuelto vía `ProcessExit`.
+
+### FUN-06 · [Medio] `Flags: ignoreversion` mantiene binarios viejos en actualizaciones
+
+- **Probabilidad:** Media · **Impacto:** Media (yt-dlp/FFmpeg/tools con CVEs persisten tras reinstalar)
+
+**Evidencia:** `installer.iss`: `Source: "publish\*"; Flags: ignoreversion` — en reinstalación, archivos con misma versión no se sobrescriben.
+
+**Corrección:** quitar `ignoreversion` para los binarios embebidos (`Tools\*`, `FFmpeg\*`, `animetracker_core.dll`) o añadir un check de hash en el instalador; Velopack ya reemplaza el directorio de instalación por completo en updates (el installer .iss es solo bootstrap).
+
+### FUN-07 · [Medio] Carrera entre `_skipTimes.Clear()` y `CargarSkipTimesAsync` fire-and-forget
+
+- **Probabilidad:** Baja · **Impacto:** Media (skip times del episodio anterior aplicados al nuevo, o `ArgumentOutOfRange`)
+
+**Evidencia** — `ReproductorViewModel.cs:799,820,890,1074`: `CargarVideoAsync` hace `_skipTimes.Clear()` mientras `_ = CargarSkipTimesAsync(...)` corre en paralelo y al final hace `_skipTimes = new List<...>(results)`; el bucle `RastrearProgresoAsync` lee `.Count` sin sincronización.
+
+**Corrección:** publicar el resultado atómicamente con `Interlocked.Exchange(ref _skipTimes, newList)` (campo `volatile`/`List` inmutable) y cancelar la tarea anterior con un `CancellationTokenSource` por video (patrón `ReferenceEquals(_skipCts, cts)` que ya se usa en búsquedas). **Validación:** test de estrés alternando videos rápidamente y verificando que los skip del video A nunca aplican al video B.
+
+### FUN-08 · [Bajo] Enriquecimiento muta objetos observables desde `Task.Run`
+
+- **Probabilidad:** Media · **Impacto:** Baja
+
+**Evidencia** — `DetalleViewModel.cs:416-435`: `EnriquecerEpisodiosEnSegundoPlanoAsync` muta `EpisodioItem.Resolucion/RutaMiniatura/Visto` desde thread pool mientras la UI lee por bindings.
+
+**Corrección:** serializar los accesos a la colección (por ejemplo, marshalear el resultado a la UI o usar `lock` de lectura sobre el snapshot) y no mutar el mismo objeto: devolver nuevos objetos y reemplazar en la colección en el hilo UI. **Validación:** los tests de estrés existentes de `DetalleViewModel` ampliados con contador de inconsistencias.
+
+### FUN-09 · [Bajo] 47 `catch { }` silenciosos
+
+- **Probabilidad:** — · **Impacto:** Baja (ocultan fallos, dificultan diagnóstico)
+
+**Evidencia:** mayoritariamente defensivos alrededor de Flyleaf (`ReproductorViewModel.cs:244,257,370,379,563,1234,1240,1264`) y limpieza (`PythonEpisodeEnricher.cs:88,120`). Los peores: `DetalleViewModel.cs:245,501,541` (errores de persistencia SQLite tragados) y `UpdateService.cs:48`.
+
+**Corrección:** añadir `AppLogger.Debug/Warn` en los catch vacíos de rutas de negocio (los de limpieza de archivos pueden quedarse). **Validación:** grep `catch { }` → solo los justificados por comentario.
+
+---
+
+## 5. Arquitectura
+
+### 5.1 Evaluación AS-IS
+
+**Fortalezas verificadas:** MVVM limpio con `CommunityToolkit.Mvvm` (source generators), DI completo vía `IServiceProvider` (23 singletons + transients), interfaces para el 100% de servicios de frontera (13+ interfaces), mensajería débil (`WeakReferenceMessenger`), políticas Polly centralizadas, ORM parametrizado, capas de frontera nativas bien aisladas (`NativeMethods` P/Invoke + DTOs propios, bridge JSON para Python), y diseño "offline-first" correcto para el dominio.
+
+**Debilidades:**
+
+| ID | Hallazgo | Severidad |
+|---|---|---|
+| ARQ-01 | God-objects: `ReproductorViewModel` 1.112 líneas (mezcla reproductor + skip + tracking + autoplay + hover), `DetalleViewModel` 959, `MainViewModel` 527 con **13 interfaces `IRecipient`** | Alto |
+| ARQ-02 | **Duplicación real**: `MainViewModel.SeleccionarYCrearAnimeAsync` (:509-595) vs `AgregarAnimeViewModel.AñadirAnimeAsync` (:212-320) — ~70 líneas casi idénticas (validación existencia, sanitizado, creación de carpeta, episodios por estado, guardado, mensaje) | Alto |
+| ARQ-03 | Duplicación de búsqueda en vivo (debounce + CTS + patrón `ReferenceEquals`) en `MainViewModel:450` y `AgregarAnimeViewModel:152` | Medio |
+| ARQ-04 | Cachés caseros sin LRU: `AniListTrackingService._cache` **estático e ilimitado** (fuga lenta), `ImageCacheService`/`HoverThumbnailService` con `Clear()` total al superar 500 entradas | Medio |
+| ARQ-05 | **Doble motor de parsing**: Rust (anitomy-pure, FFI) y Python (anitopy, bridge) implementan lo mismo (parseo de nombres) — coste de mantenimiento doble y resultados potencialmente divergentes | Medio |
+| ARQ-06 | Tres capas de resolución de video (scraper C# AnimeAv1, yt-dlp vía Python, fallback cruzado) sin contrato ni testeo directo | Medio |
+| ARQ-07 | Skeleton de loop periódico duplicado: `SyncService:93-141` vs `UpdateService:202-268` | Bajo |
+| ARQ-08 | Workarounds por reflexión sobre Flyleaf (`ReproductorView.xaml.cs:79`) — acoplamiento frágil a API volátil | Bajo |
+| ARQ-09 | Convenciones inconsistentes: namespaces file-scoped vs block-scoped, separadores `// ===` / `// ──` / `// ═══`, nombres ES/EN mezclados, tipos totalmente calificados innecesarios en `MainViewModel` | Bajo |
+
+### 5.2 Diagrama AS-IS (C4 containers simplificado)
+
+```mermaid
+flowchart TD
+    UI[WPF UI<br/>9 Views + 9 ViewModels] --> MV[MainViewModel<br/>13 IRecipient]
+    MV --> GV[GaleriaViewModel] & DV[DetalleViewModel] & RV[ReproductorViewModel]
+    DV --> PES[PythonEpisodeEnricher]
+    DV --> DS[DownloadService]
+    RV --> F[Flyleaf Engine<br/>FFmpeg 9]
+    RV --> HTS[HoverThumbnailService]
+    RV --> STC[SkipTimesCoordinator]
+    STC --> ASS[AniSkipService] & PES
+    MV --> SS[SyncService] & US[UpdateService]
+    GV --> ITS[AniListTrackingService<br/>GraphQL]
+    MV --> PBS[PythonBridgeService]
+    PBS --> DAEMON[Daemon Python<br/>AnimeTrackerTools.exe<br/>yt-dlp/anitopy/opencv]
+    PES --> DAEMON
+    PBS --> RS[NativeMethods<br/>animetracker_core.dll]
+    RS --> RUST[Rust Core<br/>anitomy/rayon/SIMD]
+    DS --> DBS[DatabaseService<br/>SQLite WAL]
+    MV --> AU[AuthService<br/>OAuth2 + DPAPI]
+    US --> VELO[Velopack<br/>GitHub Releases]
+    ITS --> ANI[AniList API]
+    ASS --> SKIP[AniSkip API]
+```
+
+### 5.3 Diagrama TO-BE (propuesto)
+
+```mermaid
+flowchart TD
+    UI[WPF UI<br/>9 Views + 9 ViewModels delgados] --> NAV[NavigationService<br/>serializa navegación + CTS]
+    NAV --> GV & DV & RV
+    DV --> ENR[EpisodeEnricherService]
+    DV --> DL[DownloadService]
+    RV --> F[Flyleaf Engine]
+    RV --> HT[HoverThumbnailService]
+    RV --> ST[SkipTimesCoordinator]
+    MV --> SS & US
+    GV --> ITS[AniListTrackingService<br/>con batching + cache LRU]
+    MV --> LIB[AnimeLibraryService<br/>nuevo: creacion/busqueda/validacion unificada]
+    LIB --> DBS & DAEMON
+    MV --> PBS[PythonBridgeService<br/>async + timeout]
+    PBS --> DAEMON & RS
+    PARSER[ParsingService unico<br/>Rust FFI (anitomy-pure)]
+    PBS --> PARSER
+    DL --> DBS
+    AU --> ANI
+    US --> VELO
+```
+
+**Cambios clave:** (1) extraer `NavigationService` y `AnimeLibraryService` para eliminar ARQ-02/03; (2) unificar el parsing en el core Rust (ARQ-05) y dejar el Python solo para yt-dlp/opencv; (3) cache con LRU (por ejemplo `MemoryCache` de `Microsoft.Extensions.Caching.Memory` o una LRU casera acotada) (ARQ-04); (4) ViewModels reducidos a orquestación, con estados de UI delegados a servicios.
+
+### 5.4 Principios evaluados
+
+| Principio | Veredicto | Nota |
+|---|---|---|
+| SOLID (S) | ⚠️ | God-objects violan SRP; interfaces bien segregadas |
+| SOLID (O/L/I/D) | ✅ | Extensiones vía DI; `last-registered-wins` para `IFileScannerService` es aceptable pero documentado |
+| DDD | ⚠️ | Modelos anémicos (`AnimeItem`, `EpisodioItem`) con lógica de negocio dispersa en VMs |
+| Clean/Hexagonal | ⚠️ | VMs acoplan UI + negocio; fronteras nativas bien aisladas |
+| Microservicios vs monolito | ✅ Monolito correcto | App de escritorio; procesos satélite (Python daemon) bien aislados |
+| Resiliencia | ✅ | Polly retries + Retry-After; semáforos; degradación graceful de FFI |
+| SPOF | ⚠️ | El daemon Python es un punto único para todas las features "ricas"; sin timeout global de comando en `ExecuteViaDaemonAsync` |
+| Consistencia | ✅ | Offline-first con sync diferido y anti-reentrada (SemaphoreSlim) |
+
+---
+
+## 6. Rendimiento y optimización
+
+### RND-01 · [Medio] `ObtenerPortada()` síncrono en el hilo UI
+
+- **Probabilidad:** Alta (bibliotecas >100 portadas) · **Impacto:** Media (jank en arranque de galería)
+
+**Evidencia** — `ImageCacheService.cs:43,148`: `File.ReadAllBytes` + decode WPF `BitmapImage` ejecutados en el hilo UI, llamados en bucle desde `GaleriaViewModel.CargarBibliotecaAsync` (:389).
+
+```csharp
+// ANTES (hot path en UI thread)
+private BitmapImage ObtenerPortada(string url) { var bytes = File.ReadAllBytes(...); return CargarBitmapDesdeBytes(bytes); }
+
+// DESPUÉS (decode en background, mostrar en UI)
+private async Task<BitmapImage> ObtenerPortadaAsync(string url, CancellationToken ct)
+{
+    var bytes = await Task.Run(() => File.ReadAllBytes(ruta), ct);
+    return await Task.Run(() => CargarBitmapDesdeBytes(bytes), ct); // BitmapCacheOption.OnLoad
+}
+```
+
+**Impacto esperado:** elimina ~5-30 ms por portada del hilo UI; arranque de galería de 200 ítems pasa de posible jank de 1-6 s a imperceptible (decode paralelizado). **Validación:** BenchmarkDotNet + `dotnet-trace` (CPU time en UI thread) antes/después.
+
+### RND-02 · [Medio] N+1 de red secuencial en actualización de biblioteca
+
+**Evidencia** — `GaleriaViewModel.ActualizarBibliotecaAsync` (:783-832): por anime → `ObtenerAnimePorIdAsync` + `ObtenerSeguimientoUsuarioAsync` + `ActualizarAnimeAsync` + `Task.Delay(250)` **secuencialmente**. 100 animes ≈ 300 llamadas seriales ≈ 3-10 min.
+
+**Propuesta:** loteo (GraphQL de AniList permite consultar múltiples IDs en una request) en 2-3 lotes con el mismo delay total de cortesía (respeta rate limit y reduce latencia de red de 300 → 3 request); `ObtenerSeguimientoUsuarioAsync` puede cachearse por sesión (el seguimiento cambia solo por acción del usuario). **Impacto esperado:** reducción de 10-30× del tiempo de la operación sin violar el rate limit. **Referencia:** documentación de rate limit de AniList (90 req/min autenticado).
+
+### RND-03 · [Bajo] `Dispatcher.Invoke` síncrono en hot path de carga de portadas
+
+**Evidencia** — `GaleriaViewModel.cs:429` (dentro de `Task.Run`). Bajo carga, el hilo pool se bloquea contra la UI. **Corrección:** `Dispatcher.InvokeAsync` + no bloquear el pool, o mover la carga completa fuera del hilo UI (ver RND-01).
+
+### RND-04 · [Bajo] Caches con `Clear()` total y sin LRU
+
+**Evidencia** — `ImageCacheService.cs:73-77`, `HoverThumbnailService.cs:261-265`: al llegar a 500 ítems, invalidación total (no LRU) → re-lectura de disco de toda la galería. `AniListTrackingService._cache` es estático y **sin límite** (fuga lenta en sesiones largas).
+
+**Propuesta:** LRU acotado (orden mantenido con `LinkedList`+`ConcurrentDictionary`, o `Microsoft.Extensions.Caching.Memory.MemoryCache` con `SizeLimit` y `SlidingExpiration`) para los 3 caches. **Impacto:** menor; estabiliza la memoria en sesiones largas.
+
+### RND-05 · [Bajo] Regex no compilados en scraping
+
+**Evidencia** — `AnimeAv1VideoSourceResolver.cs:64,111,150`. En hot path de scraping se instancia `Regex` por llamada. **Corrección:** `[GeneratedRegex]` (patrón ya usado en `FileScannerService`). Impacto menor.
+
+### RND-06 · [Info] N+1 SQLite residual (aceptable)
+
+`GuardarRegistroEpisodioAsync` hace SELECT+UPDATE por episodio; el bulk (`GuardarRegistrosEpisodioBulkAsync`, 1 transacción para 500) ya está optimizado y benchmarchado (§9). En `PlaybackStateService` el guardado cada 5 s es aceptable. Índices presentes y suficientes; 0 `LIKE`; sin queries raw. **No requiere acción.**
+
+### Core Web Vitals / bundle
+
+No aplica (app de escritorio). Análogos: tamaño de instalación (~170 MB: FFmpeg 102 MB + tools 91 MB) y arranque en frío. El pre-warm del daemon Python y el `pre-alloc` del demuxer ya atacan el arranque. El único vector de mejora sería lazy-load de `AnimeTrackerTools.exe` (73 MB) hasta el primer uso real (hoy se pre-calienta siempre).
+
+---
+
+## 7. Integraciones
+
+| Integración | Protocolo | Evaluación |
+|---|---|---|
+| **AniList** (GraphQL, OAuth2) | HTTPS | ✅ Contratos tipados con variables; rate limit bien manejado (Polly + Retry-After). ⚠️ Sin jitter/backoff exponencial inicial; sin batching (§RND-02) |
+| **AniSkip API** | HTTPS | ✅ Doble caché (por malId + skip) correcta; memoización en `SkipTimesCoordinator` |
+| **animeav1.com / mp4upload** (scraping) | HTTPS | ⚠️ **Sin contrato formal**: regex sobre HTML que cambia sin aviso (INT-01). Además validación de host evasible (SEC-03). Mantenimiento: frágil a rediseños del sitio |
+| **yt-dlp** (daemon Python) | — | ⚠️ Rango de versión abierto `>=2025.1.15` (INT-02): el `AnimeTrackerTools.exe` empaqueta la versión del momento del build sin lock. URL arbitraria a `extract_info` (SSRF residual, mitigado por ser uso local del usuario) |
+| **Velopack / GitHub Releases** | HTTPS | ⚠️ Actualizaciones sin firma de paquete (SEC-05); cache de `release_info.json` sin verificación de integridad (manipulación local → notas falsas) |
+| **OAuth AniList** | HTTPS + loopback HTTP | ⚠️ Flujo implícito + callback plano sin Origin check (SEC-01) |
+| Webhooks / SSO / pasarela de pago | — | No aplica |
+| **Idempotencia**: reanudación de descargas | — | ✅ `DownloadStateStore` + segmentos; la reanudación es idempotente por offsets. ⚠️ Validación de offsets ausente (SEC-10) |
+
+**Recomendaciones:** (1) extraer el scraping de animeav1 a un contrato JSON versionado (o migrar a yt-dlp como única fuente); (2) fijar `yt-dlp` a versión exacta en `pyproject.toml` y regenerar el binario en CI; (3) añadir trazabilidad: correlación `operationId` en logs del bridge Python para rastrear una operación a través de C#→daemon→yt-dlp.
+
+---
+
+## 8. Calidad de código y DevOps
+
+### 8.1 CI/CD — `ci.yml`
+
+**Estado:** 1 workflow, build + tests + audits (no bloqueantes), sin release.
+
+| Problema | Evidencia | Corrección |
+|---|---|---|
+| SCA no bloqueante | `ci.yml:38,46` `continue-on-error: true` | Mover `cargo audit`/`pip-audit` a jobs dedicados que **fallen** con `fail-on` high; dejar informativo el resto |
+| Sin pinning de acciones a SHA | `actions/checkout@v4`, `dtolnay/rust-toolchain@stable`, etc. | Fijar a SHA + comentario de versión (dependabot puede actualizarlos) |
+| Sin caché de builds | — | `actions/cache` para `~/.cargo`, `target/`, `~/.nuget/packages` (release Rust en cada push: ~minutos ahorrables) |
+| Sin release pipeline | — | Nuevo `release.yml` on tag: build → tests → `vpk pack` (firma en secretos) → upload a GitHub Releases (GH token en secret) |
+| Sin coverage | — | `dotnet test /p:CollectCoverage=true` + upload TRX/cobertura como artifact |
+| Sin dependabot | `.github/dependabot.yml` ausente | Añadir dependabot para NuGet, cargo, pip y GitHub Actions |
+| Reproducibilidad de restore | Sin `packages.lock.json` | `dotnet restore --use-lock-file` |
+| TRX sin upload | — | `actions/upload-artifact` en caso de fallo |
+
+### 8.2 Release (manual) — `build_velopack_release.ps1`
+
+- `vpk` instalado **sin versión** (`dotnet tool install -g vpk`) → fijar `--version`.
+- `pip install` con rangos abiertos → fijar versiones exactas (`yt-dlp==2026.x`, etc.).
+- **Sin firma** de código → aplicar SEC-05.
+- No ejecuta tests antes de empaquetar → añadir `dotnet test` gate.
+- Versión por defecto `1.0.0` (riesgo de no hacer bump) → parametrizar y fallar si la versión ya existe en releases.
+
+### 8.3 Dependencias (SCA resumido)
+
+| Paquete | Versión | Hallazgo |
+|---|---|---|
+| FluentAssertions | 8.10.0 | ⚠️ **Licencia**: v8+ es de pago para uso comercial (Xceed). Para uso personal OK; para monetizar/comercial, reemplazar por `Shouldly`/`xunit asserts` |
+| Moq | 4.20.72 | ⚠️ Sin mantenimiento activo; alternativas: NSubstitute/FakeItEasy |
+| Microsoft.Extensions.* (DI/Http/Polly/ProtectedData) | 10.0.11 | ⚠️ Desalineadas con TFM net8.0 (ramas .NET 10); bajar a 8.0.x o subir el proyecto a net9/10 |
+| xunit + runner | 2.5.3 | Desactualizado (2.9.x/3.x); el runner de test sdk 17.8.0 también |
+| VirtualizingWrapPanel | 2.5.4 | Mantenimiento comunitario bajo |
+| FlyleafLib | 3.11.3 | Activo pero API volátil (workarounds por reflexión); congelar con `Directory.Packages.props` |
+| MaterialDesignThemes | 5.2.1 | Pinned correctamente (commit `4ef2e89`) |
+| sqlite-net-pcl | 1.11.285 | Estable, modo mantenimiento |
+
+**Acción:** añadir `packages.lock.json`, `dotnet list package --vulnerable --include-transitive` en CI (falla en high), y dependabot.
+
+### 8.4 Testing
+
+**Fortalezas:** 120 tests en 22 archivos; buenos tests de VMs críticas (Reproductor 22, Galería 16), tests de integración SQLite reales, stress de concurrencia y lifecycle, integración FFI Rust (7), y benchmarks con historial comparativo.
+
+**Huecos:** sin tests para `MainViewModel` (el más grande), `ConfiguracionViewModel`, `DescargasViewModel`, `AcercaDeViewModel`, `AppLogger`, `PlaybackStateService` (solo indirecto), `SkipTimesCoordinator` (solo indirecto), `AnimeAv1VideoSourceResolver`/`PythonVideoSourceResolver` (scraping), `PythonEpisodeEnricher`. Coverage nunca medido en CI.
+
+---
+
+## 9. Informe de pruebas de rendimiento (estado y plan)
+
+### 9.1 Estado actual — BenchmarkDotNet (manual, `run_benchmarks_and_reports.ps1`)
+
+| Benchmark | Qué mide | Resultado esperado/registrado |
+|---|---|---|
+| `ReproductorBenchmarks.SeekingContinuo` | seeking 1 s→1 s, 1.440 s de video | Histórico en `BenchmarkHistory/` |
+| `ReproductorBenchmarks.SeekingAleatorio` | 100 saltos multi-punto | Ídem |
+| `ReproductorBenchmarks.AnteriorSiguiente` | resolución 100/1.000 episodios | Ídem |
+| `DatabaseBenchmarks.Guardar500Bulk` | 500 registros en 1 transacción | Ídem (+MemoryDiagnoser) |
+| `DatabaseBenchmarks.ObtenerTodos` | consulta completa | Ídem |
+| `FileScannerBenchmarks.ExtraerNumero` | 12 formatos reales (Erai-raws, fansubs) | Ídem |
+
+Los benchmarks cubren bien la **lógica pura**; no miden Flyleaf (render/decodificación) — correcto para CI, y el historial Markdown comparativo es una práctica destacable.
+
+### 9.2 Plan de pruebas de rendimiento propuesto (objetivos p50/p95/p99)
+
+| Escenario | Herramienta | Objetivo actual | Objetivo objetivo |
+|---|---|---|---|
+| Arranque en frío (splash → galería) | `dotnet-trace` + cronómetro manual | — | p95 < 3 s con >300 ítems |
+| Carga de galería 300 portadas | profiler WPF | jank posible (RND-01) | 0 frames dropped |
+| Actualización de biblioteca (100 animes) | log de tiempos | ~3-10 min (RND-02) | < 1 min (batching) |
+| Resolución de stream | telemetría del bridge | depende de daemon | primer uso < 2 s (FUN-01) |
+| Bulk DB 500 registros | BenchmarkDotNet (existente) | registrado | sin regresión > 10% |
+| Descarga segmentada 6× (1 GB local) | mock HTTP | — | throughput ≥ 90% del ancho local |
+| Primer uso del daemon Python | cronómetro | hasta 20 s bloqueo UI | < 1 s no bloqueante |
+
+---
+
+## 10. Plan de acción priorizado (esfuerzo × impacto)
+
+| Prioridad | Acción | Esfuerzo | Impacto | Fase |
+|---|---|---|---|---|
+| 🔴 | FUN-01: eliminar `Wait(20s)` del bridge Python | S (½ día) | Alto | 1 |
+| 🔴 | FUN-02: try/catch + serializar navegación (async void) | S-M (2-3 días) | Alto | 1 |
+| 🔴 | DEV-01: audits bloqueantes + dependabot + pinning SHA + caché CI | S (1 día) | Medio | 1 |
+| 🟠 | SEC-01: migrar a authorization code + PKCE + Origin check | M (3-5 días) | Alto | 1 |
+| 🟠 | SEC-02/03: validación de URL de portada y de hostname | S (½ día) | Medio | 1 |
+| 🟠 | SEC-04: sanitizar URLs en logs | S (½ día) | Medio | 1 |
+| 🟠 | FUN-03: ruta absoluta del token + eliminar fallback en claro (SEC-07) | S (½ día) | Medio | 1 |
+| 🟠 | FUN-07: publicación atómica de skip times + CTS por video | S (1 día) | Medio | 1 |
+| 🟠 | ARQ-02: extraer `AnimeLibraryService` (dedupe creación de anime) | M (2-3 días) | Medio | 2 |
+| 🟠 | SEC-05 + DEV-02: firma (certificado EV) + release pipeline | L (1-2 semanas, depende de cert) | Alto | 2 |
+| 🟠 | RND-01: portadas async fuera del UI thread | S-M (1-2 días) | Medio | 2 |
+| 🟠 | DEV-06: coverage en CI + tests de MainViewModel/Descargas/scrapers | M (3-5 días) | Medio | 2 |
+| 🟡 | FUN-04/05: single-instance + graceful shutdown | M (2-3 días) | Medio | 2 |
+| 🟡 | ARQ-04 + RND-04: caches LRU acotados | M (2 días) | Bajo-Medio | 2 |
+| 🟡 | DEV-04: evaluar licencia FluentAssertions / migrar | S (½ día) | Legal | 2 |
+| 🟡 | INT-02 + DEV-03: pin yt-dlp, lockfiles | S (1 día) | Medio | 2 |
+| 🟡 | FUN-06: quitar `ignoreversion` de binarios | S (½ día) | Medio | 2 |
+| 🟢 | ARQ-01: split de ReproductorViewModel/DetalleViewModel | L (2-4 semanas) | Medio | 3 |
+| 🟢 | RND-02: batching de AniList | M (3 días) | Medio | 3 |
+| 🟢 | ARQ-05: unificar parsing en Rust | M (3-5 días) | Bajo | 3 |
+| 🟢 | INT-01: contrato de scraping / migrar a yt-dlp | M (3-5 días) | Medio | 3 |
+| 🟢 | DEV-05: alinear Microsoft.Extensions.* a 8.0.x | S (½ día) | Bajo | 3 |
+
+---
+
+## 11. Checklist de cumplimiento de estándares y buenas prácticas
+
+| Estándar / práctica | Cumple | Nota |
+|---|---|---|
+| OWASP Top 10 2021 — A01-A10 | ⚠️ 8/10 | OK salvo A08 (firma/integridad) y A09 (logs de tokens) |
+| OWASP ASVS — V3 (auth) | ⚠️ | Fallos: flujo implícito, callback sin Origin (SEC-01) |
+| OWASP ASVS — V7 (cripto) | ⚠️ | DPAPI ✅; MD5 en naming de cache (SEC-09) |
+| CWE/SANS Top 25 | ✅ | Sin inyecciones, sin deserialización insegura, sin fallos de memoria |
+| Validación de entradas (CWE-20) | ⚠️ | Hostnames y `.state` (SEC-03, SEC-10) |
+| Secretos en código | ✅ | Ninguno |
+| TLS en tránsito | ✅ | HTTPS en todo el tráfico externo |
+| Logging responsable | ⚠️ | SEC-04 (URLs firmadas), SEC-12 (InnerException en MessageBox) |
+| SOLID / Clean / MVVM | ⚠️ | God-objects (ARQ-01) |
+| ISO/IEC 25010 — portabilidad | ✅ | net8.0-windows, framework-dependent |
+| ISO/IEC 25010 — mantenibilidad | ⚠️ | Duplicación (ARQ-02/03), convenciones mezcladas |
+| ISO/IEC 25010 — seguridad | ⚠️ | Base sólida, brechas listadas en §3 |
+| Cobertura de tests | ⚠️ | 120 tests, huecos + 0% coverage en CI |
+| CI/CD con gate de calidad | ⚠️ | Audits no bloqueantes, sin release pipeline |
+| Infraestructura como código | ⚠️ | Scripts PS (no declarativo), sin IaC real (no aplica desktop) |
+| Gestión de secretos | ✅ | Cero secrets en repo; token de usuario cifrado DPAPI |
+| Backups / DR | ⚠️ | No hay estrategia documentada de backup de `biblioteca.db` (local-first; sugerir documentar copia manual) |
+| Observabilidad | ⚠️ | Logger local robusto; sin correlación de operaciones C#↔Python↔Rust |
+| Single responsibility / SRP | ⚠️ | ARQ-01 |
+
+---
+
+## 12. Anexos
+
+### A. Dependencias vulnerables / supply chain (resumen)
+
+1. **FluentAssertions 8.10.0** — licencia comercial desde v8 (revisar antes de cualquier uso de pago).
+2. **Moq 4.20.72** — sin mantenimiento.
+3. **yt-dlp** — rango abierto; CVEs históricos en parsing (CVE-2023-35935 afecta `--exec`/`--download-archive`, patrones no usados aquí; mitigado por diseño, pero fijar versión).
+4. **Binarios embebidos**: FFmpeg 102 MB y `AnimeTrackerTools.exe` 73 MB dentro del repo (12+ commits de historia) — considerar GitHub LFS o fuente externa con hash (SEC-14).
+5. **Acciones de CI sin pinning** — supply chain del pipeline.
+
+### B. Comandos de reproducción / validación
+
+```powershell
+# 1. Congelación de UI del daemon (FUN-01): arrancar app, hacer doble clic en un episodio
+#    con cache fría de resolución de stream; observar la ventana "No responde" hasta 20 s.
+
+# 2. Verificar token en logs (SEC-04):
+Select-String -Path "$env:LOCALAPPDATA\AnimeLocalTracker\Logs\app.log" -Pattern "DirectUrl|mp4upload|CDN"
+
+# 3. Verificar puerto OAuth sin Origin check (SEC-01): iniciar sesión y enviar POST forjado
+Invoke-WebRequest -Uri http://localhost:5050/token -Method Post -Body '{"state":"<state real>","token":"x"}'
+
+# 4. Auditar dependencias (DEV-01):
+dotnet list AnimeLocalTracker/AnimeLocalTracker.csproj package --vulnerable --include-transitive
+cargo audit --manifest-path native/animetracker_core/Cargo.toml
+
+# 5. Coverage (DEV-06):
+dotnet test AnimeLocalTracker.Tests --collect:"XPlat Code Coverage"
+```
+
+### C. Consultas SQL relevantes (monitoreo de la base local)
+
+```sql
+-- Historial con rutas (fuera de la app, para diagnóstico):
+SELECT AniListId, NumeroEpisodio, RutaArchivo, VistoLocal, SincronizadoEnNube
+FROM RegistroEpisodio WHERE VistoLocal = 1 AND SincronizadoEnNube = 0;
+
+-- Episodios huérfanos (ruta no existente):
+SELECT r.* FROM RegistroEpisodio r
+LEFT JOIN AnimeItem a ON a.AniListId = r.AniListId WHERE a.AniListId IS NULL;
+```
+
+### D. Diagramas complementarios
+
 ```mermaid
 sequenceDiagram
     participant U as Usuario
-    participant B as Navegador
-    participant L as Listener 5050
-    participant A as AniList
-    U->>L: IniciarSesion
-    L->>B: abrir authorize?response_type=token&state=S
-    B->>A: GET authorize
-    A->>B: redirect #access_token=T (historial!)
-    B->>L: POST token+T (verificado con S)
-    L->>L: DPAPI → settings.json
+    participant VM as ReproductorViewModel
+    participant P as PythonBridgeService
+    participant D as Daemon Python
+    participant R as Rust Core
+    U->>VM: Play episodio
+    VM->>P: ExecuteViaDaemonAsync (resolve-stream)
+    P->>P: EnsureDaemonStarted (Wait 20s UI bloqueada ← FUN-01)
+    P->>D: JSON comando
+    D-->>P: saludo + respuesta
+    P->>VM: DirectUrl (se loguea completa ← SEC-04)
+    VM->>R: spritesheet FFI (catch_unwind ✅)
 ```
-**Fix SEC-01/02:** `response_type=code` + PKCE, `redirect_uri=http://127.0.0.1:{puerto_efimero}/`, intercambio del code por token en memoria, nunca en URL.
 
 ---
 
-## 8. Limitaciones y datos adicionales necesarios (si se requiere profundizar)
-1. **Screenshots/logs de producción** de `%LocalAppData%\AnimeLocalTracker\Logs\app.log` para validar el scraper y el daemon en campo.
-2. **Acceso al cliente AniList** (ClientId 48217) para validar si AniList ya soporta `authorization_code`+PKCE (migración SEC-01).
-3. **Distribución real del instalador** para medir SmartScreen/Defender y tiempos de arranque en máquinas HDD vs SSD.
-4. Para DAST de red: no aplica (app desktop sin superficie de red propia, salvo el listener OAuth).
-5. Para profundizar SCA Rust/Python: confirmar política de dependencias directas vs transitivas.
+## 13. Errata y limitaciones de esta auditoría
+
+- **DAST** no ejecutado (requiere instancia corriendo con UI); la evaluación de flujos es estática.
+- **Rendimiento**: los números p50/p95/p99 no se midieron en esta pasada; se ofrecen objetivos (§9.2) y los benchmarks existentes como base.
+- **Repositorio**: no hay URL pública; análisis sobre el estado local `@4ef2e89`.
+- **Datos adicionales que mejorarían la precisión:** (1) si la app tiene uso comercial (afecta la urgencia de FluentAssertions y firma de código); (2) tamaño real de bibliotecas de usuarios objetivo (afecta RND-01/02); (3) requisito de privacidad del historial local (afecta SEC-11).
 
 ---
 
-*Informe generado con evidencia verificada en el repositorio (build, 132 tests, benchmarks, `dotnet list --vulnerable`, revisión de código y scripts). Los hallazgos marcados como "RESUELTO HOY" corresponden a correcciones aplicadas en el working tree durante la sesión.*
+*Informe generado por auditoría estática multidisciplinar (seguridad + arquitectura + SRE + QA). Trazabilidad: cada hallazgo tiene ID único referenciado en la matriz (§2), el plan de acción (§10) y el checklist (§11). Sin modificaciones de código realizadas — solo propuestas.*

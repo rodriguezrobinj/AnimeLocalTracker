@@ -26,6 +26,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     private readonly ISkipTimesCoordinator _skipCoordinator;
     private readonly IHoverThumbnailService? _hoverThumbnailService;
     private CancellationTokenSource? _hoverCts;
+    private CancellationTokenSource? _skipCts;
 
     // Hover Thumbnail Preview
     [ObservableProperty] private bool _mostrarHoverPreview = false;
@@ -794,11 +795,12 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             // AniSkip API como fuente primaria; si no hay datos, detección local por escenas (Python/ffmpeg)
             // usando la ruta del video local actual (requiere un archivo en disco).
             var results = await _skipCoordinator.CargarSkipTimesAsync(animeId, episodio, TotalSeconds, ct, RutaVideo);
-            if (results.Count > 0)
+            if (!ct.IsCancellationRequested && results != null && results.Count > 0)
             {
-                _skipTimes = new List<AniSkipResult>(results);
+                Interlocked.Exchange(ref _skipTimes, new List<AniSkipResult>(results));
             }
         }
+        catch (OperationCanceledException) { }
         catch (Exception ex)
         {
             AppLogger.Debug("ReproductorViewModel", $"Error cargando skip times de AniSkip: {ex.Message}");
@@ -817,7 +819,13 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         // Descartar seeks coalescidos pendientes del episodio anterior
         CancelarSeekPendiente();
 
-        _skipTimes.Clear();
+        // Cancelar detección de skips previa
+        _skipCts?.Cancel();
+        _skipCts?.Dispose();
+        _skipCts = new CancellationTokenSource();
+        var currentSkipCts = _skipCts;
+
+        Interlocked.Exchange(ref _skipTimes, new List<AniSkipResult>());
         _skipAutoEjecutados.Clear();
         _currentActiveSkip = null;
         MostrarSkipButton = false;
@@ -887,7 +895,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         _posicionInicioSegundos = _resumingPositionSeconds;
 
         // 3. Cargar marcas de skip de AniSkip en segundo plano
-        _ = CargarSkipTimesAsync(animeId, episodio, _trackingCts.Token);
+        _ = CargarSkipTimesAsync(animeId, episodio, currentSkipCts.Token);
 
         // 4. Sincronizar ícono de fullscreen con el estado actual de la ventana
         try
@@ -1230,6 +1238,14 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             _hoverCts?.Cancel();
             _hoverCts?.Dispose();
             _hoverCts = null;
+        }
+        catch { }
+
+        try
+        {
+            _skipCts?.Cancel();
+            _skipCts?.Dispose();
+            _skipCts = null;
         }
         catch { }
 

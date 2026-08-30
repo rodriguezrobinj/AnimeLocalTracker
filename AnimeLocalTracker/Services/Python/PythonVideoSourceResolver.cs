@@ -40,7 +40,7 @@ namespace AnimeLocalTracker.Services.Python
 
                     if (result != null && result.Success && !string.IsNullOrEmpty(result.DirectUrl))
                     {
-                        AppLogger.Info("PythonVideoResolver", $"Stream resuelto exitosamente con yt-dlp: {result.DirectUrl}");
+                        AppLogger.Info("PythonVideoResolver", $"Stream resuelto exitosamente con yt-dlp: {SanitizarUrlParaLog(result.DirectUrl)}");
                         return result.DirectUrl;
                     }
                 }
@@ -52,6 +52,13 @@ namespace AnimeLocalTracker.Services.Python
 
             // 2. Fallback al extractor interno en C#
             return await _fallbackResolver.GetVideoUrlAsync(pageUrl, cancellationToken);
+        }
+
+        private static string SanitizarUrlParaLog(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url)) return "(vacía)";
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)) return "(url no parseable)";
+            return $"{uri.Scheme}://{uri.Authority}{uri.AbsolutePath}";
         }
 
         private class StreamResult
