@@ -50,10 +50,6 @@ jobs:
         cargo build --release --manifest-path native/animetracker_core/Cargo.toml
         Copy-Item native/animetracker_core/target/release/animetracker_core.dll AnimeLocalTracker/animetracker_core.dll -Force
 
-    - name: Restore and Build .NET Solution
+    - name: Build Solution and Run Tests
       run: |
-        powershell -ExecutionPolicy Bypass -File .\build.ps1
-
-    - name: Run Test Suite
-      run: |
-        dotnet test AnimeLocalTracker.Tests/AnimeLocalTracker.Tests.csproj --no-build -c Debug --logger "trx;LogFileName=test_results.trx"
+        powershell -ExecutionPolicy Bypass -File .\build.ps1 -RunTests
