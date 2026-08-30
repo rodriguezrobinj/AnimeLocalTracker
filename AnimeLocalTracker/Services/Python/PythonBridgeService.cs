@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -71,6 +73,7 @@ namespace AnimeLocalTracker.Services.Python
                     StandardOutputEncoding = Encoding.UTF8,
                     StandardInputEncoding = Encoding.UTF8
                 };
+                psi.Environment["PATH"] = ComposePath();
 
                 // Prioridad 1: Ejecutable nativo compilado Zero-Setup
                 if (!string.IsNullOrEmpty(_cachedExecutablePath))
@@ -188,8 +191,9 @@ namespace AnimeLocalTracker.Services.Python
 
         /// <summary>
         /// Arranca el proceso daemon si no está vivo (una única instancia compartida).
-        /// Hereda el PATH completo (usuario + sistema) para que el daemon encuentre
-        /// herramientas como ffmpeg instaladas por winget en WinGet\Links.
+        /// Hereda el PATH completo (usuario + sistema + FFmpeg embebido de la app) para que
+        /// el daemon encuentre herramientas como ffmpeg instaladas por winget en WinGet\Links
+        /// o los binarios ffmpeg.exe/ffprobe.exe distribuidos en la carpeta FFmpeg/ de la app.
         /// </summary>
         private void EnsureDaemonStarted()
         {
@@ -201,11 +205,6 @@ namespace AnimeLocalTracker.Services.Python
 
             try
             {
-                // PATH combinado: usuario primero (incluye WinGet\Links), luego sistema
-                string userPath = Environment.GetEnvironmentVariable("Path", EnvironmentVariableTarget.User) ?? "";
-                string machinePath = Environment.GetEnvironmentVariable("Path", EnvironmentVariableTarget.Machine) ?? "";
-                string fullPath = string.Join(";", userPath, machinePath);
-
                 var psi = new ProcessStartInfo
                 {
                     FileName = path,
@@ -220,7 +219,7 @@ namespace AnimeLocalTracker.Services.Python
                     // comando llegaba como \ufeff{...} → "JSON inválido".
                     StandardInputEncoding = new UTF8Encoding(false)
                 };
-                psi.Environment["PATH"] = fullPath;
+                psi.Environment["PATH"] = ComposePath();
 
                 var proc = new Process { StartInfo = psi };
                 proc.Start();
@@ -324,6 +323,28 @@ namespace AnimeLocalTracker.Services.Python
             }
 
             return "python";
+        }
+
+        /// <summary>
+        /// Compone el PATH para los procesos hijo: primero la carpeta FFmpeg embebida de la
+        /// app (ffmpeg.exe/ffprobe.exe distribuidos con el instalador), luego el directorio
+        /// base, y después el PATH de usuario + sistema (incluye WinGet\Links).
+        /// </summary>
+        private static string ComposePath()
+        {
+            var partes = new List<string>();
+
+            string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            string ffmpegDir = Path.Combine(baseDir, "FFmpeg");
+            if (Directory.Exists(ffmpegDir)) partes.Add(ffmpegDir);
+            if (Directory.Exists(baseDir)) partes.Add(baseDir);
+
+            string userPath = Environment.GetEnvironmentVariable("Path", EnvironmentVariableTarget.User) ?? "";
+            string machinePath = Environment.GetEnvironmentVariable("Path", EnvironmentVariableTarget.Machine) ?? "";
+            partes.Add(userPath);
+            partes.Add(machinePath);
+
+            return string.Join(";", partes.Where(p => !string.IsNullOrWhiteSpace(p)));
         }
 
         private class PingResult

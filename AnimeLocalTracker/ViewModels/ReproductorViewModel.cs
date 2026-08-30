@@ -26,7 +26,6 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     private readonly ISkipTimesCoordinator _skipCoordinator;
     private readonly IHoverThumbnailService? _hoverThumbnailService;
     private CancellationTokenSource? _hoverCts;
-    private double _ultimoHoverSolicitadoSec = -1;
 
     // Hover Thumbnail Preview
     [ObservableProperty] private bool _mostrarHoverPreview = false;
@@ -175,6 +174,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     private double _resumingPositionSeconds = 0;
     public double ResumingPositionSeconds => _resumingPositionSeconds;
     private bool _durationCached = false;
+    private bool _spritesheetPreparado = false;
 
     public ReproductorViewModel(
         IDatabaseService databaseService,
@@ -288,6 +288,14 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     private static readonly bool _esEntornoPruebas = AppDomain.CurrentDomain.GetAssemblies()
         .Any(a => a.GetName().Name?.StartsWith("xunit", StringComparison.OrdinalIgnoreCase) == true);
 
+    public void AsegurarPlayerInicializado()
+    {
+        if (Player == null || Player.IsDisposed)
+        {
+            Player = CreateOptimizedPlayer();
+        }
+    }
+
     public virtual Player CreateOptimizedPlayer()
     {
         if (_esEntornoPruebas)
@@ -323,16 +331,23 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             if (config.Player != null)
             {
                 config.Player.SeekAccurate = false;
+                config.Player.AutoPlay = true;
             }
 
-            // 2. Buffer de Demuxer en RAM (30 segundos precargados en memoria para reproducción sin tirones)
+            // 2. Decoder multi-hilos para decodificación suave de AV1 y HEVC 10-bit
+            if (config.Decoder != null)
+            {
+                config.Decoder.VideoThreads = Math.Max(2, Environment.ProcessorCount / 2);
+            }
+
+            // 3. Buffer de Demuxer en RAM (30 segundos precargados en memoria para reproducción sin tirones)
             if (config.Demuxer != null)
             {
                 // BufferDuration en ticks (1 tick = 100ns -> 30 segundos = 300,000,000 ticks)
                 config.Demuxer.BufferDuration = 300_000_000L;
             }
 
-            // 3. Subtítulos
+            // 4. Subtítulos
             if (config.Subtitles != null)
             {
                 config.Subtitles.Enabled = SubtitulosHabilitados;
@@ -344,6 +359,16 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                 _haCompletadoOpen = true;
                 EvaluarSubtitulosPorDefecto();
 
+                try
+                {
+                    if (player.Status != Status.Playing)
+                    {
+                        player.Play();
+                    }
+                    PlayPauseIcon = "Pause";
+                }
+                catch { }
+
                 if (player.Audio != null)
                 {
                     try
@@ -354,40 +379,12 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                     catch { }
                 }
 
-                // Si el usuario intentó adelantar/buscar mientras se abría el video, o si venía con posición de reanudar:
-                double pos = _seekPendienteAlAbrir >= 0
-                    ? _seekPendienteAlAbrir
-                    : _posicionInicioSegundos;
-
-                bool eraReanudacion = _seekPendienteAlAbrir < 0 && _posicionInicioSegundos > 5;
-                _seekPendienteAlAbrir = -1;
-                _posicionInicioSegundos = 0;
-
-                if (pos > 0)
-                {
-                    try
-                    {
-                        player.CurTime = TimeSpan.FromSeconds(pos).Ticks;
-                        _settleHastaUtc = DateTime.UtcNow + VentanaSettleSeek;
-                        _lastNotifiedSeconds = pos;
-                        CurrentSeconds = pos;
-
-                        if (eraReanudacion)
-                        {
-                            var tPos = TimeSpan.FromSeconds(pos);
-                            string tiempoFormateado = tPos.ToString(tPos.Hours > 0 ? @"hh\:mm\:ss" : @"mm\:ss");
-
-                            _ = WeakReferenceMessenger.Default.Send(new Messages.MostrarDialogoRequestMessage(
-                                "Reanudar Reproducción",
-                                $"Continuando desde {tiempoFormateado}",
-                                false, "PlaySpeed", "#2196F3"));
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        AppLogger.Debug("ReproductorViewModel", $"Error aplicando seek de inicio en OpenCompleted: {ex.Message}");
-                    }
-                }
+                // IMPORTANTE: NO seekear aquí (ni _seekPendienteAlAbrir ni reanudación).
+                // En este punto el decoder de video aún está creando su contexto de
+                // renderizado y un Player.CurTime inmediato interrumpe ese proceso
+                // en algunos archivos (HEVC/VFR) dejando la pantalla en negro con
+                // audio avanzando. El bucle de tracking aplica el seek por
+                // SolicitarSeekNativo cuando el video ya está reproduciendo de verdad.
             };
             return player;
         }
@@ -609,59 +606,8 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     // === Previsualización flotante al pasar el mouse (Hover Thumbnail Preview) ===
     public void ActualizarHoverPreview(double segundos, double posX)
     {
-        if (TotalSeconds <= 0 || string.IsNullOrWhiteSpace(_rutaVideo)) return;
-
-        segundos = Math.Clamp(segundos, 0, TotalSeconds);
-        var t = TimeSpan.FromSeconds(segundos);
-        HoverPreviewTexto = t.ToString(t.Hours > 0 ? @"hh\:mm\:ss" : @"mm\:ss");
-        HoverPreviewX = posX;
-        MostrarHoverPreview = true;
-
-        if (_hoverThumbnailService == null) return;
-
-        int bucketSec = ((int)segundos / _hoverThumbnailService.BucketIntervaloSegundos) * _hoverThumbnailService.BucketIntervaloSegundos;
-        if (Math.Abs(bucketSec - _ultimoHoverSolicitadoSec) < 0.1 && HoverPreviewImage != null)
-        {
-            return; // Ya tenemos el fotograma del bucket actual en pantalla
-        }
-
-        _ultimoHoverSolicitadoSec = bucketSec;
-        _hoverCts?.Cancel();
-        _hoverCts?.Dispose();
-        _hoverCts = new CancellationTokenSource();
-        var ct = _hoverCts.Token;
-
-        string ruta = _rutaVideo;
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                var img = await _hoverThumbnailService.ObtenerMiniaturaHoverAsync(ruta, bucketSec, ct).ConfigureAwait(false);
-                if (img != null && !ct.IsCancellationRequested && ruta == _rutaVideo)
-                {
-                    if (System.Windows.Application.Current?.Dispatcher != null &&
-                        !System.Windows.Application.Current.Dispatcher.CheckAccess())
-                    {
-                        _ = System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
-                        {
-                            if (!ct.IsCancellationRequested && MostrarHoverPreview)
-                            {
-                                HoverPreviewImage = img;
-                            }
-                        });
-                    }
-                    else if (MostrarHoverPreview)
-                    {
-                        HoverPreviewImage = img;
-                    }
-                }
-            }
-            catch (OperationCanceledException) { }
-            catch (Exception ex)
-            {
-                AppLogger.Debug("ReproductorViewModel", $"Error obteniendo miniatura hover: {ex.Message}");
-            }
-        }, ct);
+        // Timeline Hover desactivado
+        MostrarHoverPreview = false;
     }
 
     public void OcultarHoverPreview()
@@ -905,7 +851,6 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         _seekPendienteAlAbrir = -1;
         HoverPreviewImage = null;
         MostrarHoverPreview = false;
-        _ultimoHoverSolicitadoSec = -1;
 
         if (listaEpisodios != null)
         {
@@ -922,23 +867,18 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         _trackingCts?.Dispose();
         _trackingCts = new CancellationTokenSource();
 
-        // 1. CREAR EL PLAYER ANTES DEL PRIMER await DE ESTE MÉTODO.
-        // Si la vista llega a crearse con Player == null (esto es async y MainViewModel ya
-        // asignó VistaActual), FlyleafHost enlaza su superficie nativa vacía y NO la
-        // reconstruye cuando el Player aparece después: el video se oye pero NO se ve.
-        if (Player == null || Player.IsDisposed)
-        {
-            Player = CreateOptimizedPlayer();
-        }
-        else if (Player.Status == Status.Playing)
+        // 1. Asegurar que Player existe antes de configurar el nuevo archivo
+        AsegurarPlayerInicializado();
+
+        if (Player != null && (Player.Status == Status.Playing || Player.Status == Status.Paused))
         {
             try
             {
-                Player.Pause();
+                Player.Stop();
             }
             catch (Exception ex)
             {
-                AppLogger.Debug("ReproductorViewModel", $"Player pause antes de cambiar archivo: {ex.Message}");
+                AppLogger.Debug("ReproductorViewModel", $"Player stop antes de cambiar archivo: {ex.Message}");
             }
         }
 
@@ -967,7 +907,6 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         if (Player != null)
         {
             Player.OpenAsync(rutaVideo);
-            Player.Play();
         }
 
         _ = RastrearProgresoAsync(_trackingCts.Token);
@@ -1048,22 +987,34 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                     double curSeconds = TimeSpan.FromTicks(Player.CurTime).TotalSeconds;
                     double durSeconds = TimeSpan.FromTicks(Player.Duration).TotalSeconds;
 
-                    // Fallback de reanudación si no se aplicó en OpenCompleted
-                    if (_posicionInicioSegundos > 5 && (durSeconds > 0 || curSeconds >= 0))
+                    // Seek de arranque diferido (reanudación o scrub del usuario durante la
+                    // apertura). Se aplica aquí, con el video YA reproduciendo y la duración
+                    // conocida: aplicar CurTime en OpenCompleted interrumpe la creación del
+                    // contexto de video en algunos archivos (HEVC/VFR) y deja pantalla negra.
+                    if (durSeconds > 0 && (_seekPendienteAlAbrir >= 0 || _posicionInicioSegundos > 5))
                     {
-                        double posToSeek = _posicionInicioSegundos;
+                        bool esReanudacion = _seekPendienteAlAbrir < 0 && _posicionInicioSegundos > 5;
+                        double posToSeek = _seekPendienteAlAbrir >= 0 ? _seekPendienteAlAbrir : _posicionInicioSegundos;
+                        _seekPendienteAlAbrir = -1;
                         _posicionInicioSegundos = 0;
-                        
-                        try
+
+                        // Antes de disparar el seek nativo: congelar el repintado para que la
+                        // barra no "rebote" a la posición vieja mientras el seek se procesa.
+                        _settleHastaUtc = DateTime.UtcNow + VentanaSettleSeek;
+                        _lastNotifiedSeconds = posToSeek;
+                        CurrentSeconds = posToSeek;
+
+                        SolicitarSeekNativo(posToSeek);
+
+                        if (esReanudacion)
                         {
-                            Player.CurTime = TimeSpan.FromSeconds(posToSeek).Ticks;
-                            _settleHastaUtc = DateTime.UtcNow + VentanaSettleSeek;
-                            _lastNotifiedSeconds = posToSeek;
-                            CurrentSeconds = posToSeek;
-                        }
-                        catch (Exception ex)
-                        {
-                            AppLogger.Debug("ReproductorViewModel", $"Error aplicando seek de reanudación: {ex.Message}");
+                            var tPos = TimeSpan.FromSeconds(posToSeek);
+                            string tiempoFormateado = tPos.ToString(tPos.Hours > 0 ? @"hh\:mm\:ss" : @"mm\:ss");
+
+                            _ = WeakReferenceMessenger.Default.Send(new Messages.MostrarDialogoRequestMessage(
+                                "Reanudar Reproducción",
+                                $"Continuando desde {tiempoFormateado}",
+                                false, "PlaySpeed", "#2196F3"));
                         }
                     }
                     
@@ -1077,6 +1028,16 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                             TiempoTotalTexto = tDur.ToString(tDur.Hours > 0 ? @"hh\:mm\:ss" : @"mm\:ss");
                             _durationCached = true;
                             TiempoCombinadoTexto = $"{TiempoActualTexto} / {TiempoTotalTexto}";
+
+                            // Sprite Sheet de hover: aquí YA tenemos la duración real y el
+                            // video decodificando; lanzarlo antes (OpenCompleted) generaba
+                            // el sheet con duración 0/desconocida y competía con la
+                            // inicialización del decoder.
+                            if (!_spritesheetPreparado && !string.IsNullOrWhiteSpace(_rutaVideo))
+                            {
+                                _spritesheetPreparado = true;
+                                _hoverThumbnailService?.PrepararSpritesheet(_rutaVideo, durSeconds);
+                            }
                         }
 
                         // Durante la ventana de settle tras un seek, el reproductor aún reporta la

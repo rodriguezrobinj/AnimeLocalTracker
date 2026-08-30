@@ -10,6 +10,7 @@ using AnimeLocalTracker.ViewModels;
 
 namespace AnimeLocalTracker.Views
 {
+    [System.Runtime.Versioning.SupportedOSPlatform("windows7.0")]
     public partial class ReproductorView : UserControl
     {
         private DispatcherTimer _fadeTimer;
@@ -81,7 +82,16 @@ namespace AnimeLocalTracker.Views
 
                 if (campo?.GetValue(null) is System.Windows.DependencyProperty dp)
                 {
-                    HostFlyleaf.SetValue(dp, false);
+                    if (dp.PropertyType == typeof(bool))
+                    {
+                        HostFlyleaf.SetValue(dp, false);
+                    }
+                    else if (dp.PropertyType.IsEnum)
+                    {
+                        // En FlyleafLib 3.x el tipo es AvailableWindows (None = 0)
+                        object noneVal = Enum.ToObject(dp.PropertyType, 0);
+                        HostFlyleaf.SetValue(dp, noneVal);
+                    }
                 }
                 else
                 {
@@ -270,42 +280,21 @@ namespace AnimeLocalTracker.Views
             return ancho / 2;
         }
 
-        // === Previsualización en miniatura (Hover Thumbnail Preview) ===
+        // === Previsualización en miniatura (Hover Thumbnail Preview desactivado) ===
         private void ProgressBarArea_MouseEnter(object sender, MouseEventArgs e)
         {
-            ActualizarPosicionHoverPreview(e.GetPosition(ProgressBarArea));
         }
 
         private void ProgressBarArea_MouseMove(object sender, MouseEventArgs e)
         {
-            ActualizarPosicionHoverPreview(e.GetPosition(ProgressBarArea));
         }
 
         private void ProgressBarArea_MouseLeave(object sender, MouseEventArgs e)
         {
-            if (DataContext is ReproductorViewModel vm)
-            {
-                vm.OcultarHoverPreview();
-            }
         }
 
         private void ActualizarPosicionHoverPreview(Point p)
         {
-            if (DataContext is not ReproductorViewModel vm || vm.TotalSeconds <= 0) return;
-
-            double ancho = Math.Max(1d, ProgressBarArea.ActualWidth);
-            double halfThumb = ObtenerMitadAnchoThumb();
-            double usable = Math.Max(1d, ancho - 2 * halfThumb);
-            double ratio = Math.Clamp((p.X - halfThumb) / usable, 0d, 1d);
-            double segundos = vm.TotalSeconds * ratio;
-
-            // Centrar la tarjeta flotante de 180px de ancho sobre el cursor del ratón,
-            // acotándola para que no se corte en los extremos de la ventana.
-            double cardWidth = 180;
-            double posX = p.X - (cardWidth / 2);
-            posX = Math.Clamp(posX, 0, Math.Max(0, ancho - cardWidth));
-
-            vm.ActualizarHoverPreview(segundos, posX);
         }
 
         private static T? EncontrarHijo<T>(DependencyObject? parent) where T : DependencyObject

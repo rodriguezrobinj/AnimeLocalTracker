@@ -63,10 +63,10 @@ public class HoverThumbnailServiceTests
     }
 
     [Fact]
-    public void ReproductorViewModel_ActualizarHoverPreview_CalculaTextoYPosicionCorrecta()
+    public void ReproductorViewModel_ActualizarHoverPreview_PermaneceDesactivado()
     {
         var hoverMock = new Mock<IHoverThumbnailService>();
-        hoverMock.Setup(h => h.BucketIntervaloSegundos).Returns(4);
+        hoverMock.Setup(h => h.BucketIntervaloSegundos).Returns(1);
 
         var vm = new ReproductorViewModel(
             _dbMock.Object,
@@ -79,9 +79,8 @@ public class HoverThumbnailServiceTests
 
         vm.ActualizarHoverPreview(125.4, 250);
 
-        vm.MostrarHoverPreview.Should().BeTrue();
-        vm.HoverPreviewTexto.Should().Be("02:05");
-        vm.HoverPreviewX.Should().Be(250);
+        // Timeline Hover desactivado
+        vm.MostrarHoverPreview.Should().BeFalse();
 
         vm.OcultarHoverPreview();
         vm.MostrarHoverPreview.Should().BeFalse();

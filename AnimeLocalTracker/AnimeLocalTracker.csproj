@@ -42,6 +42,11 @@
       <None Include="Tools\**">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>
+      <!-- Núcleo nativo Rust (parsing/fingerprint/spritesheets). build.ps1 lo refresca
+           desde native\animetracker_core\target\release antes de empaquetar. -->
+      <None Include="animetracker_core.dll" Condition="Exists('animetracker_core.dll')">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
     </ItemGroup>
 
 </Project>

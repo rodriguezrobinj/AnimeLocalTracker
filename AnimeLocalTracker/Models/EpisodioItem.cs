@@ -100,9 +100,16 @@ public partial class EpisodioItem : ObservableObject
             if (Es10Bit) partes.Add("10bit");
             if (!string.IsNullOrWhiteSpace(Fps))
             {
-                var fpsNum = Fps.Split('/')[0];
-                if (double.TryParse(fpsNum, out var fpsVal) && fpsVal > 0)
-                    partes.Add($"{fpsVal:0.##}fps");
+                var partesFps = Fps.Split('/', 2);
+                if (double.TryParse(partesFps[0], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var num)
+                    && partesFps.Length > 1
+                    && double.TryParse(partesFps[1], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var den)
+                    && den > 0)
+                {
+                    num /= den;
+                }
+                if (num > 0)
+                    partes.Add($"{num:0.##}fps");
             }
             return partes.Count > 0 ? string.Join(" · ", partes) : null;
         }

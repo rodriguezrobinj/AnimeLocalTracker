@@ -15,6 +15,37 @@ param(
 $ErrorActionPreference = "Stop"
 $root = $PSScriptRoot
 
+# ────────────────────────────────────────────────────────────
+#  ffmpeg.exe / ffprobe.exe embebidos
+#  El núcleo Rust (spritesheet.rs) y el daemon Python invocan
+#  `ffmpeg`/`ffprobe` por nombre. Si no se distribuyen junto a la
+#  app, miniaturas, sprite sheets y enriquecimiento fallan en
+#  silencio en máquinas sin FFmpeg instalado.
+#  (La carpeta AnimeLocalTracker\FFmpeg\ está en .gitignore: cada
+#  clon/build descarga los binarios si no existen.)
+# ────────────────────────────────────────────────────────────
+$ffmpegDir = "$root\AnimeLocalTracker\FFmpeg"
+if (-not (Test-Path "$ffmpegDir\ffmpeg.exe") -or -not (Test-Path "$ffmpegDir\ffprobe.exe")) {
+    Write-Host "[build] ffmpeg/ffprobe embebidos no encontrados; descargando essentials de gyan.dev..." -ForegroundColor Yellow
+    $ffmpegZip = Join-Path $env:TEMP "ffmpeg-release-essentials.zip"
+    if (-not (Test-Path $ffmpegZip)) {
+        Invoke-WebRequest "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" -OutFile $ffmpegZip -UseBasicParsing
+    }
+    $ffmpegExtract = Join-Path $env:TEMP ("ffmpeg_" + [guid]::NewGuid().ToString("N"))
+    Expand-Archive $ffmpegZip $ffmpegExtract
+    try {
+        $ffmpegBin = Get-ChildItem $ffmpegExtract -Recurse -Filter "ffmpeg.exe" | Select-Object -First 1 -ExpandProperty DirectoryName
+        if (-not $ffmpegBin) { throw "No se pudo localizar ffmpeg.exe en el zip descargado." }
+        New-Item -ItemType Directory -Path $ffmpegDir -Force | Out-Null
+        Copy-Item "$ffmpegBin\ffmpeg.exe" "$ffmpegDir\" -Force
+        Copy-Item "$ffmpegBin\ffprobe.exe" "$ffmpegDir\" -Force
+        Write-Host "[build] ffmpeg/ffprobe embebidos listos en $ffmpegDir" -ForegroundColor Green
+    }
+    finally {
+        Remove-Item $ffmpegExtract -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
 function Invoke-Build {
     param([string]$Label)
     Write-Host "[build] $Label..." -ForegroundColor Cyan
@@ -40,6 +71,9 @@ if (-not $pasada2) {
 
 # Copiar librerías nativas si existen
 if (Test-Path "$root\native\animetracker_core\target\release\animetracker_core.dll") {
+    # 1) Raíz del proyecto: la referencia el csproj (copiada a output en builds y publish de Velopack)
+    Copy-Item "$root\native\animetracker_core\target\release\animetracker_core.dll" "$root\AnimeLocalTracker\animetracker_core.dll" -Force -ErrorAction SilentlyContinue
+    # 2) Binarios de app y tests (cuando no se pasa por el csproj, p.ej. builds previos)
     Copy-Item "$root\native\animetracker_core\target\release\animetracker_core.dll" "$root\AnimeLocalTracker\bin\$Configuration\net8.0-windows\" -Force -ErrorAction SilentlyContinue
     Copy-Item "$root\native\animetracker_core\target\release\animetracker_core.dll" "$root\AnimeLocalTracker.Tests\bin\$Configuration\net8.0-windows\" -Force -ErrorAction SilentlyContinue
 }

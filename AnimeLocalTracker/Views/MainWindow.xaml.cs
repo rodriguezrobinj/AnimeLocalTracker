@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Controls;
 using System.Runtime.InteropServices;
 using AnimeLocalTracker.ViewModels;
 
@@ -38,7 +39,15 @@ public partial class MainWindow : Window
         }
 
         var vmType = viewModel.GetType();
-        if (!_viewCache.TryGetValue(vmType, out var view))
+        UserControl? view;
+
+        // ReproductorView aloja una superficie de renderizado nativa Win32/Direct3D (FlyleafHost).
+        // NUNCA debe reutilizarse desde la caché porque su swapchain nativo se destruye al cerrar el player.
+        if (viewModel is ReproductorViewModel)
+        {
+            view = new ReproductorView();
+        }
+        else if (!_viewCache.TryGetValue(vmType, out view))
         {
             view = viewModel switch
             {
@@ -46,7 +55,6 @@ public partial class MainWindow : Window
                 DetalleViewModel => new DetalleView(),
                 AgregarAnimeViewModel => new AgregarAnimeView(),
                 CalendarioViewModel => new CalendarioView(),
-                ReproductorViewModel => new ReproductorView(),
                 DescargasViewModel => new DescargasView(),
                 ConfiguracionViewModel => new ConfiguracionView(),
                 AcercaDeViewModel => new AcercaDeView(),

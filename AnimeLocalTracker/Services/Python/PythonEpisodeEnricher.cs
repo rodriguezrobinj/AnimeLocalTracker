@@ -73,13 +73,22 @@ public class PythonEpisodeEnricher
     }
 
     /// <summary>
-    /// Devuelve la ruta de la miniatura si ya existe en disco, de lo contrario null.
+    /// Devuelve la ruta de la miniatura si ya existe en disco y NO está corrupta (0 bytes),
+    /// de lo contrario null. Una miniaturas de 0 bytes (proceso ffmpeg interrumpido) se
+    /// borra para que se regenere en la próxima pasada.
     /// </summary>
     public static string? ObtenerRutaMiniaturaSiExiste(string rutaCompleta)
     {
         if (string.IsNullOrWhiteSpace(rutaCompleta)) return null;
         string path = ObtenerRutaMiniaturaEsperada(rutaCompleta);
-        return File.Exists(path) ? path : null;
+
+        if (!File.Exists(path)) return null;
+        if (new FileInfo(path).Length == 0)
+        {
+            try { File.Delete(path); } catch { }
+            return null;
+        }
+        return path;
     }
 
     /// <summary>
@@ -100,24 +109,66 @@ public class PythonEpisodeEnricher
 
             if (File.Exists(thumbPath))
             {
-                episodio.RutaMiniatura = thumbPath;
-                return;
+                // Miniatura corrupta (0 bytes) de una escritura interrumpida: se descarta
+                // y se regenera en lugar de dejarla en la biblioteca con el icono roto.
+                var info = new FileInfo(thumbPath);
+                if (info.Length > 0)
+                {
+                    episodio.RutaMiniatura = thumbPath;
+                    return;
+                }
+                try { File.Delete(thumbPath); } catch { }
             }
 
-            var result = await _pythonBridge.ExecuteCommandAsync<object, ThumbResult>(
-                "generate-thumbnail",
-                new { video_path = episodio.RutaCompleta, output_path = thumbPath, timestamp = 30 },
-                ct);
+            // Prioridad 1: Extracción nativa en Rust FFI (<15ms, sin sobrecarga de procesos)
+            bool extraido = false;
+            if (Native.NativeMethods.IsAvailable)
+            {
+                extraido = Native.NativeMethods.ExtractFrame(episodio.RutaCompleta, thumbPath, 30.0, 320);
+            }
 
-            if (result != null && result.Success && File.Exists(thumbPath))
+            // Prioridad 2: Fallback a Python Bridge si Rust no está presente
+            if (!extraido && !File.Exists(thumbPath))
+            {
+                var result = await _pythonBridge.ExecuteCommandAsync<object, ThumbResult>(
+                    "generate-thumbnail",
+                    new { video_path = episodio.RutaCompleta, output_path = thumbPath, timestamp = 30 },
+                    ct);
+
+                extraido = result != null && result.Success;
+            }
+
+            if (File.Exists(thumbPath) && new FileInfo(thumbPath).Length > 0)
             {
                 episodio.RutaMiniatura = thumbPath;
+            }
+            else
+            {
+                LimpiarMiniaturaCorrupta(episodio.RutaCompleta);
             }
         }
         catch (Exception ex)
         {
             AppLogger.Debug("PythonEpisodeEnricher", $"Error generando miniatura de {episodio.TituloArchivo}: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// Elimina miniaturas corruptas (0 bytes) de una ruta de video, dejando la caché limpia
+    /// para que la próxima pasada las regenere.
+    /// </summary>
+    public static void LimpiarMiniaturaCorrupta(string rutaCompleta)
+    {
+        if (string.IsNullOrWhiteSpace(rutaCompleta)) return;
+        try
+        {
+            string thumbPath = ObtenerRutaMiniaturaEsperada(rutaCompleta);
+            if (File.Exists(thumbPath) && new FileInfo(thumbPath).Length == 0)
+            {
+                File.Delete(thumbPath);
+            }
+        }
+        catch { }
     }
 
     /// <summary>

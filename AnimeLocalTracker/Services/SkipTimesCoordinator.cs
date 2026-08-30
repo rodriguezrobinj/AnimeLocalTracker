@@ -90,6 +90,10 @@ public class SkipTimesCoordinator : ISkipTimesCoordinator
                     }
                 }
             }
+            catch (OperationCanceledException)
+            {
+                // Cancelación esperada al navegar o cambiar de episodio
+            }
             catch (Exception ex)
             {
                 AppLogger.Debug("SkipTimesCoordinator", $"Error en detección local de escenas: {ex.Message}");

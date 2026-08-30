@@ -105,4 +105,67 @@ public class RustNativeTests
             if (File.Exists(tempFile)) File.Delete(tempFile);
         }
     }
+
+    [Fact]
+    public void NativeMethods_GenerateSpritesheet_ArchivoInexistente_RetornaFalloControlado()
+    {
+        if (!NativeMethods.IsAvailable) return;
+
+        var result = NativeMethods.GenerateSpritesheet("C:\\RutaInexistente\\Video.mkv", "C:\\Temp\\out.jpg", 1440, 60);
+        result.Should().NotBeNull();
+        result!.Success.Should().BeFalse();
+        result.Error.Should().NotBeNullOrWhiteSpace();
+    }
+
+    [Fact]
+    public void NativeMethods_ConFfmpegEmbebido_DeberiaExtraerFrameSinFfmpegEnPathDelSistema()
+    {
+        // Verifica el fix de distribución de ffmpeg: en una máquina SIN ffmpeg en el PATH
+        // del sistema, el núcleo Rust debe encontrar el ffmpeg.exe embebido de la app
+        // (carpeta FFmpeg/ del output) a través de NativeMethods.AsegurarFfmpegEnPath.
+        if (!NativeMethods.IsAvailable) return;
+
+        string ffmpegDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "FFmpeg");
+        if (!File.Exists(Path.Combine(ffmpegDir, "ffmpeg.exe"))) return;
+
+        string testVideo = Path.Combine(Path.GetTempPath(), $"alt_ffmpeg_path_test_{Guid.NewGuid():N}.mp4");
+        string frameOut = testVideo + ".frame.jpg";
+        try
+        {
+            // 1. Generar un video de prueba de 2s con el ffmpeg embebido
+            var psi = new System.Diagnostics.ProcessStartInfo(Path.Combine(ffmpegDir, "ffmpeg.exe"))
+            {
+                Arguments = $"-y -loglevel error -f lavfi -i \"testsrc=duration=2:size=320x180:rate=10\" -pix_fmt yuv420p \"{testVideo}\"",
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            using var proc = System.Diagnostics.Process.Start(psi)!;
+            proc.WaitForExit();
+            if (!File.Exists(testVideo)) return;
+
+            // 2. Vaciar el PATH del proceso (solo System32) para simular una máquina sin FFmpeg instalado
+            string pathOriginal = Environment.GetEnvironmentVariable("PATH") ?? "";
+            try
+            {
+                string system32 = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "System32");
+                Environment.SetEnvironmentVariable("PATH", system32);
+
+                // 3. AsegurarFfmpegEnPath debe re-inyectar el directorio FFmpeg embebido
+                NativeMethods.AsegurarFfmpegEnPath();
+
+                bool ok = NativeMethods.ExtractFrame(testVideo, frameOut, 1.0, 240);
+                ok.Should().BeTrue();
+                File.Exists(frameOut).Should().BeTrue();
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable("PATH", pathOriginal);
+            }
+        }
+        finally
+        {
+            if (File.Exists(testVideo)) File.Delete(testVideo);
+            if (File.Exists(frameOut)) File.Delete(frameOut);
+        }
+    }
 }

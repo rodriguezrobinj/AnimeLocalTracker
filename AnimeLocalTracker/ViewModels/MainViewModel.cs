@@ -206,17 +206,21 @@ public partial class MainViewModel : ObservableObject,
             var viewModel = _serviceProvider.GetService<ReproductorViewModel>();
             if (viewModel == null) return;
 
+            // 1. Crear el objeto Player antes de montar la vista para que FlyleafHost enlace un Player no nulo
+            viewModel.AsegurarPlayerInicializado();
+
+            // 2. Montar la vista en el Visual Tree de WPF PRIMERO para que FlyleafHost capture el contexto Direct3D
+            VistaActual = viewModel;
+
+            // 3. Abrir el video con FlyleafHost ya activo en pantalla (elimina la pantalla negra por carrera)
             try
             {
-                // Esperar a que el Player exista ANTES de crear la vista: FlyleafHost enlaza su
-                // superficie nativa al inicializarse y no la reconstruye si el Player llega después.
                 await viewModel.CargarVideoAsync(message.RutaVideo, message.AnimeId, message.TituloAnime, message.Episodio, message.EpisodiosDisponibles);
             }
             catch (Exception ex)
             {
                 AppLogger.Error("MainViewModel", $"Error al cargar el video '{message.RutaVideo}'", ex);
             }
-            VistaActual = viewModel;
         }
         catch (Exception ex)
         {
