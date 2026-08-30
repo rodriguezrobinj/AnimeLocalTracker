@@ -14,9 +14,13 @@ namespace AnimeLocalTracker.Services;
 public class AniSkipService : IAniSkipService
 {
     private readonly HttpClient _httpClient;
-    private static readonly ConcurrentDictionary<string, (List<AniSkipResult> Data, DateTime Expiration)> _skipCache = new();
+    private static readonly ConcurrentDictionary<string, CacheEntry<List<AniSkipResult>>> _skipCache = new();
     private static readonly ConcurrentDictionary<int, int?> _malIdCache = new();
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
+
+    // ARQ-04: topes de capacidad para consumo de RAM constante en sesiones largas.
+    private const int MaxSkipCacheEntries = 250;
+    private const int MaxMalIdCacheEntries = 2000;
 
     public AniSkipService(HttpClient httpClient)
     {
@@ -50,7 +54,7 @@ public class AniSkipService : IAniSkipService
             // 404 significa que no hay registros para este episodio aún en la base de datos comunitaria de AniSkip
             if (response.StatusCode == HttpStatusCode.NotFound)
             {
-                _skipCache[cacheKey] = ([], DateTime.UtcNow.AddMinutes(30));
+                BoundedCache.Insert(_skipCache, cacheKey, [], MaxSkipCacheEntries, TimeSpan.FromMinutes(30));
                 return [];
             }
 
@@ -60,12 +64,12 @@ public class AniSkipService : IAniSkipService
                 var result = JsonSerializer.Deserialize<AniSkipResponse>(json, JsonOptions);
                 if (result != null && result.Found && result.Results != null && result.Results.Count > 0)
                 {
-                    _skipCache[cacheKey] = (result.Results, DateTime.UtcNow.AddHours(2));
+                    BoundedCache.Insert(_skipCache, cacheKey, result.Results, MaxSkipCacheEntries, TimeSpan.FromHours(2));
                     return result.Results;
                 }
             }
 
-            _skipCache[cacheKey] = ([], DateTime.UtcNow.AddMinutes(15));
+            BoundedCache.Insert(_skipCache, cacheKey, [], MaxSkipCacheEntries, TimeSpan.FromMinutes(15));
             return [];
         }
         catch (OperationCanceledException)
@@ -108,7 +112,7 @@ public class AniSkipService : IAniSkipService
                 var content = await response.Content.ReadAsStringAsync(ct);
                 var result = JsonSerializer.Deserialize<AniListResponse>(content, JsonOptions);
                 var malId = result?.Data?.Media?.IdMal;
-                _malIdCache[aniListId] = malId;
+                BoundedCache.InsertNoExpiry(_malIdCache, aniListId, malId, MaxMalIdCacheEntries);
                 return malId;
             }
         }

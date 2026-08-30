@@ -48,6 +48,7 @@
 | SEC-09 | Comentario de caché actualizado a SHA-256 (el código ya usaba SHA256) | `PythonEpisodeEnricher.cs:60` | ✅ |
 | DEV-03 | Añadido `.github/dependabot.yml` (NuGet, Cargo, pip, GitHub Actions con grupos) | `.github/dependabot.yml` | ✅ |
 | FUN-01b | **Fix de CI**: el daemon Python lanzaba `InvalidOperationException` (y rompía el fallback one-shot) cuando el ejecutable compilado `AnimeTrackerTools.exe` no existe (p.ej. CI, donde está gitignored). Ahora `EnsureDaemonStartedAsync` devuelve `false` en vez de lanzar, `ExecuteViaDaemonAsync` captura cualquier fallo de daemon, y se descarta el daemon por sesión tras un arranque/saludo fallido para evitar stalls de 8 s repetidos. **Validado simulando CI (sin el exe): 3/3 tests Python en verde por el camino one-shot; suite completa 132/132** | `PythonBridgeService.cs:144-162,209-274` | ✅ |
+| ARQ-04 | **Tope de capacidad en cachés de red**: nuevo helper `BoundedCache` con `CacheEntry<T>` (tipo explícito, evita el borrado de nombres de tuplas en genéricos). Evicción: primero entradas expiradas, luego las ~32 más antiguas en lote. Aplicado a: `AniListTrackingService._cache` (250), `AniSkipService._skipCache` (250), `AniSkipService._malIdCache` (2000) y `SkipTimesCoordinator._malIdCache` (2000). RAM constante en sesiones largas | `BoundedCache.cs` (nuevo), `AniListTrackingService.cs:18,80-82`, `AniSkipService.cs:17-24,53,63,68,111`, `SkipTimesCoordinator.cs:19-41` | ✅ |
 
 ### Ya resuelto antes de esta iteración (verificado en repo)
 

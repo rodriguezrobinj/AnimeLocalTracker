@@ -15,8 +15,11 @@ public class AniListTrackingService : IAnimeTrackingService
 {
     private readonly HttpClient _httpClient;
     private readonly IAuthService? _authService;
-    private static readonly ConcurrentDictionary<string, (object Data, DateTime Expiration)> _cache = new();
+    private static readonly ConcurrentDictionary<string, CacheEntry<object>> _cache = new();
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
+
+    // ARQ-04: tope de capacidad para que el consumo de RAM sea constante en sesiones largas.
+    private const int MaxCacheEntries = 250;
 
     private const string BrowserUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
@@ -77,7 +80,7 @@ public class AniListTrackingService : IAnimeTrackingService
 
     private static void SetInCache<T>(string key, T data, TimeSpan duration) where T : class
     {
-        _cache[key] = (data, DateTime.UtcNow.Add(duration));
+        BoundedCache.Insert(_cache, key, data, MaxCacheEntries, duration);
     }
 
     public static void InvalidateCacheForMedia(int mediaId)

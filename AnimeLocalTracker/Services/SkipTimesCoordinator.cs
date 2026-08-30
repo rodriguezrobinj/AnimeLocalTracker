@@ -15,8 +15,10 @@ public class SkipTimesCoordinator : ISkipTimesCoordinator
     private readonly IAniSkipService? _aniSkipService;
     private readonly IPythonBridgeService? _pythonBridge;
 
-    // Memoización del mapeo AniListId -> MAL ID durante la vida del reproductor
+    // Memoización del mapeo AniListId -> MAL ID durante la vida del reproductor.
+    // ARQ-04: tope de capacidad para evitar crecimiento sin límite.
     private readonly ConcurrentDictionary<int, int?> _malIdCache = new();
+    private const int MaxMalIdCacheEntries = 2000;
 
     public SkipTimesCoordinator(IAniSkipService? aniSkipService, IPythonBridgeService? pythonBridge = null)
     {
@@ -31,13 +33,16 @@ public class SkipTimesCoordinator : ISkipTimesCoordinator
         {
             try
             {
-                var malId = _malIdCache.GetOrAdd(animeId, id => null);
+                if (!_malIdCache.TryGetValue(animeId, out var malId))
+                {
+                    BoundedCache.InsertNoExpiry(_malIdCache, animeId, null, MaxMalIdCacheEntries);
+                }
                 if (!malId.HasValue || malId.Value <= 0)
                 {
                     malId = await _aniSkipService.ObtenerMalIdDesdeAniListAsync(animeId, ct);
                     if (malId.HasValue && malId.Value > 0)
                     {
-                        _malIdCache[animeId] = malId;
+                        BoundedCache.InsertNoExpiry(_malIdCache, animeId, malId, MaxMalIdCacheEntries);
                     }
                 }
 
