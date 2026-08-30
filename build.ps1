@@ -73,9 +73,17 @@ if (-not $pasada2) {
 if (Test-Path "$root\native\animetracker_core\target\release\animetracker_core.dll") {
     # 1) Raíz del proyecto: la referencia el csproj (copiada a output en builds y publish de Velopack)
     Copy-Item "$root\native\animetracker_core\target\release\animetracker_core.dll" "$root\AnimeLocalTracker\animetracker_core.dll" -Force -ErrorAction SilentlyContinue
-    # 2) Binarios de app y tests (cuando no se pasa por el csproj, p.ej. builds previos)
-    Copy-Item "$root\native\animetracker_core\target\release\animetracker_core.dll" "$root\AnimeLocalTracker\bin\$Configuration\net8.0-windows\" -Force -ErrorAction SilentlyContinue
-    Copy-Item "$root\native\animetracker_core\target\release\animetracker_core.dll" "$root\AnimeLocalTracker.Tests\bin\$Configuration\net8.0-windows\" -Force -ErrorAction SilentlyContinue
+    
+    # 2) Binarios de app y tests si los directorios existen
+    $appBinDir = "$root\AnimeLocalTracker\bin\$Configuration\net8.0-windows"
+    $testsBinDir = "$root\AnimeLocalTracker.Tests\bin\$Configuration\net8.0-windows"
+
+    if (Test-Path $appBinDir) {
+        Copy-Item "$root\native\animetracker_core\target\release\animetracker_core.dll" (Join-Path $appBinDir "animetracker_core.dll") -Force -ErrorAction SilentlyContinue
+    }
+    if (Test-Path $testsBinDir) {
+        Copy-Item "$root\native\animetracker_core\target\release\animetracker_core.dll" (Join-Path $testsBinDir "animetracker_core.dll") -Force -ErrorAction SilentlyContinue
+    }
 }
 
 Write-Host "[build] OK ($Configuration)" -ForegroundColor Green

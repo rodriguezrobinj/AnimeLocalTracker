@@ -419,7 +419,10 @@ public class DownloadService : IDownloadService
 
             try
             {
-                using var headRes = await _httpClient.SendAsync(headReq, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+                using var probeCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                probeCts.CancelAfter(TimeSpan.FromSeconds(6));
+
+                using var headRes = await _httpClient.SendAsync(headReq, HttpCompletionOption.ResponseHeadersRead, probeCts.Token);
                 if (headRes.IsSuccessStatusCode)
                 {
                     totalBytes = headRes.Content.Headers.ContentLength ?? -1;
@@ -428,7 +431,7 @@ public class DownloadService : IDownloadService
             }
             catch (Exception ex)
             {
-                AppLogger.Warn("DownloadService", $"Error en sondeo HEAD para '{SanitizarUrlParaLog(videoUrl)}': {ex.Message}");
+                AppLogger.Debug("DownloadService", $"Sondeo HEAD para '{SanitizarUrlParaLog(videoUrl)}' omitido/timeout: {ex.Message}");
             }
         }
 
@@ -442,7 +445,10 @@ public class DownloadService : IDownloadService
 
             try
             {
-                using var testRes = await _httpClient.SendAsync(testReq, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+                using var probeGetCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                probeGetCts.CancelAfter(TimeSpan.FromSeconds(6));
+
+                using var testRes = await _httpClient.SendAsync(testReq, HttpCompletionOption.ResponseHeadersRead, probeGetCts.Token);
                 if (testRes.StatusCode == System.Net.HttpStatusCode.PartialContent)
                 {
                     supportsRanges = true;
@@ -458,7 +464,7 @@ public class DownloadService : IDownloadService
             }
             catch (Exception ex)
             {
-                AppLogger.Warn("DownloadService", $"Error en sondeo GET Range(0,0) para '{SanitizarUrlParaLog(videoUrl)}': {ex.Message}");
+                AppLogger.Debug("DownloadService", $"Sondeo GET Range(0,0) para '{SanitizarUrlParaLog(videoUrl)}' omitido/timeout: {ex.Message}");
             }
         }
 

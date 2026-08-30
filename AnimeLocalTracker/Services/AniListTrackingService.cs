@@ -141,6 +141,16 @@ public class AniListTrackingService : IAnimeTrackingService
             }
             return null;
         }
+        catch (OperationCanceledException)
+        {
+            AppLogger.Warn("AniListTrackingService", $"Timeout al obtener anime por ID {id} de AniList (la API tardó más de 30s o la conexión fue lenta).");
+            return null;
+        }
+        catch (HttpRequestException ex)
+        {
+            AppLogger.Warn("AniListTrackingService", $"Fallo de red al conectar con AniList ({id}): {ex.Message}");
+            return null;
+        }
         catch (Exception ex)
         {
             AppLogger.Error("AniListTrackingService", $"Error al obtener anime por ID {id}", ex);

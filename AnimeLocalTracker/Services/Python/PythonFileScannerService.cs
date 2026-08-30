@@ -32,12 +32,23 @@ namespace AnimeLocalTracker.Services.Python
                     var residuales = dirInfo.EnumerateFiles("Episodio *.downloading", SearchOption.TopDirectoryOnly);
                     foreach (var res in residuales)
                     {
-                        try { res.Delete(); } catch (Exception ex) { AppLogger.Warn("PythonFileScanner", $"No se pudo eliminar residual '{res.FullName}': {ex.Message}"); }
+                        try
+                        {
+                            res.Delete();
+                        }
+                        catch (IOException)
+                        {
+                            // Archivo en uso por una descarga activa actual: omitir limpiamente
+                        }
+                        catch (Exception ex)
+                        {
+                            AppLogger.Debug("PythonFileScanner", $"No se pudo eliminar residual '{res.FullName}': {ex.Message}");
+                        }
                     }
                 }
                 catch (Exception ex)
                 {
-                    AppLogger.Warn("PythonFileScanner", $"Error al limpiar residuales en {carpeta}: {ex.Message}");
+                    AppLogger.Debug("PythonFileScanner", $"Error al limpiar residuales en {carpeta}: {ex.Message}");
                 }
 
                 try
