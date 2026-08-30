@@ -14,6 +14,160 @@
 
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+
+        <!-- Estilo para la parte reproducida (Blanco sólido conectado sin fisuras con el centro del Thumb) -->
+        <Style x:Key="TimelinePlayedRepeatButtonStyle" TargetType="{x:Type RepeatButton}">
+            <Setter Property="OverridesDefaultStyle" Value="true" />
+            <Setter Property="IsTabStop" Value="false" />
+            <Setter Property="Focusable" Value="false" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type RepeatButton}">
+                        <Border x:Name="PlayedTrackBorder" Height="3" CornerRadius="1.5,0,0,1.5"
+                                Margin="0,0,-10,0"
+                                Background="White" VerticalAlignment="Center" />
+                        <ControlTemplate.Triggers>
+                            <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Slider}}" Value="True">
+                                <Setter TargetName="PlayedTrackBorder" Property="Height" Value="5" />
+                                <Setter TargetName="PlayedTrackBorder" Property="CornerRadius" Value="2.5,0,0,2.5" />
+                            </DataTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Estilo para la parte no reproducida (Transparente para dejar visible el BackgroundTrack translúcido) -->
+        <Style x:Key="TimelineUnplayedRepeatButtonStyle" TargetType="{x:Type RepeatButton}">
+            <Setter Property="OverridesDefaultStyle" Value="true" />
+            <Setter Property="IsTabStop" Value="false" />
+            <Setter Property="Focusable" Value="false" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type RepeatButton}">
+                        <Rectangle Fill="Transparent" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Estilo del Thumb (la bolita blanca limpia, unida a la barra y sin sombras) -->
+        <Style x:Key="TimelineScrubberThumbStyle" TargetType="{x:Type Thumb}">
+            <Setter Property="OverridesDefaultStyle" Value="true" />
+            <Setter Property="IsTabStop" Value="false" />
+            <Setter Property="Focusable" Value="false" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Width" Value="20" />
+            <Setter Property="Height" Value="20" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Thumb}">
+                        <Grid Width="20" Height="20" Background="Transparent">
+                            <Ellipse x:Name="ThumbEllipse"
+                                     Width="10" Height="10"
+                                     Fill="White"
+                                     HorizontalAlignment="Center"
+                                     VerticalAlignment="Center"
+                                     RenderTransformOrigin="0.5,0.5">
+                                <Ellipse.RenderTransform>
+                                    <ScaleTransform ScaleX="1.0" ScaleY="1.0" />
+                                </Ellipse.RenderTransform>
+                            </Ellipse>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <!-- Hover general sobre el slider (hace crecer la bolita de 10px a 16px) -->
+                            <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Slider}}" Value="True">
+                                <DataTrigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="ThumbEllipse"
+                                                             Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
+                                                             To="1.6" Duration="0:0:0.12"/>
+                                            <DoubleAnimation Storyboard.TargetName="ThumbEllipse"
+                                                             Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
+                                                             To="1.6" Duration="0:0:0.12"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </DataTrigger.EnterActions>
+                                <DataTrigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="ThumbEllipse"
+                                                             Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
+                                                             To="1.0" Duration="0:0:0.12"/>
+                                            <DoubleAnimation Storyboard.TargetName="ThumbEllipse"
+                                                             Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
+                                                             To="1.0" Duration="0:0:0.12"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </DataTrigger.ExitActions>
+                            </DataTrigger>
+                            
+                            <!-- Cuando se está arrastrando la bolita (feedback táctil a 18px) -->
+                            <Trigger Property="IsDragging" Value="True">
+                                <Setter TargetName="ThumbEllipse" Property="RenderTransform">
+                                    <Setter.Value>
+                                        <ScaleTransform ScaleX="1.8" ScaleY="1.8" />
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Estilo completo del Slider de la Línea de Tiempo -->
+        <Style x:Key="TimelineSliderStyle" TargetType="{x:Type Slider}">
+            <Setter Property="OverridesDefaultStyle" Value="True" />
+            <Setter Property="IsTabStop" Value="False" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Height" Value="24" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Slider}">
+                        <Grid x:Name="SliderGrid" VerticalAlignment="Center" Background="Transparent">
+                            <!-- Pista de fondo translúcida (tiempo no reproducido) -->
+                            <Border x:Name="BackgroundTrack" Height="3" CornerRadius="1.5"
+                                    Background="#55FFFFFF" VerticalAlignment="Center" />
+
+                            <!-- Track con el botón izquierdo que representa el progreso reproducido en blanco -->
+                            <Track x:Name="PART_Track">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Style="{StaticResource TimelinePlayedRepeatButtonStyle}" />
+                                </Track.DecreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb x:Name="Thumb" Style="{StaticResource TimelineScrubberThumbStyle}" />
+                                </Track.Thumb>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Style="{StaticResource TimelineUnplayedRepeatButtonStyle}" />
+                                </Track.IncreaseRepeatButton>
+                            </Track>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <!-- Expansión de la barra de fondo de 3px a 5px en Hover -->
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="BackgroundTrack" Storyboard.TargetProperty="Height" To="5" Duration="0:0:0.12"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="BackgroundTrack" Storyboard.TargetProperty="Height" To="3" Duration="0:0:0.12"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </UserControl.Resources>
 
     <Grid>
@@ -108,45 +262,17 @@
                             </StackPanel>
                         </Button>
 
-                        <!-- Barra de progreso con hover interactivo -->
+                        <!-- Barra de progreso interactiva con Bolita Scrubber (YouTube / Netflix Style) -->
                         <Grid Grid.Row="1" Margin="0,0,0,15" x:Name="ProgressBarArea" Cursor="Hand"
                               Background="Transparent"
                               PreviewMouseLeftButtonDown="ProgressBarArea_PreviewMouseLeftButtonDown">
-                            <!-- Línea de progreso visual -->
-                            <ProgressBar Minimum="0" Maximum="{Binding TotalSeconds}" Value="{Binding CurrentSeconds, Mode=OneWay}"
-                                         Height="3" Foreground="White" Background="#44FFFFFF" BorderThickness="0" VerticalAlignment="Center">
-                                <ProgressBar.Style>
-                                    <Style TargetType="ProgressBar" BasedOn="{StaticResource {x:Type ProgressBar}}">
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Grid}}" Value="True">
-                                                <DataTrigger.EnterActions>
-                                                    <BeginStoryboard>
-                                                        <Storyboard>
-                                                            <DoubleAnimation Storyboard.TargetProperty="Height" To="5" Duration="0:0:0.15"/>
-                                                        </Storyboard>
-                                                    </BeginStoryboard>
-                                                </DataTrigger.EnterActions>
-                                                <DataTrigger.ExitActions>
-                                                    <BeginStoryboard>
-                                                        <Storyboard>
-                                                            <DoubleAnimation Storyboard.TargetProperty="Height" To="3" Duration="0:0:0.15"/>
-                                                        </Storyboard>
-                                                    </BeginStoryboard>
-                                                </DataTrigger.ExitActions>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </ProgressBar.Style>
-                            </ProgressBar>
-
-                            <!-- Slider transparente encima (solo para ARRASTRE del thumb; el clic exacto
-                                 lo calcula ProgressBarArea_PreviewMouseLeftButtonDown con corrección de thumb) -->
                             <Slider x:Name="SliderTiempo" Minimum="0" Maximum="{Binding TotalSeconds}" Value="{Binding CurrentSeconds, Mode=TwoWay}"
-                                    IsMoveToPointEnabled="True" Foreground="White" Focusable="False"
+                                    Style="{StaticResource TimelineSliderStyle}"
+                                    IsMoveToPointEnabled="True" Focusable="False"
                                     primitives:Thumb.DragStarted="Slider_DragStarted"
                                     primitives:Thumb.DragDelta="Slider_DragDelta"
                                     primitives:Thumb.DragCompleted="Slider_DragCompleted"
-                                    Opacity="0.01" Height="20" VerticalAlignment="Center" />
+                                    VerticalAlignment="Center" />
                         </Grid>
 
                         <!-- Controles -->

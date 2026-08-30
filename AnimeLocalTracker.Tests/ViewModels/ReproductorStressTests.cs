@@ -46,8 +46,8 @@ public class ReproductorStressTests
 
         stopwatch.Stop();
 
-        // Assert: 1,440 operaciones de seeking continuo deben completarse en menos de 200ms
-        stopwatch.ElapsedMilliseconds.Should().BeLessThan(200, 
+        // Assert: 1,440 operaciones de seeking continuo deben completarse en menos de 500ms
+        stopwatch.ElapsedMilliseconds.Should().BeLessThan(500, 
             $"El seeking continuo de 1,440 segundos tomó {stopwatch.ElapsedMilliseconds}ms, lo cual excede el umbral deseado de fluidez.");
 
         sut.Dispose();

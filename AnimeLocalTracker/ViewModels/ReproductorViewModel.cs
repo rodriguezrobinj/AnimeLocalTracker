@@ -75,6 +75,8 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     private int _volumenPrevioMute = 100;
     private bool _autoPlayEjecutado = false;
     private double _posicionInicioSegundos = 0;
+    private volatile bool _haCompletadoOpen = false;
+    private double _seekPendienteAlAbrir = -1;
 
     private List<AniSkipResult> _skipTimes = new();
     public List<AniSkipResult> SkipTimes => _skipTimes;
@@ -326,6 +328,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             var player = new Player(config);
             player.OpenCompleted += (s, e) =>
             {
+                _haCompletadoOpen = true;
                 EvaluarSubtitulosPorDefecto();
 
                 if (player.Audio != null)
@@ -338,11 +341,17 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                     catch { }
                 }
 
-                // Si hay posición previa para reanudar, saltar de inmediato antes de reproducir
-                if (_posicionInicioSegundos > 5)
+                // Si el usuario intentó adelantar/buscar mientras se abría el video, o si venía con posición de reanudar:
+                double pos = _seekPendienteAlAbrir >= 0
+                    ? _seekPendienteAlAbrir
+                    : _posicionInicioSegundos;
+
+                bool eraReanudacion = _seekPendienteAlAbrir < 0 && _posicionInicioSegundos > 5;
+                _seekPendienteAlAbrir = -1;
+                _posicionInicioSegundos = 0;
+
+                if (pos > 0)
                 {
-                    double pos = _posicionInicioSegundos;
-                    _posicionInicioSegundos = 0;
                     try
                     {
                         player.CurTime = TimeSpan.FromSeconds(pos).Ticks;
@@ -350,17 +359,20 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                         _lastNotifiedSeconds = pos;
                         CurrentSeconds = pos;
 
-                        var tPos = TimeSpan.FromSeconds(pos);
-                        string tiempoFormateado = tPos.ToString(tPos.Hours > 0 ? @"hh\:mm\:ss" : @"mm\:ss");
+                        if (eraReanudacion)
+                        {
+                            var tPos = TimeSpan.FromSeconds(pos);
+                            string tiempoFormateado = tPos.ToString(tPos.Hours > 0 ? @"hh\:mm\:ss" : @"mm\:ss");
 
-                        _ = WeakReferenceMessenger.Default.Send(new Messages.MostrarDialogoRequestMessage(
-                            "Reanudar Reproducción",
-                            $"Continuando desde {tiempoFormateado}",
-                            false, "PlaySpeed", "#2196F3"));
+                            _ = WeakReferenceMessenger.Default.Send(new Messages.MostrarDialogoRequestMessage(
+                                "Reanudar Reproducción",
+                                $"Continuando desde {tiempoFormateado}",
+                                false, "PlaySpeed", "#2196F3"));
+                        }
                     }
                     catch (Exception ex)
                     {
-                        AppLogger.Debug("ReproductorViewModel", $"Error aplicando seek de reanudación en OpenCompleted: {ex.Message}");
+                        AppLogger.Debug("ReproductorViewModel", $"Error aplicando seek de inicio en OpenCompleted: {ex.Message}");
                     }
                 }
             };
@@ -506,6 +518,15 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     private void AplicarSeekNativo(double segundos)
     {
         if (Player == null || Player.IsDisposed) return;
+
+        // Si el reproductor todavía se está abriendo o no ha completado la inicialización inicial del decodificador,
+        // no invocar Player.CurTime de inmediato (interrumpe la creación del contexto de video en FFmpeg/Flyleaf
+        // dejando la pantalla negra). Guardamos la posición para aplicarla en cuanto OpenCompleted se active.
+        if (!_haCompletadoOpen || Player.Status == Status.Opening || Player.Status == Status.Stopped)
+        {
+            _seekPendienteAlAbrir = segundos;
+            return;
+        }
 
         _ultimoSeekAplicadoUtc = DateTime.UtcNow;
         try
@@ -801,6 +822,8 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         _lastSavedSeconds = -1;
         _resumingPositionSeconds = 0;
         _posicionInicioSegundos = 0;
+        _haCompletadoOpen = false;
+        _seekPendienteAlAbrir = -1;
 
         if (listaEpisodios != null)
         {
