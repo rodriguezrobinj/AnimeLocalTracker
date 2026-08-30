@@ -1,0 +1,59 @@
+name: CI & Security Audit
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    name: Build, Test & SCA Security Audit
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Setup .NET 8 SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Setup Rust Toolchain
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Cargo Security Audit (Rust SCA)
+      run: |
+        cargo install cargo-audit --locked
+        cargo audit --manifest-path native/animetracker_core/Cargo.toml
+      continue-on-error: true
+
+    - name: Python SCA Audit (pip-audit)
+      run: |
+        python -m pip install --upgrade pip
+        pip install pip-audit
+        pip install -e tools/python
+        pip-audit
+      continue-on-error: true
+
+    - name: Build Rust Native Library
+      run: |
+        cargo build --release --manifest-path native/animetracker_core/Cargo.toml
+        Copy-Item native/animetracker_core/target/release/animetracker_core.dll AnimeLocalTracker/animetracker_core.dll -Force
+
+    - name: Restore and Build .NET Solution
+      run: |
+        powershell -ExecutionPolicy Bypass -File .\build.ps1
+
+    - name: Run Test Suite
+      run: |
+        dotnet test AnimeLocalTracker.Tests/AnimeLocalTracker.Tests.csproj --no-build -c Debug --logger "trx;LogFileName=test_results.trx"
