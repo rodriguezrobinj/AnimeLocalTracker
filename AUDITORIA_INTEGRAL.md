@@ -1,294 +1,258 @@
-# Auditoría Integral — AnimeLocalTracker · **v2 (segunda pasada)**
+# Auditoría Integral — AnimeLocalTracker · **v3 (tercera pasada)**
 
 > **Proyecto:** AnimeLocalTracker · App de escritorio WPF para gestión de colecciones locales de anime
-> **Stack:** .NET 8 (C# 12, WPF, MVVM Toolkit 8.4.2) · SQLite (WAL, sqlite-net-pcl 1.11.285) · FlyleafLib 3.11.3 (FFmpeg 9) · Rust `animetracker_core` (FFI cdylib, anitomy-pure, rayon) · Python daemon (PyInstaller, yt-dlp, anitopy, opencv) · MaterialDesignThemes 5.2.1 · Velopack 1.2.0 · OAuth2 AniList (GraphQL) · AniSkip API
-> **Repositorio:** `github.com/rodriguezrobinj/AnimeLocalTracker` · **Baseline:** commit `0b0001f` (main)
-> **Entorno objetivo:** producción (instalador por-usuario, win-x64, Velopack) · **Fecha:** 2026-08-30
-> **Método:** SAST estático manual (C#, Python, Rust, PS, YAML, ISS) + SCA (CI) + verificación de la remediación v1 contra el código real. Sin cambios de código: solo propuestas.
+> **Stack:** .NET 8 (C# 12, WPF, MVVM Toolkit 8.4.2) · SQLite (WAL, sqlite-net-pcl 1.11.285) · FlyleafLib 3.11.3 (FFmpeg 9) · Rust `animetracker_core` (FFI cdylib, anitomy-pure, rayon) · Python daemon (PyInstaller, yt-dlp **pineado** 2026.8.19, anitopy, opencv) · MaterialDesignThemes 5.2.1 · Velopack 1.2.0 · OAuth2 AniList (GraphQL) · AniSkip API
+> **Repositorio:** `github.com/rodriguezrobinj/AnimeLocalTracker` · **Baseline:** commit `6905254` (main)
+> **Entorno objetivo:** producción (instalador Velopack por-usuario, win-x64, releases 1.0.0→1.0.3)
+> **Fecha:** 2026-08-30 · **Método:** SAST estático manual (C#, Rust, Python, PS, YAML, ISS) + verificación de la remediación v1/v2 contra el código real + validación empírica (tests 126/126, builds, instalador 1.0.3). Sin cambios de código: solo propuestas.
 
-**Supuestos declarados (campos del prompt):** nombre = AnimeLocalTracker; stack = el indicado arriba; repo = GitHub público; arquitectura = MVVM + DI + capa nativa Rust FFI + daemon Python; entorno = producción desktop; requisitos = README (local-first, sync AniList, auto-skip, descargas, calendario, Velopack).
+**Supuestos (campos del prompt):** nombre = AnimeLocalTracker; stack = el indicado; repo = GitHub público; arquitectura = MVVM + DI + capa nativa Rust FFI + daemon Python + Velopack; entorno = producción desktop por-usuario; requisitos = README (local-first, sync AniList, auto-skip, descargas, calendario, updates silenciosos).
 
 ---
 
-## 0. Checklist de verificación (v2)
+## 0. Checklist de verificación (v3)
 
 | # | Verificación | Estado | Evidencia |
 |---|---|---|---|
-| V1 | Compilación .NET (build.ps1 doble pasada) | ✅ | `build.ps1 -RunTests` OK local y en CI |
-| V2 | Compilación Rust (cargo build --release) | ✅ | OK; bug de campos corregido en `0b0001f` |
-| V3 | Suite de tests | ✅ 132/132 | xUnit, 22 archivos |
-| V4 | Tests en entorno CI (sin `AnimeTrackerTools.exe` embebido) | ✅ | Fallback one-shot validado simulando CI (3/3) |
-| V5 | SCA .NET (`dotnet list package --vulnerable`) | ⚠️ No en CI | Sin `packages.lock.json` |
-| V6 | SCA Rust / Python (cargo-audit / pip-audit) | ⚠️ Informativo | `continue-on-error: true` en `ci.yml:43,49` |
-| V7 | Búsqueda de secretos | ✅ | Ninguno real (solo ClientId OAuth público) |
-| V8 | DAST dinámico | ❌ No realizado | App de escritorio; cubierto por análisis estático de flujos |
-| V9 | Carga/estrés (k6/JMeter) | ❌ No aplica | BenchmarkDotNet cubre lógica pura (§7) |
-| V10 | CI/CD y release | ⚠️ | CI OK; **release 100% manual, sin firma** |
-| V11 | Instalador | ⚠️ | `installer.iss:41` con `ignoreversion`, sin SignTool |
-| V12 | Protección de rama `main` | ❌ | **Pendiente de activar** (ruleset en proceso) |
-| V13 | Dependabot | ✅ | `.github/dependabot.yml` añadido (commit `ce3b1f8`) |
-| V14 | Coverage en CI | ❌ | coverlet instalado, nunca invocado |
-| V15 | Working tree limpio | ⚠️ | `animetracker_core.dll` (artefacto binario) modificado sin commit |
+| V1 | Compilación .NET (build.ps1 doble pasada) | ✅ | OK local y en CI |
+| V2 | Compilación Rust (cargo build --release) | ✅ | OK; solo warning benigno de linker MSVC |
+| V3 | Suite de tests | ✅ **126/126** | 126 tests (se retiraron los de hover/spritesheet, que ya no existen) |
+| V4 | Tests en CI (sin exe embebido) | ✅ | Fallback one-shot validado (3/3) |
+| V5 | Instalador generado | ✅ | v1.0.3 (Setup + Portable + full + delta 0.1 MB) |
+| V6 | SCA .NET / Rust / Python | ⚠️ | `dotnet list package` añadido (informacional); cargo/pip-audit con `continue-on-error` |
+| V7 | Búsqueda de secretos | ✅ | Ninguno real |
+| V8 | DAST dinámico | ❌ | No realizado (desktop; análisis estático de flujos) |
+| V9 | Carga/estrés | ❌ | No aplica; BenchmarkDotNet manual |
+| V10 | Protección de rama `main` | ⚠️ | Ruleset en configuración (estado exacto no verificado en GitHub) |
+| V11 | Datos del usuario fuera del directorio de instalación | ✅ | **AppDataPaths** (`%LocalAppData%\AnimeLocalTrackerData`) + migración |
+| V12 | Working tree | ✅ | Limpio tras `6905254` |
 
 ---
 
-## 1. Resumen ejecutivo v2
+## 1. Resumen ejecutivo v3
 
-### 1.1 Estado de remediación v1 → v2
+### 1.1 Evolución v1 → v3
 
-**De los 34 hallazgos de la v1, 20 están resueltos y verificados en código:**
-
-| Estado | Hallazgos |
+| Hito | Estado |
 |---|---|
-| ✅ **Resueltos (20)** | SEC-01 (Origin check), SEC-02, SEC-03, SEC-04, SEC-07, SEC-09, SEC-10, SEC-12, SEC-15, FUN-01, FUN-01b (fallback CI), FUN-02, FUN-03, FUN-04, FUN-07, ARQ-04 (cachés acotados), DEV-03 (dependabot), RND-01 (parcial), FUN-05 (parcial), SEC-08 |
-| 🟠 **Abiertos Fase 2 (12)** | SEC-05 (firma), SEC-06 (pre-asignación disco), FUN-06 (`ignoreversion`), ARQ-02 (duplicación creación anime), ARQ-03 (duplicación búsqueda), ARQ-04b (evicción `Clear()` total), RND-02 (batching AniList), RND-03 (`Dispatcher.Invoke` hot path), INT-01 (contrato scraping), INT-02 (pin yt-dlp), DEV-01 (SCA no bloqueante + pinning SHA + caché CI), DEV-06 (coverage + tests faltantes) |
-| 🟢 **Abiertos Fase 3 (5)** | ARQ-01 (god-objects), ARQ-05 (doble motor parsing), DEV-04 (licencia FluentAssertions), DEV-05 (Microsoft.Extensions 10.x sobre net8), DEV-02 (release pipeline + signing) |
-| 🆕 **Nuevos en v2 (2)** | NEW-01 (binario `animetracker_core.dll` trackeado en git), NEW-02 (protección de rama `main` sin activar) |
+| Hallazgos v1 resueltos | **31 de 34** (verificados en código) |
+| Hallazgos v2 resueltos | **12 de 13** (los quick wins) |
+| Hallazgos **nuevos** en v3 | **3**: DATA-01 (daemon huérfano bloquea instalación), DATA-02 (variable muerta en AnimeItem), RST-01 (export Rust `extract_frames_batch` sin uso) |
 
 ### 1.2 Conclusiones clave
 
-1. **El riesgo crítico de estabilidad ya no existe.** El bloqueo de UI del daemon Python (FUN-01), los `async void` peligrosos (FUN-02) y la carrera de skip times (FUN-07) están corregidos; el fallback one-shot (FUN-01b) devolvió el CI a verde incluso sin el binario embebido.
-2. **La superficie de seguridad quedó muy reducida:** sin fallback de token en claro, validación de Origin en el callback OAuth, URL de portadas con límite de 10 MB, hostname validado exacto, logs saneados y cachés acotadas (ARQ-04). No queda ningún hallazgo de seguridad **Alto** abierto; los abiertos son Medios/Bajos.
-3. **Los huecos restantes son de producción, no de código:** firma de código (SEC-05/DEV-02), pre-asignación de disco controlada por servidor (SEC-06), `ignoreversion` en el instalador (FUN-06) y SCA informativo en CI (DEV-01).
-4. **Deuda arquitectónica intacta** (Fase 3): god-objects (`ReproductorViewModel` 1.112 líneas, `DetalleViewModel` 959) y duplicación de creación de anime (`MainViewModel.cs:510` vs `AgregarAnimeViewModel.cs:213`, ~70 líneas).
-5. **Proceso:** dependabot activo y protección de `main` en configuración (NEW-02). Falta el gate de coverage y el pinning de acciones CI.
+1. **El incidente real de la semana se corrigió de raíz:** la pérdida de datos al desinstalar (los datos vivían dentro del directorio de instalación de Velopack) está resuelta con `AppDataPaths` + migración automática (`6905254`). Es el cambio más importante del ciclo.
+2. **El rendimiento de miniaturas quedó resuelto por completo:** lista instantánea + generación 1×1 secuencial con refresco por episodio (`61baf94`). El experimento `-skip_frame nokey` se descartó tras validar que falla de forma fiable (encoder mjpeg) — quedó documentado el camino correcto: seek exacto a 2 s + `-threads 0` + scale 320.
+3. **Nuevo hallazgo alto (DATA-01):** el daemon Python puede quedar huérfano tras un cierre brusco de la app y **bloquear el directorio de instalación** → falla el update ("Failed to remove existing application directory", que te obligó a desinstalar). `OnExit` mata el daemon solo en cierre ordenado; no hay `ProcessExit` para el caso forzado. **Este es el único hallazgo que causa fallos de instalación hoy.**
+4. **Deuda arquitectónica intacta (Fase 3):** god-objects (`ReproductorViewModel` ~1.250 líneas, `DetalleViewModel` ~1.075) y duplicación Main↔AgregarAnime (~70 líneas).
+5. **DevOps sin cambios desde v2:** SCA no bloqueante, sin release pipeline, sin firma, sin coverage en CI.
 
-### 1.3 Madurez por dominio (0–5) — evolución
+### 1.3 Madurez por dominio (0–5)
 
-| Dominio | v1 | v2 | Comentario |
+| Dominio | v1 | v2 | v3 |
 |---|---|---|---|
-| Seguridad de código | 4.0 | **4.5** | Origen/tamaño/fallback resueltos; queda firma e integridad |
-| Funcionalidad/estabilidad | 3.5 | **4.0** | Daemon async, navegación blindada, CI verde |
-| Arquitectura | 3.0 | 3.0 | Cachés acotadas (ARQ-04) pero god-objects intactos |
-| Rendimiento | 3.5 | 3.5 | Decode async parcial; batching pendiente |
-| Integraciones | 3.5 | 3.5 | Sin cambios sustanciales |
-| DevOps | 2.5 | **3.5** | Dependabot + single-instance + graceful shutdown; falta release/firma |
-| Testing | 3.5 | 3.5 | 132 tests; coverage sin medir en CI |
-| **Media** | **3.4** | **3.7** | |
+| Seguridad de código | 4.0 | 4.5 | **4.5** |
+| Funcionalidad/estabilidad | 3.5 | 4.0 | **4.2** (miniaturas 1×1; daemon huérfano pendiente) |
+| Arquitectura | 3.0 | 3.0 | **3.2** (datos separados, código muerto limpiado) |
+| Rendimiento | 3.5 | 3.5 | **4.0** (miniaturas sub-segundo, batch eliminado) |
+| Integraciones | 3.5 | 3.5 | 3.5 |
+| DevOps | 2.5 | 3.5 | 3.5 |
+| Testing | 3.5 | 3.5 | **3.6** (tests actualizados con las features) |
+| **Media** | **3.4** | **3.7** | **3.9** |
 
 ---
 
-## 2. Matriz de riesgos actualizada (solo abiertos)
+## 2. Matriz de riesgos v3 (solo abiertos)
 
 | ID | Hallazgo | Sev. | Prob. | Impacto | Fase |
 |---|---|---|---|---|---|
+| **DATA-01** 🆕 | Daemon Python huérfano tras cierre brusco bloquea el directorio de instalación → update falla ("Failed to remove existing application directory") y obliga a desinstalar | **Alto** | Alta | Alta | **1** |
 | SEC-05 | Velopack + instalador sin firma de código | Medio | Baja | Alta | 2 |
-| SEC-06 | Pre-asignación de disco con tamaño del servidor (`DownloadService.cs:514`) | Medio | Baja | Media | 2 |
-| FUN-06 | `Flags: ignoreversion` en instalador (binarios viejos persisten) | Medio | Media | Media | 2 |
+| DEV-01 | CI: SCA no bloqueante (`continue-on-error`), sin pinning en las audit steps, sin coverage | Medio | Alta | Media | 2 |
+| DEV-02 | Release 100% manual (subir a GitHub a mano); versión en script | Alto | Alta | Media | 2 |
+| DEV-06 | Sin tests de MainViewModel/Configuración/Descargas/scrapers; coverage nunca medido | Medio | Media | Media | 2 |
 | ARQ-02 | Duplicación creación de anime (Main↔AgregarAnime, ~70 líneas) | Alto | Alta | Media | 2 |
-| ARQ-03 | Duplicación búsqueda en vivo (debounce+CTS) | Medio | Alta | Baja | 2 |
-| ARQ-04b | `Clear()` total (no LRU) en ImageCacheService/HoverThumbnailService | Medio | Media | Media | 2 |
+| ARQ-04b | Evicción de caches de imágenes por `Take(16)` (aproximada, no LRU exacta) | Bajo | Media | Baja | 3 |
 | RND-02 | N+1 de red secuencial en `ActualizarBibliotecaAsync` (~300 llamadas seriales) | Medio | Alta | Media | 3 |
-| RND-03 | `Dispatcher.Invoke` síncrono en hot path (`GaleriaViewModel.cs:429`) | Bajo | Media | Baja | 2 |
 | INT-01 | Scraping animeav1.com con regex sobre HTML sin contrato | Medio | Alta | Media | 3 |
-| INT-02 | `yt-dlp>=2025.1.15` rango abierto (supply chain) | Medio | Baja | Media | 2 |
-| DEV-01 | CI: audits no bloqueantes, sin pinning SHA, sin caché, sin coverage | Medio | Alta | Media | 2 |
-| DEV-02 | Release 100% manual, sin firma, versión `1.0.0` fija | Alto | Alta | Media | 2 |
 | DEV-04 | FluentAssertions 8.x: licencia comercial | Medio | — | Legal | 2 |
-| DEV-06 | Sin tests de Main/Configuración/Descargas/scrapers; coverage 0 en CI | Medio | Media | Media | 2 |
-| ARQ-01 | God-objects (ReproductorViewModel 1.112, DetalleViewModel 959) | Alto | Alta | Media | 3 |
-| ARQ-05 | Doble motor de parsing (Rust anitomy-pure + Python anitopy) | Medio | Alta | Baja | 3 |
 | DEV-05 | `Microsoft.Extensions.* 10.0.11` sobre TFM net8.0 | Bajo | Baja | Baja | 3 |
-| NEW-01 | `animetracker_core.dll` (409 KB binario) trackeado en git | Bajo | Alta | Baja | **1** |
-| NEW-02 | Rama `main` sin protección (ruleset en configuración) | Medio | Alta | Media | **1** |
+| ARQ-01 | God-objects (ReproductorViewModel, DetalleViewModel) | Alto | Alta | Media | 3 |
+| ARQ-05 | Export Rust `anitomy_extract_frames_batch` muerto (sin llamadores C#) | Bajo | Alta | Baja | **1** |
+| DATA-02 🆕 | `AnimeItem.cs:131` variable `appData` sin usar (residuo de la migración de rutas) | Info | Alta | Nula | **1** |
 
-### Quick wins aplicados tras esta pasada (validados: 132/132 tests)
-
-| ID | Cambio | Archivo |
-|---|---|---|
-| NEW-01 | `animetracker_core.dll` sacado del control de versiones (`git rm --cached`) + `.gitignore` (build.ps1 lo regenera desde `target/release`) | `.gitignore` |
-| SEC-06 | Tope de pre-asignación de disco a 50 GB; por encima → descarga incremental sin reserva | `DownloadService.cs:514-526` |
-| FUN-06 | Eliminado `ignoreversion` del instalador (binarios siempre se sobrescriben) | `installer.iss:41` |
-| ARQ-04b | Evicción parcial (16 entradas) en vez de `Clear()` total en caches de portadas y spritesheets | `ImageCacheService.cs:71-84`, `HoverThumbnailService.cs:266-279` |
-| RND-01 | Nuevo `ObtenerPortadaEnMemoria` para el loop de carga de galería; disco/red van en segundo plano (sin decode en UI thread) | `IImageCacheService.cs`, `ImageCacheService.cs:43-47`, `GaleriaViewModel.cs:389` |
-| RND-03 | `Dispatcher.InvokeAsync` en el hot path de portadas (no bloquea el thread pool) | `GaleriaViewModel.cs:429` |
-| INT-02 | `yt-dlp==2026.8.19` fijado exacto (antes rango abierto) | `tools/python/pyproject.toml:9` |
-| DEV-01 | CI: acciones pineadas a SHA, caché Cargo/NuGet, auditoría NuGet añadida (informacional) | `.github/workflows/ci.yml` |
-| PERF-01 | **Fix de rendimiento de miniaturas**: la pestaña de detalle ya no espera a generar TODAS las miniaturas para mostrar la lista (antes `ExtractFramesBatch` bloqueante previo a construir los episodios, hasta horas con muchos episodios). Ahora: lista inmediata + extracción por chunks de 16 en segundo plano con refresco progresivo de UI. En Rust: `-threads 1`→`-threads 0` (decode multihilo, 4-8× más rápido en HEVC/4K) y paralelismo de batch acotado a 4 ffmpeg (antes uno por núcleo → saturación) | `DetalleViewModel.cs` (InicializarAsync, EnriquecerEpisodiosEnSegundoPlanoAsync, PersistirRegistrosAsync), `spritesheet.rs` (extract_frame, extract_frames_batch) |
+**Resueltos desde v2** (verificados): NEW-01, SEC-06, FUN-06, ARQ-04b (parcial), RND-01, RND-03, INT-02, FUN-05, más el incidente de pérdida de datos (nuevo en v3 como resuelto).
 
 ---
 
-## 3. Seguridad — hallazgos abiertos (con código antes/después)
+## 3. Seguridad — abiertos (detalle)
 
-### SEC-06 · Pre-asignación de disco controlada por el servidor
+### SEC-05 · Cadena de actualización sin firma (persistente)
 
-- **Categoría:** A04 Insecure Design (CWE-400) · **CVSS 3.1:** 5.5 · **Probabilidad:** Baja · **Impacto:** Media
+- **Categoría:** A08 Software & Data Integrity Failures (CWE-494) · **CVSS 3.1:** 6.8 · **Probabilidad:** Baja · **Impacto:** Alta
+- **Evidencia:** `UpdateService.cs:45` — `new GithubSource(RepoUrl, null, false)` sin clave de firma; `build_velopack_release.ps1` hace `vpk pack` sin `--signTemplate`; el instalador no está firmado Authenticode (warning "No signing parameters provided" en cada build de release).
+- **Corrección propuesta:**
+```powershell
+# build_velopack_release.ps1 — DESPUÉS (certificado en secretos del CI)
+vpk pack ... --signTemplate "signtool sign /fd SHA256 /f `"$env:CERT_PATH`" /p `"$env:CERT_PASSWORD`" `$file"
+```
+- **Validación:** `Get-AuthenticodeSignature` → Valid en Setup.exe y nupkg. **Referencia:** OWASP ASVS V7, Velopack docs (signing).
 
-**Evidencia** — `AnimeLocalTracker\Services\DownloadService.cs:514`: `preAlloc.SetLength(totalBytes)` donde `totalBytes` proviene de `Content-Length`/`Content-Range` de un servidor remoto. Un servidor malicioso puede declarar tamaños enormes → reserva de disco antes de descargar.
+### Estado de los riesgos de seguridad previos (verificados)
+
+| ID | Estado v3 |
+|---|---|
+| SEC-01 OAuth (Origin check) | ✅ Resuelto (validación Origin/Referer en `POST /token`) |
+| SEC-02 SSRF portadas | ✅ Resuelto (URI + esquema + límite 10 MB streamed) |
+| SEC-03 Hostname exacto | ✅ Resuelto (`EsDominioPermitido`) |
+| SEC-04 Logs de URLs firmadas | ✅ Resuelto (`SanitizarUrlParaLog`) |
+| SEC-07 Token en claro | ✅ Resuelto (sin fallback; token ahora además en carpeta segura) |
+| SEC-10 `.state` | ✅ Resuelto (`EsEstadoValido`) |
+| SEC-12 MessageBox | ✅ Resuelto (mensaje genérico) |
+| SEC-15 Rust clamp | ✅ Resuelto (clamp + límite de píxeles; campos corregidos) |
+
+---
+
+## 4. Funcionalidad — abiertos (detalle)
+
+### DATA-01 · [Alto, NUEVO] Daemon Python huérfano bloquea la instalación
+
+- **Categoría:** robustez/operación (causa raíz del "Failed to remove existing application directory")
+- **Probabilidad:** Alta · **Impacto:** Alta (update falla → el usuario termina desinstalando y perdiendo datos… que ya no se pierden gracias a AppDataPaths, pero la fricción persiste)
+
+**Evidencia:** `App.xaml.cs:243-264` — `OnExit` hace `pythonBridge?.Dispose()` (mata el daemon) **solo en cierre ordenado**. Si la app muere por Task Manager, crash, o cierre forzado de Velopack durante el update, `AnimeTrackerTools.exe` queda vivo y mantiene **locked** `%LocalAppData%\AnimeLocalTracker\current\Tools\AnimeTrackerTools.exe` → Velopack no puede eliminar el directorio → error de instalación. El diagnóstico del equipo lo confirmó: tras el fallo no había read-only ni procesos… en ese momento; el lock es transitorio (hasta que el daemon muera por sí solo, que puede tardar minutos/horas).
+
+**Corrección propuesta — matar el daemon también en `ProcessExit` (aplicable también al fallo de update):**
 
 ```csharp
-// ANTES (DownloadService.cs:514)
-preAlloc.SetLength(totalBytes);
-
-// DESPUÉS
-const long MaxPreallocBytes = 50L * 1024 * 1024 * 1024; // 50 GB por archivo (4K remux)
-if (totalBytes > MaxPreallocBytes)
+// App.xaml.cs — constructor, junto a los handlers de excepciones
+AppDomain.CurrentDomain.ProcessExit += (s, e) =>
 {
-    AppLogger.Warn("DownloadService", $"Tamaño declarado excesivo ({totalBytes} bytes); descarga incremental sin pre-asignación.");
-    preAlloc.SetLength(0);
-}
-else
-{
-    preAlloc.SetLength(totalBytes);
-}
+    try { ServiceProvider?.GetService<IPythonBridgeService>()?.Dispose(); } catch { }
+};
 ```
 
-**Validación:** test con mock HTTP que declare `Content-Length = long.MaxValue` → la descarga no reserva el disco y no lanza. **Referencia:** CWE-400, OWASP ASVS V5.x.
+Mejor aún, en `PythonBridgeService`: registrar el PID del daemon y, en `ProcessExit`, `Kill(entireProcessTree: true)` sin esperar `Dispose` asíncrono. **Validación:** matar la app con Task Manager → verificar que `AnimeTrackerTools.exe` desaparece en <2 s → reintentar el Setup sin desinstalar. **Esfuerzo:** S (30 min).
 
-### SEC-05 · Cadena de actualización sin firma (resumen)
+### FUN-05 · [Verificado] Graceful shutdown — parcial
 
-`UpdateService.cs:45` — `new GithubSource(RepoUrl, null, false)` sin clave de firma de paquetes Velopack; `installer.iss` sin bloque `[Setup] SignTool`. Un repo/release comprometido instalaría payload sin verificación (Velopack solo verifica SHA1 de `RELEASES`). **Solución:** `vpk pack --signTemplate "signtool sign /fd SHA256 /f cert.pfx /p PASS $file"` con certificado en secretos de CI + `SignTool=...` + `SignedUninstaller=yes` en el .iss. **CVSS 3.1:** 6.8 · Fase 2 (requiere certificado).
-
-### SEC-08 · [Verificado resuelto] Temporales predecibles
-
-`HoverThumbnailService` ya escribe en directorio privado de la app (LocalAppData), no en `Path.GetTempPath()` — corregido en `d7625b6`. ✅
+`OnExit` ya libera daemon + mutex. Pendiente menor: los loops de Sync/Update no se cancelan explícitamente en `OnExit` (mueren con el proceso — inofensivo).
 
 ---
 
-## 4. Funcionalidad — hallazgos abiertos
-
-### FUN-06 · `ignoreversion` mantiene binarios viejos en reinstalaciones
-
-**Evidencia** — `installer.iss:41`: `Source: "publish\*"; Flags: ignoreversion recursesubdirs createallsubdirs`. En reinstalación, archivos con versión idéntica no se sobrescriben → yt-dlp/FFmpeg/tools con CVEs pueden persistir.
-
-**Solución:** quitar `ignoreversion` de `Tools\*`, `FFmpeg\*` y `animetracker_core.dll` (o añadir check de hash en el instalador). Nota: Velopack ya reemplaza el directorio completo en updates; el .iss es solo bootstrap — aplicar el fix afecta solo reinstalaciones manuales. **Impacto:** Media.
-
-### FUN-05 · [Verificado parcial] Graceful shutdown
-
-✅ `App.OnExit` (`App.xaml.cs:242-264`) ahora hace `Dispose()` del daemon Python y libera el mutex de instancia única. 🟠 Pendiente: los loops de `SyncService`/`UpdateService` (Task.Run infinitos con `_cts`) no se cancelan desde `OnExit` (solo `SyncService._cts.Cancel()` existe en su propia lógica). La descarga activa no se cancela en exit (correcto: `.state` permite reanudar). **Esfuerzo:** S.
-
-### ARQ-04b · Evicción `Clear()` total en caches de imágenes
-
-`ImageCacheService.cs:73-77` y `HoverThumbnailService.cs:261-265` invalidan TODO el caché al superar 500 entradas (no LRU) → re-lectura de disco de toda la galería. **Solución:** reemplazar `_memoryCache.Clear()` por evicción del ítem más antiguo (o reutilizar el patrón `BoundedCache` de `AniSkipService`). **Impacto:** Bajo-Medio.
-
----
-
-## 5. Arquitectura — hallazgos abiertos
-
-| ID | Hallazgo | Severidad | Estado |
-|---|---|---|---|
-| ARQ-01 | God-objects: `ReproductorViewModel` (1.112 líneas), `DetalleViewModel` (959), `MainViewModel` (527, 13 `IRecipient`) | Alto | Abierto (Fase 3) |
-| ARQ-02 | Duplicación `MainViewModel.SeleccionarYCrearAnimeAsync` (:510-595) vs `AgregarAnimeViewModel.AñadirAnimeAsync` (:213-320) — ~70 líneas idénticas | Alto | Abierto — extraer `AnimeLibraryService` |
-| ARQ-03 | Búsqueda en vivo duplicada (debounce + CTS + `ReferenceEquals`) — `MainViewModel:450` vs `AgregarAnimeViewModel:152` | Medio | Abierto |
-| ARQ-04 | Cachés de red acotadas — **✅ Resuelto** (`BoundedCache` + `CacheEntry<T>`, topes 250/250/2000/2000, commit `85c8d10`) | — | Cerrado |
-| ARQ-05 | Doble motor de parsing (Rust anitomy-pure + Python anitopy) | Medio | Abierto (Fase 3) |
-| ARQ-06 | Tres capas de resolución de video (scraper C#, yt-dlp, fallback cruzado) sin contrato | Medio | Abierto (ver INT-01) |
-
-```mermaid
-flowchart LR
-    subgraph Ya_remidiado["✅ Remediado v1→v2"]
-        A1[Daemon async 8s + fallback one-shot]
-        A2[Skip times atómicos]
-        A3[Cachés acotadas 250/250/2000]
-        A4[Portadas: URI + límite 10 MB]
-        A5[Mutex single-instance]
-    end
-    subgraph Pendiente["🟠 Pendiente Fase 2"]
-        B1[AnimeLibraryService unificado]
-        B2[LRU en caches de imágenes]
-        B3[Batching AniList]
-        B4[Firma Velopack/instalador]
-    end
-    Pendiente --> Ya_remidiado
-```
-
----
-
-## 6. Rendimiento — estado y hallazgos abiertos
+## 5. Arquitectura — estado v3
 
 | ID | Hallazgo | Estado |
 |---|---|---|
-| RND-01 | Decode de portadas fuera del UI thread | 🟠 **Parcial**: `ObtenerPortadaAsync` decodifica en `Task.Run` (✅), pero `GaleriaViewModel.cs:389` sigue llamando al síncrono `ObtenerPortada` (lectura+decode en UI thread) durante la carga de biblioteca. Convertir la carga inicial a async |
-| RND-02 | N+1 de red: `ActualizarBibliotecaAsync` ~300 llamadas seriales + `Task.Delay(250)` por anime (`GaleriaViewModel.cs:826`) | Abierto — loteo GraphQL por IDs + caché de seguimiento por sesión (10-30× más rápido, sin violar rate limit) |
-| RND-03 | `Dispatcher.Invoke` síncrono en `GaleriaViewModel.cs:429` (hot path de portadas) | Abierto — usar `InvokeAsync` y no bloquear el pool |
-| RND-04 | Cachés con `Clear()` total (no LRU) | Abierto — ver ARQ-04b |
-| RND-05 | Regex en scraping | Abierto — `[GeneratedRegex]` (menor) |
+| ARQ-01 | God-objects: `ReproductorViewModel` (~1.250 líneas), `DetalleViewModel` (~1.075), `MainViewModel` (13 `IRecipient`) | Abierto (Fase 3) |
+| ARQ-02 | Duplicación `MainViewModel.SeleccionarYCrearAnimeAsync` vs `AgregarAnimeViewModel.AñadirAnimeAsync` (~70 líneas) | Abierto — extraer `AnimeLibraryService` |
+| ARQ-04 | Cachés de red acotadas (`BoundedCache` + `CacheEntry<T>`) | ✅ Resuelto |
+| ARQ-04b | Caches de imágenes: evicción `Take(16)` aproximada | Abierto (menor, Fase 3) |
+| ARQ-05 | **Export Rust `anitomy_extract_frames_batch` muerto** — tras el cambio a 1×1, ningún llamador C# lo usa; `extract_frames_batch` + `FrameExtractionRequest` quedan sin uso | Abierto — eliminar del core Rust (reduce binario y superficie) |
+| ARQ-06 | Hover spritesheet eliminado por completo (Rust + C# + XAML + DI + tests) | ✅ Resuelto |
 
-**Benchmarks existentes (BenchmarkDotNet, manual):** seeking continuo/aleatorio del reproductor (lógica pura), bulk DB 500 registros en 1 transacción, consulta completa, y parseo de 12 formatos de archivo — con historial comparativo Markdown (`run_benchmarks_and_reports.ps1`). **Recomendación:** ejecutar una pasada de referencia y adjuntar resultados al informe v3; no corren en CI.
+**Diagrama TO-BE actualizado (cambios de este ciclo):**
+
+```mermaid
+flowchart LR
+    subgraph Datos["Datos de usuario (inmunes a desinstalacion)"]
+        DB[biblioteca.db] --- TOKEN[anilist_token.txt]
+        DB --- COVERS[Covers/]
+        DB --- THUMBS[Thumbnails/]
+        DB --- LOGS[Logs/]
+    end
+    subgraph Instalacion["Directorio de instalacion (Velopack borra)"]
+        APP[AnimeLocalTracker.exe + DLLs]
+        RUST[animetracker_core.dll<br/>parse/hash/extract_frame]
+        PY[AnimeTrackerTools.exe daemon]
+    end
+    APP -->|AppDataPaths| Datos
+    APP --> RUST
+    APP --> PY
+```
 
 ---
 
-## 7. Integraciones — estado
+## 6. Rendimiento — estado v3
 
-| Integración | Evaluación v2 |
-|---|---|
-| AniList (GraphQL + OAuth) | ✅ Origin check activo; caché acotada; Polly con Retry-After. Pendiente: batching (RND-02) |
-| AniSkip API | ✅ Cachés acotadas (ARQ-04) |
-| animeav1/mp4upload (scraping) | 🟠 Hostname exacto ✅ (SEC-03), pero sin contrato versionado (INT-01) |
-| yt-dlp (daemon Python) | 🟠 Rango abierto `>=2025.1.15` (INT-02) — fijar versión exacta |
-| Velopack / GitHub Releases | 🟠 Sin firma (SEC-05); caché `release_info.json` sin verificación de integridad |
-| Descargas segmentadas | ✅ `.state` validado (SEC-10) ✅; pre-asignación pendiente (SEC-06) |
-
----
-
-## 8. Calidad de código y DevOps — estado
-
-### 8.1 CI (`ci.yml`) — pendientes
-
-| Problema | Evidencia | Corrección |
+| ID | Hallazgo | Estado |
 |---|---|---|
-| SCA no bloqueante | `ci.yml:43,49` `continue-on-error: true` | Jobs dedicados que fallen con hallazgos high |
-| Sin pinning de acciones a SHA | `actions/checkout@v4`, `setup-dotnet@v4`, `setup-python@v5`, `rust-toolchain@stable` | Fijar a SHA + dependabot |
-| Sin caché de builds | — | `actions/cache` para `~/.cargo`, `target/`, `~/.nuget/packages` |
-| Sin release pipeline | — | `release.yml` on tag: build → tests → `vpk pack` firmado → upload |
-| Sin coverage | — | `dotnet test /p:CollectCoverage=true` + upload TRX |
-| Sin `packages.lock.json` | — | `RestorePackagesWithLockFile` |
+| RND-01 | Portadas fuera del UI thread | ✅ Resuelto (`ObtenerPortadaEnMemoria` + decode async) |
+| RND-02 | N+1 de red en `ActualizarBibliotecaAsync` (~300 llamadas seriales) | Abierto — loteo GraphQL por IDs (10-30×) |
+| RND-03 | `Dispatcher.InvokeAsync` en hot path | ✅ Resuelto |
+| RND-04 | Evicción parcial `Take(16)` | Abierto (menor) |
+| PERF-01 | **Miniaturas 1×1 secuenciales** con refresco por episodio; `-ss 2 -vframes 1 -threads 0 -vf scale=320:-2`; batch eliminado | ✅ Resuelto (validado empíricamente: `-skip_frame nokey` y `-hwaccel auto` descartados por fallos reales) |
 
-### 8.2 Dependencias (resumen SCA)
-
-| Paquete | Hallazgo |
-|---|---|
-| FluentAssertions 8.10.0 | ⚠️ Licencia comercial desde v8 (uso comercial) — evaluar Shouldly |
-| Moq 4.20.72 | ⚠️ Sin mantenimiento activo |
-| Microsoft.Extensions.* 10.0.11 | ⚠️ Desalineadas con net8.0 (DEV-05) |
-| xunit 2.5.3 / Test.Sdk 17.8.0 | Desactualizados |
-| FlyleafLib 3.11.3 / MaterialDesign 5.2.1 | Pinned correctamente ✅ |
-
-### 8.3 Testing
-
-132 tests (22 archivos). Huecos sin cubrir: `MainViewModel`, `ConfiguracionViewModel`, `DescargasViewModel`, `AppLogger`, `AnimeAv1VideoSourceResolver`/`PythonVideoSourceResolver`, `PythonEpisodeEnricher`. Coverage nunca medido en CI (DEV-06).
+**Objetivo medido vs logrado (heurística en hardware i5-7300U 2C/4T):**
+- Lista de episodios: **instantánea** (<1 s, sin esperar miniaturas).
+- Primera miniatura: **~1 s**; siguientes: 1 cada 0.3-1.5 s (1080p) / 2-4 s (4K HEVC software).
+- Con GPU funcional (`-hwaccel auto` no aplica en HD 620): <100 ms/frame.
 
 ---
 
-## 9. Plan de acción v2 (quick wins primero)
+## 7. Integraciones — estado v3
+
+| Integración | Evaluación |
+|---|---|
+| AniList (GraphQL + OAuth) | ✅ Origin check; caché acotada; Polly con Retry-After. Pendiente: batching (RND-02) |
+| AniSkip | ✅ Cachés acotadas |
+| animeav1/mp4upload | 🟠 Hostname exacto ✅; sin contrato (INT-01) |
+| yt-dlp | ✅ **Pineado** `==2026.8.19` (pyproject + script de release) |
+| Velopack | 🟠 Sin firma (SEC-05); delta funcional (1.0.3 = 0.1 MB) |
+| Descargas | ✅ `.state` validado; pre-asignación acotada (SEC-06 ✅) |
+| Datos usuario | ✅ Separados del instalador (AppDataPaths) |
+
+---
+
+## 8. Calidad de código y DevOps — estado v3
+
+| Área | Estado |
+|---|---|
+| Tests | **126/126**. Huecos: MainViewModel, Configuración, Descargas, scrapers. Coverage nunca medido en CI (DEV-06) |
+| CI | SCA con `continue-on-error: true` (DEV-01); acciones pineadas a SHA ✅; caché Cargo/NuGet ✅; dependabot ✅ |
+| Release | Manual (DEV-02); sin firma (SEC-05); `Releases/` gitignored (`*.nupkg` en .gitignore) ✅ |
+| Dependencias | FluentAssertions 8.x (licencia, DEV-04); Microsoft.Extensions 10.x sobre net8 (DEV-05) |
+| Proceso | Protección de `main` en configuración (pendiente de verificar en GitHub) |
+| Nota de build | El quirk `_wpftmp`/incremental de MSBuild puede reportar "OK" sin recompilar (visto 2 veces en este ciclo); `build.ps1` doble pasada lo mitiga, pero verificar el binario tras builds grandes |
+
+---
+
+## 9. Plan de acción v3
 
 | Prioridad | Acción | Esfuerzo | Fase |
 |---|---|---|---|
-| 🔴 | **NEW-01**: mover `animetracker_core.dll` al `.gitignore` + regenerar con `build.ps1` (ya copia desde `target/release`) | S (5 min) | 1 |
-| 🔴 | **NEW-02**: activar ruleset de protección de `main` (PR + status check "Build, Test & SCA Security Audit" + block force-push/deletions) | S (10 min, UI) | 1 |
-| 🟠 | **SEC-06**: tope de pre-asignación de disco | S (½ día) | 2 |
-| 🟠 | **FUN-06**: quitar `ignoreversion` de binarios en `.iss` | S (½ día) | 2 |
-| 🟠 | **DEV-01**: audits bloqueantes + pinning SHA + caché CI + dependabot ya activo | S-M (1 día) | 2 |
+| 🔴 | **DATA-01**: matar el daemon en `ProcessExit` (kill por PID + tree) | S (30 min) | 1 |
+| 🔴 | **ARQ-05**: eliminar `extract_frames_batch`/`anitomy_extract_frames_batch` del core Rust | S (30 min) | 1 |
+| 🔴 | **DATA-02**: quitar `appData` muerto en `AnimeItem.cs:131` | S (2 min) | 1 |
+| 🟠 | **DEV-02**: release pipeline en CI (build → vpk pack → upload GitHub Release) | M (1-2 días) | 2 |
+| 🟠 | **SEC-05**: certificado + firma | L (1-2 sem) | 2 |
+| 🟠 | **DEV-01**: audits bloqueantes + coverage en CI | S-M (1 día) | 2 |
 | 🟠 | **ARQ-02**: extraer `AnimeLibraryService` | M (2-3 días) | 2 |
-| 🟠 | **ARQ-04b/RND-04**: evicción LRU en caches de imágenes | M (1-2 días) | 2 |
-| 🟠 | **RND-01**: carga inicial de portadas async | S-M (1 día) | 2 |
-| 🟠 | **INT-02 + lockfiles**: fijar yt-dlp + `packages.lock.json` | S (1 día) | 2 |
-| 🟠 | **DEV-06**: coverage en CI + tests de MainViewModel/Descargas | M (3-5 días) | 2 |
-| 🟡 | **SEC-05 + DEV-02**: certificado + firma + release pipeline | L (1-2 sem) | 2 |
-| 🟢 | **RND-02**: batching AniList | M (3 días) | 3 |
+| 🟠 | **DEV-06**: tests de MainViewModel/Descargas | M (3-5 días) | 2 |
+| 🟡 | **RND-02**: batching AniList | M (3 días) | 3 |
 | 🟢 | **ARQ-01**: split god-objects | L (2-4 sem) | 3 |
-| 🟢 | **ARQ-05 / INT-01**: unificar parsing / contrato scraping | M (3-5 días) | 3 |
-| 🟢 | **DEV-04 / DEV-05**: licencia FluentAssertions / alinear Extensions 8.0.x | S | 3 |
 
 ---
 
-## 10. Checklist de cumplimiento (v2)
+## 10. Checklist de cumplimiento (v3)
 
-| Estándar / práctica | Cumple | Nota |
+| Estándar | Cumple | Nota |
 |---|---|---|
-| OWASP Top 10 2021 | ⚠️ 9/10 | Falta A08 (firma/integridad, SEC-05) |
-| OWASP ASVS V3 (auth) | ⚠️ | Origin check ✅; flujo implícito documentado (PKCE no viable sin secret en AniList) |
-| CWE/SANS Top 25 | ✅ | Sin inyecciones; sin deserialización insegura |
+| OWASP Top 10 2021 | ⚠️ 9/10 | Falta A08 (firma/integridad) |
+| CWE/SANS Top 25 | ✅ | Sin inyecciones ni deserialización insegura |
 | Secretos en código | ✅ | Ninguno |
-| TLS en tránsito | ✅ | HTTPS salvo callback local loopback (mitigado) |
-| Logging responsable | ✅ | URLs saneadas; MessageBox genérico |
+| TLS en tránsito | ✅ | HTTPS salvo loopback OAuth (mitigado) |
+| Logging responsable | ✅ | URLs saneadas, MessageBox genérico |
 | MVVM/SOLID | ⚠️ | God-objects (ARQ-01) |
-| Cobertura de tests | ⚠️ | 132 tests; coverage sin medir |
-| CI/CD gate | ⚠️ | Audits informativos; release manual |
-| Gestión de secretos | ✅ | DPAPI; cero secrets en repo |
-| Backup/DR | ⚠️ | No documentado (sugerir copia manual de `biblioteca.db`) |
-| Supply chain | ⚠️ | Dependabot ✅; falta lockfile + pin yt-dlp + acciones CI a SHA |
-| Protección de rama | ❌ | NEW-02 en configuración |
+| ISO 25010 — mantenibilidad | ⚠️ | Duplicación ARQ-02; separación de datos ✅ |
+| ISO 25010 — seguridad | ⚠️ | Base sólida; firma pendiente |
+| ISO 25010 — portabilidad | ✅ | net8.0-windows; Velopack |
+| Cobertura de tests | ⚠️ | 126 tests; coverage sin medir |
+| CI/CD gate | ⚠️ | SCA informativo; release manual |
+| Gestión de secretos | ✅ | DPAPI; 0 secrets en repo |
+| **Datos de usuario vs instalación** | ✅ | **Corregido en este ciclo** |
+| Backups/DR | ⚠️ | No documentado (ahora al menos no se pierde con updates) |
+| Protección de rama | ⚠️ | En configuración |
 
 ---
 
@@ -297,36 +261,39 @@ flowchart LR
 ### A. Comandos de reproducción / validación
 
 ```powershell
-# Verificar que el binario nativo no esté trackeado (NEW-01):
-git rm --cached AnimeLocalTracker/animetracker_core.dll
-Add-Content .gitignore "AnimeLocalTracker/animetracker_core.dll"
+# Reproducir DATA-01 (daemon huérfano):
+# 1. Abrir la app, entrar a un anime (arranca el daemon), cerrar con Task Manager (no OnExit)
+# 2. Verificar que AnimeTrackerTools.exe sigue vivo:
+Get-Process AnimeTrackerTools, ffmpeg -ErrorAction SilentlyContinue
+# 3. Intentar el Setup.exe → "Failed to remove existing application directory"
+# Fix esperado: el daemon se mata en ProcessExit → el Setup ya no falla
 
-# Auditar dependencias (DEV-01):
+# Verificar que los datos ya no viven en el directorio de instalación:
+Test-Path "$env:LOCALAPPDATA\AnimeLocalTracker\biblioteca.db"   # → False
+Test-Path "$env:LOCALAPPDATA\AnimeLocalTrackerData\biblioteca.db" # → True
+
+# Auditar dependencias:
 dotnet list AnimeLocalTracker/AnimeLocalTracker.csproj package --vulnerable --include-transitive
 cargo audit --manifest-path native/animetracker_core/Cargo.toml
 pip-audit
-
-# Coverage (DEV-06):
-dotnet test AnimeLocalTracker.Tests --collect:"XPlat Code Coverage"
 ```
 
-### B. Regla de protección recomendada (NEW-02)
+### B. Resumen del ciclo v2→v3 (commits en español)
 
-- Require a pull request (0 approvals, conversación resuelta)
-- Require status check: **Build, Test & SCA Security Audit** + branches up to date
-- Block force pushes + Restrict deletions · Enforcement: **Active**
+| Commit | Cambio |
+|---|---|
+| `81d54d8` | Lista de episodios instantánea + miniaturas por chunks + `-threads 0` + paralelismo acotado |
+| `490f896` | Sin ping a Python antes de Rust; timestamp 8 s |
+| `df9ef64` | Hover spritesheet eliminado por completo; timestamp 2 s |
+| `61baf94` | Miniaturas **1×1 secuenciales** + limpieza del batch C# |
+| `6905254` | **Datos separados del instalador** (AppDataPaths + migración) — fix del incidente de pérdida de datos |
 
-### C. Deuda arquitectónica (referencia ARQ-01/02)
+### C. Datos adicionales que mejorarían la precisión
 
-- `ReproductorViewModel` 1.112 líneas — candidatos a extraer: `PlaybackTrackingService` (bucle `RastrearProgresoAsync`), `SkipControlService`, `HoverThumbnailController`
-- `MainViewModel.SeleccionarYCrearAnimeAsync` (:510) ≈ `AgregarAnimeViewModel.AñadirAnimeAsync` (:213) → `AnimeLibraryService`
-
-### D. Datos adicionales que mejorarían la precisión
-
-1. ¿Uso comercial? (afecta urgencia de DEV-04 y SEC-05)
-2. Tamaño real de bibliotecas objetivo (afecta RND-01/02)
-3. ¿Se distribuye a terceros? (afecta firma y reglas de rama)
+1. Estado real de la protección de `main` en GitHub (¿ruleset activo?).
+2. Tamaño de bibliotecas reales (afecta RND-02).
+3. ¿Uso comercial? (afecta DEV-04 y SEC-05).
 
 ---
 
-*Informe v2 generado por auditoría estática multidisciplinar. Trazabilidad: hallazgos v1 → estado de remediación (§1.1) → matriz abierta (§2) → plan (§9). Sin modificaciones de código: solo propuestas.*
+*Informe v3 generado por auditoría estática multidisciplinar. Trazabilidad: v1→v2→v3 con estado de cada hallazgo; sin modificaciones de código en esta pasada — solo propuestas.*

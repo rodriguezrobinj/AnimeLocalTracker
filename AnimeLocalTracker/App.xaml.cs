@@ -63,6 +63,20 @@ public partial class App : Application
             AppLogger.Error("App", "Unobserved Task Exception", args.Exception);
             args.SetObserved(); // Marcar como observada para prevenir cierre
         };
+
+        // 4. DATA-01: en cierre brusco (Task Manager, crash, update forzado de Velopack)
+        // OnExit NO se ejecuta → el daemon Python quedaría huérfano y bloquearía el
+        // directorio de instalación (update falla con "Failed to remove existing
+        // application directory"). ProcessExit se dispara en casi todos los cierres:
+        // matar el daemon aquí garantiza que nunca quede bloqueando la app.
+        AppDomain.CurrentDomain.ProcessExit += (s, e) =>
+        {
+            try
+            {
+                ServiceProvider?.GetService<IPythonBridgeService>()?.Dispose();
+            }
+            catch { }
+        };
     }
 
     private void ConfigureServices(IServiceCollection services)

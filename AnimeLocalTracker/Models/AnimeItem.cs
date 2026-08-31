@@ -128,7 +128,6 @@ public partial class AnimeItem : ObservableObject
             if (_portadaCacheada != null) return _portadaCacheada;
             if (string.IsNullOrWhiteSpace(UrlPortada)) return string.Empty;
             
-            string appData = System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData);
             string directory = Services.AppDataPaths.CoversDir;
             string localPath = System.IO.Path.Combine(directory, $"{AniListId}.jpg");
             

@@ -58,43 +58,6 @@ fn anitomy_extract_frame_inner(
     spritesheet::extract_frame(video_str, out_str, timestamp, width.max(0) as u32)
 }
 
-/// Extrae múltiples fotogramas en paralelo utilizando Rayon y retorna un JSON con los resultados.
-#[no_mangle]
-pub extern "C" fn anitomy_extract_frames_batch(json_requests: *const c_char) -> *mut c_char {
-    ffi_catch(
-        || anitomy_extract_frames_batch_inner(json_requests),
-        std::ptr::null_mut(),
-    )
-}
-
-fn anitomy_extract_frames_batch_inner(json_requests: *const c_char) -> *mut c_char {
-    if json_requests.is_null() {
-        return std::ptr::null_mut();
-    }
-
-    let c_str = unsafe { CStr::from_ptr(json_requests) };
-    let json_str = match c_str.to_str() {
-        Ok(s) => s,
-        Err(_) => return std::ptr::null_mut(),
-    };
-
-    let requests: Vec<spritesheet::FrameExtractionRequest> = match serde_json::from_str(json_str) {
-        Ok(r) => r,
-        Err(_) => return std::ptr::null_mut(),
-    };
-
-    let results = spritesheet::extract_frames_batch(requests);
-    let out_json = match serde_json::to_string(&results) {
-        Ok(j) => j,
-        Err(_) => return std::ptr::null_mut(),
-    };
-
-    match CString::new(out_json) {
-        Ok(cs) => cs.into_raw(),
-        Err(_) => std::ptr::null_mut(),
-    }
-}
-
 /// Parsea un nombre de archivo de anime y retorna un JSON con los metadatos.
 /// La cadena retornada DEBE ser liberada usando `anitomy_free_string`.
 #[no_mangle]
