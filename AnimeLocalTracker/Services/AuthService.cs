@@ -18,8 +18,9 @@ public class AuthService : IAuthService
     
     public string? Token { get; private set; }
     
-    // Ruta donde guardaremos el token para que no inicies sesión cada vez que abras la app
-    private readonly string _rutaToken = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AnimeLocalTracker", "anilist_token.txt");
+    // Ruta donde guardaremos el token para que no inicies sesión cada vez que abras la app.
+    // Ubicado en la carpeta de datos (fuera del directorio de instalación de Velopack).
+    private readonly string _rutaToken = AppDataPaths.TokenPath;
 
     public bool EstaAutenticado() => File.Exists(_rutaToken) && ObtenerTokenGuardado() != string.Empty;
     

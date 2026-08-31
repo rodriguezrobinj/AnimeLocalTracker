@@ -178,6 +178,10 @@ public partial class App : Application
 
         try
         {
+            // Migrar datos del layout de instalación antiguo (%LocalAppData%\AnimeLocalTracker)
+            // a la carpeta segura de datos, ANTES de inicializar la base de datos.
+            AppDataPaths.MigrarDesdeInstalacionAntigua();
+
             // Pedimos la instancia del servicio de base de datos
             var dbService = ServiceProvider.GetRequiredService<IDatabaseService>();
 

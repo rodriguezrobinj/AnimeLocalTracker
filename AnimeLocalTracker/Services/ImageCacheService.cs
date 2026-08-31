@@ -24,8 +24,7 @@ public class ImageCacheService : IImageCacheService
     {
         _httpClientFactory = httpClientFactory;
         
-        string appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        _coversDirectory = Path.Combine(appData, "AnimeLocalTracker", "Covers");
+        _coversDirectory = AppDataPaths.CoversDir;
         
         try
         {

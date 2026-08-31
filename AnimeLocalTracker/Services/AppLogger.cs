@@ -24,8 +24,7 @@ public record LogEntry(DateTime Timestamp, string Level, string Source, string M
 /// </summary>
 public static class AppLogger
 {
-    private static readonly string LogDirectory = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AnimeLocalTracker", "Logs");
+    private static readonly string LogDirectory = AppDataPaths.LogsDir;
     private static readonly string LogPath = Path.Combine(LogDirectory, "app.log");
 
     private const int MaxInMemoryLogs = 500;

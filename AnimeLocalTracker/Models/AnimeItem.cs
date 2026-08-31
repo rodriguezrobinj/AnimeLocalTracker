@@ -129,7 +129,7 @@ public partial class AnimeItem : ObservableObject
             if (string.IsNullOrWhiteSpace(UrlPortada)) return string.Empty;
             
             string appData = System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData);
-            string directory = System.IO.Path.Combine(appData, "AnimeLocalTracker", "Covers");
+            string directory = Services.AppDataPaths.CoversDir;
             string localPath = System.IO.Path.Combine(directory, $"{AniListId}.jpg");
             
             _portadaCacheada = System.IO.File.Exists(localPath) ? localPath : UrlPortada;

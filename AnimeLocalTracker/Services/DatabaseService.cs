@@ -38,10 +38,9 @@ public class DatabaseService : IDatabaseService
             }
             else
             {
-                var rutaAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-                var rutaCarpetaApp = Path.Combine(rutaAppData, "AnimeLocalTracker");
+                var rutaCarpetaApp = Path.GetDirectoryName(AppDataPaths.BibliotecaDb)!;
                 Directory.CreateDirectory(rutaCarpetaApp);
-                rutaBaseDatos = Path.Combine(rutaCarpetaApp, "biblioteca.db");
+                rutaBaseDatos = AppDataPaths.BibliotecaDb;
             }
 
             var conexion = new SQLiteAsyncConnection(rutaBaseDatos);

@@ -17,7 +17,7 @@ public class ImageCacheServiceTests
     public void ObtenerPortada_DeberiaCargarPortadasExistentes()
     {
         var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        var coversDir = Path.Combine(appData, "AnimeLocalTracker", "Covers");
+        var coversDir = AppDataPaths.CoversDir;
         
         var mockFactory = new Mock<IHttpClientFactory>();
         mockFactory.Setup(f => f.CreateClient(It.IsAny<string>())).Returns(new HttpClient());
@@ -42,7 +42,7 @@ public class ImageCacheServiceTests
     public async Task ObtenerPortadaAsync_DeberiaDecodificarYGuardarCorrectamente()
     {
         var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        var file185801 = Path.Combine(appData, "AnimeLocalTracker", "Covers", "185801.jpg");
+        var file185801 = Path.Combine(AppDataPaths.CoversDir, "185801.jpg");
         if (!File.Exists(file185801)) return;
 
         var bytes = await File.ReadAllBytesAsync(file185801);

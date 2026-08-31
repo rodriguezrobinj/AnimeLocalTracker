@@ -62,9 +62,7 @@ public class PythonEpisodeEnricher
     public static string ObtenerRutaMiniaturaEsperada(string rutaCompleta)
     {
         if (string.IsNullOrWhiteSpace(rutaCompleta)) return string.Empty;
-        var thumbsDir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "AnimeLocalTracker", "Thumbnails");
+        var thumbsDir = AppDataPaths.ThumbnailsDir;
         
         byte[] hash = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(rutaCompleta.ToLowerInvariant()));
         string hex = Convert.ToHexString(hash).ToLowerInvariant();
@@ -99,9 +97,7 @@ public class PythonEpisodeEnricher
 
         try
         {
-            var thumbsDir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "AnimeLocalTracker", "Thumbnails");
+            var thumbsDir = AppDataPaths.ThumbnailsDir;
             Directory.CreateDirectory(thumbsDir);
 
             string thumbPath = ObtenerRutaMiniaturaEsperada(episodio.RutaCompleta);
