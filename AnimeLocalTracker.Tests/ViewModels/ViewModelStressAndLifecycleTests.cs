@@ -50,6 +50,7 @@ public class ViewModelStressAndLifecycleTests
         services.AddSingleton<DescargasViewModel>();
         services.AddSingleton<ConfiguracionViewModel>();
         services.AddSingleton<AnimeLibraryService>();
+        services.AddSingleton<CacheMaintenanceService>();
 
         var sp = services.BuildServiceProvider();
         var sut = new MainViewModel(sp, _trackingMock.Object, sp.GetRequiredService<AnimeLibraryService>(), _downloadMock.Object, _updateMock.Object);

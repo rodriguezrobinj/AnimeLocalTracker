@@ -11,6 +11,10 @@ public interface IDatabaseService
     Task<List<AnimeItem>> ObtenerTodosLosAnimesAsync();
     Task GuardarAnimeAsync(AnimeItem anime);
     Task EliminarAnimeAsync(AnimeItem anime);
+    Task EliminarRegistroEpisodioAsync(int aniListId, int numeroEpisodio);
+    Task<bool> ExportarCopiaSeguridadAsync(string rutaDestino);
+    Task<int> ExportarBibliotecaJsonAsync(string rutaDestino);
+    Task<int> ImportarBibliotecaJsonAsync(string rutaOrigen);
     
     // === NUEVOS MÉTODOS PARA EL TRACKING ===
     Task GuardarRegistroEpisodioAsync(RegistroEpisodio registro);

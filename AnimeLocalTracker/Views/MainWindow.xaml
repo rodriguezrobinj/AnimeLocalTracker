@@ -149,6 +149,39 @@
                                 </Button>
                             </Grid>
 
+                            <!-- BOTÓN ESTADÍSTICAS -->
+                            <Grid Margin="0,8">
+                                <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"
+                                           Visibility="{Binding EsEstadisticasActivo, Converter={StaticResource BoolToVis}}"/>
+                                <Button Command="{Binding NavegarEstadisticasCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="Estadísticas">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
+                                            <Setter Property="Background" Value="Transparent"/>
+                                            <Style.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="Background" Value="#1B222C"/>
+                                                </Trigger>
+                                                <DataTrigger Binding="{Binding EsEstadisticasActivo}" Value="True">
+                                                    <Setter Property="Background" Value="#1E293B"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                    <materialDesign:PackIcon Kind="ChartBar" Width="24" Height="24">
+                                        <materialDesign:PackIcon.Style>
+                                            <Style TargetType="materialDesign:PackIcon">
+                                                <Setter Property="Foreground" Value="#6B7280"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding EsEstadisticasActivo}" Value="True">
+                                                        <Setter Property="Foreground" Value="#60A5FA"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </materialDesign:PackIcon.Style>
+                                    </materialDesign:PackIcon>
+                                </Button>
+                            </Grid>
+
                             <!-- BOTÓN COLA DE DESCARGAS -->
                             <Grid Margin="0,8">
                                 <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"

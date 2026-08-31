@@ -58,6 +58,7 @@ public partial class MainWindow : Window
                 DescargasViewModel => new DescargasView(),
                 ConfiguracionViewModel => new ConfiguracionView(),
                 AcercaDeViewModel => new AcercaDeView(),
+                EstadisticasViewModel => new EstadisticasView(),
                 _ => null
             };
 

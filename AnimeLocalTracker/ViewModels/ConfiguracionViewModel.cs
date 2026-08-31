@@ -17,11 +17,17 @@ public partial class ConfiguracionViewModel : ObservableObject
     private readonly IAuthService _authService;
     private readonly IDatabaseService _databaseService;
     private readonly IDialogService _dialogService;
+    private readonly CacheMaintenanceService _cacheMaintenanceService;
 
     // === ALMACENAMIENTO ===
     [ObservableProperty] private string _rutaBaseAnimes = string.Empty;
     [ObservableProperty] private string _espacioLibreTexto = "Calculando...";
     [ObservableProperty] private int _totalAnimesBiblioteca = 0;
+
+    /// <summary>Contador localizado: "12 animes registrados" / "12 registered anime".</summary>
+    public string TotalAnimesTexto => $"{TotalAnimesBiblioteca} {LocalizationService.T("Cfg_TotalAnimes")}";
+
+    partial void OnTotalAnimesBibliotecaChanged(int value) => OnPropertyChanged(nameof(TotalAnimesTexto));
 
     // === REPRODUCCIÓN Y DESCARGAS ===
     [ObservableProperty] private bool _autoPlaySiguiente = true;
@@ -29,6 +35,30 @@ public partial class ConfiguracionViewModel : ObservableObject
     [ObservableProperty] private bool _subtitulosPorDefecto = true;
     [ObservableProperty] private int _descargasSimultaneas = 3;
     [ObservableProperty] private int _intervaloSincronizacionMinutos = 5;
+
+    // === PREFERENCIAS DE USUARIO ===
+    [ObservableProperty] private int _umbralMarcadoVisto = 95;
+    [ObservableProperty] private bool _notificarNuevosEpisodios = true;
+    [ObservableProperty] private string _idioma = "es";
+    [ObservableProperty] private double _velocidadReproduccionDefecto = 1.0;
+
+    /// <summary>Atajos de teclado configurables (acción → tecla). Se enlaza por índice desde XAML.</summary>
+    public Dictionary<string, string> Atajos { get; set; } = new();
+
+    partial void OnVelocidadReproduccionDefectoChanged(double value)
+        => VelocidadReproduccionTexto = value.ToString("0.##x");
+
+    [ObservableProperty] private string _velocidadReproduccionTexto = "1x";
+
+    /// <summary>Texto visible del idioma seleccionado ("Español"/"English").</summary>
+    public string IdiomaTexto => Idioma == "en" ? "English" : "Español";
+
+    partial void OnIdiomaChanged(string value)
+    {
+        // Aplicar el idioma al instante: los bindings de la UI se refrescan solos
+        LocalizationService.Instance.Idioma = value;
+        OnPropertyChanged(nameof(IdiomaTexto));
+    }
 
     // === AUTENTICACIÓN ANILIST ===
     [ObservableProperty] private bool _estaAutenticadoAniList;
@@ -38,12 +68,14 @@ public partial class ConfiguracionViewModel : ObservableObject
         ISettingsService settingsService,
         IAuthService authService,
         IDatabaseService databaseService,
-        IDialogService dialogService)
+        IDialogService dialogService,
+        CacheMaintenanceService cacheMaintenanceService)
     {
         _settingsService = settingsService;
         _authService = authService;
         _databaseService = databaseService;
         _dialogService = dialogService;
+        _cacheMaintenanceService = cacheMaintenanceService;
 
         CargarDatosConfiguracion();
     }
@@ -57,6 +89,12 @@ public partial class ConfiguracionViewModel : ObservableObject
         SubtitulosPorDefecto = config.SubtitulosPorDefecto;
         DescargasSimultaneas = config.DescargasSimultaneas;
         IntervaloSincronizacionMinutos = config.IntervaloSincronizacionMinutos;
+        UmbralMarcadoVisto = config.UmbralMarcadoVisto is >= 1 and <= 100 ? config.UmbralMarcadoVisto : 95;
+        NotificarNuevosEpisodios = config.NotificarNuevosEpisodios;
+        Idioma = config.Idioma == "en" ? "en" : "es";
+        VelocidadReproduccionDefecto = config.VelocidadReproduccionDefecto is >= 0.5 and <= 2.0 ? config.VelocidadReproduccionDefecto : 1.0;
+        Atajos = config.Atajos ?? new Dictionary<string, string>();
+        OnPropertyChanged(nameof(Atajos));
 
         CalcularEspacioDisco(RutaBaseAnimes);
         _ = ActualizarEstadisticasBibliotecaAsync();
@@ -202,6 +240,11 @@ public partial class ConfiguracionViewModel : ObservableObject
             config.SubtitulosPorDefecto = SubtitulosPorDefecto;
             config.DescargasSimultaneas = DescargasSimultaneas;
             config.IntervaloSincronizacionMinutos = IntervaloSincronizacionMinutos;
+            config.UmbralMarcadoVisto = Math.Clamp(UmbralMarcadoVisto, 1, 100);
+            config.NotificarNuevosEpisodios = NotificarNuevosEpisodios;
+            config.Idioma = Idioma == "en" ? "en" : "es";
+            config.VelocidadReproduccionDefecto = VelocidadReproduccionDefecto is >= 0.5 and <= 2.0 ? VelocidadReproduccionDefecto : 1.0;
+            config.Atajos = new Dictionary<string, string>(Atajos);
 
             await _settingsService.GuardarConfiguracionAsync(config);
 
@@ -233,6 +276,120 @@ public partial class ConfiguracionViewModel : ObservableObject
             _authService.CerrarSesion();
             ActualizarEstadoAutenticacion();
             WeakReferenceMessenger.Default.Send(new UsuarioDesconectadoMensaje());
+        }
+    }
+
+    /// <summary>
+    /// Mantenimiento: elimina miniaturas y portadas de animes/episodios que ya no existen
+    /// en la biblioteca (liberan espacio sin tocar ningún episodio).
+    /// </summary>
+    [RelayCommand]
+    public async Task LimpiarCacheAsync()
+    {
+        bool confirmar = await _dialogService.MostrarDialogoAsync(
+            "Limpiar caché de imágenes",
+            "¿Eliminar miniaturas y portadas de animes que ya no existen en tu biblioteca?\n\nEsto libera espacio en disco sin borrar ningún episodio.",
+            true,
+            "Broom",
+            "#F59E0B");
+
+        if (!confirmar) return;
+
+        try
+        {
+            var resultado = await _cacheMaintenanceService.LimpiarCacheHuerfanoAsync();
+
+            await _dialogService.MostrarDialogoAsync(
+                "Limpieza completada",
+                $"Se liberaron {resultado.MegabytesLiberados:F1} MB\n" +
+                $"{resultado.MiniaturasBorradas} miniaturas y {resultado.PortadasBorradas} portadas eliminadas.",
+                false,
+                "CheckCircleOutline",
+                "#4CAF50");
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("ConfiguracionViewModel", "Error limpiando caché de imágenes", ex);
+            await _dialogService.MostrarDialogoAsync("Error", "No se pudo completar la limpieza de caché.", false, "AlertCircleOutline", "#EF4444");
+        }
+    }
+
+    /// <summary>Backup manual con 1 clic: copia biblioteca.db a la ubicación elegida.</summary>
+    [RelayCommand]
+    public async Task ExportarBackupAsync()
+    {
+        var dialogo = new Microsoft.Win32.SaveFileDialog
+        {
+            Title = LocalizationService.T("Cfg_ExportarBackup"),
+            Filter = "Base de datos SQLite (*.db)|*.db",
+            FileName = $"biblioteca_backup_{DateTime.Now:yyyyMMdd_HHmmss}.db"
+        };
+
+        if (dialogo.ShowDialog() != true) return;
+
+        bool ok = await _databaseService.ExportarCopiaSeguridadAsync(dialogo.FileName);
+        await _dialogService.MostrarDialogoAsync(
+            ok ? "OK" : "Error",
+            ok ? LocalizationService.T("Cfg_BackupOk") : LocalizationService.T("Cfg_BackupError"),
+            false, ok ? "CheckCircleOutline" : "AlertCircleOutline", ok ? "#4CAF50" : "#EF4444");
+    }
+
+    /// <summary>Exporta la biblioteca (animes + registros) a un JSON portable.</summary>
+    [RelayCommand]
+    public async Task ExportarBibliotecaAsync()
+    {
+        var dialogo = new Microsoft.Win32.SaveFileDialog
+        {
+            Title = LocalizationService.T("Cfg_ExportarBiblioteca"),
+            Filter = "JSON (*.json)|*.json",
+            FileName = $"biblioteca_{DateTime.Now:yyyyMMdd_HHmmss}.json"
+        };
+
+        if (dialogo.ShowDialog() != true) return;
+
+        try
+        {
+            int animes = await _databaseService.ExportarBibliotecaJsonAsync(dialogo.FileName);
+            await _dialogService.MostrarDialogoAsync("OK",
+                string.Format(LocalizationService.T("Cfg_BibliotecaExportada"), animes),
+                false, "CheckCircleOutline", "#4CAF50");
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("ConfiguracionViewModel", "Error exportando biblioteca", ex);
+            await _dialogService.MostrarDialogoAsync("Error", LocalizationService.T("Cfg_BackupError"), false, "AlertCircleOutline", "#EF4444");
+        }
+    }
+
+    /// <summary>Importa una biblioteca desde JSON, fusionándola con la existente.</summary>
+    [RelayCommand]
+    public async Task ImportarBibliotecaAsync()
+    {
+        bool confirmar = await _dialogService.MostrarDialogoAsync(
+            LocalizationService.T("Cfg_ImportarBiblioteca"),
+            LocalizationService.T("Cfg_ImportarConfirmacion"),
+            true, "Import", "#F59E0B");
+        if (!confirmar) return;
+
+        var dialogo = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = LocalizationService.T("Cfg_ImportarBiblioteca"),
+            Filter = "JSON (*.json)|*.json"
+        };
+
+        if (dialogo.ShowDialog() != true) return;
+
+        try
+        {
+            int animes = await _databaseService.ImportarBibliotecaJsonAsync(dialogo.FileName);
+            await _dialogService.MostrarDialogoAsync("OK",
+                string.Format(LocalizationService.T("Cfg_BibliotecaImportada"), animes),
+                false, "CheckCircleOutline", "#4CAF50");
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("ConfiguracionViewModel", "Error importando biblioteca", ex);
+            await _dialogService.MostrarDialogoAsync("Error", LocalizationService.T("Cfg_BackupError"), false, "AlertCircleOutline", "#EF4444");
         }
     }
 }

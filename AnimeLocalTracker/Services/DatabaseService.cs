@@ -128,6 +128,109 @@ public class DatabaseService : IDatabaseService
     public async Task EliminarAnimeAsync(AnimeItem anime)
     {
         await _conexion.DeleteAsync(anime);
+        // Limpiar también los registros de episodios para no dejar huérfanos
+        await _conexion.ExecuteAsync("DELETE FROM RegistroEpisodio WHERE AniListId = ?", anime.AniListId);
+    }
+
+    public async Task EliminarRegistroEpisodioAsync(int aniListId, int numeroEpisodio)
+    {
+        await _conexion.ExecuteAsync("DELETE FROM RegistroEpisodio WHERE AniListId = ? AND NumeroEpisodio = ?", aniListId, numeroEpisodio);
+    }
+
+    /// <summary>
+    /// Copia la base de datos completa (con checkpoint del WAL) a una ruta de destino
+    /// elegida por el usuario. Devuelve true si se copió correctamente.
+    /// </summary>
+    public async Task<bool> ExportarCopiaSeguridadAsync(string rutaDestino)
+    {
+        try
+        {
+            if (_conexion == null) return false;
+
+            string dbPath = _conexion.DatabasePath;
+            if (!File.Exists(dbPath)) return false;
+
+            // Checkpoint para que la copia incluya todas las escrituras recientes
+            try { await _conexion.ExecuteAsync("PRAGMA wal_checkpoint(TRUNCATE);"); } catch { }
+
+            var destinoDir = Path.GetDirectoryName(rutaDestino);
+            if (!string.IsNullOrEmpty(destinoDir)) Directory.CreateDirectory(destinoDir);
+
+            File.Copy(dbPath, rutaDestino, overwrite: true);
+            return File.Exists(rutaDestino);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn("DatabaseService", $"No se pudo exportar la copia de seguridad: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Exporta la biblioteca completa (animes + registros de episodios) a un JSON
+    /// de respaldo portable. Devuelve la cantidad de animes exportados.
+    /// </summary>
+    public async Task<int> ExportarBibliotecaJsonAsync(string rutaDestino)
+    {
+        var animes = await ObtenerTodosLosAnimesAsync() ?? new List<AnimeItem>();
+        var registros = await ObtenerTodosLosRegistrosAsync() ?? new List<RegistroEpisodio>();
+
+        var backup = new BibliotecaBackup
+        {
+            Animes = animes,
+            Registros = registros
+        };
+
+        var json = System.Text.Json.JsonSerializer.Serialize(backup,
+            new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+
+        var destinoDir = Path.GetDirectoryName(rutaDestino);
+        if (!string.IsNullOrEmpty(destinoDir)) Directory.CreateDirectory(destinoDir);
+        await File.WriteAllTextAsync(rutaDestino, json);
+
+        return animes.Count;
+    }
+
+    /// <summary>
+    /// Importa una biblioteca desde JSON (generado por <see cref="ExportarBibliotecaJsonAsync"/>),
+    /// fusionando con la existente (upsert por AniListId / AniListId+Episodio).
+    /// Devuelve la cantidad de animes importados.
+    /// </summary>
+    public async Task<int> ImportarBibliotecaJsonAsync(string rutaOrigen)
+    {
+        if (!File.Exists(rutaOrigen)) return 0;
+
+        var json = await File.ReadAllTextAsync(rutaOrigen);
+        var backup = System.Text.Json.JsonSerializer.Deserialize<BibliotecaBackup>(json);
+        if (backup?.Animes == null) return 0;
+
+        int importados = 0;
+        foreach (var anime in backup.Animes)
+        {
+            try
+            {
+                await GuardarAnimeAsync(anime);
+                importados++;
+            }
+            catch { }
+        }
+
+        if (backup.Registros != null)
+        {
+            foreach (var registro in backup.Registros)
+            {
+                try { await GuardarRegistroEpisodioAsync(registro); } catch { }
+            }
+        }
+
+        return importados;
+    }
+
+    /// <summary>Contenedor JSON portable de la biblioteca.</summary>
+    public class BibliotecaBackup
+    {
+        public List<AnimeItem> Animes { get; set; } = new();
+        public List<RegistroEpisodio> Registros { get; set; } = new();
     }
     
     public async Task GuardarRegistroEpisodioAsync(RegistroEpisodio registro)

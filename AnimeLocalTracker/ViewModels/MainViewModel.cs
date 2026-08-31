@@ -19,11 +19,13 @@ public partial class MainViewModel : ObservableObject,
     IRecipient<NavegarMensaje_Descargas>,
     IRecipient<NavegarMensaje_Configuracion>,
     IRecipient<NavegarMensaje_AcercaDe>,
+    IRecipient<NavegarMensaje_Estadisticas>,
     IRecipient<AbrirBuscadorMensaje>,
     IRecipient<MostrarDialogoRequestMessage>,
     IRecipient<NavegarMensaje_Reproductor>,
     IRecipient<NavegarMensaje_VolverDelReproductor>,
-    IRecipient<DescargaProgresoMensaje>
+    IRecipient<DescargaProgresoMensaje>,
+    IRecipient<NuevosEpisodiosMensaje>
 {
     private readonly IServiceProvider _serviceProvider;
     private readonly IAnimeTrackingService _animeTrackingService;
@@ -41,6 +43,7 @@ public partial class MainViewModel : ObservableObject,
     [NotifyPropertyChangedFor(nameof(EsDescargasActivas))]
     [NotifyPropertyChangedFor(nameof(EsConfiguracionActiva))]
     [NotifyPropertyChangedFor(nameof(EsAcercaDeActivo))]
+    [NotifyPropertyChangedFor(nameof(EsEstadisticasActivo))]
     private ObservableObject _vistaActual = null!;
 
     public bool EsGaleriaActiva => VistaActual is GaleriaViewModel || VistaActual is DetalleViewModel;
@@ -49,6 +52,7 @@ public partial class MainViewModel : ObservableObject,
     public bool EsDescargasActivas => VistaActual is DescargasViewModel;
     public bool EsConfiguracionActiva => VistaActual is ConfiguracionViewModel;
     public bool EsAcercaDeActivo => VistaActual is AcercaDeViewModel;
+    public bool EsEstadisticasActivo => VistaActual is EstadisticasViewModel;
 
     // === BADGE DE DESCARGAS ===
     [ObservableProperty]
@@ -141,6 +145,28 @@ public partial class MainViewModel : ObservableObject,
     public void Receive(DescargaProgresoMensaje message)
     {
         ActualizarConteoDescargas();
+    }
+
+    public void Receive(NuevosEpisodiosMensaje message)
+    {
+        if (message.Cantidad <= 0) return;
+
+        ToastTitulo = LocalizationService.T("Notif_NuevosEpisodios");
+        ToastMensaje = $"{message.Cantidad} {LocalizationService.T("Notif_ResumenNuevos")}\n{message.Resumen}";
+        ToastIcono = "NewReleases";
+        ToastColor = "#4CAF50";
+        ToastVisible = true;
+
+        // Ocultar automáticamente después de 6 segundos
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(6000);
+                System.Windows.Application.Current?.Dispatcher?.Invoke(() => ToastVisible = false);
+            }
+            catch { }
+        });
     }
 
     private void ActualizarConteoDescargas()
@@ -316,6 +342,26 @@ public partial class MainViewModel : ObservableObject,
     public void Receive(NavegarMensaje_AcercaDe message)
     {
         NavegarAcercaDe();
+    }
+
+    [RelayCommand]
+    private async Task NavegarEstadisticas()
+    {
+        try
+        {
+            var estadisticasVm = _serviceProvider.GetRequiredService<EstadisticasViewModel>();
+            VistaActual = estadisticasVm;
+            await estadisticasVm.CargarEstadisticasAsync();
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("MainViewModel", "Error navegando a estadísticas", ex);
+        }
+    }
+
+    public void Receive(NavegarMensaje_Estadisticas message)
+    {
+        _ = NavegarEstadisticas();
     }
 
     public void Receive(AbrirBuscadorMensaje message)

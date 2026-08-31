@@ -679,6 +679,82 @@ public partial class DetalleViewModel : ObservableObject,
     }
 
     [RelayCommand]
+    private void AbrirCarpetaEpisodio(EpisodioItem episodio)
+    {
+        if (episodio == null || string.IsNullOrWhiteSpace(episodio.RutaCompleta) || !File.Exists(episodio.RutaCompleta))
+        {
+            _ = _dialogService.MostrarDialogoAsync("Archivo no encontrado", "El archivo del episodio ya no existe en disco.", false, "AlertCircleOutline", "#F59E0B");
+            return;
+        }
+
+        try
+        {
+            // Abre el Explorador con el archivo seleccionado
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "explorer.exe",
+                Arguments = $"/select,\"{episodio.RutaCompleta}\"",
+                UseShellExecute = false
+            });
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("DetalleViewModel", $"Error abriendo carpeta del episodio: {ex.Message}");
+        }
+    }
+
+    [RelayCommand]
+    private async Task EliminarEpisodio(EpisodioItem episodio)
+    {
+        if (episodio == null || !episodio.Descargado || string.IsNullOrWhiteSpace(episodio.RutaCompleta)) return;
+
+        bool confirmar = await _dialogService.MostrarDialogoAsync(
+            "Eliminar episodio",
+            $"¿Eliminar el archivo del episodio {episodio.NumeroEpisodio}?\n\nSe borrará del disco y no podrá recuperarse.",
+            true, "DeleteOutline", "#EF4444");
+        if (!confirmar) return;
+
+        string rutaArchivo = episodio.RutaCompleta;
+        string rutaMiniatura = PythonEpisodeEnricher.ObtenerRutaMiniaturaEsperada(rutaArchivo);
+
+        // 1. Borrar el archivo de video
+        try { if (File.Exists(rutaArchivo)) File.Delete(rutaArchivo); }
+        catch (Exception ex) { AppLogger.Debug("DetalleViewModel", $"No se pudo borrar archivo del episodio: {ex.Message}"); }
+
+        // 2. Borrar su miniatura
+        try { if (File.Exists(rutaMiniatura)) File.Delete(rutaMiniatura); } catch { }
+
+        // 3. Quitar el registro de la base de datos
+        try
+        {
+            await _databaseService.EliminarRegistroEpisodioAsync(AnimeSeleccionado?.AniListId ?? 0, episodio.NumeroEpisodio);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("DetalleViewModel", $"No se pudo eliminar el registro del episodio: {ex.Message}");
+        }
+
+        // 4. Reiniciar el estado del item en la UI
+        episodio.Descargado = false;
+        episodio.RutaCompleta = string.Empty;
+        episodio.RutaMiniatura = null;
+        episodio.TamanoArchivoFormateado = string.Empty;
+        episodio.Resolucion = string.Empty;
+        episodio.CodecVideo = string.Empty;
+        episodio.Fps = string.Empty;
+        episodio.Es10Bit = false;
+        episodio.ProgresoSegundos = 0;
+        episodio.TotalSegundos = 0;
+        episodio.Visto = false;
+
+        AplicarFiltrosYOrdenamiento();
+
+        await _dialogService.MostrarDialogoAsync("Episodio eliminado",
+            $"El episodio {episodio.NumeroEpisodio} fue eliminado del disco.",
+            false, "CheckCircleOutline", "#4CAF50");
+    }
+
+    [RelayCommand]
     private void VolverAGaleria()
     {
         WeakReferenceMessenger.Default.Send(new NavegarMensaje_Galeria());
@@ -696,7 +772,28 @@ public partial class DetalleViewModel : ObservableObject,
 
         if (confirmacion)
         {
+            // Opción extra: borrar también los archivos del disco
+            bool borrarArchivos = await _dialogService.MostrarDialogoAsync(
+                "¿Borrar también los archivos?",
+                $"¿Deseas eliminar también la carpeta con los episodios descargados del disco?\n\n'{(string.IsNullOrWhiteSpace(AnimeSeleccionado.RutaCarpeta) ? "sin carpeta local" : AnimeSeleccionado.RutaCarpeta)}'\n\nElige NO para conservar los archivos y solo quitar el anime de la biblioteca.",
+                true, "FolderOutline", "#EF4444");
+
+            string? carpeta = AnimeSeleccionado.RutaCarpeta;
+
             await _databaseService.EliminarAnimeAsync(AnimeSeleccionado);
+
+            if (borrarArchivos && !string.IsNullOrWhiteSpace(carpeta) && Directory.Exists(carpeta))
+            {
+                try
+                {
+                    Directory.Delete(carpeta, recursive: true);
+                }
+                catch (Exception ex)
+                {
+                    AppLogger.Debug("DetalleViewModel", $"No se pudo borrar la carpeta del anime: {ex.Message}");
+                }
+            }
+
             VolverAGaleria();
         }
     }

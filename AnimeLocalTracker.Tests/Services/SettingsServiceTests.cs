@@ -117,7 +117,8 @@ public class SettingsServiceTests : IDisposable
             settingsMock.Object, 
             authMock.Object, 
             dbMock.Object, 
-            dialogMock.Object);
+            dialogMock.Object,
+            new CacheMaintenanceService(dbMock.Object));
 
         // Assert
         vm.RutaBaseAnimes.Should().Be(@"D:\AnimesTest");

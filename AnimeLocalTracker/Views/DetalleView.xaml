@@ -392,6 +392,8 @@
                                             <ColumnDefinition Width="Auto"/>
                                             <!-- Columna 4: Acción Descargar / Progreso / Reproducir -->
                                             <ColumnDefinition Width="Auto"/>
+                                            <!-- Columna 5: Acciones (abrir carpeta / eliminar episodio) -->
+                                            <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
 
                                         <!-- PUNTO NO VISTO + MARCADOR BOOKMARK -->
@@ -504,6 +506,23 @@
                                                 <materialDesign:PackIcon Kind="DownloadCircleOutline" Foreground="#60A5FA" Width="24" Height="24" VerticalAlignment="Center"/>
                                             </Button>
                                         </Grid>
+
+                                        <!-- 5. ACCIONES DEL EPISODIO DESCARGADO: ABRIR CARPETA / ELIMINAR -->
+                                        <StackPanel Grid.Column="5" Orientation="Horizontal" VerticalAlignment="Center"
+                                                    Visibility="{Binding Descargado, Converter={StaticResource BoolToVis}}">
+                                            <Button Command="{Binding DataContext.AbrirCarpetaEpisodioCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}"
+                                                    Style="{StaticResource MaterialDesignIconButton}" Width="30" Height="30" Padding="0"
+                                                    ToolTip="Mostrar en carpeta (Explorador)">
+                                                <materialDesign:PackIcon Kind="FolderOutline" Foreground="#9CA3AF" Width="18" Height="18" VerticalAlignment="Center"/>
+                                            </Button>
+                                            <Button Command="{Binding DataContext.EliminarEpisodioCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}"
+                                                    Style="{StaticResource MaterialDesignIconButton}" Width="30" Height="30" Padding="0"
+                                                    ToolTip="Eliminar episodio del disco">
+                                                <materialDesign:PackIcon Kind="DeleteOutline" Foreground="#F87171" Width="18" Height="18" VerticalAlignment="Center"/>
+                                            </Button>
+                                        </StackPanel>
                                     </Grid>
                                 </Border>
                                 

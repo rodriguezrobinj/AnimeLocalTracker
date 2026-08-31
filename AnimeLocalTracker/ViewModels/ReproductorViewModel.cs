@@ -887,9 +887,107 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         if (Player != null)
         {
             Player.OpenAsync(rutaVideo);
+
+            // Velocidad de reproducción por defecto configurable
+            try
+            {
+                double velocidad = _settingsService?.ObtenerConfiguracion()?.VelocidadReproduccionDefecto ?? 1.0;
+                Player.Speed = (float)Math.Clamp(velocidad, 0.5, 2.0);
+            }
+            catch { }
         }
 
         _ = RastrearProgresoAsync(_trackingCts.Token);
+    }
+
+    /// <summary>Tecla configurada para una acción del reproductor (con fallback).</summary>
+    public System.Windows.Input.Key ObtenerTeclaPara(string accion)
+    {
+        var config = _settingsService?.ObtenerConfiguracion();
+        string nombre = config?.ObtenerTecla(accion, accion switch
+        {
+            "PlayPausa" => "Space",
+            "PantallaCompleta" => "F11",
+            "Silenciar" => "M",
+            "SubirVolumen" => "Up",
+            "BajarVolumen" => "Down",
+            "Adelantar10" => "Right",
+            "Retroceder10" => "Left",
+            "SaltarIntro" => "S",
+            "SiguienteEpisodio" => "N",
+            "AnteriorEpisodio" => "P",
+            "Cerrar" => "Escape",
+            "CapturarFrame" => "C",
+            _ => string.Empty
+        }) ?? string.Empty;
+
+        return Enum.TryParse<System.Windows.Input.Key>(nombre, true, out var tecla)
+            ? tecla
+            : System.Windows.Input.Key.None;
+    }
+
+    /// <summary>
+    /// Captura el frame actual del episodio y lo guarda como PNG en la ubicación
+    /// elegida por el usuario (usa el ffmpeg embebido, a resolución completa).
+    /// </summary>
+    [RelayCommand]
+    private async Task CapturarFrameAsync()
+    {
+        if (Player == null || string.IsNullOrWhiteSpace(_rutaVideo) || !File.Exists(_rutaVideo)) return;
+
+        double posicion = TimeSpan.FromTicks(Player.CurTime).TotalSeconds;
+
+        var dialogo = new Microsoft.Win32.SaveFileDialog
+        {
+            Title = "Capturar frame",
+            Filter = "PNG (*.png)|*.png|JPEG (*.jpg)|*.jpg",
+            FileName = $"frame_{DateTime.Now:yyyyMMdd_HHmmss}.png"
+        };
+
+        if (dialogo.ShowDialog() != true) return;
+
+        try
+        {
+            // Buscar el ffmpeg embebido de la app (ya está en el PATH del proceso)
+            string ffmpeg = "ffmpeg";
+            string embebido = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "FFmpeg", "ffmpeg.exe");
+            if (File.Exists(embebido)) ffmpeg = embebido;
+
+            var psi = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = ffmpeg,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardError = true
+            };
+            psi.ArgumentList.Add("-y");
+            psi.ArgumentList.Add("-loglevel"); psi.ArgumentList.Add("error");
+            psi.ArgumentList.Add("-ss"); psi.ArgumentList.Add(posicion.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture));
+            psi.ArgumentList.Add("-i"); psi.ArgumentList.Add(_rutaVideo);
+            psi.ArgumentList.Add("-frames:v"); psi.ArgumentList.Add("1");
+            psi.ArgumentList.Add("-q:v"); psi.ArgumentList.Add("2");
+            psi.ArgumentList.Add(dialogo.FileName);
+
+            using var proceso = System.Diagnostics.Process.Start(psi)!;
+            string stderr = await proceso.StandardError.ReadToEndAsync();
+            await proceso.WaitForExitAsync();
+
+            if (proceso.ExitCode == 0 && File.Exists(dialogo.FileName))
+            {
+                _ = WeakReferenceMessenger.Default.Send(new Messages.MostrarDialogoRequestMessage(
+                    "Frame capturado", $"Imagen guardada en:\n{dialogo.FileName}", false, "CameraOutline", "#4CAF50"));
+            }
+            else
+            {
+                AppLogger.Debug("ReproductorViewModel", $"ffmpeg falló al capturar frame: {stderr}");
+                _ = WeakReferenceMessenger.Default.Send(new Messages.MostrarDialogoRequestMessage(
+                    "Error", "No se pudo capturar el frame.", false, "AlertCircleOutline", "#EF4444"));
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("ReproductorViewModel", $"Error capturando frame: {ex.Message}");
+        }
     }
 
     public async Task GuardarProgresoActualAsync(bool forzarProgresoCero = false)

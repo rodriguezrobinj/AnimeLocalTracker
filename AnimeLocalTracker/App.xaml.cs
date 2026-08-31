@@ -144,6 +144,15 @@ public partial class App : Application
 
         // ARQ-02: alta de animes unificada (MainViewModel + AgregarAnimeViewModel)
         services.AddSingleton<AnimeLibraryService>();
+
+        // Mantenimiento de caché (miniaturas/portadas huérfanas)
+        services.AddSingleton<CacheMaintenanceService>();
+
+        // Notificaciones de episodios nuevos
+        services.AddSingleton<NewEpisodeNotifier>();
+
+        // Estadísticas personales
+        services.AddSingleton<EstadisticasViewModel>();
     }
 
     private static Polly.IAsyncPolicy<System.Net.Http.HttpResponseMessage> GetRetryPolicy()
@@ -199,6 +208,14 @@ public partial class App : Application
             // a la carpeta segura de datos, ANTES de inicializar la base de datos.
             AppDataPaths.MigrarDesdeInstalacionAntigua();
 
+            // Aplicar el idioma guardado (ES/EN) antes de construir la UI
+            try
+            {
+                var settingsService = ServiceProvider.GetRequiredService<ISettingsService>();
+                LocalizationService.Instance.Idioma = settingsService.ObtenerConfiguracion()?.Idioma ?? "es";
+            }
+            catch { }
+
             // Pedimos la instancia del servicio de base de datos
             var dbService = ServiceProvider.GetRequiredService<IDatabaseService>();
 
@@ -250,6 +267,21 @@ public partial class App : Application
             // con todas sus dependencias ya inyectadas.
             var mainWindow = ServiceProvider.GetRequiredService<MainWindow>();
             mainWindow.Show();
+
+            // Notificaciones de episodios nuevos (diferido para no competir con la carga)
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await Task.Delay(3000);
+                    var notifier = ServiceProvider.GetService<NewEpisodeNotifier>();
+                    if (notifier != null)
+                    {
+                        await notifier.BuscarYNotificarNuevosAsync();
+                    }
+                }
+                catch { }
+            });
         }
         catch (Exception ex)
         {
