@@ -509,3 +509,8 @@ $RECYCLE.BIN/
 
 # Artefacto de build (regenerado por build.ps1 desde native\animetracker_core\target\release)
 animetracker_core.dll
+
+# Archivos que no se suben al repositorio (generados/privados)
+.vscode/
+installer.iss
+AUDITORIA_INTEGRAL.md
