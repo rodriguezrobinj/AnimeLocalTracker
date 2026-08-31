@@ -65,6 +65,22 @@ jobs:
     - name: Build Solution and Run Tests
       run: powershell -ExecutionPolicy Bypass -File .\build.ps1 -RunTests
 
+    # vpk solo genera el delta si encuentra los paquetes anteriores en Releases/.
+    # En un runner limpio no existen → descargar los assets de la release previa.
+    - name: Download Previous Release Assets (para el delta)
+      shell: powershell
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        $prevTag = gh release list --limit 1 --json tagName --jq '.[0].tagName'
+        if ($prevTag) {
+          New-Item -ItemType Directory -Path Releases -Force | Out-Null
+          Write-Host "Descargando assets de la release previa: $prevTag"
+          gh release download $prevTag --dir Releases
+        } else {
+          Write-Host "Sin release previa: se generará solo el paquete completo."
+        }
+
     - name: Package Velopack Release
       shell: powershell
       run: |
