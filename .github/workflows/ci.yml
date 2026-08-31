@@ -61,6 +61,9 @@ jobs:
 
     - name: Python SCA Audit (pip-audit)
       run: |
+        # La imagen de Python de GitHub trae setuptools 65.5.0 (7 CVEs conocidas):
+        # actualizarlo antes de auditar, si no el audit falla por el entorno, no por el proyecto
+        python -m pip install --upgrade setuptools pip
         python -m pip install pip-audit
         pip-audit
 
