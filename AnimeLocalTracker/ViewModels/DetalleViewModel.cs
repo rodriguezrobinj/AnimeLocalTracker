@@ -410,10 +410,10 @@ public partial class DetalleViewModel : ObservableObject,
                 // se resuelve pythonDisponible de forma diferida, solo si se necesita.
                 bool pythonDisponible = false;
 
-                // ── FASE 1: Extracción PARALELA de miniaturas con Rust FFI, por chunks
-                //    progresivos: cada chunk completado se persiste y se refleja en la UI
-                //    antes de seguir, para que las miniaturas aparezcan de inmediato
-                //    (no todas al final del lote completo). ──
+                // ── FASE 1: Miniaturas 1×1 con Rust FFI. Cada episodio se extrae, persiste y
+                //    se refleja en la UI ANTES de pasar al siguiente: la primera miniatura
+                //    aparece en ~1s y el resto van apareciendo de forma secuencial apenas
+                //    cada una termina (sin esperar a que se generen todas). ──
                 var sinMiniatura = pendientes.Where(e => string.IsNullOrEmpty(e.RutaMiniatura)).ToList();
                 if (sinMiniatura.Count > 0)
                 {
@@ -421,57 +421,27 @@ public partial class DetalleViewModel : ObservableObject,
 
                     if (NativeMethods.IsAvailable)
                     {
-                        const int TamanoChunk = 16;
-                        foreach (var chunk in sinMiniatura.Chunk(TamanoChunk))
+                        foreach (var ep in sinMiniatura)
                         {
-                            var requests = chunk.Select(ep => new NativeFrameRequest
-                            {
-                                VideoPath = ep.RutaCompleta,
-                                OutPath = PythonEpisodeEnricher.ObtenerRutaMiniaturaEsperada(ep.RutaCompleta),
-                                // Timestamp corto (2s): el keyframe previo cae en los primeros
-                                // segundos del video, así el decode intermedio (frames entre el
-                                // keyframe y el punto exacto) es mínimo → miniatura casi instantánea.
-                                Timestamp = 2.0,
-                                Width = 320
-                            }).ToList();
+                            string outPath = PythonEpisodeEnricher.ObtenerRutaMiniaturaEsperada(ep.RutaCompleta);
+                            // Timestamp corto (2s): el keyframe previo cae en los primeros
+                            // segundos del video, así el decode intermedio (frames entre el
+                            // keyframe y el punto exacto) es mínimo → miniatura casi instantánea.
+                            bool ok = NativeMethods.ExtractFrame(ep.RutaCompleta, outPath, 2.0, 320);
 
-                            var batchResults = NativeMethods.ExtractFramesBatch(requests);
-                            if (batchResults != null)
+                            if (ok && File.Exists(outPath) && new FileInfo(outPath).Length > 0)
                             {
-                                foreach (var res in batchResults)
-                                {
-                                    if (res.Success && File.Exists(res.OutPath) && new FileInfo(res.OutPath).Length > 0)
-                                    {
-                                        string resNorm = Path.GetFullPath(res.OutPath);
-                                        var ep = sinMiniatura.FirstOrDefault(e =>
-                                            string.Equals(
-                                                Path.GetFullPath(PythonEpisodeEnricher.ObtenerRutaMiniaturaEsperada(e.RutaCompleta)),
-                                                resNorm,
-                                                StringComparison.OrdinalIgnoreCase));
+                                ep.RutaMiniatura = outPath;
+                                huboCambiosMiniatura = true;
 
-                                        if (ep != null)
-                                        {
-                                            ep.RutaMiniatura = res.OutPath;
-                                            huboCambiosMiniatura = true;
-                                        }
-                                    }
-                                }
-                            }
-
-                            // Persistir y refrescar la UI con el chunk ya terminado
-                            var conMiniatura = chunk.Where(e => !string.IsNullOrEmpty(e.RutaMiniatura)).ToList();
-                            if (conMiniatura.Count > 0)
-                            {
-                                await PersistirRegistrosAsync(aniListId, conMiniatura).ConfigureAwait(false);
+                                // Mostrar esta miniatura YA y persistirla antes de seguir
+                                await PersistirRegistrosAsync(aniListId, new[] { ep }).ConfigureAwait(false);
                                 var disp = System.Windows.Application.Current?.Dispatcher;
                                 if (disp != null && !disp.HasShutdownStarted)
                                 {
                                     _ = disp.InvokeAsync(() => alTerminar());
                                 }
                             }
-
-                            // Dejar respirar a la UI/otros hilos entre chunks
-                            await Task.Delay(30).ConfigureAwait(false);
                         }
                     }
 

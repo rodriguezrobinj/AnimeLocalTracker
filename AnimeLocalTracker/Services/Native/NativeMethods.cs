@@ -27,9 +27,6 @@ public static class NativeMethods
     [return: MarshalAs(UnmanagedType.I1)]
     private static extern bool NativeExtractFrame(IntPtr videoPath, IntPtr outPath, double timestamp, int width);
 
-    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, EntryPoint = "anitomy_extract_frames_batch")]
-    private static extern IntPtr NativeExtractFramesBatch(IntPtr jsonRequests);
-
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, EntryPoint = "anitomy_free_string")]
     private static extern void NativeAnitomyFreeString(IntPtr ptr);
 
@@ -213,39 +210,6 @@ public static class NativeMethods
         }
     }
 
-    /// <summary>
-    /// Extrae un lote de fotogramas en paralelo utilizando todos los núcleos de CPU disponibles vía Rayon (<50ms para todo el lote).
-    /// </summary>
-    public static List<NativeFrameResult>? ExtractFramesBatch(IEnumerable<NativeFrameRequest> requests)
-    {
-        if (!IsAvailable || requests == null) return null;
-
-        IntPtr inPtr = IntPtr.Zero;
-        IntPtr outPtr = IntPtr.Zero;
-        try
-        {
-            string jsonIn = JsonSerializer.Serialize(requests);
-            inPtr = StringToUtf8Ptr(jsonIn);
-            outPtr = NativeExtractFramesBatch(inPtr);
-            string? jsonOut = MarshalStringAndFree(outPtr);
-            outPtr = IntPtr.Zero;
-
-            if (string.IsNullOrEmpty(jsonOut)) return null;
-
-            return JsonSerializer.Deserialize<List<NativeFrameResult>>(jsonOut);
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Debug("NativeMethods", $"Error en anitomy_extract_frames_batch nativo: {ex.Message}");
-            return null;
-        }
-        finally
-        {
-            if (inPtr != IntPtr.Zero) Marshal.FreeHGlobal(inPtr);
-            if (outPtr != IntPtr.Zero) NativeAnitomyFreeString(outPtr);
-        }
-    }
-
     private static IntPtr StringToUtf8Ptr(string str)
     {
         byte[] bytes = System.Text.Encoding.UTF8.GetBytes(str + '\0');
@@ -281,15 +245,6 @@ public class NativeFrameRequest
 
     [JsonPropertyName("width")]
     public uint Width { get; set; } = 320;
-}
-
-public class NativeFrameResult
-{
-    [JsonPropertyName("out_path")]
-    public string OutPath { get; set; } = string.Empty;
-
-    [JsonPropertyName("success")]
-    public bool Success { get; set; }
 }
 
 public class ParsedAnimeInfo

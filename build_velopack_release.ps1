@@ -44,7 +44,7 @@ if ($pythonChanged) {
     Write-Host "  El codigo Python es mas reciente o el binario no existe. Compilando..." -ForegroundColor Yellow
     try {
         # Asegurar dependencias PyPI antes de PyInstaller (sin ellas el exe queda sin modulos)
-        & python -m pip install -q anitopy rapidfuzz "yt-dlp>=2025.1.15" pydantic "opencv-python-headless>=4.9.0" numpy 2>&1 | Out-Host
+        & python -m pip install -q anitopy rapidfuzz "yt-dlp==2026.8.19" pydantic "opencv-python-headless>=4.9.0" numpy 2>&1 | Out-Host
         & python "$PSScriptRoot\tools\python\build_binary.py" 2>&1 | Out-Host
         if ($LASTEXITCODE -ne 0 -or -not (Test-Path $vtoolsExe)) {
             Write-Host "  PyInstaller fallo; se usara el binario existente si hay." -ForegroundColor Red
