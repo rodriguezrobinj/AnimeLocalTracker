@@ -72,12 +72,13 @@ jobs:
         Write-Host "Empaquetando versión $version desde tag $env:GITHUB_REF_NAME"
         powershell -ExecutionPolicy Bypass -File .\build_velopack_release.ps1 -Version $version
 
-    - name: Upload to GitHub Release
+    - name: Upload to GitHub Release (Pre-release)
       shell: powershell
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
         $version = $env:GITHUB_REF_NAME.TrimStart('v')
         gh release create $env:GITHUB_REF_NAME Releases/* `
-          --title "AnimeLocalTracker v$version" `
+          --title "AnimeLocalTracker v$version (Pre-release)" `
+          --prerelease `
           --generate-notes
