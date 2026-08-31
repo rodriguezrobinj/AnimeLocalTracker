@@ -11,12 +11,12 @@ Write-Host "  AnimeLocalTracker - Generador de Release (Velopack)" -ForegroundCo
 Write-Host "  Versión: $Version" -ForegroundColor Yellow
 Write-Host "=================================================" -ForegroundColor Cyan
 
-# 1. Asegurar herramienta vpk instalada globalmente
+# 1. Asegurar herramienta vpk instalada globalmente (versión fijada = reproducible)
 Write-Host "`n[1/5] Verificando herramienta vpk (Velopack CLI)..." -ForegroundColor Green
 $vpkInstalled = Get-Command vpk -ErrorAction SilentlyContinue
 if (-not $vpkInstalled) {
-    Write-Host "Instalando vpk globalmente con dotnet tool..." -ForegroundColor Yellow
-    dotnet tool install -g vpk
+    Write-Host "Instalando vpk 1.2.0 globalmente con dotnet tool..." -ForegroundColor Yellow
+    dotnet tool install -g vpk --version 1.2.0
 } else {
     Write-Host "vpk encontrado: $($vpkInstalled.Source)" -ForegroundColor Gray
 }
@@ -44,7 +44,7 @@ if ($pythonChanged) {
     Write-Host "  El codigo Python es mas reciente o el binario no existe. Compilando..." -ForegroundColor Yellow
     try {
         # Asegurar dependencias PyPI antes de PyInstaller (sin ellas el exe queda sin modulos)
-        & python -m pip install -q anitopy rapidfuzz "yt-dlp==2026.8.19" pydantic "opencv-python-headless>=4.9.0" numpy 2>&1 | Out-Host
+        & python -m pip install -q pyinstaller anitopy rapidfuzz "yt-dlp==2026.8.19" pydantic "opencv-python-headless>=4.9.0" numpy 2>&1 | Out-Host
         & python "$PSScriptRoot\tools\python\build_binary.py" 2>&1 | Out-Host
         if ($LASTEXITCODE -ne 0 -or -not (Test-Path $vtoolsExe)) {
             Write-Host "  PyInstaller fallo; se usara el binario existente si hay." -ForegroundColor Red
@@ -60,6 +60,17 @@ dotnet publish "$PSScriptRoot\AnimeLocalTracker\AnimeLocalTracker.csproj" `
     -r win-x64 `
     --self-contained false `
     -o $publishDir
+
+if ($LASTEXITCODE -ne 0) {
+    # Reintento: el flake conocido del SDK WPF (*_wpftmp con obj limpio) puede fallar
+    # en la PRIMERA publicación de un runner limpio (CS2001 por .g.cs ausentes).
+    Write-Host "  Publish falló en el primer intento (posible flake wpftmp); reintentando..." -ForegroundColor Yellow
+    dotnet publish "$PSScriptRoot\AnimeLocalTracker\AnimeLocalTracker.csproj" `
+        -c Release `
+        -r win-x64 `
+        --self-contained false `
+        -o $publishDir
+}
 
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Fallo en la publicación de dotnet publish."

@@ -7,6 +7,7 @@ namespace AnimeLocalTracker.Services;
 public interface IDatabaseService
 {
     Task InicializarBaseDatosAsync();
+    Task CrearBackupRotativoAsync(int maxCopias = 5, string? backupDir = null);
     Task<List<AnimeItem>> ObtenerTodosLosAnimesAsync();
     Task GuardarAnimeAsync(AnimeItem anime);
     Task EliminarAnimeAsync(AnimeItem anime);

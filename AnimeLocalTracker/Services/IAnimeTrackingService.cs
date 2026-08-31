@@ -10,6 +10,7 @@ public interface IAnimeTrackingService
     Task<List<AniListMedia>> BuscarAnimePorTituloAsync(string titulo); 
     Task<bool> ActualizarProgresoAsync(int mediaId, int episodio, string token);
     Task<AniListMedia?> ObtenerAnimePorIdAsync(int id);
+    Task<Dictionary<int, AniListMedia>> ObtenerAnimesPorIdsLoteAsync(IEnumerable<int> ids, string? token = null);
     // Obtener los datos actuales de tu cuenta
     Task<AniListMediaList?> ObtenerSeguimientoUsuarioAsync(int mediaId, string token);
     // Guardar el panel completo de datos

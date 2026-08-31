@@ -141,6 +141,9 @@ public partial class App : Application
 
         // Servicio de caché y precarga de imágenes optimizadas para 60fps
         services.AddSingleton<IImageCacheService, ImageCacheService>();
+
+        // ARQ-02: alta de animes unificada (MainViewModel + AgregarAnimeViewModel)
+        services.AddSingleton<AnimeLibraryService>();
     }
 
     private static Polly.IAsyncPolicy<System.Net.Http.HttpResponseMessage> GetRetryPolicy()
@@ -216,6 +219,9 @@ public partial class App : Application
 
             // Obligamos a que se cree el archivo y la tabla antes de continuar
             await dbService.InicializarBaseDatosAsync();
+
+            // Backup rotativo de la biblioteca (protección contra corrupción/pérdida)
+            await dbService.CrearBackupRotativoAsync();
 
             // Iniciar sincronización periódica en segundo plano
             var syncService = ServiceProvider.GetRequiredService<ISyncService>();

@@ -161,6 +161,112 @@ public class AniListTrackingService : IAnimeTrackingService
         }
     }
 
+    /// <summary>
+    /// RND-02: consulta muchos animes de una vez (Page.media con id_in + mediaListEntry
+    /// del usuario autenticado). Reemplaza N× ObtenerAnimePorIdAsync + N×
+    /// ObtenerSeguimientoUsuarioAsync por ~1 request cada 50 animes: la actualización
+    /// de biblioteca pasa de cientos de llamadas seriales a unas pocas.
+    /// Usa el caché para los IDs ya frescos (30 min).
+    /// </summary>
+    public async Task<Dictionary<int, AniListMedia>> ObtenerAnimesPorIdsLoteAsync(IEnumerable<int> ids, string? token = null)
+    {
+        var resultado = new Dictionary<int, AniListMedia>();
+        var idsUnicos = ids.Distinct().ToList();
+        if (idsUnicos.Count == 0) return resultado;
+
+        // 1. Servir los que ya estén en caché
+        var pendientes = new List<int>();
+        foreach (var id in idsUnicos)
+        {
+            if (TryGetFromCache<AniListMedia>($"media_{id}", out var cached) && cached != null)
+            {
+                resultado[id] = cached;
+            }
+            else
+            {
+                pendientes.Add(id);
+            }
+        }
+        if (pendientes.Count == 0) return resultado;
+
+        // 2. Lotes de 50 (máximo perPage de AniList para la conexión media)
+        const int TamanoLote = 50;
+        foreach (var chunk in pendientes.Chunk(TamanoLote))
+        {
+            try
+            {
+                var query = @"
+                query ($ids: [Int]) {
+                    Page(page: 1, perPage: 50) {
+                        media(id_in: $ids, type: ANIME) {
+                            id
+                            idMal
+                            title { romaji english native userPreferred }
+                            synonyms
+                            coverImage { extraLarge }
+                            description(asHtml: false)
+                            genres
+                            episodes
+                            status
+                            nextAiringEpisode { episode }
+                            mediaListEntry {
+                                id
+                                status
+                                score
+                                progress
+                                startedAt { year month day }
+                                completedAt { year month day }
+                            }
+                        }
+                    }
+                }";
+
+                var payload = new { query, variables = new { ids = chunk } };
+                var jsonContent = JsonSerializer.Serialize(payload, JsonOptions);
+
+                var request = CrearRequest(jsonContent, token);
+                var response = await _httpClient.SendAsync(request);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    AppLogger.Warn("AniListTrackingService", $"Lote de animes ({chunk.Length} ids) falló con HTTP {(int)response.StatusCode}.");
+                    continue;
+                }
+
+                var content = await response.Content.ReadAsStringAsync();
+                if (content.Contains("\"errors\""))
+                {
+                    AppLogger.Warn("AniListTrackingService", $"AniList devolvió error en lote de animes: {Truncar(content)}");
+                    continue;
+                }
+
+                var result = JsonSerializer.Deserialize<AniListResponse>(content, JsonOptions);
+                var medias = result?.Data?.Page?.Media;
+                if (medias == null) continue;
+
+                foreach (var media in medias)
+                {
+                    resultado[media.Id] = media;
+                    SetInCache($"media_{media.Id}", media, TimeSpan.FromMinutes(30));
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                AppLogger.Warn("AniListTrackingService", $"Timeout al obtener lote de animes de AniList.");
+            }
+            catch (HttpRequestException ex)
+            {
+                AppLogger.Warn("AniListTrackingService", $"Fallo de red al conectar con AniList (lote): {ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Error("AniListTrackingService", $"Error al obtener lote de animes", ex);
+            }
+        }
+
+        return resultado;
+    }
+
     public async Task<List<AniListMedia>> BuscarAnimePorTituloAsync(string titulo)
     {
         if (string.IsNullOrWhiteSpace(titulo)) return [];

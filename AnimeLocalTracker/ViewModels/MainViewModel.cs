@@ -27,10 +27,9 @@ public partial class MainViewModel : ObservableObject,
 {
     private readonly IServiceProvider _serviceProvider;
     private readonly IAnimeTrackingService _animeTrackingService;
-    private readonly IDatabaseService _databaseService;
+    private readonly AnimeLibraryService _animeLibraryService;
     private readonly IDownloadService _downloadService;
     private readonly IUpdateService _updateService;
-    private readonly ISettingsService _settingsService;
 
     public string VersionAppTexto => _updateService.ObtenerVersionActual();
 
@@ -97,17 +96,15 @@ public partial class MainViewModel : ObservableObject,
     public MainViewModel(
         IServiceProvider serviceProvider, 
         IAnimeTrackingService animeTrackingService, 
-        IDatabaseService databaseService,
+        AnimeLibraryService animeLibraryService,
         IDownloadService downloadService,
-        IUpdateService updateService,
-        ISettingsService settingsService)
+        IUpdateService updateService)
     {
         _serviceProvider = serviceProvider;
         _animeTrackingService = animeTrackingService;
-        _databaseService = databaseService;
+        _animeLibraryService = animeLibraryService;
         _downloadService = downloadService;
         _updateService = updateService;
-        _settingsService = settingsService;
 
         WeakReferenceMessenger.Default.RegisterAll(this);
 
@@ -513,9 +510,11 @@ public partial class MainViewModel : ObservableObject,
 
         try
         {
-            // Validar si el anime ya existe en la biblioteca
-            var animesGuardados = await _databaseService.ObtenerTodosLosAnimesAsync();
-            if (animesGuardados.Any(a => a.AniListId == animeAPI.Id))
+            // ARQ-02: toda la lógica de creación (validación, carpeta, episodios, persistencia)
+            // vive en AnimeLibraryService; este ViewModel solo gestiona su estado de UI.
+            var nuevoAnime = await _animeLibraryService.CrearYGuardarAnimeAsync(animeAPI, animeAPI.Title.Romaji);
+
+            if (nuevoAnime == null)
             {
                 IsDialogOpen = false;
                 await Task.Delay(250); // Permitir que la animación de cierre termine
@@ -525,67 +524,12 @@ public partial class MainViewModel : ObservableObject,
                 return;
             }
 
-            string nombreSeguro = string.Join("_", animeAPI.Title.Romaji.Split(System.IO.Path.GetInvalidFileNameChars()));
-            string rutaBaseVideos = _settingsService.ObtenerRutaBaseAnimes();
-            string nuevaRutaCarpeta = System.IO.Path.Combine(rutaBaseVideos, nombreSeguro);
-
-            if (!System.IO.Directory.Exists(nuevaRutaCarpeta))
-            {
-                System.IO.Directory.CreateDirectory(nuevaRutaCarpeta);
-            }
-
-            int episodiosEmitidos = 0;
-            string estadoAnime = animeAPI.Status?.ToUpperInvariant() ?? "UNKNOWN";
-
-            if (estadoAnime == "NOT_YET_RELEASED")
-            {
-                episodiosEmitidos = 0;
-            }
-            else if (estadoAnime == "RELEASING")
-            {
-                if (animeAPI.NextAiringEpisode != null)
-                {
-                    episodiosEmitidos = Math.Max(0, animeAPI.NextAiringEpisode.Episode - 1);
-                }
-                else
-                {
-                    episodiosEmitidos = animeAPI.Episodes ?? 0;
-                }
-            }
-            else // FINISHED, etc.
-            {
-                episodiosEmitidos = animeAPI.Episodes ?? 0;
-            }
-                
-            var titulosAlt = new System.Collections.Generic.List<string>();
-            if (!string.IsNullOrWhiteSpace(animeAPI.Title.English)) titulosAlt.Add(animeAPI.Title.English);
-            if (!string.IsNullOrWhiteSpace(animeAPI.Title.UserPreferred) && animeAPI.Title.UserPreferred != animeAPI.Title.Romaji) titulosAlt.Add(animeAPI.Title.UserPreferred);
-            if (animeAPI.Synonyms != null) titulosAlt.AddRange(System.Linq.Enumerable.Where(animeAPI.Synonyms, s => !string.IsNullOrWhiteSpace(s)));
-
-            var nuevoAnimeLocal = new AnimeItem
-            {
-                AniListId = animeAPI.Id,
-                Titulo = animeAPI.Title.Romaji,
-                NombresAlternativos = string.Join(" | ", System.Linq.Enumerable.Distinct(titulosAlt)),
-                UrlPortada = animeAPI.CoverImage?.ExtraLarge ?? animeAPI.CoverImage?.Large ?? "",
-                RutaCarpeta = nuevaRutaCarpeta,
-                Estado = animeAPI.Status ?? "UNKNOWN",
-                TotalEpisodios = episodiosEmitidos,
-                Generos = animeAPI.Genres != null ? string.Join(", ", animeAPI.Genres) : "",
-                Sinopsis = animeAPI.Description ?? ""
-            };
-
-            await _databaseService.GuardarAnimeAsync(nuevoAnimeLocal);
-
-            // Notificamos a la Galeria que se añadió un anime
-            WeakReferenceMessenger.Default.Send(new AnimeAñadidoMensaje(nuevoAnimeLocal));
-
             IsDialogOpen = false;
             await Task.Delay(250); // Permitir que la animación de cierre termine antes de limpiar
             TextoBusqueda = string.Empty;
             ResultadosBusqueda.Clear();
-            
-            await MostrarDialogoLocalAsync("Anime Añadido", $"Carpeta creada automáticamente en:\n{nuevaRutaCarpeta}", false, "FolderPlusOutline", "#4CAF50");
+
+            await MostrarDialogoLocalAsync("Anime Añadido", $"Carpeta creada automáticamente en:\n{nuevoAnime.RutaCarpeta}", false, "FolderPlusOutline", "#4CAF50");
         }
         catch (Exception ex)
         {

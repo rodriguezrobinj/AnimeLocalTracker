@@ -31,6 +31,33 @@ public class DatabaseServiceUpsertTests : IDisposable
     }
 
     [Fact]
+    public async Task CrearBackupRotativo_DeberiaCrearCopiaYRotar()
+    {
+        // Arrange
+        var backupDir = Path.Combine(Path.GetTempPath(), $"AnimeTracker_Backup_{Guid.NewGuid():N}");
+        try
+        {
+            await _sut.InicializarBaseDatosAsync();
+            await _sut.GuardarAnimeAsync(new AnimeItem { AniListId = 1, Titulo = "Test" });
+
+            // Act: dos backups seguidos
+            await _sut.CrearBackupRotativoAsync(maxCopias: 3, backupDir);
+            await _sut.CrearBackupRotativoAsync(maxCopias: 3, backupDir);
+
+            // Assert: la copia más reciente existe y la rotación empujó la primera
+            var copia1 = Path.Combine(backupDir, "biblioteca.backup.1.db");
+            var copia2 = Path.Combine(backupDir, "biblioteca.backup.2.db");
+            File.Exists(copia1).Should().BeTrue("el backup más reciente debe existir");
+            File.Exists(copia2).Should().BeTrue("el backup anterior debe rotar a .2");
+            new FileInfo(copia1).Length.Should().BeGreaterThan(0);
+        }
+        finally
+        {
+            try { if (Directory.Exists(backupDir)) Directory.Delete(backupDir, recursive: true); } catch { }
+        }
+    }
+
+    [Fact]
     public async Task BulkUpsert_ConExistentes_DeberiaActualizarSinDuplicar()
     {
         // Arrange: 10 registros iniciales

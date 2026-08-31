@@ -9,7 +9,8 @@
 param(
     [ValidateSet("Debug", "Release")]
     [string]$Configuration = "Debug",
-    [switch]$RunTests
+    [switch]$RunTests,
+    [switch]$Coverage
 )
 
 $ErrorActionPreference = "Stop"
@@ -92,7 +93,12 @@ if ($RunTests) {
     Write-Host "== Tests ==" -ForegroundColor Yellow
     # --no-build: reutiliza los binarios de la pasada 2. Evita que VSTest recompile
     # el proyecto principal (WPF) con un graph distinto → BG1002/CS2001 intermitente.
-    & dotnet test "$root\AnimeLocalTracker.Tests" -c $Configuration --no-build --nologo -v q -nodeReuse:false
+    $testArgs = @("test", "$root\AnimeLocalTracker.Tests", "-c", $Configuration, "--no-build", "--nologo", "-v", "q", "-nodeReuse:false")
+    if ($Coverage) {
+        Write-Host "[tests] Recolectando cobertura de código (coverlet)..." -ForegroundColor Cyan
+        $testArgs += @("--collect:XPlat Code Coverage", "--logger:trx;LogFileName=tests.trx")
+    }
+    & dotnet @testArgs
     if ($LASTEXITCODE -ne 0) {
         Write-Host "[tests] ERROR: algunos tests fallaron." -ForegroundColor Red
         exit 1

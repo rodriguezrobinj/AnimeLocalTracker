@@ -20,6 +20,7 @@ public class AgregarAnimeViewModelTests : IDisposable
     private readonly Mock<IDatabaseService> _dbMock = new();
     private readonly Mock<ISettingsService> _settingsMock = new();
     private readonly Mock<IDialogService> _dialogMock = new();
+    private readonly AnimeLibraryService _libraryService;
     private readonly string _tempFolder;
 
     public AgregarAnimeViewModelTests()
@@ -40,6 +41,8 @@ public class AgregarAnimeViewModelTests : IDisposable
                     Episodes = 28
                 }
             });
+
+        _libraryService = new AnimeLibraryService(_dbMock.Object, _settingsMock.Object);
     }
 
     public void Dispose()
@@ -59,7 +62,7 @@ public class AgregarAnimeViewModelTests : IDisposable
         return new AgregarAnimeViewModel(
             _trackingMock.Object,
             _dbMock.Object,
-            _settingsMock.Object,
+            _libraryService,
             _dialogMock.Object);
     }
 

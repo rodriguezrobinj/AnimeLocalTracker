@@ -793,40 +793,38 @@ public partial class GaleriaViewModel : ObservableObject,
         EstaActualizando = true;
         ProgresoTotal = listaAnimes.Count;
         ProgresoActual = 0;
+        TextoProgreso = "Consultando AniList...";
 
+        // RND-02: una consulta loteada (50 animes por request) reemplaza las ~300
+        // llamadas seriales (anime + seguimiento por separado) con Task.Delay(250).
+        var token = EstaConectado ? _authService.ObtenerTokenGuardado() : null;
+        var datosLote = await _animeTrackingService.ObtenerAnimesPorIdsLoteAsync(
+            listaAnimes.Select(a => a.AniListId), token);
+
+        int procesados = 0;
         foreach (var anime in listaAnimes)
         {
-            ProgresoActual++;
-            TextoProgreso = $"Sincronizando: {anime.Titulo} ({ProgresoActual}/{ProgresoTotal})";
+            procesados++;
+            ProgresoActual = procesados;
+            TextoProgreso = $"Sincronizando: {anime.Titulo} ({procesados}/{ProgresoTotal})";
 
-            var datosFrescos = await _animeTrackingService.ObtenerAnimePorIdAsync(anime.AniListId);
-            if (datosFrescos != null)
+            if (!datosLote.TryGetValue(anime.AniListId, out var datosFrescos)) continue;
+
+            int episodiosEmitidos = datosFrescos.NextAiringEpisode != null
+                ? datosFrescos.NextAiringEpisode.Episode - 1
+                : (datosFrescos.Episodes ?? 0);
+
+            anime.TotalEpisodios = episodiosEmitidos;
+            anime.Estado = datosFrescos.Status ?? "UNKNOWN";
+
+            // El estado personal del usuario viene embebido en la misma consulta loteada
+            // (mediaListEntry del usuario autenticado): sin llamadas extra por anime.
+            if (token != null && datosFrescos.MediaListEntry != null && !string.IsNullOrEmpty(datosFrescos.MediaListEntry.Status))
             {
-                int episodiosEmitidos = datosFrescos.NextAiringEpisode != null 
-                    ? datosFrescos.NextAiringEpisode.Episode - 1 
-                    : (datosFrescos.Episodes ?? 0);
-                
-                anime.TotalEpisodios = episodiosEmitidos;
-                anime.Estado = datosFrescos.Status ?? "UNKNOWN";
-                
-                // Si está conectado, sincronizamos también el estado personal del usuario
-                if (EstaConectado)
-                {
-                    var token = _authService.ObtenerTokenGuardado();
-                    if (!string.IsNullOrEmpty(token))
-                    {
-                        var seguimiento = await _animeTrackingService.ObtenerSeguimientoUsuarioAsync(anime.AniListId, token);
-                        if (seguimiento != null && !string.IsNullOrEmpty(seguimiento.Status))
-                        {
-                            anime.EstadoUsuario = seguimiento.Status;
-                        }
-                    }
-                }
-                
-                await _databaseService.ActualizarAnimeAsync(anime);
+                anime.EstadoUsuario = datosFrescos.MediaListEntry.Status;
             }
-            
-            await Task.Delay(250); 
+
+            await _databaseService.ActualizarAnimeAsync(anime);
         }
         
         TextoProgreso = "¡Actualización completada con éxito!";

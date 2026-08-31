@@ -65,6 +65,55 @@ public class DatabaseService : IDatabaseService
         }
     }
 
+    /// <summary>
+    /// Copia de seguridad rotativa de la base de datos (historial de visionado, favoritos,
+    /// sincronización). Se ejecuta al arrancar: hace checkpoint del WAL para que la copia
+    /// sea consistente y conserva las últimas <paramref name="maxCopias"/> copias en
+    /// %LocalAppData%\AnimeLocalTrackerData\Backups (inmunes a la desinstalación).
+    /// </summary>
+    public async Task CrearBackupRotativoAsync(int maxCopias = 5, string? backupDir = null)
+    {
+        try
+        {
+            if (_conexion == null) return;
+
+            string dbPath = _conexion.DatabasePath;
+            var info = new FileInfo(dbPath);
+            if (!info.Exists || info.Length == 0) return;
+
+            // Checkpoint del WAL: sin esto la copia podría perder las escrituras recientes
+            try
+            {
+                await _conexion.ExecuteAsync("PRAGMA wal_checkpoint(TRUNCATE);");
+            }
+            catch { }
+
+            backupDir ??= Path.Combine(AppDataPaths.DataRoot, "Backups");
+            Directory.CreateDirectory(backupDir);
+
+            // Rotación: 4→5, 3→4, …, 1→2 (la copia más reciente queda en .backup.1.db)
+            for (int i = maxCopias - 1; i >= 1; i--)
+            {
+                string viejo = Path.Combine(backupDir, $"biblioteca.backup.{i}.db");
+                string nuevo = Path.Combine(backupDir, $"biblioteca.backup.{i + 1}.db");
+                if (File.Exists(viejo))
+                {
+                    if (File.Exists(nuevo)) File.Delete(nuevo);
+                    File.Move(viejo, nuevo);
+                }
+            }
+
+            string destino = Path.Combine(backupDir, "biblioteca.backup.1.db");
+            File.Copy(dbPath, destino, overwrite: true);
+
+            AppLogger.Info("DatabaseService", $"Backup de la biblioteca creado: {destino}");
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn("DatabaseService", $"No se pudo crear el backup de la biblioteca: {ex.Message}");
+        }
+    }
+
     public async Task GuardarAnimeAsync(AnimeItem anime)
     {
         // InsertOrReplace actualiza el registro si el AniListId ya existe, o lo inserta si es nuevo
