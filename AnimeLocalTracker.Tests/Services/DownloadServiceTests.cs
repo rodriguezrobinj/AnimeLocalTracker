@@ -1,10 +1,12 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using AnimeLocalTracker.Messages;
 using AnimeLocalTracker.Services;
+using AnimeLocalTracker.Services.Python;
 using CommunityToolkit.Mvvm.Messaging;
 using FluentAssertions;
 using Moq;
@@ -37,6 +39,63 @@ public class DownloadServiceTests
             _httpClientFactoryMock.Object,
             sourceResolver: _sourceResolverMock.Object,
             settingsService: _settingsServiceMock.Object);
+    }
+
+    [Fact]
+    public async Task DownloadVideoAsync_ConManifiestoHls_DeberiaDescargarConElDaemon()
+    {
+        // Arrange: URL m3u8 â†’ se enruta al daemon (download-stream), nunca al HttpClient
+        var bridgeMock = new Mock<IPythonBridgeService>();
+        var tempDest = Path.Combine(Path.GetTempPath(), $"hls_{Guid.NewGuid():N}.mkv");
+        var archivoDaemon = tempDest + ".mp4"; // yt-dlp aÃ±ade la extensiÃ³n real al outtmpl
+        await File.WriteAllTextAsync(archivoDaemon, "contenido-segmentado");
+        bridgeMock.Setup(b => b.ExecuteCommandOneShotAsync<object, DownloadService.DownloadStreamResult>(
+                "download-stream", It.IsAny<object>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new DownloadService.DownloadStreamResult { Success = true, RutaArchivo = archivoDaemon });
+
+        var sut = new DownloadService(
+            _httpClientFactoryMock.Object,
+            sourceResolver: _sourceResolverMock.Object,
+            settingsService: _settingsServiceMock.Object,
+            pythonBridge: bridgeMock.Object);
+        try
+        {
+            // Act
+            await sut.DownloadVideoAsync("https://cdn.example.com/master.m3u8", tempDest);
+
+            // Assert: el archivo del daemon se normalizÃ³ al destino esperado
+            File.Exists(tempDest).Should().BeTrue("el archivo descargado debe quedar en el destino");
+            File.Exists(archivoDaemon).Should().BeFalse("la ruta con extensiÃ³n del daemon se mueve al destino");
+            bridgeMock.Verify(b => b.ExecuteCommandOneShotAsync<object, DownloadService.DownloadStreamResult>(
+                "download-stream", It.IsAny<object>(), It.IsAny<CancellationToken>()), Times.Once);
+        }
+        finally
+        {
+            try { if (File.Exists(tempDest)) File.Delete(tempDest); } catch { }
+            try { if (File.Exists(archivoDaemon)) File.Delete(archivoDaemon); } catch { }
+        }
+    }
+
+    [Fact]
+    public async Task DownloadVideoAsync_ConManifiestoHlsYDaemonFallido_DeberiaLanzarConElError()
+    {
+        // Arrange: el daemon devuelve error (p. ej. el proveedor HLS cayÃ³)
+        var bridgeMock = new Mock<IPythonBridgeService>();
+        bridgeMock.Setup(b => b.ExecuteCommandOneShotAsync<object, DownloadService.DownloadStreamResult>(
+                "download-stream", It.IsAny<object>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new DownloadService.DownloadStreamResult { Success = false, Error = "timeout de red" });
+
+        var sut = new DownloadService(
+            _httpClientFactoryMock.Object,
+            sourceResolver: _sourceResolverMock.Object,
+            settingsService: _settingsServiceMock.Object,
+            pythonBridge: bridgeMock.Object);
+
+        // Act & Assert
+        var destino = Path.Combine(Path.GetTempPath(), $"hls_fail_{Guid.NewGuid():N}.mkv");
+        var act = async () => await sut.DownloadVideoAsync("https://cdn.example.com/master.m3u8", destino);
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*timeout de red*", "el error del daemon debe propagarse al usuario");
     }
 
     [Fact]
@@ -105,10 +164,10 @@ public class DownloadServiceTests
         // Esperar a que se alcancen 2 concurrentes
         await EsperarHastaAsync(() => activeCounter >= 2);
 
-        // Assert: solo 2 activas en el pico mientras el límite es 2
+        // Assert: solo 2 activas en el pico mientras el lÃ­mite es 2
         maxConcurrent.Should().BeLessThanOrEqualTo(2);
 
-        // Liberar la primera descarga: otra debería ocupar su slot
+        // Liberar la primera descarga: otra deberÃ­a ocupar su slot
         puertas[0].TrySetResult(true);
         await Task.Delay(300);
 
@@ -148,15 +207,15 @@ public class DownloadServiceTests
             tareas.Add(_sut.IniciarDescargaEpisodioAsync(200 + i, $"Anime {i}", System.IO.Path.Combine(System.IO.Path.GetTempPath(), "AltTest2"), i));
         }
 
-        // Esperar a que la primera descarga esté resolviendo (slot 1 ocupado)
+        // Esperar a que la primera descarga estÃ© resolviendo (slot 1 ocupado)
         await EsperarHastaAsync(() => resolucionesIniciadas >= 1);
         await Task.Delay(200);
 
-        // Act: subir el límite a 3 → las 2 pendientes deben arrancar
+        // Act: subir el lÃ­mite a 3 â†’ las 2 pendientes deben arrancar
         _sut.ActualizarLimiteDescargas(3);
         await EsperarHastaAsync(() => resolucionesIniciadas >= 3, timeoutMs: 5000);
 
-        // Assert: las 3 descargas han alcanzado la fase de resolución (todas con slot)
+        // Assert: las 3 descargas han alcanzado la fase de resoluciÃ³n (todas con slot)
         resolucionesIniciadas.Should().Be(3);
 
         foreach (var p in puertas) p.TrySetResult(true);
@@ -186,7 +245,7 @@ public class DownloadServiceTests
         {
             await Task.Delay(50);
         }
-        condition().Should().BeTrue($"Condición no alcanzada tras {timeoutMs} ms");
+        condition().Should().BeTrue($"CondiciÃ³n no alcanzada tras {timeoutMs} ms");
     }
 
     private static void InterlockedExchangeMax(ref int target, int value)

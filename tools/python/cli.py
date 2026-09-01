@@ -43,6 +43,12 @@ def process_command(command: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         headers = payload.get("headers")
         return StreamExtractor.extract_stream_info(url, headers)
 
+    elif command == "download-stream":
+        url = payload.get("url", "")
+        output_path = payload.get("output_path", "")
+        headers = payload.get("headers")
+        return StreamExtractor.download_stream(url, output_path, headers)
+
     elif command == "detect-scenes":
         video_path = payload.get("video_path", "")
         max_sec = int(payload.get("max_seconds", 300))

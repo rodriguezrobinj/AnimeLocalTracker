@@ -9,6 +9,7 @@ using System.Net.Http.Headers;
 using System.Threading;
 using System.Threading.Tasks;
 using AnimeLocalTracker.Messages;
+using AnimeLocalTracker.Services.Python;
 using CommunityToolkit.Mvvm.Messaging;
 using Microsoft.Win32.SafeHandles;
 
@@ -23,6 +24,7 @@ public class DownloadService : IDownloadService
     private readonly HttpClient _httpClient;
     private readonly IDownloadStateStore _stateStore;
     private readonly IVideoSourceResolver _sourceResolver;
+    private readonly IPythonBridgeService? _pythonBridge;
     private readonly ConcurrentDictionary<string, DownloadState> _activeDownloads = new();
 
     // Gestor de slots de concurrencia (redimensionable en caliente según DescargasSimultaneas)
@@ -53,11 +55,13 @@ public class DownloadService : IDownloadService
         IHttpClientFactory httpClientFactory,
         IDownloadStateStore? stateStore = null,
         IVideoSourceResolver? sourceResolver = null,
-        ISettingsService? settingsService = null)
+        ISettingsService? settingsService = null,
+        IPythonBridgeService? pythonBridge = null)
     {
         _httpClient = httpClientFactory.CreateClient("Downloader");
         _stateStore = stateStore ?? new DownloadStateStore();
         _sourceResolver = sourceResolver ?? new AnimeAv1VideoSourceResolver(_httpClient);
+        _pythonBridge = pythonBridge;
 
         if (settingsService != null)
         {
@@ -400,6 +404,45 @@ public class DownloadService : IDownloadService
         return await _sourceResolver.GetVideoUrlAsync(pageUrl, cancellationToken);
     }
 
+    /// <summary>
+    /// Descarga un stream HLS/DASH con yt-dlp en el daemon (bloqueante, sin progreso
+    /// incremental en esta fase). yt-dlp puede añadir la extensión real al outtmpl:
+    /// se normaliza al destino esperado.
+    /// </summary>
+    private async Task DescargarManifiestoConDaemonAsync(string videoUrl, string destinationPath, CancellationToken cancellationToken)
+    {
+        var resultado = await _pythonBridge!.ExecuteCommandOneShotAsync<object, DownloadStreamResult>(
+            "download-stream",
+            new { url = videoUrl, output_path = destinationPath },
+            cancellationToken);
+
+        if (resultado == null || !resultado.Success)
+        {
+            throw new InvalidOperationException($"No se pudo descargar el stream (HLS): {resultado?.Error ?? "respuesta vacía del daemon"}");
+        }
+
+        // yt-dlp escribe en outtmpl + extensión real → mover al destino esperado
+        if (!string.IsNullOrEmpty(resultado.RutaArchivo) &&
+            !resultado.RutaArchivo.Equals(destinationPath, StringComparison.OrdinalIgnoreCase) &&
+            File.Exists(resultado.RutaArchivo))
+        {
+            if (File.Exists(destinationPath)) File.Delete(destinationPath);
+            File.Move(resultado.RutaArchivo, destinationPath);
+        }
+        else if (!File.Exists(destinationPath))
+        {
+            throw new InvalidOperationException("El daemon no generó el archivo esperado.");
+        }
+    }
+
+    /// <summary>DTO de la respuesta del daemon para download-stream. Público para testeo.</summary>
+    public class DownloadStreamResult
+    {
+        public bool Success { get; set; }
+        public string? RutaArchivo { get; set; }
+        public string? Error { get; set; }
+    }
+
     public async Task DownloadVideoAsync(string videoUrl, string destinationPath, IProgress<double>? progress = null, CancellationToken cancellationToken = default)
     {
         // Hardening INT-01 (defensa en profundidad): el punto de descarga solo acepta
@@ -408,6 +451,14 @@ public class DownloadService : IDownloadService
         {
             AppLogger.Warn("DownloadService", "URL de video rechazada: no es https o contiene credenciales embebidas.");
             throw new InvalidOperationException("La URL del video no es segura (solo se admiten enlaces https).");
+        }
+
+        // Fase 2: los manifiestos HLS/DASH no son archivos directos — se descargan
+        // con yt-dlp en el daemon (segmentos, encriptación y merge los maneja yt-dlp)
+        if (_pythonBridge != null && Core.UrlSeguridad.EsUrlManifiestoStreaming(videoUrl))
+        {
+            await DescargarManifiestoConDaemonAsync(videoUrl, destinationPath, cancellationToken);
+            return;
         }
 
         var dir = Path.GetDirectoryName(destinationPath);

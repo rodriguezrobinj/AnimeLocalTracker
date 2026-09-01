@@ -61,6 +61,24 @@ namespace AnimeLocalTracker.Services.Python
             if (viaDaemon != null) return viaDaemon;
 
             // 2. Fallback: spawn de proceso one-shot (como antes)
+            return await EjecutarOneShotAsync<TRequest, TResponse>(command, payload, ct);
+        }
+
+        /// <summary>
+        /// Ejecuta un comando en un proceso one-shot dedicado, SIN pasar por el daemon
+        /// persistente (que procesa comandos en serie y se bloquearía con uno largo).
+        /// Si se cancela, el proceso se mata con todo su árbol (yt-dlp/ffmpeg no
+        /// mueren con el Dispose del objeto Process). Para comandos largos como
+        /// download-stream (HLS).
+        /// </summary>
+        public async Task<TResponse?> ExecuteCommandOneShotAsync<TRequest, TResponse>(string command, TRequest payload, CancellationToken ct = default)
+        {
+            return await EjecutarOneShotAsync<TRequest, TResponse>(command, payload, ct);
+        }
+
+        private async Task<TResponse?> EjecutarOneShotAsync<TRequest, TResponse>(string command, TRequest payload, CancellationToken ct)
+        {
+            Process? proceso = null;
             try
             {
                 var psi = new ProcessStartInfo
@@ -88,20 +106,20 @@ namespace AnimeLocalTracker.Services.Python
                     psi.Arguments = $"\"{_cachedScriptPath}\" --command \"{command}\"";
                 }
 
-                using var process = new Process { StartInfo = psi };
-                process.Start();
+                proceso = new Process { StartInfo = psi };
+                proceso.Start();
 
                 // Enviar payload JSON por stdin
                 string jsonInput = JsonSerializer.Serialize(payload, JsonOptions);
-                await process.StandardInput.WriteLineAsync(jsonInput);
-                await process.StandardInput.FlushAsync(ct);
-                process.StandardInput.Close();
+                await proceso.StandardInput.WriteLineAsync(jsonInput);
+                await proceso.StandardInput.FlushAsync(ct);
+                proceso.StandardInput.Close();
 
                 // Leer respuesta JSON por stdout
-                string output = await process.StandardOutput.ReadToEndAsync(ct);
-                string error = await process.StandardError.ReadToEndAsync(ct);
+                string output = await proceso.StandardOutput.ReadToEndAsync(ct);
+                string error = await proceso.StandardError.ReadToEndAsync(ct);
 
-                await process.WaitForExitAsync(ct);
+                await proceso.WaitForExitAsync(ct);
 
                 if (!string.IsNullOrWhiteSpace(error))
                 {
@@ -120,10 +138,22 @@ namespace AnimeLocalTracker.Services.Python
                 }
                 return res;
             }
+            catch (OperationCanceledException)
+            {
+                // SEC-16/DATA-01: cancelación → matar el árbol completo; el proceso
+                // Python (yt-dlp/ffmpeg) no muere con el Dispose del objeto Process
+                // y quedaría huérfano descargando/escribiendo en disco.
+                try { proceso?.Kill(entireProcessTree: true); } catch { }
+                throw;
+            }
             catch (Exception ex)
             {
                 AppLogger.Error("PythonBridge", $"Error ejecutando comando Python '{command}': {ex.Message}", ex);
                 return default;
+            }
+            finally
+            {
+                proceso?.Dispose();
             }
         }
 

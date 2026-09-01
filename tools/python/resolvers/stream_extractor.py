@@ -1,5 +1,6 @@
 from typing import Dict, Any, List, Optional
 from urllib.parse import urlparse
+import os
 import yt_dlp
 
 class StreamExtractor:
@@ -104,3 +105,56 @@ class StreamExtractor:
                 "success": False,
                 "error": str(ex)
             }
+
+    @staticmethod
+    def download_stream(url: str, output_path: str, custom_headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+        """
+        Descarga un stream (HLS/DASH segmentado o archivo directo) con yt-dlp a un
+        archivo local. Bloqueante. Hardening INT-01: URL validada (solo http/https)
+        y ruta de salida absoluta (nunca rutas relativas/relativas al cwd).
+        """
+        if not StreamExtractor._is_safe_http_url(url):
+            return {"success": False, "error": "URL no permitida (solo http/https)."}
+        if not os.path.isabs(output_path):
+            return {"success": False, "error": "ruta de salida no permitida (debe ser absoluta)."}
+
+        try:
+            out_dir = os.path.dirname(output_path)
+            if out_dir:
+                os.makedirs(out_dir, exist_ok=True)
+        except Exception as ex:
+            return {"success": False, "error": f"no se pudo crear el directorio de salida: {ex}"}
+
+        ydl_opts: Dict[str, Any] = {
+            'quiet': True,
+            'no_warnings': True,
+            # Hardening: nunca expandir playlists y acotar red/archivo
+            'noplaylist': True,
+            'playlist_items': '1',
+            'socket_timeout': 20,
+            'format': 'best',
+            'outtmpl': output_path,
+            'retries': 3,
+            'fragment_retries': 3,
+            'concurrent_fragment_downloads': 4,
+            'max_filesize': 50 * 1024 * 1024 * 1024,  # 50 GB tope por episodio
+        }
+
+        if custom_headers:
+            ydl_opts['http_headers'] = custom_headers
+
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=True)
+                if not info:
+                    return {"success": False, "error": "No se pudo descargar el stream."}
+
+                # yt-dlp añade la extensión real al outtmpl cuando no la tiene
+                final = ydl.prepare_filename(info)
+                if os.path.isfile(final):
+                    return {"success": True, "file": final, "title": info.get("title", "")}
+                if os.path.isfile(output_path):
+                    return {"success": True, "file": output_path, "title": info.get("title", "")}
+                return {"success": False, "error": "No se encontró el archivo descargado."}
+        except Exception as ex:
+            return {"success": False, "error": str(ex)}

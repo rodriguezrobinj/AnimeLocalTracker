@@ -109,9 +109,10 @@ public class PythonVideoSourceResolverTests
     }
 
     [Fact]
-    public async Task BuscarUrlEpisodioAsync_ManifiestoHlsDeYtDlp_DeberiaOmitirseEnEstaFase()
+    public async Task BuscarUrlEpisodioAsync_ManifiestoHlsDeYtDlp_DeberiaDevolverloParaElDaemon()
     {
-        // Arrange: yt-dlp devuelve un manifiesto m3u8 (HLS segmentado) → se omite
+        // Arrange: yt-dlp devuelve un manifiesto m3u8 → se entrega al descargador
+        // segmentado del daemon (fase 2), no se descarta
         var (resolver, bridge) = Crear(req =>
         {
             if (req.RequestUri!.Host.Contains("animeav1.com")) return Ok(FixturePaginaEpisodio);
@@ -125,8 +126,8 @@ public class PythonVideoSourceResolverTests
         // Act
         var url = await resolver.BuscarUrlEpisodioAsync(Titulos, 9);
 
-        // Assert: sin URL descargable en esta fase (el descargador no maneja segmentos)
-        url.Should().BeNull();
+        // Assert: el manifiesto se devuelve (DownloadService lo enruta al daemon)
+        url.Should().Be("https://cdn.example.com/master.m3u8");
     }
 
     [Fact]

@@ -55,12 +55,12 @@ namespace AnimeLocalTracker.Services.Python
 
                     if (result != null && result.Success && Core.UrlSeguridad.EsUrlDescargaHttpSegura(result.DirectUrl))
                     {
-                        // Los manifiestos HLS/DASH se omiten en esta fase (el descargador
-                        // solo maneja archivos directos; la descarga segmentada es fase 2)
+                        // Los manifiestos HLS/DASH se descargan con el daemon
+                        // (fase 2: download-stream con yt-dlp segmentado)
                         if (Core.UrlSeguridad.EsUrlManifiestoStreaming(result.DirectUrl))
                         {
-                            AppLogger.Debug("PythonVideoResolver", $"Servidor '{embed.Server}' devolvió manifiesto HLS/DASH; se omite en esta fase.");
-                            continue;
+                            AppLogger.Info("PythonVideoResolver", $"Episodio resuelto como HLS/DASH ({embed.Server}); se descargará con el daemon.");
+                            return result.DirectUrl;
                         }
 
                         AppLogger.Info("PythonVideoResolver", $"Episodio resuelto con yt-dlp ({embed.Server}): {SanitizarUrlParaLog(result.DirectUrl)}");
