@@ -288,6 +288,46 @@ public class ProveedorVideoAnimeAv1Tests
     }
 
     [Fact]
+    public void GenerarTerminosBusqueda_ConSubtitulo_DeberiaIncluirElSubtituloComoTermino()
+    {
+        // Act: el título de AniList no dice "Película 14"; el subtítulo tras ':' es
+        // lo que el catálogo del sitio matchea con "Dragon Ball Z Película 14: Battle of Gods"
+        var terminos = AnimeAv1VideoSourceResolver.GenerarTerminosBusqueda("Dragon Ball Z: Battle of Gods");
+
+        // Assert: el subtítulo y la cola se generan como términos de búsqueda
+        terminos.Should().Contain("Battle of Gods");
+        terminos.Should().Contain("Dragon Ball Z");
+    }
+
+    [Fact]
+    public async Task BuscarUrlEpisodioAsync_Pelicula_DeberiaBuscarPorElSubtituloYResolver()
+    {
+        // Arrange: el catálogo solo encuentra la película cuando se busca "Battle of
+        // Gods" (el término "Dragon Ball Z" pagina y la deja fuera)
+        var busquedas = new List<string>();
+        var (proveedor, bridge) = Crear(req =>
+        {
+            var u = req.RequestUri!.AbsoluteUri;
+            if (req.RequestUri.Host.Contains("mp4upload.com")) return Ok(FixturePlayerMp4Upload);
+            if (u.Contains("/catalogo"))
+            {
+                busquedas.Add(u);
+                return Ok(FixtureCatalogo);
+            }
+            if (u.Contains("/media/dragon-ball-z-movie-14-kami-to-kami/14")) return Ok(FixturePeliculaEpisodio14);
+            if (u.Contains("/media/dragon-ball-z-movie-14-kami-to-kami")) return Ok(FixturePeliculaMedia);
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        }, malIdResolver: (_, _) => Task.FromResult<int?>(14837));
+
+        // Act
+        var url = await proveedor.BuscarUrlEpisodioAsync(TitulosPelicula, 1, aniListId: 1328);
+
+        // Assert: en alguna búsqueda se usó el subtítulo (lo distintivo) y se resolvió
+        busquedas.Should().Contain(b => Uri.UnescapeDataString(b).Contains("Battle of Gods"));
+        url.Should().Be("https://cdn.mp4upload.com/r0xdfbvme2yy/720p/video.mp4");
+    }
+
+    [Fact]
     public void OrdenarEmbedsPorPreferencia_DeberiaPonerMp4UploadPrimeroYOmitirMega()
     {
         // Arrange: lista en el orden del sitio (HLS, UPNShare, Voe, Byse, Mega, MP4Upload)

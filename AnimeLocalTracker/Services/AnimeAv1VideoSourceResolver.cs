@@ -536,7 +536,8 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
         return list;
     }
 
-    private static List<string> GenerarTerminosBusqueda(string titulo)
+    /// <summary>Términos de búsqueda para el catálogo (público para testeo).</summary>
+    public static List<string> GenerarTerminosBusqueda(string titulo)
     {
         var terminos = new List<string>();
         if (string.IsNullOrWhiteSpace(titulo)) return terminos;
@@ -544,7 +545,9 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
         // 1. Título completo limpio
         terminos.Add(titulo.Trim());
 
-        // 2. Parte antes de dos puntos / subtítulo
+        // 2. Parte antes de dos puntos / subtítulo + EL SUBTÍTULO TRAS ':' — a menudo
+        //    lo más distintivo ("Battle of Gods" frente a cientos de "Dragon Ball Z"
+        //    que el catálogo pagina y deja fuera la película buscada)
         var partes = titulo.Split([':', '-', '–', '~', '('], StringSplitOptions.RemoveEmptyEntries);
         if (partes.Length > 1)
         {
@@ -553,19 +556,35 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
             {
                 terminos.Add(mainPart);
             }
+
+            string subPart = partes[1].Trim();
+            if (!string.IsNullOrWhiteSpace(subPart) && !terminos.Contains(subPart, StringComparer.OrdinalIgnoreCase))
+            {
+                terminos.Add(subPart);
+            }
         }
 
-        // 3. Primeras 2 o 3 palabras significativas
         var palabras = titulo.Split([' '], StringSplitOptions.RemoveEmptyEntries)
                              .Where(p => p.Length > 2)
-                             .Take(3)
                              .ToList();
+
+        // 3. Primeras 2-3 palabras significativas
         if (palabras.Count > 0)
         {
-            string shortTerm = string.Join(" ", palabras);
+            string shortTerm = string.Join(" ", palabras.Take(3));
             if (!terminos.Contains(shortTerm, StringComparer.OrdinalIgnoreCase))
             {
                 terminos.Add(shortTerm);
+            }
+        }
+
+        // 4. Últimas 2-3 palabras significativas (cola del título — colas distintivas)
+        if (palabras.Count >= 3)
+        {
+            string tailTerm = string.Join(" ", palabras.TakeLast(3));
+            if (!terminos.Contains(tailTerm, StringComparer.OrdinalIgnoreCase))
+            {
+                terminos.Add(tailTerm);
             }
         }
 
