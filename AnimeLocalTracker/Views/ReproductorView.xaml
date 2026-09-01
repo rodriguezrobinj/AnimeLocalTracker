@@ -421,14 +421,14 @@
                             <Button Grid.Column="6" Command="{Binding Rewind10Command}" 
                                     ToolTip="Retroceder 10s (←)"
                                     Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,5,0">
-                                <materialDesign:PackIcon Kind="Rewind10" Width="26" Height="26" />
+                                <materialDesign:PackIcon Kind="Rewind" Width="26" Height="26" />
                             </Button>
 
                             <!-- Adelantar 10s -->
                             <Button Grid.Column="7" Command="{Binding Forward10Command}" 
                                     ToolTip="Adelantar 10s (→)"
                                     Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,10,0">
-                                <materialDesign:PackIcon Kind="FastForward10" Width="26" Height="26" />
+                                <materialDesign:PackIcon Kind="FastForward" Width="26" Height="26" />
                             </Button>
 
                             <!-- Subtítulos (Menú Manual) -->
