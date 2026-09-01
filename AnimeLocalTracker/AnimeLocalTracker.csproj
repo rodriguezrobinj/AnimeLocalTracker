@@ -28,7 +28,7 @@
       <PackageReference Include="Flyleaf.FFmpeg" Version="9.0.0" />
       <PackageReference Include="FlyleafLib" Version="3.11.3" />
       <PackageReference Include="FlyleafLib.Controls.WPF" Version="1.7.3" />
-      <PackageReference Include="MaterialDesignThemes" Version="5.3.3-ci1443" />
+      <PackageReference Include="MaterialDesignThemes" Version="5.3.3-ci1462" />
       <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
       <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.1" />
       <PackageReference Include="Microsoft.Extensions.Http.Polly" Version="8.0.1" />
