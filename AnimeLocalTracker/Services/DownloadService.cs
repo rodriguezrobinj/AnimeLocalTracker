@@ -632,7 +632,7 @@ public class DownloadService : IDownloadService
 
         do
         {
-            var read = await contentStream.ReadAsync(buffer, 0, buffer.Length, cancellationToken);
+            var read = await contentStream.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken);
             if (read == 0)
             {
                 isMoreToRead = false;

@@ -1,10 +1,28 @@
 param(
     [Parameter(Mandatory=$false)]
-    [string]$Version = "1.0.0",
+    [string]$Version = "",
 
     [Parameter(Mandatory=$false)]
-    [string]$Channel = "win"
+    [string]$Channel = "win",
+
+    [Parameter(Mandatory=$false)]
+    [string]$SignTemplate = ""
 )
+
+# DEV-09: sin -Version ya no existe un default silencioso ("1.0.0") que pueda pisar
+# releases reales. Se lee la versión del csproj; si tampoco está, se aborta.
+if (-not $Version) {
+    $csproj = Get-Content "$PSScriptRoot\AnimeLocalTracker\AnimeLocalTracker.csproj" -Raw
+    $match = [regex]::Match($csproj, '<Version>([^<]+)</Version>')
+    if ($match.Success) {
+        $Version = $match.Groups[1].Value.Trim()
+        Write-Host "Versión leída del csproj: $Version" -ForegroundColor Yellow
+    }
+    else {
+        Write-Error "No se especificó -Version y el csproj no define <Version>. Abortando para no generar un paquete con versión arbitraria."
+        exit 1
+    }
+}
 
 Write-Host "=================================================" -ForegroundColor Cyan
 Write-Host "  AnimeLocalTracker - Generador de Release (Velopack)" -ForegroundColor Cyan
@@ -77,6 +95,17 @@ if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
 
+# SEC-05: firma de código. El CI prepara el certificado en el runner y lo expone como
+# SIGN_CERT_PATH/SIGN_CERT_PASSWORD; si no hay certificado, el paquete sale sin firmar.
+if (-not $SignTemplate -and $env:SIGN_CERT_PATH) {
+    $SignTemplate = "signtool sign /fd SHA256 /f `"$env:SIGN_CERT_PATH`" /p `"$env:SIGN_CERT_PASSWORD`" `$file"
+}
+if ($SignTemplate) {
+    Write-Host "Firma de código ACTIVADA (template con signtool)" -ForegroundColor Green
+} else {
+    Write-Host "Sin certificado: la release se genera SIN firma (SEC-05 pendiente)." -ForegroundColor Yellow
+}
+
 # 3. Empaquetar con Velopack (vpk)
 Write-Host "`n[3/5] Creando instalador y paquetes delta con vpk..." -ForegroundColor Green
 $releasesDir = "$PSScriptRoot\Releases"
@@ -84,15 +113,22 @@ if (-not (Test-Path $releasesDir)) {
     New-Item -ItemType Directory -Path $releasesDir | Out-Null
 }
 
-vpk pack `
-    --packId "AnimeLocalTracker" `
-    --packVersion $Version `
-    --packDir $publishDir `
-    --packAuthors "Robin Rodriguez" `
-    --packTitle "AnimeLocalTracker" `
-    --mainExe "AnimeLocalTracker.exe" `
-    --outputDir $releasesDir `
-    --channel $Channel
+$vpkArgs = @(
+    "pack",
+    "--packId", "AnimeLocalTracker",
+    "--packVersion", $Version,
+    "--packDir", $publishDir,
+    "--packAuthors", "Robin Rodriguez",
+    "--packTitle", "AnimeLocalTracker",
+    "--mainExe", "AnimeLocalTracker.exe",
+    "--outputDir", $releasesDir,
+    "--channel", $Channel
+)
+if ($SignTemplate) {
+    $vpkArgs += @("--signTemplate", $SignTemplate)
+}
+
+vpk @vpkArgs
 
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Fallo al empaquetar con Velopack."

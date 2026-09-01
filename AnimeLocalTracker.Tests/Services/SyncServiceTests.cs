@@ -10,7 +10,7 @@ using Xunit;
 
 namespace AnimeLocalTracker.Tests.Services;
 
-public class SyncServiceTests
+public class SyncServiceTests : IDisposable
 {
     private readonly Mock<IDatabaseService> _dbMock = new();
     private readonly Mock<IAnimeTrackingService> _trackingMock = new();
@@ -20,6 +20,12 @@ public class SyncServiceTests
     public SyncServiceTests()
     {
         _sut = new SyncService(_dbMock.Object, _trackingMock.Object, _authMock.Object);
+    }
+
+    public void Dispose()
+    {
+        GC.SuppressFinalize(this);
+        _sut.Dispose();
     }
 
     [Fact]

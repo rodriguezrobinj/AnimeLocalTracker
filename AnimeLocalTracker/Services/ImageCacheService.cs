@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.IO;
 using System.Net.Http;
 using System.Threading;
@@ -9,12 +8,21 @@ using System.Windows.Media.Imaging;
 
 namespace AnimeLocalTracker.Services;
 
-public class ImageCacheService : IImageCacheService
+public class ImageCacheService : IImageCacheService, IDisposable
 {
     private readonly IHttpClientFactory _httpClientFactory;
-    private readonly ConcurrentDictionary<int, ImageSource> _memoryCache = new();
+    // ARQ-04b: LRU real — el acceso marca recientemente usado y la evicción expulsa
+    // la entrada menos usada (antes: Take(16) aproximado que podía expulsar portadas visibles).
+    private readonly LruCache<int, ImageSource> _memoryCache = new(MaxEntradasEnMemoria);
     private readonly SemaphoreSlim _downloadSemaphore = new(6, 6);
     private readonly string _coversDirectory;
+
+    // CA1001: el semáforo de descargas se libera en el cierre de la app (singleton DI)
+    public void Dispose()
+    {
+        _downloadSemaphore.Dispose();
+        GC.SuppressFinalize(this);
+    }
 
     // ~500 portadas a 220px ≈ 135MB. Al superar el tope se limpia el caché completo:
     // recargar desde disco es barato (sin red) y evita crecimiento sin límite en bibliotecas grandes.
@@ -74,17 +82,9 @@ public class ImageCacheService : IImageCacheService
 
     private void GuardarEnCache(int animeId, ImageSource bitmap)
     {
-        // ARQ-04b: al superar el tope se expulsan solo algunas entradas (no el caché completo),
-        // evitando invalidar toda la galería a la vez (recargar desde disco es barato, pero el
-        // Clear() total provocaba re-decode masivo en el arranque de bibliotecas grandes).
-        if (_memoryCache.Count >= MaxEntradasEnMemoria)
-        {
-            foreach (var kv in _memoryCache.Take(16))
-            {
-                _memoryCache.TryRemove(kv.Key, out _);
-            }
-        }
-        _memoryCache[animeId] = bitmap;
+        // ARQ-04b: el LruCache expulsa la entrada menos usada al superar el tope,
+        // evitando invalidar toda la galería a la vez (recargar desde disco es barato).
+        _memoryCache.Set(animeId, bitmap);
     }
 
     public async Task<ImageSource?> ObtenerPortadaAsync(int animeId, string? urlPortada, int decodeWidth = 220)
@@ -147,7 +147,7 @@ public class ImageCacheService : IImageCacheService
             byte[] buffer = new byte[81920];
             int bytesRead;
             long totalRead = 0;
-            while ((bytesRead = await responseStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+            while ((bytesRead = await responseStream.ReadAsync(buffer.AsMemory(0, buffer.Length))) > 0)
             {
                 totalRead += bytesRead;
                 if (totalRead > maxBytes)
@@ -190,7 +190,7 @@ public class ImageCacheService : IImageCacheService
 
     public void InvalidarCache(int animeId)
     {
-        _memoryCache.TryRemove(animeId, out _);
+        _memoryCache.Remove(animeId);
     }
 
     private static BitmapSource? CargarBitmapDesdeArchivo(string filePath, int decodeWidth)

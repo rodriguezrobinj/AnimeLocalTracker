@@ -71,19 +71,32 @@ if (-not $pasada2) {
 }
 
 # Copiar librerías nativas si existen
+# DEV-10: si la copia del DLL falla (bloqueado, disco lleno...), el build NO debe
+# reportar "OK" en silencio: un exe sin el núcleo Rust rompe parse/hash/miniaturas.
+function Copy-NativeDll {
+    param([string]$Origen, [string]$Destino, [string]$Etiqueta)
+    try {
+        Copy-Item $Origen $Destino -Force
+        Write-Host "[build] DLL nativo copiado -> $Etiqueta" -ForegroundColor Green
+    }
+    catch {
+        Write-Host "[build] AVISO: no se pudo copiar animetracker_core.dll a $Etiqueta ($($_.Exception.Message))" -ForegroundColor Yellow
+    }
+}
+
 if (Test-Path "$root\native\animetracker_core\target\release\animetracker_core.dll") {
     # 1) Raíz del proyecto: la referencia el csproj (copiada a output en builds y publish de Velopack)
-    try { Copy-Item "$root\native\animetracker_core\target\release\animetracker_core.dll" "$root\AnimeLocalTracker\animetracker_core.dll" -Force } catch { }
+    Copy-NativeDll "$root\native\animetracker_core\target\release\animetracker_core.dll" "$root\AnimeLocalTracker\animetracker_core.dll" "raiz del proyecto"
     
     # 2) Binarios de app y tests si los directorios existen
     $appBinDir = "$root\AnimeLocalTracker\bin\$Configuration\net8.0-windows"
     $testsBinDir = "$root\AnimeLocalTracker.Tests\bin\$Configuration\net8.0-windows"
 
     if (Test-Path $appBinDir) {
-        try { Copy-Item "$root\native\animetracker_core\target\release\animetracker_core.dll" (Join-Path $appBinDir "animetracker_core.dll") -Force } catch { }
+        Copy-NativeDll "$root\native\animetracker_core\target\release\animetracker_core.dll" (Join-Path $appBinDir "animetracker_core.dll") "bin de la app"
     }
     if (Test-Path $testsBinDir) {
-        try { Copy-Item "$root\native\animetracker_core\target\release\animetracker_core.dll" (Join-Path $testsBinDir "animetracker_core.dll") -Force } catch { }
+        Copy-NativeDll "$root\native\animetracker_core\target\release\animetracker_core.dll" (Join-Path $testsBinDir "animetracker_core.dll") "bin de tests"
     }
 }
 
@@ -96,7 +109,8 @@ if ($RunTests) {
     $testArgs = @("test", "$root\AnimeLocalTracker.Tests", "-c", $Configuration, "--no-build", "--nologo", "-v", "q", "-nodeReuse:false")
     if ($Coverage) {
         Write-Host "[tests] Recolectando cobertura de código (coverlet)..." -ForegroundColor Cyan
-        $testArgs += @("--collect:XPlat Code Coverage", "--logger:trx;LogFileName=tests.trx")
+        # coverlet.runsettings excluye el ensamblado de tests del cálculo (DEV-06b)
+        $testArgs += @("--collect:XPlat Code Coverage", "--settings", "$root\AnimeLocalTracker.Tests\coverlet.runsettings", "--logger:trx;LogFileName=tests.trx")
     }
     & dotnet @testArgs
     if ($LASTEXITCODE -ne 0) {

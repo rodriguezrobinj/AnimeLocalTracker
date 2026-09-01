@@ -768,7 +768,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         {
             // AniSkip API como fuente primaria; si no hay datos, detección local por escenas (Python/ffmpeg)
             // usando la ruta del video local actual (requiere un archivo en disco).
-            var results = await _skipCoordinator.CargarSkipTimesAsync(animeId, episodio, TotalSeconds, ct, RutaVideo);
+            var results = await _skipCoordinator.CargarSkipTimesAsync(animeId, episodio, TotalSeconds, RutaVideo, ct);
             if (!ct.IsCancellationRequested && results != null && results.Count > 0)
             {
                 Interlocked.Exchange(ref _skipTimes, new List<AniSkipResult>(results));
@@ -970,7 +970,22 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
             using var proceso = System.Diagnostics.Process.Start(psi)!;
             string stderr = await proceso.StandardError.ReadToEndAsync();
-            await proceso.WaitForExitAsync();
+
+            // CAP-01: timeout de 30 s — un ffmpeg colgado (ruta de red, codec raro, AV)
+            // no puede dejar procesos huérfanos acumulándose en segundo plano
+            using var timeoutCts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(30));
+            try
+            {
+                await proceso.WaitForExitAsync(timeoutCts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                try { proceso.Kill(entireProcessTree: true); } catch { }
+                AppLogger.Warn("ReproductorViewModel", "Captura de frame cancelada por timeout (30 s)");
+                _ = WeakReferenceMessenger.Default.Send(new Messages.MostrarDialogoRequestMessage(
+                    "Error", "La captura del frame tardó demasiado (30 s). Inténtalo de nuevo.", false, "AlertCircleOutline", "#EF4444"));
+                return;
+            }
 
             if (proceso.ExitCode == 0 && File.Exists(dialogo.FileName))
             {
@@ -979,9 +994,12 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             }
             else
             {
+                // CAP-02: exponer un extracto del stderr real para que el usuario pueda diagnosticar
+                string detalle = string.IsNullOrWhiteSpace(stderr) ? "" : $"\n\n{stderr.Trim()}";
+                if (detalle.Length > 320) detalle = detalle[..320] + "…";
                 AppLogger.Debug("ReproductorViewModel", $"ffmpeg falló al capturar frame: {stderr}");
                 _ = WeakReferenceMessenger.Default.Send(new Messages.MostrarDialogoRequestMessage(
-                    "Error", "No se pudo capturar el frame.", false, "AlertCircleOutline", "#EF4444"));
+                    "Error", $"No se pudo capturar el frame.{detalle}", false, "AlertCircleOutline", "#EF4444"));
             }
         }
         catch (Exception ex)
@@ -1288,6 +1306,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         // Idempotente: Cerrar() dispone y OnVistaActualChanged también dispone al navegar fuera
         if (_disposeHecho) return;
         _disposeHecho = true;
+        GC.SuppressFinalize(this);
 
         _ = GuardarProgresoActualAsync();
 
@@ -1304,6 +1323,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         try
         {
             _trackingCts?.Cancel();
+            _trackingCts?.Dispose();
         }
         catch { }
         _trackingCts = null;

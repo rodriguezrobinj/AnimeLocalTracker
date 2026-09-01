@@ -20,7 +20,8 @@ public partial class DetalleViewModel : ObservableObject,
     IRecipient<UsuarioLogeadoMensaje>, 
     IRecipient<UsuarioDesconectadoMensaje>, 
     IRecipient<EpisodioActualizadoMensaje>,
-    IRecipient<DescargaProgresoMensaje>
+    IRecipient<DescargaProgresoMensaje>,
+    IDisposable
 {
     private readonly IAnimeTrackingService _animeTrackingService;
     private readonly IDatabaseService _databaseService;
@@ -33,6 +34,14 @@ public partial class DetalleViewModel : ObservableObject,
     // Evita pasadas concurrentes de enriquecimiento (entrar/salir de la vista rápido
     // lanzaba varios ExtractFrame simultáneos sobre los mismos archivos).
     private readonly SemaphoreSlim _enriquecimientoGate = new(1, 1);
+
+    // CA1001: el gate de enriquecimiento se libera al descartar el ViewModel
+    // (los transients no los dispone el contenedor; lo hace el GC vía finalizador del semáforo)
+    public void Dispose()
+    {
+        _enriquecimientoGate.Dispose();
+        GC.SuppressFinalize(this);
+    }
     
     [ObservableProperty]
     private AnimeItem? _animeSeleccionado;
@@ -227,7 +236,7 @@ public partial class DetalleViewModel : ObservableObject,
                                 {
                                     var reg = new RegistroEpisodio
                                     {
-                                        AniListId = _animeSeleccionado?.AniListId ?? 0,
+                                        AniListId = AnimeSeleccionado?.AniListId ?? 0,
                                         NumeroEpisodio = episodio.NumeroEpisodio,
                                         RutaArchivo = episodio.RutaCompleta,
                                         Resolucion = episodio.Resolucion,
@@ -454,7 +463,7 @@ public partial class DetalleViewModel : ObservableObject,
                         {
                             foreach (var ep in sinMiniatura)
                             {
-                                await _enricher.GenerarMiniaturaAsync(ep).ConfigureAwait(false);
+                                await _enricher!.GenerarMiniaturaAsync(ep).ConfigureAwait(false);
                                 if (!string.IsNullOrEmpty(ep.RutaMiniatura)) huboCambiosMiniatura = true;
                             }
 
@@ -646,25 +655,8 @@ public partial class DetalleViewModel : ObservableObject,
             return;
         }
 
-        var query = _todosLosEpisodios.AsEnumerable();
-
-        switch (FiltroEpisodios)
-        {
-            case "Descargados":
-                query = query.Where(e => e.Descargado);
-                break;
-            case "Vistos":
-                query = query.Where(e => e.Visto);
-                break;
-            case "No Vistos":
-                query = query.Where(e => !e.Visto);
-                break;
-            case "Favoritos":
-                query = query.Where(e => e.Favorito);
-                break;
-        }
-
-        query = OrdenAscendente ? query.OrderBy(e => e.NumeroEpisodio) : query.OrderByDescending(e => e.NumeroEpisodio);
+        // ARQ-01: filtrado/orden delegados a la lógica pura extraída (testeable sin UI)
+        var query = Core.EpisodiosOrganizador.FiltrarYOrdenar(_todosLosEpisodios, FiltroEpisodios, OrdenAscendente);
 
         EpisodiosDelAnime.Clear();
         foreach (var ep in query) EpisodiosDelAnime.Add(ep);

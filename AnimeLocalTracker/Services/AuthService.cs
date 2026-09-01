@@ -130,7 +130,7 @@ public class AuthService : IAuthService
                     byte[] buffer = Encoding.UTF8.GetBytes(html);
                     response.ContentType = "text/html; charset=utf-8";
                     response.ContentLength64 = buffer.Length;
-                    await response.OutputStream.WriteAsync(buffer, 0, buffer.Length);
+                    await response.OutputStream.WriteAsync(buffer.AsMemory(0, buffer.Length));
                     response.OutputStream.Close();
                 }
                 else if (request.Url?.AbsolutePath == "/token" && request.HttpMethod == "POST")
@@ -168,7 +168,7 @@ public class AuthService : IAuthService
                             byte[] okMsg = Encoding.UTF8.GetBytes("{\"success\":true}");
                             response.ContentType = "application/json";
                             response.ContentLength64 = okMsg.Length;
-                            await response.OutputStream.WriteAsync(okMsg, 0, okMsg.Length);
+                            await response.OutputStream.WriteAsync(okMsg.AsMemory(0, okMsg.Length));
                             response.OutputStream.Close();
                             break;
                         }

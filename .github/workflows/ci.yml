@@ -6,10 +6,17 @@ on:
   pull_request:
     branches: [ main ]
 
+# DEV-07: un solo run por rama — un push nuevo cancela el anterior (mismo código) y
+# ninguno puede colgarse más de 45 min (el default de 6 h agota runners sin razón).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-test:
     name: Build, Test & SCA Security Audit
     runs-on: windows-latest
+    timeout-minutes: 45
 
     steps:
     - name: Checkout Repository
@@ -56,7 +63,8 @@ jobs:
     - name: Cargo Security Audit (Rust SCA)
       working-directory: native/animetracker_core
       run: |
-        cargo install cargo-audit --locked
+        # DEV-01b: versión pineada para runs reproducibles
+        cargo install cargo-audit --locked --version 0.22.2
         cargo audit
 
     - name: Python SCA Audit (pip-audit)
@@ -64,7 +72,8 @@ jobs:
         # La imagen de Python de GitHub trae setuptools 65.5.0 (7 CVEs conocidas):
         # actualizarlo antes de auditar, si no el audit falla por el entorno, no por el proyecto
         python -m pip install --upgrade setuptools pip
-        python -m pip install pip-audit
+        # DEV-01b: versión pineada para runs reproducibles
+        python -m pip install pip-audit==2.10.1
         pip-audit
 
     - name: NuGet SCA Audit (dotnet)
@@ -76,8 +85,29 @@ jobs:
         Copy-Item native/animetracker_core/target/release/animetracker_core.dll AnimeLocalTracker/animetracker_core.dll -Force
 
     - name: Build Solution and Run Tests with Coverage
+      env:
+        # DEV-08: builds deterministas en CI (mismos bits que la release)
+        ContinuousIntegrationBuild: 'true'
       run: |
         powershell -ExecutionPolicy Bypass -File .\build.ps1 -RunTests -Coverage
+
+    # DEV-06b: umbral de cobertura de líneas. Baseline medido: 43.1%
+    # (2026-08-31, excluyendo el ensamblado de tests). SUBIR este umbral
+    # conforme crezca la cobertura de las features nuevas.
+    - name: Check Coverage Threshold (>= 40%)
+      shell: powershell
+      run: |
+        $threshold = 0.40
+        $cov = Get-ChildItem "AnimeLocalTracker.Tests/TestResults" -Recurse -Filter "coverage.cobertura.xml" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+        if (-not $cov) { Write-Host "::error::No se encontró coverage.cobertura.xml"; exit 1 }
+        [xml]$xml = Get-Content $cov.FullName
+        $rate = [double]$xml.coverage.'line-rate'
+        $pct = [math]::Round($rate * 100, 1)
+        Write-Host "Cobertura de líneas: $pct% (umbral: $([math]::Round($threshold * 100))%)"
+        if ($rate -lt $threshold) {
+          Write-Host "::error::Cobertura por debajo del umbral ($pct% < $([math]::Round($threshold * 100))%)"
+          exit 1
+        }
 
     - name: Upload Test Results and Coverage Report
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

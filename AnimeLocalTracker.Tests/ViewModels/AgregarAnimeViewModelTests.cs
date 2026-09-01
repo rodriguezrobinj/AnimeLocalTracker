@@ -47,6 +47,7 @@ public class AgregarAnimeViewModelTests : IDisposable
 
     public void Dispose()
     {
+        GC.SuppressFinalize(this);
         try
         {
             if (Directory.Exists(_tempFolder))

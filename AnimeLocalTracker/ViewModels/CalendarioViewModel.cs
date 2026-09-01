@@ -9,11 +9,18 @@ using CommunityToolkit.Mvvm.Input;
 
 namespace AnimeLocalTracker.ViewModels;
 
-public partial class CalendarioViewModel : ObservableObject
+public partial class CalendarioViewModel : ObservableObject, IDisposable
 {
     private readonly IDatabaseService _databaseService;
     private readonly IAnimeTrackingService _animeTrackingService;
     private readonly SemaphoreSlim _cargaLock = new(1, 1);
+
+    // CA1001: el semáforo se libera en el cierre de la app (singleton DI)
+    public void Dispose()
+    {
+        _cargaLock.Dispose();
+        GC.SuppressFinalize(this);
+    }
 
     [ObservableProperty] private bool _estaCargando;
     [ObservableProperty] private int _totalAnimesEnEmision;

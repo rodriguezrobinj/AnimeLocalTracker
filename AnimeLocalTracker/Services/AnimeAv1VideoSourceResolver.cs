@@ -9,6 +9,51 @@ using System.Threading.Tasks;
 
 namespace AnimeLocalTracker.Services;
 
+/// <summary>
+/// INT-01: contrato tipado del scraping de animeav1.com — todo el parseo de HTML vive
+/// aquí, aislado de la red, para poder testearse con fixtures reales.
+/// </summary>
+public static partial class AnimeAv1HtmlParser
+{
+    /// <summary>Extrae el ID de un embed de MP4Upload desde una página de animeav1.com.</summary>
+    public static string? ExtraerMp4UploadId(string html)
+    {
+        var match = Mp4UploadRegex().Match(html ?? string.Empty);
+        return match.Success ? match.Groups[1].Value : null;
+    }
+
+    /// <summary>Extrae la URL directa .mp4/.mkv de player.src en una página de MP4Upload.</summary>
+    public static string? ExtraerVideoDirecto(string html)
+    {
+        var match = DirectVideoSrcRegex().Match(html ?? string.Empty);
+        return match.Success ? match.Groups[1].Value : null;
+    }
+
+    /// <summary>Extrae slugs candidatos de /media/{slug} o slug:"{slug}" (sin "catalogo").</summary>
+    public static IEnumerable<string> ExtraerSlugs(string html)
+    {
+        var slugs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (Match match in SlugsRegex().Matches(html ?? string.Empty))
+        {
+            string slug = match.Groups[1].Value.Trim('"', '\'');
+            if (!string.IsNullOrWhiteSpace(slug) && !slug.Equals("catalogo", StringComparison.OrdinalIgnoreCase))
+            {
+                slugs.Add(slug);
+            }
+        }
+        return slugs;
+    }
+
+    [GeneratedRegex(@"(?:/media/|slug:\s*""?)([a-zA-Z0-9_-]+)")]
+    private static partial Regex SlugsRegex();
+
+    [GeneratedRegex(@"https?://(?:www\.)?mp4upload\.com/(?:embed-)?([a-zA-Z0-9]+)(?:\.html)?")]
+    private static partial Regex Mp4UploadRegex();
+
+    [GeneratedRegex(@"src:\s*""(https?://[^""]+?\.(?:mp4|mkv)[^""]*)""", RegexOptions.IgnoreCase)]
+    private static partial Regex DirectVideoSrcRegex();
+}
+
 public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
 {
     private const string UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
@@ -60,14 +105,10 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
                     {
                         var html = await res.Content.ReadAsStringAsync(cancellationToken);
 
-                        // Extraer slugs de los enlaces /media/{slug} o de JSON slug:"{slug}"
-                        var matches = SlugsRegex().Matches(html);
-                        foreach (Match match in matches)
+                        // INT-01: parseo delegado al contrato tipado (testeable con fixtures)
+                        foreach (string discoveredSlug in AnimeAv1HtmlParser.ExtraerSlugs(html))
                         {
-                            string discoveredSlug = match.Groups[1].Value.Trim('"', '\'');
-                            if (!string.IsNullOrWhiteSpace(discoveredSlug) &&
-                                !discoveredSlug.Equals("catalogo", StringComparison.OrdinalIgnoreCase) &&
-                                slugsProbados.Add(discoveredSlug))
+                            if (slugsProbados.Add(discoveredSlug))
                             {
                                 // VALIDACIÓN CRÍTICA: Asegurar que el slug encontrado corresponde a la temporada/secuela exacta solicitada
                                 if (EsSlugCompatible(discoveredSlug, titulosLista))
@@ -116,12 +157,11 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
 
                 var html = await res.Content.ReadAsStringAsync(cancellationToken);
 
-                // 1. Buscar enlace de MP4Upload en los embeds o descargas
-                var mp4UploadMatch = Mp4UploadRegex().Match(html);
-                if (mp4UploadMatch.Success)
+                // INT-01: parseo delegado al contrato tipado (testeable con fixtures)
+                var mp4UploadId = AnimeAv1HtmlParser.ExtraerMp4UploadId(html);
+                if (!string.IsNullOrEmpty(mp4UploadId))
                 {
-                    string mp4Id = mp4UploadMatch.Groups[1].Value;
-                    var directMp4 = await ExtractFromMp4UploadAsync($"https://www.mp4upload.com/embed-{mp4Id}.html", cancellationToken);
+                    var directMp4 = await ExtractFromMp4UploadAsync($"https://www.mp4upload.com/embed-{mp4UploadId}.html", cancellationToken);
                     if (!string.IsNullOrEmpty(directMp4))
                     {
                         return directMp4;
@@ -156,12 +196,8 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
 
             var html = await res.Content.ReadAsStringAsync(cancellationToken);
 
-            // Extraer enlace directo .mp4 de player.src
-            var srcMatch = DirectVideoSrcRegex().Match(html);
-            if (srcMatch.Success)
-            {
-                return srcMatch.Groups[1].Value;
-            }
+            // INT-01: parseo delegado al contrato tipado (testeable con fixtures)
+            return AnimeAv1HtmlParser.ExtraerVideoDirecto(html);
         }
         catch (Exception ex)
         {
@@ -300,13 +336,4 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
 
         return terminos;
     }
-
-    [GeneratedRegex(@"(?:/media/|slug:\s*""?)([a-zA-Z0-9_-]+)")]
-    private static partial Regex SlugsRegex();
-
-    [GeneratedRegex(@"https?://(?:www\.)?mp4upload\.com/(?:embed-)?([a-zA-Z0-9]+)(?:\.html)?")]
-    private static partial Regex Mp4UploadRegex();
-
-    [GeneratedRegex(@"src:\s*""(https?://[^""]+?\.(?:mp4|mkv)[^""]*)""", RegexOptions.IgnoreCase)]
-    private static partial Regex DirectVideoSrcRegex();
 }

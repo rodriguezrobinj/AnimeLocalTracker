@@ -26,7 +26,7 @@ public class SkipTimesCoordinator : ISkipTimesCoordinator
         _pythonBridge = pythonBridge;
     }
 
-    public async Task<IReadOnlyList<AniSkipResult>> CargarSkipTimesAsync(int animeId, int episodio, double duracionSegundos, CancellationToken ct = default, string? rutaVideoLocal = null)
+    public async Task<IReadOnlyList<AniSkipResult>> CargarSkipTimesAsync(int animeId, int episodio, double duracionSegundos, string? rutaVideoLocal = null, CancellationToken ct = default)
     {
         // Fuente 1: AniSkip API (comunitaria, requiere MAL ID)
         if (_aniSkipService != null && animeId > 0 && episodio > 0)

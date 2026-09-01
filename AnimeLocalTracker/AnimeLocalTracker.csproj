@@ -8,6 +8,9 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <UseWPF>true</UseWPF>
         <UseWindowsForms>true</UseWindowsForms>
+        <!-- DEV-09: versión única del producto; el pipeline de release la lee del tag
+             (vX.Y.Z) y los builds locales del script de empaquetado la toman de aquí. -->
+        <Version>1.0.5</Version>
     </PropertyGroup>
 
     <ItemGroup>
@@ -26,11 +29,11 @@
       <PackageReference Include="FlyleafLib" Version="3.11.3" />
       <PackageReference Include="FlyleafLib.Controls.WPF" Version="1.7.3" />
       <PackageReference Include="MaterialDesignThemes" Version="5.3.3-ci1443" />
-      <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.11" />
-      <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.11" />
-      <PackageReference Include="Microsoft.Extensions.Http.Polly" Version="10.0.11" />
+      <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
+      <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.1" />
+      <PackageReference Include="Microsoft.Extensions.Http.Polly" Version="8.0.1" />
       <PackageReference Include="sqlite-net-pcl" Version="1.11.285" />
-      <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.11" />
+      <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
       <PackageReference Include="Velopack" Version="1.2.0" />
       <PackageReference Include="VirtualizingWrapPanel" Version="2.5.4" />
     </ItemGroup>

@@ -54,6 +54,7 @@ public class MainViewModelTests : IDisposable
 
     public void Dispose()
     {
+        GC.SuppressFinalize(this);
         try { if (Directory.Exists(_tempFolder)) Directory.Delete(_tempFolder, true); } catch { }
     }
 

@@ -94,7 +94,7 @@ namespace AnimeLocalTracker.Services.Python
                 // Enviar payload JSON por stdin
                 string jsonInput = JsonSerializer.Serialize(payload, JsonOptions);
                 await process.StandardInput.WriteLineAsync(jsonInput);
-                await process.StandardInput.FlushAsync();
+                await process.StandardInput.FlushAsync(ct);
                 process.StandardInput.Close();
 
                 // Leer respuesta JSON por stdout
@@ -286,6 +286,7 @@ namespace AnimeLocalTracker.Services.Python
 
         public void Dispose()
         {
+            GC.SuppressFinalize(this);
             CleanupDaemon();
         }
 
