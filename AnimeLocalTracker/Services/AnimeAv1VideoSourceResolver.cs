@@ -15,6 +15,54 @@ namespace AnimeLocalTracker.Services;
 /// </summary>
 public static partial class AnimeAv1HtmlParser
 {
+    /// <summary>Servidor de video publicado por la página de episodio.</summary>
+    public readonly record struct EmbedServidor(string Server, string Url);
+
+    /// <summary>
+    /// Extrae los embeds de servidores de la página de episodio (SvelteKit). El sitio
+    /// incrusta la lista en JSON: embeds:{SUB:[{server:"HLS",url:"https://..."},...]}.
+    /// Solo se devuelven URLs https; el filtrado por host permitido lo hace UrlSeguridad.
+    /// </summary>
+    public static List<EmbedServidor> ExtraerEmbeds(string html)
+    {
+        var lista = new List<EmbedServidor>();
+        if (string.IsNullOrWhiteSpace(html)) return lista;
+
+        int inicio = html.IndexOf("embeds:{", StringComparison.Ordinal);
+        if (inicio < 0) return lista;
+
+        int fin = html.IndexOf("]}", inicio, StringComparison.Ordinal);
+        string seccion = fin > inicio ? html[inicio..fin] : html[inicio..];
+
+        foreach (Match m in EmbedServidorRegex().Matches(seccion))
+        {
+            string server = m.Groups[1].Value.Trim();
+            string url = m.Groups[2].Value.Trim();
+            if (!string.IsNullOrWhiteSpace(server) && !string.IsNullOrWhiteSpace(url))
+            {
+                lista.Add(new EmbedServidor(server, url));
+            }
+        }
+        return lista;
+    }
+
+    /// <summary>
+    /// Orden de preferencia de servidores para la resolución (Fase 1):
+    /// MP4Upload directo primero, luego los que resuelve yt-dlp (Voe, UPNShare, HLS,
+    /// Byse). Mega se excluye (requiere API propia de mega.nz, fuera de esta fase).
+    /// </summary>
+    public static List<EmbedServidor> OrdenarEmbedsPorPreferencia(IEnumerable<EmbedServidor> embeds)
+    {
+        var preferencia = new[] { "MP4Upload", "Voe", "UPNShare", "HLS", "Byse" };
+        return preferencia
+            .SelectMany((nombre, i) => embeds
+                .Where(e => e.Server.Equals(nombre, StringComparison.OrdinalIgnoreCase))
+                .Select(e => (e, i)))
+            .OrderBy(x => x.i)
+            .Select(x => x.e)
+            .ToList();
+    }
+
     /// <summary>Extrae el ID de un embed de MP4Upload desde una página de animeav1.com.</summary>
     public static string? ExtraerMp4UploadId(string html)
     {
@@ -44,6 +92,10 @@ public static partial class AnimeAv1HtmlParser
         return slugs;
     }
 
+    // El JSON del sitio usa claves SIN comillas: {server:"HLS",url:"https://..."}
+    [GeneratedRegex(@"server\s*:\s*""([^""]+)""\s*,\s*url\s*:\s*""(https?://[^""]+)""", RegexOptions.IgnoreCase)]
+    private static partial Regex EmbedServidorRegex();
+
     [GeneratedRegex(@"(?:/media/|slug:\s*""?)([a-zA-Z0-9_-]+)")]
     private static partial Regex SlugsRegex();
 
@@ -67,23 +119,38 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
 
     public async Task<string?> BuscarUrlEpisodioAsync(IEnumerable<string> titulos, int numeroEpisodio, CancellationToken cancellationToken = default)
     {
+        // FASE 1 (multi-servidor): obtener los embeds de la página del episodio.
+        // El C# solo resuelve MP4Upload; los demás servidores los orquesta
+        // PythonVideoSourceResolver con yt-dlp.
+        var embeds = await ObtenerEmbedsEpisodioAsync(titulos, numeroEpisodio, cancellationToken);
+        if (embeds.Count == 0) return null;
+
+        var mp4 = embeds.FirstOrDefault(e => e.Server.Equals("MP4Upload", StringComparison.OrdinalIgnoreCase));
+        if (string.IsNullOrEmpty(mp4.Url)) return null;
+
+        return await GetVideoUrlAsync(mp4.Url, cancellationToken);
+    }
+
+    /// <summary>
+    /// Devuelve los embeds de servidores de la página del episodio (contrato tipado,
+    /// Fase 1 multi-servidor), en el orden en que los publica el sitio y solo con
+    /// hosts permitidos por la política de seguridad.
+    /// </summary>
+    public async Task<List<AnimeAv1HtmlParser.EmbedServidor>> ObtenerEmbedsEpisodioAsync(
+        IEnumerable<string> titulos, int numeroEpisodio, CancellationToken cancellationToken = default)
+    {
         var titulosLista = titulos.Where(t => !string.IsNullOrWhiteSpace(t)).ToList();
         var slugsProbados = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         // FASE 1: Probar slugs generados directamente a partir de todos los títulos válidos
         foreach (var titulo in titulosLista)
         {
-            var variaciones = GenerarVariacionesSlug(titulo);
-            foreach (var slug in variaciones)
+            foreach (var slug in GenerarVariacionesSlug(titulo))
             {
                 if (slugsProbados.Add(slug) && EsSlugCompatible(slug, titulosLista))
                 {
-                    string pageUrl = $"https://animeav1.com/media/{slug}/{numeroEpisodio}";
-                    string? videoUrl = await GetVideoUrlAsync(pageUrl, cancellationToken);
-                    if (!string.IsNullOrEmpty(videoUrl))
-                    {
-                        return videoUrl;
-                    }
+                    var embeds = await ObtenerEmbedsDePaginaAsync($"https://animeav1.com/media/{slug}/{numeroEpisodio}", cancellationToken);
+                    if (embeds.Count > 0) return embeds;
                 }
             }
         }
@@ -91,8 +158,7 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
         // FASE 2: Si no coincidió directamente, buscar en el catálogo de AnimeAV1 pero con validación estricta
         foreach (var titulo in titulosLista)
         {
-            var terminosBusqueda = GenerarTerminosBusqueda(titulo);
-            foreach (var termino in terminosBusqueda)
+            foreach (var termino in GenerarTerminosBusqueda(titulo))
             {
                 try
                 {
@@ -108,18 +174,12 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
                         // INT-01: parseo delegado al contrato tipado (testeable con fixtures)
                         foreach (string discoveredSlug in AnimeAv1HtmlParser.ExtraerSlugs(html))
                         {
-                            if (slugsProbados.Add(discoveredSlug))
-                            {
+                            if (slugsProbados.Add(discoveredSlug) &&
                                 // VALIDACIÓN CRÍTICA: Asegurar que el slug encontrado corresponde a la temporada/secuela exacta solicitada
-                                if (EsSlugCompatible(discoveredSlug, titulosLista))
-                                {
-                                    string pageUrl = $"https://animeav1.com/media/{discoveredSlug}/{numeroEpisodio}";
-                                    string? videoUrl = await GetVideoUrlAsync(pageUrl, cancellationToken);
-                                    if (!string.IsNullOrEmpty(videoUrl))
-                                    {
-                                        return videoUrl;
-                                    }
-                                }
+                                EsSlugCompatible(discoveredSlug, titulosLista))
+                            {
+                                var embeds = await ObtenerEmbedsDePaginaAsync($"https://animeav1.com/media/{discoveredSlug}/{numeroEpisodio}", cancellationToken);
+                                if (embeds.Count > 0) return embeds;
                             }
                         }
                     }
@@ -131,7 +191,35 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
             }
         }
 
-        return null;
+        return new List<AnimeAv1HtmlParser.EmbedServidor>();
+    }
+
+    /// <summary>
+    /// Descarga la página del episodio y extrae sus embeds, filtrando los hosts
+    /// que no están en la allowlist de servidores (seguridad INT-01/SEC-16).
+    /// </summary>
+    private async Task<List<AnimeAv1HtmlParser.EmbedServidor>> ObtenerEmbedsDePaginaAsync(string pageUrl, CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (!EsDominioPermitido(pageUrl, "animeav1.com")) return [];
+
+            using var req = new HttpRequestMessage(HttpMethod.Get, pageUrl);
+            req.Headers.Add("User-Agent", UserAgent);
+
+            using var res = await _httpClient.SendAsync(req, cancellationToken);
+            if (!res.IsSuccessStatusCode) return [];
+
+            var html = await res.Content.ReadAsStringAsync(cancellationToken);
+            return AnimeAv1HtmlParser.ExtraerEmbeds(html)
+                .Where(e => Core.UrlSeguridad.EsUrlEmbedPermitida(e.Url))
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[AnimeAv1VideoSourceResolver] Error obteniendo embeds de {pageUrl}: {ex.Message}");
+            return [];
+        }
     }
 
     private static bool EsDominioPermitido(string url, string dominioEsperado)

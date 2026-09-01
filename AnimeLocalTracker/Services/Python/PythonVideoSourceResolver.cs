@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
@@ -19,8 +20,60 @@ namespace AnimeLocalTracker.Services.Python
 
         public async Task<string?> BuscarUrlEpisodioAsync(IEnumerable<string> titulos, int numeroEpisodio, CancellationToken cancellationToken = default)
         {
-            // Delegamos la búsqueda del catálogo/slugs al resolver estándar de AnimeAV1
-            return await _fallbackResolver.BuscarUrlEpisodioAsync(titulos, numeroEpisodio, cancellationToken);
+            // Fase 1 multi-servidor: la página del episodio publica los embeds de
+            // HLS, UPNShare, Voe, Byse, Mega y MP4Upload. Se prueban en orden de
+            // preferencia; Mega se omite (requiere API propia de mega.nz).
+            var embeds = await _fallbackResolver.ObtenerEmbedsEpisodioAsync(titulos, numeroEpisodio, cancellationToken);
+            var ordenados = AnimeAv1HtmlParser.OrdenarEmbedsPorPreferencia(embeds);
+            if (ordenados.Count == 0) return null;
+
+            foreach (var embed in ordenados)
+            {
+                if (cancellationToken.IsCancellationRequested) return null;
+
+                try
+                {
+                    if (embed.Server.Equals("MP4Upload", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // Extractor directo probado (C#): embed → player → src
+                        var directo = await _fallbackResolver.GetVideoUrlAsync(embed.Url, cancellationToken);
+                        if (Core.UrlSeguridad.EsUrlVideoPermitida(directo))
+                        {
+                            AppLogger.Info("PythonVideoResolver", $"Episodio resuelto vía MP4Upload: {SanitizarUrlParaLog(directo)}");
+                            return directo;
+                        }
+                        continue;
+                    }
+
+                    // Servidores que resuelve yt-dlp (Voe, UPNShare, HLS, Byse)
+                    if (!await _pythonBridge.IsAvailableAsync()) continue;
+
+                    var result = await _pythonBridge.ExecuteCommandAsync<object, StreamResult>(
+                        "resolve-stream",
+                        new { url = embed.Url },
+                        cancellationToken);
+
+                    if (result != null && result.Success && Core.UrlSeguridad.EsUrlDescargaHttpSegura(result.DirectUrl))
+                    {
+                        // Los manifiestos HLS/DASH se omiten en esta fase (el descargador
+                        // solo maneja archivos directos; la descarga segmentada es fase 2)
+                        if (Core.UrlSeguridad.EsUrlManifiestoStreaming(result.DirectUrl))
+                        {
+                            AppLogger.Debug("PythonVideoResolver", $"Servidor '{embed.Server}' devolvió manifiesto HLS/DASH; se omite en esta fase.");
+                            continue;
+                        }
+
+                        AppLogger.Info("PythonVideoResolver", $"Episodio resuelto con yt-dlp ({embed.Server}): {SanitizarUrlParaLog(result.DirectUrl)}");
+                        return result.DirectUrl;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    AppLogger.Debug("PythonVideoResolver", $"Servidor '{embed.Server}' falló: {ex.Message}");
+                }
+            }
+
+            return null;
         }
 
         public async Task<string?> GetVideoUrlAsync(string pageUrl, CancellationToken cancellationToken = default)
@@ -60,14 +113,15 @@ namespace AnimeLocalTracker.Services.Python
             return await _fallbackResolver.GetVideoUrlAsync(pageUrl, cancellationToken);
         }
 
-        private static string SanitizarUrlParaLog(string url)
+        private static string SanitizarUrlParaLog(string? url)
         {
             if (string.IsNullOrWhiteSpace(url)) return "(vacía)";
             if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)) return "(url no parseable)";
             return $"{uri.Scheme}://{uri.Authority}{uri.AbsolutePath}";
         }
 
-        private class StreamResult
+        /// <summary>DTO del resultado del daemon (resolve-stream). Público para testeo.</summary>
+        public class StreamResult
         {
             public bool Success { get; set; }
             public string? Title { get; set; }

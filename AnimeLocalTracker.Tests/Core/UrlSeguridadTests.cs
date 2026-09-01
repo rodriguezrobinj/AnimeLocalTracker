@@ -37,6 +37,53 @@ public class UrlSeguridadTests
         UrlSeguridad.EsUrlVideoPermitida(url).Should().BeFalse();
     }
 
+    // === EsUrlEmbedPermitida (embeds publicados por la página de episodio) ===
+
+    [Theory]
+    [InlineData("https://www.mp4upload.com/embed-abc123.html")]
+    [InlineData("https://voe.sx/e/xkwrsnscgvze")]
+    [InlineData("https://byselapuix.com/e/ollcejudwkem")]
+    [InlineData("https://animeav1.uns.bio/#xpzikv")]
+    [InlineData("https://player.zilla-networks.com/play/abc123")]
+    [InlineData("https://mega.nz/embed/ntxzURRJ#clave")]
+    public void EsUrlEmbedPermitida_ProveedoresConocidos_DeberiaAceptar(string url)
+    {
+        UrlSeguridad.EsUrlEmbedPermitida(url).Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData("https://servidor-desconocido.com/e/abc")]
+    [InlineData("http://voe.sx/e/abc")]
+    [InlineData("https://voe.sx.evil.com/e/abc")]
+    [InlineData("ftp://voe.sx/abc")]
+    [InlineData("no-es-una-url")]
+    [InlineData("")]
+    [InlineData(null)]
+    public void EsUrlEmbedPermitida_ProveedoresNoPermitidos_DeberiaRechazar(string? url)
+    {
+        UrlSeguridad.EsUrlEmbedPermitida(url).Should().BeFalse();
+    }
+
+    // === EsUrlManifiestoStreaming (HLS/DASH: fase 2) ===
+
+    [Theory]
+    [InlineData("https://cdn.example.com/master.m3u8")]
+    [InlineData("https://cdn.example.com/stream/manifest.mpd")]
+    public void EsUrlManifiestoStreaming_Manifiestos_DeberiaDetectar(string url)
+    {
+        UrlSeguridad.EsUrlManifiestoStreaming(url).Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData("https://cdn.example.com/video.mp4")]
+    [InlineData("https://cdn.example.com/video.mkv?v=2")]
+    [InlineData("")]
+    [InlineData(null)]
+    public void EsUrlManifiestoStreaming_ArchivosDirectos_DeberiaRechazar(string? url)
+    {
+        UrlSeguridad.EsUrlManifiestoStreaming(url).Should().BeFalse();
+    }
+
     // === EsUrlDescargaHttpSegura (punto de descarga, defensa en profundidad) ===
 
     [Theory]
