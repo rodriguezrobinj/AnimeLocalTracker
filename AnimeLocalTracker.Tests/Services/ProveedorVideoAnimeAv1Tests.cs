@@ -37,7 +37,29 @@ public class ProveedorVideoAnimeAv1Tests
         <html><script>var config = { src: "https://cdn.mp4upload.com/r0xdfbvme2yy/720p/video.mp4", type: "video/mp4" };</script></html>
         """;
 
+    private const string FixturePeliculaMedia = """
+        <html><body>
+        <script>{__sveltekit_1p4gm49 = {data: [{type:"data",data:{media:{id:1328,title:"Dragon Ball Z Película 14: Battle of Gods",slug:"dragon-ball-z-movie-14-kami-to-kami",malId:14837,category:{id:2,name:"Película",slug:"pelicula"},episodes:[{id:21013,number:14}],relations:[{type:5,destination:{id:350,slug:"dragon-ball-z"}}]}}}]}}</script>
+        </body></html>
+        """;
+
+    private const string FixturePeliculaEpisodio14 = """
+        <html><body>
+        <script>{__sveltekit_1p4gm49 = {data: [{type:"data",data:{media:{id:1328,title:"Dragon Ball Z Película 14: Battle of Gods",slug:"dragon-ball-z-movie-14-kami-to-kami",malId:14837,episodes:[{id:21013,number:14}]},episode:{id:21013,number:14,variants:{DUB:1}},
+        embeds:{DUB:[
+          {server:"HLS",url:"https://player.zilla-networks.com/play/ee137c2514f48a79d6c7c41063133be7"},
+          {server:"Voe",url:"https://voe.sx/e/37dfuaxjurww"},
+          {server:"MP4Upload",url:"https://www.mp4upload.com/embed-r0xdfbvme2yy.html"}
+        ]}}]}}</script>
+        </body></html>
+        """;
+
+    private const string FixtureCatalogo = """
+        <html><a href="/media/dragon-ball-z-movie-14-kami-to-kami">Dragon Ball Z Película 14</a></html>
+        """;
+
     private static readonly string[] Titulos = { "Grand Blue Season 3" };
+    private static readonly string[] TitulosPelicula = { "Dragon Ball Z: Battle of Gods" };
 
     private sealed class StubHandler : HttpMessageHandler
     {
@@ -179,6 +201,67 @@ public class ProveedorVideoAnimeAv1Tests
     public void ExtraerMalIdDelMedia_SinMediaEnLaPagina_DeberiaDevolverNull()
     {
         AnimeAv1HtmlParser.ExtraerMalIdDelMedia("<html>sin datos</html>").Should().BeNull();
+    }
+
+    [Fact]
+    public void ExtraerEpisodiosDelMedia_ConPayloadDelSitio_DeberiaExtraerLosEpisodiosReales()
+    {
+        // Act
+        var episodios = AnimeAv1HtmlParser.ExtraerEpisodiosDelMedia(FixturePeliculaMedia);
+
+        // Assert: la película se numera como Ep 14 en el catálogo del sitio
+        episodios.Should().ContainSingle();
+        episodios[0].Id.Should().Be(21013);
+        episodios[0].Numero.Should().Be(14);
+    }
+
+    [Fact]
+    public void ExtraerEpisodiosDelMedia_SinSeccionDeEpisodios_DeberiaDevolverVacio()
+    {
+        AnimeAv1HtmlParser.ExtraerEpisodiosDelMedia("<html>sin episodios</html>").Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task BuscarUrlEpisodioAsync_PeliculaNumeradaDistinto_DeberiaResolverPorLaPaginaDelMedia()
+    {
+        // Arrange: la app registra la película como Episodio 1, pero el sitio la
+        // numera como Ep 14 (posición en el catálogo). El slug del sitio contiene
+        // "-movie-14-" y el título de AniList no dice "movie" → la heurística sola
+        // lo rechazaría; con MAL ID conocido se acepta y FASE 3 corrige el número.
+        var (proveedor, bridge) = Crear(req =>
+        {
+            var u = req.RequestUri!.AbsoluteUri;
+            if (req.RequestUri.Host.Contains("mp4upload.com")) return Ok(FixturePlayerMp4Upload);
+            if (u.Contains("/catalogo")) return Ok(FixtureCatalogo);
+            if (u.Contains("/media/dragon-ball-z-movie-14-kami-to-kami/14")) return Ok(FixturePeliculaEpisodio14);
+            if (u.Contains("/media/dragon-ball-z-movie-14-kami-to-kami")) return Ok(FixturePeliculaMedia);
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        }, malIdResolver: (_, _) => Task.FromResult<int?>(14837));
+
+        // Act: episodio 1 solicitado (la app lo registra así)
+        var url = await proveedor.BuscarUrlEpisodioAsync(TitulosPelicula, 1, aniListId: 1328);
+
+        // Assert: resuelto con el número real del sitio (14) y el extractor directo
+        url.Should().Be("https://cdn.mp4upload.com/r0xdfbvme2yy/720p/video.mp4");
+    }
+
+    [Fact]
+    public async Task BuscarUrlEpisodioAsync_PeliculaDeOtroMalId_DeberiaRechazarEnLaPaginaDelMedia()
+    {
+        // Arrange: la página del media es de OTRA película (malId distinto)
+        var (proveedor, bridge) = Crear(req =>
+        {
+            var u = req.RequestUri!.AbsoluteUri;
+            if (u.Contains("/catalogo")) return Ok(FixtureCatalogo);
+            if (u.Contains("/media/dragon-ball-z-movie-14-kami-to-kami")) return Ok(FixturePeliculaMedia);
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        }, malIdResolver: (_, _) => Task.FromResult<int?>(99999));
+
+        // Act
+        var url = await proveedor.BuscarUrlEpisodioAsync(TitulosPelicula, 1, aniListId: 1328);
+
+        // Assert: rechazada (ni el episodio ni la página del media pasan el malId)
+        url.Should().BeNull();
     }
 
     [Fact]

@@ -88,6 +88,31 @@ public static partial class AnimeAv1HtmlParser
         return m.Success && int.TryParse(m.Groups[1].Value, out var id) ? id : null;
     }
 
+    /// <summary>
+    /// Extrae los episodios reales del media desde el payload: episodes:[{id:21013,number:14},...].
+    /// La numeración del sitio puede diferir de la de la app (películas numeradas por
+    /// posición en el catálogo) — esto permite resolver el número correcto.
+    /// </summary>
+    public static List<(int Id, int Numero)> ExtraerEpisodiosDelMedia(string html)
+    {
+        var lista = new List<(int, int)>();
+        if (string.IsNullOrWhiteSpace(html)) return lista;
+
+        int inicio = html.IndexOf("episodes:[", StringComparison.Ordinal);
+        if (inicio < 0) return lista;
+        int fin = html.IndexOf(']', inicio);
+        if (fin <= inicio) return lista;
+
+        foreach (Match m in EpisodioMediaRegex().Matches(html.Substring(inicio, fin - inicio)))
+        {
+            if (int.TryParse(m.Groups[1].Value, out var id) && int.TryParse(m.Groups[2].Value, out var numero))
+            {
+                lista.Add((id, numero));
+            }
+        }
+        return lista;
+    }
+
     /// <summary>Extrae slugs candidatos de /media/{slug} o slug:"{slug}" (sin "catalogo").</summary>
     public static IEnumerable<string> ExtraerSlugs(string html)
     {
@@ -106,6 +131,9 @@ public static partial class AnimeAv1HtmlParser
     // El JSON del sitio usa claves SIN comillas: {server:"HLS",url:"https://..."}
     [GeneratedRegex(@"server\s*:\s*""([^""]+)""\s*,\s*url\s*:\s*""(https?://[^""]+)""", RegexOptions.IgnoreCase)]
     private static partial Regex EmbedServidorRegex();
+
+    [GeneratedRegex(@"\{id:(\d+),number:(\d+)\}")]
+    private static partial Regex EpisodioMediaRegex();
 
     [GeneratedRegex(@"slug:""[^""]*"",malId:(\d+)")]
     private static partial Regex MalIdMediaRegex();
@@ -164,11 +192,12 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
         IEnumerable<string> titulos, int numeroEpisodio, int? aniListId = null, CancellationToken cancellationToken = default)
     {
         var titulosLista = titulos.Where(t => !string.IsNullOrWhiteSpace(t)).ToList();
-        var slugsProbados = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (titulosLista.Count == 0) return [];
 
         // Verificación anti-confusión: si conocemos el AniListId, resolvemos su MAL ID
-        // y solo aceptamos páginas cuyo malId coincida (títulos parecidos de otros
-        // animes dejan de descargar episodios equivocados).
+        // y solo aceptamos páginas cuyo malId coincida. Con malId conocido, la
+        // heurística de slugs se relaja (el malId es la verificación autoritativa:
+        // los slugs de películas "movie-N-" se rechazaban aunque fueran correctos).
         int? malIdEsperado = null;
         if (aniListId.HasValue && _malIdResolver != null)
         {
@@ -176,20 +205,20 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
             catch (Exception ex) { AppLogger.Debug("AnimeAv1VideoSourceResolver", $"No se pudo resolver MAL ID de {aniListId}: {ex.Message}"); }
         }
 
-        // FASE 1: Probar slugs generados directamente a partir de todos los títulos válidos
+        // Recolectar slugs candidatos en orden de prioridad
+        var slugs = new List<string>();
+        var vistos = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        // FASE 1: slugs generados de los títulos (heurística estricta siempre)
         foreach (var titulo in titulosLista)
         {
             foreach (var slug in GenerarVariacionesSlug(titulo))
             {
-                if (slugsProbados.Add(slug) && EsSlugCompatible(slug, titulosLista))
-                {
-                    var embeds = await ObtenerEmbedsDePaginaAsync($"https://animeav1.com/media/{slug}/{numeroEpisodio}", malIdEsperado, cancellationToken);
-                    if (embeds.Count > 0) return embeds;
-                }
+                if (vistos.Add(slug) && EsSlugCompatible(slug, titulosLista)) slugs.Add(slug);
             }
         }
 
-        // FASE 2: Si no coincidió directamente, buscar en el catálogo de AnimeAV1 pero con validación estricta
+        // FASE 2: slugs del catálogo (con malId conocido se relaja la heurística)
         foreach (var titulo in titulosLista)
         {
             foreach (var termino in GenerarTerminosBusqueda(titulo))
@@ -201,20 +230,15 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
                     req.Headers.Add("User-Agent", UserAgent);
 
                     using var res = await _httpClient.SendAsync(req, cancellationToken);
-                    if (res.IsSuccessStatusCode)
-                    {
-                        var html = await res.Content.ReadAsStringAsync(cancellationToken);
+                    if (!res.IsSuccessStatusCode) continue;
 
-                        // INT-01: parseo delegado al contrato tipado (testeable con fixtures)
-                        foreach (string discoveredSlug in AnimeAv1HtmlParser.ExtraerSlugs(html))
+                    var html = await res.Content.ReadAsStringAsync(cancellationToken);
+                    foreach (string discoveredSlug in AnimeAv1HtmlParser.ExtraerSlugs(html))
+                    {
+                        if (vistos.Add(discoveredSlug) &&
+                            (malIdEsperado.HasValue || EsSlugCompatible(discoveredSlug, titulosLista)))
                         {
-                            if (slugsProbados.Add(discoveredSlug) &&
-                                // VALIDACIÓN CRÍTICA: Asegurar que el slug encontrado corresponde a la temporada/secuela exacta solicitada
-                                EsSlugCompatible(discoveredSlug, titulosLista))
-                            {
-                                var embeds = await ObtenerEmbedsDePaginaAsync($"https://animeav1.com/media/{discoveredSlug}/{numeroEpisodio}", malIdEsperado, cancellationToken);
-                                if (embeds.Count > 0) return embeds;
-                            }
+                            slugs.Add(discoveredSlug);
                         }
                     }
                 }
@@ -225,7 +249,73 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
             }
         }
 
-        return new List<AnimeAv1HtmlParser.EmbedServidor>();
+        // PRUEBA 1: página del episodio con el número solicitado
+        foreach (var slug in slugs)
+        {
+            if (cancellationToken.IsCancellationRequested) return [];
+
+            var embeds = await ObtenerEmbedsDePaginaAsync($"https://animeav1.com/media/{slug}/{numeroEpisodio}", malIdEsperado, cancellationToken);
+            if (embeds.Count > 0) return embeds;
+        }
+
+        // PRUEBA 2 (FASE 3): la numeración del sitio puede diferir de la app
+        // (películas = "Ep N" de posición en el catálogo). Página del media →
+        // verificar malId → episodios reales → número objetivo → embeds.
+        foreach (var slug in slugs)
+        {
+            if (cancellationToken.IsCancellationRequested) return [];
+
+            int? objetivo = await ObtenerNumeroEpisodioDelMediaAsync(slug, numeroEpisodio, malIdEsperado, cancellationToken);
+            if (!objetivo.HasValue || objetivo.Value == numeroEpisodio) continue;
+
+            var embeds = await ObtenerEmbedsDePaginaAsync($"https://animeav1.com/media/{slug}/{objetivo.Value}", malIdEsperado, cancellationToken);
+            if (embeds.Count > 0) return embeds;
+        }
+
+        return [];
+    }
+
+    /// <summary>
+    /// Resuelve el número de episodio real del sitio desde la página del media.
+    /// Coincidencia exacta si existe; para películas/especiales (1 solo episodio
+    /// en el sitio) se usa ese número aunque la app lo registre como episodio 1.
+    /// Verifica el malId antes de confiar en la página.
+    /// </summary>
+    private async Task<int?> ObtenerNumeroEpisodioDelMediaAsync(string slug, int numeroSolicitado, int? malIdEsperado, CancellationToken ct)
+    {
+        try
+        {
+            string mediaUrl = $"https://animeav1.com/media/{slug}";
+            if (!EsDominioPermitido(mediaUrl, "animeav1.com")) return null;
+
+            using var req = new HttpRequestMessage(HttpMethod.Get, mediaUrl);
+            req.Headers.Add("User-Agent", UserAgent);
+
+            using var res = await _httpClient.SendAsync(req, ct);
+            if (!res.IsSuccessStatusCode) return null;
+
+            var html = await res.Content.ReadAsStringAsync(ct);
+
+            // Anti-confusión: el media debe ser el anime esperado
+            var malIdPagina = AnimeAv1HtmlParser.ExtraerMalIdDelMedia(html);
+            if (malIdEsperado.HasValue && malIdPagina.HasValue && malIdPagina.Value != malIdEsperado.Value) return null;
+
+            var episodios = AnimeAv1HtmlParser.ExtraerEpisodiosDelMedia(html);
+            if (episodios.Count == 0) return null;
+
+            if (episodios.Any(e => e.Numero == numeroSolicitado)) return numeroSolicitado;
+
+            // Película/especial: el sitio numera la media como "Ep N" del catálogo
+            // pero la app la registra como un solo episodio → usar el único disponible
+            if (episodios.Count == 1) return episodios[0].Numero;
+
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[AnimeAv1VideoSourceResolver] Error en página del media {slug}: {ex.Message}");
+            return null;
+        }
     }
 
     /// <summary>
