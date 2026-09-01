@@ -67,12 +67,49 @@ public partial class EstadisticasViewModel : ObservableObject
     [ObservableProperty] private List<BarraDato> _vistosPorAnio = new();
     [ObservableProperty] private List<BarraDato> _vistosPorGenero = new();
 
+    // === ERRORES ===
+    [ObservableProperty] private bool _hayError;
+    [ObservableProperty] private string _mensajeError = "";
+
     public async Task CargarEstadisticasAsync()
     {
-        var animes = await _databaseService.ObtenerTodosLosAnimesAsync() ?? new List<Models.AnimeItem>();
-        var registros = await _databaseService.ObtenerTodosLosRegistrosAsync() ?? new List<Models.RegistroEpisodio>();
+        try
+        {
+            HayError = false;
+            MensajeError = "";
+            // PER-02: la carga y la agregación corren fuera del hilo de UI — si la
+            // continuación reanudara en la UI, bibliotecas grandes congelarían la ventana.
+            var datos = await Task.Run(async () =>
+            {
+                var animes = await _databaseService.ObtenerTodosLosAnimesAsync() ?? new List<Models.AnimeItem>();
+                var registros = await _databaseService.ObtenerTodosLosRegistrosAsync() ?? new List<Models.RegistroEpisodio>();
+                return (animes, registros);
+            });
+            await Task.Run(() => CalcularEstadisticas(datos.animes, datos.registros));
+        }
+        catch (Exception ex)
+        {
+            // EST-03: si la DB está bloqueada/corrompida, mostrar un estado de error
+            // visible en vez de dejar el panel con placeholders vacíos sin explicación.
+            AppLogger.Error("EstadisticasViewModel", "Error cargando estadísticas", ex);
+            HayError = true;
+            MensajeError = "No se pudieron cargar las estadísticas. Inténtalo de nuevo más tarde.";
+        }
+    }
+
+    /// <summary>
+    /// Agregación pura de las estadísticas. PER-01: los registros se indexan UNA sola vez
+    /// (lookup por AniListId y por fecha) — los barridos O(A×R) originales son O(A+R).
+    /// WPF enlaza cambios de propiedad desde cualquier hilo, así que puede correr en un
+    /// hilo de fondo y solo se publica el resultado final.
+    /// </summary>
+    private void CalcularEstadisticas(List<Models.AnimeItem> animes, List<Models.RegistroEpisodio> registros)
+    {
+        var registrosPorAnime = registros.ToLookup(r => r.AniListId);
+        var animesPorId = animes.ToDictionary(a => a.AniListId);
 
         var vistos = registros.Where(r => r.VistoLocal).ToList();
+        var porDia = vistos.ToLookup(r => r.UltimaReproduccion?.Date);
 
         // === RESUMEN ===
         TotalAnimes = animes.Count;
@@ -94,7 +131,7 @@ public partial class EstadisticasViewModel : ObservableObject
 
         AnimesEnProceso = animes.Count(a =>
         {
-            int vistosAnime = registros.Count(r => r.AniListId == a.AniListId && r.VistoLocal);
+            int vistosAnime = registrosPorAnime[a.AniListId].Count(r => r.VistoLocal);
             return vistosAnime > 0 && vistosAnime < Math.Max(a.TotalEpisodios, 0);
         });
 
@@ -104,7 +141,7 @@ public partial class EstadisticasViewModel : ObservableObject
         for (int i = 6; i >= 0; i--)
         {
             var dia = DateTime.Today.AddDays(-i);
-            int n = vistos.Count(r => r.UltimaReproduccion.HasValue && r.UltimaReproduccion.Value.Date == dia);
+            int n = porDia[dia].Count();
             actividad.Add((dia.ToString("ddd d"), n));
             maxDia = Math.Max(maxDia, n);
         }
@@ -112,7 +149,7 @@ public partial class EstadisticasViewModel : ObservableObject
             .Select(a => new BarraDato(a.Etiqueta, a.Valor, (a.Valor / (double)maxDia) * 420.0))
             .ToList();
 
-        int semana = vistos.Count(r => r.UltimaReproduccion.HasValue && r.UltimaReproduccion.Value >= DateTime.Today.AddDays(-6));
+        int semana = porDia.Where(g => g.Key.HasValue && g.Key.Value >= DateTime.Today.AddDays(-6)).Sum(g => g.Count());
         PromedioDiarioTexto = $"{semana / 7.0:F1}";
 
         // === ESTADO DE LA LISTA (EstadoUsuario) ===
@@ -149,7 +186,7 @@ public partial class EstadisticasViewModel : ObservableObject
             .Take(5)
             .Select((x, idx) =>
             {
-                var anime = animes.FirstOrDefault(a => a.AniListId == x.Id);
+                animesPorId.TryGetValue(x.Id, out var anime);
                 return new TopAnime(
                     anime?.Titulo ?? $"Anime {x.Id}",
                     x.N,
@@ -177,8 +214,7 @@ public partial class EstadisticasViewModel : ObservableObject
         foreach (var anime in animes)
         {
             if (string.IsNullOrWhiteSpace(anime.Generos)) continue;
-            bool tieneVistos = registros.Any(r => r.AniListId == anime.AniListId && r.VistoLocal);
-            if (!tieneVistos) continue;
+            if (!registrosPorAnime[anime.AniListId].Any(r => r.VistoLocal)) continue;
 
             foreach (var genero in anime.Generos.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
             {
@@ -218,7 +254,7 @@ public partial class EstadisticasViewModel : ObservableObject
         var top1 = vistos.GroupBy(r => r.AniListId).OrderByDescending(g => g.Count()).FirstOrDefault();
         if (top1 != null)
         {
-            var animeTop = animes.FirstOrDefault(a => a.AniListId == top1.Key);
+            animesPorId.TryGetValue(top1.Key, out var animeTop);
             AnimeMasVisto = animeTop?.Titulo ?? $"Anime {top1.Key}";
             int totalDelAnime = animeTop?.TotalEpisodios ?? 0;
             AnimeMasVistoDetalle = totalDelAnime > 0
