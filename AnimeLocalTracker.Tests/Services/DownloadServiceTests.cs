@@ -28,7 +28,7 @@ public class DownloadServiceTests
             .Returns(new HttpClient());
 
         _sourceResolverMock
-            .Setup(r => r.BuscarUrlEpisodioAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.BuscarUrlEpisodioAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync("https://example.com/video.mp4");
 
         _settingsServiceMock
@@ -44,10 +44,10 @@ public class DownloadServiceTests
     [Fact]
     public async Task DownloadVideoAsync_ConManifiestoHls_DeberiaDescargarConElDaemon()
     {
-        // Arrange: URL m3u8 â†’ se enruta al daemon (download-stream), nunca al HttpClient
+        // Arrange: URL m3u8 → se enruta al daemon (download-stream), nunca al HttpClient
         var bridgeMock = new Mock<IPythonBridgeService>();
         var tempDest = Path.Combine(Path.GetTempPath(), $"hls_{Guid.NewGuid():N}.mkv");
-        var archivoDaemon = tempDest + ".mp4"; // yt-dlp aÃ±ade la extensiÃ³n real al outtmpl
+        var archivoDaemon = tempDest + ".mp4"; // yt-dlp añade la extensión real al outtmpl
         await File.WriteAllTextAsync(archivoDaemon, "contenido-segmentado");
         bridgeMock.Setup(b => b.ExecuteCommandOneShotAsync<object, DownloadService.DownloadStreamResult>(
                 "download-stream", It.IsAny<object>(), It.IsAny<CancellationToken>()))
@@ -63,9 +63,9 @@ public class DownloadServiceTests
             // Act
             await sut.DownloadVideoAsync("https://cdn.example.com/master.m3u8", tempDest);
 
-            // Assert: el archivo del daemon se normalizÃ³ al destino esperado
+            // Assert: el archivo del daemon se normalizó al destino esperado
             File.Exists(tempDest).Should().BeTrue("el archivo descargado debe quedar en el destino");
-            File.Exists(archivoDaemon).Should().BeFalse("la ruta con extensiÃ³n del daemon se mueve al destino");
+            File.Exists(archivoDaemon).Should().BeFalse("la ruta con extensión del daemon se mueve al destino");
             bridgeMock.Verify(b => b.ExecuteCommandOneShotAsync<object, DownloadService.DownloadStreamResult>(
                 "download-stream", It.IsAny<object>(), It.IsAny<CancellationToken>()), Times.Once);
         }
@@ -79,7 +79,7 @@ public class DownloadServiceTests
     [Fact]
     public async Task DownloadVideoAsync_ConManifiestoHlsYDaemonFallido_DeberiaLanzarConElError()
     {
-        // Arrange: el daemon devuelve error (p. ej. el proveedor HLS cayÃ³)
+        // Arrange: el daemon devuelve error (p. ej. el proveedor HLS cayó)
         var bridgeMock = new Mock<IPythonBridgeService>();
         bridgeMock.Setup(b => b.ExecuteCommandOneShotAsync<object, DownloadService.DownloadStreamResult>(
                 "download-stream", It.IsAny<object>(), It.IsAny<CancellationToken>()))
@@ -139,8 +139,8 @@ public class DownloadServiceTests
         var maxConcurrent = 0;
 
         _sourceResolverMock
-            .Setup(r => r.BuscarUrlEpisodioAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .Returns(async (IEnumerable<string> t, int ep, CancellationToken ct) =>
+            .Setup(r => r.BuscarUrlEpisodioAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()))
+            .Returns(async (IEnumerable<string> t, int ep, int? aniListId, CancellationToken ct) =>
             {
                 int now = Interlocked.Increment(ref activeCounter);
                 InterlockedExchangeMax(ref maxConcurrent, now);
@@ -164,10 +164,10 @@ public class DownloadServiceTests
         // Esperar a que se alcancen 2 concurrentes
         await EsperarHastaAsync(() => activeCounter >= 2);
 
-        // Assert: solo 2 activas en el pico mientras el lÃ­mite es 2
+        // Assert: solo 2 activas en el pico mientras el límite es 2
         maxConcurrent.Should().BeLessThanOrEqualTo(2);
 
-        // Liberar la primera descarga: otra deberÃ­a ocupar su slot
+        // Liberar la primera descarga: otra debería ocupar su slot
         puertas[0].TrySetResult(true);
         await Task.Delay(300);
 
@@ -190,8 +190,8 @@ public class DownloadServiceTests
         var resolucionesIniciadas = 0;
 
         _sourceResolverMock
-            .Setup(r => r.BuscarUrlEpisodioAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .Returns(async (IEnumerable<string> t, int ep, CancellationToken ct) =>
+            .Setup(r => r.BuscarUrlEpisodioAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()))
+            .Returns(async (IEnumerable<string> t, int ep, int? aniListId, CancellationToken ct) =>
             {
                 Interlocked.Increment(ref resolucionesIniciadas);
                 var puerta = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -207,15 +207,15 @@ public class DownloadServiceTests
             tareas.Add(_sut.IniciarDescargaEpisodioAsync(200 + i, $"Anime {i}", System.IO.Path.Combine(System.IO.Path.GetTempPath(), "AltTest2"), i));
         }
 
-        // Esperar a que la primera descarga estÃ© resolviendo (slot 1 ocupado)
+        // Esperar a que la primera descarga esté resolviendo (slot 1 ocupado)
         await EsperarHastaAsync(() => resolucionesIniciadas >= 1);
         await Task.Delay(200);
 
-        // Act: subir el lÃ­mite a 3 â†’ las 2 pendientes deben arrancar
+        // Act: subir el límite a 3 → las 2 pendientes deben arrancar
         _sut.ActualizarLimiteDescargas(3);
         await EsperarHastaAsync(() => resolucionesIniciadas >= 3, timeoutMs: 5000);
 
-        // Assert: las 3 descargas han alcanzado la fase de resoluciÃ³n (todas con slot)
+        // Assert: las 3 descargas han alcanzado la fase de resolución (todas con slot)
         resolucionesIniciadas.Should().Be(3);
 
         foreach (var p in puertas) p.TrySetResult(true);
@@ -245,7 +245,7 @@ public class DownloadServiceTests
         {
             await Task.Delay(50);
         }
-        condition().Should().BeTrue($"CondiciÃ³n no alcanzada tras {timeoutMs} ms");
+        condition().Should().BeTrue($"Condición no alcanzada tras {timeoutMs} ms");
     }
 
     private static void InterlockedExchangeMax(ref int target, int value)

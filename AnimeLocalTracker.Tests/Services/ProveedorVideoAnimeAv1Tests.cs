@@ -21,7 +21,7 @@ public class ProveedorVideoAnimeAv1Tests
 {
     private const string FixturePaginaEpisodio = """
         <html><body>
-        <script>{__sveltekit_1p4gm49 = {data: [{type:"data",data:{episode:{number:9},
+        <script>{__sveltekit_1p4gm49 = {data: [{type:"data",data:{media:{id:4408,title:"Grand Blue Season 3",slug:"grand-blue-season-3",malId:62542,episodes:[{id:60052,number:9}]},episode:{number:9},
         embeds:{SUB:[
           {server:"HLS",url:"https://player.zilla-networks.com/play/02a6a12077b53fa28f4b0e4d08ab3e08"},
           {server:"UPNShare",url:"https://animeav1.uns.bio/#xpzikv"},
@@ -49,9 +49,10 @@ public class ProveedorVideoAnimeAv1Tests
     }
 
     private static (ProveedorVideoAnimeAv1 Proveedor, Mock<IPythonBridgeService> Bridge) Crear(
-        Func<HttpRequestMessage, HttpResponseMessage> responder)
+        Func<HttpRequestMessage, HttpResponseMessage> responder,
+        Func<int, CancellationToken, Task<int?>>? malIdResolver = null)
     {
-        var resolver = new AnimeAv1VideoSourceResolver(new HttpClient(new StubHandler(responder)));
+        var resolver = new AnimeAv1VideoSourceResolver(new HttpClient(new StubHandler(responder)), malIdResolver);
         var bridge = new Mock<IPythonBridgeService>();
         bridge.Setup(b => b.IsAvailableAsync()).ReturnsAsync(true);
         return (new ProveedorVideoAnimeAv1(bridge.Object, resolver), bridge);
@@ -124,6 +125,60 @@ public class ProveedorVideoAnimeAv1Tests
 
         // Assert: el manifiesto se devuelve (DownloadService lo enruta al daemon)
         url.Should().Be("https://cdn.example.com/master.m3u8");
+    }
+
+    [Fact]
+    public async Task BuscarUrlEpisodioAsync_MalIdDePaginaDiferente_DeberiaRechazarElAnimeEquivocado()
+    {
+        // Arrange: el MAL ID esperado (99999) no coincide con el de la página (62542)
+        // → es OTRO anime con nombre parecido → no se resuelve nada
+        var (proveedor, bridge) = Crear(req =>
+        {
+            if (req.RequestUri!.Host.Contains("animeav1.com")) return Ok(FixturePaginaEpisodio);
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        }, malIdResolver: (_, _) => Task.FromResult<int?>(99999));
+
+        // Act
+        var url = await proveedor.BuscarUrlEpisodioAsync(Titulos, 9, aniListId: 4408);
+
+        // Assert: rechazado sin descargar (la página no es del anime buscado)
+        url.Should().BeNull();
+        bridge.Verify(b => b.ExecuteCommandAsync<object, ProveedorVideoAnimeAv1.StreamResult>(
+            It.IsAny<string>(), It.IsAny<object>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task BuscarUrlEpisodioAsync_MalIdCoincide_DeberiaResolverNormalmente()
+    {
+        // Arrange: el MAL ID esperado (62542) coincide con la página
+        var (proveedor, _) = Crear(req =>
+        {
+            if (req.RequestUri!.Host.Contains("animeav1.com")) return Ok(FixturePaginaEpisodio);
+            if (req.RequestUri!.Host.Contains("mp4upload.com")) return Ok(FixturePlayerMp4Upload);
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        }, malIdResolver: (_, _) => Task.FromResult<int?>(62542));
+
+        // Act
+        var url = await proveedor.BuscarUrlEpisodioAsync(Titulos, 9, aniListId: 4408);
+
+        // Assert: resuelto (el anime de la página es el correcto)
+        url.Should().Be("https://cdn.mp4upload.com/r0xdfbvme2yy/720p/video.mp4");
+    }
+
+    [Fact]
+    public void ExtraerMalIdDelMedia_ConHtmlDelSitio_DeberiaExtraerElMalIdDelAnime()
+    {
+        // Act
+        var malId = AnimeAv1HtmlParser.ExtraerMalIdDelMedia(FixturePaginaEpisodio);
+
+        // Assert: el par slug+malId del media, no el de los géneros
+        malId.Should().Be(62542);
+    }
+
+    [Fact]
+    public void ExtraerMalIdDelMedia_SinMediaEnLaPagina_DeberiaDevolverNull()
+    {
+        AnimeAv1HtmlParser.ExtraerMalIdDelMedia("<html>sin datos</html>").Should().BeNull();
     }
 
     [Fact]

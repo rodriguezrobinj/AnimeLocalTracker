@@ -139,7 +139,14 @@ public partial class App : Application
         // IProveedorVideo intercambiable y el orquestador los prueba por
         // prioridad con degradación por salud (fallos → cooldown → reintento).
         services.AddSingleton<AnimeAv1VideoSourceResolver>(sp =>
-            new AnimeAv1VideoSourceResolver(sp.GetRequiredService<IHttpClientFactory>().CreateClient("Downloader")));
+        {
+            var http = sp.GetRequiredService<IHttpClientFactory>().CreateClient("Downloader");
+            // Anti-confusión: AniListId → MAL ID para verificar que la página del
+            // episodio es del anime correcto (nombres parecidos ya no descargan
+            // episodios equivocados).
+            var aniSkip = sp.GetRequiredService<IAniSkipService>();
+            return new AnimeAv1VideoSourceResolver(http, (id, ct) => aniSkip.ObtenerMalIdDesdeAniListAsync(id, ct));
+        });
         services.AddSingleton<ProveedorVideoAnimeAv1>();
         services.AddSingleton<IVideoSourceResolver>(sp => new OrquestadorMultiProveedor(
             new IProveedorVideo[]

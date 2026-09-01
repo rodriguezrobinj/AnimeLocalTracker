@@ -37,7 +37,7 @@ public class OrquestadorMultiProveedor : IVideoSourceResolver
         _cooldown = cooldown ?? TimeSpan.FromMinutes(5);
     }
 
-    public async Task<string?> BuscarUrlEpisodioAsync(IEnumerable<string> titulos, int numeroEpisodio, CancellationToken cancellationToken = default)
+    public async Task<string?> BuscarUrlEpisodioAsync(IEnumerable<string> titulos, int numeroEpisodio, int? aniListId = null, CancellationToken cancellationToken = default)
     {
         var titulosLista = titulos.ToList();
         foreach (var estado in _proveedores.Where(EstaSaludable))
@@ -46,7 +46,7 @@ public class OrquestadorMultiProveedor : IVideoSourceResolver
 
             try
             {
-                var url = await estado.Proveedor.BuscarUrlEpisodioAsync(titulosLista, numeroEpisodio, cancellationToken);
+                var url = await estado.Proveedor.BuscarUrlEpisodioAsync(titulosLista, numeroEpisodio, aniListId, cancellationToken);
                 if (!string.IsNullOrEmpty(url))
                 {
                     RegistrarExito(estado);

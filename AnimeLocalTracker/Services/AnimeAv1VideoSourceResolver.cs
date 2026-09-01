@@ -77,6 +77,17 @@ public static partial class AnimeAv1HtmlParser
         return match.Success ? match.Groups[1].Value : null;
     }
 
+    /// <summary>
+    /// Extrae el MAL ID del anime desde la página del episodio. El payload de
+    /// SvelteKit expone media:{...slug:"x",malId:62542,...}; el par slug+malId es
+    /// inequívoco (a diferencia de los géneros, que también tienen malId).
+    /// </summary>
+    public static int? ExtraerMalIdDelMedia(string html)
+    {
+        var m = MalIdMediaRegex().Match(html ?? string.Empty);
+        return m.Success && int.TryParse(m.Groups[1].Value, out var id) ? id : null;
+    }
+
     /// <summary>Extrae slugs candidatos de /media/{slug} o slug:"{slug}" (sin "catalogo").</summary>
     public static IEnumerable<string> ExtraerSlugs(string html)
     {
@@ -96,6 +107,9 @@ public static partial class AnimeAv1HtmlParser
     [GeneratedRegex(@"server\s*:\s*""([^""]+)""\s*,\s*url\s*:\s*""(https?://[^""]+)""", RegexOptions.IgnoreCase)]
     private static partial Regex EmbedServidorRegex();
 
+    [GeneratedRegex(@"slug:""[^""]*"",malId:(\d+)")]
+    private static partial Regex MalIdMediaRegex();
+
     [GeneratedRegex(@"(?:/media/|slug:\s*""?)([a-zA-Z0-9_-]+)")]
     private static partial Regex SlugsRegex();
 
@@ -112,17 +126,27 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
 
     private readonly HttpClient _httpClient;
 
-    public AnimeAv1VideoSourceResolver(HttpClient httpClient)
+    /// <summary>
+    /// Resuelve AniListId → MAL ID (para verificar que la página encontrada es el
+    /// anime correcto y no otro con nombre parecido). Nullable: sin resolver, la
+    /// coincidencia queda solo en la heurística de slugs.
+    /// </summary>
+    private readonly Func<int, CancellationToken, Task<int?>>? _malIdResolver;
+
+    public AnimeAv1VideoSourceResolver(
+        HttpClient httpClient,
+        Func<int, CancellationToken, Task<int?>>? malIdResolver = null)
     {
         _httpClient = httpClient;
+        _malIdResolver = malIdResolver;
     }
 
-    public async Task<string?> BuscarUrlEpisodioAsync(IEnumerable<string> titulos, int numeroEpisodio, CancellationToken cancellationToken = default)
+    public async Task<string?> BuscarUrlEpisodioAsync(IEnumerable<string> titulos, int numeroEpisodio, int? aniListId = null, CancellationToken cancellationToken = default)
     {
         // FASE 1 (multi-servidor): obtener los embeds de la página del episodio.
         // El C# solo resuelve MP4Upload; los demás servidores los orquesta
-        // PythonVideoSourceResolver con yt-dlp.
-        var embeds = await ObtenerEmbedsEpisodioAsync(titulos, numeroEpisodio, cancellationToken);
+        // ProveedorVideoAnimeAv1 con yt-dlp.
+        var embeds = await ObtenerEmbedsEpisodioAsync(titulos, numeroEpisodio, aniListId, cancellationToken);
         if (embeds.Count == 0) return null;
 
         var mp4 = embeds.FirstOrDefault(e => e.Server.Equals("MP4Upload", StringComparison.OrdinalIgnoreCase));
@@ -137,10 +161,20 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
     /// hosts permitidos por la política de seguridad.
     /// </summary>
     public async Task<List<AnimeAv1HtmlParser.EmbedServidor>> ObtenerEmbedsEpisodioAsync(
-        IEnumerable<string> titulos, int numeroEpisodio, CancellationToken cancellationToken = default)
+        IEnumerable<string> titulos, int numeroEpisodio, int? aniListId = null, CancellationToken cancellationToken = default)
     {
         var titulosLista = titulos.Where(t => !string.IsNullOrWhiteSpace(t)).ToList();
         var slugsProbados = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        // Verificación anti-confusión: si conocemos el AniListId, resolvemos su MAL ID
+        // y solo aceptamos páginas cuyo malId coincida (títulos parecidos de otros
+        // animes dejan de descargar episodios equivocados).
+        int? malIdEsperado = null;
+        if (aniListId.HasValue && _malIdResolver != null)
+        {
+            try { malIdEsperado = await _malIdResolver(aniListId.Value, cancellationToken); }
+            catch (Exception ex) { AppLogger.Debug("AnimeAv1VideoSourceResolver", $"No se pudo resolver MAL ID de {aniListId}: {ex.Message}"); }
+        }
 
         // FASE 1: Probar slugs generados directamente a partir de todos los títulos válidos
         foreach (var titulo in titulosLista)
@@ -149,7 +183,7 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
             {
                 if (slugsProbados.Add(slug) && EsSlugCompatible(slug, titulosLista))
                 {
-                    var embeds = await ObtenerEmbedsDePaginaAsync($"https://animeav1.com/media/{slug}/{numeroEpisodio}", cancellationToken);
+                    var embeds = await ObtenerEmbedsDePaginaAsync($"https://animeav1.com/media/{slug}/{numeroEpisodio}", malIdEsperado, cancellationToken);
                     if (embeds.Count > 0) return embeds;
                 }
             }
@@ -178,7 +212,7 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
                                 // VALIDACIÓN CRÍTICA: Asegurar que el slug encontrado corresponde a la temporada/secuela exacta solicitada
                                 EsSlugCompatible(discoveredSlug, titulosLista))
                             {
-                                var embeds = await ObtenerEmbedsDePaginaAsync($"https://animeav1.com/media/{discoveredSlug}/{numeroEpisodio}", cancellationToken);
+                                var embeds = await ObtenerEmbedsDePaginaAsync($"https://animeav1.com/media/{discoveredSlug}/{numeroEpisodio}", malIdEsperado, cancellationToken);
                                 if (embeds.Count > 0) return embeds;
                             }
                         }
@@ -195,10 +229,11 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
     }
 
     /// <summary>
-    /// Descarga la página del episodio y extrae sus embeds, filtrando los hosts
-    /// que no están en la allowlist de servidores (seguridad INT-01/SEC-16).
+    /// Descarga la página del episodio, verifica el MAL ID (si se espera uno) y
+    /// extrae sus embeds filtrando los hosts que no están en la allowlist de
+    /// servidores (seguridad INT-01/SEC-16).
     /// </summary>
-    private async Task<List<AnimeAv1HtmlParser.EmbedServidor>> ObtenerEmbedsDePaginaAsync(string pageUrl, CancellationToken cancellationToken)
+    private async Task<List<AnimeAv1HtmlParser.EmbedServidor>> ObtenerEmbedsDePaginaAsync(string pageUrl, int? malIdEsperado, CancellationToken cancellationToken)
     {
         try
         {
@@ -211,6 +246,17 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
             if (!res.IsSuccessStatusCode) return [];
 
             var html = await res.Content.ReadAsStringAsync(cancellationToken);
+
+            // Anti-confusión: si la página declara un malId distinto del esperado,
+            // es OTRO anime con nombre parecido → rechazar (siguiente slug).
+            var malIdPagina = AnimeAv1HtmlParser.ExtraerMalIdDelMedia(html);
+            if (malIdEsperado.HasValue && malIdPagina.HasValue && malIdPagina.Value != malIdEsperado.Value)
+            {
+                AppLogger.Warn("AnimeAv1VideoSourceResolver",
+                    $"Página {pageUrl} rechazada: malId {malIdPagina} != esperado {malIdEsperado} (anime con nombre parecido).");
+                return [];
+            }
+
             return AnimeAv1HtmlParser.ExtraerEmbeds(html)
                 .Where(e => Core.UrlSeguridad.EsUrlEmbedPermitida(e.Url))
                 .ToList();

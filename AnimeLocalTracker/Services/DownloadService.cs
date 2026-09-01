@@ -338,7 +338,7 @@ public class DownloadService : IDownloadService
 
                 if (string.IsNullOrEmpty(state.VideoUrl))
                 {
-                    state.VideoUrl = await _sourceResolver.BuscarUrlEpisodioAsync(state.Titulos, state.NumeroEpisodio, state.Cts.Token);
+                    state.VideoUrl = await _sourceResolver.BuscarUrlEpisodioAsync(state.Titulos, state.NumeroEpisodio, state.AniListId, state.Cts.Token);
                     if (string.IsNullOrEmpty(state.VideoUrl))
                     {
                         if (state.IsPaused || state.Cts.IsCancellationRequested) return;

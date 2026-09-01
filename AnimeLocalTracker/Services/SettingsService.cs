@@ -50,7 +50,7 @@ public class SettingsService : ISettingsService
                         {
                             config.RutaBaseAnimes = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), "Anime");
                         }
-                        // ATA-01: el settings.json puede estar editado a mano â€” sanear los atajos
+                        // ATA-01: el settings.json puede estar editado a mano — sanear los atajos
                         SanitizarAtajos(config);
                         return config;
                     }
@@ -58,7 +58,7 @@ public class SettingsService : ISettingsService
             }
             catch (Exception ex)
             {
-                AppLogger.Warn("SettingsService", $"No se pudo leer archivo de configuraciÃ³n: {ex.Message}");
+                AppLogger.Warn("SettingsService", $"No se pudo leer archivo de configuración: {ex.Message}");
             }
 
             var defaultSettings = new AppSettings();
@@ -81,7 +81,7 @@ public class SettingsService : ISettingsService
     /// - Se rechazan teclas de sistema (Win) y valores que no corresponden a una tecla real.
     /// - Cada tecla se asigna una sola vez: si dos acciones piden la misma, la segunda
     ///   vuelve a su valor por defecto.
-    /// - Las acciones ausentes se completan con los defaults (fallback por acciÃ³n).
+    /// - Las acciones ausentes se completan con los defaults (fallback por acción).
     /// </summary>
     private static void SanitizarAtajos(AppSettings config)
     {
@@ -129,7 +129,7 @@ public class SettingsService : ISettingsService
             GuardarEnDiscoInterno(_configuracion);
         }
 
-        AppLogger.Info("SettingsService", "ConfiguraciÃ³n guardada exitosamente.");
+        AppLogger.Info("SettingsService", "Configuración guardada exitosamente.");
         ConfiguracionModificada?.Invoke(configuracion);
         return Task.CompletedTask;
     }
@@ -149,7 +149,7 @@ public class SettingsService : ISettingsService
         }
         catch (Exception ex)
         {
-            AppLogger.Error("SettingsService", "Error escribiendo archivo de configuraciÃ³n", ex);
+            AppLogger.Error("SettingsService", "Error escribiendo archivo de configuración", ex);
         }
     }
 

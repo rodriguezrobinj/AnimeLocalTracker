@@ -29,9 +29,12 @@ public class OrquestadorMultiProveedorTests
         }
 
         public string Nombre { get; }
-        public Task<string?> BuscarUrlEpisodioAsync(IEnumerable<string> titulos, int numeroEpisodio, CancellationToken ct = default)
+        public int? UltimoAniListId { get; private set; }
+
+        public Task<string?> BuscarUrlEpisodioAsync(IEnumerable<string> titulos, int numeroEpisodio, int? aniListId = null, CancellationToken ct = default)
         {
             Llamadas++;
+            UltimoAniListId = aniListId;
             return _resolver();
         }
 
@@ -140,5 +143,19 @@ public class OrquestadorMultiProveedorTests
 
         // Assert
         url.Should().Be("https://p1.com/directo.mp4");
+    }
+
+    [Fact]
+    public async Task BuscarUrlEpisodioAsync_ConAniListId_DeberiaPasarloAlProveedor()
+    {
+        // Arrange
+        var p1 = new ProveedorStub("P1", () => Task.FromResult<string?>("https://p1.com/v.mp4"));
+        var orquestador = new OrquestadorMultiProveedor(new IProveedorVideo[] { p1 });
+
+        // Act
+        await orquestador.BuscarUrlEpisodioAsync(Titulos, 7, aniListId: 4408);
+
+        // Assert: el identificador viaja hasta el proveedor (para el chequeo de MAL ID)
+        p1.UltimoAniListId.Should().Be(4408);
     }
 }
