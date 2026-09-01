@@ -58,6 +58,8 @@ public partial class ConfiguracionViewModel : ObservableObject
         // Aplicar el idioma al instante: los bindings de la UI se refrescan solos
         LocalizationService.Instance.Idioma = value;
         OnPropertyChanged(nameof(IdiomaTexto));
+        // LOC-04: el contador compone el texto localizado de forma no reactiva → refrescarlo aquí
+        OnPropertyChanged(nameof(TotalAnimesTexto));
     }
 
     // === AUTENTICACIÓN ANILIST ===
@@ -358,6 +360,42 @@ public partial class ConfiguracionViewModel : ObservableObject
         {
             AppLogger.Error("ConfiguracionViewModel", "Error exportando biblioteca", ex);
             await _dialogService.MostrarDialogoAsync("Error", LocalizationService.T("Cfg_BackupError"), false, "AlertCircleOutline", "#EF4444");
+        }
+    }
+
+    /// <summary>Restaura la biblioteca desde una copia de seguridad (.db) con validación de integridad (BAK-03).</summary>
+    [RelayCommand]
+    public async Task RestaurarBackupAsync()
+    {
+        bool confirmar = await _dialogService.MostrarDialogoAsync(
+            LocalizationService.T("Cfg_RestaurarBackup"),
+            LocalizationService.T("Cfg_RestaurarConfirmacion"),
+            true, "Restore", "#F59E0B");
+        if (!confirmar) return;
+
+        var dialogo = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = LocalizationService.T("Cfg_RestaurarBackup"),
+            Filter = "Base de datos SQLite (*.db)|*.db"
+        };
+        if (dialogo.ShowDialog() != true) return;
+
+        try
+        {
+            bool ok = await _databaseService.RestaurarCopiaSeguridadAsync(dialogo.FileName);
+            if (ok)
+            {
+                CargarDatosConfiguracion(); // refrescar contador y espacio tras restaurar
+            }
+            await _dialogService.MostrarDialogoAsync(
+                ok ? "OK" : "Error",
+                ok ? LocalizationService.T("Cfg_RestaurarOk") : LocalizationService.T("Cfg_RestaurarError"),
+                false, ok ? "CheckCircleOutline" : "AlertCircleOutline", ok ? "#4CAF50" : "#EF4444");
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("ConfiguracionViewModel", "Error restaurando copia de seguridad", ex);
+            await _dialogService.MostrarDialogoAsync("Error", LocalizationService.T("Cfg_RestaurarError"), false, "AlertCircleOutline", "#EF4444");
         }
     }
 

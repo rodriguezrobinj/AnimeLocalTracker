@@ -13,6 +13,7 @@ public interface IDatabaseService
     Task EliminarAnimeAsync(AnimeItem anime);
     Task EliminarRegistroEpisodioAsync(int aniListId, int numeroEpisodio);
     Task<bool> ExportarCopiaSeguridadAsync(string rutaDestino);
+    Task<bool> RestaurarCopiaSeguridadAsync(string rutaOrigen);
     Task<int> ExportarBibliotecaJsonAsync(string rutaDestino);
     Task<int> ImportarBibliotecaJsonAsync(string rutaOrigen);
     

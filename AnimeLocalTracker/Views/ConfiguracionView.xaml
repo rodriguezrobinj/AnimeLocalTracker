@@ -82,7 +82,7 @@
                                     Background="#3B82F6" BorderBrush="#1D4ED8" Foreground="White"
                                     Height="42" Padding="16,0" Margin="0,0,8,0"
                                     materialDesign:ButtonAssist.CornerRadius="8"
-                                    ToolTip="Elegir una nueva carpeta de almacenamiento">
+                                    ToolTip="{Binding [Cfg_CambiarCarpetaTip], Source={x:Static loc:LocalizationService.Instance}}">
                                 <StackPanel Orientation="Horizontal">
                                     <materialDesign:PackIcon Kind="FolderEditOutline" Width="18" Height="18" VerticalAlignment="Center" Margin="0,0,6,0"/>
                                     <TextBlock Text="{Binding [Cfg_CambiarCarpeta], Source={x:Static loc:LocalizationService.Instance}}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="12"/>
@@ -94,7 +94,7 @@
                                     BorderBrush="#6B7280" Foreground="#E2E8F0"
                                     Height="42" Padding="16,0"
                                     materialDesign:ButtonAssist.CornerRadius="8"
-                                    ToolTip="Abrir en el Explorador de Windows">
+                                    ToolTip="{Binding [Cfg_ExploradorTip], Source={x:Static loc:LocalizationService.Instance}}">
                                 <StackPanel Orientation="Horizontal">
                                     <materialDesign:PackIcon Kind="OpenInNew" Width="18" Height="18" VerticalAlignment="Center" Margin="0,0,6,0"/>
                                     <TextBlock Text="{Binding [Cfg_Explorador], Source={x:Static loc:LocalizationService.Instance}}" VerticalAlignment="Center" FontWeight="Medium" FontSize="12"/>
@@ -123,16 +123,17 @@
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                     <materialDesign:PackIcon Kind="AnimationPlay" Foreground="#93C5FD" Width="20" Height="20" VerticalAlignment="Center" Margin="0,0,12,0"/>
                                     <StackPanel VerticalAlignment="Center">
-                                        <TextBlock Text="Colección Total" FontSize="10" Foreground="#9CA3AF" FontWeight="SemiBold"/>
+                                        <TextBlock Text="{Binding [Cfg_ColeccionTotal], Source={x:Static loc:LocalizationService.Instance}}" FontSize="10" Foreground="#9CA3AF" FontWeight="SemiBold"/>
                                         <TextBlock Text="{Binding TotalAnimesTexto}" Foreground="White" FontSize="13" FontWeight="Bold" Margin="0,2,0,0"/>
                                     </StackPanel>
                                 </StackPanel>
                             </Border>
                         </Grid>
 
-                        <!-- Mantenimiento: limpiar caché + Respaldos: exportar DB / exportar JSON / importar JSON -->
+                        <!-- Mantenimiento: limpiar caché + Respaldos: exportar DB / exportar JSON / importar JSON / restaurar -->
                         <Grid Margin="0,16,0,0">
                             <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="*"/>
@@ -175,12 +176,23 @@
                             <Button Grid.Column="3" Command="{Binding ImportarBibliotecaCommand}"
                                     Style="{StaticResource MaterialDesignOutlinedButton}"
                                     BorderBrush="#F59E0B" Foreground="#FCD34D"
-                                    Height="40" Padding="16,0" Margin="6,0,0,0"
+                                    Height="40" Padding="16,0" Margin="3,0,3,0"
                                     materialDesign:ButtonAssist.CornerRadius="8"
                                     ToolTip="{Binding [Cfg_ImportarBiblioteca], Source={x:Static loc:LocalizationService.Instance}}">
                                 <StackPanel Orientation="Horizontal">
                                     <materialDesign:PackIcon Kind="Import" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,7,0"/>
                                     <TextBlock Text="{Binding [Cfg_BtnImportarJson], Source={x:Static loc:LocalizationService.Instance}}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="12"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Grid.Column="4" Command="{Binding RestaurarBackupCommand}"
+                                    Style="{StaticResource MaterialDesignOutlinedButton}"
+                                    BorderBrush="#F87171" Foreground="#FCA5A5"
+                                    Height="40" Padding="16,0" Margin="6,0,0,0"
+                                    materialDesign:ButtonAssist.CornerRadius="8"
+                                    ToolTip="{Binding [Cfg_RestaurarBackup], Source={x:Static loc:LocalizationService.Instance}}">
+                                <StackPanel Orientation="Horizontal">
+                                    <materialDesign:PackIcon Kind="DatabaseImportOutline" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,7,0"/>
+                                    <TextBlock Text="{Binding [Cfg_BtnRestaurar], Source={x:Static loc:LocalizationService.Instance}}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="12"/>
                                 </StackPanel>
                             </Button>
                         </Grid>
@@ -393,7 +405,7 @@
 
                                     <TextBlock Grid.Row="0" Grid.Column="0" Text="{Binding [Atajo_PlayPausa], Source={x:Static loc:LocalizationService.Instance}}" Foreground="#D1D5DB" FontSize="12" VerticalAlignment="Center" Margin="0,4"/>
                                     <ComboBox Grid.Row="0" Grid.Column="1" SelectedValue="{Binding Atajos[PlayPausa], Mode=TwoWay}" SelectedValuePath="Tag" Height="32" MinWidth="130" Margin="8,2">
-                                        <ComboBoxItem Content="Espacio" Tag="Space"/><ComboBoxItem Content="Enter" Tag="Return"/><ComboBoxItem Content="P" Tag="P"/>
+                                        <ComboBoxItem Content="{Binding [Tecla_Espacio], Source={x:Static loc:LocalizationService.Instance}}" Tag="Space"/><ComboBoxItem Content="Enter" Tag="Return"/><ComboBoxItem Content="P" Tag="P"/>
                                     </ComboBox>
 
                                     <TextBlock Grid.Row="1" Grid.Column="0" Text="{Binding [Atajo_PantallaCompleta], Source={x:Static loc:LocalizationService.Instance}}" Foreground="#D1D5DB" FontSize="12" VerticalAlignment="Center" Margin="0,4"/>

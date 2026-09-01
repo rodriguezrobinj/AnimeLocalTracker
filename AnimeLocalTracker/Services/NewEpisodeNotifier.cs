@@ -24,11 +24,16 @@ public class NewEpisodeNotifier
     public NewEpisodeNotifier(
         IDatabaseService databaseService,
         IFileScannerService fileScannerService,
-        ISettingsService settingsService)
+        ISettingsService settingsService,
+        string? customNotificadosPath = null)
     {
         _databaseService = databaseService;
         _fileScannerService = fileScannerService;
         _settingsService = settingsService;
+        if (!string.IsNullOrWhiteSpace(customNotificadosPath))
+        {
+            _notificadosPath = customNotificadosPath;
+        }
     }
 
     /// <summary>
@@ -103,13 +108,23 @@ public class NewEpisodeNotifier
     {
         try
         {
-            // Acotar el historial para que el JSON no crezca sin límite (máx 5000 entradas)
+            // UX-02 (NOT-02, decisión tomada): el JSON es solo dedup temporal. Con >5000
+            // entradas se descartan las antiguas y podrían re-notificarse si el escaneo
+            // vuelve a verlas como "nuevas" — aceptado: la fuente de verdad son los
+            // registros de la DB (un episodio registrado nunca se notifica dos veces).
+            // Migrar el dedup a la DB eliminaría este límite (pendiente Fase 6).
             var lista = notificados.Count > 5000
                 ? notificados.TakeLast(5000).ToList()
                 : notificados.ToList();
 
-            Directory.CreateDirectory(Path.GetDirectoryName(_notificadosPath)!);
-            File.WriteAllText(_notificadosPath, JsonSerializer.Serialize(lista));
+            var dir = Path.GetDirectoryName(_notificadosPath);
+            if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+
+            // NOT-01: escritura atómica — un crash a mitad de escritura no puede dejar el
+            // JSON corrupto (que CargarNotificados degradaría a vacío y re-notificaría todo)
+            string tmp = _notificadosPath + ".tmp";
+            File.WriteAllText(tmp, JsonSerializer.Serialize(lista));
+            File.Move(tmp, _notificadosPath, overwrite: true);
         }
         catch { }
     }

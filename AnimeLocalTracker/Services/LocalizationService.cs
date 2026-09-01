@@ -20,6 +20,8 @@ public sealed class LocalizationService : INotifyPropertyChanged
         get => _idioma;
         set
         {
+            // LOC-03: normalizar — cualquier valor que no sea "en" se trata como "es"
+            value = value == "en" ? "en" : "es";
             if (_idioma != value)
             {
                 _idioma = value;
@@ -101,7 +103,56 @@ public sealed class LocalizationService : INotifyPropertyChanged
 
         ["Notif_NuevosEpisodios"] = "Episodios nuevos",
         ["Notif_ResumenNuevos"] = "nuevo(s) episodio(s) detectado(s) en tu biblioteca:",
-        ["Notif_SinTitulo"] = "Anime"
+        ["Notif_SinTitulo"] = "Anime",
+
+        // === ESTADÍSTICAS (LOC-01) ===
+        ["Stats_Titulo"] = "Panel de Estadísticas",
+        ["Stats_Subtitulo"] = "Análisis de tu historial de visualización",
+        ["Stats_EpisodiosVistos"] = "EPISODIOS VISTOS",
+        ["Stats_HorasReproducidas"] = "HORAS REPRODUCIDAS",
+        ["Stats_AnimesBiblioteca"] = "ANIMES EN BIBLIOTECA",
+        ["Stats_BibliotecaCompletada"] = "BIBLIOTECA COMPLETADA",
+        ["Stats_AMedioVer"] = "A medio ver",
+        ["Stats_EpisodiosFavoritos"] = "Episodios favoritos",
+        ["Stats_EpisodiosDescargados"] = "Episodios descargados",
+        ["Stats_DuracionPromedio"] = "Duración promedio / ep.",
+        ["Stats_GeneroFavorito"] = "GÉNERO FAVORITO",
+        ["Stats_AnimeMasVisto"] = "ANIME MÁS VISTO",
+        ["Stats_AnioMasActivo"] = "AÑO MÁS ACTIVO",
+        ["Stats_Ritmo"] = "RITMO",
+        ["Stats_PorMes"] = " / mes",
+        ["Stats_RachaActual"] = "Racha actual: ",
+        ["Stats_DistribucionLista"] = "Distribución de tu lista",
+        ["Stats_PorEstado"] = "Por estado de seguimiento",
+        ["Stats_DonutCentroAnimes"] = "animes",
+        ["Stats_AnalisisGenero"] = "Análisis de género",
+        ["Stats_GeneroSub"] = "Animes con episodios vistos, por género",
+        ["Stats_Actividad7Dias"] = "Actividad de los últimos 7 días",
+        ["Stats_PromedioDiarioSub"] = " episodios/día · racha máxima: ",
+        ["Stats_TopAnimes"] = "Top 5 animes más vistos",
+        ["Stats_TopAnimesSub"] = "Por número de episodios reproducidos",
+        ["Stats_PorAnio"] = "Episodios vistos por año",
+        ["Stats_PorAnioSub"] = "Evolución de tu consumo anual",
+
+        // === VENTANA PRINCIPAL (LOC-01) ===
+        ["Nav_Estadisticas"] = "Estadísticas",
+        ["Nav_ComprobarUpdates"] = "Comprobar actualizaciones en GitHub",
+        ["Nav_PantallaCompleta"] = "Pantalla Completa (F11)",
+        ["Dlg_Cancelar"] = "CANCELAR",
+        ["Dlg_Aceptar"] = "ACEPTAR",
+
+        // === CONFIGURACIÓN (LOC-02) ===
+        ["Cfg_CambiarCarpetaTip"] = "Elegir una nueva carpeta de almacenamiento",
+        ["Cfg_ExploradorTip"] = "Abrir en el Explorador de Windows",
+        ["Cfg_ColeccionTotal"] = "Colección Total",
+        ["Tecla_Espacio"] = "Espacio",
+
+        // === RESTAURAR BACKUP (BAK-03) ===
+        ["Cfg_BtnRestaurar"] = "Restaurar copia",
+        ["Cfg_RestaurarBackup"] = "Restaurar copia de seguridad",
+        ["Cfg_RestaurarConfirmacion"] = "Se reemplazará la biblioteca actual por la copia seleccionada. ¿Continuar?",
+        ["Cfg_RestaurarOk"] = "Biblioteca restaurada correctamente.",
+        ["Cfg_RestaurarError"] = "No se pudo restaurar la copia (archivo inválido o corrupto)."
     };
 
     private static readonly Dictionary<string, string> En = new()
@@ -177,7 +228,56 @@ public sealed class LocalizationService : INotifyPropertyChanged
 
         ["Notif_NuevosEpisodios"] = "New episodes",
         ["Notif_ResumenNuevos"] = "new episode(s) detected in your library:",
-        ["Notif_SinTitulo"] = "Anime"
+        ["Notif_SinTitulo"] = "Anime",
+
+        // === STATISTICS (LOC-01) ===
+        ["Stats_Titulo"] = "Statistics Dashboard",
+        ["Stats_Subtitulo"] = "Analysis of your watch history",
+        ["Stats_EpisodiosVistos"] = "EPISODES WATCHED",
+        ["Stats_HorasReproducidas"] = "HOURS PLAYED",
+        ["Stats_AnimesBiblioteca"] = "ANIME IN LIBRARY",
+        ["Stats_BibliotecaCompletada"] = "LIBRARY COMPLETED",
+        ["Stats_AMedioVer"] = "In progress",
+        ["Stats_EpisodiosFavoritos"] = "Favorite episodes",
+        ["Stats_EpisodiosDescargados"] = "Downloaded episodes",
+        ["Stats_DuracionPromedio"] = "Avg. duration / ep.",
+        ["Stats_GeneroFavorito"] = "FAVORITE GENRE",
+        ["Stats_AnimeMasVisto"] = "MOST WATCHED ANIME",
+        ["Stats_AnioMasActivo"] = "MOST ACTIVE YEAR",
+        ["Stats_Ritmo"] = "PACE",
+        ["Stats_PorMes"] = " / month",
+        ["Stats_RachaActual"] = "Current streak: ",
+        ["Stats_DistribucionLista"] = "Your list distribution",
+        ["Stats_PorEstado"] = "By tracking status",
+        ["Stats_DonutCentroAnimes"] = "anime",
+        ["Stats_AnalisisGenero"] = "Genre analysis",
+        ["Stats_GeneroSub"] = "Anime with watched episodes, by genre",
+        ["Stats_Actividad7Dias"] = "Activity of the last 7 days",
+        ["Stats_PromedioDiarioSub"] = " episodes/day · max streak: ",
+        ["Stats_TopAnimes"] = "Top 5 most watched anime",
+        ["Stats_TopAnimesSub"] = "By number of episodes played",
+        ["Stats_PorAnio"] = "Episodes watched per year",
+        ["Stats_PorAnioSub"] = "Evolution of your yearly consumption",
+
+        // === MAIN WINDOW (LOC-01) ===
+        ["Nav_Estadisticas"] = "Statistics",
+        ["Nav_ComprobarUpdates"] = "Check for updates on GitHub",
+        ["Nav_PantallaCompleta"] = "Fullscreen (F11)",
+        ["Dlg_Cancelar"] = "CANCEL",
+        ["Dlg_Aceptar"] = "OK",
+
+        // === SETTINGS (LOC-02) ===
+        ["Cfg_CambiarCarpetaTip"] = "Choose a new storage folder",
+        ["Cfg_ExploradorTip"] = "Open in Windows Explorer",
+        ["Cfg_ColeccionTotal"] = "Total Collection",
+        ["Tecla_Espacio"] = "Space",
+
+        // === RESTORE BACKUP (BAK-03) ===
+        ["Cfg_BtnRestaurar"] = "Restore backup",
+        ["Cfg_RestaurarBackup"] = "Restore backup",
+        ["Cfg_RestaurarConfirmacion"] = "The current library will be replaced by the selected backup. Continue?",
+        ["Cfg_RestaurarOk"] = "Library restored successfully.",
+        ["Cfg_RestaurarError"] = "Could not restore the backup (invalid or corrupt file)."
     };
 
     public string this[string key] =>

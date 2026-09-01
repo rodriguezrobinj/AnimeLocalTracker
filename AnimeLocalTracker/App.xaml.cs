@@ -237,8 +237,10 @@ public partial class App : Application
             // Obligamos a que se cree el archivo y la tabla antes de continuar
             await dbService.InicializarBaseDatosAsync();
 
-            // Backup rotativo de la biblioteca (protección contra corrupción/pérdida)
-            await dbService.CrearBackupRotativoAsync();
+            // Backup rotativo de la biblioteca (protección contra corrupción/pérdida).
+            // BAK-02: se dispara en segundo plano para no retrasar la aparición de la
+            // ventana; DatabaseService captura y registra sus propios errores.
+            _ = dbService.CrearBackupRotativoAsync();
 
             // Iniciar sincronización periódica en segundo plano
             var syncService = ServiceProvider.GetRequiredService<ISyncService>();
