@@ -80,11 +80,18 @@ public static partial class AnimeAv1HtmlParser
     /// <summary>
     /// Extrae el MAL ID del anime desde la página del episodio. El payload de
     /// SvelteKit expone media:{...slug:"x",malId:62542,...}; el par slug+malId es
-    /// inequívoco (a diferencia de los géneros, que también tienen malId).
+    /// inequívoco SIEMPRE QUE se busque tras votes: — los géneros también tienen
+    /// pares slug:"fantasia",malId:10 ANTES del media y contaminarían la primera
+    /// coincidencia. votes solo existe en el media.
     /// </summary>
     public static int? ExtraerMalIdDelMedia(string html)
     {
-        var m = MalIdMediaRegex().Match(html ?? string.Empty);
+        if (string.IsNullOrWhiteSpace(html)) return null;
+
+        int inicio = html.IndexOf("votes:", StringComparison.Ordinal);
+        string seccion = inicio >= 0 ? html[inicio..] : html;
+
+        var m = MalIdMediaRegex().Match(seccion);
         return m.Success && int.TryParse(m.Groups[1].Value, out var id) ? id : null;
     }
 

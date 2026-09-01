@@ -198,6 +198,29 @@ public class ProveedorVideoAnimeAv1Tests
     }
 
     [Fact]
+    public void ExtraerMalIdDelMedia_ConGenerosConMalIdAntes_DeberiaExtraerElDelAnime()
+    {
+        // Arrange: payload real — los géneros (malId 10/22) aparecen ANTES del media
+        // (malId 61240). Regresión: la regex antigua tomaba el malId del género.
+        string html = """
+            <script>{__sveltekit_1p4gm49 = {data: [{type:"data",data:{media:{id:4426,title:"Futsutsuka na Akujo dewa Gozaimasu ga: Suuguu Chouso Torikae Den",aka:{},genres:[{id:7,name:"Fantasía",type:0,slug:"fantasia",malId:10},{id:10,name:"Romance",type:0,slug:"romance",malId:22}],synopsis:"...",status:2,score:8.16,votes:9307,slug:"futsutsuka-na-akujo-dewa-gozaimasu-ga-suuguu-chouso-torikae-den",malId:61240,seasons:null,episodes:[{id:59664,number:3}]}}}]}}</script>
+            """;
+
+        // Act
+        var malId = AnimeAv1HtmlParser.ExtraerMalIdDelMedia(html);
+
+        // Assert: el malId del ANIME, no el del género "Fantasía"
+        malId.Should().Be(61240);
+    }
+
+    [Fact]
+    public void ExtraerMalIdDelMedia_SinVotes_DeberiaDevolverLaPrimeraCoincidencia()
+    {
+        // Fixtures de test sin votes (Grand Blue/DBZ): primera coincidencia = media
+        AnimeAv1HtmlParser.ExtraerMalIdDelMedia(FixturePeliculaMedia).Should().Be(14837);
+    }
+
+    [Fact]
     public void ExtraerMalIdDelMedia_SinMediaEnLaPagina_DeberiaDevolverNull()
     {
         AnimeAv1HtmlParser.ExtraerMalIdDelMedia("<html>sin datos</html>").Should().BeNull();
