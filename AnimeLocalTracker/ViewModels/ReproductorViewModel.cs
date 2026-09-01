@@ -961,6 +961,9 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                 RedirectStandardError = true
             };
             psi.ArgumentList.Add("-y");
+            psi.ArgumentList.Add("-nostdin");
+            // Sec: acota la asignación de memoria por bloque en ffmpeg (2 GB)
+            psi.ArgumentList.Add("-max_alloc"); psi.ArgumentList.Add("2147483648");
             psi.ArgumentList.Add("-loglevel"); psi.ArgumentList.Add("error");
             psi.ArgumentList.Add("-ss"); psi.ArgumentList.Add(posicion.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture));
             psi.ArgumentList.Add("-i"); psi.ArgumentList.Add(_rutaVideo);

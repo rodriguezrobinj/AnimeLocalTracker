@@ -45,6 +45,9 @@ pub fn extract_frame(
     cmd.args([
         "-y",
         "-nostdin",
+        // Sec: acota la asignación de memoria por bloque (av_malloc) para que un
+        // demuxer/header malicioso no pueda hacer bombas de memoria (2 GB).
+        "-max_alloc", "2147483648",
         "-loglevel", "error",
         "-ss", &ts_str,
         "-i", video_path,
