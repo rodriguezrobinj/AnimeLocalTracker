@@ -40,8 +40,14 @@ namespace AnimeLocalTracker.Services.Python
 
                     if (result != null && result.Success && !string.IsNullOrEmpty(result.DirectUrl))
                     {
-                        AppLogger.Info("PythonVideoResolver", $"Stream resuelto exitosamente con yt-dlp: {SanitizarUrlParaLog(result.DirectUrl)}");
-                        return result.DirectUrl;
+                        // Hardening INT-01: el resultado de yt-dlp también pasa la
+                        // política https (si no, se cae al fallback C# validado).
+                        if (Core.UrlSeguridad.EsUrlDescargaHttpSegura(result.DirectUrl))
+                        {
+                            AppLogger.Info("PythonVideoResolver", $"Stream resuelto exitosamente con yt-dlp: {SanitizarUrlParaLog(result.DirectUrl)}");
+                            return result.DirectUrl;
+                        }
+                        AppLogger.Warn("PythonVideoResolver", "Stream de yt-dlp rechazado (URL no https). Usando fallback C#.");
                     }
                 }
             }

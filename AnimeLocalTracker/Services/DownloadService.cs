@@ -402,6 +402,14 @@ public class DownloadService : IDownloadService
 
     public async Task DownloadVideoAsync(string videoUrl, string destinationPath, IProgress<double>? progress = null, CancellationToken cancellationToken = default)
     {
+        // Hardening INT-01 (defensa en profundidad): el punto de descarga solo acepta
+        // https sin credenciales, venga la URL de donde venga (scraper, yt-dlp o entrada).
+        if (!Core.UrlSeguridad.EsUrlDescargaHttpSegura(videoUrl))
+        {
+            AppLogger.Warn("DownloadService", "URL de video rechazada: no es https o contiene credenciales embebidas.");
+            throw new InvalidOperationException("La URL del video no es segura (solo se admiten enlaces https).");
+        }
+
         var dir = Path.GetDirectoryName(destinationPath);
         if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
         {

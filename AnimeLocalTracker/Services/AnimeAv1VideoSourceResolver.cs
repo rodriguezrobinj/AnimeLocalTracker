@@ -196,8 +196,12 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
 
             var html = await res.Content.ReadAsStringAsync(cancellationToken);
 
-            // INT-01: parseo delegado al contrato tipado (testeable con fixtures)
-            return AnimeAv1HtmlParser.ExtraerVideoDirecto(html);
+            // INT-01: parseo delegado al contrato tipado (testeable con fixtures).
+            // Hardening: la URL extraída del HTML de terceros solo se acepta si es
+            // https y pertenece a mp4upload.com (un proveedor comprometido no puede
+            // redirigir la descarga a un servidor arbitrario).
+            var url = AnimeAv1HtmlParser.ExtraerVideoDirecto(html);
+            return Core.UrlSeguridad.EsUrlVideoPermitida(url) ? url : null;
         }
         catch (Exception ex)
         {
