@@ -13,11 +13,11 @@ using Xunit;
 namespace AnimeLocalTracker.Tests.Services;
 
 /// <summary>
-/// Orquestación multi-servidor (Fase 1): la página del episodio publica embeds de
-/// HLS/UPNShare/Voe/Byse/Mega/MP4Upload. Se prueban por preferencia: MP4Upload con
-/// el extractor C# y el resto vía yt-dlp (daemon mockeado, sin red real).
+/// Proveedor AnimeAV1 como fuente intercambiable (Fase A): embeds multi-servidor
+/// de la página del episodio (MP4Upload directo + Voe/UPNShare/HLS/Byse vía
+/// yt-dlp mockeado, sin red real).
 /// </summary>
-public class PythonVideoSourceResolverTests
+public class ProveedorVideoAnimeAv1Tests
 {
     private const string FixturePaginaEpisodio = """
         <html><body>
@@ -48,17 +48,13 @@ public class PythonVideoSourceResolverTests
             => Task.FromResult(_responder(request));
     }
 
-    private static (PythonVideoSourceResolver Resolver, Mock<IPythonBridgeService> Bridge) Crear(
+    private static (ProveedorVideoAnimeAv1 Proveedor, Mock<IPythonBridgeService> Bridge) Crear(
         Func<HttpRequestMessage, HttpResponseMessage> responder)
     {
-        var handler = new StubHandler(responder);
-        var httpFactory = new Mock<IHttpClientFactory>();
-        httpFactory.Setup(f => f.CreateClient(It.IsAny<string>())).Returns(new HttpClient(handler));
-
+        var resolver = new AnimeAv1VideoSourceResolver(new HttpClient(new StubHandler(responder)));
         var bridge = new Mock<IPythonBridgeService>();
         bridge.Setup(b => b.IsAvailableAsync()).ReturnsAsync(true);
-
-        return (new PythonVideoSourceResolver(bridge.Object, httpFactory.Object), bridge);
+        return (new ProveedorVideoAnimeAv1(bridge.Object, resolver), bridge);
     }
 
     private static HttpResponseMessage Ok(string html) =>
@@ -69,7 +65,7 @@ public class PythonVideoSourceResolverTests
     {
         // Arrange: la página del episodio responde con los 6 embeds y el player de
         // mp4upload con src directo. El daemon NO debe intervenir.
-        var (resolver, bridge) = Crear(req =>
+        var (proveedor, bridge) = Crear(req =>
         {
             if (req.RequestUri!.Host.Contains("animeav1.com")) return Ok(FixturePaginaEpisodio);
             if (req.RequestUri!.Host.Contains("mp4upload.com")) return Ok(FixturePlayerMp4Upload);
@@ -77,11 +73,11 @@ public class PythonVideoSourceResolverTests
         });
 
         // Act
-        var url = await resolver.BuscarUrlEpisodioAsync(Titulos, 9);
+        var url = await proveedor.BuscarUrlEpisodioAsync(Titulos, 9);
 
         // Assert: URL directa del CDN de mp4upload, validada por la política
         url.Should().Be("https://cdn.mp4upload.com/r0xdfbvme2yy/720p/video.mp4");
-        bridge.Verify(b => b.ExecuteCommandAsync<object, PythonVideoSourceResolver.StreamResult>(
+        bridge.Verify(b => b.ExecuteCommandAsync<object, ProveedorVideoAnimeAv1.StreamResult>(
             It.IsAny<string>(), It.IsAny<object>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -89,22 +85,22 @@ public class PythonVideoSourceResolverTests
     public async Task BuscarUrlEpisodioAsync_Mp4UploadRoto_DeberiaCaerAlSiguienteServidorViaYtDlp()
     {
         // Arrange: mp4upload sin src (extracción falla) → Voe se resuelve con el daemon
-        var (resolver, bridge) = Crear(req =>
+        var (proveedor, bridge) = Crear(req =>
         {
             if (req.RequestUri!.Host.Contains("animeav1.com")) return Ok(FixturePaginaEpisodio);
             if (req.RequestUri!.Host.Contains("mp4upload.com")) return Ok("<html>sin player</html>");
             return new HttpResponseMessage(HttpStatusCode.NotFound);
         });
-        bridge.Setup(b => b.ExecuteCommandAsync<object, PythonVideoSourceResolver.StreamResult>(
+        bridge.Setup(b => b.ExecuteCommandAsync<object, ProveedorVideoAnimeAv1.StreamResult>(
                 "resolve-stream", It.IsAny<object>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new PythonVideoSourceResolver.StreamResult { Success = true, DirectUrl = "https://cdn.voe.example.com/video.mp4" });
+            .ReturnsAsync(new ProveedorVideoAnimeAv1.StreamResult { Success = true, DirectUrl = "https://cdn.voe.example.com/video.mp4" });
 
         // Act
-        var url = await resolver.BuscarUrlEpisodioAsync(Titulos, 9);
+        var url = await proveedor.BuscarUrlEpisodioAsync(Titulos, 9);
 
         // Assert: resuelto por yt-dlp con el servidor Voe
         url.Should().Be("https://cdn.voe.example.com/video.mp4");
-        bridge.Verify(b => b.ExecuteCommandAsync<object, PythonVideoSourceResolver.StreamResult>(
+        bridge.Verify(b => b.ExecuteCommandAsync<object, ProveedorVideoAnimeAv1.StreamResult>(
             "resolve-stream", It.IsAny<object>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -113,18 +109,18 @@ public class PythonVideoSourceResolverTests
     {
         // Arrange: yt-dlp devuelve un manifiesto m3u8 → se entrega al descargador
         // segmentado del daemon (fase 2), no se descarta
-        var (resolver, bridge) = Crear(req =>
+        var (proveedor, bridge) = Crear(req =>
         {
             if (req.RequestUri!.Host.Contains("animeav1.com")) return Ok(FixturePaginaEpisodio);
             if (req.RequestUri!.Host.Contains("mp4upload.com")) return Ok("<html>sin player</html>");
             return new HttpResponseMessage(HttpStatusCode.NotFound);
         });
-        bridge.Setup(b => b.ExecuteCommandAsync<object, PythonVideoSourceResolver.StreamResult>(
+        bridge.Setup(b => b.ExecuteCommandAsync<object, ProveedorVideoAnimeAv1.StreamResult>(
                 "resolve-stream", It.IsAny<object>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new PythonVideoSourceResolver.StreamResult { Success = true, DirectUrl = "https://cdn.example.com/master.m3u8" });
+            .ReturnsAsync(new ProveedorVideoAnimeAv1.StreamResult { Success = true, DirectUrl = "https://cdn.example.com/master.m3u8" });
 
         // Act
-        var url = await resolver.BuscarUrlEpisodioAsync(Titulos, 9);
+        var url = await proveedor.BuscarUrlEpisodioAsync(Titulos, 9);
 
         // Assert: el manifiesto se devuelve (DownloadService lo enruta al daemon)
         url.Should().Be("https://cdn.example.com/master.m3u8");

@@ -134,7 +134,18 @@ public partial class App : Application
         services.AddSingleton<IPythonBridgeService, PythonBridgeService>();
         services.AddSingleton<PythonEpisodeEnricher>();
         services.AddTransient<IFileScannerService, PythonFileScannerService>();
-        services.AddSingleton<IVideoSourceResolver, PythonVideoSourceResolver>();
+        // ── PROVEEDORES DE VIDEO (Fase A multi-fuente) ──
+        // La app ya no depende de una sola fuente: cada proveedor es un
+        // IProveedorVideo intercambiable y el orquestador los prueba por
+        // prioridad con degradación por salud (fallos → cooldown → reintento).
+        services.AddSingleton<AnimeAv1VideoSourceResolver>(sp =>
+            new AnimeAv1VideoSourceResolver(sp.GetRequiredService<IHttpClientFactory>().CreateClient("Downloader")));
+        services.AddSingleton<ProveedorVideoAnimeAv1>();
+        services.AddSingleton<IVideoSourceResolver>(sp => new OrquestadorMultiProveedor(
+            new IProveedorVideo[]
+            {
+                sp.GetRequiredService<ProveedorVideoAnimeAv1>()
+            }));
 
         // Persistencia del estado de descargas segmentadas (.state)
         services.AddSingleton<IDownloadStateStore, DownloadStateStore>();
