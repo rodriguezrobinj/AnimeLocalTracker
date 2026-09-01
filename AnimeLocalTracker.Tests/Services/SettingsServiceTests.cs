@@ -24,6 +24,7 @@ public class SettingsServiceTests : IDisposable
 
     public void Dispose()
     {
+        GC.SuppressFinalize(this);
         try
         {
             if (Directory.Exists(_tempSettingsDir))
@@ -90,6 +91,78 @@ public class SettingsServiceTests : IDisposable
         eventoDisparado.Should().BeTrue();
         sut.ObtenerConfiguracion().AutoPlaySiguiente.Should().BeFalse();
         sut.ObtenerConfiguracion().DescargasSimultaneas.Should().Be(5);
+    }
+
+    [Fact]
+    public void SettingsService_AtajosInvalidosOSistema_DeberiaSanitizarConDefaults()
+    {
+        // Arrange (ATA-01): settings.json editado a mano con tecla de sistema, inválida y acción desconocida
+        File.WriteAllText(_tempSettingsFile, """
+        {
+          "RutaBaseAnimes": "C:\\Anime",
+          "Atajos": {
+            "PlayPausa": "LWin",
+            "Silenciar": "9999",
+            "AccionInexistente": "Space",
+            "Adelantar10": "Left"
+          }
+        }
+        """);
+
+        // Act
+        var sut = new SettingsService(_tempSettingsFile);
+        var atajos = sut.ObtenerConfiguracion().Atajos;
+
+        // Assert: inválidos/de sistema vuelven a su default; la acción desconocida se ignora
+        atajos["PlayPausa"].Should().Be("Space", "LWin es una tecla de sistema y debe degradarse al default");
+        atajos["Silenciar"].Should().Be("M", "9999 no es una tecla real");
+        atajos.Should().NotContainKey("AccionInexistente");
+        atajos["Adelantar10"].Should().Be("Left", "una tecla válida y sin conflicto se conserva");
+        atajos["Cerrar"].Should().Be("Escape", "las acciones ausentes se completan con su default");
+    }
+
+    [Fact]
+    public void SettingsService_AtajosDuplicadosEntreAcciones_DeberiaConservarElPrimero()
+    {
+        // Arrange (ATA-01): dos acciones con la misma tecla → la primera gana y la segunda degrada
+        File.WriteAllText(_tempSettingsFile, """
+        {
+          "RutaBaseAnimes": "C:\\Anime",
+          "Atajos": {
+            "PlayPausa": "Space",
+            "Silenciar": "Space"
+          }
+        }
+        """);
+
+        // Act
+        var sut = new SettingsService(_tempSettingsFile);
+        var atajos = sut.ObtenerConfiguracion().Atajos;
+
+        // Assert
+        atajos["PlayPausa"].Should().Be("Space", "la primera ocurrencia gana");
+        atajos["Silenciar"].Should().Be("M", "la segunda acción vuelve a su default");
+    }
+
+    [Fact]
+    public void SettingsService_AtajosNulos_DeberiaRestaurarLosDefaults()
+    {
+        // Arrange: "Atajos": null en el JSON
+        File.WriteAllText(_tempSettingsFile, """
+        {
+          "RutaBaseAnimes": "C:\\Anime",
+          "Atajos": null
+        }
+        """);
+
+        // Act
+        var sut = new SettingsService(_tempSettingsFile);
+        var atajos = sut.ObtenerConfiguracion().Atajos;
+
+        // Assert
+        atajos.Should().NotBeNull();
+        atajos["PlayPausa"].Should().Be("Space");
+        atajos["CapturarFrame"].Should().Be("C");
     }
 
     [Fact]

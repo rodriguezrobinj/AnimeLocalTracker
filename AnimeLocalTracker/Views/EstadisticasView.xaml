@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
              xmlns:ctl="clr-namespace:AnimeLocalTracker.Controls"
+             xmlns:loc="clr-namespace:AnimeLocalTracker.Services"
              TextElement.Foreground="{DynamicResource MaterialDesignBody}"
              Background="Transparent">
 
@@ -49,11 +50,21 @@
                     <materialDesign:PackIcon Kind="ChartDonut" Foreground="#93C5FD" Width="24" Height="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
                 <StackPanel VerticalAlignment="Center">
-                    <TextBlock Text="Panel de Estadísticas" Style="{StaticResource AppText.PageTitle}"/>
-                    <TextBlock Text="Análisis de tu historial de visualización" FontSize="12" Foreground="#9CA3AF" Margin="0,3,0,0"/>
+                    <TextBlock Text="{Binding [Stats_Titulo], Source={x:Static loc:LocalizationService.Instance}}" Style="{StaticResource AppText.PageTitle}"/>
+                    <TextBlock Text="{Binding [Stats_Subtitulo], Source={x:Static loc:LocalizationService.Instance}}" FontSize="12" Foreground="#9CA3AF" Margin="0,3,0,0"/>
                 </StackPanel>
             </StackPanel>
         </Grid>
+
+        <!-- BANNER DE ERROR (EST-03) -->
+        <Border Grid.Row="1" Background="#3A1416" BorderBrush="#F87171" BorderThickness="1" CornerRadius="12"
+                Padding="16,12" Margin="0,0,24,14" VerticalAlignment="Top"
+                Visibility="{Binding HayError, Converter={StaticResource BoolToVis}}">
+            <StackPanel Orientation="Horizontal">
+                <materialDesign:PackIcon Kind="AlertCircle" Foreground="#F87171" Width="20" Height="20" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding MensajeError}" Foreground="#FECACA" FontSize="13" VerticalAlignment="Center" TextWrapping="Wrap"/>
+            </StackPanel>
+        </Border>
 
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
             <StackPanel Margin="0,0,24,20" HorizontalAlignment="Stretch">
@@ -71,7 +82,7 @@
                         <StackPanel>
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="AnimationPlay" Foreground="#60A5FA" Width="18" Height="18" VerticalAlignment="Center"/>
-                                <TextBlock Text="EPISODIOS VISTOS" FontSize="10" Foreground="#6B7280" FontWeight="Bold" Margin="8,0,0,0"/>
+                                <TextBlock Text="{Binding [Stats_EpisodiosVistos], Source={x:Static loc:LocalizationService.Instance}}" FontSize="10" Foreground="#6B7280" FontWeight="Bold" Margin="8,0,0,0"/>
                             </StackPanel>
                             <TextBlock Text="{Binding TotalEpisodiosVistos}" FontSize="30" FontWeight="Bold" Foreground="White" Margin="0,6,0,0"/>
                         </StackPanel>
@@ -81,7 +92,7 @@
                         <StackPanel>
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="ClockOutline" Foreground="#34D399" Width="18" Height="18" VerticalAlignment="Center"/>
-                                <TextBlock Text="HORAS REPRODUCIDAS" FontSize="10" Foreground="#6B7280" FontWeight="Bold" Margin="8,0,0,0"/>
+                                <TextBlock Text="{Binding [Stats_HorasReproducidas], Source={x:Static loc:LocalizationService.Instance}}" FontSize="10" Foreground="#6B7280" FontWeight="Bold" Margin="8,0,0,0"/>
                             </StackPanel>
                             <TextBlock Text="{Binding HorasVistasTexto}" FontSize="30" FontWeight="Bold" Foreground="White" Margin="0,6,0,0"/>
                         </StackPanel>
@@ -91,7 +102,7 @@
                         <StackPanel>
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="ViewGallery" Foreground="#A78BFA" Width="18" Height="18" VerticalAlignment="Center"/>
-                                <TextBlock Text="ANIMES EN BIBLIOTECA" FontSize="10" Foreground="#6B7280" FontWeight="Bold" Margin="8,0,0,0"/>
+                                <TextBlock Text="{Binding [Stats_AnimesBiblioteca], Source={x:Static loc:LocalizationService.Instance}}" FontSize="10" Foreground="#6B7280" FontWeight="Bold" Margin="8,0,0,0"/>
                             </StackPanel>
                             <TextBlock Text="{Binding TotalAnimes}" FontSize="30" FontWeight="Bold" Foreground="White" Margin="0,6,0,0"/>
                         </StackPanel>
@@ -101,7 +112,7 @@
                         <StackPanel>
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="TrophyOutline" Foreground="#FBBF24" Width="18" Height="18" VerticalAlignment="Center"/>
-                                <TextBlock Text="BIBLIOTECA COMPLETADA" FontSize="10" Foreground="#6B7280" FontWeight="Bold" Margin="8,0,0,0"/>
+                                <TextBlock Text="{Binding [Stats_BibliotecaCompletada], Source={x:Static loc:LocalizationService.Instance}}" FontSize="10" Foreground="#6B7280" FontWeight="Bold" Margin="8,0,0,0"/>
                             </StackPanel>
                             <TextBlock Text="{Binding PorcentajeCompletadoTexto}" FontSize="30" FontWeight="Bold" Foreground="White" Margin="0,6,0,0"/>
                         </StackPanel>
@@ -112,7 +123,7 @@
                             <materialDesign:PackIcon Kind="ProgressClock" Foreground="#F59E0B" Width="16" Height="16" VerticalAlignment="Center"/>
                             <StackPanel Margin="8,0,0,0">
                                 <TextBlock Text="{Binding AnimesEnProceso}" FontSize="18" FontWeight="Bold" Foreground="White"/>
-                                <TextBlock Text="A medio ver" FontSize="10" Foreground="#9CA3AF"/>
+                                <TextBlock Text="{Binding [Stats_AMedioVer], Source={x:Static loc:LocalizationService.Instance}}" FontSize="10" Foreground="#9CA3AF"/>
                             </StackPanel>
                         </StackPanel>
                     </Border>
@@ -122,7 +133,7 @@
                             <materialDesign:PackIcon Kind="HeartOutline" Foreground="#F87171" Width="16" Height="16" VerticalAlignment="Center"/>
                             <StackPanel Margin="8,0,0,0">
                                 <TextBlock Text="{Binding TotalFavoritos}" FontSize="18" FontWeight="Bold" Foreground="White"/>
-                                <TextBlock Text="Episodios favoritos" FontSize="10" Foreground="#9CA3AF"/>
+                                <TextBlock Text="{Binding [Stats_EpisodiosFavoritos], Source={x:Static loc:LocalizationService.Instance}}" FontSize="10" Foreground="#9CA3AF"/>
                             </StackPanel>
                         </StackPanel>
                     </Border>
@@ -132,7 +143,7 @@
                             <materialDesign:PackIcon Kind="DownloadCircle" Foreground="#38BDF8" Width="16" Height="16" VerticalAlignment="Center"/>
                             <StackPanel Margin="8,0,0,0">
                                 <TextBlock Text="{Binding TotalDescargados}" FontSize="18" FontWeight="Bold" Foreground="White"/>
-                                <TextBlock Text="Episodios descargados" FontSize="10" Foreground="#9CA3AF"/>
+                                <TextBlock Text="{Binding [Stats_EpisodiosDescargados], Source={x:Static loc:LocalizationService.Instance}}" FontSize="10" Foreground="#9CA3AF"/>
                             </StackPanel>
                         </StackPanel>
                     </Border>
@@ -142,7 +153,7 @@
                             <materialDesign:PackIcon Kind="Timelapse" Foreground="#F472B6" Width="16" Height="16" VerticalAlignment="Center"/>
                             <StackPanel Margin="8,0,0,0">
                                 <TextBlock Text="{Binding DuracionPromedioTexto}" FontSize="18" FontWeight="Bold" Foreground="White"/>
-                                <TextBlock Text="Duración promedio / ep." FontSize="10" Foreground="#9CA3AF"/>
+                                <TextBlock Text="{Binding [Stats_DuracionPromedio], Source={x:Static loc:LocalizationService.Instance}}" FontSize="10" Foreground="#9CA3AF"/>
                             </StackPanel>
                         </StackPanel>
                     </Border>
@@ -163,7 +174,7 @@
                                 <materialDesign:PackIcon Kind="PaletteOutline" Foreground="#A78BFA" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
-                                <TextBlock Text="GÉNERO FAVORITO" FontSize="9" Foreground="#6B7280" FontWeight="Bold"/>
+                                <TextBlock Text="{Binding [Stats_GeneroFavorito], Source={x:Static loc:LocalizationService.Instance}}" FontSize="9" Foreground="#6B7280" FontWeight="Bold"/>
                                 <TextBlock Text="{Binding GeneroFavorito}" FontSize="15" FontWeight="Bold" Foreground="White" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/>
                                 <TextBlock Text="{Binding GeneroFavoritoDetalle}" FontSize="10" Foreground="#9CA3AF" Margin="0,1,0,0" TextTrimming="CharacterEllipsis"/>
                             </StackPanel>
@@ -179,7 +190,7 @@
                                 <materialDesign:PackIcon Kind="Crown" Foreground="#60A5FA" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
-                                <TextBlock Text="ANIME MÁS VISTO" FontSize="9" Foreground="#6B7280" FontWeight="Bold"/>
+                                <TextBlock Text="{Binding [Stats_AnimeMasVisto], Source={x:Static loc:LocalizationService.Instance}}" FontSize="9" Foreground="#6B7280" FontWeight="Bold"/>
                                 <TextBlock Text="{Binding AnimeMasVisto}" FontSize="15" FontWeight="Bold" Foreground="White" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/>
                                 <TextBlock Text="{Binding AnimeMasVistoDetalle}" FontSize="10" Foreground="#9CA3AF" Margin="0,1,0,0" TextTrimming="CharacterEllipsis"/>
                             </StackPanel>
@@ -195,7 +206,7 @@
                                 <materialDesign:PackIcon Kind="CalendarStar" Foreground="#34D399" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
-                                <TextBlock Text="AÑO MÁS ACTIVO" FontSize="9" Foreground="#6B7280" FontWeight="Bold"/>
+                                <TextBlock Text="{Binding [Stats_AnioMasActivo], Source={x:Static loc:LocalizationService.Instance}}" FontSize="9" Foreground="#6B7280" FontWeight="Bold"/>
                                 <TextBlock Text="{Binding MejorAnio}" FontSize="15" FontWeight="Bold" Foreground="White" Margin="0,2,0,0"/>
                                 <TextBlock Text="{Binding MejorAnioDetalle}" FontSize="10" Foreground="#9CA3AF" Margin="0,1,0,0" TextTrimming="CharacterEllipsis"/>
                             </StackPanel>
@@ -211,11 +222,11 @@
                                 <materialDesign:PackIcon Kind="Speedometer" Foreground="#FBBF24" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
-                                <TextBlock Text="RITMO" FontSize="9" Foreground="#6B7280" FontWeight="Bold"/>
+                                <TextBlock Text="{Binding [Stats_Ritmo], Source={x:Static loc:LocalizationService.Instance}}" FontSize="9" Foreground="#6B7280" FontWeight="Bold"/>
                                 <TextBlock FontSize="15" FontWeight="Bold" Foreground="White" Margin="0,2,0,0">
-                                    <Run Text="{Binding HorasPorMes}"/><Run Text=" / mes"/>
+                                    <Run Text="{Binding HorasPorMes}"/><Run Text="{Binding [Stats_PorMes], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
                                 </TextBlock>                                <TextBlock FontSize="10" Foreground="#9CA3AF" Margin="0,1,0,0">
-                                    <Run Text="Racha actual: "/><Run Text="{Binding RachaActual}"/>
+                                    <Run Text="{Binding [Stats_RachaActual], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/><Run Text="{Binding RachaActual}"/>
                                 </TextBlock>
                             </StackPanel>
                         </Grid>
@@ -230,16 +241,16 @@
 
                     <Border Grid.Column="0" Background="#121212" BorderBrush="#262D38" BorderThickness="1" CornerRadius="14" Padding="22,18" Margin="0,0,8,0">
                         <StackPanel>
-                            <TextBlock Text="Distribución de tu lista" FontSize="14" FontWeight="Bold" Foreground="White" Margin="0,0,0,4"/>
-                            <TextBlock Text="Por estado de seguimiento" FontSize="11" Foreground="#9CA3AF" Margin="0,0,0,14"/>
-                            <ctl:DonutChart ItemsSource="{Binding DonutEstado}" CentroTexto="{Binding DonutEstadoCentro}" CentroSubtexto="animes"/>
+                            <TextBlock Text="{Binding [Stats_DistribucionLista], Source={x:Static loc:LocalizationService.Instance}}" FontSize="14" FontWeight="Bold" Foreground="White" Margin="0,0,0,4"/>
+                            <TextBlock Text="{Binding [Stats_PorEstado], Source={x:Static loc:LocalizationService.Instance}}" FontSize="11" Foreground="#9CA3AF" Margin="0,0,0,14"/>
+                            <ctl:DonutChart ItemsSource="{Binding DonutEstado}" CentroTexto="{Binding DonutEstadoCentro}" CentroSubtexto="{Binding [Stats_DonutCentroAnimes], Source={x:Static loc:LocalizationService.Instance}}"/>
                         </StackPanel>
                     </Border>
 
                     <Border Grid.Column="1" Background="#121212" BorderBrush="#262D38" BorderThickness="1" CornerRadius="14" Padding="22,18" Margin="8,0,0,0">
                         <StackPanel>
-                            <TextBlock Text="Análisis de género" FontSize="14" FontWeight="Bold" Foreground="White" Margin="0,0,0,4"/>
-                            <TextBlock Text="Animes con episodios vistos, por género" FontSize="11" Foreground="#9CA3AF" Margin="0,0,0,14"/>
+                            <TextBlock Text="{Binding [Stats_AnalisisGenero], Source={x:Static loc:LocalizationService.Instance}}" FontSize="14" FontWeight="Bold" Foreground="White" Margin="0,0,0,4"/>
+                            <TextBlock Text="{Binding [Stats_GeneroSub], Source={x:Static loc:LocalizationService.Instance}}" FontSize="11" Foreground="#9CA3AF" Margin="0,0,0,14"/>
                             <ctl:DonutChart ItemsSource="{Binding DonutGeneros}" CentroTexto="{Binding DonutGenerosCentro}" CentroSubtexto="{Binding DonutGenerosSubcentro}"/>
                         </StackPanel>
                     </Border>
@@ -254,11 +265,11 @@
                     <Border Grid.Column="0" Background="#121212" BorderBrush="#262D38" BorderThickness="1" CornerRadius="14" Padding="22,18" Margin="0,0,8,0">
                         <StackPanel>
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                                <TextBlock Text="Actividad de los últimos 7 días" FontSize="14" FontWeight="Bold" Foreground="White"/>
+                                <TextBlock Text="{Binding [Stats_Actividad7Dias], Source={x:Static loc:LocalizationService.Instance}}" FontSize="14" FontWeight="Bold" Foreground="White"/>
                             </StackPanel>
                             <TextBlock FontSize="11" Foreground="#9CA3AF" Margin="0,0,0,4">
                                 <Run Text="{Binding PromedioDiarioTexto}"/>
-                                <Run Text=" episodios/día · racha máxima: "/>
+                                <Run Text="{Binding [Stats_PromedioDiarioSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
                                 <Run Text="{Binding RachaMaxima}"/>
                             </TextBlock>
                             <ItemsControl ItemsSource="{Binding ActividadSemana}" Margin="0,14,0,0">
@@ -291,8 +302,8 @@
 
                     <Border Grid.Column="1" Background="#121212" BorderBrush="#262D38" BorderThickness="1" CornerRadius="14" Padding="22,18" Margin="8,0,0,0">
                         <StackPanel>
-                            <TextBlock Text="Top 5 animes más vistos" FontSize="14" FontWeight="Bold" Foreground="White" Margin="0,0,0,4"/>
-                            <TextBlock Text="Por número de episodios reproducidos" FontSize="11" Foreground="#9CA3AF" Margin="0,0,0,12"/>
+                            <TextBlock Text="{Binding [Stats_TopAnimes], Source={x:Static loc:LocalizationService.Instance}}" FontSize="14" FontWeight="Bold" Foreground="White" Margin="0,0,0,4"/>
+                            <TextBlock Text="{Binding [Stats_TopAnimesSub], Source={x:Static loc:LocalizationService.Instance}}" FontSize="11" Foreground="#9CA3AF" Margin="0,0,0,12"/>
                             <ItemsControl ItemsSource="{Binding TopAnimes}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
@@ -330,8 +341,8 @@
                 <!-- ══ FILA 5: POR AÑO ══ -->
                 <Border Background="#121212" BorderBrush="#262D38" BorderThickness="1" CornerRadius="14" Padding="22,18" Margin="0,0,0,20">
                     <StackPanel>
-                        <TextBlock Text="Episodios vistos por año" FontSize="14" FontWeight="Bold" Foreground="White" Margin="0,0,0,4"/>
-                        <TextBlock Text="Evolución de tu consumo anual" FontSize="11" Foreground="#9CA3AF" Margin="0,0,0,12"/>
+                        <TextBlock Text="{Binding [Stats_PorAnio], Source={x:Static loc:LocalizationService.Instance}}" FontSize="14" FontWeight="Bold" Foreground="White" Margin="0,0,0,4"/>
+                        <TextBlock Text="{Binding [Stats_PorAnioSub], Source={x:Static loc:LocalizationService.Instance}}" FontSize="11" Foreground="#9CA3AF" Margin="0,0,0,12"/>
                         <ItemsControl ItemsSource="{Binding VistosPorAnio}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
