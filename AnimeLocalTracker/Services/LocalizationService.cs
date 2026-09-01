@@ -152,7 +152,11 @@ public sealed class LocalizationService : INotifyPropertyChanged
         ["Cfg_RestaurarBackup"] = "Restaurar copia de seguridad",
         ["Cfg_RestaurarConfirmacion"] = "Se reemplazará la biblioteca actual por la copia seleccionada. ¿Continuar?",
         ["Cfg_RestaurarOk"] = "Biblioteca restaurada correctamente.",
-        ["Cfg_RestaurarError"] = "No se pudo restaurar la copia (archivo inválido o corrupto)."
+        ["Cfg_RestaurarError"] = "No se pudo restaurar la copia (archivo inválido o corrupto).",
+
+        // === TÍTULO DE CONFIGURACIÓN (LOC-07) ===
+        ["Cfg_Titulo"] = "Configuración y Preferencias",
+        ["Cfg_TituloSub"] = "Personaliza el almacenamiento de tus animes, reproducción multimedia y sincronización con AniList"
     };
 
     private static readonly Dictionary<string, string> En = new()
@@ -277,7 +281,11 @@ public sealed class LocalizationService : INotifyPropertyChanged
         ["Cfg_RestaurarBackup"] = "Restore backup",
         ["Cfg_RestaurarConfirmacion"] = "The current library will be replaced by the selected backup. Continue?",
         ["Cfg_RestaurarOk"] = "Library restored successfully.",
-        ["Cfg_RestaurarError"] = "Could not restore the backup (invalid or corrupt file)."
+        ["Cfg_RestaurarError"] = "Could not restore the backup (invalid or corrupt file).",
+
+        // === SETTINGS TITLE (LOC-07) ===
+        ["Cfg_Titulo"] = "Settings & Preferences",
+        ["Cfg_TituloSub"] = "Customize your anime storage, playback and AniList sync"
     };
 
     public string this[string key] =>

@@ -34,8 +34,8 @@
                     <materialDesign:PackIcon Kind="Cog" Width="26" Height="26" Foreground="#60A5FA" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
                 <StackPanel VerticalAlignment="Center">
-                    <TextBlock Text="Configuración y Preferencias" Style="{StaticResource AppText.PageTitle}"/>
-                    <TextBlock Text="Personaliza el almacenamiento de tus animes, reproducción multimedia y sincronización con AniList" 
+                    <TextBlock Text="{Binding [Cfg_Titulo], Source={x:Static loc:LocalizationService.Instance}}" Style="{StaticResource AppText.PageTitle}"/>
+                    <TextBlock Text="{Binding [Cfg_TituloSub], Source={x:Static loc:LocalizationService.Instance}}" 
                                FontSize="12" Foreground="#9CA3AF" Margin="0,3,0,0"/>
                 </StackPanel>
             </StackPanel>

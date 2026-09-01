@@ -91,13 +91,13 @@ jobs:
       run: |
         powershell -ExecutionPolicy Bypass -File .\build.ps1 -RunTests -Coverage
 
-    # DEV-06b: umbral de cobertura de líneas. Baseline medido: 43.1%
-    # (2026-08-31, excluyendo el ensamblado de tests). SUBIR este umbral
-    # conforme crezca la cobertura de las features nuevas.
-    - name: Check Coverage Threshold (>= 40%)
+    # DEV-06b: umbral de cobertura de líneas. Medido: 46.9%
+    # (2026-09-01, excluyendo el ensamblado de tests; subió desde 43.1% con los
+    # tests de AniSkipService). SUBIR este umbral conforme crezca la cobertura.
+    - name: Check Coverage Threshold (>= 45%)
       shell: powershell
       run: |
-        $threshold = 0.40
+        $threshold = 0.45
         $cov = Get-ChildItem "AnimeLocalTracker.Tests/TestResults" -Recurse -Filter "coverage.cobertura.xml" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
         if (-not $cov) { Write-Host "::error::No se encontró coverage.cobertura.xml"; exit 1 }
         [xml]$xml = Get-Content $cov.FullName
