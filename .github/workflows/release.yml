@@ -119,19 +119,23 @@ jobs:
     # SEC-05: firma de código. Requiere provisionar el certificado en los secrets
     # SIGN_CERT_BASE64 / SIGN_CERT_PASSWORD. Sin secrets el paso se omite y la
     # release sale SIN firmar (bloqueada hasta provisionar el certificado).
+    # NOTA: GitHub no permite referenciar secrets en `if:` — se maneja en el script.
     - name: Prepare Code Signing Certificate
       id: cert
       shell: powershell
-      if: ${{ secrets.SIGN_CERT_BASE64 != '' }}
       env:
         CERT_B64: ${{ secrets.SIGN_CERT_BASE64 }}
         CERT_PASSWORD: ${{ secrets.SIGN_CERT_PASSWORD }}
       run: |
-        $pfx = Join-Path $env:RUNNER_TEMP "alt.pfx"
-        [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:CERT_B64))
-        Add-Content -Path $env:GITHUB_ENV -Value "SIGN_CERT_PATH=$pfx"
-        Add-Content -Path $env:GITHUB_ENV -Value "SIGN_CERT_PASSWORD=$env:CERT_PASSWORD"
-        Write-Output "cert_ready=true" >> $env:GITHUB_OUTPUT
+        if (-not $env:CERT_B64) {
+          Write-Host "Sin certificado configurado: la release se genera SIN firma (SEC-05 pendiente)."
+        } else {
+          $pfx = Join-Path $env:RUNNER_TEMP "alt.pfx"
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:CERT_B64))
+          Add-Content -Path $env:GITHUB_ENV -Value "SIGN_CERT_PATH=$pfx"
+          Add-Content -Path $env:GITHUB_ENV -Value "SIGN_CERT_PASSWORD=$env:CERT_PASSWORD"
+          Write-Output "cert_ready=true" >> $env:GITHUB_OUTPUT
+        }
 
     - name: Package Velopack Release
       shell: powershell
