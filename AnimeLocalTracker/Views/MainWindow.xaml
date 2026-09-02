@@ -302,9 +302,11 @@
                     </Grid>
                 </Border>
 
-                <!-- CONTENIDO PRINCIPAL: Gestionado directamente por MainWindow.xaml.cs según VistaActual -->
+                <!-- CONTENIDO PRINCIPAL: la vista se resuelve con las DataTemplates
+                     VM→Vista de App.xaml según la VistaActual (ARC-04). -->
                 <!-- Sin margen superior para que el fondo (ej. desenfoque) cubra toda la ventana detrás de la barra de título -->
-                <ContentControl x:Name="ContenedorVistaPrincipal" Grid.Column="0" Grid.ColumnSpan="2" />
+                <ContentControl x:Name="ContenedorVistaPrincipal" Grid.Column="0" Grid.ColumnSpan="2"
+                                Content="{Binding VistaActual}" />
                 
                 <!-- BARRA DE TÍTULO CUSTOM -->
                 <Grid Grid.Column="0" Grid.ColumnSpan="2" x:Name="BarraTitulo" Height="45" Background="Transparent" VerticalAlignment="Top" Panel.ZIndex="20">

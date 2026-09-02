@@ -89,13 +89,11 @@ public partial class App : Application
 
     internal static void ConfigureServices(IServiceCollection services)
     {
-        // 1. Registramos las Vistas (Ventanas)
-        services.AddTransient<MainWindow>();
-        services.AddTransient<AgregarAnimeView>();
-        services.AddTransient<ReproductorView>();
-        services.AddTransient<DescargasView>();
-        services.AddTransient<ConfiguracionView>();
-        services.AddTransient<AcercaDeView>();
+        // 1. Ventana principal (ARC-04): las vistas de página ya NO se registran en DI —
+        // se resuelven con las DataTemplates VM→Vista de App.xaml (los registros estaban
+        // muertos: MainWindow las creaba con `new` y nunca se resolvían).
+        services.AddSingleton<MainWindow>();
+        services.AddSingleton<IVentanaPrincipal>(sp => sp.GetRequiredService<MainWindow>());
 
         // 2. Registramos los ViewModels (Vistas principales como Singleton para preservar estado y no repetir queries al cambiar de pestaña)
         services.AddTransient<MainViewModel>();
@@ -107,6 +105,10 @@ public partial class App : Application
         services.AddSingleton<DescargasViewModel>();
         services.AddSingleton<ConfiguracionViewModel>();
         services.AddSingleton<AcercaDeViewModel>();
+
+        // ARC-02: la navegación resuelve ViewModels a través de un único servicio;
+        // los ViewModels ya no reciben IServiceProvider.
+        services.AddSingleton<INavigationService, NavigationService>();
 
         // 3. Aquí registraremos los Servicios
         services.AddSingleton<ISettingsService, SettingsService>();

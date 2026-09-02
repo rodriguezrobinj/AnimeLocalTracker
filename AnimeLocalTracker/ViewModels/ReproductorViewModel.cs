@@ -22,6 +22,7 @@ namespace AnimeLocalTracker.ViewModels;
 public partial class ReproductorViewModel : ObservableObject, IDisposable
 {
     private readonly ISettingsService? _settingsService;
+    private readonly IVentanaPrincipal? _ventanaPrincipal;
     private readonly IPlaybackStateService _playbackState;
     private readonly ISkipTimesCoordinator _skipCoordinator;
     private CancellationTokenSource? _skipCts;
@@ -175,9 +176,11 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         IAniSkipService? aniSkipService = null,
         ISettingsService? settingsService = null,
         IPlaybackStateService? playbackStateService = null,
-        ISkipTimesCoordinator? skipTimesCoordinator = null)
+        ISkipTimesCoordinator? skipTimesCoordinator = null,
+        IVentanaPrincipal? ventanaPrincipal = null)
     {
         _settingsService = settingsService;
+        _ventanaPrincipal = ventanaPrincipal;
 
         _playbackState = playbackStateService ?? new PlaybackStateService(databaseService, animeTrackingService, authService);
         _skipCoordinator = skipTimesCoordinator ?? new SkipTimesCoordinator(aniSkipService);
@@ -599,21 +602,16 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     [RelayCommand]
     public void ToggleFullscreen()
     {
-        var mainWindow = System.Windows.Application.Current?.MainWindow as AnimeLocalTracker.Views.MainWindow;
-        if (mainWindow != null)
-        {
-            mainWindow.TogglePantallaCompleta();
-            FullscreenIcon = mainWindow.IsFullScreen ? "FullscreenExit" : "Fullscreen";
+        // ARC-04: sin cast a MainWindow — la ventana se consume vía contrato IVentanaPrincipal.
+        if (_ventanaPrincipal == null) return;
 
-            // Devolver foco a MainWindow para que las teclas sigan respondiendo
-            System.Windows.Application.Current?.Dispatcher?.BeginInvoke(
-                System.Windows.Threading.DispatcherPriority.Input,
-                () =>
-                {
-                    mainWindow.Focus();
-                    System.Windows.Input.Keyboard.Focus(mainWindow);
-                });
-        }
+        _ventanaPrincipal.TogglePantallaCompleta();
+        FullscreenIcon = _ventanaPrincipal.IsFullScreen ? "FullscreenExit" : "Fullscreen";
+
+        // Devolver foco a MainWindow para que las teclas sigan respondiendo
+        System.Windows.Application.Current?.Dispatcher?.BeginInvoke(
+            System.Windows.Threading.DispatcherPriority.Input,
+            () => _ventanaPrincipal.Enfocar());
     }
 
     [RelayCommand]
@@ -875,16 +873,14 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         // 4. Sincronizar ícono de fullscreen con el estado actual de la ventana
         try
         {
-            if (System.Windows.Application.Current != null &&
-                System.Windows.Application.Current.Dispatcher.CheckAccess() &&
-                System.Windows.Application.Current.MainWindow is AnimeLocalTracker.Views.MainWindow mainWindow)
+            if (_ventanaPrincipal != null)
             {
-                FullscreenIcon = mainWindow.IsFullScreen ? "FullscreenExit" : "Fullscreen";
+                FullscreenIcon = _ventanaPrincipal.IsFullScreen ? "FullscreenExit" : "Fullscreen";
             }
         }
         catch
         {
-            // Entornos de pruebas sin Dispatcher o en subprocesos en segundo plano
+            // Entornos de pruebas sin ventana principal
         }
 
         if (Player != null)

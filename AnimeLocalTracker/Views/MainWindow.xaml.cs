@@ -1,79 +1,20 @@
-using System.Windows;
-using System.Windows.Controls;
 using System.Runtime.InteropServices;
+using System.Windows;
+using AnimeLocalTracker.Services;
 using AnimeLocalTracker.ViewModels;
 
 namespace AnimeLocalTracker.Views;
 
-public partial class MainWindow : Window
+public partial class MainWindow : Window, IVentanaPrincipal
 {
     public bool IsFullScreen { get; private set; }
 
-    private MainViewModel _viewModel;
     private System.Windows.Shell.WindowChrome? _chromeCache;
 
     public MainWindow(MainViewModel viewModel) 
     {
         InitializeComponent();
-        _viewModel = viewModel;
-        DataContext = _viewModel; 
-
-        ActualizarVista(_viewModel.VistaActual);
-        _viewModel.PropertyChanged += (s, e) =>
-        {
-            if (e.PropertyName == nameof(MainViewModel.VistaActual))
-            {
-                ActualizarVista(_viewModel.VistaActual);
-            }
-        };
-    }
-
-    private readonly System.Collections.Generic.Dictionary<System.Type, System.Windows.Controls.UserControl> _viewCache = new();
-
-    private void ActualizarVista(object? viewModel)
-    {
-        if (viewModel == null)
-        {
-            ContenedorVistaPrincipal.Content = null;
-            return;
-        }
-
-        var vmType = viewModel.GetType();
-        UserControl? view;
-
-        // ReproductorView aloja una superficie de renderizado nativa Win32/Direct3D (FlyleafHost).
-        // NUNCA debe reutilizarse desde la caché porque su swapchain nativo se destruye al cerrar el player.
-        if (viewModel is ReproductorViewModel)
-        {
-            view = new ReproductorView();
-        }
-        else if (!_viewCache.TryGetValue(vmType, out view))
-        {
-            view = viewModel switch
-            {
-                GaleriaViewModel => new GaleriaView(),
-                DetalleViewModel => new DetalleView(),
-                AgregarAnimeViewModel => new AgregarAnimeView(),
-                CalendarioViewModel => new CalendarioView(),
-                DescargasViewModel => new DescargasView(),
-                ConfiguracionViewModel => new ConfiguracionView(),
-                AcercaDeViewModel => new AcercaDeView(),
-                EstadisticasViewModel => new EstadisticasView(),
-                _ => null
-            };
-
-            if (view != null)
-            {
-                _viewCache[vmType] = view;
-            }
-        }
-
-        if (view != null)
-        {
-            view.DataContext = viewModel;
-        }
-
-        ContenedorVistaPrincipal.Content = view;
+        DataContext = viewModel;
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -207,6 +148,16 @@ public partial class MainWindow : Window
         {
             TogglePantallaCompleta();
         }
+    }
+
+    /// <summary>
+    /// ARC-04: devuelve el foco del teclado a la ventana principal (lo usa el
+    /// reproductor al alternar pantalla completa, sin castear a la ventana).
+    /// </summary>
+    public void Enfocar()
+    {
+        Focus();
+        System.Windows.Input.Keyboard.Focus(this);
     }
 
     // ═══════════════════════════════════════════════════════════════

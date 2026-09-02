@@ -1,7 +1,6 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
@@ -27,7 +26,7 @@ public partial class MainViewModel : ObservableObject,
     IRecipient<DescargaProgresoMensaje>,
     IRecipient<NuevosEpisodiosMensaje>
 {
-    private readonly IServiceProvider _serviceProvider;
+    private readonly INavigationService _navigationService;
     private readonly IAnimeTrackingService _animeTrackingService;
     private readonly AnimeLibraryService _animeLibraryService;
     private readonly IDownloadService _downloadService;
@@ -98,13 +97,13 @@ public partial class MainViewModel : ObservableObject,
     }
 
     public MainViewModel(
-        IServiceProvider serviceProvider, 
+        INavigationService navigationService, 
         IAnimeTrackingService animeTrackingService, 
         AnimeLibraryService animeLibraryService,
         IDownloadService downloadService,
         IUpdateService updateService)
     {
-        _serviceProvider = serviceProvider;
+        _navigationService = navigationService;
         _animeTrackingService = animeTrackingService;
         _animeLibraryService = animeLibraryService;
         _downloadService = downloadService;
@@ -113,7 +112,7 @@ public partial class MainViewModel : ObservableObject,
         WeakReferenceMessenger.Default.RegisterAll(this);
 
         // Cargamos la vista inicial
-        VistaActual = _serviceProvider.GetRequiredService<GaleriaViewModel>();
+        VistaActual = _navigationService.ObtenerGaleria();
         ActualizarConteoDescargas();
     }
 
@@ -184,7 +183,7 @@ public partial class MainViewModel : ObservableObject,
     // ==========================================
     public void Receive(NavegarMensaje_Galeria message)
     {
-        VistaActual = _serviceProvider.GetRequiredService<GaleriaViewModel>();
+        VistaActual = _navigationService.ObtenerGaleria();
     }
 
     public void Receive(NavegarMensaje_Detalle message) => _ = InicializarDetalleAsync(message);
@@ -193,7 +192,7 @@ public partial class MainViewModel : ObservableObject,
     {
         try
         {
-            var detalleVm = _serviceProvider.GetRequiredService<DetalleViewModel>();
+            var detalleVm = _navigationService.CrearDetalle();
             VistaActual = detalleVm;
             await detalleVm.InicializarAsync(message.AnimeSeleccionado);
         }
@@ -205,7 +204,7 @@ public partial class MainViewModel : ObservableObject,
 
     public void Receive(NavegarMensaje_Calendario message)
     {
-        var calendarioVm = _serviceProvider.GetRequiredService<CalendarioViewModel>();
+        var calendarioVm = _navigationService.ObtenerCalendario();
         VistaActual = calendarioVm;
 
         // El calendario es singleton: si la carga inicial falló (red/rate-limit) o está vacío,
@@ -218,7 +217,7 @@ public partial class MainViewModel : ObservableObject,
 
     public void Receive(NavegarMensaje_Descargas message)
     {
-        VistaActual = _serviceProvider.GetRequiredService<DescargasViewModel>();
+        VistaActual = _navigationService.ObtenerDescargas();
     }
 
     public void Receive(NavegarMensaje_Reproductor message) => _ = NavegarAlReproductorAsync(message);
@@ -230,7 +229,7 @@ public partial class MainViewModel : ObservableObject,
             // Guardar la vista actual antes de navegar al reproductor
             _vistaAnteriorAlReproductor = VistaActual;
 
-            var viewModel = _serviceProvider.GetService<ReproductorViewModel>();
+            var viewModel = _navigationService.CrearReproductor();
             if (viewModel == null) return;
 
             // 1. Crear el objeto Player antes de montar la vista para que FlyleafHost enlace un Player no nulo
@@ -277,20 +276,20 @@ public partial class MainViewModel : ObservableObject,
         }
         else
         {
-            VistaActual = _serviceProvider.GetRequiredService<GaleriaViewModel>();
+            VistaActual = _navigationService.ObtenerGaleria();
         }
     }
 
     [RelayCommand]
     private void NavegarGaleria()
     {
-        VistaActual = _serviceProvider.GetRequiredService<GaleriaViewModel>();
+        VistaActual = _navigationService.ObtenerGaleria();
     }
 
     [RelayCommand]
     private void NavegarAgregarAnime()
     {
-        VistaActual = _serviceProvider.GetRequiredService<AgregarAnimeViewModel>();
+        VistaActual = _navigationService.ObtenerAgregarAnime();
     }
 
     public void Receive(NavegarMensaje_AgregarAnime message)
@@ -301,13 +300,13 @@ public partial class MainViewModel : ObservableObject,
     [RelayCommand]
     private void NavegarCalendario()
     {
-        VistaActual = _serviceProvider.GetRequiredService<CalendarioViewModel>();
+        VistaActual = _navigationService.ObtenerCalendario();
     }
 
     [RelayCommand]
     private void NavegarDescargas()
     {
-        VistaActual = _serviceProvider.GetRequiredService<DescargasViewModel>();
+        VistaActual = _navigationService.ObtenerDescargas();
     }
 
     [RelayCommand]
@@ -315,7 +314,7 @@ public partial class MainViewModel : ObservableObject,
     {
         try
         {
-            VistaActual = _serviceProvider.GetRequiredService<ConfiguracionViewModel>();
+            VistaActual = _navigationService.ObtenerConfiguracion();
         }
         catch (Exception ex)
         {
@@ -335,7 +334,7 @@ public partial class MainViewModel : ObservableObject,
     {
         try 
         {
-            VistaActual = _serviceProvider.GetRequiredService<AcercaDeViewModel>();
+            VistaActual = _navigationService.ObtenerAcercaDe();
         }
         catch (Exception ex)
         {
@@ -353,7 +352,7 @@ public partial class MainViewModel : ObservableObject,
     {
         try
         {
-            var estadisticasVm = _serviceProvider.GetRequiredService<EstadisticasViewModel>();
+            var estadisticasVm = _navigationService.ObtenerEstadisticas();
             VistaActual = estadisticasVm;
             await estadisticasVm.CargarEstadisticasAsync();
         }
