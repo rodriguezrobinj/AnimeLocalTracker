@@ -3,7 +3,27 @@ from urllib.parse import urlparse
 import os
 import yt_dlp
 
+# Impersonación (opcional): el player de zilla-networks (HLS de animeav1) está tras
+# Cloudflare anti-bot; yt-dlp puede pasar el challenge si curl_cffi está instalado.
+try:
+    import curl_cffi  # noqa: F401
+    HAVE_CURL_CFFI = True
+except ImportError:
+    HAVE_CURL_CFFI = False
+
 class StreamExtractor:
+    @staticmethod
+    def _error_msg(ex: Exception) -> str:
+        """Mensaje de error nunca vacío: str(ex) puede ser '' (p. ej. DownloadError
+        del flujo de impersonación) y dejaba al C# sin causa para el log."""
+        msg = str(ex).strip()
+        if msg:
+            return msg
+        # Sin mensaje: incluir el tipo de excepción (p. ej. 'yt_dlp.utils.DownloadError')
+        import traceback
+        detalle = " | ".join(l.strip() for l in traceback.format_exception_only(type(ex), ex) if l.strip())
+        return detalle if detalle else f"{type(ex).__name__} (sin mensaje de detalle)"
+
     @staticmethod
     def _is_safe_http_url(url: str) -> bool:
         """Solo http/https absolutas. Nunca esquemas locales (file://, ftp://, rutas)."""
@@ -35,6 +55,10 @@ class StreamExtractor:
             'playlist_items': '1',
             'socket_timeout': 20,
         }
+        # Impersonación contra Cloudflare (player zilla de animeav1) — solo si curl_cffi
+        # (vía extractor_args: la opción 'impersonate' como string rompe en yt-dlp 2026.08)
+        if HAVE_CURL_CFFI:
+            ydl_opts['extractor_args'] = {'generic': ['impersonate=chrome']}
         
         if custom_headers:
             ydl_opts['http_headers'] = custom_headers
@@ -103,7 +127,7 @@ class StreamExtractor:
         except Exception as ex:
             return {
                 "success": False,
-                "error": str(ex)
+                "error": StreamExtractor._error_msg(ex)
             }
 
     @staticmethod
@@ -139,6 +163,10 @@ class StreamExtractor:
             'concurrent_fragment_downloads': 4,
             'max_filesize': 50 * 1024 * 1024 * 1024,  # 50 GB tope por episodio
         }
+        # Impersonación contra Cloudflare (player zilla de animeav1) — solo si curl_cffi
+        # (vía extractor_args: la opción 'impersonate' como string rompe en yt-dlp 2026.08)
+        if HAVE_CURL_CFFI:
+            ydl_opts['extractor_args'] = {'generic': ['impersonate=chrome']}
 
         if custom_headers:
             ydl_opts['http_headers'] = custom_headers
@@ -157,4 +185,4 @@ class StreamExtractor:
                     return {"success": True, "file": output_path, "title": info.get("title", "")}
                 return {"success": False, "error": "No se encontró el archivo descargado."}
         except Exception as ex:
-            return {"success": False, "error": str(ex)}
+            return {"success": False, "error": StreamExtractor._error_msg(ex)}

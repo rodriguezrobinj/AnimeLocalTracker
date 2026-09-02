@@ -62,7 +62,9 @@ if ($pythonChanged) {
     Write-Host "  El codigo Python es mas reciente o el binario no existe. Compilando..." -ForegroundColor Yellow
     try {
         # Asegurar dependencias PyPI antes de PyInstaller (sin ellas el exe queda sin modulos)
-        & python -m pip install -q pyinstaller anitopy rapidfuzz "yt-dlp==2026.8.19" pydantic "opencv-python-headless>=4.9.0" numpy 2>&1 | Out-Host
+        # curl_cffi 0.10.x: única línea soportada por yt-dlp para impersonar Cloudflare
+        # (0.16.x rompe con AssertionError y 0.9.x no es detectada por yt-dlp)
+        & python -m pip install -q pyinstaller anitopy rapidfuzz "yt-dlp==2026.8.19" pydantic "opencv-python-headless>=4.9.0" numpy "curl_cffi>=0.10,<0.11" 2>&1 | Out-Host
         & python "$PSScriptRoot\tools\python\build_binary.py" 2>&1 | Out-Host
         if ($LASTEXITCODE -ne 0 -or -not (Test-Path $vtoolsExe)) {
             Write-Host "  PyInstaller fallo; se usara el binario existente si hay." -ForegroundColor Red

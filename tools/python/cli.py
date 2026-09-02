@@ -38,6 +38,23 @@ def process_command(command: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         res = AnimeFileParser.match_title_fuzzy(query, candidates, threshold)
         return {"success": True, "match": res}
 
+    elif command == "match-media":
+        # Sistema riguroso de coincidencia: busca el MEJOR match de nombres entre
+        # los títulos de la app y los del sitio (título + aka), usando rapidfuzz.
+        titles = payload.get("titles", [])
+        candidates = payload.get("candidates", [])
+        threshold = float(payload.get("threshold", 75.0))
+        best = None
+        for t in titles:
+            m = AnimeFileParser.match_title_fuzzy(t, candidates, threshold)
+            if m and (best is None or m["score"] > best["score"]):
+                best = m
+        return {
+            "success": best is not None,
+            "score": float(best["score"]) if best else 0.0,
+            "matched_title": best["matched_title"] if best else "",
+        }
+
     elif command == "resolve-stream":
         url = payload.get("url", "")
         headers = payload.get("headers")
