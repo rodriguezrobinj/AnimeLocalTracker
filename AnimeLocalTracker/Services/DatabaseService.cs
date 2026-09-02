@@ -61,20 +61,9 @@ public class DatabaseService : IDatabaseService, IDisposable
             await conexion.ExecuteAsync("PRAGMA temp_store = MEMORY;");
             await conexion.ExecuteAsync("PRAGMA cache_size = -64000;");
 
-            // Creamos ambas tablas
-            await conexion.CreateTableAsync<AnimeItem>();
-            await conexion.CreateTableAsync<RegistroEpisodio>();
-
-            // ÍNDICE COMPUESTO PARA BÚSQUEDAS RÁPIDAS POR (AniListId, NumeroEpisodio)
-            await conexion.ExecuteAsync("CREATE INDEX IF NOT EXISTS IX_RegistroEpisodio_AnimeEp ON RegistroEpisodio(AniListId, NumeroEpisodio);");
-
-            // ARQ-01: Versiones de base de datos para futuras migraciones de esquema
-            int userVersion = await conexion.ExecuteScalarAsync<int>("PRAGMA user_version;");
-            if (userVersion < 1)
-            {
-                // Versión base 1: Tablas iniciales ya creadas arriba con CreateTableAsync
-                await conexion.ExecuteAsync("PRAGMA user_version = 1;");
-            }
+            // ARC-06: el esquema evoluciona con migraciones versionadas (user_version),
+            // no con CreateTableAsync suelto (que no altera columnas existentes).
+            await EjecutarMigracionesPendientesAsync(conexion);
 
             _conexion = conexion;
         }
@@ -82,6 +71,39 @@ public class DatabaseService : IDatabaseService, IDisposable
         {
             _initLock.Release();
         }
+    }
+
+    /// <summary>
+    /// ARC-06: migraciones versionadas. Cada entrada (Versión, Descripción, Aplicar)
+    /// se ejecuta en orden; user_version avanza al terminar cada una, de modo que una
+    /// base vieja migra hasta la última versión y una nueva las aplica todas.
+    /// </summary>
+    private static readonly (int Version, string Descripcion, Func<SQLiteAsyncConnection, Task> Aplicar)[] Migraciones =
+    {
+        (1, "esquema base (tablas AnimeItem/RegistroEpisodio + índice compuesto)", CrearEsquemaBaseAsync)
+    };
+
+    private static async Task EjecutarMigracionesPendientesAsync(SQLiteAsyncConnection conexion)
+    {
+        int versionActual = await conexion.ExecuteScalarAsync<int>("PRAGMA user_version;");
+
+        foreach (var (version, descripcion, aplicar) in Migraciones.OrderBy(m => m.Version))
+        {
+            if (version <= versionActual) continue;
+
+            await aplicar(conexion);
+            await conexion.ExecuteAsync($"PRAGMA user_version = {version};");
+            AppLogger.Info("DatabaseService", $"Migración aplicada: v{version} ({descripcion}).");
+        }
+    }
+
+    private static async Task CrearEsquemaBaseAsync(SQLiteAsyncConnection conexion)
+    {
+        await conexion.CreateTableAsync<AnimeItem>();
+        await conexion.CreateTableAsync<RegistroEpisodio>();
+
+        // ÍNDICE COMPUESTO PARA BÚSQUEDAS RÁPIDAS POR (AniListId, NumeroEpisodio)
+        await conexion.ExecuteAsync("CREATE INDEX IF NOT EXISTS IX_RegistroEpisodio_AnimeEp ON RegistroEpisodio(AniListId, NumeroEpisodio);");
     }
 
     /// <summary>

@@ -33,6 +33,33 @@ public class DatabaseServiceUpsertTests : IDisposable
     }
 
     [Fact]
+    public async Task InicializarBaseDatosAsync_DeberiaAplicarMigracionesHastaLaUltimaVersion()
+    {
+        // Act
+        await _sut.InicializarBaseDatosAsync();
+
+        // Assert (ARC-06): user_version avanza y el esquema de la migración v1 existe
+        using var conexion = new SQLiteConnection(_tempDbPath);
+        conexion.ExecuteScalar<int>("PRAGMA user_version;").Should().BeGreaterThanOrEqualTo(1);
+        conexion.ExecuteScalar<string>(
+                "SELECT sql FROM sqlite_master WHERE type='index' AND name='IX_RegistroEpisodio_AnimeEp'")
+            .Should().NotBeNullOrEmpty("la migración v1 debe crear el índice compuesto");
+    }
+
+    [Fact]
+    public async Task InicializarBaseDatosAsync_DosVeces_DeberiaSerIdempotente()
+    {
+        // Act: inicializar dos veces (arranque + test concurrente)
+        await _sut.InicializarBaseDatosAsync();
+        await _sut.InicializarBaseDatosAsync();
+
+        // Assert: sin errores y sin duplicar esquema
+        using var conexion = new SQLiteConnection(_tempDbPath);
+        conexion.ExecuteScalar<int>("PRAGMA user_version;").Should().BeGreaterThanOrEqualTo(1);
+        conexion.Table<AnimeItem>().Count().Should().Be(0);
+    }
+
+    [Fact]
     public async Task CrearBackupRotativo_DeberiaCrearCopiaValidaYRotar()
     {
         // Arrange
