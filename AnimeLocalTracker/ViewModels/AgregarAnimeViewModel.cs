@@ -47,7 +47,7 @@ public partial class AgregarAnimeViewModel : ObservableObject,
             {
                 OnPropertyChanged(nameof(TieneTextoBusqueda));
                 BusquedaSinResultados = false;
-                EjecutarBusquedaEnVivo(value);
+                _ = EjecutarBusquedaEnVivoAsync(value);
             }
         }
     }
@@ -149,7 +149,7 @@ public partial class AgregarAnimeViewModel : ObservableObject,
         }
     }
 
-    private async void EjecutarBusquedaEnVivo(string busqueda)
+    private async Task EjecutarBusquedaEnVivoAsync(string busqueda)
     {
         if (string.IsNullOrWhiteSpace(busqueda) || busqueda.Trim().Length < 2)
         {

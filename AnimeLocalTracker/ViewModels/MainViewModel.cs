@@ -93,7 +93,7 @@ public partial class MainViewModel : ObservableObject,
         {
             SetProperty(ref _textoBusqueda, value);
             BusquedaSinResultados = false; // Resetear al escribir
-            EjecutarBusquedaEnVivoAsyncCore(value);
+            _ = EjecutarBusquedaEnVivoAsyncCore(value);
         }
     }
 
@@ -187,7 +187,9 @@ public partial class MainViewModel : ObservableObject,
         VistaActual = _serviceProvider.GetRequiredService<GaleriaViewModel>();
     }
 
-    public async void Receive(NavegarMensaje_Detalle message)
+    public void Receive(NavegarMensaje_Detalle message) => _ = InicializarDetalleAsync(message);
+
+    private async Task InicializarDetalleAsync(NavegarMensaje_Detalle message)
     {
         try
         {
@@ -219,7 +221,9 @@ public partial class MainViewModel : ObservableObject,
         VistaActual = _serviceProvider.GetRequiredService<DescargasViewModel>();
     }
 
-    public async void Receive(NavegarMensaje_Reproductor message)
+    public void Receive(NavegarMensaje_Reproductor message) => _ = NavegarAlReproductorAsync(message);
+
+    private async Task NavegarAlReproductorAsync(NavegarMensaje_Reproductor message)
     {
         try
         {
@@ -490,7 +494,7 @@ public partial class MainViewModel : ObservableObject,
     // LÓGICA DE BÚSQUEDA Y CREACIÓN DE ANIME
     // ==========================================
 
-    private async void EjecutarBusquedaEnVivoAsyncCore(string busqueda)
+    private async Task EjecutarBusquedaEnVivoAsyncCore(string busqueda)
     {
         if (string.IsNullOrWhiteSpace(busqueda) || busqueda.Length < 3)
         {
