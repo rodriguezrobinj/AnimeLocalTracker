@@ -12,6 +12,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# SEC-08: mínimo privilegio — este job solo necesita leer el repo.
+permissions:
+  contents: read
+
 jobs:
   build-and-test:
     name: Build, Test & SCA Security Audit
@@ -59,6 +63,13 @@ jobs:
         python -m pip install --upgrade pip
         python -m pip install -e tools/python
 
+    # ARC-14: los tests del daemon Python deben bloquear el CI (hoy solo existían
+    # en local y nadie los ejecutaba).
+    - name: Python Unit Tests (pytest)
+      run: |
+        python -m pip install pytest
+        python -m pytest tools/python/tests -q
+
     # ── SCA BLOQUEANTES (DEV-01): cualquier vulnerabilidad conocida rompe el CI ──
     - name: Cargo Security Audit (Rust SCA)
       working-directory: native/animetracker_core
@@ -78,6 +89,11 @@ jobs:
 
     - name: NuGet SCA Audit (dotnet)
       run: dotnet list AnimeLocalTracker/AnimeLocalTracker.csproj package --vulnerable --include-transitive
+
+    # SEC-09: el proyecto de tests también se audita (arrastraba transitivas
+    # vulnerables System.Net.Http/Text.RegularExpressions 4.3.0 fuera del radar).
+    - name: NuGet SCA Audit (dotnet Tests)
+      run: dotnet list AnimeLocalTracker.Tests/AnimeLocalTracker.Tests.csproj package --vulnerable --include-transitive
 
     - name: Build Rust Native Library
       run: |
