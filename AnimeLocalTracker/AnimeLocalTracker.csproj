@@ -8,6 +8,8 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <UseWPF>true</UseWPF>
         <UseWindowsForms>true</UseWindowsForms>
+        <!-- ARC-08: LibraryImport source-generated (FFI a animetracker_core.dll) exige unsafe. -->
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <!-- DEV-09: versión única del producto; el pipeline de release la lee del tag
              (vX.Y.Z) y los builds locales del script de empaquetado la toman de aquí. -->
         <Version>1.0.5</Version>
