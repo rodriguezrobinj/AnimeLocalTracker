@@ -40,7 +40,7 @@ public class AniListTrackingService : IAnimeTrackingService
             }
             if (_httpClient.Timeout.TotalSeconds >= 100) // default .NET
             {
-                _httpClient.Timeout = TimeSpan.FromSeconds(30);
+                _httpClient.Timeout = TimeSpan.FromSeconds(60);
             }
         }
         catch (Exception ex)
@@ -639,8 +639,9 @@ public class AniListTrackingService : IAnimeTrackingService
         }
 
         var query = @"
-        query ($mediaIds: [Int], $airingAt_greater: Int, $airingAt_lesser: Int) {
-          Page (page: 1, perPage: 50) {
+        query ($mediaIds: [Int], $airingAt_greater: Int, $airingAt_lesser: Int, $page: Int) {
+          Page (page: $page, perPage: 50) {
+            pageInfo { hasNextPage }
             airingSchedules (mediaId_in: $mediaIds, airingAt_greater: $airingAt_greater, airingAt_lesser: $airingAt_lesser, sort: TIME) {
               episode
               airingAt
@@ -653,53 +654,67 @@ public class AniListTrackingService : IAnimeTrackingService
           }
         }";
 
-        var requestBody = new
-        {
-            query,
-            variables = new
-            {
-                mediaIds = validIds,
-                airingAt_greater = (int)inicioSemana,
-                airingAt_lesser = (int)finSemana
-            }
-        };
+        var airingList = new List<AiringEpisode>();
 
         try
         {
-            var jsonContent = JsonSerializer.Serialize(requestBody, JsonOptions);
-            var request = CrearRequest(jsonContent);
-            var response = await _httpClient.SendAsync(request);
+            bool hasNextPage = true;
+            int page = 1;
 
-            if (!response.IsSuccessStatusCode)
+            while (hasNextPage && page <= 5)
             {
-                AppLogger.Warn("AniListTrackingService", $"Calendario de emisión falló con HTTP {(int)response.StatusCode}.");
-                return [];
-            }
-
-            var jsonResponse = await response.Content.ReadAsStringAsync();
-            if (jsonResponse.Contains("\"errors\""))
-            {
-                AppLogger.Error("AniListTrackingService", $"AniList devolvió errores GraphQL en el calendario: {Truncar(jsonResponse)}", null);
-                return [];
-            }
-
-            var result = JsonSerializer.Deserialize<AniListResponse>(jsonResponse, JsonOptions);
-
-            var schedules = result?.Data?.Page?.AiringSchedules;
-            if (schedules == null) return [];
-
-            var airingList = new List<AiringEpisode>();
-            foreach (var s in schedules)
-            {
-                if (s.Media == null) continue;
-                airingList.Add(new AiringEpisode
+                var requestBody = new
                 {
-                    AniListId = s.Media.Id,
-                    Titulo = s.Media.Title.Romaji,
-                    UrlPortada = s.Media.CoverImage.ExtraLarge ?? "",
-                    NumeroEpisodio = s.Episode,
-                    FechaEmision = DateTimeOffset.FromUnixTimeSeconds(s.AiringAt).DateTime
-                });
+                    query,
+                    variables = new
+                    {
+                        mediaIds = validIds,
+                        airingAt_greater = (int)inicioSemana,
+                        airingAt_lesser = (int)finSemana,
+                        page
+                    }
+                };
+
+                var jsonContent = JsonSerializer.Serialize(requestBody, JsonOptions);
+                var request = CrearRequest(jsonContent);
+                var response = await _httpClient.SendAsync(request);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    AppLogger.Warn("AniListTrackingService", $"Calendario de emisión (página {page}) falló con HTTP {(int)response.StatusCode}.");
+                    break;
+                }
+
+                var jsonResponse = await response.Content.ReadAsStringAsync();
+                if (jsonResponse.Contains("\"errors\""))
+                {
+                    AppLogger.Error("AniListTrackingService", $"AniList devolvió errores GraphQL en el calendario (página {page}): {Truncar(jsonResponse)}", null);
+                    break;
+                }
+
+                var result = JsonSerializer.Deserialize<AniListResponse>(jsonResponse, JsonOptions);
+
+                var pageInfo = result?.Data?.Page?.PageInfo;
+                hasNextPage = pageInfo?.HasNextPage ?? false;
+
+                var schedules = result?.Data?.Page?.AiringSchedules;
+                if (schedules != null)
+                {
+                    foreach (var s in schedules)
+                    {
+                        if (s.Media == null) continue;
+                        airingList.Add(new AiringEpisode
+                        {
+                            AniListId = s.Media.Id,
+                            Titulo = s.Media.Title.Romaji,
+                            UrlPortada = s.Media.CoverImage.ExtraLarge ?? "",
+                            NumeroEpisodio = s.Episode,
+                            FechaEmision = DateTimeOffset.FromUnixTimeSeconds(s.AiringAt).DateTime
+                        });
+                    }
+                }
+                
+                page++;
             }
 
             if (airingList.Count > 0)
@@ -721,5 +736,20 @@ public class AniListTrackingService : IAnimeTrackingService
         }
     }
 
-    private static string Truncar(string texto) => texto.Length <= 400 ? texto : texto[..400] + "...";
+    private static string Truncar(string texto)
+    {
+        if (texto.Length <= 400) return texto;
+
+        // Recortar por runes (no por char) para no partir pares sustitutos UTF-16.
+        var sb = new StringBuilder(403);
+        int caracteres = 0;
+        foreach (var rune in texto.EnumerateRunes())
+        {
+            int longitud = rune.Utf16SequenceLength;
+            if (caracteres + longitud > 400) break;
+            sb.Append(rune);
+            caracteres += longitud;
+        }
+        return sb.Append("...").ToString();
+    }
 }

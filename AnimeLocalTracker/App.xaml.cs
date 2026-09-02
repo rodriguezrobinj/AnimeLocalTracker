@@ -137,6 +137,7 @@ public partial class App : Application
 
         // Orquestación de skip-times (resolución MAL ID + reglas de evaluación)
         services.AddSingleton<ISkipTimesCoordinator, SkipTimesCoordinator>();
+        services.AddSingleton<IMediaEnrichmentService, MediaEnrichmentService>();
 
         // 4. Integración del Ecosistema de Automatización Python (Zero-Setup & Clean Architecture)
         services.AddSingleton<IPythonBridgeService, PythonBridgeService>();
@@ -227,25 +228,42 @@ public partial class App : Application
 
     private static Polly.IAsyncPolicy<System.Net.Http.HttpResponseMessage> GetRetryPolicy()
     {
-        return Polly.Extensions.Http.HttpPolicyExtensions
+        var circuitBreaker = Polly.Extensions.Http.HttpPolicyExtensions
             .HandleTransientHttpError()
             .OrResult(msg => msg.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+            .CircuitBreakerAsync(
+                handledEventsAllowedBeforeBreaking: 3,
+                durationOfBreak: TimeSpan.FromMinutes(2),
+                onBreak: (result, timespan) => AppLogger.Warn("AniListTrackingService", $"Circuit Breaker ABIERTO por {timespan.TotalSeconds}s"),
+                onReset: () => AppLogger.Info("AniListTrackingService", "Circuit Breaker RESET CERRADO"),
+                onHalfOpen: () => AppLogger.Info("AniListTrackingService", "Circuit Breaker MEDIO ABIERTO")
+            );
+
+        var random = new Random();
+        var retry = Polly.Extensions.Http.HttpPolicyExtensions
+            .HandleTransientHttpError()
+            .OrResult(msg => msg.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+            // Permitir que el retry no falle de inmediato si el breaker está abierto (espera y reintenta)
+            .Or<Polly.CircuitBreaker.BrokenCircuitException>() 
             .WaitAndRetryAsync(
                 retryCount: 3,
                 sleepDurationProvider: (retryCount, response, context) =>
                 {
                     var delay = TimeSpan.FromSeconds(60); // Por defecto AniList bloquea 1 minuto
-                    if (response.Result?.Headers.RetryAfter?.Delta.HasValue == true)
+                    if (response?.Result?.Headers.RetryAfter?.Delta.HasValue == true)
                     {
                         delay = response.Result.Headers.RetryAfter.Delta.Value.Add(TimeSpan.FromSeconds(1));
                     }
-                    return delay;
+                    // Jitter para evitar thundering herd
+                    return delay.Add(TimeSpan.FromMilliseconds(random.Next(500, 2000)));
                 },
                 onRetryAsync: (outcome, timespan, retryCount, context) =>
                 {
                     System.Diagnostics.Debug.WriteLine($"[AniList Rate Limit] Esperando {timespan.TotalSeconds} segundos. Reintento {retryCount}...");
                     return System.Threading.Tasks.Task.CompletedTask;
                 });
+
+        return Polly.Policy.WrapAsync(retry, circuitBreaker);
     }
 
     private static System.Threading.Mutex? _singleInstanceMutex;
