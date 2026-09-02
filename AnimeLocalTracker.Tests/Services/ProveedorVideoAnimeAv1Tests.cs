@@ -110,7 +110,7 @@ public class ProveedorVideoAnimeAv1Tests
         // Assert: URL directa del CDN de mp4upload, validada por la política.
         // Con MP4Upload primero, el daemon no se toca.
         url.Should().Be("https://cdn.mp4upload.com/r0xdfbvme2yy/720p/video.mp4");
-        bridge.Verify(b => b.ExecuteCommandAsync<object, ProveedorVideoAnimeAv1.StreamResult>(
+        bridge.Verify(b => b.ExecuteCommandOneShotAsync<object, ProveedorVideoAnimeAv1.StreamResult>(
             It.IsAny<string>(), It.IsAny<object>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -124,7 +124,7 @@ public class ProveedorVideoAnimeAv1Tests
             if (req.RequestUri!.Host.Contains("mp4upload.com")) return Ok("<html>sin player</html>");
             return new HttpResponseMessage(HttpStatusCode.NotFound);
         });
-        bridge.Setup(b => b.ExecuteCommandAsync<object, ProveedorVideoAnimeAv1.StreamResult>(
+        bridge.Setup(b => b.ExecuteCommandOneShotAsync<object, ProveedorVideoAnimeAv1.StreamResult>(
                 "resolve-stream", It.IsAny<object>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ProveedorVideoAnimeAv1.StreamResult { Success = true, DirectUrl = "https://cdn.voe.example.com/video.mp4" });
 
@@ -133,7 +133,7 @@ public class ProveedorVideoAnimeAv1Tests
 
         // Assert: resuelto por yt-dlp con el servidor Voe
         url.Should().Be("https://cdn.voe.example.com/video.mp4");
-        bridge.Verify(b => b.ExecuteCommandAsync<object, ProveedorVideoAnimeAv1.StreamResult>(
+        bridge.Verify(b => b.ExecuteCommandOneShotAsync<object, ProveedorVideoAnimeAv1.StreamResult>(
             "resolve-stream", It.IsAny<object>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -148,7 +148,7 @@ public class ProveedorVideoAnimeAv1Tests
             if (req.RequestUri!.Host.Contains("mp4upload.com")) return Ok("<html>sin player</html>");
             return new HttpResponseMessage(HttpStatusCode.NotFound);
         });
-        bridge.Setup(b => b.ExecuteCommandAsync<object, ProveedorVideoAnimeAv1.StreamResult>(
+        bridge.Setup(b => b.ExecuteCommandOneShotAsync<object, ProveedorVideoAnimeAv1.StreamResult>(
                 "resolve-stream", It.IsAny<object>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ProveedorVideoAnimeAv1.StreamResult { Success = true, DirectUrl = "https://cdn.example.com/master.m3u8" });
 
@@ -175,7 +175,7 @@ public class ProveedorVideoAnimeAv1Tests
 
         // Assert: rechazado sin descargar (la página no es del anime buscado)
         url.Should().BeNull();
-        bridge.Verify(b => b.ExecuteCommandAsync<object, ProveedorVideoAnimeAv1.StreamResult>(
+        bridge.Verify(b => b.ExecuteCommandOneShotAsync<object, ProveedorVideoAnimeAv1.StreamResult>(
             It.IsAny<string>(), It.IsAny<object>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 

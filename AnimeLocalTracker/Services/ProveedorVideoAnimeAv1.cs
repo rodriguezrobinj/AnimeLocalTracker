@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -62,7 +62,7 @@ public class ProveedorVideoAnimeAv1 : IProveedorVideo
                     continue;
                 }
 
-                var result = await _pythonBridge.ExecuteCommandAsync<object, StreamResult>(
+                var result = await _pythonBridge.ExecuteCommandOneShotAsync<object, StreamResult>(
                     "resolve-stream",
                     new { url = embed.Url },
                     ct);
