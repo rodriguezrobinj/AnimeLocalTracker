@@ -55,7 +55,9 @@ fn anitomy_extract_frame_inner(
         Err(_) => return false,
     };
 
-    spritesheet::extract_frame(video_str, out_str, timestamp, width.max(0) as u32)
+    let w = (width.max(16).min(4096) as u32).next_power_of_two().min(4096);
+    let t = if timestamp.is_finite() && timestamp >= 0.0 { timestamp } else { 0.0 };
+    spritesheet::extract_frame(video_str, out_str, t, w)
 }
 
 /// Parsea un nombre de archivo de anime y retorna un JSON con los metadatos.

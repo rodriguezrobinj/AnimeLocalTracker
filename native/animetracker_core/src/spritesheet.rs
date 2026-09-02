@@ -40,6 +40,14 @@ pub fn extract_frame(
     let scale_filter = format!("scale={}:-2", w);
     let ts_str = format!("{:.2}", timestamp.max(0.0));
     let ffmpeg_bin = get_ffmpeg_path();
+    
+    let safe_path = |p: &str| -> String {
+        let p = p.replace('"', "_");
+        if p.starts_with('-') { format!(".\\{}", p) } else { p.to_string() }
+    };
+    
+    let video_safe = safe_path(video_path);
+    let out_safe = safe_path(out_path);
 
     let mut cmd = Command::new(&ffmpeg_bin);
     cmd.args([
@@ -50,7 +58,7 @@ pub fn extract_frame(
         "-max_alloc", "2147483648",
         "-loglevel", "error",
         "-ss", &ts_str,
-        "-i", video_path,
+        "-i", &video_safe,
         "-an",
         "-sn",
         "-dn",
@@ -58,7 +66,7 @@ pub fn extract_frame(
         "-vf", &scale_filter,
         "-threads", "0",
         "-q:v", "3",
-        out_path,
+        &out_safe,
     ]);
 
     #[cfg(windows)]
@@ -70,4 +78,19 @@ pub fn extract_frame(
         Ok(out) => out.status.success() && Path::new(out_path).exists(),
         Err(_) => false,
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_ffmpeg_path_fallback() {
+        let path = get_ffmpeg_path();
+        // Fallback or bundled
+        assert!(!path.is_empty());
+    }
+
+    // Nota: test_extract_frame requeriría un archivo de video real
+    // En una prueba real se mockearía la ejecución.
 }
