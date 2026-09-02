@@ -63,6 +63,36 @@ public class AniListTrackingService : IAnimeTrackingService
         return request;
     }
 
+    /// <summary>
+    /// Envía la petición y detecta un 401 (token revocado o vencido): en lugar de fallar
+    /// en silencio para siempre, cierra la sesión local para forzar un nuevo login.
+    /// </summary>
+    private async Task<HttpResponseMessage> EnviarYDetectarSesionAsync(HttpRequestMessage request, CancellationToken cancellationToken = default)
+    {
+        var response = await _httpClient.SendAsync(request, cancellationToken);
+
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            var auth = _authService;
+            if (auth?.EstaAutenticado() == true)
+            {
+                AppLogger.Warn("AniListTrackingService", "AniList rechazó el token (401): se cierra la sesión local para forzar un nuevo inicio de sesión.");
+                var dispatcher = System.Windows.Application.Current?.Dispatcher;
+                if (dispatcher != null)
+                {
+                    // CerrarSesion notifica a los ViewModels vía messenger: debe ejecutarse en el hilo de UI.
+                    await dispatcher.InvokeAsync(() => auth.CerrarSesion());
+                }
+                else
+                {
+                    auth.CerrarSesion();
+                }
+            }
+        }
+
+        return response;
+    }
+
     private static bool TryGetFromCache<T>(string key, out T? result) where T : class
     {
         if (_cache.TryGetValue(key, out var entry))
@@ -119,7 +149,7 @@ public class AniListTrackingService : IAnimeTrackingService
             var jsonContent = JsonSerializer.Serialize(payload, JsonOptions);
 
             var request = CrearRequest(jsonContent);
-            var response = await _httpClient.SendAsync(request);
+            var response = await EnviarYDetectarSesionAsync(request);
 
             if (response.IsSuccessStatusCode)
             {
@@ -225,7 +255,7 @@ public class AniListTrackingService : IAnimeTrackingService
                 var jsonContent = JsonSerializer.Serialize(payload, JsonOptions);
 
                 var request = CrearRequest(jsonContent, token);
-                var response = await _httpClient.SendAsync(request);
+                var response = await EnviarYDetectarSesionAsync(request);
 
                 if (!response.IsSuccessStatusCode)
                 {
@@ -300,7 +330,7 @@ public class AniListTrackingService : IAnimeTrackingService
         try
         {
             var request = CrearRequest(jsonContent);
-            var response = await _httpClient.SendAsync(request);
+            var response = await EnviarYDetectarSesionAsync(request);
 
             if (response.IsSuccessStatusCode)
             {
@@ -350,7 +380,7 @@ public class AniListTrackingService : IAnimeTrackingService
             var jsonContent = JsonSerializer.Serialize(payload, JsonOptions);
 
             var request = CrearRequest(jsonContent, token);
-            var response = await _httpClient.SendAsync(request);
+            var response = await EnviarYDetectarSesionAsync(request);
 
             if (response.IsSuccessStatusCode)
             {
@@ -395,7 +425,7 @@ public class AniListTrackingService : IAnimeTrackingService
             var jsonContent = JsonSerializer.Serialize(payload, JsonOptions);
 
             var request = CrearRequest(jsonContent, token);
-            var response = await _httpClient.SendAsync(request);
+            var response = await EnviarYDetectarSesionAsync(request);
 
             if (response.IsSuccessStatusCode)
             {
@@ -440,7 +470,7 @@ public class AniListTrackingService : IAnimeTrackingService
             var jsonContent = JsonSerializer.Serialize(payload, JsonOptions);
 
             var request = CrearRequest(jsonContent, token);
-            var response = await _httpClient.SendAsync(request);
+            var response = await EnviarYDetectarSesionAsync(request);
             var content = await response.Content.ReadAsStringAsync();
             
             if (content.Contains("\"errors\""))
@@ -480,7 +510,7 @@ public class AniListTrackingService : IAnimeTrackingService
             var jsonContent = JsonSerializer.Serialize(payload, JsonOptions);
 
             var request = CrearRequest(jsonContent, token);
-            var response = await _httpClient.SendAsync(request);
+            var response = await EnviarYDetectarSesionAsync(request);
 
             if (response.IsSuccessStatusCode)
             {
@@ -532,7 +562,7 @@ public class AniListTrackingService : IAnimeTrackingService
             var jsonContent = JsonSerializer.Serialize(payload, JsonOptions);
 
             var request = CrearRequest(jsonContent);
-            var response = await _httpClient.SendAsync(request, cancellationToken);
+            var response = await EnviarYDetectarSesionAsync(request, cancellationToken);
 
             if (response.IsSuccessStatusCode)
             {
@@ -598,7 +628,7 @@ public class AniListTrackingService : IAnimeTrackingService
             var jsonContent = JsonSerializer.Serialize(payload, JsonOptions);
 
             var request = CrearRequest(jsonContent);
-            var response = await _httpClient.SendAsync(request, cancellationToken);
+            var response = await EnviarYDetectarSesionAsync(request, cancellationToken);
 
             if (response.IsSuccessStatusCode)
             {
@@ -684,7 +714,7 @@ public class AniListTrackingService : IAnimeTrackingService
 
                 var jsonContent = JsonSerializer.Serialize(requestBody, JsonOptions);
                 var request = CrearRequest(jsonContent);
-                var response = await _httpClient.SendAsync(request);
+                var response = await EnviarYDetectarSesionAsync(request);
 
                 if (!response.IsSuccessStatusCode)
                 {

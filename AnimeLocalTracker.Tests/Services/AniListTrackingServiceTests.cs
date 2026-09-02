@@ -241,4 +241,46 @@ public class AniListTrackingServiceTests
         result.Should().BeEmpty();
         _httpMessageHandlerMock.Protected().Verify("SendAsync", Times.Never(), ItExpr.IsAny<HttpRequestMessage>(), ItExpr.IsAny<CancellationToken>());
     }
+
+    [Fact]
+    public async Task ActualizarProgresoAsync_Con401_DeberiaCerrarSesionLocal()
+    {
+        // Arrange: token revocado → AniList responde 401
+        _authServiceMock.Setup(a => a.EstaAutenticado()).Returns(true);
+        _httpMessageHandlerMock
+            .Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>())
+            .ReturnsAsync(new HttpResponseMessage { StatusCode = HttpStatusCode.Unauthorized });
+
+        // Act
+        bool resultado = await _sut.ActualizarProgresoAsync(16498, 5, "token-invalido");
+
+        // Assert: la mutación falla y la sesión local se cierra para forzar re-login
+        resultado.Should().BeFalse();
+        _authServiceMock.Verify(a => a.CerrarSesion(), Times.Once);
+    }
+
+    [Fact]
+    public async Task ActualizarProgresoAsync_Con401_YaSesionCerrada_NoDeberiaRepetirCerrarSesion()
+    {
+        // Arrange: ya no está autenticado (sesión cerrada en un 401 anterior)
+        _authServiceMock.Setup(a => a.EstaAutenticado()).Returns(false);
+        _httpMessageHandlerMock
+            .Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>())
+            .ReturnsAsync(new HttpResponseMessage { StatusCode = HttpStatusCode.Unauthorized });
+
+        // Act
+        bool resultado = await _sut.ActualizarProgresoAsync(16498, 5, "token-invalido");
+
+        // Assert
+        resultado.Should().BeFalse();
+        _authServiceMock.Verify(a => a.CerrarSesion(), Times.Never);
+    }
 }
