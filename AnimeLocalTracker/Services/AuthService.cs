@@ -141,9 +141,7 @@ public class AuthService : IAuthService
                     // Referer válidos (p.ej. script local, DNS rebinding) se rechaza.
                     string origin = request.Headers["Origin"] ?? string.Empty;
                     string referer = request.Headers["Referer"] ?? string.Empty;
-                    bool origenValido = origin.Equals("http://localhost:5050", StringComparison.OrdinalIgnoreCase)
-                                        || referer.StartsWith("http://localhost:5050", StringComparison.OrdinalIgnoreCase);
-                    if (!origenValido)
+                    if (!EsOrigenLocal(origin) && !EsOrigenLocal(referer))
                     {
                         AppLogger.Warn("AuthService", "POST /token rechazado: Origin/Referer no coincide con el listener local.");
                         response.StatusCode = 403;
@@ -256,5 +254,19 @@ public class AuthService : IAuthService
         }
         
         WeakReferenceMessenger.Default.Send(new UsuarioDesconectadoMensaje());
+    }
+
+    /// <summary>
+    /// Valida que un header Origin/Referer sea exactamente el listener local del flujo
+    /// OAuth (http://localhost:5050). Una comparación por prefijo de cadena aceptaría
+    /// hosts evasivos como "localhost:5050.evil.com"; aquí se compara el Uri parseado
+    /// (esquema + host + puerto exactos).
+    /// </summary>
+    internal static bool EsOrigenLocal(string? valor)
+    {
+        return Uri.TryCreate(valor, UriKind.Absolute, out var uri)
+               && uri.Scheme == Uri.UriSchemeHttp
+               && uri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase)
+               && uri.Port == 5050;
     }
 }
