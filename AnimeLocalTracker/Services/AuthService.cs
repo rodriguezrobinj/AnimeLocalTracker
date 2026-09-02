@@ -17,6 +17,9 @@ public class AuthService : IAuthService
     private const string ClientId = "48217";
     
     public string? Token { get; private set; }
+
+    // SEC-01: el POST /token solo es válido una vez por intento de login (anti-replay).
+    private bool _tokenEntregado;
     
     // Ruta donde guardaremos el token para que no inicies sesión cada vez que abras la app.
     // Ubicado en la carpeta de datos (fuera del directorio de instalación de Velopack).
@@ -59,6 +62,9 @@ public class AuthService : IAuthService
             AppLogger.Error("AuthService", "No se pudo iniciar el listener local en el puerto 5050. Puede que el puerto esté ocupado por otra instancia.", ex);
             return false;
         }
+
+        // SEC-01: cada intento de login reinicia el guard de un solo uso.
+        _tokenEntregado = false;
 
         string expectedState = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
 
@@ -149,6 +155,14 @@ public class AuthService : IAuthService
                         continue;
                     }
 
+                    if (_tokenEntregado)
+                    {
+                        // SEC-01: un segundo POST /token (replay tras capturar el token) se rechaza.
+                        response.StatusCode = 410;
+                        response.OutputStream.Close();
+                        continue;
+                    }
+
                     try
                     {
                         using var reader = new StreamReader(request.InputStream, Encoding.UTF8);
@@ -161,6 +175,7 @@ public class AuthService : IAuthService
 
                         if (!string.IsNullOrEmpty(receivedState) && receivedState == expectedState && !string.IsNullOrWhiteSpace(receivedToken))
                         {
+                            _tokenEntregado = true;
                             tokenCapturado = receivedToken;
                             response.StatusCode = 200;
                             byte[] okMsg = Encoding.UTF8.GetBytes("{\"success\":true}");
