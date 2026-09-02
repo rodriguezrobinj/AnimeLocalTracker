@@ -128,7 +128,8 @@ jobs:
         CERT_PASSWORD: ${{ secrets.SIGN_CERT_PASSWORD }}
       run: |
         if (-not $env:CERT_B64) {
-          Write-Host "Sin certificado configurado: la release se genera SIN firma (SEC-05 pendiente)."
+          Write-Host "::error::Sin certificado configurado: la release se genera SIN firma (SEC-05). Abortando empaquetado."
+          exit 1
         } else {
           $pfx = Join-Path $env:RUNNER_TEMP "alt.pfx"
           [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:CERT_B64))
