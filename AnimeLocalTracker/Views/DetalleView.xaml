@@ -391,7 +391,7 @@
 
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <Border Padding="10,8" Background="Transparent">
+                                <Border Padding="10,8" Background="Transparent" Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=ListBox}}">
                                     <!-- Menú contextual de la fila: se abre con clic izquierdo SOLO sobre el
                                          icono de episodio descargado (o con clic derecho en la fila) -->
                                     <Border.ContextMenu>
@@ -463,7 +463,7 @@
                                                 </Style>
                                             </ContextMenu.Resources>
                                             <MenuItem Header="Reproducir episodio"
-                                                      Command="{Binding DataContext.ReproducirEpisodioCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                                      Command="{Binding PlacementTarget.Tag.ReproducirEpisodioCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                                       CommandParameter="{Binding}">
                                                 <MenuItem.Icon>
                                                     <materialDesign:PackIcon Kind="PlayArrow" Foreground="#60A5FA" Width="16" Height="16"/>
@@ -471,7 +471,7 @@
                                             </MenuItem>
                                             <Separator/>
                                             <MenuItem Header="Eliminar episodio del disco"
-                                                      Command="{Binding DataContext.EliminarEpisodioCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                                      Command="{Binding PlacementTarget.Tag.EliminarEpisodioCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                                       CommandParameter="{Binding}">
                                                 <MenuItem.Icon>
                                                     <materialDesign:PackIcon Kind="DeleteOutline" Foreground="#F87171" Width="16" Height="16"/>
