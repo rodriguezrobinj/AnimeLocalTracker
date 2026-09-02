@@ -62,7 +62,7 @@ public class ImageCacheServiceTests
         factoryMock.Setup(f => f.CreateClient(It.IsAny<string>())).Returns(client);
 
         var service = new ImageCacheService(factoryMock.Object);
-        var result = await service.ObtenerPortadaAsync(888888, "https://example.com/test-cover.png");
+        var result = await service.ObtenerPortadaAsync(888888, "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx185801-test.png");
         
         result.Should().NotBeNull();
         

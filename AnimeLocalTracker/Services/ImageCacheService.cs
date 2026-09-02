@@ -47,6 +47,35 @@ public class ImageCacheService : IImageCacheService, IDisposable
         }
     }
 
+    /// <summary>
+    /// SEC-04: solo se descargan portadas de la CDN de AniList por https. Sin esta
+    /// restricción, una URL arbitraria (p. ej. de un import JSON) permitiría sondear
+    /// servicios internos de la red local (SSRF limitado).
+    /// </summary>
+    internal static bool EsHostPortadaPermitido(string? url)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)) return false;
+        if (uri.Scheme != Uri.UriSchemeHttps) return false;
+        return uri.Host.Equals("anilist.co", StringComparison.OrdinalIgnoreCase)
+               || uri.Host.EndsWith(".anilist.co", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// SEC-04: valida la firma mágica del archivo (JPEG/PNG/GIF/WebP) ANTES de
+    /// escribirlo a disco: los bytes de una URL comprometida no pueden dejar
+    /// basura arbitraria en la carpeta de portadas.
+    /// </summary>
+    internal static bool EsImagenValida(byte[] bytes)
+    {
+        if (bytes == null || bytes.Length < 12) return false;
+
+        if (bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF) return true; // JPEG
+        if (bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47) return true; // PNG
+        if (bytes[0] == 0x47 && bytes[1] == 0x49 && bytes[2] == 0x46) return true; // GIF
+        return bytes[0] == 0x52 && bytes[1] == 0x49 && bytes[2] == 0x46 && bytes[3] == 0x46 // RIFF....WEBP
+               && bytes[8] == 0x57 && bytes[9] == 0x45 && bytes[10] == 0x42 && bytes[11] == 0x50;
+    }
+
     public ImageSource? ObtenerPortada(int animeId, string? urlPortada, int decodeWidth = 220)
     {
         if (_memoryCache.TryGetValue(animeId, out var cached))
@@ -125,8 +154,8 @@ public class ImageCacheService : IImageCacheService, IDisposable
                 }
             }
 
-            if (!Uri.TryCreate(urlPortada, UriKind.Absolute, out var uri) ||
-                (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+            if (!EsHostPortadaPermitido(urlPortada) ||
+                !Uri.TryCreate(urlPortada, UriKind.Absolute, out var uri))
             {
                 return null;
             }
@@ -159,6 +188,14 @@ public class ImageCacheService : IImageCacheService, IDisposable
             }
 
             byte[] bytes = ms.ToArray();
+
+            // SEC-04: validar firma mágica antes de tocar disco (los bytes se escriben
+            // solo si corresponden a una imagen real).
+            if (!EsImagenValida(bytes))
+            {
+                AppLogger.Warn("ImageCacheService", $"Portada rechazada para anime {animeId}: los bytes descargados no son una imagen válida.");
+                return null;
+            }
 
             try
             {
