@@ -84,19 +84,46 @@ function Copy-NativeDll {
     }
 }
 
-if (Test-Path "$root\native\animetracker_core\target\release\animetracker_core.dll") {
+# ARC-10: compilar el núcleo Rust si falta o está desactualizado respecto a sus fuentes.
+# Antes se copiaba lo que hubiera en target\release sin verificar, pudiendo quedar una
+# DLL stale en los builds locales (el CI sí compilaba cargo antes de copiar).
+$rustDllPath = "$root\native\animetracker_core\target\release\animetracker_core.dll"
+$rustNeedsBuild = -not (Test-Path $rustDllPath)
+if (-not $rustNeedsBuild) {
+    $rustDllTime = (Get-Item $rustDllPath).LastWriteTime
+    $rustNewestSrc = Get-ChildItem "$root\native\animetracker_core\src" -Recurse -Filter "*.rs" |
+        Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    if ($rustNewestSrc -and $rustNewestSrc.LastWriteTime -gt $rustDllTime) {
+        $rustNeedsBuild = $true
+    }
+}
+if ($rustNeedsBuild) {
+    Write-Host "[build] Compilando núcleo Rust (release)..." -ForegroundColor Yellow
+    try {
+        & cargo build --release --manifest-path "$root\native\animetracker_core\Cargo.toml"
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "[build] ERROR: la compilación de animetracker_core falló." -ForegroundColor Red
+            exit 1
+        }
+    }
+    catch {
+        Write-Host "[build] AVISO: cargo no disponible; se usará la DLL existente si la hay." -ForegroundColor Yellow
+    }
+}
+
+if (Test-Path $rustDllPath) {
     # 1) Raíz del proyecto: la referencia el csproj (copiada a output en builds y publish de Velopack)
-    Copy-NativeDll "$root\native\animetracker_core\target\release\animetracker_core.dll" "$root\AnimeLocalTracker\animetracker_core.dll" "raiz del proyecto"
+    Copy-NativeDll $rustDllPath "$root\AnimeLocalTracker\animetracker_core.dll" "raiz del proyecto"
     
     # 2) Binarios de app y tests si los directorios existen
     $appBinDir = "$root\AnimeLocalTracker\bin\$Configuration\net8.0-windows"
     $testsBinDir = "$root\AnimeLocalTracker.Tests\bin\$Configuration\net8.0-windows"
 
     if (Test-Path $appBinDir) {
-        Copy-NativeDll "$root\native\animetracker_core\target\release\animetracker_core.dll" (Join-Path $appBinDir "animetracker_core.dll") "bin de la app"
+        Copy-NativeDll $rustDllPath (Join-Path $appBinDir "animetracker_core.dll") "bin de la app"
     }
     if (Test-Path $testsBinDir) {
-        Copy-NativeDll "$root\native\animetracker_core\target\release\animetracker_core.dll" (Join-Path $testsBinDir "animetracker_core.dll") "bin de tests"
+        Copy-NativeDll $rustDllPath (Join-Path $testsBinDir "animetracker_core.dll") "bin de tests"
     }
 }
 
