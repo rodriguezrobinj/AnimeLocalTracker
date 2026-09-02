@@ -64,12 +64,36 @@ public class SyncService : ISyncService
 
                 try
                 {
-                    bool ok = await _trackingService.ActualizarProgresoAsync(aniListId, maxEpisodio, token);
+                    // FUN-001: Consultar estado remoto en AniList para evitar degradar el progreso
+                    // si el usuario avanzó en otro dispositivo o en la web mientras estaba offline.
+                    var seguimientoRemoto = await _trackingService.ObtenerSeguimientoUsuarioAsync(aniListId, token);
+                    int progresoRemoto = seguimientoRemoto?.Progress ?? 0;
+                    int progresoFinal = Math.Max(maxEpisodio, progresoRemoto);
+
+                    // Si en la nube el usuario ya avanzó más allá de lo pendiente local,
+                    // sincronizamos también los registros locales que estén por debajo del remoto.
+                    if (progresoRemoto > maxEpisodio)
+                    {
+                        var todosRegistros = await _databaseService.ObtenerRegistrosPorAnimeAsync(aniListId);
+                        var pendientesHastaRemoto = todosRegistros
+                            .Where(r => r.NumeroEpisodio <= progresoRemoto && !r.SincronizadoEnNube)
+                            .Select(r => r.Id)
+                            .ToList();
+                        foreach (var id in pendientesHastaRemoto)
+                        {
+                            if (!idsSincronizar.Contains(id))
+                            {
+                                idsSincronizar.Add(id);
+                            }
+                        }
+                    }
+
+                    bool ok = await _trackingService.ActualizarProgresoAsync(aniListId, progresoFinal, token);
                     if (ok)
                     {
                         await _databaseService.MarcarEpisodiosSincronizadosAsync(idsSincronizar);
                         totalExitosos += idsSincronizar.Count;
-                        AppLogger.Info($"[SyncService] Sincronizado AniListId={aniListId} hasta episodio {maxEpisodio}.", "SyncService");
+                        AppLogger.Info($"[SyncService] Sincronizado AniListId={aniListId} hasta episodio {progresoFinal} (Local: {maxEpisodio}, Remoto: {progresoRemoto}).", "SyncService");
                     }
                 }
                 catch (Exception ex)

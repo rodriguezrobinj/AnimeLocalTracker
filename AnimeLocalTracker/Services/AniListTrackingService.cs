@@ -354,6 +354,13 @@ public class AniListTrackingService : IAnimeTrackingService
 
             if (response.IsSuccessStatusCode)
             {
+                var content = await response.Content.ReadAsStringAsync();
+                if (content.Contains("\"errors\""))
+                {
+                    AppLogger.Warn("AniListTrackingService", $"AniList devolvió error al actualizar progreso para MediaId {mediaId}: {Truncar(content)}");
+                    return false;
+                }
+
                 InvalidateCacheForMedia(mediaId);
                 return true;
             }
