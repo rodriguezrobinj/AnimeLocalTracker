@@ -25,23 +25,23 @@ public class SyncService : ISyncService
         _authService = authService;
     }
 
-    public async Task<int> SincronizarPendientesAsync()
+    public async Task<(int Exitosos, int Pendientes)> SincronizarPendientesAsync()
     {
         if (!_authService.EstaAutenticado())
         {
             AppLogger.Debug("[SyncService] Usuario no autenticado; omitiendo sincronización.", "SyncService");
-            return 0;
+            return (0, 0);
         }
 
         string? token = _authService.ObtenerToken();
         if (string.IsNullOrEmpty(token))
         {
-            return 0;
+            return (0, 0);
         }
 
         if (!await _syncLock.WaitAsync(100))
         {
-            return 0;
+            return (0, 0);
         }
 
         try
@@ -49,10 +49,11 @@ public class SyncService : ISyncService
             var noSincronizados = await _databaseService.ObtenerEpisodiosNoSincronizadosAsync();
             if (noSincronizados.Count == 0)
             {
-                return 0;
+                return (0, 0);
             }
 
             int totalExitosos = 0;
+            int totalPendientes = noSincronizados.Count;
             var grupos = noSincronizados.GroupBy(e => e.AniListId);
 
             foreach (var grupo in grupos)
@@ -77,12 +78,12 @@ public class SyncService : ISyncService
                 }
             }
 
-            return totalExitosos;
+            return (totalExitosos, totalPendientes);
         }
         catch (Exception ex)
         {
             AppLogger.Error($"[SyncService] Excepción general durante sincronización: {ex.Message}", "SyncService", ex);
-            return 0;
+            return (0, 0);
         }
         finally
         {
@@ -99,16 +100,26 @@ public class SyncService : ISyncService
 
         _ = Task.Run(async () =>
         {
+            TimeSpan nextDelay = intervalo;
             try
             {
                 while (!token.IsCancellationRequested)
                 {
                     try
                     {
-                        await Task.Delay(intervalo, token);
+                        await Task.Delay(nextDelay, token);
                         if (token.IsCancellationRequested) break;
 
-                        await SincronizarPendientesAsync();
+                        var (exitosos, pendientes) = await SincronizarPendientesAsync();
+                        if (pendientes > 0 && exitosos == 0)
+                        {
+                            nextDelay = TimeSpan.FromMinutes(10);
+                            AppLogger.Info("SyncService", "Aplicando backoff de 10 min por fallos consecutivos.");
+                        }
+                        else
+                        {
+                            nextDelay = intervalo;
+                        }
                     }
                     catch (OperationCanceledException)
                     {
