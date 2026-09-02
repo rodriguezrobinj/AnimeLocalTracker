@@ -51,7 +51,7 @@ namespace AnimeLocalTracker.Views
 
         private void ReproductorView_Loaded(object sender, RoutedEventArgs e)
         {
-            DesactivarDobleClickFullscreenHost();
+            DesactivarInteraccionNativaDelHost();
 
             // Suscribir al pipeline global de input DESPUÉS de que FlyleafHost
             // haya creado su ventana nativa (ocurre durante el layout pass de Loaded).
@@ -67,12 +67,15 @@ namespace AnimeLocalTracker.Views
         }
 
         /// <summary>
-        /// FlyleafHost captura el mouse a nivel nativo: su doble-click fullscreen no pasa por el
-        /// routing de WPF y hay que desactivarlo en el propio host. Se asigna por reflexión porque
-        /// como atributo XAML el compilador BAML de FlyleafLib 3.11 lo mapea a la propiedad
-        /// equivocada ("False is not a valid value for AvailableWindows").
+        /// Desactiva la interacción nativa del mouse del FlyleafHost:
+        /// - El doble-click fullscreen no pasa por el routing de WPF y hay que
+        ///   desactivarlo en el propio host (por reflexión: como atributo XAML el
+        ///   compilador BAML lo mapea a la propiedad equivocada).
+        /// - Los bindings nativos del ratón (MouseBindings en Surface) capturan el
+        ///   mouse tras un click en el video y los controles WPF dejan de recibir
+        ///   eventos hasta usar el teclado. Con None, el host no consume clicks.
         /// </summary>
-        private void DesactivarDobleClickFullscreenHost()
+        private void DesactivarInteraccionNativaDelHost()
         {
             try
             {
@@ -101,6 +104,25 @@ namespace AnimeLocalTracker.Views
             catch (Exception ex)
             {
                 AppLogger.Debug("ReproductorView", $"No se pudo desactivar el doble-click del host: {ex.Message}");
+            }
+
+            try
+            {
+                // Bug reproductor: click en medio del video dejaba los controles sin
+                // responder (captura nativa del mouse del host) hasta usar el teclado.
+                var mbField = typeof(FlyleafLib.Controls.WPF.FlyleafHost).GetField(
+                    "MouseBindingsProperty",
+                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+
+                if (mbField?.GetValue(null) is System.Windows.DependencyProperty mbDp)
+                {
+                    HostFlyleaf.SetValue(mbDp, FlyleafLib.Controls.WPF.AvailableWindows.None);
+                    AppLogger.Debug("ReproductorView", "MouseBindings del host desactivados (None): los clicks ya no capturan el ratón.");
+                }
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Debug("ReproductorView", $"No se pudieron desactivar los MouseBindings del host: {ex.Message}");
             }
         }
 

@@ -238,6 +238,9 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         {
             _volumenPrevioMute = Volumen;
             IsMuted = true;
+            // Bug: la barra de volumen seguía al máximo al silenciar porque Volumen
+            // no cambiaba — ahora baja a 0 (y se restaura el previo al desmutear)
+            Volumen = 0;
             if (Player?.Audio != null)
             {
                 try

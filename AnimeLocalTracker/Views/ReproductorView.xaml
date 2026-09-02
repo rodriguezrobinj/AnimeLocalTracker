@@ -217,7 +217,7 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <!-- Back Arrow -->
-                        <Button Grid.Column="0" Command="{Binding CerrarCommand}"
+                        <Button Grid.Column="0" Command="{Binding CerrarCommand}" Focusable="False"
                                 Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="50" Height="50" Margin="0,0,15,0">
                             <materialDesign:PackIcon Kind="ArrowLeft" Width="36" Height="36" />
                         </Button>
@@ -247,7 +247,7 @@
                         </Grid.RowDefinitions>
 
                         <!-- Botón Skip Intro / Outro (AniSkip API Crunchyroll / Netflix Style) -->
-                        <Button Grid.Row="0" Command="{Binding SkipIntroOutroCommand}"
+                        <Button Grid.Row="0" Command="{Binding SkipIntroOutroCommand}" Focusable="False"
                                 Visibility="{Binding MostrarSkipButton, Converter={StaticResource BooleanToVisibilityConverter}}"
                                 HorizontalAlignment="Right" Margin="0,0,0,14"
                                 Background="#E616181F" Foreground="White" BorderBrush="#55FFFFFF" BorderThickness="1"
@@ -292,7 +292,7 @@
                             </Grid.ColumnDefinitions>
 
                             <!-- Episodio Anterior -->
-                            <Button Grid.Column="0" Command="{Binding AnteriorEpisodioCommand}"
+                            <Button Grid.Column="0" Command="{Binding AnteriorEpisodioCommand}" Focusable="False"
                                     IsEnabled="{Binding TieneEpisodioAnterior}"
                                     ToolTip="{Binding EpisodioAnteriorTooltip}"
                                     Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="36" Height="36" Margin="0,0,2,0">
@@ -300,14 +300,14 @@
                             </Button>
 
                             <!-- Play/Pause -->
-                            <Button Grid.Column="1" Command="{Binding TogglePlayPauseCommand}" 
+                            <Button Grid.Column="1" Command="{Binding TogglePlayPauseCommand}" Focusable="False" 
                                     ToolTip="Reproducir / Pausar (Espacio)"
                                     Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,2,0">
                                 <materialDesign:PackIcon Kind="{Binding PlayPauseIcon}" Width="28" Height="28" />
                             </Button>
 
                             <!-- Episodio Siguiente -->
-                            <Button Grid.Column="2" Command="{Binding SiguienteEpisodioCommand}"
+                            <Button Grid.Column="2" Command="{Binding SiguienteEpisodioCommand}" Focusable="False"
                                     IsEnabled="{Binding TieneEpisodioSiguiente}"
                                     ToolTip="{Binding EpisodioSiguienteTooltip}"
                                     Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="36" Height="36" Margin="0,0,8,0">
@@ -316,10 +316,10 @@
 
                             <!-- Contenedor Volumen Animado -->
                             <StackPanel Grid.Column="3" Orientation="Horizontal" x:Name="VolumePanel" Background="Transparent" Margin="0,0,10,0">
-                                <Button Command="{Binding ToggleMuteCommand}" Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40">
+                                <Button Command="{Binding ToggleMuteCommand}" Focusable="False" Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40">
                                     <materialDesign:PackIcon Kind="{Binding VolumenIcon}" Width="24" Height="24" />
                                 </Button>
-                                <Slider Minimum="0" Maximum="100" Value="{Binding Volumen, Mode=TwoWay}" 
+                                <Slider Minimum="0" Maximum="100" Value="{Binding Volumen, Mode=TwoWay}"
                                         VerticalAlignment="Center" Focusable="False" Cursor="Hand"
                                         IsMoveToPointEnabled="True">
                                     <Slider.Resources>
@@ -418,21 +418,21 @@
                                        Foreground="White" VerticalAlignment="Center" FontSize="13" FontWeight="Bold" Margin="5,0,0,0" Opacity="0.9"/>
                                        
                             <!-- Retroceder 10s -->
-                            <Button Grid.Column="6" Command="{Binding Rewind10Command}" 
+                            <Button Grid.Column="6" Command="{Binding Rewind10Command}" Focusable="False" 
                                     ToolTip="Retroceder 10s (←)"
                                     Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,5,0">
                                 <materialDesign:PackIcon Kind="Rewind" Width="26" Height="26" />
                             </Button>
 
                             <!-- Adelantar 10s -->
-                            <Button Grid.Column="7" Command="{Binding Forward10Command}" 
+                            <Button Grid.Column="7" Command="{Binding Forward10Command}" Focusable="False" 
                                     ToolTip="Adelantar 10s (→)"
                                     Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,10,0">
                                 <materialDesign:PackIcon Kind="FastForward" Width="26" Height="26" />
                             </Button>
 
                             <!-- Subtítulos (Menú Manual) -->
-                            <Button x:Name="SubtitlesButton" Grid.Column="8"
+                            <Button x:Name="SubtitlesButton" Grid.Column="8" Focusable="False"
                                     ToolTip="Subtítulos"
                                     PreviewMouseLeftButtonDown="SubtitlesButton_PreviewMouseLeftButtonDown"
                                     Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,5,0">
@@ -504,7 +504,7 @@
                             </Popup>
                             
                             <!-- Fullscreen con ícono dinámico -->
-                            <Button Grid.Column="9" Command="{Binding ToggleFullscreenCommand}" 
+                            <Button Grid.Column="9" Command="{Binding ToggleFullscreenCommand}" Focusable="False" 
                                     ToolTip="Pantalla completa (F11)"
                                     Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,0,0">
                                 <materialDesign:PackIcon Kind="{Binding FullscreenIcon}" Width="26" Height="26" />
