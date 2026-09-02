@@ -68,6 +68,14 @@ public class DatabaseService : IDatabaseService, IDisposable
             // ÍNDICE COMPUESTO PARA BÚSQUEDAS RÁPIDAS POR (AniListId, NumeroEpisodio)
             await conexion.ExecuteAsync("CREATE INDEX IF NOT EXISTS IX_RegistroEpisodio_AnimeEp ON RegistroEpisodio(AniListId, NumeroEpisodio);");
 
+            // ARQ-01: Versiones de base de datos para futuras migraciones de esquema
+            int userVersion = await conexion.ExecuteScalarAsync<int>("PRAGMA user_version;");
+            if (userVersion < 1)
+            {
+                // Versión base 1: Tablas iniciales ya creadas arriba con CreateTableAsync
+                await conexion.ExecuteAsync("PRAGMA user_version = 1;");
+            }
+
             _conexion = conexion;
         }
         finally
@@ -145,7 +153,15 @@ public class DatabaseService : IDatabaseService, IDisposable
 
     public async Task<List<AnimeItem>> ObtenerTodosLosAnimesAsync()
     {
-        return await _conexion.Table<AnimeItem>().ToListAsync();
+        var animes = await _conexion.Table<AnimeItem>().ToListAsync();
+        await Task.Run(() => 
+        {
+            foreach (var a in animes)
+            {
+                a.ResolverPortadaLocal();
+            }
+        });
+        return animes;
     }
     
     public async Task EliminarAnimeAsync(AnimeItem anime)

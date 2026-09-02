@@ -133,7 +133,7 @@ public partial class AnimeItem : ObservableObject
     // === LÓGICA DE CACHÉ DE PORTADAS OFFLINE ===
     private string? _portadaCacheada;
 
-    // IMP-05: el getter hace File.Exists — System.Text.Json no debe evaluarlo al exportar
+    // IMP-05 / PERF-01: Evitar File.Exists en el getter para no bloquear la UI.
     [Ignore]
     [JsonIgnore]
     public string PortadaVisible
@@ -143,11 +143,17 @@ public partial class AnimeItem : ObservableObject
             if (_portadaCacheada != null) return _portadaCacheada;
             if (string.IsNullOrWhiteSpace(UrlPortada)) return string.Empty;
             
-            string directory = Services.AppDataPaths.CoversDir;
-            string localPath = System.IO.Path.Combine(directory, $"{AniListId}.jpg");
-            
-            _portadaCacheada = System.IO.File.Exists(localPath) ? localPath : UrlPortada;
-            return _portadaCacheada;
+            return UrlPortada;
+        }
+    }
+
+    public void ResolverPortadaLocal()
+    {
+        if (string.IsNullOrWhiteSpace(UrlPortada)) return;
+        string localPath = System.IO.Path.Combine(Services.AppDataPaths.CoversDir, $"{AniListId}.jpg");
+        if (System.IO.File.Exists(localPath))
+        {
+            _portadaCacheada = localPath;
         }
     }
 
