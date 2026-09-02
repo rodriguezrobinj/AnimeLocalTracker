@@ -14,7 +14,6 @@ from resolvers.stream_extractor import StreamExtractor
 from media.scene_detector import SceneDetector
 from media.episode_fingerprint import EpisodeFingerprint
 from media.episode_metadata import EpisodeMetadata, Thumbnail
-from automation.db_mock_generator import DbMockGenerator
 
 
 def process_command(command: str, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -92,11 +91,6 @@ def process_command(command: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         width = int(payload.get("width", 240))
         return Thumbnail.generate_thumbnail(video_path, output_path, timestamp, width)
 
-    elif command == "mock-db":
-        db_path = payload.get("db_path", "mock_anime.db")
-        count = int(payload.get("count", 500))
-        return DbMockGenerator.populate_sqlite(db_path, count)
-
     elif command == "ping":
         return {"success": True, "version": "1.0.0", "engine": "AnimeTrackerTools Python"}
 
@@ -111,7 +105,8 @@ def run_daemon():
     sys.stdout.reconfigure(encoding='utf-8', newline='\n')
     sys.stdin.reconfigure(encoding='utf-8')
     # Primer mensaje de saludo para confirmar que el daemon está vivo
-    print(json.dumps({"success": True, "daemon": "ready", "version": "1.0.0"}), flush=True)
+    # INT-02: Se añade protocolVersion para detectar desajustes entre la app C# y el daemon Python
+    print(json.dumps({"success": True, "daemon": "ready", "version": "1.0.0", "protocolVersion": 1}), flush=True)
     for line in sys.stdin:
         try:
             payload = json.loads(line.strip().lstrip('\ufeff'))

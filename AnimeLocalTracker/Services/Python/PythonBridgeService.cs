@@ -7,6 +7,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using AnimeLocalTracker.Core.Native;
 
 namespace AnimeLocalTracker.Services.Python
 {
@@ -108,6 +109,7 @@ namespace AnimeLocalTracker.Services.Python
 
                 proceso = new Process { StartInfo = psi };
                 proceso.Start();
+                JobObjectHelper.AddProcess(proceso);
 
                 // Enviar payload JSON por stdin
                 string jsonInput = JsonSerializer.Serialize(payload, JsonOptions);
@@ -271,6 +273,7 @@ namespace AnimeLocalTracker.Services.Python
 
                 var proc = new Process { StartInfo = psi };
                 proc.Start();
+                JobObjectHelper.AddProcess(proc);
                 _daemonProcess = proc;
                 _daemonOut = proc.StandardOutput;
                 _daemonIn = proc.StandardInput;
@@ -280,12 +283,33 @@ namespace AnimeLocalTracker.Services.Python
                 linkedCts.CancelAfter(TimeSpan.FromSeconds(8));
                 try
                 {
-                    _ = await _daemonOut.ReadLineAsync(linkedCts.Token).ConfigureAwait(false);
+                    string? greetingLine = await _daemonOut.ReadLineAsync(linkedCts.Token).ConfigureAwait(false);
+                    if (string.IsNullOrWhiteSpace(greetingLine))
+                    {
+                        throw new InvalidOperationException("Daemon cerró el stream de salida sin saludar.");
+                    }
+
+                    // INT-02: Validar la versión del protocolo para evitar desajustes ocultos.
+                    using var doc = JsonDocument.Parse(greetingLine);
+                    if (doc.RootElement.TryGetProperty("protocolVersion", out var prop))
+                    {
+                        if (prop.GetInt32() != 1)
+                        {
+                            throw new InvalidOperationException($"El daemon devolvió protocolVersion={prop.GetInt32()}, pero se esperaba 1.");
+                        }
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException("El saludo del daemon no incluyó protocolVersion.");
+                    }
+
                     return true;
                 }
-                catch
+                catch (Exception initEx)
                 {
-                    // El daemon no saludó a tiempo: descartarlo para esta sesión y usar one-shot.
+                    // El daemon no saludó a tiempo, crasheó o devolvió versión errónea:
+                    // descartarlo para esta sesión y usar one-shot de respaldo seguro.
+                    AppLogger.Warn("PythonBridge", $"Fallo en handshake del daemon: {initEx.Message}. Se usará modo one-shot.");
                     _daemonDescartado = true;
                     CleanupDaemon();
                     return false;
