@@ -25,10 +25,9 @@ public class SettingsService : ISettingsService
         }
         else
         {
-            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            var folder = Path.Combine(appData, "AnimeLocalTracker");
-            Directory.CreateDirectory(folder);
-            _settingsFilePath = Path.Combine(folder, "settings.json");
+            // ARQ-02: los datos del usuario SIEMPRE viven en %LocalAppData%\AnimeLocalTrackerData.
+            _settingsFilePath = AppDataPaths.SettingsPath;
+            AppDataPaths.MigrarArchivoDesdeRoaming("settings.json", _settingsFilePath);
         }
 
         _configuracion = CargarConfiguracionInicial();
