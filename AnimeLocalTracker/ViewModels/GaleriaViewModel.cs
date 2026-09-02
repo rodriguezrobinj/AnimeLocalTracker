@@ -277,6 +277,12 @@ public partial class GaleriaViewModel : ObservableObject,
         // la entrega del mensaje al resto de receptores suscritos.
         try
         {
+            if (System.Windows.Application.Current?.Dispatcher is { } d && !d.CheckAccess())
+            {
+                d.InvokeAsync(() => Receive(message));
+                return;
+            }
+
             if (!BibliotecaLocales.Any(a => a.AniListId == message.NuevoAnime.AniListId))
             {
                 message.NuevoAnime.PortadaImagen = _imageCacheService.ObtenerPortada(message.NuevoAnime.AniListId, message.NuevoAnime.UrlPortada);
