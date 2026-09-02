@@ -113,6 +113,12 @@ public partial class App : Application
         services.AddSingleton<IDialogService, DialogService>();
         services.AddSingleton<IAuthService, AuthService>();
         services.AddHttpClient();
+
+        // SEC-03: el cliente "Downloader" (scraper + descargas) no sigue redirects a ciegas:
+        // cada salto se valida con UrlSeguridad (solo https, sin credenciales embebidas).
+        services.AddHttpClient("Downloader")
+            .ConfigurePrimaryHttpMessageHandler(() => new System.Net.Http.HttpClientHandler { AllowAutoRedirect = false })
+            .AddHttpMessageHandler(() => new RedirectSeguroHandler());
         services.AddSingleton<IDownloadService, DownloadService>();
         
         // IHttpClientFactory nativo con Polly para Rate Limiting

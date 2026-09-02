@@ -20,6 +20,8 @@ public class DownloadService : IDownloadService
     private const string UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
     private const int SegmentosParalelos = 6;
     private const int LimiteDescargasPorDefecto = 3;
+    // SEC-03: tope de seguridad por archivo en el modo secuencial (el segmentado ya lo acota).
+    private const long MaxArchivoDescargaBytes = 35L * 1024 * 1024 * 1024;
 
     private readonly HttpClient _httpClient;
     private readonly IDownloadStateStore _stateStore;
@@ -678,6 +680,14 @@ public class DownloadService : IDownloadService
             if (existingLength > 0) totalBytes += existingLength; // Adjust total if resumed
         }
 
+        // SEC-03: el modo secuencial queda acotado igual que el segmentado: un servidor
+        // que declare un tamaño absurdo no puede llenar el disco.
+        if (totalBytes > MaxArchivoDescargaBytes)
+        {
+            EliminarParcialSeguro(destinationPath);
+            throw new IOException($"El tamaño declarado del video supera el límite de seguridad de {MaxArchivoDescargaBytes / (1024.0 * 1024 * 1024):F0} GB.");
+        }
+
         var canReportProgress = totalBytes > 0 && progress != null;
 
         using var contentStream = await response.Content.ReadAsStreamAsync(cancellationToken);
@@ -686,6 +696,7 @@ public class DownloadService : IDownloadService
         var totalRead = existingLength;
         var buffer = new byte[131072];
         var isMoreToRead = true;
+        bool superoLimite = false;
         var lastReportedPercentage = -1.0;
         var lastReportTime = DateTime.UtcNow;
 
@@ -698,27 +709,55 @@ public class DownloadService : IDownloadService
             }
             else
             {
-                await fileStream.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
                 totalRead += read;
 
-                if (canReportProgress && progress != null)
+                // SEC-03: corte duro si el servidor no declaró el tamaño y el stream excede el tope.
+                if (totalRead > MaxArchivoDescargaBytes)
                 {
-                    double currentPercentage = Math.Clamp((double)totalRead / totalBytes * 100, 0.0, 100.0);
-                    var now = DateTime.UtcNow;
-                    if (currentPercentage - lastReportedPercentage >= 0.5 || (now - lastReportTime).TotalMilliseconds >= 150 || totalRead == totalBytes)
+                    superoLimite = true;
+                    isMoreToRead = false;
+                }
+                else
+                {
+                    await fileStream.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+
+                    if (canReportProgress && progress != null)
                     {
-                        lastReportedPercentage = currentPercentage;
-                        lastReportTime = now;
-                        progress.Report(currentPercentage);
+                        double currentPercentage = Math.Clamp((double)totalRead / totalBytes * 100, 0.0, 100.0);
+                        var now = DateTime.UtcNow;
+                        if (currentPercentage - lastReportedPercentage >= 0.5 || (now - lastReportTime).TotalMilliseconds >= 150 || totalRead == totalBytes)
+                        {
+                            lastReportedPercentage = currentPercentage;
+                            lastReportTime = now;
+                            progress.Report(currentPercentage);
+                        }
                     }
                 }
             }
         }
         while (isMoreToRead);
 
+        if (superoLimite)
+        {
+            EliminarParcialSeguro(destinationPath);
+            throw new IOException($"El archivo descargado superó el límite de seguridad de {MaxArchivoDescargaBytes / (1024.0 * 1024 * 1024):F0} GB.");
+        }
+
         if (canReportProgress && progress != null)
         {
             progress.Report(100.0);
+        }
+    }
+
+    private static void EliminarParcialSeguro(string destinationPath)
+    {
+        try
+        {
+            if (File.Exists(destinationPath)) File.Delete(destinationPath);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("DownloadService", $"No se pudo limpiar el archivo parcial tras el corte de seguridad: {ex.Message}");
         }
     }
 

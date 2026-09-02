@@ -10,6 +10,7 @@ using AnimeLocalTracker.Services.Python;
 using CommunityToolkit.Mvvm.Messaging;
 using FluentAssertions;
 using Moq;
+using Moq.Protected;
 using Xunit;
 
 namespace AnimeLocalTracker.Tests.Services;
@@ -258,5 +259,46 @@ public class DownloadServiceTests
             updated = Math.Max(current, value);
         }
         while (Interlocked.CompareExchange(ref target, updated, current) != current);
+    }
+
+    [Fact]
+    public async Task DownloadVideoAsync_ConTamanoDeclaradoGigante_SinSoporteRange_DeberiaAbortarYNoCrearArchivo()
+    {
+        // Arrange (SEC-03): servidor sin soporte de rangos que declara > 35 GB
+        const long gigante = 36L * 1024 * 1024 * 1024;
+        var destino = Path.Combine(Path.GetTempPath(), $"cap_{Guid.NewGuid():N}.mp4");
+
+        var handlerMock = new Mock<HttpMessageHandler>();
+        handlerMock.Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>())
+            .Returns<HttpRequestMessage, CancellationToken>((req, _) =>
+            {
+                var respuesta = new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                {
+                    Content = new ByteArrayContent(new byte[] { 1, 2, 3 })
+                };
+                respuesta.Content.Headers.ContentLength = req.Method == HttpMethod.Head ? gigante : gigante;
+                return Task.FromResult(respuesta);
+            });
+
+        var factoryMock = new Mock<IHttpClientFactory>();
+        factoryMock.Setup(f => f.CreateClient(It.IsAny<string>())).Returns(new HttpClient(handlerMock.Object));
+        var sut = new DownloadService(factoryMock.Object, sourceResolver: _sourceResolverMock.Object, settingsService: _settingsServiceMock.Object);
+
+        try
+        {
+            // Act & Assert: aborta con IOException y no deja archivo parcial
+            var act = async () => await sut.DownloadVideoAsync("https://cdn.example.com/video-gigante.mp4", destino);
+            await act.Should().ThrowAsync<IOException>()
+                .WithMessage("*límite de seguridad*");
+            File.Exists(destino).Should().BeFalse("no debe quedar archivo parcial tras el corte de seguridad");
+        }
+        finally
+        {
+            try { if (File.Exists(destino)) File.Delete(destino); } catch { }
+        }
     }
 }
