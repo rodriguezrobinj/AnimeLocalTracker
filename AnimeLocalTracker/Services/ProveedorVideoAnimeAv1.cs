@@ -51,34 +51,52 @@ public class ProveedorVideoAnimeAv1 : IProveedorVideo
                         AppLogger.Info("ProveedorVideoAnimeAv1", $"Episodio resuelto vía MP4Upload: {SanitizarUrlParaLog(directo)}");
                         return directo;
                     }
+                    AppLogger.Debug("ProveedorVideoAnimeAv1", "Servidor 'MP4Upload' sin video directo en el player (embed roto o 'undef' del sitio).");
                     continue;
                 }
 
-                // Servidores que resuelve yt-dlp (Voe, UPNShare, HLS, Byse)
-                if (!await _pythonBridge.IsAvailableAsync()) continue;
+                // Servidores que resuelve yt-dlp (HLS, Voe, UPNShare, Byse)
+                if (!await _pythonBridge.IsAvailableAsync())
+                {
+                    AppLogger.Debug("ProveedorVideoAnimeAv1", $"Daemon Python no disponible; se omite '{embed.Server}'.");
+                    continue;
+                }
 
                 var result = await _pythonBridge.ExecuteCommandAsync<object, StreamResult>(
                     "resolve-stream",
                     new { url = embed.Url },
                     ct);
 
-                if (result != null && result.Success && Core.UrlSeguridad.EsUrlDescargaHttpSegura(result.DirectUrl))
+                if (result == null)
                 {
-                    // Los manifiestos HLS/DASH se descargan con el daemon
-                    // (download-stream con yt-dlp segmentado)
-                    if (Core.UrlSeguridad.EsUrlManifiestoStreaming(result.DirectUrl))
-                    {
-                        AppLogger.Info("ProveedorVideoAnimeAv1", $"Episodio resuelto como HLS/DASH ({embed.Server}); se descargará con el daemon.");
-                        return result.DirectUrl;
-                    }
+                    AppLogger.Warn("ProveedorVideoAnimeAv1", $"Servidor '{embed.Server}' sin respuesta del daemon (resolver o URL no soportada).");
+                    continue;
+                }
+                if (!result.Success)
+                {
+                    AppLogger.Info("ProveedorVideoAnimeAv1", $"Servidor '{embed.Server}' falló en el daemon: {result.Error}");
+                    continue;
+                }
+                if (!Core.UrlSeguridad.EsUrlDescargaHttpSegura(result.DirectUrl))
+                {
+                    AppLogger.Warn("ProveedorVideoAnimeAv1", $"Servidor '{embed.Server}' devolvió URL no segura: {SanitizarUrlParaLog(result.DirectUrl)}");
+                    continue;
+                }
 
-                    AppLogger.Info("ProveedorVideoAnimeAv1", $"Episodio resuelto con yt-dlp ({embed.Server}): {SanitizarUrlParaLog(result.DirectUrl)}");
+                // Los manifiestos HLS/DASH se descargan con el daemon
+                // (download-stream con yt-dlp segmentado)
+                if (Core.UrlSeguridad.EsUrlManifiestoStreaming(result.DirectUrl))
+                {
+                    AppLogger.Info("ProveedorVideoAnimeAv1", $"Episodio resuelto como HLS/DASH ({embed.Server}); se descargará con el daemon.");
                     return result.DirectUrl;
                 }
+
+                AppLogger.Info("ProveedorVideoAnimeAv1", $"Episodio resuelto con yt-dlp ({embed.Server}): {SanitizarUrlParaLog(result.DirectUrl)}");
+                return result.DirectUrl;
             }
             catch (Exception ex)
             {
-                AppLogger.Debug("ProveedorVideoAnimeAv1", $"Servidor '{embed.Server}' falló: {ex.Message}");
+                AppLogger.Warn("ProveedorVideoAnimeAv1", $"Servidor '{embed.Server}' falló con excepción: {ex.Message}");
             }
         }
 
@@ -100,16 +118,22 @@ public class ProveedorVideoAnimeAv1 : IProveedorVideo
                     ct
                 );
 
-                if (result != null && result.Success && !string.IsNullOrEmpty(result.DirectUrl))
+                if (result == null)
                 {
-                    // Hardening INT-01: el resultado de yt-dlp también pasa la
-                    // política https (si no, se cae al fallback C# validado).
-                    if (Core.UrlSeguridad.EsUrlDescargaHttpSegura(result.DirectUrl))
-                    {
-                        AppLogger.Info("ProveedorVideoAnimeAv1", $"Stream resuelto exitosamente con yt-dlp: {SanitizarUrlParaLog(result.DirectUrl)}");
-                        return result.DirectUrl;
-                    }
+                    AppLogger.Warn("ProveedorVideoAnimeAv1", "Daemon sin respuesta para la página; usando fallback C#.");
+                }
+                else if (!result.Success)
+                {
+                    AppLogger.Info("ProveedorVideoAnimeAv1", $"Daemon no pudo resolver la página: {result.Error}");
+                }
+                else if (!Core.UrlSeguridad.EsUrlDescargaHttpSegura(result.DirectUrl))
+                {
                     AppLogger.Warn("ProveedorVideoAnimeAv1", "Stream de yt-dlp rechazado (URL no https). Usando fallback C#.");
+                }
+                else
+                {
+                    AppLogger.Info("ProveedorVideoAnimeAv1", $"Stream resuelto exitosamente con yt-dlp: {SanitizarUrlParaLog(result.DirectUrl)}");
+                    return result.DirectUrl;
                 }
             }
         }
