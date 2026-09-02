@@ -5,7 +5,7 @@
 [![.NET 8](https://img.shields.io/badge/.NET-8.0_WPF-512BD4?style=for-the-badge&logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
 [![AniList API](https://img.shields.io/badge/AniList-GraphQL_Sync-02A9FF?style=for-the-badge&logo=anilist&logoColor=white)](https://anilist.co/)
 [![Flyleaf Video Engine](https://img.shields.io/badge/Engine-Flyleaf_DirectX11-FF6B00?style=for-the-badge&logo=ffmpeg&logoColor=white)](https://github.com/FredTinc/Flyleaf)
-[![Tests Passing](https://img.shields.io/badge/Tests-98%2F98_Passing-28a745?style=for-the-badge&logo=githubactions&logoColor=white)](https://github.com/rodriguezrobinj/AnimeLocalTracker)
+[![Tests Passing](https://img.shields.io/badge/Tests-265%2F265_Passing-28a745?style=for-the-badge&logo=githubactions&logoColor=white)](https://github.com/rodriguezrobinj/AnimeLocalTracker)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](LICENSE)
 
 ---
@@ -120,7 +120,7 @@ El proyecto cuenta con una suite rigurosa de pruebas unitarias e integración co
 
 ```text
 Serie de pruebas: AnimeLocalTracker.Tests.dll (net8.0)
-Correctas: 98 | Fallidas: 0 | Omitidas: 0 | Duración: ~3.0s
+Correctas: 265 | Fallidas: 0 | Omitidas: 0 | Duración: ~14s
 ```
 
 ---
