@@ -16,6 +16,14 @@ public partial class App : Application
     // Este es nuestro contenedor global de dependencias
     public static IServiceProvider ServiceProvider { get; private set; } = null!;
 
+    /// <summary>DTO del veredicto de nombres del daemon (match-media).</summary>
+    private sealed class MatchMediaResult
+    {
+        public bool Success { get; set; }
+        public double Score { get; set; }
+        public string? MatchedTitle { get; set; }
+    }
+
     public App()
     {
         try
@@ -145,7 +153,51 @@ public partial class App : Application
             // episodio es del anime correcto (nombres parecidos ya no descargan
             // episodios equivocados).
             var aniSkip = sp.GetRequiredService<IAniSkipService>();
-            return new AnimeAv1VideoSourceResolver(http, (id, ct) => aniSkip.ObtenerMalIdDesdeAniListAsync(id, ct));
+            var bridge = sp.GetRequiredService<IPythonBridgeService>();
+            var tracking = sp.GetRequiredService<IAnimeTrackingService>();
+
+            return new AnimeAv1VideoSourceResolver(
+                http,
+                (id, ct) => aniSkip.ObtenerMalIdDesdeAniListAsync(id, ct),
+                // Veredicto de nombres con rapidfuzz (daemon Python) sobre título+aka
+                async (titles, candidates, ct) =>
+                {
+                    try
+                    {
+                        if (!await bridge.IsAvailableAsync()) return null;
+                        var r = await bridge.ExecuteCommandAsync<object, MatchMediaResult>(
+                            "match-media",
+                            new { titles, candidates, threshold = 75.0 },
+                            ct);
+                        return r?.Success == true ? r.Score / 100.0 : null;
+                    }
+                    catch
+                    {
+                        return null;
+                    }
+                },
+                // Títulos adicionales desde AniList: native japonés, synonyms, etc.
+                // — la búsqueda no depende de lo que la biblioteca local guarde
+                async (id, ct) =>
+                {
+                    try
+                    {
+                        var anime = await tracking.ObtenerAnimePorIdAsync(id);
+                        if (anime?.Title == null) return (List<string>?)null;
+
+                        var titulos = new List<string>();
+                        if (!string.IsNullOrWhiteSpace(anime.Title.Romaji)) titulos.Add(anime.Title.Romaji);
+                        if (!string.IsNullOrWhiteSpace(anime.Title.English)) titulos.Add(anime.Title.English!);
+                        if (!string.IsNullOrWhiteSpace(anime.Title.Native)) titulos.Add(anime.Title.Native!);
+                        if (!string.IsNullOrWhiteSpace(anime.Title.UserPreferred)) titulos.Add(anime.Title.UserPreferred!);
+                        if (anime.Synonyms != null) titulos.AddRange(anime.Synonyms.Where(s => !string.IsNullOrWhiteSpace(s)));
+                        return titulos.Distinct().ToList();
+                    }
+                    catch
+                    {
+                        return (List<string>?)null;
+                    }
+                });
         });
         services.AddSingleton<ProveedorVideoAnimeAv1>();
         services.AddSingleton<IVideoSourceResolver>(sp => new OrquestadorMultiProveedor(

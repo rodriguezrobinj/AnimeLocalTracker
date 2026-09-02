@@ -60,6 +60,9 @@ public class AnimeLibraryService
         if (!string.IsNullOrWhiteSpace(animeAPI.Title.English)) titulosAlt.Add(animeAPI.Title.English!);
         if (!string.IsNullOrWhiteSpace(animeAPI.Title.UserPreferred) && animeAPI.Title.UserPreferred != titulo)
             titulosAlt.Add(animeAPI.Title.UserPreferred!);
+        // El título nativo (japonés) es clave: los sitios lo publican en su aka
+        // ("ja-jp") y su catálogo lo matchea — el principal muchas veces no.
+        if (!string.IsNullOrWhiteSpace(animeAPI.Title.Native)) titulosAlt.Add(animeAPI.Title.Native!);
         if (animeAPI.Synonyms != null) titulosAlt.AddRange(animeAPI.Synonyms.Where(s => !string.IsNullOrWhiteSpace(s)));
 
         var nuevoAnime = new AnimeItem

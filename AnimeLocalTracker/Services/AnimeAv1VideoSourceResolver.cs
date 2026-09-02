@@ -47,13 +47,15 @@ public static partial class AnimeAv1HtmlParser
     }
 
     /// <summary>
-    /// Orden de preferencia de servidores para la resolución (Fase 1):
-    /// MP4Upload directo primero, luego los que resuelve yt-dlp (Voe, UPNShare, HLS,
-    /// Byse). Mega se excluye (requiere API propia de mega.nz, fuera de esta fase).
+    /// Orden de preferencia de servidores: MP4Upload primero — es la ÚNICA fuente
+    /// fiable hoy (el player HLS de zilla está tras Cloudflare anti-bot que ni la
+    /// impersonación de yt-dlp pasa; Voe/UPNShare/Byse no tienen extractor).
+    /// HLS se conserva como intento (403 limpio en el log) por si el sitio
+    /// relaja Cloudflare. Mega se excluye.
     /// </summary>
     public static List<EmbedServidor> OrdenarEmbedsPorPreferencia(IEnumerable<EmbedServidor> embeds)
     {
-        var preferencia = new[] { "MP4Upload", "Voe", "UPNShare", "HLS", "Byse" };
+        var preferencia = new[] { "MP4Upload", "HLS", "Voe", "UPNShare", "Byse" };
         return preferencia
             .SelectMany((nombre, i) => embeds
                 .Where(e => e.Server.Equals(nombre, StringComparison.OrdinalIgnoreCase))
@@ -120,6 +122,54 @@ public static partial class AnimeAv1HtmlParser
         return lista;
     }
 
+    /// <summary>Títulos de un media del sitio: principal + nombres alternativos (aka).</summary>
+    public sealed record TitulosMedia(string Principal, List<string> Alternativos);
+
+    /// <summary>
+    /// Extrae el título principal y los aka del media (payload SvelteKit):
+    /// media:{id,title:"...",aka:{"en-us":"...","ja-jp":"...","es-419":"..."},...}.
+    /// </summary>
+    public static TitulosMedia? ExtraerTitulosDelMedia(string html)
+    {
+        if (string.IsNullOrWhiteSpace(html)) return null;
+
+        var m = TituloMediaRegex().Match(html);
+        if (!m.Success) return null;
+
+        var alternativos = new List<string>();
+        var aka = AkaMediaRegex().Match(html);
+        if (aka.Success)
+        {
+            foreach (Match v in ValorAkaRegex().Matches(aka.Groups[1].Value))
+            {
+                string valor = v.Groups[1].Value.Trim();
+                if (!string.IsNullOrWhiteSpace(valor)) alternativos.Add(valor);
+            }
+        }
+        return new TitulosMedia(m.Groups[1].Value, alternativos);
+    }
+
+    /// <summary>
+    /// Títulos del media relacionados (relations): [{slug, title}] — permite
+    /// descubrir películas/secuelas de una franquicia de forma determinista.
+    /// </summary>
+    public static List<(string Slug, string Titulo)> ExtraerRelationsDelMedia(string html)
+    {
+        var lista = new List<(string, string)>();
+        if (string.IsNullOrWhiteSpace(html)) return lista;
+
+        foreach (Match m in RelationMediaRegex().Matches(html))
+        {
+            string slug = m.Groups[1].Value.Trim();
+            string titulo = m.Groups[2].Value.Trim();
+            if (!string.IsNullOrWhiteSpace(slug) && !string.IsNullOrWhiteSpace(titulo))
+            {
+                lista.Add((slug, titulo));
+            }
+        }
+        return lista;
+    }
+
     /// <summary>Extrae slugs candidatos de /media/{slug} o slug:"{slug}" (sin "catalogo").</summary>
     public static IEnumerable<string> ExtraerSlugs(string html)
     {
@@ -138,6 +188,18 @@ public static partial class AnimeAv1HtmlParser
     // El JSON del sitio usa claves SIN comillas: {server:"HLS",url:"https://..."}
     [GeneratedRegex(@"server\s*:\s*""([^""]+)""\s*,\s*url\s*:\s*""(https?://[^""]+)""", RegexOptions.IgnoreCase)]
     private static partial Regex EmbedServidorRegex();
+
+    [GeneratedRegex(@"destination:\{id:\d+,slug:""([^""]+)"",title:""([^""]+)""")]
+    private static partial Regex RelationMediaRegex();
+
+    [GeneratedRegex(@"media:\{[^}]*?title:""([^""]+)""")]
+    private static partial Regex TituloMediaRegex();
+
+    [GeneratedRegex(@"aka:\{([^}]*)\}")]
+    private static partial Regex AkaMediaRegex();
+
+    [GeneratedRegex(@":""([^""]+)""")]
+    private static partial Regex ValorAkaRegex();
 
     [GeneratedRegex(@"\{id:(\d+),number:(\d+)\}")]
     private static partial Regex EpisodioMediaRegex();
@@ -164,16 +226,33 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
     /// <summary>
     /// Resuelve AniListId → MAL ID (para verificar que la página encontrada es el
     /// anime correcto y no otro con nombre parecido). Nullable: sin resolver, la
-    /// coincidencia queda solo en la heurística de slugs.
+    /// coincidencia queda en nombres (Python rapidfuzz o fallback C#).
     /// </summary>
     private readonly Func<int, CancellationToken, Task<int?>>? _malIdResolver;
 
+    /// <summary>
+    /// Similitud de nombres (0..1) vía daemon Python (rapidfuzz) sobre títulos +
+    /// aka del media. Null si el daemon no está disponible → fallback C#.
+    /// </summary>
+    private readonly Func<List<string>, List<string>, CancellationToken, Task<double?>>? _similitudNombres;
+
+    /// <summary>
+    /// Títulos adicionales desde AniList (romaji, english, native, userPreferred y
+    /// synonyms) para ampliar la búsqueda aunque la biblioteca local no los tenga
+    /// guardados. Null (resultado) si no está disponible.
+    /// </summary>
+    private readonly Func<int, CancellationToken, Task<List<string>?>>? _titulosDesdeAniList;
+
     public AnimeAv1VideoSourceResolver(
         HttpClient httpClient,
-        Func<int, CancellationToken, Task<int?>>? malIdResolver = null)
+        Func<int, CancellationToken, Task<int?>>? malIdResolver = null,
+        Func<List<string>, List<string>, CancellationToken, Task<double?>>? similitudNombres = null,
+        Func<int, CancellationToken, Task<List<string>?>>? titulosDesdeAniList = null)
     {
         _httpClient = httpClient;
         _malIdResolver = malIdResolver;
+        _similitudNombres = similitudNombres;
+        _titulosDesdeAniList = titulosDesdeAniList;
     }
 
     public async Task<string?> BuscarUrlEpisodioAsync(IEnumerable<string> titulos, int numeroEpisodio, int? aniListId = null, CancellationToken cancellationToken = default)
@@ -194,6 +273,11 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
     /// Devuelve los embeds de servidores de la página del episodio (contrato tipado,
     /// Fase 1 multi-servidor), en el orden en que los publica el sitio y solo con
     /// hosts permitidos por la política de seguridad.
+    /// FLUJO RIGUROSO (media-first): por cada candidato se consulta la página del
+    /// media (una petición, no spam de 404 de episodios), se verifica la identidad
+    /// con veredicto en cascada — MAL ID exacto → acepta; MAL ID no comparable →
+    /// coincidencia de nombre (rapidfuzz en el daemon Python o fallback C#) contra
+    /// título + aka — y se resuelve el número de episodio real del sitio.
     /// </summary>
     public async Task<List<AnimeAv1HtmlParser.EmbedServidor>> ObtenerEmbedsEpisodioAsync(
         IEnumerable<string> titulos, int numeroEpisodio, int? aniListId = null, CancellationToken cancellationToken = default)
@@ -201,22 +285,105 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
         var titulosLista = titulos.Where(t => !string.IsNullOrWhiteSpace(t)).ToList();
         if (titulosLista.Count == 0) return [];
 
-        // Verificación anti-confusión: si conocemos el AniListId, resolvemos su MAL ID
-        // y solo aceptamos páginas cuyo malId coincida. Con malId conocido, la
-        // heurística de slugs se relaja (el malId es la verificación autoritativa:
-        // los slugs de películas "movie-N-" se rechazaban aunque fueran correctos).
-        int? malIdEsperado = null;
-        if (aniListId.HasValue && _malIdResolver != null)
+        // Títulos adicionales desde AniList (native japonés, synonyms…) — la
+        // biblioteca local puede no tenerlos guardados (refresh pendiente del detalle)
+        if (aniListId.HasValue && _titulosDesdeAniList != null)
         {
-            try { malIdEsperado = await _malIdResolver(aniListId.Value, cancellationToken); }
-            catch (Exception ex) { AppLogger.Debug("AnimeAv1VideoSourceResolver", $"No se pudo resolver MAL ID de {aniListId}: {ex.Message}"); }
+            try
+            {
+                var extra = await _titulosDesdeAniList(aniListId.Value, cancellationToken);
+                if (extra != null)
+                {
+                    foreach (var t in extra)
+                    {
+                        if (!string.IsNullOrWhiteSpace(t) &&
+                            !titulosLista.Contains(t, StringComparer.OrdinalIgnoreCase))
+                        {
+                            titulosLista.Add(t);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Debug("AnimeAv1VideoSourceResolver", $"No se pudieron obtener títulos de AniList para {aniListId}: {ex.Message}");
+            }
         }
 
-        // Recolectar slugs candidatos en orden de prioridad
+        var malIdEsperado = await ObtenerMalIdEsperadoAsync(aniListId, cancellationToken);
+        var slugs = await ObtenerSlugsCandidatosAsync(titulosLista, malIdEsperado, cancellationToken);
+
+        // Media-first con crawl de relations: cuando un media se prueba, sus
+        // relations (películas/secuelas de la franquicia) se insertan INMEDIATAMENTE
+        // después de él — así dragon-ball-z (rechazado por malId) lleva directo al
+        // movie-14 sin depender del orden/limite del catálogo. Presupuesto total:
+        // MaxMediaProbes peticiones de media.
+        const int MaxMediaProbes = 25;
+        int probes = 0;
+        var probados = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var encolados = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        for (int i = 0; i < slugs.Count && probes < MaxMediaProbes; i++)
+        {
+            if (cancellationToken.IsCancellationRequested) return [];
+            string slug = slugs[i];
+            if (!probados.Add(slug)) continue;
+
+            probes++;
+            var media = await ObtenerInfoMediaAsync(slug, cancellationToken);
+            if (media == null) continue;
+
+            // Crawl inmediato: encolar las relations del media justo detrás de él
+            // (el media principal de una franquicia las lista todas)
+            if (probes < MaxMediaProbes)
+            {
+                var relations = AnimeAv1HtmlParser.ExtraerRelationsDelMedia(media.Html);
+                int restantes = MaxMediaProbes - probes;
+                var nuevos = new List<string>();
+                foreach (var r in relations.Take(restantes))
+                {
+                    if (encolados.Add(r.Slug) && !probados.Contains(r.Slug)) nuevos.Add(r.Slug);
+                }
+                if (nuevos.Count > 0) slugs.InsertRange(i + 1, nuevos);
+            }
+
+            if (!await EsMediaCoincidenteAsync(media, malIdEsperado, titulosLista, cancellationToken))
+            {
+                continue;
+            }
+
+            int? objetivo = ResolverNumeroEpisodio(media, numeroEpisodio);
+            if (!objetivo.HasValue) continue;
+
+            var embeds = await ObtenerEmbedsDeEpisodioAsync(slug, objetivo.Value, malIdEsperado, cancellationToken);
+            if (embeds.Count > 0) return embeds;
+        }
+
+        return [];
+    }
+
+    /// <summary>Resuelve el MAL ID esperado del anime (si hay AniListId y resolver).</summary>
+    public async Task<int?> ObtenerMalIdEsperadoAsync(int? aniListId, CancellationToken ct = default)
+    {
+        if (aniListId.HasValue && _malIdResolver != null)
+        {
+            try { return await _malIdResolver(aniListId.Value, ct); }
+            catch (Exception ex) { AppLogger.Debug("AnimeAv1VideoSourceResolver", $"No se pudo resolver MAL ID de {aniListId}: {ex.Message}"); }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Recolecta slugs candidatos: generados de los títulos (heurística estricta)
+    /// y descubiertos en el catálogo (heurística relajada si el malId es conocido,
+    /// porque el malId de la página es la verificación autoritativa).
+    /// </summary>
+    public async Task<List<string>> ObtenerSlugsCandidatosAsync(
+        List<string> titulosLista, int? malIdEsperado, CancellationToken ct = default)
+    {
         var slugs = new List<string>();
         var vistos = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        // FASE 1: slugs generados de los títulos (heurística estricta siempre)
         foreach (var titulo in titulosLista)
         {
             foreach (var slug in GenerarVariacionesSlug(titulo))
@@ -225,7 +392,6 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
             }
         }
 
-        // FASE 2: slugs del catálogo (con malId conocido se relaja la heurística)
         foreach (var titulo in titulosLista)
         {
             foreach (var termino in GenerarTerminosBusqueda(titulo))
@@ -236,18 +402,27 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
                     using var req = new HttpRequestMessage(HttpMethod.Get, searchUrl);
                     req.Headers.Add("User-Agent", UserAgent);
 
-                    using var res = await _httpClient.SendAsync(req, cancellationToken);
+                    using var res = await _httpClient.SendAsync(req, ct);
                     if (!res.IsSuccessStatusCode) continue;
 
-                    var html = await res.Content.ReadAsStringAsync(cancellationToken);
+                    var html = await res.Content.ReadAsStringAsync(ct);
+                    // Sin gate de heurística aquí: el veredicto (malId exacto o
+                    // nombres con rapidfuzz/C#) decide por cada media. La heurística
+                    // de slugs rechazaba películas correctas ("movie-N-") cuando el
+                    // malId no era comparable.
+                    int nuevos = 0;
                     foreach (string discoveredSlug in AnimeAv1HtmlParser.ExtraerSlugs(html))
                     {
-                        if (vistos.Add(discoveredSlug) &&
-                            (malIdEsperado.HasValue || EsSlugCompatible(discoveredSlug, titulosLista)))
+                        if (vistos.Add(discoveredSlug))
                         {
                             slugs.Add(discoveredSlug);
+                            nuevos++;
                         }
                     }
+                    // Diagnóstico: si un término no devuelve nada nuevo, el problema
+                    // está en el catálogo, no en la verificación.
+                    AppLogger.Debug("AnimeAv1VideoSourceResolver",
+                        $"Búsqueda de catálogo '{termino}': {nuevos} slugs nuevos ({slugs.Count} totales).");
                 }
                 catch (Exception ex)
                 {
@@ -256,39 +431,14 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
             }
         }
 
-        // PRUEBA 1: página del episodio con el número solicitado
-        foreach (var slug in slugs)
-        {
-            if (cancellationToken.IsCancellationRequested) return [];
-
-            var embeds = await ObtenerEmbedsDePaginaAsync($"https://animeav1.com/media/{slug}/{numeroEpisodio}", malIdEsperado, cancellationToken);
-            if (embeds.Count > 0) return embeds;
-        }
-
-        // PRUEBA 2 (FASE 3): la numeración del sitio puede diferir de la app
-        // (películas = "Ep N" de posición en el catálogo). Página del media →
-        // verificar malId → episodios reales → número objetivo → embeds.
-        foreach (var slug in slugs)
-        {
-            if (cancellationToken.IsCancellationRequested) return [];
-
-            int? objetivo = await ObtenerNumeroEpisodioDelMediaAsync(slug, numeroEpisodio, malIdEsperado, cancellationToken);
-            if (!objetivo.HasValue || objetivo.Value == numeroEpisodio) continue;
-
-            var embeds = await ObtenerEmbedsDePaginaAsync($"https://animeav1.com/media/{slug}/{objetivo.Value}", malIdEsperado, cancellationToken);
-            if (embeds.Count > 0) return embeds;
-        }
-
-        return [];
+        return slugs;
     }
 
-    /// <summary>
-    /// Resuelve el número de episodio real del sitio desde la página del media.
-    /// Coincidencia exacta si existe; para películas/especiales (1 solo episodio
-    /// en el sitio) se usa ese número aunque la app lo registre como episodio 1.
-    /// Verifica el malId antes de confiar en la página.
-    /// </summary>
-    private async Task<int?> ObtenerNumeroEpisodioDelMediaAsync(string slug, int numeroSolicitado, int? malIdEsperado, CancellationToken ct)
+    /// <summary>Info del media del sitio (malId, títulos, episodios reales, HTML crudo para relations).</summary>
+    public sealed record InfoMedia(string Slug, int? MalId, string? Titulo, List<string> Alternativos, List<(int Id, int Numero)> Episodios, string Html);
+
+    /// <summary>Descarga la página del media y parsea su información.</summary>
+    public async Task<InfoMedia?> ObtenerInfoMediaAsync(string slug, CancellationToken ct = default)
     {
         try
         {
@@ -302,27 +452,105 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
             if (!res.IsSuccessStatusCode) return null;
 
             var html = await res.Content.ReadAsStringAsync(ct);
-
-            // Anti-confusión: el media debe ser el anime esperado
-            var malIdPagina = AnimeAv1HtmlParser.ExtraerMalIdDelMedia(html);
-            if (malIdEsperado.HasValue && malIdPagina.HasValue && malIdPagina.Value != malIdEsperado.Value) return null;
-
-            var episodios = AnimeAv1HtmlParser.ExtraerEpisodiosDelMedia(html);
-            if (episodios.Count == 0) return null;
-
-            if (episodios.Any(e => e.Numero == numeroSolicitado)) return numeroSolicitado;
-
-            // Película/especial: el sitio numera la media como "Ep N" del catálogo
-            // pero la app la registra como un solo episodio → usar el único disponible
-            if (episodios.Count == 1) return episodios[0].Numero;
-
-            return null;
+            var titulos = AnimeAv1HtmlParser.ExtraerTitulosDelMedia(html);
+            return new InfoMedia(
+                slug,
+                AnimeAv1HtmlParser.ExtraerMalIdDelMedia(html),
+                titulos?.Principal,
+                titulos?.Alternativos ?? new List<string>(),
+                AnimeAv1HtmlParser.ExtraerEpisodiosDelMedia(html),
+                html);
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[AnimeAv1VideoSourceResolver] Error en página del media {slug}: {ex.Message}");
+            Debug.WriteLine($"[AnimeAv1VideoSourceResolver] Error obteniendo media {slug}: {ex.Message}");
             return null;
         }
+    }
+
+    /// <summary>Embeds de una página de episodio con verificación de malId.</summary>
+    public async Task<List<AnimeAv1HtmlParser.EmbedServidor>> ObtenerEmbedsDeEpisodioAsync(
+        string slug, int numero, int? malIdEsperado, CancellationToken ct = default)
+    {
+        return await ObtenerEmbedsDePaginaAsync($"https://animeav1.com/media/{slug}/{numero}", malIdEsperado, ct);
+    }
+
+    /// <summary>
+    /// Veredicto de identidad en cascada (el sistema riguroso):
+    /// 1. MAL ID exacto (ambos conocidos) → coinciden = acepta, difieren = rechaza.
+    /// 2. MAL ID no comparable → coincidencia de NOMBRES: rapidfuzz del daemon
+    ///    (Python) sobre título + aka, con fallback C# (TituloSimilaridad).
+    /// </summary>
+    private async Task<bool> EsMediaCoincidenteAsync(
+        InfoMedia media, int? malIdEsperado, List<string> titulosLista, CancellationToken ct)
+    {
+        if (malIdEsperado.HasValue && media.MalId.HasValue)
+        {
+            if (media.MalId.Value == malIdEsperado.Value) return true;
+
+            AppLogger.Warn("AnimeAv1VideoSourceResolver",
+                $"Media {media.Slug} rechazado: malId {media.MalId} != esperado {malIdEsperado} (anime con nombre parecido).");
+            return false;
+        }
+
+        // Sin malId comparable → nombres (título + aka del sitio vs títulos de la app)
+        var nombresMedia = new List<string>();
+        if (!string.IsNullOrWhiteSpace(media.Titulo)) nombresMedia.Add(media.Titulo);
+        nombresMedia.AddRange(media.Alternativos);
+        if (nombresMedia.Count == 0) return false;
+
+        double score;
+        string fuente;
+        if (_similitudNombres != null)
+        {
+            try
+            {
+                var s = await _similitudNombres(titulosLista, nombresMedia, ct);
+                if (s.HasValue)
+                {
+                    score = s.Value;
+                    fuente = "rapidfuzz (Python)";
+                    if (score < 0.75)
+                    {
+                        AppLogger.Warn("AnimeAv1VideoSourceResolver",
+                            $"Media {media.Slug} rechazado por nombre: {score:P0} < 75% ({fuente}).");
+                        return false;
+                    }
+                    AppLogger.Info("AnimeAv1VideoSourceResolver",
+                        $"Media {media.Slug} aceptado por nombre: {score:P0} ({fuente}).");
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Debug("AnimeAv1VideoSourceResolver", $"Fallo rapidfuzz para {media.Slug}: {ex.Message}");
+            }
+        }
+
+        double mejor = titulosLista.Max(t => Core.TituloSimilaridad.MejorSimilitud(t, nombresMedia));
+        fuente = "fallback C#";
+        if (mejor < 0.70)
+        {
+            AppLogger.Warn("AnimeAv1VideoSourceResolver",
+                $"Media {media.Slug} rechazado por nombre: {mejor:P0} < 70% ({fuente}).");
+            return false;
+        }
+        AppLogger.Info("AnimeAv1VideoSourceResolver",
+            $"Media {media.Slug} aceptado por nombre: {mejor:P0} ({fuente}).");
+        return true;
+    }
+
+    /// <summary>
+    /// Número de episodio real del sitio: coincidencia exacta; para películas/
+    /// especiales (1 solo episodio en el sitio) se usa ese número aunque la app
+    /// lo registre como episodio 1.
+    /// </summary>
+    private static int? ResolverNumeroEpisodio(InfoMedia media, int numeroSolicitado)
+    {
+        if (media.Episodios.Count == 0) return null;
+        if (media.Episodios.Any(e => e.Numero == numeroSolicitado)) return numeroSolicitado;
+        if (media.Episodios.Count == 1) return media.Episodios[0].Numero;
+        return null;
     }
 
     /// <summary>
