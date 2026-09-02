@@ -670,28 +670,36 @@ public partial class DetalleViewModel : ObservableObject,
         TieneCapituloEnProgreso = _todosLosEpisodios != null && _todosLosEpisodios.Any(e => e.TieneProgresoGuardado);
     }
 
+    /// <summary>
+    /// Abre la CARPETA DEL ANIME en el Explorador (acción única de nivel anime,
+    /// no por episodio — evita saturar la lista de episodios).
+    /// </summary>
     [RelayCommand]
-    private void AbrirCarpetaEpisodio(EpisodioItem episodio)
+    private void AbrirCarpetaAnime()
     {
-        if (episodio == null || string.IsNullOrWhiteSpace(episodio.RutaCompleta) || !File.Exists(episodio.RutaCompleta))
+        if (AnimeSeleccionado == null || string.IsNullOrWhiteSpace(AnimeSeleccionado.RutaCarpeta))
         {
-            _ = _dialogService.MostrarDialogoAsync("Archivo no encontrado", "El archivo del episodio ya no existe en disco.", false, "AlertCircleOutline", "#F59E0B");
+            _ = _dialogService.MostrarDialogoAsync("Carpeta no encontrada", "El anime no tiene una carpeta local asociada.", false, "AlertCircleOutline", "#F59E0B");
+            return;
+        }
+        if (!Directory.Exists(AnimeSeleccionado.RutaCarpeta))
+        {
+            _ = _dialogService.MostrarDialogoAsync("Carpeta no encontrada", "La carpeta del anime ya no existe en disco.", false, "AlertCircleOutline", "#F59E0B");
             return;
         }
 
         try
         {
-            // Abre el Explorador con el archivo seleccionado
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
             {
                 FileName = "explorer.exe",
-                Arguments = $"/select,\"{episodio.RutaCompleta}\"",
+                Arguments = $"\"{AnimeSeleccionado.RutaCarpeta}\"",
                 UseShellExecute = false
             });
         }
         catch (Exception ex)
         {
-            AppLogger.Debug("DetalleViewModel", $"Error abriendo carpeta del episodio: {ex.Message}");
+            AppLogger.Debug("DetalleViewModel", $"Error abriendo carpeta del anime: {ex.Message}");
         }
     }
 
@@ -998,6 +1006,8 @@ public partial class DetalleViewModel : ObservableObject,
             var titulosAlt = new List<string>();
             if (!string.IsNullOrWhiteSpace(datosFrescos.Title.English)) titulosAlt.Add(datosFrescos.Title.English);
             if (!string.IsNullOrWhiteSpace(datosFrescos.Title.UserPreferred) && datosFrescos.Title.UserPreferred != datosFrescos.Title.Romaji) titulosAlt.Add(datosFrescos.Title.UserPreferred);
+            // El título nativo (japonés) es clave para el catálogo del sitio (aka ja-jp)
+            if (!string.IsNullOrWhiteSpace(datosFrescos.Title.Native)) titulosAlt.Add(datosFrescos.Title.Native!);
             if (datosFrescos.Synonyms != null) titulosAlt.AddRange(datosFrescos.Synonyms.Where(s => !string.IsNullOrWhiteSpace(s)));
             AnimeSeleccionado.NombresAlternativos = string.Join(" | ", titulosAlt.Distinct());
 

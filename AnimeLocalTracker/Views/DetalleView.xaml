@@ -266,6 +266,18 @@
                                           Content="{materialDesign:PackIcon Kind=SortDescending, Size=18}"
                                           materialDesign:ToggleButtonAssist.OnContent="{materialDesign:PackIcon Kind=SortAscending, Size=18}"
                                           ToolTip="Cambiar orden ascendente/descendente" Width="34" Height="34" Background="#1F242C" BorderBrush="#2D333B" BorderThickness="1" Foreground="White" />
+
+                            <!-- CARPETA DEL ANIME (acción única, no por episodio) -->
+                            <Button Command="{Binding AbrirCarpetaAnimeCommand}"
+                                    Style="{StaticResource MaterialDesignOutlinedButton}"
+                                    BorderBrush="#34D399" Foreground="#34D399"
+                                    Height="34" Padding="10,0" Margin="8,0,0,0"
+                                    ToolTip="Abrir la carpeta del anime en el Explorador">
+                                <StackPanel Orientation="Horizontal">
+                                    <materialDesign:PackIcon Kind="FolderOpen" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                    <TextBlock Text="Carpeta" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="11"/>
+                                </StackPanel>
+                            </Button>
                         </StackPanel>
 
                         <!-- BOTONES DE ACCIÓN MASIVA (Cápsulas modernas) -->
@@ -380,6 +392,93 @@
                         <ListBox.ItemTemplate>
                             <DataTemplate>
                                 <Border Padding="10,8" Background="Transparent">
+                                    <!-- Menú contextual de la fila: se abre con clic izquierdo SOLO sobre el
+                                         icono de episodio descargado (o con clic derecho en la fila) -->
+                                    <Border.ContextMenu>
+                                        <ContextMenu Placement="RelativePoint" HorizontalOffset="18" VerticalOffset="12"
+                                                     Background="#151B29" BorderBrush="#2D333B" BorderThickness="1"
+                                                     Padding="6" FontSize="12.5" Foreground="#E2E8F0" HasDropShadow="False">
+                                            <ContextMenu.Resources>
+                                                <Style TargetType="ContextMenu">
+                                                    <Setter Property="Template">
+                                                        <Setter.Value>
+                                                            <ControlTemplate TargetType="ContextMenu">
+                                                                <Border Background="{TemplateBinding Background}"
+                                                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                                                        BorderThickness="{TemplateBinding BorderThickness}"
+                                                                        CornerRadius="10" Padding="6">
+                                                                    <Border.Effect>
+                                                                        <DropShadowEffect BlurRadius="18" ShadowDepth="3" Opacity="0.55" Color="#000000"/>
+                                                                    </Border.Effect>
+                                                                    <ScrollViewer>
+                                                                        <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle"/>
+                                                                    </ScrollViewer>
+                                                                </Border>
+                                                            </ControlTemplate>
+                                                        </Setter.Value>
+                                                    </Setter>
+                                                </Style>
+                                                <Style TargetType="MenuItem">
+                                                    <Setter Property="Foreground" Value="#E2E8F0"/>
+                                                    <Setter Property="Background" Value="Transparent"/>
+                                                    <Setter Property="Template">
+                                                        <Setter.Value>
+                                                            <ControlTemplate TargetType="MenuItem">
+                                                                <Border x:Name="FondoItem" Background="{TemplateBinding Background}"
+                                                                        CornerRadius="7" Padding="10,8">
+                                                                    <Grid>
+                                                                        <Grid.ColumnDefinitions>
+                                                                            <ColumnDefinition Width="Auto"/>
+                                                                            <ColumnDefinition Width="*"/>
+                                                                        </Grid.ColumnDefinitions>
+                                                                        <ContentPresenter Grid.Column="0" ContentSource="Icon" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                                                        <ContentPresenter Grid.Column="1" ContentSource="Header" RecognizesAccessKey="True" VerticalAlignment="Center"/>
+                                                                    </Grid>
+                                                                </Border>
+                                                                <ControlTemplate.Triggers>
+                                                                    <Trigger Property="IsHighlighted" Value="True">
+                                                                        <Setter TargetName="FondoItem" Property="Background" Value="#24344A"/>
+                                                                    </Trigger>
+                                                                    <Trigger Property="IsEnabled" Value="False">
+                                                                        <Setter Property="Opacity" Value="0.45"/>
+                                                                    </Trigger>
+                                                                </ControlTemplate.Triggers>
+                                                            </ControlTemplate>
+                                                        </Setter.Value>
+                                                    </Setter>
+                                                </Style>
+                                                <Style TargetType="Separator">
+                                                    <Setter Property="Background" Value="#2D333B"/>
+                                                    <Setter Property="Height" Value="1"/>
+                                                    <Setter Property="Margin" Value="8,4"/>
+                                                    <Setter Property="Template">
+                                                        <Setter.Value>
+                                                            <ControlTemplate TargetType="Separator">
+                                                                <Border Background="{TemplateBinding Background}"
+                                                                        Height="{TemplateBinding Height}"
+                                                                        Margin="{TemplateBinding Margin}"/>
+                                                            </ControlTemplate>
+                                                        </Setter.Value>
+                                                    </Setter>
+                                                </Style>
+                                            </ContextMenu.Resources>
+                                            <MenuItem Header="Reproducir episodio"
+                                                      Command="{Binding DataContext.ReproducirEpisodioCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                                      CommandParameter="{Binding}">
+                                                <MenuItem.Icon>
+                                                    <materialDesign:PackIcon Kind="PlayArrow" Foreground="#60A5FA" Width="16" Height="16"/>
+                                                </MenuItem.Icon>
+                                            </MenuItem>
+                                            <Separator/>
+                                            <MenuItem Header="Eliminar episodio del disco"
+                                                      Command="{Binding DataContext.EliminarEpisodioCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                                      CommandParameter="{Binding}">
+                                                <MenuItem.Icon>
+                                                    <materialDesign:PackIcon Kind="DeleteOutline" Foreground="#F87171" Width="16" Height="16"/>
+                                                </MenuItem.Icon>
+                                            </MenuItem>
+                                        </ContextMenu>
+                                    </Border.ContextMenu>
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <!-- Columna 0: Punto no visto + Marcador Bookmark -->
@@ -391,8 +490,6 @@
                                             <!-- Columna 3: Tamaño de archivo -->
                                             <ColumnDefinition Width="Auto"/>
                                             <!-- Columna 4: Acción Descargar / Progreso / Reproducir -->
-                                            <ColumnDefinition Width="Auto"/>
-                                            <!-- Columna 5: Acciones (abrir carpeta / eliminar episodio) -->
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
 
@@ -452,11 +549,10 @@
                                         <!-- ACCIÓN: DESCARGAR / REPRODUCIR / DESCARGANDO -->
                                         <Grid Grid.Column="4" Width="34" Height="34" VerticalAlignment="Center">
                                             
-                                            <!-- 1. DESCARGADO: BOTÓN DE REPRODUCIR -->
-                                            <Button Command="{Binding DataContext.ReproducirEpisodioCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                    CommandParameter="{Binding}"
+                                            <!-- 1. DESCARGADO: ICONO QUE ABRE EL MENÚ DEL EPISODIO -->
+                                            <Button Click="BotonEpisodioDescargado_Click"
                                                     Style="{StaticResource MaterialDesignIconButton}" Width="34" Height="34"
-                                                    ToolTip="Descargado (Clic para reproducir)"
+                                                    ToolTip="Descargado (Clic para reproducir o eliminar)"
                                                     Visibility="{Binding Descargado, Converter={StaticResource BoolToVis}}">
                                                 <materialDesign:PackIcon Kind="CheckCircle" Foreground="#60A5FA" Width="24" Height="24" VerticalAlignment="Center"/>
                                             </Button>
@@ -506,23 +602,6 @@
                                                 <materialDesign:PackIcon Kind="DownloadCircleOutline" Foreground="#60A5FA" Width="24" Height="24" VerticalAlignment="Center"/>
                                             </Button>
                                         </Grid>
-
-                                        <!-- 5. ACCIONES DEL EPISODIO DESCARGADO: ABRIR CARPETA / ELIMINAR -->
-                                        <StackPanel Grid.Column="5" Orientation="Horizontal" VerticalAlignment="Center"
-                                                    Visibility="{Binding Descargado, Converter={StaticResource BoolToVis}}">
-                                            <Button Command="{Binding DataContext.AbrirCarpetaEpisodioCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                    CommandParameter="{Binding}"
-                                                    Style="{StaticResource MaterialDesignIconButton}" Width="30" Height="30" Padding="0"
-                                                    ToolTip="Mostrar en carpeta (Explorador)">
-                                                <materialDesign:PackIcon Kind="FolderOutline" Foreground="#9CA3AF" Width="18" Height="18" VerticalAlignment="Center"/>
-                                            </Button>
-                                            <Button Command="{Binding DataContext.EliminarEpisodioCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                    CommandParameter="{Binding}"
-                                                    Style="{StaticResource MaterialDesignIconButton}" Width="30" Height="30" Padding="0"
-                                                    ToolTip="Eliminar episodio del disco">
-                                                <materialDesign:PackIcon Kind="DeleteOutline" Foreground="#F87171" Width="18" Height="18" VerticalAlignment="Center"/>
-                                            </Button>
-                                        </StackPanel>
                                     </Grid>
                                 </Border>
                                 
