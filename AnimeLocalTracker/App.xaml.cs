@@ -38,7 +38,7 @@ public partial class App : Application
         var services = new ServiceCollection();
         ConfigureServices(services);
         ServiceProvider = services.BuildServiceProvider();
-        
+
         // === MANEJADORES GLOBALES DE EXCEPCIONES ===
         
         // 1. Excepciones no manejadas en el hilo de UI (Dispatcher)
@@ -87,7 +87,7 @@ public partial class App : Application
         };
     }
 
-    private void ConfigureServices(IServiceCollection services)
+    internal static void ConfigureServices(IServiceCollection services)
     {
         // 1. Registramos las Vistas (Ventanas)
         services.AddTransient<MainWindow>();
@@ -112,7 +112,6 @@ public partial class App : Application
         services.AddSingleton<ISettingsService, SettingsService>();
         services.AddSingleton<IDialogService, DialogService>();
         services.AddSingleton<IAuthService, AuthService>();
-        services.AddTransient<IFileScannerService, FileScannerService>();
         services.AddHttpClient();
         services.AddSingleton<IDownloadService, DownloadService>();
         
