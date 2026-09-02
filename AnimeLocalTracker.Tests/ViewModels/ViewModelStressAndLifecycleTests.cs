@@ -53,7 +53,7 @@ public class ViewModelStressAndLifecycleTests
         services.AddSingleton<CacheMaintenanceService>();
 
         var sp = services.BuildServiceProvider();
-        var sut = new MainViewModel(sp, _trackingMock.Object, sp.GetRequiredService<AnimeLibraryService>(), _downloadMock.Object, _updateMock.Object);
+        var sut = new MainViewModel(new NavigationService(sp), _trackingMock.Object, sp.GetRequiredService<AnimeLibraryService>(), _downloadMock.Object, _updateMock.Object);
 
         // Act: Conmutar 100 veces entre todas las vistas principales
         for (int i = 0; i < 100; i++)

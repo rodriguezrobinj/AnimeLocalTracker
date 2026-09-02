@@ -86,7 +86,7 @@ public class UpdateServiceTests
         services.AddSingleton<AnimeLibraryService>();
 
         var sp = services.BuildServiceProvider();
-        var sut = new MainViewModel(sp, trackingMock.Object, sp.GetRequiredService<AnimeLibraryService>(), downloadMock.Object, updateMock.Object);
+        var sut = new MainViewModel(new NavigationService(sp), trackingMock.Object, sp.GetRequiredService<AnimeLibraryService>(), downloadMock.Object, updateMock.Object);
 
         // Act
         await sut.BuscarActualizacionesManualCommand.ExecuteAsync(null);
