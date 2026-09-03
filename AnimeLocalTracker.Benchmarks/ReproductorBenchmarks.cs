@@ -119,6 +119,10 @@ public class ReproductorBenchmarks : IDisposable
         public Task CrearBackupRotativoAsync(int maxCopias = 5, string? backupDir = null) => Task.CompletedTask;
         public Task GuardarAnimeAsync(AnimeItem anime) => Task.CompletedTask;
         public Task<List<AnimeItem>> ObtenerTodosLosAnimesAsync() => Task.FromResult(new List<AnimeItem>());
+public Task<List<AnimeItem>> ObtenerAnimesLigerosAsync() => Task.FromResult(new List<AnimeItem>());
+public Task<AnimeItem?> ObtenerAnimePorIdAsync(int aniListId) => Task.FromResult<AnimeItem?>(null);
+public Task<bool> ExisteAnimeAsync(int aniListId) => Task.FromResult(false);
+public Task ActualizarAnimesAsync(IEnumerable<AnimeItem> animes) => Task.CompletedTask;
         public Task EliminarAnimeAsync(AnimeItem anime) => Task.CompletedTask;
         public Task EliminarRegistroEpisodioAsync(int aniListId, int numeroEpisodio) => Task.CompletedTask;
         public Task<bool> ExportarCopiaSeguridadAsync(string rutaDestino) => Task.FromResult(true);
