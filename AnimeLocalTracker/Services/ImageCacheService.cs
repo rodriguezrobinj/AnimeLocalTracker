@@ -48,6 +48,22 @@ public class ImageCacheService : IImageCacheService, IDisposable
     }
 
     /// <summary>
+    /// PERF-08: elimina una portada corrupta del disco (decode fallido). Se invoca una
+    /// sola vez por archivo; la siguiente visita la re-descarga desde la red.
+    /// </summary>
+    private static void EliminarPortadaCorrupta(string localPath)
+    {
+        try
+        {
+            if (File.Exists(localPath)) File.Delete(localPath);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("ImageCacheService", $"No se pudo eliminar la portada corrupta {localPath}: {ex.Message}");
+        }
+    }
+
+    /// <summary>
     /// SEC-04: solo se descargan portadas de la CDN de AniList por https. Sin esta
     /// restricción, una URL arbitraria (p. ej. de un import JSON) permitiría sondear
     /// servicios internos de la red local (SSRF limitado).
@@ -132,6 +148,10 @@ public class ImageCacheService : IImageCacheService, IDisposable
                 GuardarEnCache(animeId, diskBitmap);
                 return diskBitmap;
             }
+
+            // PERF-08: archivo corrupto en disco — se elimina UNA vez para que las visitas
+            // siguientes no reintenten el decode fallido (y la re-descarga) en cada visita.
+            EliminarPortadaCorrupta(localPath);
         }
 
         if (string.IsNullOrWhiteSpace(urlPortada)) return null;

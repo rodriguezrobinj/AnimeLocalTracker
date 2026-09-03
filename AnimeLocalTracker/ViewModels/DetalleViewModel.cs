@@ -268,14 +268,8 @@ public partial class DetalleViewModel : ObservableObject,
                                 }
                                 catch { }
 
-                                var disp = System.Windows.Application.Current?.Dispatcher;
-                                if (disp != null && !disp.HasShutdownStarted)
-                                {
-                                    _ = disp.InvokeAsync(() =>
-                                    {
-                                        AplicarFiltrosYOrdenamiento();
-                                    });
-                                }
+                                // PERF-01: refresco coalescido (varios pueden completar a la vez)
+                                SolicitarRefrescoEpisodios();
                             }
                         }
                         catch (Exception ex)
@@ -402,7 +396,7 @@ public partial class DetalleViewModel : ObservableObject,
         AplicarFiltrosYOrdenamiento();
 
         // Enriquecimiento Python (metadata ffprobe + miniaturas) en segundo plano solo para los que falten
-        _ = EnriquecerEpisodiosEnSegundoPlanoAsync(anime.AniListId, AplicarFiltrosYOrdenamiento);
+        _ = EnriquecerEpisodiosEnSegundoPlanoAsync(anime.AniListId);
         _ = CargarProximosEpisodiosDeAniListAsync();
     }
 
@@ -414,7 +408,7 @@ public partial class DetalleViewModel : ObservableObject,
     /// en el hilo de UI (los await del hilo llamador reanudaban en el SynchronizationContext)
     /// y cada episodio lanzaba un proceso ffmpeg síncrono → congelamiento total de la vista.
     /// </summary>
-    private async Task EnriquecerEpisodiosEnSegundoPlanoAsync(int aniListId, Action alTerminar)
+    private async Task EnriquecerEpisodiosEnSegundoPlanoAsync(int aniListId)
     {
         // Coalescing: si ya hay una pasada en curso, no abrir otra en paralelo.
         if (!_enriquecimientoGate.Wait(0)) return;
@@ -464,7 +458,7 @@ public partial class DetalleViewModel : ObservableObject,
                                 var disp = System.Windows.Application.Current?.Dispatcher;
                                 if (disp != null && !disp.HasShutdownStarted)
                                 {
-                                    _ = disp.InvokeAsync(() => alTerminar());
+                                    SolicitarRefrescoEpisodios();
                                 }
                             }
                         }
@@ -489,7 +483,7 @@ public partial class DetalleViewModel : ObservableObject,
                                 var disp = System.Windows.Application.Current?.Dispatcher;
                                 if (disp != null && !disp.HasShutdownStarted)
                                 {
-                                    _ = disp.InvokeAsync(() => alTerminar());
+                                    SolicitarRefrescoEpisodios();
                                 }
                             }
                         }
@@ -515,7 +509,7 @@ public partial class DetalleViewModel : ObservableObject,
                             var disp = System.Windows.Application.Current?.Dispatcher;
                             if (disp != null && !disp.HasShutdownStarted)
                             {
-                                _ = disp.InvokeAsync(() => alTerminar());
+                                SolicitarRefrescoEpisodios();
                             }
                         }
 
@@ -537,6 +531,30 @@ public partial class DetalleViewModel : ObservableObject,
         {
             _enriquecimientoGate.Release();
         }
+    }
+
+    // PERF-01: refrescos coalescidos de la lista de episodios — varios episodios pueden
+    // completar su miniatura casi a la vez; repintar la lista completa por cada uno era
+    // O(N²) en la UI. Un solo refresco por ráfaga vía el Dispatcher.
+    private bool _refrescoListaEpisodiosPendiente;
+
+    private void SolicitarRefrescoEpisodios()
+    {
+        if (_refrescoListaEpisodiosPendiente) return;
+        _refrescoListaEpisodiosPendiente = true;
+
+        var disp = System.Windows.Application.Current?.Dispatcher;
+        if (disp == null || disp.HasShutdownStarted)
+        {
+            _refrescoListaEpisodiosPendiente = false;
+            return;
+        }
+
+        _ = disp.InvokeAsync(() =>
+        {
+            _refrescoListaEpisodiosPendiente = false;
+            AplicarFiltrosYOrdenamiento();
+        });
     }
 
     // PERF-05: la persistencia del enriquecimiento se acumula y se escribe por lotes
