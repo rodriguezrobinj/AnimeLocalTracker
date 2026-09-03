@@ -524,6 +524,9 @@ public partial class DetalleViewModel : ObservableObject,
                         }
                     }
                 }
+
+                // PERF-05: vaciar el lote de persistencia acumulado del enriquecimiento
+                await VaciarPersistenciaPendienteAsync().ConfigureAwait(false);
             }).ConfigureAwait(false);
         }
         catch (Exception ex)
@@ -536,17 +539,25 @@ public partial class DetalleViewModel : ObservableObject,
         }
     }
 
+    // PERF-05: la persistencia del enriquecimiento se acumula y se escribe por lotes
+    // (antes 1 SELECT + 1 write por episodio; ahora 1 transacción por lote de 20).
+    private readonly object _persistenciaLock = new();
+    private readonly List<RegistroEpisodio> _persistenciaPendiente = new();
+    private const int PersistenciaLoteMax = 20;
+
     /// <summary>
     /// Persiste los episodios con miniatura/metadata recién generada en SQLite para
     /// que las siguientes visitas al anime sean instantáneas (sin regenerar).
     /// </summary>
     private async Task PersistirRegistrosAsync(int aniListId, IEnumerable<EpisodioItem> episodios)
     {
-        foreach (var ep in episodios)
+        List<RegistroEpisodio>? loteAEnviar = null;
+
+        lock (_persistenciaLock)
         {
-            try
+            foreach (var ep in episodios)
             {
-                var registro = new RegistroEpisodio
+                _persistenciaPendiente.Add(new RegistroEpisodio
                 {
                     AniListId = aniListId,
                     NumeroEpisodio = ep.NumeroEpisodio,
@@ -560,10 +571,46 @@ public partial class DetalleViewModel : ObservableObject,
                     FavoritoLocal = ep.Favorito,
                     ProgresoSegundos = ep.ProgresoSegundos,
                     TotalSegundos = ep.TotalSegundos
-                };
-                await _databaseService.GuardarRegistroEpisodioAsync(registro).ConfigureAwait(false);
+                });
             }
-            catch { }
+
+            if (_persistenciaPendiente.Count >= PersistenciaLoteMax)
+            {
+                loteAEnviar = new List<RegistroEpisodio>(_persistenciaPendiente);
+                _persistenciaPendiente.Clear();
+            }
+        }
+
+        if (loteAEnviar != null)
+        {
+            try
+            {
+                await _databaseService.GuardarRegistrosEpisodioBulkAsync(loteAEnviar).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Debug("DetalleViewModel", $"Error persistiendo lote de enriquecimiento: {ex.Message}");
+            }
+        }
+    }
+
+    private async Task VaciarPersistenciaPendienteAsync()
+    {
+        List<RegistroEpisodio>? pendiente = null;
+        lock (_persistenciaLock)
+        {
+            if (_persistenciaPendiente.Count == 0) return;
+            pendiente = new List<RegistroEpisodio>(_persistenciaPendiente);
+            _persistenciaPendiente.Clear();
+        }
+
+        try
+        {
+            await _databaseService.GuardarRegistrosEpisodioBulkAsync(pendiente).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("DetalleViewModel", $"Error vaciando persistencia de enriquecimiento: {ex.Message}");
         }
     }
 

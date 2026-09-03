@@ -31,4 +31,7 @@ public interface IDatabaseService
     Task<List<RegistroEpisodio>> ObtenerEpisodiosNoSincronizadosAsync();
     Task MarcarEpisodiosSincronizadosAsync(IEnumerable<int> ids);
     Task ActualizarAnimeAsync(AnimeItem anime);
+
+    // === ESCRITURAS MASIVAS (PERF-06): una transacción por lote en vez de N escrituras ===
+    Task ActualizarAnimesAsync(IEnumerable<AnimeItem> animes);
 }

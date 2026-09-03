@@ -810,6 +810,7 @@ public partial class GaleriaViewModel : ObservableObject,
             listaAnimes.Select(a => a.AniListId), token);
 
         int procesados = 0;
+        var modificados = new List<Models.AnimeItem>();
         foreach (var anime in listaAnimes)
         {
             procesados++;
@@ -822,6 +823,10 @@ public partial class GaleriaViewModel : ObservableObject,
                 ? datosFrescos.NextAiringEpisode.Episode - 1
                 : (datosFrescos.Episodes ?? 0);
 
+            // PERF-06: detectar cambios y persistir por lote al final (antes 1 UPDATE por anime).
+            bool cambio = anime.TotalEpisodios != episodiosEmitidos
+                          || !string.Equals(anime.Estado, datosFrescos.Status ?? "UNKNOWN", StringComparison.Ordinal);
+
             anime.TotalEpisodios = episodiosEmitidos;
             anime.Estado = datosFrescos.Status ?? "UNKNOWN";
 
@@ -829,10 +834,19 @@ public partial class GaleriaViewModel : ObservableObject,
             // (mediaListEntry del usuario autenticado): sin llamadas extra por anime.
             if (token != null && datosFrescos.MediaListEntry != null && !string.IsNullOrEmpty(datosFrescos.MediaListEntry.Status))
             {
-                anime.EstadoUsuario = datosFrescos.MediaListEntry.Status;
+                if (!string.Equals(anime.EstadoUsuario, datosFrescos.MediaListEntry.Status, StringComparison.Ordinal))
+                {
+                    anime.EstadoUsuario = datosFrescos.MediaListEntry.Status;
+                    cambio = true;
+                }
             }
 
-            await _databaseService.ActualizarAnimeAsync(anime);
+            if (cambio) modificados.Add(anime);
+        }
+
+        if (modificados.Count > 0)
+        {
+            await _databaseService.ActualizarAnimesAsync(modificados);
         }
         
         TextoProgreso = "¡Actualización completada con éxito!";
@@ -875,12 +889,13 @@ public partial class GaleriaViewModel : ObservableObject,
         var seleccionados = BibliotecaLocales.Where(a => a.EstaSeleccionado).ToList();
         if (seleccionados.Count == 0) return;
 
+        // PERF-06: una sola transacción para el lote de seleccionados.
         foreach (var anime in seleccionados)
         {
             anime.EstadoUsuario = nuevoEstado;
-            await _databaseService.ActualizarAnimeAsync(anime);
             anime.EstaSeleccionado = false;
         }
+        await _databaseService.ActualizarAnimesAsync(seleccionados);
 
         ModoSeleccion = false;
         BibliotecaFiltrada?.Refresh();

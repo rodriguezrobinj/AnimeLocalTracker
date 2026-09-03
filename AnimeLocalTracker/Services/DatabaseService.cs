@@ -615,4 +615,13 @@ public class DatabaseService : IDatabaseService, IDisposable
     {
         await _conexion.UpdateAsync(anime);
     }
+
+    public async Task ActualizarAnimesAsync(IEnumerable<AnimeItem> animes)
+    {
+        var lista = animes?.ToList();
+        if (lista == null || lista.Count == 0) return;
+
+        // PERF-06: UpdateAll en una sola transacción (los animes ya existen en la BD).
+        await _conexion.UpdateAllAsync(lista);
+    }
 }
