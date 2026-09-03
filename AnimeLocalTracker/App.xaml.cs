@@ -299,6 +299,12 @@ public partial class App : Application
 
         try
         {
+            // OPS-05: la primera línea del log identifica versión y entorno del binario
+            // (antes no había forma de saber qué build produjo un app.log).
+            string versionApp = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "desconocida";
+            string arquitectura = System.Environment.Is64BitProcess ? "x64" : "x86";
+            AppLogger.Info("App", $"AnimeLocalTracker iniciando (versión {versionApp}, {arquitectura}).");
+
             // Migrar datos del layout de instalación antiguo (%LocalAppData%\AnimeLocalTracker)
             // a la carpeta segura de datos, ANTES de inicializar la base de datos.
             AppDataPaths.MigrarDesdeInstalacionAntigua();

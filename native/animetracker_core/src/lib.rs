@@ -55,7 +55,7 @@ fn anitomy_extract_frame_inner(
         Err(_) => return false,
     };
 
-    let w = (width.max(16).min(4096) as u32).next_power_of_two().min(4096);
+    let w = (width.clamp(16, 4096) as u32).next_power_of_two().min(4096);
     let t = if timestamp.is_finite() && timestamp >= 0.0 { timestamp } else { 0.0 };
     spritesheet::extract_frame(video_str, out_str, t, w)
 }
@@ -159,8 +159,12 @@ fn compute_file_fingerprint_inner(video_path: *const c_char) -> *mut c_char {
 }
 
 /// Libera la memoria de una cadena de texto creada en Rust para el llamador de C#.
+///
+/// # Safety
+/// `ptr` debe ser un puntero producido por `CString::into_raw` (nulo permitido) y
+/// solo debe liberarse una vez; cualquier otro uso es un double-free o un free inválido.
 #[no_mangle]
-pub extern "C" fn anitomy_free_string(ptr: *mut c_char) {
+pub unsafe extern "C" fn anitomy_free_string(ptr: *mut c_char) {
     if !ptr.is_null() {
         unsafe {
             let _ = CString::from_raw(ptr);

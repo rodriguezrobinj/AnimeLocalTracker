@@ -100,6 +100,11 @@ jobs:
         cargo build --release --manifest-path native/animetracker_core/Cargo.toml
         Copy-Item native/animetracker_core/target/release/animetracker_core.dll AnimeLocalTracker/animetracker_core.dll -Force
 
+    # OPS-04: estilo del núcleo Rust con 0 warnings (mismo estándar que .NET en
+    # Directory.Build.props: TreatWarningsAsErrors).
+    - name: Rust Lint (clippy -D warnings)
+      run: cargo clippy --release --manifest-path native/animetracker_core/Cargo.toml -- -D warnings
+
     - name: Build Solution and Run Tests with Coverage
       env:
         # DEV-08: builds deterministas en CI (mismos bits que la release)
@@ -107,21 +112,25 @@ jobs:
       run: |
         powershell -ExecutionPolicy Bypass -File .\build.ps1 -RunTests -Coverage
 
-    # DEV-06b: umbral de cobertura de líneas. Medido: 46.9%
-    # (2026-09-01, excluyendo el ensamblado de tests; subió desde 43.1% con los
-    # tests de AniSkipService). SUBIR este umbral conforme crezca la cobertura.
-    - name: Check Coverage Threshold (>= 45%)
+    # OPS-08: umbrales de cobertura de líneas (45%) y ramas (30%). Medido 2026-09-01:
+    # 46.9% líneas / 34.3% ramas. SUBIR estos umbrales conforme crezca la cobertura.
+    - name: Check Coverage Threshold (>= 45% lines, >= 30% branches)
       shell: powershell
       run: |
-        $threshold = 0.45
         $cov = Get-ChildItem "AnimeLocalTracker.Tests/TestResults" -Recurse -Filter "coverage.cobertura.xml" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
         if (-not $cov) { Write-Host "::error::No se encontró coverage.cobertura.xml"; exit 1 }
         [xml]$xml = Get-Content $cov.FullName
-        $rate = [double]$xml.coverage.'line-rate'
-        $pct = [math]::Round($rate * 100, 1)
-        Write-Host "Cobertura de líneas: $pct% (umbral: $([math]::Round($threshold * 100))%)"
-        if ($rate -lt $threshold) {
-          Write-Host "::error::Cobertura por debajo del umbral ($pct% < $([math]::Round($threshold * 100))%)"
+        $lineRate = [double]$xml.coverage.'line-rate'
+        $branchRate = [double]$xml.coverage.'branch-rate'
+        $linePct = [math]::Round($lineRate * 100, 1)
+        $branchPct = [math]::Round($branchRate * 100, 1)
+        Write-Host "Cobertura: $linePct% líneas / $branchPct% ramas (umbrales: 45% / 30%)"
+        if ($lineRate -lt 0.45) {
+          Write-Host "::error::Cobertura de líneas por debajo del umbral ($linePct% < 45%)"
+          exit 1
+        }
+        if ($branchRate -lt 0.30) {
+          Write-Host "::error::Cobertura de ramas por debajo del umbral ($branchPct% < 30%)"
           exit 1
         }
 
