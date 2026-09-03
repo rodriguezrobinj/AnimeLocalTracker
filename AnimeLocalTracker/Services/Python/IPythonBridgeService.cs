@@ -15,5 +15,12 @@ namespace AnimeLocalTracker.Services.Python
         /// Ejecuta un comando en el motor de herramientas Python enviando y recibiendo JSON tipado.
         /// </summary>
         Task<TResponse?> ExecuteCommandAsync<TRequest, TResponse>(string command, TRequest payload, CancellationToken ct = default);
+
+        /// <summary>
+        /// Ejecuta un comando en un proceso one-shot dedicado (nunca bloquea el daemon
+        /// persistente) y mata el proceso con su árbol si se cancela. Para comandos
+        /// largos como la descarga HLS (download-stream).
+        /// </summary>
+        Task<TResponse?> ExecuteCommandOneShotAsync<TRequest, TResponse>(string command, TRequest payload, CancellationToken ct = default);
     }
 }

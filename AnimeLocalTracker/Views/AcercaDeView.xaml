@@ -149,6 +149,23 @@
                     </Grid>
                 </materialDesign:Card>
 
+                <!-- 4. PRIVACIDAD Y DATOS (PRI-03/04) -->
+                <materialDesign:Card Background="#121212" BorderBrush="#262D38" BorderThickness="1" UniformCornerRadius="16" Margin="0,0,0,20" Padding="24" materialDesign:ElevationAssist.Elevation="Dp0">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                            <materialDesign:PackIcon Kind="ShieldAccount" Width="20" Height="20" Foreground="#34D399" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBlock Text="Privacidad y tus datos" FontWeight="Bold" Foreground="White" FontSize="15" VerticalAlignment="Center"/>
+                        </StackPanel>
+
+                        <TextBlock Text="Local-first: tu biblioteca, historial de visionado, portadas y miniaturas se guardan SOLO en tu equipo (carpeta de datos de usuario de Windows) y nunca se suben." 
+                                   FontSize="12" Foreground="#E2E8F0" TextWrapping="Wrap" LineHeight="20" Margin="0,0,0,6"/>
+                        <TextBlock Text="Al conectar AniList se lee tu perfil y lista, y se escribe en ella tu progreso, estado y puntuación cuando los marcas (consulta el aviso antes de conectar). AniSkip recibe solo identificadores públicos; las descargas no envían datos de tu cuenta." 
+                                   FontSize="12" Foreground="#E2E8F0" TextWrapping="Wrap" LineHeight="20" Margin="0,0,0,6"/>
+                        <TextBlock Text="Sin telemetría ni analítica. Los registros (logs) y el historial se guardan en claro en tu equipo con retención acotada (log de 5 MB, 5 backups rotativos); desde Configuración puedes exportar tus datos o borrarlos todos." 
+                                   FontSize="12" Foreground="#E2E8F0" TextWrapping="Wrap" LineHeight="20"/>
+                    </StackPanel>
+                </materialDesign:Card>
+
             </StackPanel>
         </ScrollViewer>
     </Grid>

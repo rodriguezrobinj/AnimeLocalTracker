@@ -2,6 +2,8 @@ import json
 import subprocess
 from typing import Dict, Any, List
 
+from media.ffmpeg_guard import es_ruta_media_segura, MAX_ALLOC
+
 
 class EpisodeMetadata:
     """Extrae metadatos técnicos de un video con ffprobe (duración, codecs, resolucion, bits)."""
@@ -9,8 +11,13 @@ class EpisodeMetadata:
     @staticmethod
     def inspect_episode(video_path: str) -> Dict[str, Any]:
         try:
+            # Hardening: nunca pasar URLs ni archivos no-video a ffprobe
+            if not es_ruta_media_segura(video_path):
+                return {"success": False, "error": "ruta de video no permitida"}
+
             ffprobe = subprocess.run(
-                ["ffprobe", "-v", "error", "-print_format", "json", "-show_format", "-show_streams", video_path],
+                ["ffprobe", "-nostdin", "-max_alloc", MAX_ALLOC, "-v", "error",
+                 "-print_format", "json", "-show_format", "-show_streams", video_path],
                 capture_output=True, text=True, timeout=30
             )
             if ffprobe.returncode != 0:
@@ -68,9 +75,15 @@ class Thumbnail:
     @staticmethod
     def generate_thumbnail(video_path: str, output_path: str, timestamp: float = 30.0, width: int = 320) -> Dict[str, Any]:
         try:
+            # Hardening: solo archivos locales de video; ffmpeg nunca lee stdin
+            # y la memoria por bloque está acotada
+            if not es_ruta_media_segura(video_path):
+                return {"success": False, "error": "ruta de video no permitida"}
+
             import subprocess as sp
             result = sp.run(
-                ["ffmpeg", "-y", "-ss", str(timestamp), "-i", video_path,
+                ["ffmpeg", "-y", "-nostdin", "-max_alloc", MAX_ALLOC,
+                 "-ss", str(timestamp), "-i", video_path,
                  "-frames:v", "1", "-vf", f"scale={width}:-2", "-q:v", "3", output_path],
                 capture_output=True, text=True, timeout=60
             )

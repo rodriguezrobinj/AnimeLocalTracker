@@ -28,6 +28,7 @@ class EpisodeFingerprint:
             frame_number = int(timestamp * fps)
             cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number)
             ok, frame = cap.read()
+            width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) if cap.isOpened() else 0
             cap.release()
             if not ok or frame is None:
                 return {"success": False, "error": "no se pudo extraer el frame"}
@@ -43,7 +44,7 @@ class EpisodeFingerprint:
                 "success": True,
                 "hash": f"{hash_val:016x}",
                 "timestamp": timestamp,
-                "width": int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) if cap.isOpened() else 0,
+                "width": width,
             }
         except Exception as ex:
             return {"success": False, "error": str(ex)}

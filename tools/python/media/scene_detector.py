@@ -4,6 +4,8 @@ import shutil
 import subprocess
 from typing import Dict, Any, List, Optional, Tuple
 
+from media.ffmpeg_guard import es_ruta_media_segura, MAX_ALLOC
+
 
 class SceneDetector:
     """Detecta opening/ending en un video local analizando frames con OpenCV.
@@ -203,6 +205,9 @@ class SceneDetector:
         ffmpeg = shutil.which("ffmpeg")
         if not ffmpeg:
             return {"success": False, "error": "ffmpeg no disponible"}
+        # Hardening: solo archivos locales de video
+        if not es_ruta_media_segura(video_path):
+            return {"success": False, "error": "ruta de video no permitida"}
 
         dur = SceneDetector._probe_ffmpeg(video_path)
         search_sec = int(min(max_search_seconds, max(dur if dur else max_search_seconds, 60)))
@@ -210,7 +215,8 @@ class SceneDetector:
         try:
             # Filtro scdet disponible desde ffmpeg 4.4
             cmd = [
-                ffmpeg, "-hide_banner", "-nostats", "-i", video_path,
+                ffmpeg, "-hide_banner", "-nostats", "-nostdin", "-max_alloc", MAX_ALLOC,
+                "-i", video_path,
                 "-t", str(search_sec),
                 "-vf", f"scdet=s=0.30:sc=1,metadata=print:file=-",
                 "-f", "null", "-"
@@ -243,9 +249,13 @@ class SceneDetector:
         ffprobe = shutil.which("ffprobe")
         if not ffprobe:
             return None
+        # Hardening: solo archivos locales de video
+        if not es_ruta_media_segura(video_path):
+            return None
         try:
             result = subprocess.run(
-                [ffprobe, "-v", "error", "-show_entries", "format=duration",
+                [ffprobe, "-nostdin", "-max_alloc", MAX_ALLOC, "-v", "error",
+                 "-show_entries", "format=duration",
                  "-of", "json", video_path],
                 capture_output=True, text=True, timeout=30
             )

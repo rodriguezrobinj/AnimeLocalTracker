@@ -39,6 +39,15 @@ public class AniListPage
     // NUEVO: Para recibir el calendario de emisiones
     [JsonPropertyName("airingSchedules")]
     public List<AiringScheduleNode>? AiringSchedules { get; set; }
+
+    [JsonPropertyName("pageInfo")]
+    public AniListPageInfo? PageInfo { get; set; }
+}
+
+public class AniListPageInfo
+{
+    [JsonPropertyName("hasNextPage")]
+    public bool HasNextPage { get; set; }
 }
 
 public class AiringScheduleNode

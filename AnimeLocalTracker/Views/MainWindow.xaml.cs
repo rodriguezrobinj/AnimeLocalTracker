@@ -1,78 +1,48 @@
-using System.Windows;
-using System.Windows.Controls;
 using System.Runtime.InteropServices;
+using System.Windows;
+using AnimeLocalTracker.Services;
 using AnimeLocalTracker.ViewModels;
 
 namespace AnimeLocalTracker.Views;
 
-public partial class MainWindow : Window
+public partial class MainWindow : Window, IVentanaPrincipal
 {
     public bool IsFullScreen { get; private set; }
 
-    private MainViewModel _viewModel;
     private System.Windows.Shell.WindowChrome? _chromeCache;
 
     public MainWindow(MainViewModel viewModel) 
     {
         InitializeComponent();
-        _viewModel = viewModel;
-        DataContext = _viewModel; 
+        DataContext = viewModel;
 
-        ActualizarVista(_viewModel.VistaActual);
-        _viewModel.PropertyChanged += (s, e) =>
+        // UX-05: al abrir un diálogo modal, el foco se mueve al botón Aceptar para que
+        // el teclado (Enter/Esc) funcione de inmediato y no quede en la página subyacente.
+        viewModel.PropertyChanged += (s, e) =>
         {
-            if (e.PropertyName == nameof(MainViewModel.VistaActual))
+            if (e.PropertyName == nameof(MainViewModel.DialogoVisible) && viewModel.DialogoVisible)
             {
-                ActualizarVista(_viewModel.VistaActual);
+                Dispatcher.BeginInvoke(
+                    System.Windows.Threading.DispatcherPriority.Input,
+                    () => BtnDialogoAceptar?.Focus());
             }
         };
     }
 
-    private readonly System.Collections.Generic.Dictionary<System.Type, System.Windows.Controls.UserControl> _viewCache = new();
-
-    private void ActualizarVista(object? viewModel)
+    /// <summary>
+    /// UX-05: Esc cierra el diálogo abierto (antes el foco podía quedar bajo el overlay
+    /// y Esc llegaba a la página de detrás, p. ej. cerrando el reproductor).
+    /// </summary>
+    private void Window_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
-        if (viewModel == null)
+        if (e.Key == System.Windows.Input.Key.Escape && DataContext is MainViewModel vm && vm.DialogoVisible)
         {
-            ContenedorVistaPrincipal.Content = null;
-            return;
-        }
-
-        var vmType = viewModel.GetType();
-        UserControl? view;
-
-        // ReproductorView aloja una superficie de renderizado nativa Win32/Direct3D (FlyleafHost).
-        // NUNCA debe reutilizarse desde la caché porque su swapchain nativo se destruye al cerrar el player.
-        if (viewModel is ReproductorViewModel)
-        {
-            view = new ReproductorView();
-        }
-        else if (!_viewCache.TryGetValue(vmType, out view))
-        {
-            view = viewModel switch
+            if (vm.CancelarDialogoCommand.CanExecute(null))
             {
-                GaleriaViewModel => new GaleriaView(),
-                DetalleViewModel => new DetalleView(),
-                AgregarAnimeViewModel => new AgregarAnimeView(),
-                CalendarioViewModel => new CalendarioView(),
-                DescargasViewModel => new DescargasView(),
-                ConfiguracionViewModel => new ConfiguracionView(),
-                AcercaDeViewModel => new AcercaDeView(),
-                _ => null
-            };
-
-            if (view != null)
-            {
-                _viewCache[vmType] = view;
+                vm.CancelarDialogoCommand.Execute(null);
             }
+            e.Handled = true;
         }
-
-        if (view != null)
-        {
-            view.DataContext = viewModel;
-        }
-
-        ContenedorVistaPrincipal.Content = view;
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -206,6 +176,16 @@ public partial class MainWindow : Window
         {
             TogglePantallaCompleta();
         }
+    }
+
+    /// <summary>
+    /// ARC-04: devuelve el foco del teclado a la ventana principal (lo usa el
+    /// reproductor al alternar pantalla completa, sin castear a la ventana).
+    /// </summary>
+    public void Enfocar()
+    {
+        Focus();
+        System.Windows.Input.Keyboard.Focus(this);
     }
 
     // ═══════════════════════════════════════════════════════════════

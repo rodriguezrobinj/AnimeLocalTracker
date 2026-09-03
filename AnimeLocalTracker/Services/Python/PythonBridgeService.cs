@@ -7,6 +7,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using AnimeLocalTracker.Core.Native;
 
 namespace AnimeLocalTracker.Services.Python
 {
@@ -61,6 +62,24 @@ namespace AnimeLocalTracker.Services.Python
             if (viaDaemon != null) return viaDaemon;
 
             // 2. Fallback: spawn de proceso one-shot (como antes)
+            return await EjecutarOneShotAsync<TRequest, TResponse>(command, payload, ct);
+        }
+
+        /// <summary>
+        /// Ejecuta un comando en un proceso one-shot dedicado, SIN pasar por el daemon
+        /// persistente (que procesa comandos en serie y se bloquearía con uno largo).
+        /// Si se cancela, el proceso se mata con todo su árbol (yt-dlp/ffmpeg no
+        /// mueren con el Dispose del objeto Process). Para comandos largos como
+        /// download-stream (HLS).
+        /// </summary>
+        public async Task<TResponse?> ExecuteCommandOneShotAsync<TRequest, TResponse>(string command, TRequest payload, CancellationToken ct = default)
+        {
+            return await EjecutarOneShotAsync<TRequest, TResponse>(command, payload, ct);
+        }
+
+        private async Task<TResponse?> EjecutarOneShotAsync<TRequest, TResponse>(string command, TRequest payload, CancellationToken ct)
+        {
+            Process? proceso = null;
             try
             {
                 var psi = new ProcessStartInfo
@@ -88,20 +107,21 @@ namespace AnimeLocalTracker.Services.Python
                     psi.Arguments = $"\"{_cachedScriptPath}\" --command \"{command}\"";
                 }
 
-                using var process = new Process { StartInfo = psi };
-                process.Start();
+                proceso = new Process { StartInfo = psi };
+                proceso.Start();
+                JobObjectHelper.AddProcess(proceso);
 
                 // Enviar payload JSON por stdin
                 string jsonInput = JsonSerializer.Serialize(payload, JsonOptions);
-                await process.StandardInput.WriteLineAsync(jsonInput);
-                await process.StandardInput.FlushAsync();
-                process.StandardInput.Close();
+                await proceso.StandardInput.WriteLineAsync(jsonInput);
+                await proceso.StandardInput.FlushAsync(ct);
+                proceso.StandardInput.Close();
 
                 // Leer respuesta JSON por stdout
-                string output = await process.StandardOutput.ReadToEndAsync(ct);
-                string error = await process.StandardError.ReadToEndAsync(ct);
+                string output = await proceso.StandardOutput.ReadToEndAsync(ct);
+                string error = await proceso.StandardError.ReadToEndAsync(ct);
 
-                await process.WaitForExitAsync(ct);
+                await proceso.WaitForExitAsync(ct);
 
                 if (!string.IsNullOrWhiteSpace(error))
                 {
@@ -120,10 +140,22 @@ namespace AnimeLocalTracker.Services.Python
                 }
                 return res;
             }
+            catch (OperationCanceledException)
+            {
+                // SEC-16/DATA-01: cancelación → matar el árbol completo; el proceso
+                // Python (yt-dlp/ffmpeg) no muere con el Dispose del objeto Process
+                // y quedaría huérfano descargando/escribiendo en disco.
+                try { proceso?.Kill(entireProcessTree: true); } catch { }
+                throw;
+            }
             catch (Exception ex)
             {
                 AppLogger.Error("PythonBridge", $"Error ejecutando comando Python '{command}': {ex.Message}", ex);
                 return default;
+            }
+            finally
+            {
+                proceso?.Dispose();
             }
         }
 
@@ -204,11 +236,16 @@ namespace AnimeLocalTracker.Services.Python
         /// de la app) para que el daemon encuentre herramientas como ffmpeg instaladas por winget
         /// en WinGet\Links o los binarios ffmpeg.exe/ffprobe.exe distribuidos en la carpeta FFmpeg/ de la app.
         /// </summary>
-        private static bool _daemonDescartado;
+        /// <summary>
+        /// INT-04: en vez de descartar el daemon PARA SIEMPRE tras un handshake fallido, se
+        /// reintenta después de una pausa (backoff de 10 min). Un onefile lento que no llega
+        /// a saludar a tiempo puede lograrlo en el siguiente intento.
+        /// </summary>
+        private static DateTime _daemonProximoIntento = DateTime.MinValue;
 
         private async Task<bool> EnsureDaemonStartedAsync(CancellationToken ct)
         {
-            if (_daemonDescartado) return false;
+            if (DateTime.UtcNow < _daemonProximoIntento) return false;
             if (_daemonProcess != null && !_daemonProcess.HasExited)
                 return true;
 
@@ -217,7 +254,6 @@ namespace AnimeLocalTracker.Services.Python
             if (string.IsNullOrEmpty(_cachedExecutablePath))
             {
                 AppLogger.Debug("PythonBridge", "Daemon no disponible (sin ejecutable compilado); se usará el modo one-shot.");
-                _daemonDescartado = true;
                 return false;
             }
 
@@ -241,22 +277,46 @@ namespace AnimeLocalTracker.Services.Python
 
                 var proc = new Process { StartInfo = psi };
                 proc.Start();
+                JobObjectHelper.AddProcess(proc);
                 _daemonProcess = proc;
                 _daemonOut = proc.StandardOutput;
                 _daemonIn = proc.StandardInput;
 
-                // Consumir el saludo de forma no bloqueante antes del primer comando
+                // Consumir el saludo de forma no bloqueante antes del primer comando.
+                // INT-04: 20 s de margen (la extracción onefile + imports puede superar los 8 s).
                 using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                linkedCts.CancelAfter(TimeSpan.FromSeconds(8));
+                linkedCts.CancelAfter(TimeSpan.FromSeconds(20));
                 try
                 {
-                    _ = await _daemonOut.ReadLineAsync(linkedCts.Token).ConfigureAwait(false);
+                    string? greetingLine = await _daemonOut.ReadLineAsync(linkedCts.Token).ConfigureAwait(false);
+                    if (string.IsNullOrWhiteSpace(greetingLine))
+                    {
+                        throw new InvalidOperationException("Daemon cerró el stream de salida sin saludar.");
+                    }
+
+                    // INT-02: Validar la versión del protocolo para evitar desajustes ocultos.
+                    using var doc = JsonDocument.Parse(greetingLine);
+                    if (doc.RootElement.TryGetProperty("protocolVersion", out var prop))
+                    {
+                        if (prop.GetInt32() != 1)
+                        {
+                            throw new InvalidOperationException($"El daemon devolvió protocolVersion={prop.GetInt32()}, pero se esperaba 1.");
+                        }
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException("El saludo del daemon no incluyó protocolVersion.");
+                    }
+
+                    _daemonProximoIntento = DateTime.MinValue;
                     return true;
                 }
-                catch
+                catch (Exception initEx)
                 {
-                    // El daemon no saludó a tiempo: descartarlo para esta sesión y usar one-shot.
-                    _daemonDescartado = true;
+                    // El daemon no saludó a tiempo, crasheó o devolvió versión errónea:
+                    // backoff de 10 min (INT-04) y one-shot de respaldo mientras tanto.
+                    AppLogger.Warn("PythonBridge", $"Fallo en handshake del daemon: {initEx.Message}. Se usará modo one-shot y se reintentará en unos minutos.");
+                    _daemonProximoIntento = DateTime.UtcNow.AddMinutes(10);
                     CleanupDaemon();
                     return false;
                 }
@@ -264,7 +324,7 @@ namespace AnimeLocalTracker.Services.Python
             catch (Exception ex)
             {
                 AppLogger.Debug("PythonBridge", $"No se pudo iniciar el daemon Python: {ex.Message}");
-                _daemonDescartado = true;
+                _daemonProximoIntento = DateTime.UtcNow.AddMinutes(10);
                 _daemonProcess = null;
                 _daemonOut = null;
                 _daemonIn = null;
@@ -286,6 +346,7 @@ namespace AnimeLocalTracker.Services.Python
 
         public void Dispose()
         {
+            GC.SuppressFinalize(this);
             CleanupDaemon();
         }
 

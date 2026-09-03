@@ -16,6 +16,14 @@ public partial class App : Application
     // Este es nuestro contenedor global de dependencias
     public static IServiceProvider ServiceProvider { get; private set; } = null!;
 
+    /// <summary>DTO del veredicto de nombres del daemon (match-media).</summary>
+    private sealed class MatchMediaResult
+    {
+        public bool Success { get; set; }
+        public double Score { get; set; }
+        public string? MatchedTitle { get; set; }
+    }
+
     public App()
     {
         try
@@ -30,7 +38,7 @@ public partial class App : Application
         var services = new ServiceCollection();
         ConfigureServices(services);
         ServiceProvider = services.BuildServiceProvider();
-        
+
         // === MANEJADORES GLOBALES DE EXCEPCIONES ===
         
         // 1. Excepciones no manejadas en el hilo de UI (Dispatcher)
@@ -79,15 +87,13 @@ public partial class App : Application
         };
     }
 
-    private void ConfigureServices(IServiceCollection services)
+    internal static void ConfigureServices(IServiceCollection services)
     {
-        // 1. Registramos las Vistas (Ventanas)
-        services.AddTransient<MainWindow>();
-        services.AddTransient<AgregarAnimeView>();
-        services.AddTransient<ReproductorView>();
-        services.AddTransient<DescargasView>();
-        services.AddTransient<ConfiguracionView>();
-        services.AddTransient<AcercaDeView>();
+        // 1. Ventana principal (ARC-04): las vistas de página ya NO se registran en DI —
+        // se resuelven con las DataTemplates VM→Vista de App.xaml (los registros estaban
+        // muertos: MainWindow las creaba con `new` y nunca se resolvían).
+        services.AddSingleton<MainWindow>();
+        services.AddSingleton<IVentanaPrincipal>(sp => sp.GetRequiredService<MainWindow>());
 
         // 2. Registramos los ViewModels (Vistas principales como Singleton para preservar estado y no repetir queries al cambiar de pestaña)
         services.AddTransient<MainViewModel>();
@@ -100,12 +106,21 @@ public partial class App : Application
         services.AddSingleton<ConfiguracionViewModel>();
         services.AddSingleton<AcercaDeViewModel>();
 
+        // ARC-02: la navegación resuelve ViewModels a través de un único servicio;
+        // los ViewModels ya no reciben IServiceProvider.
+        services.AddSingleton<INavigationService, NavigationService>();
+
         // 3. Aquí registraremos los Servicios
         services.AddSingleton<ISettingsService, SettingsService>();
         services.AddSingleton<IDialogService, DialogService>();
         services.AddSingleton<IAuthService, AuthService>();
-        services.AddTransient<IFileScannerService, FileScannerService>();
         services.AddHttpClient();
+
+        // SEC-03: el cliente "Downloader" (scraper + descargas) no sigue redirects a ciegas:
+        // cada salto se valida con UrlSeguridad (solo https, sin credenciales embebidas).
+        services.AddHttpClient("Downloader")
+            .ConfigurePrimaryHttpMessageHandler(() => new System.Net.Http.HttpClientHandler { AllowAutoRedirect = false })
+            .AddHttpMessageHandler(() => new RedirectSeguroHandler());
         services.AddSingleton<IDownloadService, DownloadService>();
         
         // IHttpClientFactory nativo con Polly para Rate Limiting
@@ -129,12 +144,75 @@ public partial class App : Application
 
         // Orquestación de skip-times (resolución MAL ID + reglas de evaluación)
         services.AddSingleton<ISkipTimesCoordinator, SkipTimesCoordinator>();
+        services.AddSingleton<IMediaEnrichmentService, MediaEnrichmentService>();
 
         // 4. Integración del Ecosistema de Automatización Python (Zero-Setup & Clean Architecture)
         services.AddSingleton<IPythonBridgeService, PythonBridgeService>();
         services.AddSingleton<PythonEpisodeEnricher>();
         services.AddTransient<IFileScannerService, PythonFileScannerService>();
-        services.AddSingleton<IVideoSourceResolver, PythonVideoSourceResolver>();
+        // ── PROVEEDORES DE VIDEO (Fase A multi-fuente) ──
+        // La app ya no depende de una sola fuente: cada proveedor es un
+        // IProveedorVideo intercambiable y el orquestador los prueba por
+        // prioridad con degradación por salud (fallos → cooldown → reintento).
+        services.AddSingleton<AnimeAv1VideoSourceResolver>(sp =>
+        {
+            var http = sp.GetRequiredService<IHttpClientFactory>().CreateClient("Downloader");
+            // Anti-confusión: AniListId → MAL ID para verificar que la página del
+            // episodio es del anime correcto (nombres parecidos ya no descargan
+            // episodios equivocados).
+            var aniSkip = sp.GetRequiredService<IAniSkipService>();
+            var bridge = sp.GetRequiredService<IPythonBridgeService>();
+            var tracking = sp.GetRequiredService<IAnimeTrackingService>();
+
+            return new AnimeAv1VideoSourceResolver(
+                http,
+                (id, ct) => aniSkip.ObtenerMalIdDesdeAniListAsync(id, ct),
+                // Veredicto de nombres con rapidfuzz (daemon Python) sobre título+aka
+                async (titles, candidates, ct) =>
+                {
+                    try
+                    {
+                        if (!await bridge.IsAvailableAsync()) return null;
+                        var r = await bridge.ExecuteCommandAsync<object, MatchMediaResult>(
+                            "match-media",
+                            new { titles, candidates, threshold = 75.0 },
+                            ct);
+                        return r?.Success == true ? r.Score / 100.0 : null;
+                    }
+                    catch
+                    {
+                        return null;
+                    }
+                },
+                // Títulos adicionales desde AniList: native japonés, synonyms, etc.
+                // — la búsqueda no depende de lo que la biblioteca local guarde
+                async (id, ct) =>
+                {
+                    try
+                    {
+                        var anime = await tracking.ObtenerAnimePorIdAsync(id);
+                        if (anime?.Title == null) return (List<string>?)null;
+
+                        var titulos = new List<string>();
+                        if (!string.IsNullOrWhiteSpace(anime.Title.Romaji)) titulos.Add(anime.Title.Romaji);
+                        if (!string.IsNullOrWhiteSpace(anime.Title.English)) titulos.Add(anime.Title.English!);
+                        if (!string.IsNullOrWhiteSpace(anime.Title.Native)) titulos.Add(anime.Title.Native!);
+                        if (!string.IsNullOrWhiteSpace(anime.Title.UserPreferred)) titulos.Add(anime.Title.UserPreferred!);
+                        if (anime.Synonyms != null) titulos.AddRange(anime.Synonyms.Where(s => !string.IsNullOrWhiteSpace(s)));
+                        return titulos.Distinct().ToList();
+                    }
+                    catch
+                    {
+                        return (List<string>?)null;
+                    }
+                });
+        });
+        services.AddSingleton<ProveedorVideoAnimeAv1>();
+        services.AddSingleton<IVideoSourceResolver>(sp => new OrquestadorMultiProveedor(
+            new IProveedorVideo[]
+            {
+                sp.GetRequiredService<ProveedorVideoAnimeAv1>()
+            }));
 
         // Persistencia del estado de descargas segmentadas (.state)
         services.AddSingleton<IDownloadStateStore, DownloadStateStore>();
@@ -144,29 +222,55 @@ public partial class App : Application
 
         // ARQ-02: alta de animes unificada (MainViewModel + AgregarAnimeViewModel)
         services.AddSingleton<AnimeLibraryService>();
+
+        // Mantenimiento de caché (miniaturas/portadas huérfanas)
+        services.AddSingleton<CacheMaintenanceService>();
+
+        // Notificaciones de episodios nuevos
+        services.AddSingleton<NewEpisodeNotifier>();
+
+        // Estadísticas personales
+        services.AddSingleton<EstadisticasViewModel>();
     }
 
     private static Polly.IAsyncPolicy<System.Net.Http.HttpResponseMessage> GetRetryPolicy()
     {
-        return Polly.Extensions.Http.HttpPolicyExtensions
+        var circuitBreaker = Polly.Extensions.Http.HttpPolicyExtensions
             .HandleTransientHttpError()
             .OrResult(msg => msg.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+            .CircuitBreakerAsync(
+                handledEventsAllowedBeforeBreaking: 3,
+                durationOfBreak: TimeSpan.FromMinutes(2),
+                onBreak: (result, timespan) => AppLogger.Warn("AniListTrackingService", $"Circuit Breaker ABIERTO por {timespan.TotalSeconds}s"),
+                onReset: () => AppLogger.Info("AniListTrackingService", "Circuit Breaker RESET CERRADO"),
+                onHalfOpen: () => AppLogger.Info("AniListTrackingService", "Circuit Breaker MEDIO ABIERTO")
+            );
+
+        var random = new Random();
+        var retry = Polly.Extensions.Http.HttpPolicyExtensions
+            .HandleTransientHttpError()
+            .OrResult(msg => msg.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+            // Permitir que el retry no falle de inmediato si el breaker está abierto (espera y reintenta)
+            .Or<Polly.CircuitBreaker.BrokenCircuitException>() 
             .WaitAndRetryAsync(
                 retryCount: 3,
                 sleepDurationProvider: (retryCount, response, context) =>
                 {
                     var delay = TimeSpan.FromSeconds(60); // Por defecto AniList bloquea 1 minuto
-                    if (response.Result?.Headers.RetryAfter?.Delta.HasValue == true)
+                    if (response?.Result?.Headers.RetryAfter?.Delta.HasValue == true)
                     {
                         delay = response.Result.Headers.RetryAfter.Delta.Value.Add(TimeSpan.FromSeconds(1));
                     }
-                    return delay;
+                    // Jitter para evitar thundering herd
+                    return delay.Add(TimeSpan.FromMilliseconds(random.Next(500, 2000)));
                 },
                 onRetryAsync: (outcome, timespan, retryCount, context) =>
                 {
                     System.Diagnostics.Debug.WriteLine($"[AniList Rate Limit] Esperando {timespan.TotalSeconds} segundos. Reintento {retryCount}...");
                     return System.Threading.Tasks.Task.CompletedTask;
                 });
+
+        return Polly.Policy.WrapAsync(retry, circuitBreaker);
     }
 
     private static System.Threading.Mutex? _singleInstanceMutex;
@@ -195,9 +299,24 @@ public partial class App : Application
 
         try
         {
+            // OPS-05: la primera línea del log identifica versión y entorno del binario
+            // (antes no había forma de saber qué build produjo un app.log).
+            string versionApp = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "desconocida";
+            string arquitectura = System.Environment.Is64BitProcess ? "x64" : "x86";
+            AppLogger.Info("App", $"AnimeLocalTracker iniciando (versión {versionApp}, {arquitectura}).");
+
             // Migrar datos del layout de instalación antiguo (%LocalAppData%\AnimeLocalTracker)
             // a la carpeta segura de datos, ANTES de inicializar la base de datos.
             AppDataPaths.MigrarDesdeInstalacionAntigua();
+
+            // Aplicar el idioma guardado (ES/EN) antes de construir la UI
+            ISettingsService? settingsService = null;
+            try
+            {
+                settingsService = ServiceProvider.GetRequiredService<ISettingsService>();
+                LocalizationService.Instance.Idioma = settingsService.ObtenerConfiguracion()?.Idioma ?? "es";
+            }
+            catch { }
 
             // Pedimos la instancia del servicio de base de datos
             var dbService = ServiceProvider.GetRequiredService<IDatabaseService>();
@@ -220,16 +339,40 @@ public partial class App : Application
             // Obligamos a que se cree el archivo y la tabla antes de continuar
             await dbService.InicializarBaseDatosAsync();
 
-            // Backup rotativo de la biblioteca (protección contra corrupción/pérdida)
-            await dbService.CrearBackupRotativoAsync();
+            // Backup rotativo de la biblioteca (protección contra corrupción/pérdida).
+            // BAK-02: se dispara en segundo plano para no retrasar la aparición de la
+            // ventana; DatabaseService captura y registra sus propios errores.
+            _ = dbService.CrearBackupRotativoAsync();
 
-            // Iniciar sincronización periódica en segundo plano
+            // Iniciar sincronización periódica en segundo plano.
+            // FUN-005: el intervalo es el configurado (ya no 5 min fijos) y se reinicia al guardar.
             var syncService = ServiceProvider.GetRequiredService<ISyncService>();
-            syncService.IniciarSincronizacionPeriodica(TimeSpan.FromMinutes(5));
+            var configuracion = settingsService?.ObtenerConfiguracion();
+            int intervaloMinutos = Math.Clamp(configuracion?.IntervaloSincronizacionMinutos ?? 5, 1, 1440);
+            syncService.IniciarSincronizacionPeriodica(TimeSpan.FromMinutes(intervaloMinutos));
+            if (settingsService != null)
+            {
+                settingsService.ConfiguracionModificada += cfg =>
+                {
+                    if (cfg?.IntervaloSincronizacionMinutos > 0)
+                    {
+                        syncService.IniciarSincronizacionPeriodica(TimeSpan.FromMinutes(cfg.IntervaloSincronizacionMinutos));
+                        AppLogger.Info("App", $"Intervalo de sincronización actualizado a {cfg.IntervaloSincronizacionMinutos} min.");
+                    }
+                };
+            }
 
-            // Iniciar verificación de actualizaciones automáticas en segundo plano
+            // Verificación de actualizaciones automáticas en segundo plano (4 h), salvo que
+            // el usuario la desactive con "Buscar actualizaciones al iniciar".
             var updateService = ServiceProvider.GetRequiredService<IUpdateService>();
-            updateService.IniciarVerificacionSegundoPlano(TimeSpan.FromHours(4));
+            if (configuracion?.BuscarActualizacionesAlIniciar ?? true)
+            {
+                updateService.IniciarVerificacionSegundoPlano(TimeSpan.FromHours(4));
+            }
+            else
+            {
+                AppLogger.Info("App", "Comprobación automática de actualizaciones desactivada por configuración.");
+            }
 
             // Pre-calentar el demonio de Python en segundo plano (Zero-Lag en primera entrada a un anime)
             _ = Task.Run(async () =>
@@ -250,6 +393,11 @@ public partial class App : Application
             // con todas sus dependencias ya inyectadas.
             var mainWindow = ServiceProvider.GetRequiredService<MainWindow>();
             mainWindow.Show();
+
+            // Notificaciones de episodios nuevos: primer chequeo a los 3 s y luego cada
+            // 30 min mientras la app esté abierta (FUN-008: antes solo UNA vez al arrancar).
+            var notifier = ServiceProvider.GetService<NewEpisodeNotifier>();
+            notifier?.IniciarMonitoreoPeriodico(TimeSpan.FromMinutes(30));
         }
         catch (Exception ex)
         {

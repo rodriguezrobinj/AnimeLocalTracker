@@ -277,6 +277,12 @@ public partial class GaleriaViewModel : ObservableObject,
         // la entrega del mensaje al resto de receptores suscritos.
         try
         {
+            if (System.Windows.Application.Current?.Dispatcher is { } d && !d.CheckAccess())
+            {
+                d.InvokeAsync(() => Receive(message));
+                return;
+            }
+
             if (!BibliotecaLocales.Any(a => a.AniListId == message.NuevoAnime.AniListId))
             {
                 message.NuevoAnime.PortadaImagen = _imageCacheService.ObtenerPortada(message.NuevoAnime.AniListId, message.NuevoAnime.UrlPortada);
@@ -362,25 +368,26 @@ public partial class GaleriaViewModel : ObservableObject,
                     a.EpisodiosVistos = 0;
                 }
 
+                // FUN-018: la migración de estado solo persiste cuando el estado CAMBIA de
+                // verdad (antes se escribía la BD por cada anime en cada carga de biblioteca).
                 if (string.IsNullOrEmpty(a.EstadoUsuario) || a.EstadoUsuario == "PLANNING")
                 {
+                    string estadoAnterior = a.EstadoUsuario;
                     int episodiosVistos = a.EpisodiosVistos;
 
                     if (episodiosVistos > 0)
                     {
-                        if (a.TotalEpisodios > 0 && episodiosVistos >= a.TotalEpisodios)
-                        {
-                            a.EstadoUsuario = "COMPLETED";
-                        }
-                        else
-                        {
-                            a.EstadoUsuario = "CURRENT";
-                        }
-                        await _databaseService.ActualizarAnimeAsync(a);
+                        a.EstadoUsuario = (a.TotalEpisodios > 0 && episodiosVistos >= a.TotalEpisodios)
+                            ? "COMPLETED"
+                            : "CURRENT";
                     }
                     else if (string.IsNullOrEmpty(a.EstadoUsuario))
                     {
                         a.EstadoUsuario = "PLANNING";
+                    }
+
+                    if (!string.Equals(estadoAnterior, a.EstadoUsuario, StringComparison.Ordinal))
+                    {
                         await _databaseService.ActualizarAnimeAsync(a);
                     }
                 }
@@ -488,6 +495,7 @@ public partial class GaleriaViewModel : ObservableObject,
                     {
                         var episodios = (await _fileScannerService.EscanearEpisodiosAsync(anime.RutaCarpeta!))
                             .Where(e => !string.IsNullOrWhiteSpace(e.RutaCompleta))
+                            .Where(e => e.NumeroEpisodio > 0) // FUN-004: sin número no es candidato
                             .OrderBy(e => e.NumeroEpisodio)
                             .ToList();
 
@@ -763,6 +771,21 @@ public partial class GaleriaViewModel : ObservableObject,
     private async Task ConectarAniListAsync()
     {
         MenuUsuarioAbierto = false;
+
+        // PRI-02: consentimiento informado ANTES del OAuth — la primera vez se explica
+        // qué se lee y qué se escribe en AniList (antes el navegador se abría sin copy).
+        bool consentimiento = await _dialogService.MostrarDialogoAsync(
+            "Conectar con AniList",
+            "Al conectar, la app podrá:\n\n" +
+            "• LEER tu perfil y tu lista de AniList (títulos y progreso).\n" +
+            "• ESCRIBIR tu progreso (episodios vistos), estado y puntuación cuando los marques.\n\n" +
+            "Tus archivos de video nunca se suben y la app no tiene telemetría.",
+            true,
+            "ShieldAccount",
+            "#60A5FA");
+
+        if (!consentimiento) return;
+
         bool exito = await _authService.IniciarSesionAsync();
         if (exito)
         {
@@ -802,6 +825,7 @@ public partial class GaleriaViewModel : ObservableObject,
             listaAnimes.Select(a => a.AniListId), token);
 
         int procesados = 0;
+        var modificados = new List<Models.AnimeItem>();
         foreach (var anime in listaAnimes)
         {
             procesados++;
@@ -814,6 +838,10 @@ public partial class GaleriaViewModel : ObservableObject,
                 ? datosFrescos.NextAiringEpisode.Episode - 1
                 : (datosFrescos.Episodes ?? 0);
 
+            // PERF-06: detectar cambios y persistir por lote al final (antes 1 UPDATE por anime).
+            bool cambio = anime.TotalEpisodios != episodiosEmitidos
+                          || !string.Equals(anime.Estado, datosFrescos.Status ?? "UNKNOWN", StringComparison.Ordinal);
+
             anime.TotalEpisodios = episodiosEmitidos;
             anime.Estado = datosFrescos.Status ?? "UNKNOWN";
 
@@ -821,10 +849,19 @@ public partial class GaleriaViewModel : ObservableObject,
             // (mediaListEntry del usuario autenticado): sin llamadas extra por anime.
             if (token != null && datosFrescos.MediaListEntry != null && !string.IsNullOrEmpty(datosFrescos.MediaListEntry.Status))
             {
-                anime.EstadoUsuario = datosFrescos.MediaListEntry.Status;
+                if (!string.Equals(anime.EstadoUsuario, datosFrescos.MediaListEntry.Status, StringComparison.Ordinal))
+                {
+                    anime.EstadoUsuario = datosFrescos.MediaListEntry.Status;
+                    cambio = true;
+                }
             }
 
-            await _databaseService.ActualizarAnimeAsync(anime);
+            if (cambio) modificados.Add(anime);
+        }
+
+        if (modificados.Count > 0)
+        {
+            await _databaseService.ActualizarAnimesAsync(modificados);
         }
         
         TextoProgreso = "¡Actualización completada con éxito!";
@@ -867,12 +904,13 @@ public partial class GaleriaViewModel : ObservableObject,
         var seleccionados = BibliotecaLocales.Where(a => a.EstaSeleccionado).ToList();
         if (seleccionados.Count == 0) return;
 
+        // PERF-06: una sola transacción para el lote de seleccionados.
         foreach (var anime in seleccionados)
         {
             anime.EstadoUsuario = nuevoEstado;
-            await _databaseService.ActualizarAnimeAsync(anime);
             anime.EstaSeleccionado = false;
         }
+        await _databaseService.ActualizarAnimesAsync(seleccionados);
 
         ModoSeleccion = false;
         BibliotecaFiltrada?.Refresh();

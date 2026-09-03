@@ -7,31 +7,33 @@ using System.Text.Json.Serialization;
 
 namespace AnimeLocalTracker.Services.Native;
 
-public static class NativeMethods
+public static partial class NativeMethods
 {
     private const string DllName = "animetracker_core.dll";
     private static readonly Lazy<bool> _isAvailable = new(VerificarDisponibilidad);
 
     public static bool IsAvailable => _isAvailable.Value;
 
-    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, EntryPoint = "anitomy_parse")]
-    private static extern IntPtr NativeAnitomyParse(IntPtr input);
+    // ARC-08: LibraryImport source-generated en lugar de DllImport: el stub se genera
+    // en compilación, el puntero nativo se libera siempre en el finally del llamador.
+    [LibraryImport(DllName, EntryPoint = "anitomy_parse")]
+    private static partial IntPtr NativeAnitomyParse(IntPtr input);
 
-    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, EntryPoint = "anitomy_parse_batch")]
-    private static extern IntPtr NativeAnitomyParseBatch(IntPtr inputJsonArray);
+    [LibraryImport(DllName, EntryPoint = "anitomy_parse_batch")]
+    private static partial IntPtr NativeAnitomyParseBatch(IntPtr inputJsonArray);
 
-    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, EntryPoint = "compute_file_fingerprint")]
-    private static extern IntPtr NativeComputeFingerprint(IntPtr videoPath);
+    [LibraryImport(DllName, EntryPoint = "compute_file_fingerprint")]
+    private static partial IntPtr NativeComputeFingerprint(IntPtr videoPath);
 
-    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, EntryPoint = "anitomy_extract_frame")]
+    [LibraryImport(DllName, EntryPoint = "anitomy_extract_frame")]
     [return: MarshalAs(UnmanagedType.I1)]
-    private static extern bool NativeExtractFrame(IntPtr videoPath, IntPtr outPath, double timestamp, int width);
+    private static partial bool NativeExtractFrame(IntPtr videoPath, IntPtr outPath, double timestamp, int width);
 
-    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, EntryPoint = "anitomy_free_string")]
-    private static extern void NativeAnitomyFreeString(IntPtr ptr);
+    [LibraryImport(DllName, EntryPoint = "anitomy_free_string")]
+    private static partial void NativeAnitomyFreeString(IntPtr ptr);
 
-    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, EntryPoint = "anitomy_version")]
-    private static extern IntPtr NativeAnitomyVersion();
+    [LibraryImport(DllName, EntryPoint = "anitomy_version")]
+    private static partial IntPtr NativeAnitomyVersion();
 
     private static bool VerificarDisponibilidad()
     {
@@ -75,7 +77,13 @@ public static class NativeMethods
         {
             string baseDir = AppDomain.CurrentDomain.BaseDirectory;
             string ffmpegDir = Path.Combine(baseDir, "FFmpeg");
-            if (!File.Exists(Path.Combine(ffmpegDir, "ffmpeg.exe"))) return;
+            if (!File.Exists(Path.Combine(ffmpegDir, "ffmpeg.exe")))
+            {
+                // SEC-07: visibilidad — si el ffmpeg embebido falta, el núcleo Rust y el
+                // daemon Python caerían a un "ffmpeg" del PATH del sistema sin avisar.
+                AppLogger.Warn("NativeMethods", "ffmpeg embebido no encontrado en FFmpeg/: miniaturas y daemon dependerán del ffmpeg del PATH del sistema (SEC-07).");
+                return;
+            }
 
             string? current = Environment.GetEnvironmentVariable("PATH");
             var partes = (current ?? string.Empty)
@@ -212,7 +220,10 @@ public static class NativeMethods
 
     private static IntPtr StringToUtf8Ptr(string str)
     {
-        byte[] bytes = System.Text.Encoding.UTF8.GetBytes(str + '\0');
+        // SEC-06: codificación estricta — un string .NET con surrogates sin par no se
+        // convierte silenciosamente a '?': se lanza y el llamador degrada con log
+        // (el contrato FFI espera UTF-8 válido terminado en NUL).
+        byte[] bytes = new System.Text.UTF8Encoding(false, true).GetBytes(str + '\0');
         IntPtr ptr = Marshal.AllocHGlobal(bytes.Length);
         Marshal.Copy(bytes, 0, ptr, bytes.Length);
         return ptr;

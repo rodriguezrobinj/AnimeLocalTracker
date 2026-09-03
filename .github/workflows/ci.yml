@@ -6,10 +6,21 @@ on:
   pull_request:
     branches: [ main ]
 
+# DEV-07: un solo run por rama — un push nuevo cancela el anterior (mismo código) y
+# ninguno puede colgarse más de 45 min (el default de 6 h agota runners sin razón).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# SEC-08: mínimo privilegio — este job solo necesita leer el repo.
+permissions:
+  contents: read
+
 jobs:
   build-and-test:
     name: Build, Test & SCA Security Audit
     runs-on: windows-latest
+    timeout-minutes: 45
 
     steps:
     - name: Checkout Repository
@@ -52,29 +63,80 @@ jobs:
         python -m pip install --upgrade pip
         python -m pip install -e tools/python
 
+    # ARC-14: los tests del daemon Python deben bloquear el CI (hoy solo existían
+    # en local y nadie los ejecutaba).
+    - name: Python Unit Tests (pytest)
+      run: |
+        python -m pip install pytest
+        python -m pytest tools/python/tests -q
+
     # ── SCA BLOQUEANTES (DEV-01): cualquier vulnerabilidad conocida rompe el CI ──
     - name: Cargo Security Audit (Rust SCA)
       working-directory: native/animetracker_core
       run: |
-        cargo install cargo-audit --locked
+        # DEV-01b: versión pineada para runs reproducibles
+        cargo install cargo-audit --locked --version 0.22.2
         cargo audit
 
     - name: Python SCA Audit (pip-audit)
       run: |
-        python -m pip install pip-audit
+        # La imagen de Python de GitHub trae setuptools 65.5.0 (7 CVEs conocidas):
+        # actualizarlo antes de auditar, si no el audit falla por el entorno, no por el proyecto
+        python -m pip install --upgrade setuptools pip
+        # DEV-01b: versión pineada para runs reproducibles
+        python -m pip install pip-audit==2.10.1
         pip-audit
 
     - name: NuGet SCA Audit (dotnet)
-      run: dotnet list AnimeLocalTracker/AnimeLocalTracker.csproj package --vulnerable --include-transitive
+      run: |
+        dotnet restore AnimeLocalTracker/AnimeLocalTracker.csproj --nologo
+        dotnet list AnimeLocalTracker/AnimeLocalTracker.csproj package --vulnerable --include-transitive
+
+    # SEC-09: el proyecto de tests también se audita (arrastraba transitivas
+    # vulnerables System.Net.Http/Text.RegularExpressions 4.3.0 fuera del radar).
+    - name: NuGet SCA Audit (dotnet Tests)
+      run: |
+        dotnet restore AnimeLocalTracker.Tests/AnimeLocalTracker.Tests.csproj --nologo
+        dotnet list AnimeLocalTracker.Tests/AnimeLocalTracker.Tests.csproj package --vulnerable --include-transitive
 
     - name: Build Rust Native Library
       run: |
         cargo build --release --manifest-path native/animetracker_core/Cargo.toml
         Copy-Item native/animetracker_core/target/release/animetracker_core.dll AnimeLocalTracker/animetracker_core.dll -Force
 
+    # OPS-04: estilo del núcleo Rust con 0 warnings (mismo estándar que .NET en
+    # Directory.Build.props: TreatWarningsAsErrors).
+    - name: Rust Lint (clippy -D warnings)
+      run: cargo clippy --release --manifest-path native/animetracker_core/Cargo.toml -- -D warnings
+
     - name: Build Solution and Run Tests with Coverage
+      env:
+        # DEV-08: builds deterministas en CI (mismos bits que la release)
+        ContinuousIntegrationBuild: 'true'
       run: |
         powershell -ExecutionPolicy Bypass -File .\build.ps1 -RunTests -Coverage
+
+    # OPS-08: umbrales de cobertura de líneas (45%) y ramas (30%). Medido 2026-09-01:
+    # 46.9% líneas / 34.3% ramas. SUBIR estos umbrales conforme crezca la cobertura.
+    - name: Check Coverage Threshold (>= 45% lines, >= 30% branches)
+      shell: powershell
+      run: |
+        $cov = Get-ChildItem "AnimeLocalTracker.Tests/TestResults" -Recurse -Filter "coverage.cobertura.xml" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+        if (-not $cov) { Write-Host "::error::No se encontró coverage.cobertura.xml"; exit 1 }
+        [xml]$xml = Get-Content $cov.FullName
+        $lineRate = [double]$xml.coverage.'line-rate'
+        $branchRate = [double]$xml.coverage.'branch-rate'
+        $linePct = [math]::Round($lineRate * 100, 1)
+        $branchPct = [math]::Round($branchRate * 100, 1)
+        Write-Host "Cobertura: $linePct% líneas / $branchPct% ramas (umbrales: 45% / 30%)"
+        if ($lineRate -lt 0.45) {
+          Write-Host "::error::Cobertura de líneas por debajo del umbral ($linePct% < 45%)"
+          exit 1
+        }
+        if ($branchRate -lt 0.30) {
+          Write-Host "::error::Cobertura de ramas por debajo del umbral ($branchPct% < 30%)"
+          exit 1
+        }
 
     - name: Upload Test Results and Coverage Report
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

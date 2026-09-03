@@ -24,7 +24,7 @@ public record LogEntry(DateTime Timestamp, string Level, string Source, string M
 /// </summary>
 public static class AppLogger
 {
-    private static readonly string LogDirectory = AppDataPaths.LogsDir;
+    private static readonly string LogDirectory = Environment.GetEnvironmentVariable("ANIMELOCALTRACKER_LOG_DIR") ?? AppDataPaths.LogsDir;
     private static readonly string LogPath = Path.Combine(LogDirectory, "app.log");
 
     private const int MaxInMemoryLogs = 500;
@@ -59,6 +59,10 @@ public static class AppLogger
 
     private static void Log(string level, string source, string message, string? exceptionDetails = null)
     {
+        // SEC-12: nunca volcar rutas completas del perfil del usuario en los logs.
+        message = Sanitizar(message);
+        exceptionDetails = Sanitizar(exceptionDetails);
+
         var entry = new LogEntry(DateTime.Now, level, source, message, exceptionDetails);
 
         _recentLogs.Enqueue(entry);
@@ -194,5 +198,37 @@ public static class AppLogger
         {
             System.Diagnostics.Debug.WriteLine($"[AppLogger] No se pudo rotar el log: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// SEC-12: sustituye las rutas del perfil de usuario por marcadores cortos antes
+    /// de escribir cualquier entrada de log (higiene de privacidad en disco).
+    /// </summary>
+    internal static string Sanitizar(string? texto)
+    {
+        if (string.IsNullOrEmpty(texto)) return texto ?? string.Empty;
+
+        string resultado = texto;
+        try
+        {
+            // Orden importante: %LocalAppData% vive DENTRO del perfil → reemplazarlo primero.
+            string localApp = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            if (!string.IsNullOrEmpty(localApp))
+            {
+                resultado = resultado.Replace(localApp, "<datos>", StringComparison.OrdinalIgnoreCase);
+            }
+
+            string perfil = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            if (!string.IsNullOrEmpty(perfil))
+            {
+                resultado = resultado.Replace(perfil, "<perfil>", StringComparison.OrdinalIgnoreCase);
+            }
+        }
+        catch
+        {
+            // Si el entorno no expone las rutas, se deja el texto tal cual.
+        }
+
+        return resultado;
     }
 }

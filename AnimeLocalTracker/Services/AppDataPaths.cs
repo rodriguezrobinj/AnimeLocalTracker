@@ -22,6 +22,13 @@ public static class AppDataPaths
     public static string ThumbnailsDir { get; } = Path.Combine(DataRoot, "Thumbnails");
     public static string BibliotecaDb { get; } = Path.Combine(DataRoot, "biblioteca.db");
     public static string TokenPath { get; } = Path.Combine(DataRoot, "anilist_token.txt");
+    public static string SettingsPath { get; } = Path.Combine(DataRoot, "settings.json");
+    public static string ReleaseInfoPath { get; } = Path.Combine(DataRoot, "release_info.json");
+
+    /// <summary>Ubicación heredada (pre-v5) de settings y caché de release: %AppData%\AnimeLocalTracker.</summary>
+    private static string RutaRoamingAntigua() => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        "AnimeLocalTracker");
 
     /// <summary>
     /// Migra los datos guardados por versiones antiguas (ubicados dentro del directorio
@@ -80,5 +87,27 @@ public static class AppDataPaths
                 Directory.Move(origen, destino);
         }
         catch { }
+    }
+
+    /// <summary>
+    /// ARQ-02: migra un archivo de la ubicación heredada en %AppData%\AnimeLocalTracker
+    /// (Roaming) a la raíz segura de datos si el destino aún no existe. Best-effort.
+    /// </summary>
+    public static void MigrarArchivoDesdeRoaming(string nombreArchivo, string destino)
+    {
+        try
+        {
+            string origen = Path.Combine(RutaRoamingAntigua(), nombreArchivo);
+            if (File.Exists(origen) && !File.Exists(destino))
+            {
+                Directory.CreateDirectory(DataRoot);
+                File.Copy(origen, destino);
+                AppLogger.Info("AppDataPaths", $"'{nombreArchivo}' migrado de Roaming a la carpeta de datos segura.");
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn("AppDataPaths", $"No se pudo migrar '{nombreArchivo}' desde Roaming: {ex.Message}");
+        }
     }
 }

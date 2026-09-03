@@ -10,7 +10,7 @@ using BenchmarkDotNet.Attributes;
 namespace AnimeLocalTracker.Benchmarks;
 
 [MemoryDiagnoser]
-public class DatabaseBenchmarks
+public class DatabaseBenchmarks : IDisposable
 {
     private string _tempDbPath = null!;
     private DatabaseService _dbService = null!;
@@ -36,9 +36,17 @@ public class DatabaseBenchmarks
     [GlobalCleanup]
     public void Cleanup()
     {
+        Dispose();
+    }
+
+    // CA1001: el benchmark posee DatabaseService (IDisposable)
+    public void Dispose()
+    {
+        GC.SuppressFinalize(this);
         try
         {
-            if (File.Exists(_tempDbPath))
+            _dbService?.Dispose();
+            if (_tempDbPath != null && File.Exists(_tempDbPath))
             {
                 File.Delete(_tempDbPath);
             }

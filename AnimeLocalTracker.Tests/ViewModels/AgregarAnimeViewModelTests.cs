@@ -47,6 +47,7 @@ public class AgregarAnimeViewModelTests : IDisposable
 
     public void Dispose()
     {
+        GC.SuppressFinalize(this);
         try
         {
             if (Directory.Exists(_tempFolder))
@@ -140,6 +141,7 @@ public class AgregarAnimeViewModelTests : IDisposable
         // Arrange
         var animeExistente = new AnimeItem { AniListId = 200, Titulo = "Dungeon Meshi" };
         _dbMock.Setup(d => d.ObtenerTodosLosAnimesAsync()).ReturnsAsync(new List<AnimeItem> { animeExistente });
+        _dbMock.Setup(d => d.ExisteAnimeAsync(It.IsAny<int>())).ReturnsAsync(true); // PERF-03
 
         var sut = CreateSut();
         var item = new AnimeBusquedaItem
@@ -166,6 +168,7 @@ public class AgregarAnimeViewModelTests : IDisposable
         // Arrange
         var animeExistente = new AnimeItem { AniListId = 300, Titulo = "Bleach" };
         _dbMock.Setup(d => d.ObtenerTodosLosAnimesAsync()).ReturnsAsync(new List<AnimeItem> { animeExistente });
+        _dbMock.Setup(d => d.ExisteAnimeAsync(It.IsAny<int>())).ReturnsAsync(true); // PERF-03
 
         var sut = CreateSut();
         var item = new AnimeBusquedaItem

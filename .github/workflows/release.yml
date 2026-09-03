@@ -11,10 +11,17 @@ on:
 permissions:
   contents: write
 
+# DEV-07: nunca dos releases en paralelo; sin cancel-in-progress para no
+# interrumpir una subida a mitad (los runs siguientes se encolan).
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   release:
     name: Build, Test & Publish Release
     runs-on: windows-latest
+    timeout-minutes: 60
 
     steps:
     - name: Checkout Repository
@@ -56,6 +63,37 @@ jobs:
         python -m pip install --upgrade pip
         python -m pip install -e tools/python
 
+    # ARC-14: los tests del daemon Python bloquean también el corte de release.
+    - name: Python Unit Tests (pytest)
+      run: |
+        python -m pip install pytest
+        python -m pytest tools/python/tests -q
+
+    # ── SCA BLOQUEANTES (CI-07/TST-06): la release no se corta con vulnerabilidades
+    # ── conocidas detectadas en el momento del corte ──
+    - name: Cargo Security Audit (Rust SCA)
+      working-directory: native/animetracker_core
+      run: |
+        cargo install cargo-audit --locked --version 0.22.2
+        cargo audit
+
+    - name: Python SCA Audit (pip-audit)
+      run: |
+        python -m pip install --upgrade setuptools pip
+        python -m pip install pip-audit==2.10.1
+        pip-audit
+
+    - name: NuGet SCA Audit (dotnet)
+      run: |
+        dotnet restore AnimeLocalTracker/AnimeLocalTracker.csproj --nologo
+        dotnet list AnimeLocalTracker/AnimeLocalTracker.csproj package --vulnerable --include-transitive
+
+    # SEC-09: el proyecto de tests también se audita en el corte de release.
+    - name: NuGet SCA Audit (dotnet Tests)
+      run: |
+        dotnet restore AnimeLocalTracker.Tests/AnimeLocalTracker.Tests.csproj --nologo
+        dotnet list AnimeLocalTracker.Tests/AnimeLocalTracker.Tests.csproj package --vulnerable --include-transitive
+
     - name: Build Rust Native Library
       run: |
         cargo build --release --manifest-path native/animetracker_core/Cargo.toml
@@ -63,7 +101,56 @@ jobs:
 
     # Gate de calidad: la release no se empaqueta si los tests fallan
     - name: Build Solution and Run Tests
+      env:
+        # DEV-08: builds deterministas en CI (mismos bits en cada release)
+        ContinuousIntegrationBuild: 'true'
       run: powershell -ExecutionPolicy Bypass -File .\build.ps1 -RunTests
+
+    # vpk solo genera el delta si encuentra los paquetes anteriores en Releases/.
+    # En un runner limpio no existen → descargar los nupkg de la release previa.
+    - name: Download Previous Release Assets (para el delta)
+      shell: powershell
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        # DEV-11: el tag previo se elige por orden semver (git tag --sort=-v:refname),
+        # NO por gh release list --limit 1 (podía elegir una release equivocada), y solo
+        # se bajan los *.nupkg (el delta de vpk no necesita Setup.exe/Portable.exe).
+        git fetch --tags --force --quiet
+        $current = $env:GITHUB_REF_NAME
+        $prevTag = $null
+        foreach ($tag in (git tag --sort=-v:refname | Where-Object { $_ -match '^v[0-9]' -and $_ -ne $current })) {
+            if (gh release view $tag --json tagName --jq '.tagName' 2>$null) { $prevTag = $tag; break }
+        }
+        if ($prevTag) {
+          New-Item -ItemType Directory -Path Releases -Force | Out-Null
+          Write-Host "Descargando nupkg de la release previa: $prevTag"
+          gh release download $prevTag --dir Releases --pattern "*.nupkg"
+        } else {
+          Write-Host "Sin release previa: se generará solo el paquete completo."
+        }
+
+    # SEC-05: firma de código. Requiere provisionar el certificado en los secrets
+    # SIGN_CERT_BASE64 / SIGN_CERT_PASSWORD. Sin secrets el paso se omite y la
+    # release sale SIN firmar (bloqueada hasta provisionar el certificado).
+    # NOTA: GitHub no permite referenciar secrets en `if:` — se maneja en el script.
+    - name: Prepare Code Signing Certificate
+      id: cert
+      shell: powershell
+      env:
+        CERT_B64: ${{ secrets.SIGN_CERT_BASE64 }}
+        CERT_PASSWORD: ${{ secrets.SIGN_CERT_PASSWORD }}
+      run: |
+        if (-not $env:CERT_B64) {
+          Write-Host "::error::Sin certificado configurado: la release se genera SIN firma (SEC-05). Abortando empaquetado."
+          exit 1
+        } else {
+          $pfx = Join-Path $env:RUNNER_TEMP "alt.pfx"
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:CERT_B64))
+          Add-Content -Path $env:GITHUB_ENV -Value "SIGN_CERT_PATH=$pfx"
+          Add-Content -Path $env:GITHUB_ENV -Value "SIGN_CERT_PASSWORD=$env:CERT_PASSWORD"
+          Write-Output "cert_ready=true" >> $env:GITHUB_OUTPUT
+        }
 
     - name: Package Velopack Release
       shell: powershell
@@ -72,12 +159,24 @@ jobs:
         Write-Host "Empaquetando versión $version desde tag $env:GITHUB_REF_NAME"
         powershell -ExecutionPolicy Bypass -File .\build_velopack_release.ps1 -Version $version
 
-    - name: Upload to GitHub Release
+    - name: Verify Code Signing
+      if: steps.cert.outputs.cert_ready == 'true'
+      shell: powershell
+      run: |
+        $sig = Get-AuthenticodeSignature "Releases\Setup.exe"
+        if ($sig.Status -ne 'Valid') {
+          Write-Host "::error::Setup.exe no está firmado correctamente ($($sig.Status))"
+          exit 1
+        }
+        Write-Host "Setup.exe firmado correctamente: $($sig.SignerCertificate.Subject)"
+
+    - name: Upload to GitHub Release (Pre-release)
       shell: powershell
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
         $version = $env:GITHUB_REF_NAME.TrimStart('v')
         gh release create $env:GITHUB_REF_NAME Releases/* `
-          --title "AnimeLocalTracker v$version" `
+          --title "AnimeLocalTracker v$version (Pre-release)" `
+          --prerelease `
           --generate-notes

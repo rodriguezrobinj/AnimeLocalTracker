@@ -20,7 +20,8 @@ public partial class DetalleViewModel : ObservableObject,
     IRecipient<UsuarioLogeadoMensaje>, 
     IRecipient<UsuarioDesconectadoMensaje>, 
     IRecipient<EpisodioActualizadoMensaje>,
-    IRecipient<DescargaProgresoMensaje>
+    IRecipient<DescargaProgresoMensaje>,
+    IDisposable
 {
     private readonly IAnimeTrackingService _animeTrackingService;
     private readonly IDatabaseService _databaseService;
@@ -33,6 +34,14 @@ public partial class DetalleViewModel : ObservableObject,
     // Evita pasadas concurrentes de enriquecimiento (entrar/salir de la vista rápido
     // lanzaba varios ExtractFrame simultáneos sobre los mismos archivos).
     private readonly SemaphoreSlim _enriquecimientoGate = new(1, 1);
+
+    // CA1001: el gate de enriquecimiento se libera al descartar el ViewModel
+    // (los transients no los dispone el contenedor; lo hace el GC vía finalizador del semáforo)
+    public void Dispose()
+    {
+        _enriquecimientoGate.Dispose();
+        GC.SuppressFinalize(this);
+    }
     
     [ObservableProperty]
     private AnimeItem? _animeSeleccionado;
@@ -227,7 +236,7 @@ public partial class DetalleViewModel : ObservableObject,
                                 {
                                     var reg = new RegistroEpisodio
                                     {
-                                        AniListId = _animeSeleccionado?.AniListId ?? 0,
+                                        AniListId = AnimeSeleccionado?.AniListId ?? 0,
                                         NumeroEpisodio = episodio.NumeroEpisodio,
                                         RutaArchivo = episodio.RutaCompleta,
                                         Resolucion = episodio.Resolucion,
@@ -240,18 +249,27 @@ public partial class DetalleViewModel : ObservableObject,
                                         ProgresoSegundos = episodio.ProgresoSegundos,
                                         TotalSegundos = episodio.TotalSegundos
                                     };
+
+                                    // FUN-019: si el episodio ya estaba visto o a medias (registro
+                                    // previo sin archivo local), la descarga NO debe resetear ese
+                                    // estado: el guardado solo añade los metadatos del archivo nuevo.
+                                    var registroPrevio = (await _databaseService.ObtenerRegistrosPorAnimeAsync(reg.AniListId).ConfigureAwait(false))
+                                        ?.FirstOrDefault(r => r.NumeroEpisodio == reg.NumeroEpisodio);
+                                    if (registroPrevio != null)
+                                    {
+                                        reg.VistoLocal = registroPrevio.VistoLocal;
+                                        reg.FavoritoLocal = registroPrevio.FavoritoLocal;
+                                        reg.ProgresoSegundos = registroPrevio.ProgresoSegundos;
+                                        reg.TotalSegundos = registroPrevio.TotalSegundos;
+                                        reg.UltimaReproduccion = registroPrevio.UltimaReproduccion;
+                                    }
+
                                     await _databaseService.GuardarRegistroEpisodioAsync(reg).ConfigureAwait(false);
                                 }
                                 catch { }
 
-                                var disp = System.Windows.Application.Current?.Dispatcher;
-                                if (disp != null && !disp.HasShutdownStarted)
-                                {
-                                    _ = disp.InvokeAsync(() =>
-                                    {
-                                        AplicarFiltrosYOrdenamiento();
-                                    });
-                                }
+                                // PERF-01: refresco coalescido (varios pueden completar a la vez)
+                                SolicitarRefrescoEpisodios();
                             }
                         }
                         catch (Exception ex)
@@ -354,6 +372,7 @@ public partial class DetalleViewModel : ObservableObject,
                     Favorito = memoria != null && memoria.FavoritoLocal,
                     ProgresoSegundos = memoria?.ProgresoSegundos ?? 0,
                     TotalSegundos = memoria?.TotalSegundos ?? 0,
+                    UltimaReproduccion = memoria?.UltimaReproduccion ?? DateTime.MinValue,
                     IsDownloading = estaDescargando,
                     DownloadProgress = prog,
                     Resolucion = resolucionCache,
@@ -377,7 +396,7 @@ public partial class DetalleViewModel : ObservableObject,
         AplicarFiltrosYOrdenamiento();
 
         // Enriquecimiento Python (metadata ffprobe + miniaturas) en segundo plano solo para los que falten
-        _ = EnriquecerEpisodiosEnSegundoPlanoAsync(anime.AniListId, AplicarFiltrosYOrdenamiento);
+        _ = EnriquecerEpisodiosEnSegundoPlanoAsync(anime.AniListId);
         _ = CargarProximosEpisodiosDeAniListAsync();
     }
 
@@ -389,7 +408,7 @@ public partial class DetalleViewModel : ObservableObject,
     /// en el hilo de UI (los await del hilo llamador reanudaban en el SynchronizationContext)
     /// y cada episodio lanzaba un proceso ffmpeg síncrono → congelamiento total de la vista.
     /// </summary>
-    private async Task EnriquecerEpisodiosEnSegundoPlanoAsync(int aniListId, Action alTerminar)
+    private async Task EnriquecerEpisodiosEnSegundoPlanoAsync(int aniListId)
     {
         // Coalescing: si ya hay una pasada en curso, no abrir otra en paralelo.
         if (!_enriquecimientoGate.Wait(0)) return;
@@ -439,7 +458,7 @@ public partial class DetalleViewModel : ObservableObject,
                                 var disp = System.Windows.Application.Current?.Dispatcher;
                                 if (disp != null && !disp.HasShutdownStarted)
                                 {
-                                    _ = disp.InvokeAsync(() => alTerminar());
+                                    SolicitarRefrescoEpisodios();
                                 }
                             }
                         }
@@ -454,7 +473,7 @@ public partial class DetalleViewModel : ObservableObject,
                         {
                             foreach (var ep in sinMiniatura)
                             {
-                                await _enricher.GenerarMiniaturaAsync(ep).ConfigureAwait(false);
+                                await _enricher!.GenerarMiniaturaAsync(ep).ConfigureAwait(false);
                                 if (!string.IsNullOrEmpty(ep.RutaMiniatura)) huboCambiosMiniatura = true;
                             }
 
@@ -464,7 +483,7 @@ public partial class DetalleViewModel : ObservableObject,
                                 var disp = System.Windows.Application.Current?.Dispatcher;
                                 if (disp != null && !disp.HasShutdownStarted)
                                 {
-                                    _ = disp.InvokeAsync(() => alTerminar());
+                                    SolicitarRefrescoEpisodios();
                                 }
                             }
                         }
@@ -490,7 +509,7 @@ public partial class DetalleViewModel : ObservableObject,
                             var disp = System.Windows.Application.Current?.Dispatcher;
                             if (disp != null && !disp.HasShutdownStarted)
                             {
-                                _ = disp.InvokeAsync(() => alTerminar());
+                                SolicitarRefrescoEpisodios();
                             }
                         }
 
@@ -499,6 +518,9 @@ public partial class DetalleViewModel : ObservableObject,
                         }
                     }
                 }
+
+                // PERF-05: vaciar el lote de persistencia acumulado del enriquecimiento
+                await VaciarPersistenciaPendienteAsync().ConfigureAwait(false);
             }).ConfigureAwait(false);
         }
         catch (Exception ex)
@@ -511,17 +533,49 @@ public partial class DetalleViewModel : ObservableObject,
         }
     }
 
+    // PERF-01: refrescos coalescidos de la lista de episodios — varios episodios pueden
+    // completar su miniatura casi a la vez; repintar la lista completa por cada uno era
+    // O(N²) en la UI. Un solo refresco por ráfaga vía el Dispatcher.
+    private bool _refrescoListaEpisodiosPendiente;
+
+    private void SolicitarRefrescoEpisodios()
+    {
+        if (_refrescoListaEpisodiosPendiente) return;
+        _refrescoListaEpisodiosPendiente = true;
+
+        var disp = System.Windows.Application.Current?.Dispatcher;
+        if (disp == null || disp.HasShutdownStarted)
+        {
+            _refrescoListaEpisodiosPendiente = false;
+            return;
+        }
+
+        _ = disp.InvokeAsync(() =>
+        {
+            _refrescoListaEpisodiosPendiente = false;
+            AplicarFiltrosYOrdenamiento();
+        });
+    }
+
+    // PERF-05: la persistencia del enriquecimiento se acumula y se escribe por lotes
+    // (antes 1 SELECT + 1 write por episodio; ahora 1 transacción por lote de 20).
+    private readonly object _persistenciaLock = new();
+    private readonly List<RegistroEpisodio> _persistenciaPendiente = new();
+    private const int PersistenciaLoteMax = 20;
+
     /// <summary>
     /// Persiste los episodios con miniatura/metadata recién generada en SQLite para
     /// que las siguientes visitas al anime sean instantáneas (sin regenerar).
     /// </summary>
     private async Task PersistirRegistrosAsync(int aniListId, IEnumerable<EpisodioItem> episodios)
     {
-        foreach (var ep in episodios)
+        List<RegistroEpisodio>? loteAEnviar = null;
+
+        lock (_persistenciaLock)
         {
-            try
+            foreach (var ep in episodios)
             {
-                var registro = new RegistroEpisodio
+                _persistenciaPendiente.Add(new RegistroEpisodio
                 {
                     AniListId = aniListId,
                     NumeroEpisodio = ep.NumeroEpisodio,
@@ -535,10 +589,46 @@ public partial class DetalleViewModel : ObservableObject,
                     FavoritoLocal = ep.Favorito,
                     ProgresoSegundos = ep.ProgresoSegundos,
                     TotalSegundos = ep.TotalSegundos
-                };
-                await _databaseService.GuardarRegistroEpisodioAsync(registro).ConfigureAwait(false);
+                });
             }
-            catch { }
+
+            if (_persistenciaPendiente.Count >= PersistenciaLoteMax)
+            {
+                loteAEnviar = new List<RegistroEpisodio>(_persistenciaPendiente);
+                _persistenciaPendiente.Clear();
+            }
+        }
+
+        if (loteAEnviar != null)
+        {
+            try
+            {
+                await _databaseService.GuardarRegistrosEpisodioBulkAsync(loteAEnviar).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Debug("DetalleViewModel", $"Error persistiendo lote de enriquecimiento: {ex.Message}");
+            }
+        }
+    }
+
+    private async Task VaciarPersistenciaPendienteAsync()
+    {
+        List<RegistroEpisodio>? pendiente = null;
+        lock (_persistenciaLock)
+        {
+            if (_persistenciaPendiente.Count == 0) return;
+            pendiente = new List<RegistroEpisodio>(_persistenciaPendiente);
+            _persistenciaPendiente.Clear();
+        }
+
+        try
+        {
+            await _databaseService.GuardarRegistrosEpisodioBulkAsync(pendiente).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("DetalleViewModel", $"Error vaciando persistencia de enriquecimiento: {ex.Message}");
         }
     }
 
@@ -646,25 +736,8 @@ public partial class DetalleViewModel : ObservableObject,
             return;
         }
 
-        var query = _todosLosEpisodios.AsEnumerable();
-
-        switch (FiltroEpisodios)
-        {
-            case "Descargados":
-                query = query.Where(e => e.Descargado);
-                break;
-            case "Vistos":
-                query = query.Where(e => e.Visto);
-                break;
-            case "No Vistos":
-                query = query.Where(e => !e.Visto);
-                break;
-            case "Favoritos":
-                query = query.Where(e => e.Favorito);
-                break;
-        }
-
-        query = OrdenAscendente ? query.OrderBy(e => e.NumeroEpisodio) : query.OrderByDescending(e => e.NumeroEpisodio);
+        // ARQ-01: filtrado/orden delegados a la lógica pura extraída (testeable sin UI)
+        var query = Core.EpisodiosOrganizador.FiltrarYOrdenar(_todosLosEpisodios, FiltroEpisodios, OrdenAscendente);
 
         EpisodiosDelAnime.Clear();
         foreach (var ep in query) EpisodiosDelAnime.Add(ep);
@@ -676,6 +749,90 @@ public partial class DetalleViewModel : ObservableObject,
         }
 
         TieneCapituloEnProgreso = _todosLosEpisodios != null && _todosLosEpisodios.Any(e => e.TieneProgresoGuardado);
+    }
+
+    /// <summary>
+    /// Abre la CARPETA DEL ANIME en el Explorador (acción única de nivel anime,
+    /// no por episodio — evita saturar la lista de episodios).
+    /// </summary>
+    [RelayCommand]
+    private void AbrirCarpetaAnime()
+    {
+        if (AnimeSeleccionado == null || string.IsNullOrWhiteSpace(AnimeSeleccionado.RutaCarpeta))
+        {
+            _ = _dialogService.MostrarDialogoAsync("Carpeta no encontrada", "El anime no tiene una carpeta local asociada.", false, "AlertCircleOutline", "#F59E0B");
+            return;
+        }
+        if (!Directory.Exists(AnimeSeleccionado.RutaCarpeta))
+        {
+            _ = _dialogService.MostrarDialogoAsync("Carpeta no encontrada", "La carpeta del anime ya no existe en disco.", false, "AlertCircleOutline", "#F59E0B");
+            return;
+        }
+
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "explorer.exe",
+                Arguments = $"\"{AnimeSeleccionado.RutaCarpeta}\"",
+                UseShellExecute = false
+            });
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("DetalleViewModel", $"Error abriendo carpeta del anime: {ex.Message}");
+        }
+    }
+
+    [RelayCommand]
+    private async Task EliminarEpisodio(EpisodioItem episodio)
+    {
+        if (episodio == null || !episodio.Descargado || string.IsNullOrWhiteSpace(episodio.RutaCompleta)) return;
+
+        bool confirmar = await _dialogService.MostrarDialogoAsync(
+            "Eliminar episodio",
+            $"¿Eliminar el archivo del episodio {episodio.NumeroEpisodio}?\n\nSe borrará del disco y no podrá recuperarse.",
+            true, "DeleteOutline", "#EF4444");
+        if (!confirmar) return;
+
+        string rutaArchivo = episodio.RutaCompleta;
+        string rutaMiniatura = PythonEpisodeEnricher.ObtenerRutaMiniaturaEsperada(rutaArchivo);
+
+        // 1. Borrar el archivo de video
+        try { if (File.Exists(rutaArchivo)) File.Delete(rutaArchivo); }
+        catch (Exception ex) { AppLogger.Debug("DetalleViewModel", $"No se pudo borrar archivo del episodio: {ex.Message}"); }
+
+        // 2. Borrar su miniatura
+        try { if (File.Exists(rutaMiniatura)) File.Delete(rutaMiniatura); } catch { }
+
+        // 3. Quitar el registro de la base de datos
+        try
+        {
+            await _databaseService.EliminarRegistroEpisodioAsync(AnimeSeleccionado?.AniListId ?? 0, episodio.NumeroEpisodio);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("DetalleViewModel", $"No se pudo eliminar el registro del episodio: {ex.Message}");
+        }
+
+        // 4. Reiniciar el estado del item en la UI
+        episodio.Descargado = false;
+        episodio.RutaCompleta = string.Empty;
+        episodio.RutaMiniatura = null;
+        episodio.TamanoArchivoFormateado = string.Empty;
+        episodio.Resolucion = string.Empty;
+        episodio.CodecVideo = string.Empty;
+        episodio.Fps = string.Empty;
+        episodio.Es10Bit = false;
+        episodio.ProgresoSegundos = 0;
+        episodio.TotalSegundos = 0;
+        episodio.Visto = false;
+
+        AplicarFiltrosYOrdenamiento();
+
+        await _dialogService.MostrarDialogoAsync("Episodio eliminado",
+            $"El episodio {episodio.NumeroEpisodio} fue eliminado del disco.",
+            false, "CheckCircleOutline", "#4CAF50");
     }
 
     [RelayCommand]
@@ -696,7 +853,28 @@ public partial class DetalleViewModel : ObservableObject,
 
         if (confirmacion)
         {
+            // Opción extra: borrar también los archivos del disco
+            bool borrarArchivos = await _dialogService.MostrarDialogoAsync(
+                "¿Borrar también los archivos?",
+                $"¿Deseas eliminar también la carpeta con los episodios descargados del disco?\n\n'{(string.IsNullOrWhiteSpace(AnimeSeleccionado.RutaCarpeta) ? "sin carpeta local" : AnimeSeleccionado.RutaCarpeta)}'\n\nElige NO para conservar los archivos y solo quitar el anime de la biblioteca.",
+                true, "FolderOutline", "#EF4444");
+
+            string? carpeta = AnimeSeleccionado.RutaCarpeta;
+
             await _databaseService.EliminarAnimeAsync(AnimeSeleccionado);
+
+            if (borrarArchivos && !string.IsNullOrWhiteSpace(carpeta) && Directory.Exists(carpeta))
+            {
+                try
+                {
+                    Directory.Delete(carpeta, recursive: true);
+                }
+                catch (Exception ex)
+                {
+                    AppLogger.Debug("DetalleViewModel", $"No se pudo borrar la carpeta del anime: {ex.Message}");
+                }
+            }
+
             VolverAGaleria();
         }
     }
@@ -793,8 +971,12 @@ public partial class DetalleViewModel : ObservableObject,
     {
         if (_todosLosEpisodios.Count == 0) return;
 
-        // Reproducir el episodio que se dejó a medias con progreso guardado
-        var epEnCurso = _todosLosEpisodios.FirstOrDefault(e => e.TieneProgresoGuardado);
+        // FUN-010: reanudar el episodio dejado a medias MÁS RECIENTE (antes se elegía el de
+        // menor número con progreso, ignorando UltimaReproduccion).
+        var epEnCurso = _todosLosEpisodios
+            .Where(e => e.TieneProgresoGuardado)
+            .OrderByDescending(e => e.UltimaReproduccion)
+            .FirstOrDefault();
         if (epEnCurso != null)
         {
             await ReproducirEpisodio(epEnCurso);
@@ -909,6 +1091,8 @@ public partial class DetalleViewModel : ObservableObject,
             var titulosAlt = new List<string>();
             if (!string.IsNullOrWhiteSpace(datosFrescos.Title.English)) titulosAlt.Add(datosFrescos.Title.English);
             if (!string.IsNullOrWhiteSpace(datosFrescos.Title.UserPreferred) && datosFrescos.Title.UserPreferred != datosFrescos.Title.Romaji) titulosAlt.Add(datosFrescos.Title.UserPreferred);
+            // El título nativo (japonés) es clave para el catálogo del sitio (aka ja-jp)
+            if (!string.IsNullOrWhiteSpace(datosFrescos.Title.Native)) titulosAlt.Add(datosFrescos.Title.Native!);
             if (datosFrescos.Synonyms != null) titulosAlt.AddRange(datosFrescos.Synonyms.Where(s => !string.IsNullOrWhiteSpace(s)));
             AnimeSeleccionado.NombresAlternativos = string.Join(" | ", titulosAlt.Distinct());
 

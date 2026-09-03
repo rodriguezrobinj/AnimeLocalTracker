@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using SQLite;
+using System.Text.Json.Serialization;
 
 namespace AnimeLocalTracker.Models;
 
@@ -51,16 +52,19 @@ public partial class AnimeItem : ObservableObject
 #pragma warning disable CS0657 // 'property' target is forwarded to the generated property by CommunityToolkit.Mvvm
     // Estado transitorio para la UI de Selección Múltiple
     [property: Ignore]
+    [property: JsonIgnore]
     [ObservableProperty]
     private bool _estaSeleccionado;
 
     // Imagen en memoria congelada (optimización 60fps)
     [property: Ignore]
+    [property: JsonIgnore]
     [ObservableProperty]
     private System.Windows.Media.ImageSource? _portadaImagen;
 
     // === PROPIEDADES DE PROGRESO LOCAL ===
     [property: Ignore]
+    [property: JsonIgnore]
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ProgresoPorcentaje))]
     [NotifyPropertyChangedFor(nameof(NuevosEpisodios))]
@@ -70,26 +74,33 @@ public partial class AnimeItem : ObservableObject
 #pragma warning restore CS0657
 
     [Ignore]
+    [JsonIgnore]
     public int NuevosEpisodios => TotalEpisodios > EpisodiosVistos ? (TotalEpisodios - EpisodiosVistos) : 0;
 
     [Ignore]
+    [JsonIgnore]
     public double ProgresoPorcentaje => TotalEpisodios > 0 ? (EpisodiosVistos / (double)TotalEpisodios) * 100 : 0;
 
     [Ignore]
+    [JsonIgnore]
     public bool TieneNuevosEpisodios => NuevosEpisodios > 0;
 
     [Ignore]
+    [JsonIgnore]
     public string ProgresoEpisodiosTexto => $"{EpisodiosVistos} de {TotalEpisodios} vistos";
 
 
     // === PROPIEDADES VISUALES (NO SE GUARDAN EN SQLITE) ===
     [Ignore] 
+    [JsonIgnore]
     public string EstadoVisual => Estado == "RELEASING" ? "En Emisión" : (Estado == "FINISHED" ? "Finalizado" : "Desconocido");
     
     [Ignore] 
+    [JsonIgnore]
     public string ColorEstado => Estado == "RELEASING" ? "#4CAF50" : "#9E9E9E";
     
     [Ignore]
+    [JsonIgnore]
     public string SinopsisLimpia
     {
         get
@@ -110,9 +121,11 @@ public partial class AnimeItem : ObservableObject
     partial void OnSinopsisChanged(string value) => _sinopsisLimpiaCache = null;
 
     [Ignore]
+    [JsonIgnore]
     public bool TieneSinopsisLarga => !string.IsNullOrWhiteSpace(SinopsisLimpia) && (SinopsisLimpia.Length > 150 || SinopsisLimpia.Contains('\n'));
 
     [Ignore]
+    [JsonIgnore]
     public string[] GenerosLista => string.IsNullOrWhiteSpace(Generos) 
         ? [] 
         : Generos.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
@@ -120,7 +133,9 @@ public partial class AnimeItem : ObservableObject
     // === LÓGICA DE CACHÉ DE PORTADAS OFFLINE ===
     private string? _portadaCacheada;
 
+    // IMP-05 / PERF-01: Evitar File.Exists en el getter para no bloquear la UI.
     [Ignore]
+    [JsonIgnore]
     public string PortadaVisible
     {
         get
@@ -128,11 +143,17 @@ public partial class AnimeItem : ObservableObject
             if (_portadaCacheada != null) return _portadaCacheada;
             if (string.IsNullOrWhiteSpace(UrlPortada)) return string.Empty;
             
-            string directory = Services.AppDataPaths.CoversDir;
-            string localPath = System.IO.Path.Combine(directory, $"{AniListId}.jpg");
-            
-            _portadaCacheada = System.IO.File.Exists(localPath) ? localPath : UrlPortada;
-            return _portadaCacheada;
+            return UrlPortada;
+        }
+    }
+
+    public void ResolverPortadaLocal()
+    {
+        if (string.IsNullOrWhiteSpace(UrlPortada)) return;
+        string localPath = System.IO.Path.Combine(Services.AppDataPaths.CoversDir, $"{AniListId}.jpg");
+        if (System.IO.File.Exists(localPath))
+        {
+            _portadaCacheada = localPath;
         }
     }
 

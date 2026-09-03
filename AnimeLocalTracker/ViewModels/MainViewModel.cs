@@ -1,7 +1,6 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
@@ -19,13 +18,15 @@ public partial class MainViewModel : ObservableObject,
     IRecipient<NavegarMensaje_Descargas>,
     IRecipient<NavegarMensaje_Configuracion>,
     IRecipient<NavegarMensaje_AcercaDe>,
+    IRecipient<NavegarMensaje_Estadisticas>,
     IRecipient<AbrirBuscadorMensaje>,
     IRecipient<MostrarDialogoRequestMessage>,
     IRecipient<NavegarMensaje_Reproductor>,
     IRecipient<NavegarMensaje_VolverDelReproductor>,
-    IRecipient<DescargaProgresoMensaje>
+    IRecipient<DescargaProgresoMensaje>,
+    IRecipient<NuevosEpisodiosMensaje>
 {
-    private readonly IServiceProvider _serviceProvider;
+    private readonly INavigationService _navigationService;
     private readonly IAnimeTrackingService _animeTrackingService;
     private readonly AnimeLibraryService _animeLibraryService;
     private readonly IDownloadService _downloadService;
@@ -41,6 +42,7 @@ public partial class MainViewModel : ObservableObject,
     [NotifyPropertyChangedFor(nameof(EsDescargasActivas))]
     [NotifyPropertyChangedFor(nameof(EsConfiguracionActiva))]
     [NotifyPropertyChangedFor(nameof(EsAcercaDeActivo))]
+    [NotifyPropertyChangedFor(nameof(EsEstadisticasActivo))]
     private ObservableObject _vistaActual = null!;
 
     public bool EsGaleriaActiva => VistaActual is GaleriaViewModel || VistaActual is DetalleViewModel;
@@ -49,6 +51,7 @@ public partial class MainViewModel : ObservableObject,
     public bool EsDescargasActivas => VistaActual is DescargasViewModel;
     public bool EsConfiguracionActiva => VistaActual is ConfiguracionViewModel;
     public bool EsAcercaDeActivo => VistaActual is AcercaDeViewModel;
+    public bool EsEstadisticasActivo => VistaActual is EstadisticasViewModel;
 
     // === BADGE DE DESCARGAS ===
     [ObservableProperty]
@@ -89,18 +92,18 @@ public partial class MainViewModel : ObservableObject,
         {
             SetProperty(ref _textoBusqueda, value);
             BusquedaSinResultados = false; // Resetear al escribir
-            EjecutarBusquedaEnVivoAsyncCore(value);
+            _ = EjecutarBusquedaEnVivoAsyncCore(value);
         }
     }
 
     public MainViewModel(
-        IServiceProvider serviceProvider, 
+        INavigationService navigationService, 
         IAnimeTrackingService animeTrackingService, 
         AnimeLibraryService animeLibraryService,
         IDownloadService downloadService,
         IUpdateService updateService)
     {
-        _serviceProvider = serviceProvider;
+        _navigationService = navigationService;
         _animeTrackingService = animeTrackingService;
         _animeLibraryService = animeLibraryService;
         _downloadService = downloadService;
@@ -109,7 +112,7 @@ public partial class MainViewModel : ObservableObject,
         WeakReferenceMessenger.Default.RegisterAll(this);
 
         // Cargamos la vista inicial
-        VistaActual = _serviceProvider.GetRequiredService<GaleriaViewModel>();
+        VistaActual = _navigationService.ObtenerGaleria();
         ActualizarConteoDescargas();
     }
 
@@ -143,6 +146,28 @@ public partial class MainViewModel : ObservableObject,
         ActualizarConteoDescargas();
     }
 
+    public void Receive(NuevosEpisodiosMensaje message)
+    {
+        if (message.Cantidad <= 0) return;
+
+        ToastTitulo = LocalizationService.T("Notif_NuevosEpisodios");
+        ToastMensaje = $"{message.Cantidad} {LocalizationService.T("Notif_ResumenNuevos")}\n{message.Resumen}";
+        ToastIcono = "NewReleases";
+        ToastColor = "#4CAF50";
+        ToastVisible = true;
+
+        // Ocultar automáticamente después de 6 segundos
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(6000);
+                System.Windows.Application.Current?.Dispatcher?.Invoke(() => ToastVisible = false);
+            }
+            catch { }
+        });
+    }
+
     private void ActualizarConteoDescargas()
     {
         System.Windows.Application.Current?.Dispatcher.InvokeAsync(() =>
@@ -158,14 +183,16 @@ public partial class MainViewModel : ObservableObject,
     // ==========================================
     public void Receive(NavegarMensaje_Galeria message)
     {
-        VistaActual = _serviceProvider.GetRequiredService<GaleriaViewModel>();
+        VistaActual = _navigationService.ObtenerGaleria();
     }
 
-    public async void Receive(NavegarMensaje_Detalle message)
+    public void Receive(NavegarMensaje_Detalle message) => _ = InicializarDetalleAsync(message);
+
+    private async Task InicializarDetalleAsync(NavegarMensaje_Detalle message)
     {
         try
         {
-            var detalleVm = _serviceProvider.GetRequiredService<DetalleViewModel>();
+            var detalleVm = _navigationService.CrearDetalle();
             VistaActual = detalleVm;
             await detalleVm.InicializarAsync(message.AnimeSeleccionado);
         }
@@ -177,7 +204,7 @@ public partial class MainViewModel : ObservableObject,
 
     public void Receive(NavegarMensaje_Calendario message)
     {
-        var calendarioVm = _serviceProvider.GetRequiredService<CalendarioViewModel>();
+        var calendarioVm = _navigationService.ObtenerCalendario();
         VistaActual = calendarioVm;
 
         // El calendario es singleton: si la carga inicial falló (red/rate-limit) o está vacío,
@@ -190,17 +217,19 @@ public partial class MainViewModel : ObservableObject,
 
     public void Receive(NavegarMensaje_Descargas message)
     {
-        VistaActual = _serviceProvider.GetRequiredService<DescargasViewModel>();
+        VistaActual = _navigationService.ObtenerDescargas();
     }
 
-    public async void Receive(NavegarMensaje_Reproductor message)
+    public void Receive(NavegarMensaje_Reproductor message) => _ = NavegarAlReproductorAsync(message);
+
+    private async Task NavegarAlReproductorAsync(NavegarMensaje_Reproductor message)
     {
         try
         {
             // Guardar la vista actual antes de navegar al reproductor
             _vistaAnteriorAlReproductor = VistaActual;
 
-            var viewModel = _serviceProvider.GetService<ReproductorViewModel>();
+            var viewModel = _navigationService.CrearReproductor();
             if (viewModel == null) return;
 
             // 1. Crear el objeto Player antes de montar la vista para que FlyleafHost enlace un Player no nulo
@@ -247,20 +276,20 @@ public partial class MainViewModel : ObservableObject,
         }
         else
         {
-            VistaActual = _serviceProvider.GetRequiredService<GaleriaViewModel>();
+            VistaActual = _navigationService.ObtenerGaleria();
         }
     }
 
     [RelayCommand]
     private void NavegarGaleria()
     {
-        VistaActual = _serviceProvider.GetRequiredService<GaleriaViewModel>();
+        VistaActual = _navigationService.ObtenerGaleria();
     }
 
     [RelayCommand]
     private void NavegarAgregarAnime()
     {
-        VistaActual = _serviceProvider.GetRequiredService<AgregarAnimeViewModel>();
+        VistaActual = _navigationService.ObtenerAgregarAnime();
     }
 
     public void Receive(NavegarMensaje_AgregarAnime message)
@@ -271,13 +300,13 @@ public partial class MainViewModel : ObservableObject,
     [RelayCommand]
     private void NavegarCalendario()
     {
-        VistaActual = _serviceProvider.GetRequiredService<CalendarioViewModel>();
+        VistaActual = _navigationService.ObtenerCalendario();
     }
 
     [RelayCommand]
     private void NavegarDescargas()
     {
-        VistaActual = _serviceProvider.GetRequiredService<DescargasViewModel>();
+        VistaActual = _navigationService.ObtenerDescargas();
     }
 
     [RelayCommand]
@@ -285,7 +314,7 @@ public partial class MainViewModel : ObservableObject,
     {
         try
         {
-            VistaActual = _serviceProvider.GetRequiredService<ConfiguracionViewModel>();
+            VistaActual = _navigationService.ObtenerConfiguracion();
         }
         catch (Exception ex)
         {
@@ -305,7 +334,7 @@ public partial class MainViewModel : ObservableObject,
     {
         try 
         {
-            VistaActual = _serviceProvider.GetRequiredService<AcercaDeViewModel>();
+            VistaActual = _navigationService.ObtenerAcercaDe();
         }
         catch (Exception ex)
         {
@@ -316,6 +345,26 @@ public partial class MainViewModel : ObservableObject,
     public void Receive(NavegarMensaje_AcercaDe message)
     {
         NavegarAcercaDe();
+    }
+
+    [RelayCommand]
+    private async Task NavegarEstadisticas()
+    {
+        try
+        {
+            var estadisticasVm = _navigationService.ObtenerEstadisticas();
+            VistaActual = estadisticasVm;
+            await estadisticasVm.CargarEstadisticasAsync();
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("MainViewModel", "Error navegando a estadísticas", ex);
+        }
+    }
+
+    public void Receive(NavegarMensaje_Estadisticas message)
+    {
+        _ = NavegarEstadisticas();
     }
 
     public void Receive(AbrirBuscadorMensaje message)
@@ -444,7 +493,7 @@ public partial class MainViewModel : ObservableObject,
     // LÓGICA DE BÚSQUEDA Y CREACIÓN DE ANIME
     // ==========================================
 
-    private async void EjecutarBusquedaEnVivoAsyncCore(string busqueda)
+    private async Task EjecutarBusquedaEnVivoAsyncCore(string busqueda)
     {
         if (string.IsNullOrWhiteSpace(busqueda) || busqueda.Length < 3)
         {

@@ -43,6 +43,7 @@ public class ViewModelStressAndLifecycleTests
         _downloadMock.Setup(d => d.ObtenerDescargasActivas()).Returns(new List<DescargaItem>());
 
         _dbMock.Setup(d => d.ObtenerTodosLosAnimesAsync()).ReturnsAsync(new List<AnimeItem>());
+        _dbMock.Setup(d => d.ObtenerAnimesLigerosAsync()).ReturnsAsync(new List<AnimeItem>());
         _dbMock.Setup(d => d.ObtenerTodosLosRegistrosAsync()).ReturnsAsync(new List<RegistroEpisodio>());
 
         services.AddSingleton<GaleriaViewModel>();
@@ -50,9 +51,10 @@ public class ViewModelStressAndLifecycleTests
         services.AddSingleton<DescargasViewModel>();
         services.AddSingleton<ConfiguracionViewModel>();
         services.AddSingleton<AnimeLibraryService>();
+        services.AddSingleton<CacheMaintenanceService>();
 
         var sp = services.BuildServiceProvider();
-        var sut = new MainViewModel(sp, _trackingMock.Object, sp.GetRequiredService<AnimeLibraryService>(), _downloadMock.Object, _updateMock.Object);
+        var sut = new MainViewModel(new NavigationService(sp), _trackingMock.Object, sp.GetRequiredService<AnimeLibraryService>(), _downloadMock.Object, _updateMock.Object);
 
         // Act: Conmutar 100 veces entre todas las vistas principales
         for (int i = 0; i < 100; i++)
@@ -84,6 +86,7 @@ public class ViewModelStressAndLifecycleTests
         }).ToList();
 
         _dbMock.Setup(d => d.ObtenerTodosLosAnimesAsync()).ReturnsAsync(animes);
+        _dbMock.Setup(d => d.ObtenerAnimesLigerosAsync()).ReturnsAsync(animes);
 
         DateTime lunes = DateTime.UtcNow.Date;
         while (lunes.DayOfWeek != DayOfWeek.Monday) lunes = lunes.AddDays(-1);

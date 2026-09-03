@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.IO;
 using System.Net.Http;
 using System.Threading;
@@ -9,12 +8,21 @@ using System.Windows.Media.Imaging;
 
 namespace AnimeLocalTracker.Services;
 
-public class ImageCacheService : IImageCacheService
+public class ImageCacheService : IImageCacheService, IDisposable
 {
     private readonly IHttpClientFactory _httpClientFactory;
-    private readonly ConcurrentDictionary<int, ImageSource> _memoryCache = new();
+    // ARQ-04b: LRU real — el acceso marca recientemente usado y la evicción expulsa
+    // la entrada menos usada (antes: Take(16) aproximado que podía expulsar portadas visibles).
+    private readonly LruCache<int, ImageSource> _memoryCache = new(MaxEntradasEnMemoria);
     private readonly SemaphoreSlim _downloadSemaphore = new(6, 6);
     private readonly string _coversDirectory;
+
+    // CA1001: el semáforo de descargas se libera en el cierre de la app (singleton DI)
+    public void Dispose()
+    {
+        _downloadSemaphore.Dispose();
+        GC.SuppressFinalize(this);
+    }
 
     // ~500 portadas a 220px ≈ 135MB. Al superar el tope se limpia el caché completo:
     // recargar desde disco es barato (sin red) y evita crecimiento sin límite en bibliotecas grandes.
@@ -37,6 +45,51 @@ public class ImageCacheService : IImageCacheService
         {
             AppLogger.Warn("ImageCacheService", $"No se pudo crear carpeta de portadas: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// PERF-08: elimina una portada corrupta del disco (decode fallido). Se invoca una
+    /// sola vez por archivo; la siguiente visita la re-descarga desde la red.
+    /// </summary>
+    private static void EliminarPortadaCorrupta(string localPath)
+    {
+        try
+        {
+            if (File.Exists(localPath)) File.Delete(localPath);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("ImageCacheService", $"No se pudo eliminar la portada corrupta {localPath}: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// SEC-04: solo se descargan portadas de la CDN de AniList por https. Sin esta
+    /// restricción, una URL arbitraria (p. ej. de un import JSON) permitiría sondear
+    /// servicios internos de la red local (SSRF limitado).
+    /// </summary>
+    internal static bool EsHostPortadaPermitido(string? url)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)) return false;
+        if (uri.Scheme != Uri.UriSchemeHttps) return false;
+        return uri.Host.Equals("anilist.co", StringComparison.OrdinalIgnoreCase)
+               || uri.Host.EndsWith(".anilist.co", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// SEC-04: valida la firma mágica del archivo (JPEG/PNG/GIF/WebP) ANTES de
+    /// escribirlo a disco: los bytes de una URL comprometida no pueden dejar
+    /// basura arbitraria en la carpeta de portadas.
+    /// </summary>
+    internal static bool EsImagenValida(byte[] bytes)
+    {
+        if (bytes == null || bytes.Length < 12) return false;
+
+        if (bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF) return true; // JPEG
+        if (bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47) return true; // PNG
+        if (bytes[0] == 0x47 && bytes[1] == 0x49 && bytes[2] == 0x46) return true; // GIF
+        return bytes[0] == 0x52 && bytes[1] == 0x49 && bytes[2] == 0x46 && bytes[3] == 0x46 // RIFF....WEBP
+               && bytes[8] == 0x57 && bytes[9] == 0x45 && bytes[10] == 0x42 && bytes[11] == 0x50;
     }
 
     public ImageSource? ObtenerPortada(int animeId, string? urlPortada, int decodeWidth = 220)
@@ -74,17 +127,9 @@ public class ImageCacheService : IImageCacheService
 
     private void GuardarEnCache(int animeId, ImageSource bitmap)
     {
-        // ARQ-04b: al superar el tope se expulsan solo algunas entradas (no el caché completo),
-        // evitando invalidar toda la galería a la vez (recargar desde disco es barato, pero el
-        // Clear() total provocaba re-decode masivo en el arranque de bibliotecas grandes).
-        if (_memoryCache.Count >= MaxEntradasEnMemoria)
-        {
-            foreach (var kv in _memoryCache.Take(16))
-            {
-                _memoryCache.TryRemove(kv.Key, out _);
-            }
-        }
-        _memoryCache[animeId] = bitmap;
+        // ARQ-04b: el LruCache expulsa la entrada menos usada al superar el tope,
+        // evitando invalidar toda la galería a la vez (recargar desde disco es barato).
+        _memoryCache.Set(animeId, bitmap);
     }
 
     public async Task<ImageSource?> ObtenerPortadaAsync(int animeId, string? urlPortada, int decodeWidth = 220)
@@ -103,6 +148,10 @@ public class ImageCacheService : IImageCacheService
                 GuardarEnCache(animeId, diskBitmap);
                 return diskBitmap;
             }
+
+            // PERF-08: archivo corrupto en disco — se elimina UNA vez para que las visitas
+            // siguientes no reintenten el decode fallido (y la re-descarga) en cada visita.
+            EliminarPortadaCorrupta(localPath);
         }
 
         if (string.IsNullOrWhiteSpace(urlPortada)) return null;
@@ -125,8 +174,8 @@ public class ImageCacheService : IImageCacheService
                 }
             }
 
-            if (!Uri.TryCreate(urlPortada, UriKind.Absolute, out var uri) ||
-                (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+            if (!EsHostPortadaPermitido(urlPortada) ||
+                !Uri.TryCreate(urlPortada, UriKind.Absolute, out var uri))
             {
                 return null;
             }
@@ -147,7 +196,7 @@ public class ImageCacheService : IImageCacheService
             byte[] buffer = new byte[81920];
             int bytesRead;
             long totalRead = 0;
-            while ((bytesRead = await responseStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+            while ((bytesRead = await responseStream.ReadAsync(buffer.AsMemory(0, buffer.Length))) > 0)
             {
                 totalRead += bytesRead;
                 if (totalRead > maxBytes)
@@ -159,6 +208,14 @@ public class ImageCacheService : IImageCacheService
             }
 
             byte[] bytes = ms.ToArray();
+
+            // SEC-04: validar firma mágica antes de tocar disco (los bytes se escriben
+            // solo si corresponden a una imagen real).
+            if (!EsImagenValida(bytes))
+            {
+                AppLogger.Warn("ImageCacheService", $"Portada rechazada para anime {animeId}: los bytes descargados no son una imagen válida.");
+                return null;
+            }
 
             try
             {
@@ -190,7 +247,7 @@ public class ImageCacheService : IImageCacheService
 
     public void InvalidarCache(int animeId)
     {
-        _memoryCache.TryRemove(animeId, out _);
+        _memoryCache.Remove(animeId);
     }
 
     private static BitmapSource? CargarBitmapDesdeArchivo(string filePath, int decodeWidth)

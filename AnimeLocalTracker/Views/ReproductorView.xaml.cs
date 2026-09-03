@@ -51,7 +51,7 @@ namespace AnimeLocalTracker.Views
 
         private void ReproductorView_Loaded(object sender, RoutedEventArgs e)
         {
-            DesactivarDobleClickFullscreenHost();
+            DesactivarInteraccionNativaDelHost();
 
             // Suscribir al pipeline global de input DESPUÉS de que FlyleafHost
             // haya creado su ventana nativa (ocurre durante el layout pass de Loaded).
@@ -67,12 +67,15 @@ namespace AnimeLocalTracker.Views
         }
 
         /// <summary>
-        /// FlyleafHost captura el mouse a nivel nativo: su doble-click fullscreen no pasa por el
-        /// routing de WPF y hay que desactivarlo en el propio host. Se asigna por reflexión porque
-        /// como atributo XAML el compilador BAML de FlyleafLib 3.11 lo mapea a la propiedad
-        /// equivocada ("False is not a valid value for AvailableWindows").
+        /// Desactiva la interacción nativa del mouse del FlyleafHost:
+        /// - El doble-click fullscreen no pasa por el routing de WPF y hay que
+        ///   desactivarlo en el propio host (por reflexión: como atributo XAML el
+        ///   compilador BAML lo mapea a la propiedad equivocada).
+        /// - Los bindings nativos del ratón (MouseBindings en Surface) capturan el
+        ///   mouse tras un click en el video y los controles WPF dejan de recibir
+        ///   eventos hasta usar el teclado. Con None, el host no consume clicks.
         /// </summary>
-        private void DesactivarDobleClickFullscreenHost()
+        private void DesactivarInteraccionNativaDelHost()
         {
             try
             {
@@ -101,6 +104,25 @@ namespace AnimeLocalTracker.Views
             catch (Exception ex)
             {
                 AppLogger.Debug("ReproductorView", $"No se pudo desactivar el doble-click del host: {ex.Message}");
+            }
+
+            try
+            {
+                // Bug reproductor: click en medio del video dejaba los controles sin
+                // responder (captura nativa del mouse del host) hasta usar el teclado.
+                var mbField = typeof(FlyleafLib.Controls.WPF.FlyleafHost).GetField(
+                    "MouseBindingsProperty",
+                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+
+                if (mbField?.GetValue(null) is System.Windows.DependencyProperty mbDp)
+                {
+                    HostFlyleaf.SetValue(mbDp, FlyleafLib.Controls.WPF.AvailableWindows.None);
+                    AppLogger.Debug("ReproductorView", "MouseBindings del host desactivados (None): los clicks ya no capturan el ratón.");
+                }
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Debug("ReproductorView", $"No se pudieron desactivar los MouseBindings del host: {ex.Message}");
             }
         }
 
@@ -341,71 +363,55 @@ namespace AnimeLocalTracker.Views
         {
             if (DataContext is not ReproductorViewModel vm) return;
 
-            switch (e.Key)
+            var k = e.Key;
+            bool ejecutado = true;
+
+            if (k == vm.ObtenerTeclaPara("PlayPausa"))
+                vm.TogglePlayPauseCommand.Execute(null);
+            else if (k == vm.ObtenerTeclaPara("PantallaCompleta"))
+                vm.ToggleFullscreenCommand.Execute(null);
+            else if (k == vm.ObtenerTeclaPara("Silenciar"))
+                vm.ToggleMuteCommand.Execute(null);
+            else if (k == vm.ObtenerTeclaPara("SubirVolumen"))
+                vm.Volumen = Math.Min(100, vm.Volumen + 5);
+            else if (k == vm.ObtenerTeclaPara("BajarVolumen"))
+                vm.Volumen = Math.Max(0, vm.Volumen - 5);
+            else if (k == vm.ObtenerTeclaPara("Adelantar10"))
+                vm.SeekCommand.Execute(vm.CurrentSeconds + 10);
+            else if (k == vm.ObtenerTeclaPara("Retroceder10"))
+                vm.SeekCommand.Execute(vm.CurrentSeconds - 10);
+            else if (k == vm.ObtenerTeclaPara("SaltarIntro"))
             {
-                case Key.Space:
-                    vm.TogglePlayPauseCommand.Execute(null);
-                    e.Handled = true;
-                    RegistrarActividad();
-                    break;
-                case Key.F11:
-                    vm.ToggleFullscreenCommand.Execute(null);
-                    e.Handled = true;
-                    RegistrarActividad();
-                    break;
-                case Key.M:
-                    vm.ToggleMuteCommand.Execute(null);
-                    e.Handled = true;
-                    RegistrarActividad();
-                    break;
-                case Key.Up:
-                    vm.Volumen = Math.Min(100, vm.Volumen + 5);
-                    e.Handled = true;
-                    RegistrarActividad();
-                    break;
-                case Key.Down:
-                    vm.Volumen = Math.Max(0, vm.Volumen - 5);
-                    e.Handled = true;
-                    RegistrarActividad();
-                    break;
-                case Key.Right:
-                    vm.SeekCommand.Execute(vm.CurrentSeconds + 10);
-                    e.Handled = true;
-                    RegistrarActividad();
-                    break;
-                case Key.Left:
-                    vm.SeekCommand.Execute(vm.CurrentSeconds - 10);
-                    e.Handled = true;
-                    RegistrarActividad();
-                    break;
-                case Key.S:
-                    if (vm.MostrarSkipButton || vm.MostrarSkipIntro)
-                    {
-                        vm.SkipIntroOutroCommand.Execute(null);
-                        e.Handled = true;
-                        RegistrarActividad();
-                    }
-                    break;
-                case Key.N:
-                    if (vm.TieneEpisodioSiguiente)
-                    {
-                        vm.SiguienteEpisodioCommand.Execute(null);
-                        e.Handled = true;
-                        RegistrarActividad();
-                    }
-                    break;
-                case Key.P:
-                    if (vm.TieneEpisodioAnterior)
-                    {
-                        vm.AnteriorEpisodioCommand.Execute(null);
-                        e.Handled = true;
-                        RegistrarActividad();
-                    }
-                    break;
-                case Key.Escape:
-                    vm.CerrarCommand.Execute(null);
-                    e.Handled = true;
-                    break;
+                if (vm.MostrarSkipButton || vm.MostrarSkipIntro)
+                    vm.SkipIntroOutroCommand.Execute(null);
+                else
+                    ejecutado = false;
+            }
+            else if (k == vm.ObtenerTeclaPara("SiguienteEpisodio"))
+            {
+                if (vm.TieneEpisodioSiguiente)
+                    vm.SiguienteEpisodioCommand.Execute(null);
+                else
+                    ejecutado = false;
+            }
+            else if (k == vm.ObtenerTeclaPara("AnteriorEpisodio"))
+            {
+                if (vm.TieneEpisodioAnterior)
+                    vm.AnteriorEpisodioCommand.Execute(null);
+                else
+                    ejecutado = false;
+            }
+            else if (k == vm.ObtenerTeclaPara("CapturarFrame"))
+                vm.CapturarFrameCommand.Execute(null);
+            else if (k == vm.ObtenerTeclaPara("Cerrar"))
+                vm.CerrarCommand.Execute(null);
+            else
+                ejecutado = false;
+
+            if (ejecutado)
+            {
+                e.Handled = true;
+                RegistrarActividad();
             }
         }
     }

@@ -64,7 +64,8 @@
                               Style="{StaticResource MaterialDesignActionToggleButton}"
                               Background="{DynamicResource Brush.Surface1}" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1"
                               Margin="0,0,10,0"
-                              ToolTip="Selección múltiple" Width="40" Height="40">
+                              ToolTip="Selección múltiple" Width="40" Height="40"
+                              AutomationProperties.Name="Selección múltiple">
                     <materialDesign:ToggleButtonAssist.OnContent>
                         <materialDesign:PackIcon Kind="Close" Width="18" Height="18" Foreground="White"/>
                     </materialDesign:ToggleButtonAssist.OnContent>
@@ -76,7 +77,8 @@
                         Style="{StaticResource MaterialDesignFloatingActionMiniLightButton}"
                         Background="{DynamicResource Brush.Surface1}" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1"
                         Width="40" Height="40" Padding="0" Margin="0,0,10,0"
-                        ToolTip="Actualizar datos desde la nube">
+                        ToolTip="Actualizar datos desde la nube"
+                        AutomationProperties.Name="Actualizar datos desde la nube">
                     <materialDesign:PackIcon Kind="Sync" Width="18" Height="18" Foreground="{DynamicResource Brush.Success}"/>
                 </Button>
 
@@ -607,11 +609,13 @@
                                         HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10"
                                         materialDesign:ElevationAssist.Elevation="Dp2"
                                         Visibility="{Binding EstaSeleccionado, Converter={StaticResource InverseBoolToVis}}">
-                                    <TextBlock Text="{Binding EstadoVisual}" Foreground="White" FontSize="11" FontWeight="Bold"/>
+                                    <!-- UX-03: texto oscuro sobre los chips claros (#4CAF50/#9E9E9E):
+                                         el blanco daba 2.7:1; el oscuro supera 6:1 -->
+                                    <TextBlock Text="{Binding EstadoVisual}" Foreground="#0B1220" FontSize="11" FontWeight="Bold"/>
                                 </Border>
 
                                 <!-- BADGE NUEVOS EPISODIOS -->
-                                <Border Background="#F43F5E" CornerRadius="10" Padding="8,4" 
+                                <Border Background="#E11D48" CornerRadius="10" Padding="8,4" 
                                         HorizontalAlignment="Right" VerticalAlignment="Top" Margin="10"
                                         Visibility="{Binding TieneNuevosEpisodios, Converter={StaticResource BoolToVis}}"
                                         materialDesign:ElevationAssist.Elevation="Dp4"

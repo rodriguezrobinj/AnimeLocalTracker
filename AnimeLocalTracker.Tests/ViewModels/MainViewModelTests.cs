@@ -19,7 +19,7 @@ namespace AnimeLocalTracker.Tests.ViewModels;
 /// </summary>
 public class MainViewModelTests : IDisposable
 {
-    private readonly Mock<IServiceProvider> _serviceProviderMock = new();
+    private readonly Mock<INavigationService> _navigationServiceMock = new();
     private readonly Mock<IAnimeTrackingService> _trackingMock = new();
     private readonly Mock<IDownloadService> _downloadMock = new();
     private readonly Mock<IUpdateService> _updateMock = new();
@@ -40,7 +40,7 @@ public class MainViewModelTests : IDisposable
         _downloadMock.Setup(d => d.ObtenerDescargasActivas()).Returns(new List<DescargaItem>());
         _libraryService = new AnimeLibraryService(_dbMock.Object, _settingsMock.Object);
 
-        // Vista por defecto al arrancar: el ctor pide la Galería al ServiceProvider
+        // Vista por defecto al arrancar: el ctor pide la Galería al NavigationService
         _galeriaVm = new GaleriaViewModel(
             _trackingMock.Object,
             _dbMock.Object,
@@ -49,18 +49,19 @@ public class MainViewModelTests : IDisposable
             new Mock<IHttpClientFactory>().Object,
             new Mock<IImageCacheService>().Object,
             new Mock<IFileScannerService>().Object);
-        _serviceProviderMock.Setup(p => p.GetService(typeof(GaleriaViewModel))).Returns(_galeriaVm);
+        _navigationServiceMock.Setup(n => n.ObtenerGaleria()).Returns(_galeriaVm);
     }
 
     public void Dispose()
     {
+        GC.SuppressFinalize(this);
         try { if (Directory.Exists(_tempFolder)) Directory.Delete(_tempFolder, true); } catch { }
     }
 
     private MainViewModel CreateSut()
     {
         return new MainViewModel(
-            _serviceProviderMock.Object,
+            _navigationServiceMock.Object,
             _trackingMock.Object,
             _libraryService,
             _downloadMock.Object,
@@ -86,7 +87,7 @@ public class MainViewModelTests : IDisposable
     {
         // Arrange
         var descargasVm = new DescargasViewModel(_downloadMock.Object);
-        _serviceProviderMock.Setup(p => p.GetService(typeof(DescargasViewModel))).Returns(descargasVm);
+        _navigationServiceMock.Setup(n => n.ObtenerDescargas()).Returns(descargasVm);
         var sut = CreateSut();
 
         // Act
@@ -102,7 +103,7 @@ public class MainViewModelTests : IDisposable
         // Arrange
         var sut = CreateSut();
         var otra = new DescargasViewModel(_downloadMock.Object);
-        _serviceProviderMock.Setup(p => p.GetService(typeof(DescargasViewModel))).Returns(otra);
+        _navigationServiceMock.Setup(n => n.ObtenerDescargas()).Returns(otra);
         sut.Receive(new AnimeLocalTracker.Messages.NavegarMensaje_Descargas());
         sut.VistaActual.Should().BeSameAs(otra);
 
@@ -205,6 +206,8 @@ public class MainViewModelTests : IDisposable
         // Arrange
         _dbMock.Setup(d => d.ObtenerTodosLosAnimesAsync())
             .ReturnsAsync(new List<AnimeItem> { new() { AniListId = 999, Titulo = "Test Anime" } });
+        // PERF-03: la comprobación de existencia ya no carga la biblioteca completa
+        _dbMock.Setup(d => d.ExisteAnimeAsync(It.IsAny<int>())).ReturnsAsync(true);
         var sut = CreateSut();
 
         // Act

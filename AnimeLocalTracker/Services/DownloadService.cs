@@ -9,6 +9,7 @@ using System.Net.Http.Headers;
 using System.Threading;
 using System.Threading.Tasks;
 using AnimeLocalTracker.Messages;
+using AnimeLocalTracker.Services.Python;
 using CommunityToolkit.Mvvm.Messaging;
 using Microsoft.Win32.SafeHandles;
 
@@ -19,10 +20,13 @@ public class DownloadService : IDownloadService
     private const string UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
     private const int SegmentosParalelos = 6;
     private const int LimiteDescargasPorDefecto = 3;
+    // SEC-03: tope de seguridad por archivo en el modo secuencial (el segmentado ya lo acota).
+    private const long MaxArchivoDescargaBytes = 35L * 1024 * 1024 * 1024;
 
     private readonly HttpClient _httpClient;
     private readonly IDownloadStateStore _stateStore;
     private readonly IVideoSourceResolver _sourceResolver;
+    private readonly IPythonBridgeService? _pythonBridge;
     private readonly ConcurrentDictionary<string, DownloadState> _activeDownloads = new();
 
     // Gestor de slots de concurrencia (redimensionable en caliente según DescargasSimultaneas)
@@ -53,11 +57,13 @@ public class DownloadService : IDownloadService
         IHttpClientFactory httpClientFactory,
         IDownloadStateStore? stateStore = null,
         IVideoSourceResolver? sourceResolver = null,
-        ISettingsService? settingsService = null)
+        ISettingsService? settingsService = null,
+        IPythonBridgeService? pythonBridge = null)
     {
         _httpClient = httpClientFactory.CreateClient("Downloader");
         _stateStore = stateStore ?? new DownloadStateStore();
         _sourceResolver = sourceResolver ?? new AnimeAv1VideoSourceResolver(_httpClient);
+        _pythonBridge = pythonBridge;
 
         if (settingsService != null)
         {
@@ -325,6 +331,7 @@ public class DownloadService : IDownloadService
         _ = Task.Run(async () =>
         {
             bool slotAdquirido = false;
+            int reintentosResolucion = 0;
             try
             {
                 await AdquirirSlotAsync(state.Cts.Token);
@@ -332,29 +339,51 @@ public class DownloadService : IDownloadService
 
                 if (state.Cts.IsCancellationRequested || state.IsPaused) return;
 
-                if (string.IsNullOrEmpty(state.VideoUrl))
+                IProgress<double>? progress = null;
+                bool descargaCompletada = false;
+
+                // El enlace ya resuelto puede ser rechazado por el servidor (firma caducada,
+                // 403/404/410): se re-resuelve UNA vez con un enlace nuevo antes de fallar.
+                while (!descargaCompletada)
                 {
-                    state.VideoUrl = await _sourceResolver.BuscarUrlEpisodioAsync(state.Titulos, state.NumeroEpisodio, state.Cts.Token);
+                    if (state.Cts.IsCancellationRequested || state.IsPaused) return;
+
                     if (string.IsNullOrEmpty(state.VideoUrl))
                     {
-                        if (state.IsPaused || state.Cts.IsCancellationRequested) return;
+                        state.VideoUrl = await _sourceResolver.BuscarUrlEpisodioAsync(state.Titulos, state.NumeroEpisodio, state.AniListId, state.Cts.Token);
+                        if (string.IsNullOrEmpty(state.VideoUrl))
+                        {
+                            if (state.IsPaused || state.Cts.IsCancellationRequested) return;
 
-                        Debug.WriteLine($"[DownloadService] No se encontró enlace para '{state.AnimeTitulo}' Ep {state.NumeroEpisodio}.");
-                        _activeDownloads.TryRemove(key, out _);
-                        WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, 0, isDownloading: false, isCompleted: false, isPaused: false, "", $"No se encontró el episodio {state.NumeroEpisodio} en el servidor.", state.AnimeTitulo));
-                        return;
+                            // FUN-016: trazabilidad del ciclo de descarga en app.log (antes solo Debug)
+                            AppLogger.Warn("DownloadService", $"No se encontró enlace para '{state.AnimeTitulo}' Ep {state.NumeroEpisodio}.");
+                            _activeDownloads.TryRemove(key, out _);
+                            WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, 0, isDownloading: false, isCompleted: false, isPaused: false, "", $"No se encontró el episodio {state.NumeroEpisodio} en el servidor.", state.AnimeTitulo));
+                            return;
+                        }
+                    }
+
+                    if (state.Cts.IsCancellationRequested || state.IsPaused) return;
+
+                    progress ??= new Progress<double>(p =>
+                    {
+                        state.Progreso = p;
+                        WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, p, isDownloading: true, isCompleted: false, isPaused: false, state.RutaDestino, null, state.AnimeTitulo));
+                    });
+
+                    try
+                    {
+                        await DownloadVideoAsync(state.VideoUrl, state.RutaTemporal, progress, state.Cts.Token);
+                        descargaCompletada = true;
+                    }
+                    catch (Exception ex) when (EsRechazoDeEnlace(ex) && reintentosResolucion == 0 && !state.IsPaused && !state.Cts.IsCancellationRequested)
+                    {
+                        reintentosResolucion++;
+                        AppLogger.Warn("DownloadService", $"El servidor rechazó el enlace de '{state.AnimeTitulo}' Ep {state.NumeroEpisodio} ({(int?)((HttpRequestException)ex).StatusCode}): re-resolviendo el episodio (intento 2).");
+                        EliminarParcialSeguro(state.RutaTemporal);
+                        state.VideoUrl = null;
                     }
                 }
-
-                if (state.Cts.IsCancellationRequested || state.IsPaused) return;
-
-                var progress = new Progress<double>(p =>
-                {
-                    state.Progreso = p;
-                    WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, p, isDownloading: true, isCompleted: false, isPaused: false, state.RutaDestino, null, state.AnimeTitulo));
-                });
-
-                await DownloadVideoAsync(state.VideoUrl, state.RutaTemporal, progress, state.Cts.Token);
 
                 if (File.Exists(state.RutaDestino)) File.Delete(state.RutaDestino);
                 File.Move(state.RutaTemporal, state.RutaDestino);
@@ -365,7 +394,7 @@ public class DownloadService : IDownloadService
             }
             catch (OperationCanceledException)
             {
-                Debug.WriteLine($"[DownloadService] Descarga interrumpida: {state.AnimeTitulo} Ep {state.NumeroEpisodio}. Pausado: {state.IsPaused}");
+                AppLogger.Info("DownloadService", $"Descarga interrumpida: {state.AnimeTitulo} Ep {state.NumeroEpisodio}. Pausado: {state.IsPaused}");
                 if (!state.IsPaused)
                 {
                     _stateStore.EliminarArchivosTemporales(state.RutaTemporal);
@@ -376,11 +405,11 @@ public class DownloadService : IDownloadService
             {
                 if (state.IsPaused || state.Cts.IsCancellationRequested)
                 {
-                    Debug.WriteLine($"[DownloadService] Descarga pausada generó excepción esperada: {ex.Message}");
+                    AppLogger.Debug("DownloadService", $"Descarga pausada generó excepción esperada: {ex.Message}");
                     return;
                 }
 
-                Debug.WriteLine($"[DownloadService] Error descargando {state.AnimeTitulo} Ep {state.NumeroEpisodio}: {ex.Message}");
+                AppLogger.Error("DownloadService", $"Error descargando {state.AnimeTitulo} Ep {state.NumeroEpisodio}", ex);
                 _stateStore.EliminarArchivosTemporales(state.RutaTemporal);
                 _activeDownloads.TryRemove(key, out _);
                 WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, 0, isDownloading: false, isCompleted: false, isPaused: false, "", ex.Message, state.AnimeTitulo));
@@ -400,8 +429,63 @@ public class DownloadService : IDownloadService
         return await _sourceResolver.GetVideoUrlAsync(pageUrl, cancellationToken);
     }
 
+    /// <summary>
+    /// Descarga un stream HLS/DASH con yt-dlp en el daemon (bloqueante, sin progreso
+    /// incremental en esta fase). yt-dlp puede añadir la extensión real al outtmpl:
+    /// se normaliza al destino esperado.
+    /// </summary>
+    private async Task DescargarManifiestoConDaemonAsync(string videoUrl, string destinationPath, CancellationToken cancellationToken)
+    {
+        var resultado = await _pythonBridge!.ExecuteCommandOneShotAsync<object, DownloadStreamResult>(
+            "download-stream",
+            new { url = videoUrl, output_path = destinationPath },
+            cancellationToken);
+
+        if (resultado == null || !resultado.Success)
+        {
+            throw new InvalidOperationException($"No se pudo descargar el stream (HLS): {resultado?.Error ?? "respuesta vacía del daemon"}");
+        }
+
+        // yt-dlp escribe en outtmpl + extensión real → mover al destino esperado
+        if (!string.IsNullOrEmpty(resultado.RutaArchivo) &&
+            !resultado.RutaArchivo.Equals(destinationPath, StringComparison.OrdinalIgnoreCase) &&
+            File.Exists(resultado.RutaArchivo))
+        {
+            if (File.Exists(destinationPath)) File.Delete(destinationPath);
+            File.Move(resultado.RutaArchivo, destinationPath);
+        }
+        else if (!File.Exists(destinationPath))
+        {
+            throw new InvalidOperationException("El daemon no generó el archivo esperado.");
+        }
+    }
+
+    /// <summary>DTO de la respuesta del daemon para download-stream. Público para testeo.</summary>
+    public class DownloadStreamResult
+    {
+        public bool Success { get; set; }
+        public string? RutaArchivo { get; set; }
+        public string? Error { get; set; }
+    }
+
     public async Task DownloadVideoAsync(string videoUrl, string destinationPath, IProgress<double>? progress = null, CancellationToken cancellationToken = default)
     {
+        // Hardening INT-01 (defensa en profundidad): el punto de descarga solo acepta
+        // https sin credenciales, venga la URL de donde venga (scraper, yt-dlp o entrada).
+        if (!Core.UrlSeguridad.EsUrlDescargaHttpSegura(videoUrl))
+        {
+            AppLogger.Warn("DownloadService", "URL de video rechazada: no es https o contiene credenciales embebidas.");
+            throw new InvalidOperationException("La URL del video no es segura (solo se admiten enlaces https).");
+        }
+
+        // Fase 2: los manifiestos HLS/DASH no son archivos directos — se descargan
+        // con yt-dlp en el daemon (segmentos, encriptación y merge los maneja yt-dlp)
+        if (_pythonBridge != null && Core.UrlSeguridad.EsUrlManifiestoStreaming(videoUrl))
+        {
+            await DescargarManifiestoConDaemonAsync(videoUrl, destinationPath, cancellationToken);
+            return;
+        }
+
         var dir = Path.GetDirectoryName(destinationPath);
         if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
         {
@@ -554,7 +638,19 @@ public class DownloadService : IDownloadService
                     while (segment.CurrentOffset <= segment.End)
                     {
                         int bytesToRead = (int)Math.Min(buffer.Length, segment.End - segment.CurrentOffset + 1);
-                        int read = await stream.ReadAsync(buffer.AsMemory(0, bytesToRead), cancellationToken);
+
+                        int read;
+                        try
+                        {
+                            // FUN-015: watchdog de inactividad — 60 s sin recibir datos abortan el segmento.
+                            using var idleCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                            idleCts.CancelAfter(TimeSpan.FromSeconds(60));
+                            read = await stream.ReadAsync(buffer.AsMemory(0, bytesToRead), idleCts.Token);
+                        }
+                        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+                        {
+                            throw new IOException("La descarga se detuvo por inactividad (60 s sin recibir datos del servidor).");
+                        }
                         if (read == 0) break;
 
                         await RandomAccess.WriteAsync(fileHandle, buffer.AsMemory(0, read), segment.CurrentOffset, cancellationToken);
@@ -582,6 +678,12 @@ public class DownloadService : IDownloadService
         }
         catch (OperationCanceledException)
         {
+            await _stateStore.GuardarAsync(statePath, stateInfo);
+            throw;
+        }
+        catch (IOException)
+        {
+            // FUN-015: ante inactividad se conserva el estado para poder reanudar después.
             await _stateStore.GuardarAsync(statePath, stateInfo);
             throw;
         }
@@ -613,10 +715,28 @@ public class DownloadService : IDownloadService
         using var response = await _httpClient.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         response.EnsureSuccessStatusCode();
 
-        if (totalBytes <= 0)
+        // FUN-014: si reanudamos con un archivo parcial (Range enviado) pero el servidor
+        // responde 200 en vez de 206, el cuerpo empieza en CERO: hacer append sobre el
+        // parcial corrompería el archivo. Se reinicia la descarga desde cero.
+        if (existingLength > 0 && response.StatusCode != System.Net.HttpStatusCode.PartialContent)
+        {
+            AppLogger.Warn("DownloadService", "El servidor ignoró la cabecera Range (200 en vez de 206): la descarga se reinicia desde cero para evitar corrupción (FUN-014).");
+            EliminarParcialSeguro(destinationPath);
+            existingLength = 0;
+            totalBytes = response.Content.Headers.ContentLength ?? -1L;
+        }
+        else if (totalBytes <= 0)
         {
             totalBytes = response.Content.Headers.ContentLength ?? -1L;
             if (existingLength > 0) totalBytes += existingLength; // Adjust total if resumed
+        }
+
+        // SEC-03: el modo secuencial queda acotado igual que el segmentado: un servidor
+        // que declare un tamaño absurdo no puede llenar el disco.
+        if (totalBytes > MaxArchivoDescargaBytes)
+        {
+            EliminarParcialSeguro(destinationPath);
+            throw new IOException($"El tamaño declarado del video supera el límite de seguridad de {MaxArchivoDescargaBytes / (1024.0 * 1024 * 1024):F0} GB.");
         }
 
         var canReportProgress = totalBytes > 0 && progress != null;
@@ -627,40 +747,92 @@ public class DownloadService : IDownloadService
         var totalRead = existingLength;
         var buffer = new byte[131072];
         var isMoreToRead = true;
+        bool superoLimite = false;
         var lastReportedPercentage = -1.0;
         var lastReportTime = DateTime.UtcNow;
 
         do
         {
-            var read = await contentStream.ReadAsync(buffer, 0, buffer.Length, cancellationToken);
+            int read;
+            try
+            {
+                // FUN-015: watchdog de inactividad — 60 s sin datos abortan la descarga secuencial.
+                using var idleCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                idleCts.CancelAfter(TimeSpan.FromSeconds(60));
+                read = await contentStream.ReadAsync(buffer.AsMemory(0, buffer.Length), idleCts.Token);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                throw new IOException("La descarga se detuvo por inactividad (60 s sin recibir datos del servidor).");
+            }
             if (read == 0)
             {
                 isMoreToRead = false;
             }
             else
             {
-                await fileStream.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
                 totalRead += read;
 
-                if (canReportProgress && progress != null)
+                // SEC-03: corte duro si el servidor no declaró el tamaño y el stream excede el tope.
+                if (totalRead > MaxArchivoDescargaBytes)
                 {
-                    double currentPercentage = Math.Clamp((double)totalRead / totalBytes * 100, 0.0, 100.0);
-                    var now = DateTime.UtcNow;
-                    if (currentPercentage - lastReportedPercentage >= 0.5 || (now - lastReportTime).TotalMilliseconds >= 150 || totalRead == totalBytes)
+                    superoLimite = true;
+                    isMoreToRead = false;
+                }
+                else
+                {
+                    await fileStream.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+
+                    if (canReportProgress && progress != null)
                     {
-                        lastReportedPercentage = currentPercentage;
-                        lastReportTime = now;
-                        progress.Report(currentPercentage);
+                        double currentPercentage = Math.Clamp((double)totalRead / totalBytes * 100, 0.0, 100.0);
+                        var now = DateTime.UtcNow;
+                        if (currentPercentage - lastReportedPercentage >= 0.5 || (now - lastReportTime).TotalMilliseconds >= 150 || totalRead == totalBytes)
+                        {
+                            lastReportedPercentage = currentPercentage;
+                            lastReportTime = now;
+                            progress.Report(currentPercentage);
+                        }
                     }
                 }
             }
         }
         while (isMoreToRead);
 
+        if (superoLimite)
+        {
+            EliminarParcialSeguro(destinationPath);
+            throw new IOException($"El archivo descargado superó el límite de seguridad de {MaxArchivoDescargaBytes / (1024.0 * 1024 * 1024):F0} GB.");
+        }
+
         if (canReportProgress && progress != null)
         {
             progress.Report(100.0);
         }
+    }
+
+    private static void EliminarParcialSeguro(string destinationPath)
+    {
+        try
+        {
+            if (File.Exists(destinationPath)) File.Delete(destinationPath);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("DownloadService", $"No se pudo limpiar el archivo parcial tras el corte de seguridad: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// HTTP 403/404/410 del servidor de video = el enlace firmado ya no sirve (caducado,
+    /// geo-bloqueado o eliminado): no es un fallo definitivo, merece re-resolver.
+    /// </summary>
+    private static bool EsRechazoDeEnlace(Exception ex)
+    {
+        return ex is HttpRequestException hre
+               && hre.StatusCode is System.Net.HttpStatusCode.Forbidden
+                   or System.Net.HttpStatusCode.NotFound
+                   or System.Net.HttpStatusCode.Gone;
     }
 
     private static string SanitizarUrlParaLog(string url)

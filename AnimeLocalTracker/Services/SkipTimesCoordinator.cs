@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -15,37 +14,22 @@ public class SkipTimesCoordinator : ISkipTimesCoordinator
     private readonly IAniSkipService? _aniSkipService;
     private readonly IPythonBridgeService? _pythonBridge;
 
-    // Memoización del mapeo AniListId -> MAL ID durante la vida del reproductor.
-    // ARQ-04: tope de capacidad para evitar crecimiento sin límite.
-    private readonly ConcurrentDictionary<int, int?> _malIdCache = new();
-    private const int MaxMalIdCacheEntries = 2000;
-
     public SkipTimesCoordinator(IAniSkipService? aniSkipService, IPythonBridgeService? pythonBridge = null)
     {
         _aniSkipService = aniSkipService;
         _pythonBridge = pythonBridge;
     }
 
-    public async Task<IReadOnlyList<AniSkipResult>> CargarSkipTimesAsync(int animeId, int episodio, double duracionSegundos, CancellationToken ct = default, string? rutaVideoLocal = null)
+    public async Task<IReadOnlyList<AniSkipResult>> CargarSkipTimesAsync(int animeId, int episodio, double duracionSegundos, string? rutaVideoLocal = null, CancellationToken ct = default)
     {
         // Fuente 1: AniSkip API (comunitaria, requiere MAL ID)
         if (_aniSkipService != null && animeId > 0 && episodio > 0)
         {
             try
             {
-                if (!_malIdCache.TryGetValue(animeId, out var malId))
-                {
-                    BoundedCache.InsertNoExpiry(_malIdCache, animeId, null, MaxMalIdCacheEntries);
-                }
-                if (!malId.HasValue || malId.Value <= 0)
-                {
-                    malId = await _aniSkipService.ObtenerMalIdDesdeAniListAsync(animeId, ct);
-                    if (malId.HasValue && malId.Value > 0)
-                    {
-                        BoundedCache.InsertNoExpiry(_malIdCache, animeId, malId, MaxMalIdCacheEntries);
-                    }
-                }
-
+                // ARC-05: el mapeo AniListId→MAL ID se memoiza dentro de IAniSkipService
+                // (caché única compartida por toda la app, con tope de 2000 entradas).
+                var malId = await _aniSkipService.ObtenerMalIdDesdeAniListAsync(animeId, ct);
                 if (malId.HasValue && malId.Value > 0)
                 {
                     var results = await _aniSkipService.ObtenerSkipTimesAsync(malId.Value, episodio, duracionSegundos, ct);

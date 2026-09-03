@@ -5,7 +5,7 @@ namespace AnimeLocalTracker.Services;
 
 public interface ISyncService : IDisposable
 {
-    Task<int> SincronizarPendientesAsync();
+    Task<(int Exitosos, int Pendientes)> SincronizarPendientesAsync();
     void IniciarSincronizacionPeriodica(TimeSpan intervalo);
     void DetenerSincronizacionPeriodica();
 }

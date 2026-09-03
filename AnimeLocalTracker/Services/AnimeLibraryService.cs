@@ -31,8 +31,9 @@ public class AnimeLibraryService
     /// <summary>¿El anime ya está en la biblioteca local?</summary>
     public async Task<bool> ExisteEnBibliotecaAsync(int aniListId)
     {
-        var animesGuardados = await _databaseService.ObtenerTodosLosAnimesAsync();
-        return animesGuardados.Any(a => a.AniListId == aniListId);
+        // PERF-03: antes se cargaba la biblioteca completa (+ File.Exists por anime)
+        // solo para comprobar un id.
+        return await _databaseService.ExisteAnimeAsync(aniListId);
     }
 
     /// <summary>
@@ -60,6 +61,9 @@ public class AnimeLibraryService
         if (!string.IsNullOrWhiteSpace(animeAPI.Title.English)) titulosAlt.Add(animeAPI.Title.English!);
         if (!string.IsNullOrWhiteSpace(animeAPI.Title.UserPreferred) && animeAPI.Title.UserPreferred != titulo)
             titulosAlt.Add(animeAPI.Title.UserPreferred!);
+        // El título nativo (japonés) es clave: los sitios lo publican en su aka
+        // ("ja-jp") y su catálogo lo matchea — el principal muchas veces no.
+        if (!string.IsNullOrWhiteSpace(animeAPI.Title.Native)) titulosAlt.Add(animeAPI.Title.Native!);
         if (animeAPI.Synonyms != null) titulosAlt.AddRange(animeAPI.Synonyms.Where(s => !string.IsNullOrWhiteSpace(s)));
 
         var nuevoAnime = new AnimeItem
