@@ -419,10 +419,13 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
                             nuevos++;
                         }
                     }
-                    // Diagnóstico: si un término no devuelve nada nuevo, el problema
-                    // está en el catálogo, no en la verificación.
-                    AppLogger.Debug("AnimeAv1VideoSourceResolver",
-                        $"Búsqueda de catálogo '{termino}': {nuevos} slugs nuevos ({slugs.Count} totales).");
+                    // Diagnóstico: solo se loguea cuando un término aporta slugs nuevos
+                    // (los 0s por variante inundaban el log: ~40 líneas por anime).
+                    if (nuevos > 0)
+                    {
+                        AppLogger.Debug("AnimeAv1VideoSourceResolver",
+                            $"Búsqueda de catálogo '{termino}': {nuevos} slugs nuevos ({slugs.Count} totales).");
+                    }
                 }
                 catch (Exception ex)
                 {

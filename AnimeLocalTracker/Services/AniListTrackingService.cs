@@ -113,6 +113,31 @@ public class AniListTrackingService : IAnimeTrackingService
         BoundedCache.Insert(_cache, key, data, MaxCacheEntries, duration);
     }
 
+    // Anti-martilleo: tras un 403/429/5xx de AniList para un anime concreto, no se
+    // reintenta ese id durante 90 s (antes cada apertura de Detalle re-consultaba y
+    // re-recibía 403 en cadena, sin que los fallos se cachearan).
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<int, DateTime> _fallosTemporales = new();
+
+    private static bool EstaEnVentanaDeFallo(int mediaId)
+    {
+        if (!_fallosTemporales.TryGetValue(mediaId, out var hasta)) return false;
+        if (DateTime.UtcNow < hasta) return true;
+        _fallosTemporales.TryRemove(mediaId, out _);
+        return false;
+    }
+
+    private static void RegistrarFalloTransitorio(int mediaId)
+    {
+        if (_fallosTemporales.Count > 1000)
+        {
+            foreach (var kv in _fallosTemporales)
+            {
+                if (DateTime.UtcNow >= kv.Value) _fallosTemporales.TryRemove(kv.Key, out _);
+            }
+        }
+        _fallosTemporales[mediaId] = DateTime.UtcNow.AddSeconds(90);
+    }
+
     public static void InvalidateCacheForMedia(int mediaId)
     {
         _cache.TryRemove($"media_{mediaId}", out _);
@@ -124,6 +149,12 @@ public class AniListTrackingService : IAnimeTrackingService
         if (TryGetFromCache<AniListMedia>(cacheKey, out var cachedMedia))
         {
             return cachedMedia;
+        }
+
+        // 403/429/5xx recientes de AniList para este id → no martillear (caché negativa 90 s).
+        if (EstaEnVentanaDeFallo(id))
+        {
+            return null;
         }
 
         try
@@ -170,7 +201,12 @@ public class AniListTrackingService : IAnimeTrackingService
             }
             else
             {
-                AppLogger.Warn("AniListTrackingService", $"ObtenerAnimePorId ({id}) falló con HTTP {(int)response.StatusCode}.");
+                int codigo = (int)response.StatusCode;
+                AppLogger.Warn("AniListTrackingService", $"ObtenerAnimePorId ({id}) falló con HTTP {codigo}.");
+                if (codigo == 403 || codigo == 429 || codigo >= 500)
+                {
+                    RegistrarFalloTransitorio(id);
+                }
             }
             return null;
         }
