@@ -50,7 +50,15 @@ if (-not (Test-Path "$ffmpegDir\ffmpeg.exe") -or -not (Test-Path "$ffmpegDir\ffp
 function Invoke-Build {
     param([string]$Label)
     Write-Host "[build] $Label..." -ForegroundColor Cyan
-    & dotnet build "$root\AnimeLocalTracker.sln" -c $Configuration --nologo -v q -nodeReuse:false
+
+    # Compilación EXPLÍCITA y NO INCREMENTAL por proyecto (no `dotnet build` sobre la
+    # solución): el build de la solución podía terminar con "OK" dejando el ensamblado
+    # de tests AUSENTE (runner limpio, CI) u OBSOLETO (obj poblado en local) — el doble
+    # pase no lo garantizaba. --no-incremental fuerza siempre el producto final real.
+    # El proyecto de benchmarks se compila bajo demanda (workflow benchmarks.yml).
+    & dotnet build "$root\AnimeLocalTracker\AnimeLocalTracker.csproj" -c $Configuration --nologo -v q -nodeReuse:false --no-incremental
+    if ($LASTEXITCODE -ne 0) { return $false }
+    & dotnet build "$root\AnimeLocalTracker.Tests\AnimeLocalTracker.Tests.csproj" -c $Configuration --nologo -v q -nodeReuse:false --no-incremental
     if ($LASTEXITCODE -ne 0) { return $false }
     return $true
 }
