@@ -114,7 +114,8 @@
                                                 <!-- BOTÓN PAUSA / REANUDAR -->
                                                 <Button Command="{Binding DataContext.AlternarPausaDescargaCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                         CommandParameter="{Binding}"
-                                                        Style="{StaticResource MaterialDesignIconButton}" Width="36" Height="36">
+                                                        Style="{StaticResource MaterialDesignIconButton}" Width="36" Height="36"
+                                                        AutomationProperties.Name="Pausar o reanudar descarga">
                                                     <materialDesign:PackIcon Foreground="#60A5FA" Width="22" Height="22">
                                                         <materialDesign:PackIcon.Style>
                                                             <Style TargetType="materialDesign:PackIcon">
@@ -133,7 +134,8 @@
                                                 <Button Command="{Binding DataContext.CancelarDescargaCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                         CommandParameter="{Binding}"
                                                         Style="{StaticResource MaterialDesignIconButton}" Width="36" Height="36" 
-                                                        ToolTip="Cancelar descarga" Margin="4,0,0,0">
+                                                        ToolTip="Cancelar descarga" Margin="4,0,0,0"
+                                                        AutomationProperties.Name="Cancelar descarga">
                                                     <materialDesign:PackIcon Kind="TrashCanOutline" Foreground="#F87171" Width="20" Height="20"/>
                                                 </Button>
                                             </StackPanel>

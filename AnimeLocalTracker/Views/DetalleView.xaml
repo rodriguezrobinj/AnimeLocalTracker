@@ -501,7 +501,8 @@
                                             <Button Command="{Binding DataContext.AlternarFavoritoEpisodioCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                     CommandParameter="{Binding}"
                                                     Style="{StaticResource MaterialDesignIconButton}" Width="26" Height="26" Padding="0"
-                                                    ToolTip="Marcar como favorito / guardado">
+                                                    ToolTip="Marcar como favorito / guardado"
+                                                    AutomationProperties.Name="Marcar como favorito o guardado">
                                                 <materialDesign:PackIcon x:Name="IconoBookmark" Kind="BookmarkOutline" Foreground="#6B7280" Width="17" Height="17" VerticalAlignment="Center"/>
                                             </Button>
                                         </StackPanel>
@@ -553,6 +554,7 @@
                                             <Button Click="BotonEpisodioDescargado_Click"
                                                     Style="{StaticResource MaterialDesignIconButton}" Width="34" Height="34"
                                                     ToolTip="Descargado (Clic para reproducir o eliminar)"
+                                                    AutomationProperties.Name="Episodio descargado: reproducir o eliminar"
                                                     Visibility="{Binding Descargado, Converter={StaticResource BoolToVis}}">
                                                 <materialDesign:PackIcon Kind="CheckCircle" Foreground="#60A5FA" Width="24" Height="24" VerticalAlignment="Center"/>
                                             </Button>

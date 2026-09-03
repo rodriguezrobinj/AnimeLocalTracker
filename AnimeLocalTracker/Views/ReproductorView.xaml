@@ -218,7 +218,8 @@
                         </Grid.ColumnDefinitions>
                         <!-- Back Arrow -->
                         <Button Grid.Column="0" Command="{Binding CerrarCommand}" Focusable="False"
-                                Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="50" Height="50" Margin="0,0,15,0">
+                                Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="50" Height="50" Margin="0,0,15,0"
+                                AutomationProperties.Name="Volver a la ficha del anime">
                             <materialDesign:PackIcon Kind="ArrowLeft" Width="36" Height="36" />
                         </Button>
                         <!-- Titulos Netflix Style -->
