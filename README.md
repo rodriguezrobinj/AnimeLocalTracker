@@ -132,6 +132,10 @@ Creemos firmemente en el software **local-first**, privado y ultrarrápido:
 * **Sin telemetría invasiva:** Solo tú y tu cuenta oficial de AniList tienen el control de tu historial.
 * **100% Código Abierto:** Transparencia total bajo licencia permisiva.
 
+> **Matiz (PRI-05):** cuando **conectas tu cuenta de AniList**, la app *sí* sincroniza con
+> la nube tu **progreso, estado y puntuación** (es su función principal). Lo que nunca sale
+> de tu equipo son tus archivos de video, la biblioteca local y tu historial de reproducción.
+
 ---
 
 ## 🤝 Contribuciones y Comunidad

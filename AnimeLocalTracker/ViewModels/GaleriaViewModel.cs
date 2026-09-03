@@ -771,6 +771,21 @@ public partial class GaleriaViewModel : ObservableObject,
     private async Task ConectarAniListAsync()
     {
         MenuUsuarioAbierto = false;
+
+        // PRI-02: consentimiento informado ANTES del OAuth — la primera vez se explica
+        // qué se lee y qué se escribe en AniList (antes el navegador se abría sin copy).
+        bool consentimiento = await _dialogService.MostrarDialogoAsync(
+            "Conectar con AniList",
+            "Al conectar, la app podrá:\n\n" +
+            "• LEER tu perfil y tu lista de AniList (títulos y progreso).\n" +
+            "• ESCRIBIR tu progreso (episodios vistos), estado y puntuación cuando los marques.\n\n" +
+            "Tus archivos de video nunca se suben y la app no tiene telemetría.",
+            true,
+            "ShieldAccount",
+            "#60A5FA");
+
+        if (!consentimiento) return;
+
         bool exito = await _authService.IniciarSesionAsync();
         if (exito)
         {
