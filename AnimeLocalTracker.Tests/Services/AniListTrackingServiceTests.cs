@@ -283,4 +283,31 @@ public class AniListTrackingServiceTests
         resultado.Should().BeFalse();
         _authServiceMock.Verify(a => a.CerrarSesion(), Times.Never);
     }
+
+    [Fact]
+    public async Task ObtenerAnimePorIdAsync_Con403Reciente_NoDeberiaVolverALlamarALaApi()
+    {
+        // Arrange: AniList responde 403 (anti-abuso) y luego 200 (si se volviera a llamar)
+        _httpMessageHandlerMock.Protected()
+            .SetupSequence<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>())
+            .ReturnsAsync(new HttpResponseMessage { StatusCode = HttpStatusCode.Forbidden })
+            .ReturnsAsync(new HttpResponseMessage
+            {
+                StatusCode = HttpStatusCode.OK,
+                Content = new StringContent("{\"data\":{\"Media\":null}}")
+            });
+
+        // Act: dos consultas seguidas del mismo id (p. ej. dos aperturas de Detalle)
+        var primero = await _sut.ObtenerAnimePorIdAsync(999999);
+        var segundo = await _sut.ObtenerAnimePorIdAsync(999999);
+
+        // Assert: el 403 se cachea como fallo (90 s) y no se martillea la API
+        primero.Should().BeNull();
+        segundo.Should().BeNull();
+        _httpMessageHandlerMock.Protected().Verify(
+            "SendAsync", Times.Once(), ItExpr.IsAny<HttpRequestMessage>(), ItExpr.IsAny<CancellationToken>());
+    }
 }
