@@ -15,8 +15,11 @@ public class AniListTrackingService : IAnimeTrackingService
 {
     private readonly HttpClient _httpClient;
     private readonly IAuthService? _authService;
-    private static readonly ConcurrentDictionary<string, (object Data, DateTime Expiration)> _cache = new();
+    private static readonly ConcurrentDictionary<string, CacheEntry<object>> _cache = new();
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
+
+    // ARQ-04: tope de capacidad para que el consumo de RAM sea constante en sesiones largas.
+    private const int MaxCacheEntries = 250;
 
     private const string BrowserUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
@@ -37,7 +40,7 @@ public class AniListTrackingService : IAnimeTrackingService
             }
             if (_httpClient.Timeout.TotalSeconds >= 100) // default .NET
             {
-                _httpClient.Timeout = TimeSpan.FromSeconds(30);
+                _httpClient.Timeout = TimeSpan.FromSeconds(60);
             }
         }
         catch (Exception ex)
@@ -60,6 +63,36 @@ public class AniListTrackingService : IAnimeTrackingService
         return request;
     }
 
+    /// <summary>
+    /// Envía la petición y detecta un 401 (token revocado o vencido): en lugar de fallar
+    /// en silencio para siempre, cierra la sesión local para forzar un nuevo login.
+    /// </summary>
+    private async Task<HttpResponseMessage> EnviarYDetectarSesionAsync(HttpRequestMessage request, CancellationToken cancellationToken = default)
+    {
+        var response = await _httpClient.SendAsync(request, cancellationToken);
+
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            var auth = _authService;
+            if (auth?.EstaAutenticado() == true)
+            {
+                AppLogger.Warn("AniListTrackingService", "AniList rechazó el token (401): se cierra la sesión local para forzar un nuevo inicio de sesión.");
+                var dispatcher = System.Windows.Application.Current?.Dispatcher;
+                if (dispatcher != null)
+                {
+                    // CerrarSesion notifica a los ViewModels vía messenger: debe ejecutarse en el hilo de UI.
+                    await dispatcher.InvokeAsync(() => auth.CerrarSesion());
+                }
+                else
+                {
+                    auth.CerrarSesion();
+                }
+            }
+        }
+
+        return response;
+    }
+
     private static bool TryGetFromCache<T>(string key, out T? result) where T : class
     {
         if (_cache.TryGetValue(key, out var entry))
@@ -77,7 +110,32 @@ public class AniListTrackingService : IAnimeTrackingService
 
     private static void SetInCache<T>(string key, T data, TimeSpan duration) where T : class
     {
-        _cache[key] = (data, DateTime.UtcNow.Add(duration));
+        BoundedCache.Insert(_cache, key, data, MaxCacheEntries, duration);
+    }
+
+    // Anti-martilleo: tras un 403/429/5xx de AniList para un anime concreto, no se
+    // reintenta ese id durante 90 s (antes cada apertura de Detalle re-consultaba y
+    // re-recibía 403 en cadena, sin que los fallos se cachearan).
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<int, DateTime> _fallosTemporales = new();
+
+    private static bool EstaEnVentanaDeFallo(int mediaId)
+    {
+        if (!_fallosTemporales.TryGetValue(mediaId, out var hasta)) return false;
+        if (DateTime.UtcNow < hasta) return true;
+        _fallosTemporales.TryRemove(mediaId, out _);
+        return false;
+    }
+
+    private static void RegistrarFalloTransitorio(int mediaId)
+    {
+        if (_fallosTemporales.Count > 1000)
+        {
+            foreach (var kv in _fallosTemporales)
+            {
+                if (DateTime.UtcNow >= kv.Value) _fallosTemporales.TryRemove(kv.Key, out _);
+            }
+        }
+        _fallosTemporales[mediaId] = DateTime.UtcNow.AddSeconds(90);
     }
 
     public static void InvalidateCacheForMedia(int mediaId)
@@ -91,6 +149,12 @@ public class AniListTrackingService : IAnimeTrackingService
         if (TryGetFromCache<AniListMedia>(cacheKey, out var cachedMedia))
         {
             return cachedMedia;
+        }
+
+        // 403/429/5xx recientes de AniList para este id → no martillear (caché negativa 90 s).
+        if (EstaEnVentanaDeFallo(id))
+        {
+            return null;
         }
 
         try
@@ -116,7 +180,7 @@ public class AniListTrackingService : IAnimeTrackingService
             var jsonContent = JsonSerializer.Serialize(payload, JsonOptions);
 
             var request = CrearRequest(jsonContent);
-            var response = await _httpClient.SendAsync(request);
+            var response = await EnviarYDetectarSesionAsync(request);
 
             if (response.IsSuccessStatusCode)
             {
@@ -137,7 +201,12 @@ public class AniListTrackingService : IAnimeTrackingService
             }
             else
             {
-                AppLogger.Warn("AniListTrackingService", $"ObtenerAnimePorId ({id}) falló con HTTP {(int)response.StatusCode}.");
+                int codigo = (int)response.StatusCode;
+                AppLogger.Warn("AniListTrackingService", $"ObtenerAnimePorId ({id}) falló con HTTP {codigo}.");
+                if (codigo == 403 || codigo == 429 || codigo >= 500)
+                {
+                    RegistrarFalloTransitorio(id);
+                }
             }
             return null;
         }
@@ -156,6 +225,130 @@ public class AniListTrackingService : IAnimeTrackingService
             AppLogger.Error("AniListTrackingService", $"Error al obtener anime por ID {id}", ex);
             return null;
         }
+    }
+
+    /// <summary>
+    /// RND-02: consulta muchos animes de una vez (Page.media con id_in + mediaListEntry
+    /// del usuario autenticado). Reemplaza N× ObtenerAnimePorIdAsync + N×
+    /// ObtenerSeguimientoUsuarioAsync por ~1 request cada 50 animes: la actualización
+    /// de biblioteca pasa de cientos de llamadas seriales a unas pocas.
+    /// Usa el caché para los IDs ya frescos (30 min).
+    /// </summary>
+    public async Task<Dictionary<int, AniListMedia>> ObtenerAnimesPorIdsLoteAsync(IEnumerable<int> ids, string? token = null)
+    {
+        var resultado = new Dictionary<int, AniListMedia>();
+        var idsUnicos = ids.Distinct().ToList();
+        if (idsUnicos.Count == 0) return resultado;
+
+        // 1. Servir los que ya estén en caché
+        var pendientes = new List<int>();
+        foreach (var id in idsUnicos)
+        {
+            if (TryGetFromCache<AniListMedia>($"media_{id}", out var cached) && cached != null)
+            {
+                resultado[id] = cached;
+            }
+            else
+            {
+                pendientes.Add(id);
+            }
+        }
+        if (pendientes.Count == 0) return resultado;
+
+        // 2. Lotes de 50 (máximo perPage de AniList para la conexión media)
+        const int TamanoLote = 50;
+        int fallosLote = 0;
+        foreach (var chunk in pendientes.Chunk(TamanoLote))
+        {
+            try
+            {
+                var query = @"
+                query ($ids: [Int]) {
+                    Page(page: 1, perPage: 50) {
+                        media(id_in: $ids, type: ANIME) {
+                            id
+                            idMal
+                            title { romaji english native userPreferred }
+                            synonyms
+                            coverImage { extraLarge }
+                            description(asHtml: false)
+                            genres
+                            episodes
+                            status
+                            nextAiringEpisode { episode }
+                            mediaListEntry {
+                                id
+                                status
+                                score
+                                progress
+                                startedAt { year month day }
+                                completedAt { year month day }
+                            }
+                        }
+                    }
+                }";
+
+                var payload = new { query, variables = new { ids = chunk } };
+                var jsonContent = JsonSerializer.Serialize(payload, JsonOptions);
+
+                var request = CrearRequest(jsonContent, token);
+                var response = await EnviarYDetectarSesionAsync(request);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    fallosLote++;
+                    AppLogger.Warn("AniListTrackingService", $"Lote de animes ({chunk.Length} ids) falló con HTTP {(int)response.StatusCode}.");
+                    continue;
+                }
+
+                var content = await response.Content.ReadAsStringAsync();
+                if (content.Contains("\"errors\""))
+                {
+                    fallosLote++;
+                    AppLogger.Warn("AniListTrackingService", $"AniList devolvió error en lote de animes: {Truncar(content)}");
+                    continue;
+                }
+
+                var result = JsonSerializer.Deserialize<AniListResponse>(content, JsonOptions);
+                var medias = result?.Data?.Page?.Media;
+                if (medias == null)
+                {
+                    fallosLote++;
+                    continue;
+                }
+
+                foreach (var media in medias)
+                {
+                    resultado[media.Id] = media;
+                    SetInCache($"media_{media.Id}", media, TimeSpan.FromMinutes(30));
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                fallosLote++;
+                AppLogger.Warn("AniListTrackingService", $"Timeout al obtener lote de animes de AniList.");
+            }
+            catch (HttpRequestException ex)
+            {
+                fallosLote++;
+                AppLogger.Warn("AniListTrackingService", $"Fallo de red al conectar con AniList (lote): {ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                fallosLote++;
+                AppLogger.Error("AniListTrackingService", $"Error al obtener lote de animes", ex);
+            }
+        }
+
+        // INT-01: la actualización parcial ya no es silenciosa — si algún lote falló, el
+        // usuario lo verá reflejado en el log con el alcance exacto.
+        int totalLotes = (int)Math.Ceiling(pendientes.Count / (double)TamanoLote);
+        if (fallosLote > 0)
+        {
+            AppLogger.Warn("AniListTrackingService", $"Actualización de biblioteca parcial: {fallosLote}/{totalLotes} lote(s) fallido(s); {resultado.Count}/{idsUnicos.Count} animes disponibles.");
+        }
+
+        return resultado;
     }
 
     public async Task<List<AniListMedia>> BuscarAnimePorTituloAsync(string titulo)
@@ -191,7 +384,7 @@ public class AniListTrackingService : IAnimeTrackingService
         try
         {
             var request = CrearRequest(jsonContent);
-            var response = await _httpClient.SendAsync(request);
+            var response = await EnviarYDetectarSesionAsync(request);
 
             if (response.IsSuccessStatusCode)
             {
@@ -241,10 +434,17 @@ public class AniListTrackingService : IAnimeTrackingService
             var jsonContent = JsonSerializer.Serialize(payload, JsonOptions);
 
             var request = CrearRequest(jsonContent, token);
-            var response = await _httpClient.SendAsync(request);
+            var response = await EnviarYDetectarSesionAsync(request);
 
             if (response.IsSuccessStatusCode)
             {
+                var content = await response.Content.ReadAsStringAsync();
+                if (content.Contains("\"errors\""))
+                {
+                    AppLogger.Warn("AniListTrackingService", $"AniList devolvió error al actualizar progreso para MediaId {mediaId}: {Truncar(content)}");
+                    return false;
+                }
+
                 InvalidateCacheForMedia(mediaId);
                 return true;
             }
@@ -279,7 +479,7 @@ public class AniListTrackingService : IAnimeTrackingService
             var jsonContent = JsonSerializer.Serialize(payload, JsonOptions);
 
             var request = CrearRequest(jsonContent, token);
-            var response = await _httpClient.SendAsync(request);
+            var response = await EnviarYDetectarSesionAsync(request);
 
             if (response.IsSuccessStatusCode)
             {
@@ -324,7 +524,7 @@ public class AniListTrackingService : IAnimeTrackingService
             var jsonContent = JsonSerializer.Serialize(payload, JsonOptions);
 
             var request = CrearRequest(jsonContent, token);
-            var response = await _httpClient.SendAsync(request);
+            var response = await EnviarYDetectarSesionAsync(request);
             var content = await response.Content.ReadAsStringAsync();
             
             if (content.Contains("\"errors\""))
@@ -364,7 +564,7 @@ public class AniListTrackingService : IAnimeTrackingService
             var jsonContent = JsonSerializer.Serialize(payload, JsonOptions);
 
             var request = CrearRequest(jsonContent, token);
-            var response = await _httpClient.SendAsync(request);
+            var response = await EnviarYDetectarSesionAsync(request);
 
             if (response.IsSuccessStatusCode)
             {
@@ -416,7 +616,7 @@ public class AniListTrackingService : IAnimeTrackingService
             var jsonContent = JsonSerializer.Serialize(payload, JsonOptions);
 
             var request = CrearRequest(jsonContent);
-            var response = await _httpClient.SendAsync(request, cancellationToken);
+            var response = await EnviarYDetectarSesionAsync(request, cancellationToken);
 
             if (response.IsSuccessStatusCode)
             {
@@ -482,7 +682,7 @@ public class AniListTrackingService : IAnimeTrackingService
             var jsonContent = JsonSerializer.Serialize(payload, JsonOptions);
 
             var request = CrearRequest(jsonContent);
-            var response = await _httpClient.SendAsync(request, cancellationToken);
+            var response = await EnviarYDetectarSesionAsync(request, cancellationToken);
 
             if (response.IsSuccessStatusCode)
             {
@@ -530,8 +730,9 @@ public class AniListTrackingService : IAnimeTrackingService
         }
 
         var query = @"
-        query ($mediaIds: [Int], $airingAt_greater: Int, $airingAt_lesser: Int) {
-          Page (page: 1, perPage: 50) {
+        query ($mediaIds: [Int], $airingAt_greater: Int, $airingAt_lesser: Int, $page: Int) {
+          Page (page: $page, perPage: 50) {
+            pageInfo { hasNextPage }
             airingSchedules (mediaId_in: $mediaIds, airingAt_greater: $airingAt_greater, airingAt_lesser: $airingAt_lesser, sort: TIME) {
               episode
               airingAt
@@ -544,53 +745,67 @@ public class AniListTrackingService : IAnimeTrackingService
           }
         }";
 
-        var requestBody = new
-        {
-            query,
-            variables = new
-            {
-                mediaIds = validIds,
-                airingAt_greater = (int)inicioSemana,
-                airingAt_lesser = (int)finSemana
-            }
-        };
+        var airingList = new List<AiringEpisode>();
 
         try
         {
-            var jsonContent = JsonSerializer.Serialize(requestBody, JsonOptions);
-            var request = CrearRequest(jsonContent);
-            var response = await _httpClient.SendAsync(request);
+            bool hasNextPage = true;
+            int page = 1;
 
-            if (!response.IsSuccessStatusCode)
+            while (hasNextPage && page <= 5)
             {
-                AppLogger.Warn("AniListTrackingService", $"Calendario de emisión falló con HTTP {(int)response.StatusCode}.");
-                return [];
-            }
-
-            var jsonResponse = await response.Content.ReadAsStringAsync();
-            if (jsonResponse.Contains("\"errors\""))
-            {
-                AppLogger.Error("AniListTrackingService", $"AniList devolvió errores GraphQL en el calendario: {Truncar(jsonResponse)}", null);
-                return [];
-            }
-
-            var result = JsonSerializer.Deserialize<AniListResponse>(jsonResponse, JsonOptions);
-
-            var schedules = result?.Data?.Page?.AiringSchedules;
-            if (schedules == null) return [];
-
-            var airingList = new List<AiringEpisode>();
-            foreach (var s in schedules)
-            {
-                if (s.Media == null) continue;
-                airingList.Add(new AiringEpisode
+                var requestBody = new
                 {
-                    AniListId = s.Media.Id,
-                    Titulo = s.Media.Title.Romaji,
-                    UrlPortada = s.Media.CoverImage.ExtraLarge ?? "",
-                    NumeroEpisodio = s.Episode,
-                    FechaEmision = DateTimeOffset.FromUnixTimeSeconds(s.AiringAt).DateTime
-                });
+                    query,
+                    variables = new
+                    {
+                        mediaIds = validIds,
+                        airingAt_greater = (int)inicioSemana,
+                        airingAt_lesser = (int)finSemana,
+                        page
+                    }
+                };
+
+                var jsonContent = JsonSerializer.Serialize(requestBody, JsonOptions);
+                var request = CrearRequest(jsonContent);
+                var response = await EnviarYDetectarSesionAsync(request);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    AppLogger.Warn("AniListTrackingService", $"Calendario de emisión (página {page}) falló con HTTP {(int)response.StatusCode}.");
+                    break;
+                }
+
+                var jsonResponse = await response.Content.ReadAsStringAsync();
+                if (jsonResponse.Contains("\"errors\""))
+                {
+                    AppLogger.Error("AniListTrackingService", $"AniList devolvió errores GraphQL en el calendario (página {page}): {Truncar(jsonResponse)}", null);
+                    break;
+                }
+
+                var result = JsonSerializer.Deserialize<AniListResponse>(jsonResponse, JsonOptions);
+
+                var pageInfo = result?.Data?.Page?.PageInfo;
+                hasNextPage = pageInfo?.HasNextPage ?? false;
+
+                var schedules = result?.Data?.Page?.AiringSchedules;
+                if (schedules != null)
+                {
+                    foreach (var s in schedules)
+                    {
+                        if (s.Media == null) continue;
+                        airingList.Add(new AiringEpisode
+                        {
+                            AniListId = s.Media.Id,
+                            Titulo = s.Media.Title.Romaji,
+                            UrlPortada = s.Media.CoverImage.ExtraLarge ?? "",
+                            NumeroEpisodio = s.Episode,
+                            FechaEmision = DateTimeOffset.FromUnixTimeSeconds(s.AiringAt).DateTime
+                        });
+                    }
+                }
+                
+                page++;
             }
 
             if (airingList.Count > 0)
@@ -612,5 +827,20 @@ public class AniListTrackingService : IAnimeTrackingService
         }
     }
 
-    private static string Truncar(string texto) => texto.Length <= 400 ? texto : texto[..400] + "...";
+    private static string Truncar(string texto)
+    {
+        if (texto.Length <= 400) return texto;
+
+        // Recortar por runes (no por char) para no partir pares sustitutos UTF-16.
+        var sb = new StringBuilder(403);
+        int caracteres = 0;
+        foreach (var rune in texto.EnumerateRunes())
+        {
+            int longitud = rune.Utf16SequenceLength;
+            if (caracteres + longitud > 400) break;
+            sb.Append(rune);
+            caracteres += longitud;
+        }
+        return sb.Append("...").ToString();
+    }
 }

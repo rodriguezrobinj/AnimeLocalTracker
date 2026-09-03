@@ -9,7 +9,8 @@
 param(
     [ValidateSet("Debug", "Release")]
     [string]$Configuration = "Debug",
-    [switch]$RunTests
+    [switch]$RunTests,
+    [switch]$Coverage
 )
 
 $ErrorActionPreference = "Stop"
@@ -49,7 +50,15 @@ if (-not (Test-Path "$ffmpegDir\ffmpeg.exe") -or -not (Test-Path "$ffmpegDir\ffp
 function Invoke-Build {
     param([string]$Label)
     Write-Host "[build] $Label..." -ForegroundColor Cyan
-    & dotnet build "$root\AnimeLocalTracker.sln" -c $Configuration --nologo -v q -nodeReuse:false
+
+    # Compilación EXPLÍCITA y NO INCREMENTAL por proyecto (no `dotnet build` sobre la
+    # solución): el build de la solución podía terminar con "OK" dejando el ensamblado
+    # de tests AUSENTE (runner limpio, CI) u OBSOLETO (obj poblado en local) — el doble
+    # pase no lo garantizaba. --no-incremental fuerza siempre el producto final real.
+    # El proyecto de benchmarks se compila bajo demanda (workflow benchmarks.yml).
+    & dotnet build "$root\AnimeLocalTracker\AnimeLocalTracker.csproj" -c $Configuration --nologo -v q -nodeReuse:false --no-incremental
+    if ($LASTEXITCODE -ne 0) { return $false }
+    & dotnet build "$root\AnimeLocalTracker.Tests\AnimeLocalTracker.Tests.csproj" -c $Configuration --nologo -v q -nodeReuse:false --no-incremental
     if ($LASTEXITCODE -ne 0) { return $false }
     return $true
 }
@@ -69,20 +78,74 @@ if (-not $pasada2) {
     exit 1
 }
 
+# Verificación de artefactos: el build puede reportar "OK" sin generar el ensamblado de
+# tests (observado en CI). Si falta, se reintenta con log DETALLADO para diagnosticar.
+$testsDll = Join-Path $root "AnimeLocalTracker.Tests\bin\$Configuration\net8.0-windows\AnimeLocalTracker.Tests.dll"
+if (-not (Test-Path $testsDll)) {
+    Write-Host "[build] ERROR: no se generó el ensamblado de tests ($testsDll)." -ForegroundColor Red
+    Write-Host "[build] Reintentando con salida detallada para diagnosticar..." -ForegroundColor Yellow
+    & dotnet build "$root\AnimeLocalTracker.Tests\AnimeLocalTracker.Tests.csproj" -c $Configuration --nologo -nodeReuse:false --no-incremental -v n 2>&1 | Select-Object -Last 100
+    if (-not (Test-Path $testsDll)) {
+        Write-Host "[build] ERROR: el ensamblado de tests sigue sin generarse." -ForegroundColor Red
+        exit 1
+    }
+    Write-Host "[build] AVISO: el ensamblado de tests se generó solo en el reintento detallado." -ForegroundColor DarkYellow
+}
+
 # Copiar librerías nativas si existen
-if (Test-Path "$root\native\animetracker_core\target\release\animetracker_core.dll") {
+# DEV-10: si la copia del DLL falla (bloqueado, disco lleno...), el build NO debe
+# reportar "OK" en silencio: un exe sin el núcleo Rust rompe parse/hash/miniaturas.
+function Copy-NativeDll {
+    param([string]$Origen, [string]$Destino, [string]$Etiqueta)
+    try {
+        Copy-Item $Origen $Destino -Force
+        Write-Host "[build] DLL nativo copiado -> $Etiqueta" -ForegroundColor Green
+    }
+    catch {
+        Write-Host "[build] AVISO: no se pudo copiar animetracker_core.dll a $Etiqueta ($($_.Exception.Message))" -ForegroundColor Yellow
+    }
+}
+
+# ARC-10: compilar el núcleo Rust si falta o está desactualizado respecto a sus fuentes.
+# Antes se copiaba lo que hubiera en target\release sin verificar, pudiendo quedar una
+# DLL stale en los builds locales (el CI sí compilaba cargo antes de copiar).
+$rustDllPath = "$root\native\animetracker_core\target\release\animetracker_core.dll"
+$rustNeedsBuild = -not (Test-Path $rustDllPath)
+if (-not $rustNeedsBuild) {
+    $rustDllTime = (Get-Item $rustDllPath).LastWriteTime
+    $rustNewestSrc = Get-ChildItem "$root\native\animetracker_core\src" -Recurse -Filter "*.rs" |
+        Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    if ($rustNewestSrc -and $rustNewestSrc.LastWriteTime -gt $rustDllTime) {
+        $rustNeedsBuild = $true
+    }
+}
+if ($rustNeedsBuild) {
+    Write-Host "[build] Compilando núcleo Rust (release)..." -ForegroundColor Yellow
+    try {
+        & cargo build --release --manifest-path "$root\native\animetracker_core\Cargo.toml"
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "[build] ERROR: la compilación de animetracker_core falló." -ForegroundColor Red
+            exit 1
+        }
+    }
+    catch {
+        Write-Host "[build] AVISO: cargo no disponible; se usará la DLL existente si la hay." -ForegroundColor Yellow
+    }
+}
+
+if (Test-Path $rustDllPath) {
     # 1) Raíz del proyecto: la referencia el csproj (copiada a output en builds y publish de Velopack)
-    Copy-Item "$root\native\animetracker_core\target\release\animetracker_core.dll" "$root\AnimeLocalTracker\animetracker_core.dll" -Force -ErrorAction SilentlyContinue
+    Copy-NativeDll $rustDllPath "$root\AnimeLocalTracker\animetracker_core.dll" "raiz del proyecto"
     
     # 2) Binarios de app y tests si los directorios existen
     $appBinDir = "$root\AnimeLocalTracker\bin\$Configuration\net8.0-windows"
     $testsBinDir = "$root\AnimeLocalTracker.Tests\bin\$Configuration\net8.0-windows"
 
     if (Test-Path $appBinDir) {
-        Copy-Item "$root\native\animetracker_core\target\release\animetracker_core.dll" (Join-Path $appBinDir "animetracker_core.dll") -Force -ErrorAction SilentlyContinue
+        Copy-NativeDll $rustDllPath (Join-Path $appBinDir "animetracker_core.dll") "bin de la app"
     }
     if (Test-Path $testsBinDir) {
-        Copy-Item "$root\native\animetracker_core\target\release\animetracker_core.dll" (Join-Path $testsBinDir "animetracker_core.dll") -Force -ErrorAction SilentlyContinue
+        Copy-NativeDll $rustDllPath (Join-Path $testsBinDir "animetracker_core.dll") "bin de tests"
     }
 }
 
@@ -92,7 +155,13 @@ if ($RunTests) {
     Write-Host "== Tests ==" -ForegroundColor Yellow
     # --no-build: reutiliza los binarios de la pasada 2. Evita que VSTest recompile
     # el proyecto principal (WPF) con un graph distinto → BG1002/CS2001 intermitente.
-    & dotnet test "$root\AnimeLocalTracker.Tests" -c $Configuration --no-build --nologo -v q -nodeReuse:false
+    $testArgs = @("test", "$root\AnimeLocalTracker.Tests", "-c", $Configuration, "--no-build", "--nologo", "-v", "q", "-nodeReuse:false")
+    if ($Coverage) {
+        Write-Host "[tests] Recolectando cobertura de código (coverlet)..." -ForegroundColor Cyan
+        # coverlet.runsettings excluye el ensamblado de tests del cálculo (DEV-06b)
+        $testArgs += @("--collect:XPlat Code Coverage", "--settings", "$root\AnimeLocalTracker.Tests\coverlet.runsettings", "--logger:trx;LogFileName=tests.trx")
+    }
+    & dotnet @testArgs
     if ($LASTEXITCODE -ne 0) {
         Write-Host "[tests] ERROR: algunos tests fallaron." -ForegroundColor Red
         exit 1

@@ -1,13 +1,16 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using AnimeLocalTracker.Messages;
 using AnimeLocalTracker.Services;
+using AnimeLocalTracker.Services.Python;
 using CommunityToolkit.Mvvm.Messaging;
 using FluentAssertions;
 using Moq;
+using Moq.Protected;
 using Xunit;
 
 namespace AnimeLocalTracker.Tests.Services;
@@ -26,7 +29,7 @@ public class DownloadServiceTests
             .Returns(new HttpClient());
 
         _sourceResolverMock
-            .Setup(r => r.BuscarUrlEpisodioAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.BuscarUrlEpisodioAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync("https://example.com/video.mp4");
 
         _settingsServiceMock
@@ -37,6 +40,63 @@ public class DownloadServiceTests
             _httpClientFactoryMock.Object,
             sourceResolver: _sourceResolverMock.Object,
             settingsService: _settingsServiceMock.Object);
+    }
+
+    [Fact]
+    public async Task DownloadVideoAsync_ConManifiestoHls_DeberiaDescargarConElDaemon()
+    {
+        // Arrange: URL m3u8 → se enruta al daemon (download-stream), nunca al HttpClient
+        var bridgeMock = new Mock<IPythonBridgeService>();
+        var tempDest = Path.Combine(Path.GetTempPath(), $"hls_{Guid.NewGuid():N}.mkv");
+        var archivoDaemon = tempDest + ".mp4"; // yt-dlp añade la extensión real al outtmpl
+        await File.WriteAllTextAsync(archivoDaemon, "contenido-segmentado");
+        bridgeMock.Setup(b => b.ExecuteCommandOneShotAsync<object, DownloadService.DownloadStreamResult>(
+                "download-stream", It.IsAny<object>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new DownloadService.DownloadStreamResult { Success = true, RutaArchivo = archivoDaemon });
+
+        var sut = new DownloadService(
+            _httpClientFactoryMock.Object,
+            sourceResolver: _sourceResolverMock.Object,
+            settingsService: _settingsServiceMock.Object,
+            pythonBridge: bridgeMock.Object);
+        try
+        {
+            // Act
+            await sut.DownloadVideoAsync("https://cdn.example.com/master.m3u8", tempDest);
+
+            // Assert: el archivo del daemon se normalizó al destino esperado
+            File.Exists(tempDest).Should().BeTrue("el archivo descargado debe quedar en el destino");
+            File.Exists(archivoDaemon).Should().BeFalse("la ruta con extensión del daemon se mueve al destino");
+            bridgeMock.Verify(b => b.ExecuteCommandOneShotAsync<object, DownloadService.DownloadStreamResult>(
+                "download-stream", It.IsAny<object>(), It.IsAny<CancellationToken>()), Times.Once);
+        }
+        finally
+        {
+            try { if (File.Exists(tempDest)) File.Delete(tempDest); } catch { }
+            try { if (File.Exists(archivoDaemon)) File.Delete(archivoDaemon); } catch { }
+        }
+    }
+
+    [Fact]
+    public async Task DownloadVideoAsync_ConManifiestoHlsYDaemonFallido_DeberiaLanzarConElError()
+    {
+        // Arrange: el daemon devuelve error (p. ej. el proveedor HLS cayó)
+        var bridgeMock = new Mock<IPythonBridgeService>();
+        bridgeMock.Setup(b => b.ExecuteCommandOneShotAsync<object, DownloadService.DownloadStreamResult>(
+                "download-stream", It.IsAny<object>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new DownloadService.DownloadStreamResult { Success = false, Error = "timeout de red" });
+
+        var sut = new DownloadService(
+            _httpClientFactoryMock.Object,
+            sourceResolver: _sourceResolverMock.Object,
+            settingsService: _settingsServiceMock.Object,
+            pythonBridge: bridgeMock.Object);
+
+        // Act & Assert
+        var destino = Path.Combine(Path.GetTempPath(), $"hls_fail_{Guid.NewGuid():N}.mkv");
+        var act = async () => await sut.DownloadVideoAsync("https://cdn.example.com/master.m3u8", destino);
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*timeout de red*", "el error del daemon debe propagarse al usuario");
     }
 
     [Fact]
@@ -80,8 +140,8 @@ public class DownloadServiceTests
         var maxConcurrent = 0;
 
         _sourceResolverMock
-            .Setup(r => r.BuscarUrlEpisodioAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .Returns(async (IEnumerable<string> t, int ep, CancellationToken ct) =>
+            .Setup(r => r.BuscarUrlEpisodioAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()))
+            .Returns(async (IEnumerable<string> t, int ep, int? aniListId, CancellationToken ct) =>
             {
                 int now = Interlocked.Increment(ref activeCounter);
                 InterlockedExchangeMax(ref maxConcurrent, now);
@@ -131,8 +191,8 @@ public class DownloadServiceTests
         var resolucionesIniciadas = 0;
 
         _sourceResolverMock
-            .Setup(r => r.BuscarUrlEpisodioAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .Returns(async (IEnumerable<string> t, int ep, CancellationToken ct) =>
+            .Setup(r => r.BuscarUrlEpisodioAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()))
+            .Returns(async (IEnumerable<string> t, int ep, int? aniListId, CancellationToken ct) =>
             {
                 Interlocked.Increment(ref resolucionesIniciadas);
                 var puerta = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -199,5 +259,89 @@ public class DownloadServiceTests
             updated = Math.Max(current, value);
         }
         while (Interlocked.CompareExchange(ref target, updated, current) != current);
+    }
+
+    [Fact]
+    public async Task DownloadVideoAsync_ConTamanoDeclaradoGigante_SinSoporteRange_DeberiaAbortarYNoCrearArchivo()
+    {
+        // Arrange (SEC-03): servidor sin soporte de rangos que declara > 35 GB
+        const long gigante = 36L * 1024 * 1024 * 1024;
+        var destino = Path.Combine(Path.GetTempPath(), $"cap_{Guid.NewGuid():N}.mp4");
+
+        var handlerMock = new Mock<HttpMessageHandler>();
+        handlerMock.Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>())
+            .Returns<HttpRequestMessage, CancellationToken>((req, _) =>
+            {
+                var respuesta = new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                {
+                    Content = new ByteArrayContent(new byte[] { 1, 2, 3 })
+                };
+                respuesta.Content.Headers.ContentLength = req.Method == HttpMethod.Head ? gigante : gigante;
+                return Task.FromResult(respuesta);
+            });
+
+        var factoryMock = new Mock<IHttpClientFactory>();
+        factoryMock.Setup(f => f.CreateClient(It.IsAny<string>())).Returns(new HttpClient(handlerMock.Object));
+        var sut = new DownloadService(factoryMock.Object, sourceResolver: _sourceResolverMock.Object, settingsService: _settingsServiceMock.Object);
+
+        try
+        {
+            // Act & Assert: aborta con IOException y no deja archivo parcial
+            var act = async () => await sut.DownloadVideoAsync("https://cdn.example.com/video-gigante.mp4", destino);
+            await act.Should().ThrowAsync<IOException>()
+                .WithMessage("*límite de seguridad*");
+            File.Exists(destino).Should().BeFalse("no debe quedar archivo parcial tras el corte de seguridad");
+        }
+        finally
+        {
+            try { if (File.Exists(destino)) File.Delete(destino); } catch { }
+        }
+    }
+
+    [Fact]
+    public async Task DownloadVideoAsync_AlReanudarSinSoporteDeRangos_DeberiaReiniciarEnVezDeCorromper()
+    {
+        // Arrange (FUN-014): archivo parcial en disco y servidor que ignora Range (200 en vez de 206)
+        var destino = Path.Combine(Path.GetTempPath(), $"no206_{Guid.NewGuid():N}.mp4");
+        await File.WriteAllBytesAsync(destino, "01234"u8.ToArray());
+
+        byte[] cuerpoCompleto = "0123456789"u8.ToArray();
+        var handlerMock = new Mock<HttpMessageHandler>();
+        handlerMock.Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>())
+            .Returns<HttpRequestMessage, CancellationToken>((req, _) =>
+            {
+                var respuesta = new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                {
+                    Content = new ByteArrayContent(cuerpoCompleto)
+                };
+                respuesta.Content.Headers.ContentLength = cuerpoCompleto.Length;
+                return Task.FromResult(respuesta);
+            });
+
+        var factoryMock = new Mock<IHttpClientFactory>();
+        factoryMock.Setup(f => f.CreateClient(It.IsAny<string>())).Returns(new HttpClient(handlerMock.Object));
+        var sut = new DownloadService(factoryMock.Object, sourceResolver: _sourceResolverMock.Object, settingsService: _settingsServiceMock.Object);
+
+        try
+        {
+            // Act: reanudar contra un servidor que no respeta el Range
+            await sut.DownloadVideoAsync("https://cdn.example.com/video.mp4", destino);
+
+            // Assert: el archivo final es el cuerpo completo, sin doblar el parcial
+            var contenido = await File.ReadAllBytesAsync(destino);
+            contenido.Should().Equal(cuerpoCompleto);
+        }
+        finally
+        {
+            try { if (File.Exists(destino)) File.Delete(destino); } catch { }
+        }
     }
 }

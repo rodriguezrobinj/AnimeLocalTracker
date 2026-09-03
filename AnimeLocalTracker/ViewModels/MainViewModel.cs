@@ -1,7 +1,6 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
@@ -19,18 +18,19 @@ public partial class MainViewModel : ObservableObject,
     IRecipient<NavegarMensaje_Descargas>,
     IRecipient<NavegarMensaje_Configuracion>,
     IRecipient<NavegarMensaje_AcercaDe>,
+    IRecipient<NavegarMensaje_Estadisticas>,
     IRecipient<AbrirBuscadorMensaje>,
     IRecipient<MostrarDialogoRequestMessage>,
     IRecipient<NavegarMensaje_Reproductor>,
     IRecipient<NavegarMensaje_VolverDelReproductor>,
-    IRecipient<DescargaProgresoMensaje>
+    IRecipient<DescargaProgresoMensaje>,
+    IRecipient<NuevosEpisodiosMensaje>
 {
-    private readonly IServiceProvider _serviceProvider;
+    private readonly INavigationService _navigationService;
     private readonly IAnimeTrackingService _animeTrackingService;
-    private readonly IDatabaseService _databaseService;
+    private readonly AnimeLibraryService _animeLibraryService;
     private readonly IDownloadService _downloadService;
     private readonly IUpdateService _updateService;
-    private readonly ISettingsService _settingsService;
 
     public string VersionAppTexto => _updateService.ObtenerVersionActual();
 
@@ -42,6 +42,7 @@ public partial class MainViewModel : ObservableObject,
     [NotifyPropertyChangedFor(nameof(EsDescargasActivas))]
     [NotifyPropertyChangedFor(nameof(EsConfiguracionActiva))]
     [NotifyPropertyChangedFor(nameof(EsAcercaDeActivo))]
+    [NotifyPropertyChangedFor(nameof(EsEstadisticasActivo))]
     private ObservableObject _vistaActual = null!;
 
     public bool EsGaleriaActiva => VistaActual is GaleriaViewModel || VistaActual is DetalleViewModel;
@@ -50,6 +51,7 @@ public partial class MainViewModel : ObservableObject,
     public bool EsDescargasActivas => VistaActual is DescargasViewModel;
     public bool EsConfiguracionActiva => VistaActual is ConfiguracionViewModel;
     public bool EsAcercaDeActivo => VistaActual is AcercaDeViewModel;
+    public bool EsEstadisticasActivo => VistaActual is EstadisticasViewModel;
 
     // === BADGE DE DESCARGAS ===
     [ObservableProperty]
@@ -90,29 +92,27 @@ public partial class MainViewModel : ObservableObject,
         {
             SetProperty(ref _textoBusqueda, value);
             BusquedaSinResultados = false; // Resetear al escribir
-            EjecutarBusquedaEnVivoAsyncCore(value);
+            _ = EjecutarBusquedaEnVivoAsyncCore(value);
         }
     }
 
     public MainViewModel(
-        IServiceProvider serviceProvider, 
+        INavigationService navigationService, 
         IAnimeTrackingService animeTrackingService, 
-        IDatabaseService databaseService,
+        AnimeLibraryService animeLibraryService,
         IDownloadService downloadService,
-        IUpdateService updateService,
-        ISettingsService settingsService)
+        IUpdateService updateService)
     {
-        _serviceProvider = serviceProvider;
+        _navigationService = navigationService;
         _animeTrackingService = animeTrackingService;
-        _databaseService = databaseService;
+        _animeLibraryService = animeLibraryService;
         _downloadService = downloadService;
         _updateService = updateService;
-        _settingsService = settingsService;
 
         WeakReferenceMessenger.Default.RegisterAll(this);
 
         // Cargamos la vista inicial
-        VistaActual = _serviceProvider.GetRequiredService<GaleriaViewModel>();
+        VistaActual = _navigationService.ObtenerGaleria();
         ActualizarConteoDescargas();
     }
 
@@ -146,6 +146,28 @@ public partial class MainViewModel : ObservableObject,
         ActualizarConteoDescargas();
     }
 
+    public void Receive(NuevosEpisodiosMensaje message)
+    {
+        if (message.Cantidad <= 0) return;
+
+        ToastTitulo = LocalizationService.T("Notif_NuevosEpisodios");
+        ToastMensaje = $"{message.Cantidad} {LocalizationService.T("Notif_ResumenNuevos")}\n{message.Resumen}";
+        ToastIcono = "NewReleases";
+        ToastColor = "#4CAF50";
+        ToastVisible = true;
+
+        // Ocultar automáticamente después de 6 segundos
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(6000);
+                System.Windows.Application.Current?.Dispatcher?.Invoke(() => ToastVisible = false);
+            }
+            catch { }
+        });
+    }
+
     private void ActualizarConteoDescargas()
     {
         System.Windows.Application.Current?.Dispatcher.InvokeAsync(() =>
@@ -161,14 +183,16 @@ public partial class MainViewModel : ObservableObject,
     // ==========================================
     public void Receive(NavegarMensaje_Galeria message)
     {
-        VistaActual = _serviceProvider.GetRequiredService<GaleriaViewModel>();
+        VistaActual = _navigationService.ObtenerGaleria();
     }
 
-    public async void Receive(NavegarMensaje_Detalle message)
+    public void Receive(NavegarMensaje_Detalle message) => _ = InicializarDetalleAsync(message);
+
+    private async Task InicializarDetalleAsync(NavegarMensaje_Detalle message)
     {
         try
         {
-            var detalleVm = _serviceProvider.GetRequiredService<DetalleViewModel>();
+            var detalleVm = _navigationService.CrearDetalle();
             VistaActual = detalleVm;
             await detalleVm.InicializarAsync(message.AnimeSeleccionado);
         }
@@ -180,7 +204,7 @@ public partial class MainViewModel : ObservableObject,
 
     public void Receive(NavegarMensaje_Calendario message)
     {
-        var calendarioVm = _serviceProvider.GetRequiredService<CalendarioViewModel>();
+        var calendarioVm = _navigationService.ObtenerCalendario();
         VistaActual = calendarioVm;
 
         // El calendario es singleton: si la carga inicial falló (red/rate-limit) o está vacío,
@@ -193,17 +217,19 @@ public partial class MainViewModel : ObservableObject,
 
     public void Receive(NavegarMensaje_Descargas message)
     {
-        VistaActual = _serviceProvider.GetRequiredService<DescargasViewModel>();
+        VistaActual = _navigationService.ObtenerDescargas();
     }
 
-    public async void Receive(NavegarMensaje_Reproductor message)
+    public void Receive(NavegarMensaje_Reproductor message) => _ = NavegarAlReproductorAsync(message);
+
+    private async Task NavegarAlReproductorAsync(NavegarMensaje_Reproductor message)
     {
         try
         {
             // Guardar la vista actual antes de navegar al reproductor
             _vistaAnteriorAlReproductor = VistaActual;
 
-            var viewModel = _serviceProvider.GetService<ReproductorViewModel>();
+            var viewModel = _navigationService.CrearReproductor();
             if (viewModel == null) return;
 
             // 1. Crear el objeto Player antes de montar la vista para que FlyleafHost enlace un Player no nulo
@@ -250,20 +276,20 @@ public partial class MainViewModel : ObservableObject,
         }
         else
         {
-            VistaActual = _serviceProvider.GetRequiredService<GaleriaViewModel>();
+            VistaActual = _navigationService.ObtenerGaleria();
         }
     }
 
     [RelayCommand]
     private void NavegarGaleria()
     {
-        VistaActual = _serviceProvider.GetRequiredService<GaleriaViewModel>();
+        VistaActual = _navigationService.ObtenerGaleria();
     }
 
     [RelayCommand]
     private void NavegarAgregarAnime()
     {
-        VistaActual = _serviceProvider.GetRequiredService<AgregarAnimeViewModel>();
+        VistaActual = _navigationService.ObtenerAgregarAnime();
     }
 
     public void Receive(NavegarMensaje_AgregarAnime message)
@@ -274,13 +300,13 @@ public partial class MainViewModel : ObservableObject,
     [RelayCommand]
     private void NavegarCalendario()
     {
-        VistaActual = _serviceProvider.GetRequiredService<CalendarioViewModel>();
+        VistaActual = _navigationService.ObtenerCalendario();
     }
 
     [RelayCommand]
     private void NavegarDescargas()
     {
-        VistaActual = _serviceProvider.GetRequiredService<DescargasViewModel>();
+        VistaActual = _navigationService.ObtenerDescargas();
     }
 
     [RelayCommand]
@@ -288,7 +314,7 @@ public partial class MainViewModel : ObservableObject,
     {
         try
         {
-            VistaActual = _serviceProvider.GetRequiredService<ConfiguracionViewModel>();
+            VistaActual = _navigationService.ObtenerConfiguracion();
         }
         catch (Exception ex)
         {
@@ -308,7 +334,7 @@ public partial class MainViewModel : ObservableObject,
     {
         try 
         {
-            VistaActual = _serviceProvider.GetRequiredService<AcercaDeViewModel>();
+            VistaActual = _navigationService.ObtenerAcercaDe();
         }
         catch (Exception ex)
         {
@@ -319,6 +345,26 @@ public partial class MainViewModel : ObservableObject,
     public void Receive(NavegarMensaje_AcercaDe message)
     {
         NavegarAcercaDe();
+    }
+
+    [RelayCommand]
+    private async Task NavegarEstadisticas()
+    {
+        try
+        {
+            var estadisticasVm = _navigationService.ObtenerEstadisticas();
+            VistaActual = estadisticasVm;
+            await estadisticasVm.CargarEstadisticasAsync();
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("MainViewModel", "Error navegando a estadísticas", ex);
+        }
+    }
+
+    public void Receive(NavegarMensaje_Estadisticas message)
+    {
+        _ = NavegarEstadisticas();
     }
 
     public void Receive(AbrirBuscadorMensaje message)
@@ -447,7 +493,7 @@ public partial class MainViewModel : ObservableObject,
     // LÓGICA DE BÚSQUEDA Y CREACIÓN DE ANIME
     // ==========================================
 
-    private async void EjecutarBusquedaEnVivoAsyncCore(string busqueda)
+    private async Task EjecutarBusquedaEnVivoAsyncCore(string busqueda)
     {
         if (string.IsNullOrWhiteSpace(busqueda) || busqueda.Length < 3)
         {
@@ -513,9 +559,11 @@ public partial class MainViewModel : ObservableObject,
 
         try
         {
-            // Validar si el anime ya existe en la biblioteca
-            var animesGuardados = await _databaseService.ObtenerTodosLosAnimesAsync();
-            if (animesGuardados.Any(a => a.AniListId == animeAPI.Id))
+            // ARQ-02: toda la lógica de creación (validación, carpeta, episodios, persistencia)
+            // vive en AnimeLibraryService; este ViewModel solo gestiona su estado de UI.
+            var nuevoAnime = await _animeLibraryService.CrearYGuardarAnimeAsync(animeAPI, animeAPI.Title.Romaji);
+
+            if (nuevoAnime == null)
             {
                 IsDialogOpen = false;
                 await Task.Delay(250); // Permitir que la animación de cierre termine
@@ -525,67 +573,12 @@ public partial class MainViewModel : ObservableObject,
                 return;
             }
 
-            string nombreSeguro = string.Join("_", animeAPI.Title.Romaji.Split(System.IO.Path.GetInvalidFileNameChars()));
-            string rutaBaseVideos = _settingsService.ObtenerRutaBaseAnimes();
-            string nuevaRutaCarpeta = System.IO.Path.Combine(rutaBaseVideos, nombreSeguro);
-
-            if (!System.IO.Directory.Exists(nuevaRutaCarpeta))
-            {
-                System.IO.Directory.CreateDirectory(nuevaRutaCarpeta);
-            }
-
-            int episodiosEmitidos = 0;
-            string estadoAnime = animeAPI.Status?.ToUpperInvariant() ?? "UNKNOWN";
-
-            if (estadoAnime == "NOT_YET_RELEASED")
-            {
-                episodiosEmitidos = 0;
-            }
-            else if (estadoAnime == "RELEASING")
-            {
-                if (animeAPI.NextAiringEpisode != null)
-                {
-                    episodiosEmitidos = Math.Max(0, animeAPI.NextAiringEpisode.Episode - 1);
-                }
-                else
-                {
-                    episodiosEmitidos = animeAPI.Episodes ?? 0;
-                }
-            }
-            else // FINISHED, etc.
-            {
-                episodiosEmitidos = animeAPI.Episodes ?? 0;
-            }
-                
-            var titulosAlt = new System.Collections.Generic.List<string>();
-            if (!string.IsNullOrWhiteSpace(animeAPI.Title.English)) titulosAlt.Add(animeAPI.Title.English);
-            if (!string.IsNullOrWhiteSpace(animeAPI.Title.UserPreferred) && animeAPI.Title.UserPreferred != animeAPI.Title.Romaji) titulosAlt.Add(animeAPI.Title.UserPreferred);
-            if (animeAPI.Synonyms != null) titulosAlt.AddRange(System.Linq.Enumerable.Where(animeAPI.Synonyms, s => !string.IsNullOrWhiteSpace(s)));
-
-            var nuevoAnimeLocal = new AnimeItem
-            {
-                AniListId = animeAPI.Id,
-                Titulo = animeAPI.Title.Romaji,
-                NombresAlternativos = string.Join(" | ", System.Linq.Enumerable.Distinct(titulosAlt)),
-                UrlPortada = animeAPI.CoverImage?.ExtraLarge ?? animeAPI.CoverImage?.Large ?? "",
-                RutaCarpeta = nuevaRutaCarpeta,
-                Estado = animeAPI.Status ?? "UNKNOWN",
-                TotalEpisodios = episodiosEmitidos,
-                Generos = animeAPI.Genres != null ? string.Join(", ", animeAPI.Genres) : "",
-                Sinopsis = animeAPI.Description ?? ""
-            };
-
-            await _databaseService.GuardarAnimeAsync(nuevoAnimeLocal);
-
-            // Notificamos a la Galeria que se añadió un anime
-            WeakReferenceMessenger.Default.Send(new AnimeAñadidoMensaje(nuevoAnimeLocal));
-
             IsDialogOpen = false;
             await Task.Delay(250); // Permitir que la animación de cierre termine antes de limpiar
             TextoBusqueda = string.Empty;
             ResultadosBusqueda.Clear();
-            
-            await MostrarDialogoLocalAsync("Anime Añadido", $"Carpeta creada automáticamente en:\n{nuevaRutaCarpeta}", false, "FolderPlusOutline", "#4CAF50");
+
+            await MostrarDialogoLocalAsync("Anime Añadido", $"Carpeta creada automáticamente en:\n{nuevoAnime.RutaCarpeta}", false, "FolderPlusOutline", "#4CAF50");
         }
         catch (Exception ex)
         {

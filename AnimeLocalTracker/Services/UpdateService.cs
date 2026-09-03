@@ -21,6 +21,9 @@ public class UpdateService : IUpdateService
     private readonly IDialogService _dialogService;
     private readonly HttpClient _httpClient;
     private readonly string _releaseCachePath;
+
+    // CA1869: opciones de serialización reutilizadas (caché local de releases)
+    private static readonly System.Text.Json.JsonSerializerOptions JsonOpcionesIndentadas = new() { WriteIndented = true };
     private UpdateManager? _updateManager;
     private CancellationTokenSource? _backgroundCts;
     private bool _isUpdating = false;
@@ -30,10 +33,10 @@ public class UpdateService : IUpdateService
         _dialogService = dialogService;
         _httpClient = httpClient ?? new HttpClient();
 
-        var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        var folder = Path.Combine(appData, "AnimeLocalTracker");
-        Directory.CreateDirectory(folder);
-        _releaseCachePath = Path.Combine(folder, "release_info.json");
+        // ARQ-02: la caché de release vive en la carpeta de datos segura del usuario
+        // (Roaming podía viajar con el perfil y mezclarse con la instalación).
+        _releaseCachePath = AppDataPaths.ReleaseInfoPath;
+        AppDataPaths.MigrarArchivoDesdeRoaming("release_info.json", _releaseCachePath);
 
         InicializarManager();
     }
@@ -334,7 +337,12 @@ public class UpdateService : IUpdateService
                 // Guardar en la caché local para arranques posteriores offline
                 try
                 {
-                    var serialized = JsonSerializer.Serialize(releaseInfo, new JsonSerializerOptions { WriteIndented = true });
+                    string? directorio = Path.GetDirectoryName(_releaseCachePath);
+                    if (!string.IsNullOrWhiteSpace(directorio))
+                    {
+                        Directory.CreateDirectory(directorio);
+                    }
+                    var serialized = JsonSerializer.Serialize(releaseInfo, JsonOpcionesIndentadas);
                     await File.WriteAllTextAsync(_releaseCachePath, serialized);
                 }
                 catch (Exception ex)

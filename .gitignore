@@ -506,3 +506,14 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# Artefacto de build (regenerado por build.ps1 desde native\animetracker_core\target\release)
+animetracker_core.dll
+
+# Archivos que no se suben al repositorio (generados/privados)
+.vscode/
+installer.iss
+AUDITORIA_INTEGRAL.md
+PLAN_ACCION_V4.md
+INFORME_ANTES_DESPUES.md
+AUDITORIA_V5_2026-09-01.md

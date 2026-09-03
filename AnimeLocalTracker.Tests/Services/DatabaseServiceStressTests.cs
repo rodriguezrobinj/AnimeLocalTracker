@@ -24,6 +24,7 @@ public class DatabaseServiceStressTests : IDisposable
 
     public void Dispose()
     {
+        GC.SuppressFinalize(this);
         try
         {
             if (File.Exists(_tempDbPath))

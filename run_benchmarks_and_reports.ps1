@@ -10,6 +10,11 @@ Write-Host " ANIME LOCAL TRACKER - SUITE DE RENDIMIENTO E HISTORIAL   " -Foregro
 Write-Host "==========================================================" -ForegroundColor Cyan
 
 $historyDir = Join-Path $PSScriptRoot "BenchmarkHistory"
+if (-not $env:ANIMELOCALTRACKER_BENCH_HISTORY) {
+    # OPS-01: fijar la ruta del historial para el proceso de benchmarks (los reportes y el
+    # JSON comparativo viven en la raíz del repo, no en bin\Release de la app).
+    $env:ANIMELOCALTRACKER_BENCH_HISTORY = $historyDir
+}
 if (!(Test-Path $historyDir)) {
     New-Item -ItemType Directory -Path $historyDir -Force | Out-Null
 }

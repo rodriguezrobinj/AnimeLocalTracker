@@ -13,7 +13,7 @@ namespace AnimeLocalTracker.Benchmarks;
 [MemoryDiagnoser]
 [Orderer(SummaryOrderPolicy.FastestToSlowest)]
 [RankColumn]
-public class ReproductorBenchmarks
+public class ReproductorBenchmarks : IDisposable
 {
     private ReproductorViewModel _vm = null!;
     private List<EpisodioItem> _episodios100 = null!;
@@ -36,6 +36,19 @@ public class ReproductorBenchmarks
 
         var rand = new Random(42);
         _saltosAleatorios = Enumerable.Range(0, 100).Select(_ => rand.NextDouble() * 1440).ToArray();
+    }
+
+    [GlobalCleanup]
+    public void Cleanup()
+    {
+        Dispose();
+    }
+
+    // CA1001: el benchmark posee el ReproductorViewModel (IDisposable)
+    public void Dispose()
+    {
+        GC.SuppressFinalize(this);
+        try { _vm?.Dispose(); } catch { }
     }
 
     [Benchmark(Description = "Seeking continuo segundo a segundo (1440 segundos / 24 min)")]
@@ -103,9 +116,19 @@ public class ReproductorBenchmarks
     private class DummyDatabaseService : IDatabaseService
     {
         public Task InicializarBaseDatosAsync() => Task.CompletedTask;
+        public Task CrearBackupRotativoAsync(int maxCopias = 5, string? backupDir = null) => Task.CompletedTask;
         public Task GuardarAnimeAsync(AnimeItem anime) => Task.CompletedTask;
         public Task<List<AnimeItem>> ObtenerTodosLosAnimesAsync() => Task.FromResult(new List<AnimeItem>());
+public Task<List<AnimeItem>> ObtenerAnimesLigerosAsync() => Task.FromResult(new List<AnimeItem>());
+public Task<AnimeItem?> ObtenerAnimePorIdAsync(int aniListId) => Task.FromResult<AnimeItem?>(null);
+public Task<bool> ExisteAnimeAsync(int aniListId) => Task.FromResult(false);
+public Task ActualizarAnimesAsync(IEnumerable<AnimeItem> animes) => Task.CompletedTask;
         public Task EliminarAnimeAsync(AnimeItem anime) => Task.CompletedTask;
+        public Task EliminarRegistroEpisodioAsync(int aniListId, int numeroEpisodio) => Task.CompletedTask;
+        public Task<bool> ExportarCopiaSeguridadAsync(string rutaDestino) => Task.FromResult(true);
+        public Task<bool> RestaurarCopiaSeguridadAsync(string rutaOrigen) => Task.FromResult(true);
+        public Task<int> ExportarBibliotecaJsonAsync(string rutaDestino) => Task.FromResult(0);
+        public Task<int> ImportarBibliotecaJsonAsync(string rutaOrigen) => Task.FromResult(0);
         public Task GuardarRegistroEpisodioAsync(RegistroEpisodio registro) => Task.CompletedTask;
         public Task GuardarRegistrosEpisodioBulkAsync(IEnumerable<RegistroEpisodio> registros) => Task.CompletedTask;
         public Task<List<RegistroEpisodio>> ObtenerRegistrosPorAnimeAsync(int aniListId) => Task.FromResult(new List<RegistroEpisodio>());
@@ -120,6 +143,7 @@ public class ReproductorBenchmarks
         public Task<List<AniListMedia>> BuscarAnimePorTituloAsync(string titulo) => Task.FromResult(new List<AniListMedia>());
         public Task<bool> ActualizarProgresoAsync(int mediaId, int episodio, string token) => Task.FromResult(true);
         public Task<AniListMedia?> ObtenerAnimePorIdAsync(int id) => Task.FromResult<AniListMedia?>(null);
+        public Task<Dictionary<int, AniListMedia>> ObtenerAnimesPorIdsLoteAsync(IEnumerable<int> ids, string? token = null) => Task.FromResult(new Dictionary<int, AniListMedia>());
         public Task<AniListMediaList?> ObtenerSeguimientoUsuarioAsync(int mediaId, string token) => Task.FromResult<AniListMediaList?>(null);
         public Task<bool> GuardarSeguimientoUsuarioAsync(int mediaId, string estado, int progreso, float puntaje, DateTime? fechaInicio, DateTime? fechaFin, string token) => Task.FromResult(true);
         public Task<AniListUser?> ObtenerPerfilUsuarioAsync(string token) => Task.FromResult<AniListUser?>(null);

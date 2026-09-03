@@ -31,7 +31,7 @@ public interface IPlaybackStateService
     /// Devuelve la posición desde la cual reanudar y la duración registrada,
     /// o null si no hay un progreso previo válido (regla &gt;5s y &lt;95% de duración).
     /// </summary>
-    Task<(double Posicion, double Duracion)?> ObtenerPosicionParaReanudarAsync(int animeId, int episodio);
+    Task<(double Posicion, double Duracion)?> ObtenerPosicionParaReanudarAsync(int animeId, int episodio, string? rutaVideoActual = null);
 
     /// <summary>
     /// Aplica las reglas de negocio (limpieza al 95%, mínimo de 3 segundos) y persiste el registro.

@@ -7,37 +7,33 @@ using System.Text.Json.Serialization;
 
 namespace AnimeLocalTracker.Services.Native;
 
-public static class NativeMethods
+public static partial class NativeMethods
 {
     private const string DllName = "animetracker_core.dll";
     private static readonly Lazy<bool> _isAvailable = new(VerificarDisponibilidad);
 
     public static bool IsAvailable => _isAvailable.Value;
 
-    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, EntryPoint = "anitomy_parse")]
-    private static extern IntPtr NativeAnitomyParse(IntPtr input);
+    // ARC-08: LibraryImport source-generated en lugar de DllImport: el stub se genera
+    // en compilación, el puntero nativo se libera siempre en el finally del llamador.
+    [LibraryImport(DllName, EntryPoint = "anitomy_parse")]
+    private static partial IntPtr NativeAnitomyParse(IntPtr input);
 
-    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, EntryPoint = "anitomy_parse_batch")]
-    private static extern IntPtr NativeAnitomyParseBatch(IntPtr inputJsonArray);
+    [LibraryImport(DllName, EntryPoint = "anitomy_parse_batch")]
+    private static partial IntPtr NativeAnitomyParseBatch(IntPtr inputJsonArray);
 
-    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, EntryPoint = "compute_file_fingerprint")]
-    private static extern IntPtr NativeComputeFingerprint(IntPtr videoPath);
+    [LibraryImport(DllName, EntryPoint = "compute_file_fingerprint")]
+    private static partial IntPtr NativeComputeFingerprint(IntPtr videoPath);
 
-    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, EntryPoint = "anitomy_generate_spritesheet")]
-    private static extern IntPtr NativeGenerateSpritesheet(IntPtr videoPath, IntPtr outPath, double totalSeconds, int count);
-
-    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, EntryPoint = "anitomy_extract_frame")]
+    [LibraryImport(DllName, EntryPoint = "anitomy_extract_frame")]
     [return: MarshalAs(UnmanagedType.I1)]
-    private static extern bool NativeExtractFrame(IntPtr videoPath, IntPtr outPath, double timestamp, int width);
+    private static partial bool NativeExtractFrame(IntPtr videoPath, IntPtr outPath, double timestamp, int width);
 
-    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, EntryPoint = "anitomy_extract_frames_batch")]
-    private static extern IntPtr NativeExtractFramesBatch(IntPtr jsonRequests);
+    [LibraryImport(DllName, EntryPoint = "anitomy_free_string")]
+    private static partial void NativeAnitomyFreeString(IntPtr ptr);
 
-    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, EntryPoint = "anitomy_free_string")]
-    private static extern void NativeAnitomyFreeString(IntPtr ptr);
-
-    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, EntryPoint = "anitomy_version")]
-    private static extern IntPtr NativeAnitomyVersion();
+    [LibraryImport(DllName, EntryPoint = "anitomy_version")]
+    private static partial IntPtr NativeAnitomyVersion();
 
     private static bool VerificarDisponibilidad()
     {
@@ -81,7 +77,13 @@ public static class NativeMethods
         {
             string baseDir = AppDomain.CurrentDomain.BaseDirectory;
             string ffmpegDir = Path.Combine(baseDir, "FFmpeg");
-            if (!File.Exists(Path.Combine(ffmpegDir, "ffmpeg.exe"))) return;
+            if (!File.Exists(Path.Combine(ffmpegDir, "ffmpeg.exe")))
+            {
+                // SEC-07: visibilidad — si el ffmpeg embebido falta, el núcleo Rust y el
+                // daemon Python caerían a un "ffmpeg" del PATH del sistema sin avisar.
+                AppLogger.Warn("NativeMethods", "ffmpeg embebido no encontrado en FFmpeg/: miniaturas y daemon dependerán del ffmpeg del PATH del sistema (SEC-07).");
+                return;
+            }
 
             string? current = Environment.GetEnvironmentVariable("PATH");
             var partes = (current ?? string.Empty)
@@ -192,35 +194,6 @@ public static class NativeMethods
         }
     }
 
-    public static SpritesheetResult? GenerateSpritesheet(string videoPath, string outPath, double totalSeconds, int count = 60)
-    {
-        if (!IsAvailable || string.IsNullOrWhiteSpace(videoPath) || string.IsNullOrWhiteSpace(outPath)) return null;
-
-        IntPtr videoPtr = IntPtr.Zero;
-        IntPtr outPtr = IntPtr.Zero;
-        IntPtr resultPtr = IntPtr.Zero;
-        try
-        {
-            videoPtr = StringToUtf8Ptr(videoPath);
-            outPtr = StringToUtf8Ptr(outPath);
-            resultPtr = NativeGenerateSpritesheet(videoPtr, outPtr, totalSeconds, count);
-            string? json = MarshalStringAndFree(resultPtr);
-            if (string.IsNullOrEmpty(json)) return null;
-
-            return JsonSerializer.Deserialize<SpritesheetResult>(json);
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Debug("NativeMethods", $"Error en anitomy_generate_spritesheet nativo: {ex.Message}");
-            return null;
-        }
-        finally
-        {
-            if (videoPtr != IntPtr.Zero) Marshal.FreeHGlobal(videoPtr);
-            if (outPtr != IntPtr.Zero) Marshal.FreeHGlobal(outPtr);
-        }
-    }
-
     public static bool ExtractFrame(string videoPath, string outPath, double timestamp, int width = 240)
     {
         if (!IsAvailable || string.IsNullOrWhiteSpace(videoPath) || string.IsNullOrWhiteSpace(outPath)) return false;
@@ -245,42 +218,12 @@ public static class NativeMethods
         }
     }
 
-    /// <summary>
-    /// Extrae un lote de fotogramas en paralelo utilizando todos los núcleos de CPU disponibles vía Rayon (<50ms para todo el lote).
-    /// </summary>
-    public static List<NativeFrameResult>? ExtractFramesBatch(IEnumerable<NativeFrameRequest> requests)
-    {
-        if (!IsAvailable || requests == null) return null;
-
-        IntPtr inPtr = IntPtr.Zero;
-        IntPtr outPtr = IntPtr.Zero;
-        try
-        {
-            string jsonIn = JsonSerializer.Serialize(requests);
-            inPtr = StringToUtf8Ptr(jsonIn);
-            outPtr = NativeExtractFramesBatch(inPtr);
-            string? jsonOut = MarshalStringAndFree(outPtr);
-            outPtr = IntPtr.Zero;
-
-            if (string.IsNullOrEmpty(jsonOut)) return null;
-
-            return JsonSerializer.Deserialize<List<NativeFrameResult>>(jsonOut);
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Debug("NativeMethods", $"Error en anitomy_extract_frames_batch nativo: {ex.Message}");
-            return null;
-        }
-        finally
-        {
-            if (inPtr != IntPtr.Zero) Marshal.FreeHGlobal(inPtr);
-            if (outPtr != IntPtr.Zero) NativeAnitomyFreeString(outPtr);
-        }
-    }
-
     private static IntPtr StringToUtf8Ptr(string str)
     {
-        byte[] bytes = System.Text.Encoding.UTF8.GetBytes(str + '\0');
+        // SEC-06: codificación estricta — un string .NET con surrogates sin par no se
+        // convierte silenciosamente a '?': se lanza y el llamador degrada con log
+        // (el contrato FFI espera UTF-8 válido terminado en NUL).
+        byte[] bytes = new System.Text.UTF8Encoding(false, true).GetBytes(str + '\0');
         IntPtr ptr = Marshal.AllocHGlobal(bytes.Length);
         Marshal.Copy(bytes, 0, ptr, bytes.Length);
         return ptr;
@@ -313,15 +256,6 @@ public class NativeFrameRequest
 
     [JsonPropertyName("width")]
     public uint Width { get; set; } = 320;
-}
-
-public class NativeFrameResult
-{
-    [JsonPropertyName("out_path")]
-    public string OutPath { get; set; } = string.Empty;
-
-    [JsonPropertyName("success")]
-    public bool Success { get; set; }
 }
 
 public class ParsedAnimeInfo
@@ -373,36 +307,6 @@ public class FingerprintResult
 
     [JsonPropertyName("file_size")]
     public ulong FileSize { get; set; }
-
-    [JsonPropertyName("error")]
-    public string? Error { get; set; }
-}
-
-public class SpritesheetResult
-{
-    [JsonPropertyName("success")]
-    public bool Success { get; set; }
-
-    [JsonPropertyName("spritesheet_path")]
-    public string? SpritesheetPath { get; set; }
-
-    [JsonPropertyName("columns")]
-    public uint Columns { get; set; }
-
-    [JsonPropertyName("rows")]
-    public uint Rows { get; set; }
-
-    [JsonPropertyName("thumb_width")]
-    public uint ThumbWidth { get; set; }
-
-    [JsonPropertyName("thumb_height")]
-    public uint ThumbHeight { get; set; }
-
-    [JsonPropertyName("total_thumbs")]
-    public uint TotalThumbs { get; set; }
-
-    [JsonPropertyName("interval_seconds")]
-    public double IntervalSeconds { get; set; }
 
     [JsonPropertyName("error")]
     public string? Error { get; set; }

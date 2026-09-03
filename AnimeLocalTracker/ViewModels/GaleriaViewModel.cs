@@ -277,6 +277,12 @@ public partial class GaleriaViewModel : ObservableObject,
         // la entrega del mensaje al resto de receptores suscritos.
         try
         {
+            if (System.Windows.Application.Current?.Dispatcher is { } d && !d.CheckAccess())
+            {
+                d.InvokeAsync(() => Receive(message));
+                return;
+            }
+
             if (!BibliotecaLocales.Any(a => a.AniListId == message.NuevoAnime.AniListId))
             {
                 message.NuevoAnime.PortadaImagen = _imageCacheService.ObtenerPortada(message.NuevoAnime.AniListId, message.NuevoAnime.UrlPortada);
@@ -362,31 +368,34 @@ public partial class GaleriaViewModel : ObservableObject,
                     a.EpisodiosVistos = 0;
                 }
 
+                // FUN-018: la migración de estado solo persiste cuando el estado CAMBIA de
+                // verdad (antes se escribía la BD por cada anime en cada carga de biblioteca).
                 if (string.IsNullOrEmpty(a.EstadoUsuario) || a.EstadoUsuario == "PLANNING")
                 {
+                    string estadoAnterior = a.EstadoUsuario;
                     int episodiosVistos = a.EpisodiosVistos;
 
                     if (episodiosVistos > 0)
                     {
-                        if (a.TotalEpisodios > 0 && episodiosVistos >= a.TotalEpisodios)
-                        {
-                            a.EstadoUsuario = "COMPLETED";
-                        }
-                        else
-                        {
-                            a.EstadoUsuario = "CURRENT";
-                        }
-                        await _databaseService.ActualizarAnimeAsync(a);
+                        a.EstadoUsuario = (a.TotalEpisodios > 0 && episodiosVistos >= a.TotalEpisodios)
+                            ? "COMPLETED"
+                            : "CURRENT";
                     }
                     else if (string.IsNullOrEmpty(a.EstadoUsuario))
                     {
                         a.EstadoUsuario = "PLANNING";
+                    }
+
+                    if (!string.Equals(estadoAnterior, a.EstadoUsuario, StringComparison.Ordinal))
+                    {
                         await _databaseService.ActualizarAnimeAsync(a);
                     }
                 }
 
-                // Precarga ultra-rápida desde caché en memoria o archivo local (0ms en scroll)
-                a.PortadaImagen = _imageCacheService.ObtenerPortada(a.AniListId, a.UrlPortada);
+                // Precarga ultra-rápida desde caché en memoria (0ms en scroll).
+                // RND-01: los hits de disco/red se cargan en segundo plano por
+                // CargarPortadasFaltantesEnSegundoPlanoAsync para no bloquear la UI.
+                a.PortadaImagen = _imageCacheService.ObtenerPortadaEnMemoria(a.AniListId);
             }
 
             BibliotecaLocales = new ObservableCollection<AnimeItem>(animes);
@@ -426,7 +435,8 @@ public partial class GaleriaViewModel : ObservableObject,
             {
                 if (System.Windows.Application.Current?.Dispatcher != null && !System.Windows.Application.Current.Dispatcher.CheckAccess())
                 {
-                    System.Windows.Application.Current.Dispatcher.Invoke(() => anime.PortadaImagen = img);
+                    // RND-03: InvokeAsync para no bloquear el hilo de pool contra la UI
+                    _ = System.Windows.Application.Current.Dispatcher.InvokeAsync(() => anime.PortadaImagen = img);
                 }
                 else
                 {
@@ -485,6 +495,7 @@ public partial class GaleriaViewModel : ObservableObject,
                     {
                         var episodios = (await _fileScannerService.EscanearEpisodiosAsync(anime.RutaCarpeta!))
                             .Where(e => !string.IsNullOrWhiteSpace(e.RutaCompleta))
+                            .Where(e => e.NumeroEpisodio > 0) // FUN-004: sin número no es candidato
                             .OrderBy(e => e.NumeroEpisodio)
                             .ToList();
 
@@ -760,6 +771,21 @@ public partial class GaleriaViewModel : ObservableObject,
     private async Task ConectarAniListAsync()
     {
         MenuUsuarioAbierto = false;
+
+        // PRI-02: consentimiento informado ANTES del OAuth — la primera vez se explica
+        // qué se lee y qué se escribe en AniList (antes el navegador se abría sin copy).
+        bool consentimiento = await _dialogService.MostrarDialogoAsync(
+            "Conectar con AniList",
+            "Al conectar, la app podrá:\n\n" +
+            "• LEER tu perfil y tu lista de AniList (títulos y progreso).\n" +
+            "• ESCRIBIR tu progreso (episodios vistos), estado y puntuación cuando los marques.\n\n" +
+            "Tus archivos de video nunca se suben y la app no tiene telemetría.",
+            true,
+            "ShieldAccount",
+            "#60A5FA");
+
+        if (!consentimiento) return;
+
         bool exito = await _authService.IniciarSesionAsync();
         if (exito)
         {
@@ -790,40 +816,52 @@ public partial class GaleriaViewModel : ObservableObject,
         EstaActualizando = true;
         ProgresoTotal = listaAnimes.Count;
         ProgresoActual = 0;
+        TextoProgreso = "Consultando AniList...";
 
+        // RND-02: una consulta loteada (50 animes por request) reemplaza las ~300
+        // llamadas seriales (anime + seguimiento por separado) con Task.Delay(250).
+        var token = EstaConectado ? _authService.ObtenerTokenGuardado() : null;
+        var datosLote = await _animeTrackingService.ObtenerAnimesPorIdsLoteAsync(
+            listaAnimes.Select(a => a.AniListId), token);
+
+        int procesados = 0;
+        var modificados = new List<Models.AnimeItem>();
         foreach (var anime in listaAnimes)
         {
-            ProgresoActual++;
-            TextoProgreso = $"Sincronizando: {anime.Titulo} ({ProgresoActual}/{ProgresoTotal})";
+            procesados++;
+            ProgresoActual = procesados;
+            TextoProgreso = $"Sincronizando: {anime.Titulo} ({procesados}/{ProgresoTotal})";
 
-            var datosFrescos = await _animeTrackingService.ObtenerAnimePorIdAsync(anime.AniListId);
-            if (datosFrescos != null)
+            if (!datosLote.TryGetValue(anime.AniListId, out var datosFrescos)) continue;
+
+            int episodiosEmitidos = datosFrescos.NextAiringEpisode != null
+                ? datosFrescos.NextAiringEpisode.Episode - 1
+                : (datosFrescos.Episodes ?? 0);
+
+            // PERF-06: detectar cambios y persistir por lote al final (antes 1 UPDATE por anime).
+            bool cambio = anime.TotalEpisodios != episodiosEmitidos
+                          || !string.Equals(anime.Estado, datosFrescos.Status ?? "UNKNOWN", StringComparison.Ordinal);
+
+            anime.TotalEpisodios = episodiosEmitidos;
+            anime.Estado = datosFrescos.Status ?? "UNKNOWN";
+
+            // El estado personal del usuario viene embebido en la misma consulta loteada
+            // (mediaListEntry del usuario autenticado): sin llamadas extra por anime.
+            if (token != null && datosFrescos.MediaListEntry != null && !string.IsNullOrEmpty(datosFrescos.MediaListEntry.Status))
             {
-                int episodiosEmitidos = datosFrescos.NextAiringEpisode != null 
-                    ? datosFrescos.NextAiringEpisode.Episode - 1 
-                    : (datosFrescos.Episodes ?? 0);
-                
-                anime.TotalEpisodios = episodiosEmitidos;
-                anime.Estado = datosFrescos.Status ?? "UNKNOWN";
-                
-                // Si está conectado, sincronizamos también el estado personal del usuario
-                if (EstaConectado)
+                if (!string.Equals(anime.EstadoUsuario, datosFrescos.MediaListEntry.Status, StringComparison.Ordinal))
                 {
-                    var token = _authService.ObtenerTokenGuardado();
-                    if (!string.IsNullOrEmpty(token))
-                    {
-                        var seguimiento = await _animeTrackingService.ObtenerSeguimientoUsuarioAsync(anime.AniListId, token);
-                        if (seguimiento != null && !string.IsNullOrEmpty(seguimiento.Status))
-                        {
-                            anime.EstadoUsuario = seguimiento.Status;
-                        }
-                    }
+                    anime.EstadoUsuario = datosFrescos.MediaListEntry.Status;
+                    cambio = true;
                 }
-                
-                await _databaseService.ActualizarAnimeAsync(anime);
             }
-            
-            await Task.Delay(250); 
+
+            if (cambio) modificados.Add(anime);
+        }
+
+        if (modificados.Count > 0)
+        {
+            await _databaseService.ActualizarAnimesAsync(modificados);
         }
         
         TextoProgreso = "¡Actualización completada con éxito!";
@@ -866,12 +904,13 @@ public partial class GaleriaViewModel : ObservableObject,
         var seleccionados = BibliotecaLocales.Where(a => a.EstaSeleccionado).ToList();
         if (seleccionados.Count == 0) return;
 
+        // PERF-06: una sola transacción para el lote de seleccionados.
         foreach (var anime in seleccionados)
         {
             anime.EstadoUsuario = nuevoEstado;
-            await _databaseService.ActualizarAnimeAsync(anime);
             anime.EstaSeleccionado = false;
         }
+        await _databaseService.ActualizarAnimesAsync(seleccionados);
 
         ModoSeleccion = false;
         BibliotecaFiltrada?.Refresh();

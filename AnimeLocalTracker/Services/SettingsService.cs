@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -12,6 +12,9 @@ public class SettingsService : ISettingsService
     private AppSettings _configuracion;
     private readonly object _lockObj = new();
 
+    // CA1869: opciones de serialización reutilizadas (persistencia de settings)
+    private static readonly JsonSerializerOptions JsonOpcionesIndentadas = new() { WriteIndented = true };
+
     public event Action<AppSettings>? ConfiguracionModificada;
 
     public SettingsService(string? customSettingsPath = null)
@@ -22,10 +25,9 @@ public class SettingsService : ISettingsService
         }
         else
         {
-            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            var folder = Path.Combine(appData, "AnimeLocalTracker");
-            Directory.CreateDirectory(folder);
-            _settingsFilePath = Path.Combine(folder, "settings.json");
+            // ARQ-02: los datos del usuario SIEMPRE viven en %LocalAppData%\AnimeLocalTrackerData.
+            _settingsFilePath = AppDataPaths.SettingsPath;
+            AppDataPaths.MigrarArchivoDesdeRoaming("settings.json", _settingsFilePath);
         }
 
         _configuracion = CargarConfiguracionInicial();
@@ -47,6 +49,8 @@ public class SettingsService : ISettingsService
                         {
                             config.RutaBaseAnimes = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), "Anime");
                         }
+                        // ATA-01: el settings.json puede estar editado a mano — sanear los atajos
+                        SanitizarAtajos(config);
                         return config;
                     }
                 }
@@ -68,6 +72,50 @@ public class SettingsService : ISettingsService
         {
             return _configuracion;
         }
+    }
+
+    /// <summary>
+    /// ATA-01: sanea el diccionario de atajos de un settings.json editado a mano.
+    /// - Solo acciones conocidas; primera ocurrencia gana (descartar duplicados).
+    /// - Se rechazan teclas de sistema (Win) y valores que no corresponden a una tecla real.
+    /// - Cada tecla se asigna una sola vez: si dos acciones piden la misma, la segunda
+    ///   vuelve a su valor por defecto.
+    /// - Las acciones ausentes se completan con los defaults (fallback por acción).
+    /// </summary>
+    private static void SanitizarAtajos(AppSettings config)
+    {
+        var defaults = new AppSettings().Atajos;
+        var sanitizado = new Dictionary<string, string>(StringComparer.Ordinal);
+        var teclasUsadas = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        if (config.Atajos != null)
+        {
+            foreach (var kv in config.Atajos)
+            {
+                if (!defaults.ContainsKey(kv.Key) || sanitizado.ContainsKey(kv.Key)) continue;
+                if (!EsTeclaValida(kv.Value) || !teclasUsadas.Add(kv.Value)) continue;
+                sanitizado[kv.Key] = kv.Value;
+            }
+        }
+
+        foreach (var kv in defaults)
+        {
+            if (!sanitizado.ContainsKey(kv.Key)) sanitizado[kv.Key] = kv.Value;
+        }
+
+        config.Atajos = sanitizado;
+    }
+
+    private static bool EsTeclaValida(string? tecla)
+    {
+        if (string.IsNullOrWhiteSpace(tecla)) return false;
+        if (Enum.TryParse<System.Windows.Input.Key>(tecla, out var key))
+        {
+            if (key == System.Windows.Input.Key.None) return false;
+            if (key == System.Windows.Input.Key.LWin || key == System.Windows.Input.Key.RWin) return false;
+            return Enum.IsDefined(key);
+        }
+        return false;
     }
 
     public Task GuardarConfiguracionAsync(AppSettings configuracion)
@@ -95,7 +143,7 @@ public class SettingsService : ISettingsService
                 Directory.CreateDirectory(directory);
             }
 
-            var json = JsonSerializer.Serialize(configuracion, new JsonSerializerOptions { WriteIndented = true });
+            var json = JsonSerializer.Serialize(configuracion, JsonOpcionesIndentadas);
             File.WriteAllText(_settingsFilePath, json);
         }
         catch (Exception ex)

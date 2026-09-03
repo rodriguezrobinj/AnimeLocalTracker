@@ -14,6 +14,9 @@ namespace AnimeLocalTracker.Tests.ViewModels;
 
 public class GaleriaViewModelTests
 {
+    // CA1861: arrays constantes reutilizados como campos estáticos
+    private static readonly string[] GenerosEsperados = { "Acción", "Aventura", "Comedia", "Drama", "Fantasía", "Música", "Sobrenatural" };
+
     private readonly Mock<IAnimeTrackingService> _trackingServiceMock = new();
     private readonly Mock<IDatabaseService> _databaseServiceMock = new();
     private readonly Mock<IAuthService> _authServiceMock = new();
@@ -252,7 +255,7 @@ public class GaleriaViewModelTests
 
         // Assert
         sut.GenerosDisponibles.Should().Contain("Todos los géneros");
-        sut.GenerosDisponibles.Should().Contain(new[] { "Acción", "Aventura", "Comedia", "Drama", "Fantasía", "Música", "Sobrenatural" });
+        sut.GenerosDisponibles.Should().Contain(GenerosEsperados);
         sut.GenerosDisponibles[0].Should().Be("Todos los géneros");
     }
 

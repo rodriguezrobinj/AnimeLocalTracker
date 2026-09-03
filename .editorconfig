@@ -1,0 +1,36 @@
+# DEV-08: Análisis de código .NET activado (AnalysisLevel=latest-recommended +
+# TreatWarningsAsErrors en Directory.Build.props). Las reglas suprimidas aquí son
+# deuda de limpieza documentada en PLAN_ACCION_V4.md (CI-04) — ninguna indica un bug.
+root = true
+
+[*.cs]
+# CA1707: los sufijos "_Nombre" en las clases de mensajería (NavegarMensaje_Galeria,
+# etc.) son un patrón deliberado del código; renombrarlas tocaría XAML y receptores.
+dotnet_diagnostic.CA1707.severity = none
+
+# CA1805: inicializadores redundantes (= false / = 0). Limpieza mecánica sin valor
+# funcional; se corrige en una pasada de higiene, no como bloqueante del build.
+dotnet_diagnostic.CA1805.severity = none
+
+# CA1822: los miembros están enlazados por WPF ({Binding Propiedad}); convertirlos
+# a static rompería los bindings. Falso positivo sistemático en ViewModels.
+dotnet_diagnostic.CA1822.severity = none
+
+# CA1852: sellar clases rompería el mockeo con Moq de clases concretas en tests.
+dotnet_diagnostic.CA1852.severity = none
+
+# CA1304/CA1305/CA1310/CA1311: formateo y comparaciones sensibles a la cultura.
+# Deuda real anotada (PLAN_ACCION_V4.md CI-04): migrar a CultureInfo.InvariantCulture
+# en una limpieza dedicada (74 sitios). La app es de un solo mercado; riesgo actual bajo.
+dotnet_diagnostic.CA1304.severity = none
+dotnet_diagnostic.CA1305.severity = none
+dotnet_diagnostic.CA1310.severity = none
+dotnet_diagnostic.CA1311.severity = none
+
+# CA1859: micro-optimización de tipos de retorno (3 sitios) — se corrige en la
+# limpieza de perf, no como bloqueante (tocar código de dibujo en frío es arriesgado).
+dotnet_diagnostic.CA1859.severity = none
+
+# CA1863: CompositeFormat con cadenas localizadas (el formato cambia por idioma en
+# caliente) — el caché por idioma no aporta; se corrige con la limpieza de cultura.
+dotnet_diagnostic.CA1863.severity = none

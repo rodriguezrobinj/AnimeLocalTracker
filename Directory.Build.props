@@ -2,5 +2,15 @@
     <PropertyGroup>
         <!-- Evita condiciones de carrera entre proyectos de la solución al compilar proyectos WPF con referencias cruzadas -->
         <BuildInParallel>false</BuildInParallel>
+
+        <!-- DEV-08: calidad de build —
+             TreatWarningsAsErrors: ningún warning llega al binario (los analyzers
+             del SDK ya corren en net8; esto los convierte en bloqueantes).
+             Deterministic: mismos bits en cada build (esencial para las releases).
+             EnforceCodeStyleInBuild: los analyzers de estilo (IDE*) también bloquean. -->
+        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+        <Deterministic>true</Deterministic>
+        <AnalysisLevel>latest-recommended</AnalysisLevel>
+        <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     </PropertyGroup>
 </Project>

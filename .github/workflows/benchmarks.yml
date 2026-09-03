@@ -1,0 +1,47 @@
+name: Benchmarks (manual / semanal)
+
+# OPS-01: los benchmarks de rendimiento existían pero nunca se ejecutaban ni en CI ni de
+# forma persistida. Este workflow genera la línea base y el historial comparativo (±5%):
+#   - manualmente desde Acciones (workflow_dispatch), o
+#   - automáticamente cada lunes a las 03:00 UTC.
+# No bloquea pushes: es un job informativo que sube los reportes como artefacto.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 3 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  benchmarks:
+    name: BenchmarkDotNet (reproductor/db/scanner)
+    runs-on: windows-latest
+    timeout-minutes: 60
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+    - name: Setup .NET 8 SDK
+      uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Run Benchmarks and Generate Reports
+      shell: powershell
+      env:
+        # El historial comparativo vive en la raíz del repo (misma ruta que usa el script).
+        ANIMELOCALTRACKER_BENCH_HISTORY: ${{ github.workspace }}/BenchmarkHistory
+      run: |
+        powershell -ExecutionPolicy Bypass -File .\run_benchmarks_and_reports.ps1 -Target benchmarks -BenchmarkCategory 4
+
+    - name: Upload Benchmark History
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      if: always()
+      with:
+        name: benchmark-history
+        path: BenchmarkHistory/**
+        retention-days: 90
+        if-no-files-found: warn

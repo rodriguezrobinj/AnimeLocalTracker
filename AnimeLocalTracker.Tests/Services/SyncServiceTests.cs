@@ -10,7 +10,7 @@ using Xunit;
 
 namespace AnimeLocalTracker.Tests.Services;
 
-public class SyncServiceTests
+public class SyncServiceTests : IDisposable
 {
     private readonly Mock<IDatabaseService> _dbMock = new();
     private readonly Mock<IAnimeTrackingService> _trackingMock = new();
@@ -22,6 +22,12 @@ public class SyncServiceTests
         _sut = new SyncService(_dbMock.Object, _trackingMock.Object, _authMock.Object);
     }
 
+    public void Dispose()
+    {
+        GC.SuppressFinalize(this);
+        _sut.Dispose();
+    }
+
     [Fact]
     public async Task SincronizarPendientesAsync_UsuarioNoAutenticado_DeberiaOmitirYRetornarCero()
     {
@@ -29,10 +35,11 @@ public class SyncServiceTests
         _authMock.Setup(a => a.EstaAutenticado()).Returns(false);
 
         // Act
-        int result = await _sut.SincronizarPendientesAsync();
+        var (exitosos, pendientes) = await _sut.SincronizarPendientesAsync();
 
         // Assert
-        result.Should().Be(0);
+        exitosos.Should().Be(0);
+        pendientes.Should().Be(0);
         _dbMock.Verify(d => d.ObtenerEpisodiosNoSincronizadosAsync(), Times.Never);
     }
 
@@ -45,10 +52,11 @@ public class SyncServiceTests
         _dbMock.Setup(d => d.ObtenerEpisodiosNoSincronizadosAsync()).ReturnsAsync(new List<RegistroEpisodio>());
 
         // Act
-        int result = await _sut.SincronizarPendientesAsync();
+        var (exitosos, pendientes) = await _sut.SincronizarPendientesAsync();
 
         // Assert
-        result.Should().Be(0);
+        exitosos.Should().Be(0);
+        pendientes.Should().Be(0);
         _trackingMock.Verify(t => t.ActualizarProgresoAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>()), Times.Never);
     }
 
@@ -71,10 +79,11 @@ public class SyncServiceTests
                      .ReturnsAsync(true);
 
         // Act
-        int result = await _sut.SincronizarPendientesAsync();
+        var (exitosos, totalPendientes) = await _sut.SincronizarPendientesAsync();
 
         // Assert
-        result.Should().Be(3);
+        exitosos.Should().Be(3);
+        totalPendientes.Should().Be(3);
         // Debe enviar el episodio más alto (4) para el anime 50
         _trackingMock.Verify(t => t.ActualizarProgresoAsync(50, 4, "test_token_123"), Times.Once);
         // Debe enviar el episodio 12 para el anime 99

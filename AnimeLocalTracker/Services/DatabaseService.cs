@@ -10,15 +10,26 @@ using AnimeLocalTracker.Models;
 
 namespace AnimeLocalTracker.Services;
 
-public class DatabaseService : IDatabaseService
+public class DatabaseService : IDatabaseService, IDisposable
 {
     private readonly string? _customDbPath;
     private SQLiteAsyncConnection _conexion = null!;
     private readonly SemaphoreSlim _initLock = new(1, 1);
 
+    // CA1869: opciones de serialización reutilizadas (export JSON)
+    private static readonly System.Text.Json.JsonSerializerOptions JsonOpcionesIndentadas = new() { WriteIndented = true };
+
     public DatabaseService(string? customDbPath = null)
     {
         _customDbPath = customDbPath;
+    }
+
+    // CA1001: el lock de inicialización se libera al cerrar la app (el contenedor DI
+    // dispone los singletons en el cierre de ServiceProvider)
+    public void Dispose()
+    {
+        _initLock.Dispose();
+        GC.SuppressFinalize(this);
     }
 
     public async Task InicializarBaseDatosAsync()
@@ -38,10 +49,9 @@ public class DatabaseService : IDatabaseService
             }
             else
             {
-                var rutaAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-                var rutaCarpetaApp = Path.Combine(rutaAppData, "AnimeLocalTracker");
+                var rutaCarpetaApp = Path.GetDirectoryName(AppDataPaths.BibliotecaDb)!;
                 Directory.CreateDirectory(rutaCarpetaApp);
-                rutaBaseDatos = Path.Combine(rutaCarpetaApp, "biblioteca.db");
+                rutaBaseDatos = AppDataPaths.BibliotecaDb;
             }
 
             var conexion = new SQLiteAsyncConnection(rutaBaseDatos);
@@ -51,12 +61,9 @@ public class DatabaseService : IDatabaseService
             await conexion.ExecuteAsync("PRAGMA temp_store = MEMORY;");
             await conexion.ExecuteAsync("PRAGMA cache_size = -64000;");
 
-            // Creamos ambas tablas
-            await conexion.CreateTableAsync<AnimeItem>();
-            await conexion.CreateTableAsync<RegistroEpisodio>();
-
-            // ÍNDICE COMPUESTO PARA BÚSQUEDAS RÁPIDAS POR (AniListId, NumeroEpisodio)
-            await conexion.ExecuteAsync("CREATE INDEX IF NOT EXISTS IX_RegistroEpisodio_AnimeEp ON RegistroEpisodio(AniListId, NumeroEpisodio);");
+            // ARC-06: el esquema evoluciona con migraciones versionadas (user_version),
+            // no con CreateTableAsync suelto (que no altera columnas existentes).
+            await EjecutarMigracionesPendientesAsync(conexion);
 
             _conexion = conexion;
         }
@@ -64,6 +71,111 @@ public class DatabaseService : IDatabaseService
         {
             _initLock.Release();
         }
+    }
+
+    /// <summary>
+    /// ARC-06: migraciones versionadas. Cada entrada (Versión, Descripción, Aplicar)
+    /// se ejecuta en orden; user_version avanza al terminar cada una, de modo que una
+    /// base vieja migra hasta la última versión y una nueva las aplica todas.
+    /// </summary>
+    private static readonly (int Version, string Descripcion, Func<SQLiteAsyncConnection, Task> Aplicar)[] Migraciones =
+    {
+        (1, "esquema base (tablas AnimeItem/RegistroEpisodio + índice compuesto)", CrearEsquemaBaseAsync),
+        (2, "índice de la cola de sincronización (VistoLocal, SincronizadoEnNube)", CrearIndiceColaSincronizacionAsync)
+    };
+
+    private static async Task EjecutarMigracionesPendientesAsync(SQLiteAsyncConnection conexion)
+    {
+        int versionActual = await conexion.ExecuteScalarAsync<int>("PRAGMA user_version;");
+
+        foreach (var (version, descripcion, aplicar) in Migraciones.OrderBy(m => m.Version))
+        {
+            if (version <= versionActual) continue;
+
+            await aplicar(conexion);
+            await conexion.ExecuteAsync($"PRAGMA user_version = {version};");
+            AppLogger.Info("DatabaseService", $"Migración aplicada: v{version} ({descripcion}).");
+        }
+    }
+
+    private static async Task CrearEsquemaBaseAsync(SQLiteAsyncConnection conexion)
+    {
+        await conexion.CreateTableAsync<AnimeItem>();
+        await conexion.CreateTableAsync<RegistroEpisodio>();
+
+        // ÍNDICE COMPUESTO PARA BÚSQUEDAS RÁPIDAS POR (AniListId, NumeroEpisodio)
+        await conexion.ExecuteAsync("CREATE INDEX IF NOT EXISTS IX_RegistroEpisodio_AnimeEp ON RegistroEpisodio(AniListId, NumeroEpisodio);");
+    }
+
+    /// <summary>
+    /// PERF-10: la consulta de la cola de sincronización (VistoLocal=1 y SincronizadoEnNube=0)
+    /// barría la tabla completa (SCAN). Con este índice es un rango directo cuando la
+    /// biblioteca crezca a cientos de miles de registros.
+    /// </summary>
+    private static async Task CrearIndiceColaSincronizacionAsync(SQLiteAsyncConnection conexion)
+    {
+        await conexion.ExecuteAsync("CREATE INDEX IF NOT EXISTS IX_RegistroEpisodio_SyncCola ON RegistroEpisodio(VistoLocal, SincronizadoEnNube);");
+    }
+
+    /// <summary>
+    /// Copia de seguridad rotativa de la base de datos (historial de visionado, favoritos,
+    /// sincronización). Se ejecuta al arrancar: conserva las últimas
+    /// <paramref name="maxCopias"/> copias en %LocalAppData%\AnimeLocalTrackerData\Backups
+    /// (inmunes a la desinstalación). BAK-02: la rotación y el snapshot corren en un hilo
+    /// de fondo, no en el de la UI.
+    /// </summary>
+    public async Task CrearBackupRotativoAsync(int maxCopias = 5, string? backupDir = null)
+    {
+        try
+        {
+            backupDir ??= Path.Combine(AppDataPaths.DataRoot, "Backups");
+
+            await Task.Run(async () =>
+            {
+                // Rotación: 4→5, 3→4, …, 1→2 (la copia más reciente queda en .backup.1.db)
+                for (int i = maxCopias - 1; i >= 1; i--)
+                {
+                    string viejo = Path.Combine(backupDir, $"biblioteca.backup.{i}.db");
+                    string nuevo = Path.Combine(backupDir, $"biblioteca.backup.{i + 1}.db");
+                    if (File.Exists(viejo))
+                    {
+                        if (File.Exists(nuevo)) File.Delete(nuevo);
+                        File.Move(viejo, nuevo);
+                    }
+                }
+
+                string destino = Path.Combine(backupDir, "biblioteca.backup.1.db");
+                if (!await CrearSnapshotAtomicoAsync(destino)) return;
+
+                AppLogger.Info("DatabaseService", $"Backup de la biblioteca creado: {destino}");
+            });
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn("DatabaseService", $"No se pudo crear el backup de la biblioteca: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Snapshot atómico de la base de datos mediante <c>VACUUM INTO</c> (SQLite 3.27+):
+    /// genera una copia íntegra leyendo la base + WAL en un solo paso, sin checkpoint
+    /// manual (BAK-01/BAK-04) y sin bloquear escrituras concurrentes.
+    /// </summary>
+    private async Task<bool> CrearSnapshotAtomicoAsync(string rutaDestino)
+    {
+        if (_conexion == null) return false;
+
+        string dbPath = _conexion.DatabasePath;
+        if (!File.Exists(dbPath) || new FileInfo(dbPath).Length == 0) return false;
+
+        var destinoDir = Path.GetDirectoryName(rutaDestino);
+        if (!string.IsNullOrEmpty(destinoDir)) Directory.CreateDirectory(destinoDir);
+
+        // VACUUM INTO no puede ejecutarse dentro de una transacción; escapar comillas.
+        string destinoSql = rutaDestino.Replace("'", "''");
+        if (File.Exists(rutaDestino)) File.Delete(rutaDestino);
+        await _conexion.ExecuteAsync($"VACUUM INTO '{destinoSql}'");
+        return File.Exists(rutaDestino);
     }
 
     public async Task GuardarAnimeAsync(AnimeItem anime)
@@ -74,12 +186,282 @@ public class DatabaseService : IDatabaseService
 
     public async Task<List<AnimeItem>> ObtenerTodosLosAnimesAsync()
     {
-        return await _conexion.Table<AnimeItem>().ToListAsync();
+        var animes = await _conexion.Table<AnimeItem>().ToListAsync();
+        await Task.Run(() => 
+        {
+            foreach (var a in animes)
+            {
+                a.ResolverPortadaLocal();
+            }
+        });
+        return animes;
+    }
+
+    /// <summary>
+    /// PERF-02: proyección ligera de la biblioteca para listas (calendario, notificador,
+    /// comprobaciones): omite la columna Sinopsis (hasta ~20 KB por anime en HTML) que
+    /// solo necesita la ficha de detalle.
+    /// </summary>
+    public async Task<List<AnimeItem>> ObtenerAnimesLigerosAsync()
+    {
+        var items = await _conexion.QueryAsync<AnimeItem>(
+            "SELECT AniListId, MalId, Titulo, NombresAlternativos, RutaCarpeta, UrlPortada, " +
+            "Generos, TotalEpisodios, Estado, EstadoUsuario FROM AnimeItem;");
+        foreach (var a in items)
+        {
+            a.ResolverPortadaLocal();
+        }
+        return items;
+    }
+
+    /// <summary>Devuelve la fila completa de un anime (incluida la Sinopsis) por su id.</summary>
+    public async Task<AnimeItem?> ObtenerAnimePorIdAsync(int aniListId)
+    {
+        return await _conexion.Table<AnimeItem>().FirstOrDefaultAsync(a => a.AniListId == aniListId);
+    }
+
+    /// <summary>PERF-03: comprueba la existencia sin cargar la biblioteca completa.</summary>
+    public async Task<bool> ExisteAnimeAsync(int aniListId)
+    {
+        return await _conexion.ExecuteScalarAsync<int>(
+                   "SELECT COUNT(*) FROM AnimeItem WHERE AniListId = ?", aniListId) > 0;
     }
     
     public async Task EliminarAnimeAsync(AnimeItem anime)
     {
         await _conexion.DeleteAsync(anime);
+        // Limpiar también los registros de episodios para no dejar huérfanos
+        await _conexion.ExecuteAsync("DELETE FROM RegistroEpisodio WHERE AniListId = ?", anime.AniListId);
+    }
+
+    public async Task EliminarRegistroEpisodioAsync(int aniListId, int numeroEpisodio)
+    {
+        await _conexion.ExecuteAsync("DELETE FROM RegistroEpisodio WHERE AniListId = ? AND NumeroEpisodio = ?", aniListId, numeroEpisodio);
+    }
+
+    /// <summary>
+    /// Restaura la biblioteca desde una copia de seguridad (.db): valida integridad
+    /// SQLite ANTES de tocar la base actual, guarda el estado previo para revertir
+    /// ante cualquier fallo, y reabre la conexión al final (BAK-03).
+    /// </summary>
+    public async Task<bool> RestaurarCopiaSeguridadAsync(string rutaOrigen)
+    {
+        if (!File.Exists(rutaOrigen) || new FileInfo(rutaOrigen).Length == 0) return false;
+
+        // 1. Validar la integridad de la copia antes de tocar la base actual
+        try
+        {
+            using var check = new SQLiteConnection(rutaOrigen);
+            if (check.ExecuteScalar<string>("PRAGMA integrity_check;") != "ok")
+            {
+                AppLogger.Warn("DatabaseService", "Restore rechazado: la copia no pasó integrity_check.");
+                return false;
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn("DatabaseService", $"Restore rechazado: no se pudo abrir la copia ({ex.Message})");
+            return false;
+        }
+
+        if (_conexion == null) return false;
+        string dbPath = _conexion.DatabasePath;
+        string guard = dbPath + ".restore_prev";
+
+        try
+        {
+            // 2. Guard del estado actual (permite revertir ante cualquier fallo)
+            try { if (File.Exists(guard)) File.Delete(guard); } catch { }
+            File.Copy(dbPath, guard, overwrite: true);
+
+            // 3. Cerrar la conexión y reemplazar el archivo
+            try { await _conexion.CloseAsync(); } catch { }
+            _conexion = null!;
+            File.Copy(rutaOrigen, dbPath, overwrite: true);
+
+            // 4. Reabrir (recrea WAL, tablas e índices)
+            await InicializarBaseDatosAsync();
+
+            try { if (File.Exists(guard)) File.Delete(guard); } catch { }
+            AppLogger.Info("DatabaseService", $"Biblioteca restaurada desde: {rutaOrigen}");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            // 5. Revertir al estado previo
+            AppLogger.Error("DatabaseService", "Fallo al restaurar; revirtiendo al estado previo", ex);
+            try { if (File.Exists(guard)) File.Copy(guard, dbPath, overwrite: true); } catch { }
+            _conexion = null!;
+            await InicializarBaseDatosAsync();
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Exporta un snapshot íntegro de la base de datos (VACUUM INTO) a la ruta de destino
+    /// elegida por el usuario. Devuelve true si se creó correctamente.
+    /// </summary>
+    public async Task<bool> ExportarCopiaSeguridadAsync(string rutaDestino)
+    {
+        try
+        {
+            // BAK-02: la copia corre en un hilo de fondo, no en la UI
+            return await Task.Run(async () => await CrearSnapshotAtomicoAsync(rutaDestino));
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn("DatabaseService", $"No se pudo exportar la copia de seguridad: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Exporta la biblioteca completa (animes + registros de episodios) a un JSON
+    /// de respaldo portable. Devuelve la cantidad de animes exportados.
+    /// </summary>
+    public async Task<int> ExportarBibliotecaJsonAsync(string rutaDestino)
+    {
+        var animes = await ObtenerTodosLosAnimesAsync() ?? new List<AnimeItem>();
+        var registros = await ObtenerTodosLosRegistrosAsync() ?? new List<RegistroEpisodio>();
+
+        var backup = new BibliotecaBackup
+        {
+            Animes = animes,
+            Registros = registros
+        };
+
+        // PERF-07: la serialización (CPU) corre en el thread pool, no en el hilo de UI.
+        var json = await Task.Run(() => System.Text.Json.JsonSerializer.Serialize(backup, JsonOpcionesIndentadas));
+
+        var destinoDir = Path.GetDirectoryName(rutaDestino);
+        if (!string.IsNullOrEmpty(destinoDir)) Directory.CreateDirectory(destinoDir);
+        await File.WriteAllTextAsync(rutaDestino, json);
+
+        return animes.Count;
+    }
+
+    /// <summary>Tope de tamaño del JSON de importación (IMP-01): evita agotar la RAM con archivos gigantes.</summary>
+    private const long TopeImportacionBytes = 50L * 1024 * 1024;
+
+    /// <summary>
+    /// Importa una biblioteca desde JSON (generado por <see cref="ExportarBibliotecaJsonAsync"/>),
+    /// fusionando con la existente (upsert por AniListId / AniListId+Episodio).
+    /// Devuelve la cantidad de animes importados.
+    /// </summary>
+    public async Task<int> ImportarBibliotecaJsonAsync(string rutaOrigen)
+    {
+        if (!File.Exists(rutaOrigen)) return 0;
+
+        // IMP-01: rechazar archivos fuera de rango antes de leerlos
+        if (new FileInfo(rutaOrigen).Length > TopeImportacionBytes)
+            throw new InvalidDataException("El archivo de importación supera el límite de 50 MB.");
+
+        // PERF-07: la lectura del archivo y el parseo (CPU) corren en el thread pool.
+        string json = await Task.Run(() => File.ReadAllText(rutaOrigen));
+
+        // FUN-013: un JSON con tipos inválidos o malformado debe fallar con mensaje claro
+        // (antes la JsonException llegaba al ViewModel como un error genérico "Error").
+        BibliotecaBackup? backup;
+        try
+        {
+            backup = await Task.Run(() => System.Text.Json.JsonSerializer.Deserialize<BibliotecaBackup>(json));
+        }
+        catch (System.Text.Json.JsonException ex)
+        {
+            AppLogger.Error("DatabaseService", "Import: el archivo no es un JSON de biblioteca válido", ex);
+            throw new InvalidDataException("El archivo seleccionado no es un JSON de biblioteca válido de AnimeLocalTracker.");
+        }
+        if (backup?.Animes == null) return 0;
+
+        // IMP-02: saneado semántico — solo filas coherentes entran a la base
+        var animesValidos = backup.Animes.Where(EsAnimeImportable).ToList();
+        var registrosValidos = (backup.Registros ?? new List<RegistroEpisodio>())
+            .Where(EsRegistroImportable)
+            .Select(r =>
+            {
+                // IMP-04: los registros importados NUNCA generan sync automático a AniList
+                // (el sync periódico empujaría el progreso ajeno a la nube sin consentimiento).
+                r.SincronizadoEnNube = true;
+                return r;
+            })
+            .ToList();
+
+        int descartados = (backup.Animes.Count - animesValidos.Count)
+                          + ((backup.Registros ?? new List<RegistroEpisodio>()).Count - registrosValidos.Count);
+        if (descartados > 0)
+            AppLogger.Warn("DatabaseService", $"Import: {descartados} filas descartadas por validación");
+
+        // FUN-013: AniListId duplicados DENTRO del propio JSON — antes el InsertOrReplace
+        // hacía que el último pisara al primero en silencio. Ahora se avisa y gana el último.
+        var agrupadosPorId = animesValidos.GroupBy(a => a.AniListId).ToList();
+        int idsDuplicados = agrupadosPorId.Count(g => g.Count() > 1);
+        if (idsDuplicados > 0)
+        {
+            AppLogger.Warn("DatabaseService", $"Import: {idsDuplicados} AniListId duplicados en el JSON; se conserva la última entrada de cada uno.");
+        }
+        var animesUnicos = agrupadosPorId.Select(g => g.Last()).ToList();
+
+        // IMP-03: todo o nada — una sola transacción; cualquier fallo revierte el lote completo
+        await _conexion.RunInTransactionAsync(db =>
+        {
+            foreach (var anime in animesUnicos) db.InsertOrReplace(anime);
+            AplicarUpsertRegistros(db, registrosValidos);
+        });
+
+        return animesUnicos.Count;
+    }
+
+    private static bool EsAnimeImportable(AnimeItem a)
+    {
+        if (a.AniListId <= 0) return false;
+        if (string.IsNullOrWhiteSpace(a.Titulo) || a.Titulo.Length > 500) return false;
+        if (a.Sinopsis?.Length > 20000) return false;
+        if (a.Generos?.Length > 2000) return false;
+        if (a.NombresAlternativos?.Length > 2000) return false;
+        if (a.Estado?.Length > 32 || a.EstadoUsuario?.Length > 32) return false;
+        if (a.UrlPortada?.Length > 2000) return false;
+        if (a.TotalEpisodios is < 0 or > 10000) return false;
+        if (!string.IsNullOrWhiteSpace(a.RutaCarpeta) && !EsRutaSanitaria(a.RutaCarpeta)) return false;
+        return true;
+    }
+
+    private static bool EsRegistroImportable(RegistroEpisodio r)
+    {
+        if (r.AniListId <= 0) return false;
+        if (r.NumeroEpisodio is <= 0 or > 3000) return false;
+        if (r.ProgresoSegundos < 0 || r.TotalSegundos < 0) return false;
+        // ~31 años de reproducción: protege las estadísticas de duraciones absurdas
+        if (r.ProgresoSegundos > 1_000_000_000 || r.TotalSegundos > 1_000_000_000) return false;
+        if (r.Resolucion?.Length > 32 || r.CodecVideo?.Length > 32 || r.Fps?.Length > 32) return false;
+        if (r.RutaMiniatura?.Length > 1000) return false;
+        if (!string.IsNullOrWhiteSpace(r.RutaArchivo) && !EsRutaSanitaria(r.RutaArchivo)) return false;
+        return true;
+    }
+
+    /// <summary>
+    /// IMP-02: ruta local bien formada — longitud acotada, sin caracteres inválidos y sin
+    /// esquemas remotos (http/https/ftp). La contención estricta al árbol base no aplica
+    /// porque el import entre máquinas legitima rutas de otro equipo.
+    /// </summary>
+    // CA1861/CA1870: conjunto de caracteres inválidos en caché (SearchValues, .NET 8)
+    private static readonly System.Buffers.SearchValues<char> CaracteresRutaInvalidos =
+        System.Buffers.SearchValues.Create(['\0', '?']);
+
+    private static bool EsRutaSanitaria(string ruta)
+    {
+        if (string.IsNullOrWhiteSpace(ruta) || ruta.Length > 4000) return false;
+        if (ruta.AsSpan().IndexOfAny(CaracteresRutaInvalidos) >= 0) return false;
+        if (Uri.TryCreate(ruta, UriKind.Absolute, out var uri) &&
+            (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == Uri.UriSchemeFtp))
+            return false;
+        return true;
+    }
+
+    /// <summary>Contenedor JSON portable de la biblioteca.</summary>
+    public class BibliotecaBackup
+    {
+        public List<AnimeItem> Animes { get; set; } = new();
+        public List<RegistroEpisodio> Registros { get; set; } = new();
     }
     
     public async Task GuardarRegistroEpisodioAsync(RegistroEpisodio registro)
@@ -126,55 +508,64 @@ public class DatabaseService : IDatabaseService
         var lista = registros.ToList();
         if (lista.Count == 0) return;
 
-        await _conexion.RunInTransactionAsync(db =>
+        await _conexion.RunInTransactionAsync(db => AplicarUpsertRegistros(db, lista));
+    }
+
+    /// <summary>
+    /// Upsert transaccional de registros de episodio con merge (misma semántica que
+    /// <see cref="GuardarRegistroEpisodioAsync"/>): conserva RutaArchivo si el nuevo viene
+    /// vacío y no duplica filas. Fuente única para el bulk y el import de biblioteca.
+    /// </summary>
+    private static void AplicarUpsertRegistros(SQLiteConnection db, List<RegistroEpisodio> registros)
+    {
+        if (registros.Count == 0) return;
+
+        // 1 SELECT para todos los animes involucrados (antes: 1 SELECT + 1 INSERT/UPDATE POR FILA = N+1)
+        var aniListIds = registros.Select(r => r.AniListId).Distinct().ToList();
+        var existentes = db.Table<RegistroEpisodio>()
+            .Where(r => aniListIds.Contains(r.AniListId))
+            .ToList()
+            .GroupBy(r => (r.AniListId, r.NumeroEpisodio))
+            .ToDictionary(g => g.Key, g => g.First());
+
+        var ahora = DateTime.UtcNow;
+        var aInsertar = new List<RegistroEpisodio>();
+        var aActualizar = new List<RegistroEpisodio>();
+
+        foreach (var registro in registros)
         {
-            // 1 SELECT para todos los animes involucrados (antes: 1 SELECT + 1 INSERT/UPDATE POR FILA = N+1)
-            var aniListIds = lista.Select(r => r.AniListId).Distinct().ToList();
-            var existentes = db.Table<RegistroEpisodio>()
-                .Where(r => aniListIds.Contains(r.AniListId))
-                .ToList()
-                .GroupBy(r => (r.AniListId, r.NumeroEpisodio))
-                .ToDictionary(g => g.Key, g => g.First());
-
-            var ahora = DateTime.UtcNow;
-            var aInsertar = new List<RegistroEpisodio>();
-            var aActualizar = new List<RegistroEpisodio>();
-
-            foreach (var registro in lista)
+            if (existentes.TryGetValue((registro.AniListId, registro.NumeroEpisodio), out var existente))
             {
-                if (existentes.TryGetValue((registro.AniListId, registro.NumeroEpisodio), out var existente))
+                // Mismo merge que GuardarRegistroEpisodioAsync: conservar RutaArchivo si el nuevo viene vacío
+                existente.VistoLocal = registro.VistoLocal;
+                existente.FavoritoLocal = registro.FavoritoLocal;
+                existente.ProgresoSegundos = registro.ProgresoSegundos;
+                existente.TotalSegundos = registro.TotalSegundos;
+                existente.UltimaReproduccion = registro.UltimaReproduccion ?? ahora;
+                if (!string.IsNullOrWhiteSpace(registro.RutaArchivo))
                 {
-                    // Mismo merge que GuardarRegistroEpisodioAsync: conservar RutaArchivo si el nuevo viene vacío
-                    existente.VistoLocal = registro.VistoLocal;
-                    existente.FavoritoLocal = registro.FavoritoLocal;
-                    existente.ProgresoSegundos = registro.ProgresoSegundos;
-                    existente.TotalSegundos = registro.TotalSegundos;
-                    existente.UltimaReproduccion = registro.UltimaReproduccion ?? ahora;
-                    if (!string.IsNullOrWhiteSpace(registro.RutaArchivo))
-                    {
-                        existente.RutaArchivo = registro.RutaArchivo;
-                    }
-                    if (!string.IsNullOrWhiteSpace(registro.Resolucion)) existente.Resolucion = registro.Resolucion;
-                    if (!string.IsNullOrWhiteSpace(registro.CodecVideo)) existente.CodecVideo = registro.CodecVideo;
-                    if (!string.IsNullOrWhiteSpace(registro.Fps)) existente.Fps = registro.Fps;
-                    if (registro.Es10Bit) existente.Es10Bit = registro.Es10Bit;
-                    if (!string.IsNullOrWhiteSpace(registro.RutaMiniatura)) existente.RutaMiniatura = registro.RutaMiniatura;
+                    existente.RutaArchivo = registro.RutaArchivo;
+                }
+                if (!string.IsNullOrWhiteSpace(registro.Resolucion)) existente.Resolucion = registro.Resolucion;
+                if (!string.IsNullOrWhiteSpace(registro.CodecVideo)) existente.CodecVideo = registro.CodecVideo;
+                if (!string.IsNullOrWhiteSpace(registro.Fps)) existente.Fps = registro.Fps;
+                if (registro.Es10Bit) existente.Es10Bit = registro.Es10Bit;
+                if (!string.IsNullOrWhiteSpace(registro.RutaMiniatura)) existente.RutaMiniatura = registro.RutaMiniatura;
 
-                    aActualizar.Add(existente);
-                }
-                else
-                {
-                    if (!registro.UltimaReproduccion.HasValue)
-                    {
-                        registro.UltimaReproduccion = ahora;
-                    }
-                    aInsertar.Add(registro);
-                }
+                aActualizar.Add(existente);
             }
+            else
+            {
+                if (!registro.UltimaReproduccion.HasValue)
+                {
+                    registro.UltimaReproduccion = ahora;
+                }
+                aInsertar.Add(registro);
+            }
+        }
 
-            if (aInsertar.Count > 0) db.InsertAll(aInsertar, runInTransaction: false);
-            if (aActualizar.Count > 0) db.UpdateAll(aActualizar, runInTransaction: false);
-        });
+        if (aInsertar.Count > 0) db.InsertAll(aInsertar, runInTransaction: false);
+        if (aActualizar.Count > 0) db.UpdateAll(aActualizar, runInTransaction: false);
     }
 
     public async Task<List<RegistroEpisodio>> ObtenerRegistrosPorAnimeAsync(int aniListId)
@@ -223,5 +614,28 @@ public class DatabaseService : IDatabaseService
     public async Task ActualizarAnimeAsync(AnimeItem anime)
     {
         await _conexion.UpdateAsync(anime);
+    }
+
+    public async Task ActualizarAnimesAsync(IEnumerable<AnimeItem> animes)
+    {
+        var lista = animes?.ToList();
+        if (lista == null || lista.Count == 0) return;
+
+        // PERF-06: UpdateAll en una sola transacción (los animes ya existen en la BD).
+        await _conexion.UpdateAllAsync(lista);
+    }
+
+    /// <summary>
+    /// PRI-01: vacía las tablas de la biblioteca local (animes + registros) en una sola
+    /// transacción. El esquema y las migraciones se conservan; el backup rotativo se
+    /// regenerará vacío en el siguiente arranque.
+    /// </summary>
+    public async Task VaciarBibliotecaAsync()
+    {
+        await _conexion.RunInTransactionAsync(db =>
+        {
+            db.Execute("DELETE FROM RegistroEpisodio;");
+            db.Execute("DELETE FROM AnimeItem;");
+        });
     }
 }

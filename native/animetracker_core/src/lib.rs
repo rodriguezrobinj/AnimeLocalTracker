@@ -19,54 +19,6 @@ fn ffi_catch<T>(f: impl FnOnce() -> T, fallback: T) -> T {
     }
 }
 
-/// Genera una tira de miniaturas (Sprite Sheet mosaico) de un video en segundo plano.
-#[no_mangle]
-pub extern "C" fn anitomy_generate_spritesheet(
-    video_path: *const c_char,
-    out_path: *const c_char,
-    total_seconds: f64,
-    count: i32,
-) -> *mut c_char {
-    ffi_catch(
-        || anitomy_generate_spritesheet_inner(video_path, out_path, total_seconds, count),
-        std::ptr::null_mut(),
-    )
-}
-
-fn anitomy_generate_spritesheet_inner(
-    video_path: *const c_char,
-    out_path: *const c_char,
-    total_seconds: f64,
-    count: i32,
-) -> *mut c_char {
-    if video_path.is_null() || out_path.is_null() {
-        return std::ptr::null_mut();
-    }
-
-    let c_video = unsafe { CStr::from_ptr(video_path) };
-    let c_out = unsafe { CStr::from_ptr(out_path) };
-
-    let video_str = match c_video.to_str() {
-        Ok(s) => s,
-        Err(_) => return std::ptr::null_mut(),
-    };
-    let out_str = match c_out.to_str() {
-        Ok(s) => s,
-        Err(_) => return std::ptr::null_mut(),
-    };
-
-    let result = spritesheet::generate_spritesheet(video_str, out_str, total_seconds, count.max(0) as u32);
-    let json = match serde_json::to_string(&result) {
-        Ok(j) => j,
-        Err(_) => return std::ptr::null_mut(),
-    };
-
-    match CString::new(json) {
-        Ok(cs) => cs.into_raw(),
-        Err(_) => std::ptr::null_mut(),
-    }
-}
-
 /// Extrae un fotograma único en un timestamp de forma ultrarrápida (<20ms).
 #[no_mangle]
 pub extern "C" fn anitomy_extract_frame(
@@ -103,44 +55,9 @@ fn anitomy_extract_frame_inner(
         Err(_) => return false,
     };
 
-    spritesheet::extract_frame(video_str, out_str, timestamp, width.max(0) as u32)
-}
-
-/// Extrae múltiples fotogramas en paralelo utilizando Rayon y retorna un JSON con los resultados.
-#[no_mangle]
-pub extern "C" fn anitomy_extract_frames_batch(json_requests: *const c_char) -> *mut c_char {
-    ffi_catch(
-        || anitomy_extract_frames_batch_inner(json_requests),
-        std::ptr::null_mut(),
-    )
-}
-
-fn anitomy_extract_frames_batch_inner(json_requests: *const c_char) -> *mut c_char {
-    if json_requests.is_null() {
-        return std::ptr::null_mut();
-    }
-
-    let c_str = unsafe { CStr::from_ptr(json_requests) };
-    let json_str = match c_str.to_str() {
-        Ok(s) => s,
-        Err(_) => return std::ptr::null_mut(),
-    };
-
-    let requests: Vec<spritesheet::FrameExtractionRequest> = match serde_json::from_str(json_str) {
-        Ok(r) => r,
-        Err(_) => return std::ptr::null_mut(),
-    };
-
-    let results = spritesheet::extract_frames_batch(requests);
-    let out_json = match serde_json::to_string(&results) {
-        Ok(j) => j,
-        Err(_) => return std::ptr::null_mut(),
-    };
-
-    match CString::new(out_json) {
-        Ok(cs) => cs.into_raw(),
-        Err(_) => std::ptr::null_mut(),
-    }
+    let w = (width.clamp(16, 4096) as u32).next_power_of_two().min(4096);
+    let t = if timestamp.is_finite() && timestamp >= 0.0 { timestamp } else { 0.0 };
+    spritesheet::extract_frame(video_str, out_str, t, w)
 }
 
 /// Parsea un nombre de archivo de anime y retorna un JSON con los metadatos.
@@ -242,8 +159,12 @@ fn compute_file_fingerprint_inner(video_path: *const c_char) -> *mut c_char {
 }
 
 /// Libera la memoria de una cadena de texto creada en Rust para el llamador de C#.
+///
+/// # Safety
+/// `ptr` debe ser un puntero producido por `CString::into_raw` (nulo permitido) y
+/// solo debe liberarse una vez; cualquier otro uso es un double-free o un free inválido.
 #[no_mangle]
-pub extern "C" fn anitomy_free_string(ptr: *mut c_char) {
+pub unsafe extern "C" fn anitomy_free_string(ptr: *mut c_char) {
     if !ptr.is_null() {
         unsafe {
             let _ = CString::from_raw(ptr);

@@ -52,7 +52,13 @@ public static class BenchmarkHistoryManager
 
     public static string GetDefaultHistoryDirectory()
     {
-        string dir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "BenchmarkHistory");
+        // OPS-01: la ruta se puede fijar con la variable ANIMELOCALTRACKER_BENCH_HISTORY
+        // (el script run_benchmarks_and_reports.ps1 la define en la raíz del repo; antes el
+        // historial se escribía en bin\ y el script lo buscaba en la raíz: nunca coincidían).
+        string? envDir = Environment.GetEnvironmentVariable("ANIMELOCALTRACKER_BENCH_HISTORY");
+        string dir = !string.IsNullOrWhiteSpace(envDir)
+            ? Path.GetFullPath(envDir)
+            : Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "BenchmarkHistory");
         if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
         return dir;
     }

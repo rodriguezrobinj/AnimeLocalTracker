@@ -3,6 +3,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        xmlns:loc="clr-namespace:AnimeLocalTracker.Services"
         Title="Mi Biblioteca" Height="700" Width="1100"
         WindowStartupLocation="CenterScreen"
         TextElement.Foreground="{DynamicResource MaterialDesignBody}"
@@ -11,7 +12,8 @@
         MinWidth="800" MinHeight="600"
         ResizeMode="NoResize"
         WindowState="Maximized"
-        KeyDown="Window_KeyDown">
+        KeyDown="Window_KeyDown"
+        PreviewKeyDown="Window_PreviewKeyDown">
     
 
     <WindowChrome.WindowChrome>
@@ -54,7 +56,7 @@
                             <Grid Margin="0,8">
                                 <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"
                                            Visibility="{Binding EsGaleriaActiva, Converter={StaticResource BoolToVis}}"/>
-                                <Button Command="{Binding NavegarGaleriaCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="Biblioteca">
+                                <Button Command="{Binding NavegarGaleriaCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{Binding [Nav_Galeria], Source={x:Static loc:LocalizationService.Instance}}">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
                                             <Setter Property="Background" Value="Transparent"/>
@@ -87,7 +89,7 @@
                             <Grid Margin="0,8">
                                 <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"
                                            Visibility="{Binding EsAgregarAnimeActivo, Converter={StaticResource BoolToVis}}"/>
-                                <Button Command="{Binding NavegarAgregarAnimeCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="Añadir Anime">
+                                <Button Command="{Binding NavegarAgregarAnimeCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{Binding [Nav_Agregar], Source={x:Static loc:LocalizationService.Instance}}">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
                                             <Setter Property="Background" Value="Transparent"/>
@@ -120,7 +122,7 @@
                             <Grid Margin="0,8">
                                 <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"
                                            Visibility="{Binding EsCalendarioActivo, Converter={StaticResource BoolToVis}}"/>
-                                <Button Command="{Binding NavegarCalendarioCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="Calendario de Emisión">
+                                <Button Command="{Binding NavegarCalendarioCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{Binding [Nav_Calendario], Source={x:Static loc:LocalizationService.Instance}}">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
                                             <Setter Property="Background" Value="Transparent"/>
@@ -149,11 +151,44 @@
                                 </Button>
                             </Grid>
 
+                            <!-- BOTÓN ESTADÍSTICAS -->
+                            <Grid Margin="0,8">
+                                <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"
+                                           Visibility="{Binding EsEstadisticasActivo, Converter={StaticResource BoolToVis}}"/>
+                                <Button Command="{Binding NavegarEstadisticasCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{Binding [Nav_Estadisticas], Source={x:Static loc:LocalizationService.Instance}}">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
+                                            <Setter Property="Background" Value="Transparent"/>
+                                            <Style.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="Background" Value="#1B222C"/>
+                                                </Trigger>
+                                                <DataTrigger Binding="{Binding EsEstadisticasActivo}" Value="True">
+                                                    <Setter Property="Background" Value="#1E293B"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                    <materialDesign:PackIcon Kind="ChartBar" Width="24" Height="24">
+                                        <materialDesign:PackIcon.Style>
+                                            <Style TargetType="materialDesign:PackIcon">
+                                                <Setter Property="Foreground" Value="#6B7280"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding EsEstadisticasActivo}" Value="True">
+                                                        <Setter Property="Foreground" Value="#60A5FA"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </materialDesign:PackIcon.Style>
+                                    </materialDesign:PackIcon>
+                                </Button>
+                            </Grid>
+
                             <!-- BOTÓN COLA DE DESCARGAS -->
                             <Grid Margin="0,8">
                                 <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"
                                            Visibility="{Binding EsDescargasActivas, Converter={StaticResource BoolToVis}}"/>
-                                <Button Command="{Binding NavegarDescargasCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="Cola de Descargas">
+                                <Button Command="{Binding NavegarDescargasCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{Binding [Nav_Descargas], Source={x:Static loc:LocalizationService.Instance}}">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
                                             <Setter Property="Background" Value="Transparent"/>
@@ -203,7 +238,7 @@
                             <Grid Margin="0,4">
                                 <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"
                                            Visibility="{Binding EsConfiguracionActiva, Converter={StaticResource BoolToVis}}"/>
-                                <Button Command="{Binding NavegarConfiguracionCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="Configuración">
+                                <Button Command="{Binding NavegarConfiguracionCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{Binding [Nav_Configuracion], Source={x:Static loc:LocalizationService.Instance}}">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
                                             <Setter Property="Background" Value="Transparent"/>
@@ -236,7 +271,7 @@
                             <Grid Margin="0,4">
                                 <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"
                                            Visibility="{Binding EsAcercaDeActivo, Converter={StaticResource BoolToVis}}"/>
-                                <Button Command="{Binding NavegarAcercaDeCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="Acerca de AnimeLocalTracker">
+                                <Button Command="{Binding NavegarAcercaDeCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{Binding [Nav_AcercaDe], Source={x:Static loc:LocalizationService.Instance}}">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
                                             <Setter Property="Background" Value="Transparent"/>
@@ -268,9 +303,11 @@
                     </Grid>
                 </Border>
 
-                <!-- CONTENIDO PRINCIPAL: Gestionado directamente por MainWindow.xaml.cs según VistaActual -->
+                <!-- CONTENIDO PRINCIPAL: la vista se resuelve con las DataTemplates
+                     VM→Vista de App.xaml según la VistaActual (ARC-04). -->
                 <!-- Sin margen superior para que el fondo (ej. desenfoque) cubra toda la ventana detrás de la barra de título -->
-                <ContentControl x:Name="ContenedorVistaPrincipal" Grid.Column="0" Grid.ColumnSpan="2" />
+                <ContentControl x:Name="ContenedorVistaPrincipal" Grid.Column="0" Grid.ColumnSpan="2"
+                                Content="{Binding VistaActual}" />
                 
                 <!-- BARRA DE TÍTULO CUSTOM -->
                 <Grid Grid.Column="0" Grid.ColumnSpan="2" x:Name="BarraTitulo" Height="45" Background="Transparent" VerticalAlignment="Top" Panel.ZIndex="20">
@@ -279,7 +316,7 @@
                         <TextBlock Text="AnimeTracker" FontWeight="Bold" Foreground="{DynamicResource MaterialDesignBodyLight}" VerticalAlignment="Center" FontSize="14"/>
                         <Button Command="{Binding BuscarActualizacionesManualCommand}" 
                                 WindowChrome.IsHitTestVisibleInChrome="True"
-                                ToolTip="Comprobar actualizaciones en GitHub"
+                                ToolTip="{Binding [Nav_ComprobarUpdates], Source={x:Static loc:LocalizationService.Instance}}"
                                 Style="{StaticResource MaterialDesignFlatButton}" 
                                 Padding="8,2" Height="22" Margin="12,0,0,0"
                                 Background="#1E293B" Foreground="#93C5FD" 
@@ -292,16 +329,16 @@
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
-                        <Button WindowChrome.IsHitTestVisibleInChrome="True" Click="BtnPantallaCompleta_Click" Width="45" Height="45" Style="{StaticResource MaterialDesignFlatButton}" Padding="0" Foreground="{DynamicResource MaterialDesignBodyLight}" ToolTip="Pantalla Completa (F11)">
+                        <Button WindowChrome.IsHitTestVisibleInChrome="True" Click="BtnPantallaCompleta_Click" Width="45" Height="45" Style="{StaticResource MaterialDesignFlatButton}" Padding="0" Foreground="{DynamicResource MaterialDesignBodyLight}" ToolTip="{Binding [Nav_PantallaCompleta], Source={x:Static loc:LocalizationService.Instance}}" AutomationProperties.Name="Pantalla completa">
                             <materialDesign:PackIcon Kind="Fullscreen" />
                         </Button>
-                        <Button WindowChrome.IsHitTestVisibleInChrome="True" Click="BtnMinimizar_Click" Width="45" Height="45" Style="{StaticResource MaterialDesignFlatButton}" Padding="0" Foreground="{DynamicResource MaterialDesignBodyLight}">
+                        <Button WindowChrome.IsHitTestVisibleInChrome="True" Click="BtnMinimizar_Click" Width="45" Height="45" Style="{StaticResource MaterialDesignFlatButton}" Padding="0" Foreground="{DynamicResource MaterialDesignBodyLight}" AutomationProperties.Name="Minimizar">
                             <materialDesign:PackIcon Kind="WindowMinimize" />
                         </Button>
-                        <Button WindowChrome.IsHitTestVisibleInChrome="True" Click="BtnMaximizar_Click" Width="45" Height="45" Style="{StaticResource MaterialDesignFlatButton}" Padding="0" Foreground="{DynamicResource MaterialDesignBodyLight}" IsEnabled="False">
+                        <Button WindowChrome.IsHitTestVisibleInChrome="True" Click="BtnMaximizar_Click" Width="45" Height="45" Style="{StaticResource MaterialDesignFlatButton}" Padding="0" Foreground="{DynamicResource MaterialDesignBodyLight}" IsEnabled="False" AutomationProperties.Name="Maximizar">
                             <materialDesign:PackIcon Kind="WindowMaximize" />
                         </Button>
-                        <Button WindowChrome.IsHitTestVisibleInChrome="True" Click="BtnCerrar_Click" Width="45" Height="45" Style="{StaticResource MaterialDesignFlatButton}" Padding="0" Foreground="{DynamicResource MaterialDesignBodyLight}">
+                        <Button WindowChrome.IsHitTestVisibleInChrome="True" Click="BtnCerrar_Click" Width="45" Height="45" Style="{StaticResource MaterialDesignFlatButton}" Padding="0" Foreground="{DynamicResource MaterialDesignBodyLight}" AutomationProperties.Name="Cerrar aplicación">
                             <materialDesign:PackIcon Kind="Close" />
                         </Button>
                     </StackPanel>
@@ -326,9 +363,9 @@
 
                             <!-- Botones -->
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                <Button Content="CANCELAR" Command="{Binding CancelarDialogoCommand}" Style="{StaticResource MaterialDesignFlatButton}" Margin="0,0,10,0"
+                                <Button x:Name="BtnDialogoCancelar" Content="{Binding [Dlg_Cancelar], Source={x:Static loc:LocalizationService.Instance}}" Command="{Binding CancelarDialogoCommand}" Style="{StaticResource MaterialDesignFlatButton}" Margin="0,0,10,0"
                                         Visibility="{Binding DialogoEsConfirmacion, Converter={StaticResource BoolToVis}}"/>
-                                <Button Content="ACEPTAR" Command="{Binding AceptarDialogoCommand}" Style="{StaticResource MaterialDesignRaisedButton}" Background="{Binding DialogoColor}" BorderBrush="{Binding DialogoColor}" Foreground="White" />
+                                <Button x:Name="BtnDialogoAceptar" Content="{Binding [Dlg_Aceptar], Source={x:Static loc:LocalizationService.Instance}}" Command="{Binding AceptarDialogoCommand}" Style="{StaticResource MaterialDesignRaisedButton}" Background="{Binding DialogoColor}" BorderBrush="{Binding DialogoColor}" Foreground="White" />
                             </StackPanel>
                         </StackPanel>
                     </materialDesign:Card>

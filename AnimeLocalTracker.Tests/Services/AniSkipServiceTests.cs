@@ -1,7 +1,6 @@
 using System;
 using System.Net;
 using System.Net.Http;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using AnimeLocalTracker.Models;
@@ -13,125 +12,165 @@ using Xunit;
 
 namespace AnimeLocalTracker.Tests.Services;
 
+/// <summary>
+/// AniSkipService con HttpClient mockeado (nunca toca red): parsing de la API,
+/// caché en memoria y casos límite (404, found=false, errores).
+/// NOTA: las cachés son estáticas — cada test usa IDs distintos para no interferir.
+/// </summary>
 public class AniSkipServiceTests
 {
-    private (AniSkipService sut, Mock<HttpMessageHandler> handlerMock) CreateSut(HttpResponseMessage response)
-    {
-        var handlerMock = new Mock<HttpMessageHandler>();
-        handlerMock
-            .Protected()
-            .Setup<Task<HttpResponseMessage>>(
-                "SendAsync",
-                ItExpr.IsAny<HttpRequestMessage>(),
-                ItExpr.IsAny<CancellationToken>())
-            .ReturnsAsync(response);
+    private static AniSkipService CrearServicio(Mock<HttpMessageHandler> handler)
+        => new(new HttpClient(handler.Object));
 
-        var httpClient = new HttpClient(handlerMock.Object);
-        var sut = new AniSkipService(httpClient);
-        return (sut, handlerMock);
+    private static Mock<HttpMessageHandler> CrearHandler(HttpResponseMessage respuesta)
+    {
+        var handler = new Mock<HttpMessageHandler>();
+        handler.Protected()
+            .Setup<Task<HttpResponseMessage>>("SendAsync", ItExpr.IsAny<HttpRequestMessage>(), ItExpr.IsAny<CancellationToken>())
+            .ReturnsAsync(respuesta);
+        return handler;
+    }
+
+    private static string JsonConResultados(double start, double end, string skipType = "op")
+    {
+        // CA1311: ToString() de doubles usa la cultura del sistema (es-ES → coma decimal),
+        // lo que genera JSON inválido. InvariantCulture obligatorio.
+        string s = start.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+        string e = end.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+        return $$"""
+        {"found":true,"results":[
+          {"interval":{"startTime":{{s}},"endTime":{{e}}},"skipType":"{{skipType}}","skipId":"x1","episodeLength":1428}
+        ]}
+        """;
     }
 
     [Fact]
-    public async Task ObtenerSkipTimesAsync_ConRespuestaExitosa_DeberiaMapearResultadosCorrectamente()
+    public async Task ObtenerSkipTimesAsync_MalIdOEpisodioInvalidos_DeberiaDevolverVacioSinRed()
     {
         // Arrange
-        string json = @"
-        {
-            ""found"": true,
-            ""results"": [
-                {
-                    ""interval"": {
-                        ""startTime"": 85.5,
-                        ""endTime"": 175.5
-                    },
-                    ""skipType"": ""op"",
-                    ""skipId"": ""skip_op_1"",
-                    ""episodeLength"": 1420.0
-                },
-                {
-                    ""interval"": {
-                        ""startTime"": 1300.0,
-                        ""endTime"": 1390.0
-                    },
-                    ""skipType"": ""ed"",
-                    ""skipId"": ""skip_ed_1"",
-                    ""episodeLength"": 1420.0
-                }
-            ],
-            ""statusCode"": 200
-        }";
-
-        var response = new HttpResponseMessage(HttpStatusCode.OK)
-        {
-            Content = new StringContent(json, Encoding.UTF8, "application/json")
-        };
-
-        var (sut, _) = CreateSut(response);
+        var handler = CrearHandler(new HttpResponseMessage(HttpStatusCode.OK));
+        var sut = CrearServicio(handler);
 
         // Act
-        var results = await sut.ObtenerSkipTimesAsync(52991, 1, 1420);
+        var r1 = await sut.ObtenerSkipTimesAsync(0, 5);
+        var r2 = await sut.ObtenerSkipTimesAsync(123, 0);
 
-        // Assert
-        results.Should().NotBeNull();
-        results.Should().HaveCount(2);
-
-        var op = results[0];
-        op.SkipType.Should().Be("op");
-        op.Interval.StartTime.Should().Be(85.5);
-        op.Interval.EndTime.Should().Be(175.5);
-        op.EsIntro.Should().BeTrue();
-        op.EsEnding.Should().BeFalse();
-        op.TextoBoton.Should().Be("Saltar intro");
-
-        var ed = results[1];
-        ed.SkipType.Should().Be("ed");
-        ed.Interval.StartTime.Should().Be(1300.0);
-        ed.Interval.EndTime.Should().Be(1390.0);
-        ed.EsIntro.Should().BeFalse();
-        ed.EsEnding.Should().BeTrue();
-        ed.TextoBoton.Should().Be("Saltar ending");
+        // Assert: nunca se hizo la llamada HTTP
+        r1.Should().BeEmpty();
+        r2.Should().BeEmpty();
+        handler.Protected().Verify("SendAsync", Times.Never(),
+            ItExpr.IsAny<HttpRequestMessage>(), ItExpr.IsAny<CancellationToken>());
     }
 
     [Fact]
-    public async Task ObtenerSkipTimesAsync_Con404NotFound_DeberiaRetornarListaVacia()
+    public async Task ObtenerSkipTimesAsync_Respuesta404_DeberiaDevolverVacioYCachear()
     {
         // Arrange
-        var response = new HttpResponseMessage(HttpStatusCode.NotFound);
-        var (sut, _) = CreateSut(response);
+        var handler = CrearHandler(new HttpResponseMessage(HttpStatusCode.NotFound));
+        var sut = CrearServicio(handler);
 
-        // Act
-        var results = await sut.ObtenerSkipTimesAsync(999999, 1, 1400);
+        // Act: dos llamadas seguidas (la segunda debe venir de la caché)
+        var r1 = await sut.ObtenerSkipTimesAsync(101, 1);
+        var r2 = await sut.ObtenerSkipTimesAsync(101, 1);
 
-        // Assert
-        results.Should().NotBeNull();
-        results.Should().BeEmpty();
+        // Assert: ambas vacías y solo 1 llamada HTTP
+        r1.Should().BeEmpty();
+        r2.Should().BeEmpty();
+        handler.Protected().Verify("SendAsync", Times.Once(),
+            ItExpr.IsAny<HttpRequestMessage>(), ItExpr.IsAny<CancellationToken>());
     }
 
     [Fact]
-    public async Task ObtenerMalIdDesdeAniListAsync_DeberiaRetornarIdCorrecto()
+    public async Task ObtenerSkipTimesAsync_RespuestaValida_DeberiaDevolverResultadosYCachear()
     {
         // Arrange
-        string json = @"
+        var handler = CrearHandler(new HttpResponseMessage(HttpStatusCode.OK)
         {
-            ""data"": {
-                ""Media"": {
-                    ""id"": 154587,
-                    ""idMal"": 52991
-                }
-            }
-        }";
-
-        var response = new HttpResponseMessage(HttpStatusCode.OK)
-        {
-            Content = new StringContent(json, Encoding.UTF8, "application/json")
-        };
-
-        var (sut, _) = CreateSut(response);
+            Content = new StringContent(JsonConResultados(75.5, 90.0, "op"))
+        });
+        var sut = CrearServicio(handler);
 
         // Act
-        var malId = await sut.ObtenerMalIdDesdeAniListAsync(154587);
+        var r1 = await sut.ObtenerSkipTimesAsync(102, 2);
+        var r2 = await sut.ObtenerSkipTimesAsync(102, 2);
+
+        // Assert: resultados parseados y la segunda llamada sale de la caché
+        r1.Should().HaveCount(1);
+        r1[0].Interval.StartTime.Should().Be(75.5);
+        r1[0].Interval.EndTime.Should().Be(90.0);
+        r1[0].SkipType.Should().Be("op");
+        r1[0].EsIntro.Should().BeTrue();
+        r2.Should().HaveCount(1);
+        handler.Protected().Verify("SendAsync", Times.Once(),
+            ItExpr.IsAny<HttpRequestMessage>(), ItExpr.IsAny<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ObtenerSkipTimesAsync_FoundFalse_DeberiaDevolverVacio()
+    {
+        // Arrange
+        var handler = CrearHandler(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("""{"found":false,"results":[],"message":"No skip data found"}""")
+        });
+        var sut = CrearServicio(handler);
+
+        // Act
+        var r = await sut.ObtenerSkipTimesAsync(103, 1);
 
         // Assert
-        malId.Should().Be(52991);
+        r.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ObtenerSkipTimesAsync_ErrorDeRed_DeberiaDevolverVacioSinLanzar()
+    {
+        // Arrange: el handler lanza (timeout simulado)
+        var handler = new Mock<HttpMessageHandler>();
+        handler.Protected()
+            .Setup<Task<HttpResponseMessage>>("SendAsync", ItExpr.IsAny<HttpRequestMessage>(), ItExpr.IsAny<CancellationToken>())
+            .ThrowsAsync(new TaskCanceledException("timeout"));
+        var sut = CrearServicio(handler);
+
+        // Act & Assert
+        var r = await sut.ObtenerSkipTimesAsync(104, 1);
+        r.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ObtenerMalIdDesdeAniListAsync_ConIdMal_DeberiaDevolverloYCachear()
+    {
+        // Arrange
+        var handler = CrearHandler(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("""{"data":{"Media":{"id":105,"idMal":42033}}}""")
+        });
+        var sut = CrearServicio(handler);
+
+        // Act
+        var r1 = await sut.ObtenerMalIdDesdeAniListAsync(105);
+        var r2 = await sut.ObtenerMalIdDesdeAniListAsync(105);
+
+        // Assert: 42033 y solo 1 llamada HTTP (caché)
+        r1.Should().Be(42033);
+        r2.Should().Be(42033);
+        handler.Protected().Verify("SendAsync", Times.Once(),
+            ItExpr.IsAny<HttpRequestMessage>(), ItExpr.IsAny<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ObtenerMalIdDesdeAniListAsync_AniListIdInvalido_DeberiaDevolverNullSinRed()
+    {
+        // Arrange
+        var handler = CrearHandler(new HttpResponseMessage(HttpStatusCode.OK));
+        var sut = CrearServicio(handler);
+
+        // Act
+        var r = await sut.ObtenerMalIdDesdeAniListAsync(0);
+
+        // Assert
+        r.Should().BeNull();
+        handler.Protected().Verify("SendAsync", Times.Never(),
+            ItExpr.IsAny<HttpRequestMessage>(), ItExpr.IsAny<CancellationToken>());
     }
 }

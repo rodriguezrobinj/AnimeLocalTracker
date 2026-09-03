@@ -229,6 +229,30 @@ public class ReproductorViewModelTests
     }
 
     [Fact]
+    public void ToggleMute_AlSilenciar_DeberiaLlevarLaBarraACeroYRestaurarAlDesmutear()
+    {
+        // Arrange
+        var sut = CreateSut();
+        sut.Volumen = 70;
+
+        // Act: silenciar
+        sut.ToggleMute();
+
+        // Assert: la barra refleja el mudo (bug: antes quedaba al máximo)
+        sut.IsMuted.Should().BeTrue();
+        sut.Volumen.Should().Be(0, "la barra de volumen debe mostrar el mudo");
+
+        // Act: desmutear
+        sut.ToggleMute();
+
+        // Assert: se restaura el nivel previo
+        sut.IsMuted.Should().BeFalse();
+        sut.Volumen.Should().Be(70, "al desmutear se restaura el nivel anterior");
+
+        sut.Dispose();
+    }
+
+    [Fact]
     public void CerrarCommand_DeberiaEnviarMensajeVolverDelReproductorYLimpiarRecursos()
     {
         // Arrange

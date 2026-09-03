@@ -22,17 +22,13 @@ namespace AnimeLocalTracker.ViewModels;
 public partial class ReproductorViewModel : ObservableObject, IDisposable
 {
     private readonly ISettingsService? _settingsService;
+    private readonly IVentanaPrincipal? _ventanaPrincipal;
     private readonly IPlaybackStateService _playbackState;
     private readonly ISkipTimesCoordinator _skipCoordinator;
-    private readonly IHoverThumbnailService? _hoverThumbnailService;
-    private CancellationTokenSource? _hoverCts;
     private CancellationTokenSource? _skipCts;
 
-    // Hover Thumbnail Preview
-    [ObservableProperty] private bool _mostrarHoverPreview = false;
-    [ObservableProperty] private string _hoverPreviewTexto = "00:00";
-    [ObservableProperty] private ImageSource? _hoverPreviewImage = null;
-    [ObservableProperty] private double _hoverPreviewX = 0;
+    // FUN-011: serializa los guardados periódicos de progreso (un guardado a la vez).
+    private readonly SemaphoreSlim _guardadoLock = new(1, 1);
 
     [ObservableProperty]
     private Player _player = null!;
@@ -175,7 +171,6 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     private double _resumingPositionSeconds = 0;
     public double ResumingPositionSeconds => _resumingPositionSeconds;
     private bool _durationCached = false;
-    private bool _spritesheetPreparado = false;
 
     public ReproductorViewModel(
         IDatabaseService databaseService,
@@ -185,10 +180,10 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         ISettingsService? settingsService = null,
         IPlaybackStateService? playbackStateService = null,
         ISkipTimesCoordinator? skipTimesCoordinator = null,
-        IHoverThumbnailService? hoverThumbnailService = null)
+        IVentanaPrincipal? ventanaPrincipal = null)
     {
         _settingsService = settingsService;
-        _hoverThumbnailService = hoverThumbnailService;
+        _ventanaPrincipal = ventanaPrincipal;
 
         _playbackState = playbackStateService ?? new PlaybackStateService(databaseService, animeTrackingService, authService);
         _skipCoordinator = skipTimesCoordinator ?? new SkipTimesCoordinator(aniSkipService);
@@ -203,6 +198,19 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                 _subtitulosHabilitados = config.SubtitulosPorDefecto;
                 _subtitulosIcon = config.SubtitulosPorDefecto ? "Subtitles" : "SubtitlesOutline";
             }
+        }
+    }
+
+    /// <summary>
+    /// FUN-003: umbral configurable de "marcado como visto" (AppSettings.UmbralMarcadoVisto,
+    /// 1-100 → 0-1). Antes el auto-marcado estaba fijo en 90% y el ajuste de la UI era decorativo.
+    /// </summary>
+    private double UmbralMarcadoVistoActual
+    {
+        get
+        {
+            int porcentaje = _settingsService?.ObtenerConfiguracion()?.UmbralMarcadoVisto ?? 90;
+            return Math.Clamp(porcentaje, 1, 100) / 100.0;
         }
     }
 
@@ -249,6 +257,9 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         {
             _volumenPrevioMute = Volumen;
             IsMuted = true;
+            // Bug: la barra de volumen seguía al máximo al silenciar porque Volumen
+            // no cambiaba — ahora baja a 0 (y se restaura el previo al desmutear)
+            Volumen = 0;
             if (Player?.Audio != null)
             {
                 try
@@ -604,39 +615,19 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         Seek(segundos);
     }
 
-    // === Previsualización flotante al pasar el mouse (Hover Thumbnail Preview) ===
-    public void ActualizarHoverPreview(double segundos, double posX)
-    {
-        // Timeline Hover desactivado
-        MostrarHoverPreview = false;
-    }
-
-    public void OcultarHoverPreview()
-    {
-        MostrarHoverPreview = false;
-        _hoverCts?.Cancel();
-        _hoverCts?.Dispose();
-        _hoverCts = null;
-    }
-
     [RelayCommand]
     public void ToggleFullscreen()
     {
-        var mainWindow = System.Windows.Application.Current?.MainWindow as AnimeLocalTracker.Views.MainWindow;
-        if (mainWindow != null)
-        {
-            mainWindow.TogglePantallaCompleta();
-            FullscreenIcon = mainWindow.IsFullScreen ? "FullscreenExit" : "Fullscreen";
+        // ARC-04: sin cast a MainWindow — la ventana se consume vía contrato IVentanaPrincipal.
+        if (_ventanaPrincipal == null) return;
 
-            // Devolver foco a MainWindow para que las teclas sigan respondiendo
-            System.Windows.Application.Current?.Dispatcher?.BeginInvoke(
-                System.Windows.Threading.DispatcherPriority.Input,
-                () =>
-                {
-                    mainWindow.Focus();
-                    System.Windows.Input.Keyboard.Focus(mainWindow);
-                });
-        }
+        _ventanaPrincipal.TogglePantallaCompleta();
+        FullscreenIcon = _ventanaPrincipal.IsFullScreen ? "FullscreenExit" : "Fullscreen";
+
+        // Devolver foco a MainWindow para que las teclas sigan respondiendo
+        System.Windows.Application.Current?.Dispatcher?.BeginInvoke(
+            System.Windows.Threading.DispatcherPriority.Input,
+            () => _ventanaPrincipal.Enfocar());
     }
 
     [RelayCommand]
@@ -765,7 +756,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     {
         try
         {
-            var previo = await _playbackState.ObtenerPosicionParaReanudarAsync(animeId, episodio);
+            var previo = await _playbackState.ObtenerPosicionParaReanudarAsync(animeId, episodio, _rutaVideo);
             if (previo.HasValue)
             {
                 var (posicion, duracion) = previo.Value;
@@ -794,7 +785,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         {
             // AniSkip API como fuente primaria; si no hay datos, detección local por escenas (Python/ffmpeg)
             // usando la ruta del video local actual (requiere un archivo en disco).
-            var results = await _skipCoordinator.CargarSkipTimesAsync(animeId, episodio, TotalSeconds, ct, RutaVideo);
+            var results = await _skipCoordinator.CargarSkipTimesAsync(animeId, episodio, TotalSeconds, RutaVideo, ct);
             if (!ct.IsCancellationRequested && results != null && results.Count > 0)
             {
                 Interlocked.Exchange(ref _skipTimes, new List<AniSkipResult>(results));
@@ -857,8 +848,6 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         _posicionInicioSegundos = 0;
         _haCompletadoOpen = false;
         _seekPendienteAlAbrir = -1;
-        HoverPreviewImage = null;
-        MostrarHoverPreview = false;
 
         if (listaEpisodios != null)
         {
@@ -900,29 +889,157 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         // 4. Sincronizar ícono de fullscreen con el estado actual de la ventana
         try
         {
-            if (System.Windows.Application.Current != null &&
-                System.Windows.Application.Current.Dispatcher.CheckAccess() &&
-                System.Windows.Application.Current.MainWindow is AnimeLocalTracker.Views.MainWindow mainWindow)
+            if (_ventanaPrincipal != null)
             {
-                FullscreenIcon = mainWindow.IsFullScreen ? "FullscreenExit" : "Fullscreen";
+                FullscreenIcon = _ventanaPrincipal.IsFullScreen ? "FullscreenExit" : "Fullscreen";
             }
         }
         catch
         {
-            // Entornos de pruebas sin Dispatcher o en subprocesos en segundo plano
+            // Entornos de pruebas sin ventana principal
         }
 
         if (Player != null)
         {
             Player.OpenAsync(rutaVideo);
+
+            // Velocidad de reproducción por defecto configurable
+            try
+            {
+                double velocidad = _settingsService?.ObtenerConfiguracion()?.VelocidadReproduccionDefecto ?? 1.0;
+                Player.Speed = (float)Math.Clamp(velocidad, 0.5, 2.0);
+            }
+            catch { }
         }
 
         _ = RastrearProgresoAsync(_trackingCts.Token);
     }
 
+    /// <summary>Tecla configurada para una acción del reproductor (con fallback).</summary>
+    public System.Windows.Input.Key ObtenerTeclaPara(string accion)
+    {
+        var config = _settingsService?.ObtenerConfiguracion();
+        string nombre = config?.ObtenerTecla(accion, accion switch
+        {
+            "PlayPausa" => "Space",
+            "PantallaCompleta" => "F11",
+            "Silenciar" => "M",
+            "SubirVolumen" => "Up",
+            "BajarVolumen" => "Down",
+            "Adelantar10" => "Right",
+            "Retroceder10" => "Left",
+            "SaltarIntro" => "S",
+            "SiguienteEpisodio" => "N",
+            "AnteriorEpisodio" => "P",
+            "Cerrar" => "Escape",
+            "CapturarFrame" => "C",
+            _ => string.Empty
+        }) ?? string.Empty;
+
+        return Enum.TryParse<System.Windows.Input.Key>(nombre, true, out var tecla)
+            ? tecla
+            : System.Windows.Input.Key.None;
+    }
+
+    /// <summary>
+    /// Captura el frame actual del episodio y lo guarda como PNG en la ubicación
+    /// elegida por el usuario (usa el ffmpeg embebido, a resolución completa).
+    /// </summary>
+    [RelayCommand]
+    private async Task CapturarFrameAsync()
+    {
+        if (Player == null || string.IsNullOrWhiteSpace(_rutaVideo) || !File.Exists(_rutaVideo)) return;
+
+        double posicion = TimeSpan.FromTicks(Player.CurTime).TotalSeconds;
+
+        var dialogo = new Microsoft.Win32.SaveFileDialog
+        {
+            Title = "Capturar frame",
+            Filter = "PNG (*.png)|*.png|JPEG (*.jpg)|*.jpg",
+            FileName = $"frame_{DateTime.Now:yyyyMMdd_HHmmss}.png"
+        };
+
+        if (dialogo.ShowDialog() != true) return;
+
+        try
+        {
+            // Buscar el ffmpeg embebido de la app (ya está en el PATH del proceso)
+            string ffmpeg = "ffmpeg";
+            string embebido = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "FFmpeg", "ffmpeg.exe");
+            if (File.Exists(embebido)) ffmpeg = embebido;
+
+            var psi = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = ffmpeg,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardError = true
+            };
+            psi.ArgumentList.Add("-y");
+            psi.ArgumentList.Add("-nostdin");
+            // Sec: acota la asignación de memoria por bloque en ffmpeg (2 GB)
+            psi.ArgumentList.Add("-max_alloc"); psi.ArgumentList.Add("2147483648");
+            psi.ArgumentList.Add("-loglevel"); psi.ArgumentList.Add("error");
+            psi.ArgumentList.Add("-ss"); psi.ArgumentList.Add(posicion.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture));
+            psi.ArgumentList.Add("-i"); psi.ArgumentList.Add(_rutaVideo);
+            psi.ArgumentList.Add("-frames:v"); psi.ArgumentList.Add("1");
+            psi.ArgumentList.Add("-q:v"); psi.ArgumentList.Add("2");
+            psi.ArgumentList.Add(dialogo.FileName);
+
+            using var proceso = System.Diagnostics.Process.Start(psi)!;
+            string stderr = await proceso.StandardError.ReadToEndAsync();
+
+            // CAP-01: timeout de 30 s — un ffmpeg colgado (ruta de red, codec raro, AV)
+            // no puede dejar procesos huérfanos acumulándose en segundo plano
+            using var timeoutCts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(30));
+            try
+            {
+                await proceso.WaitForExitAsync(timeoutCts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                try { proceso.Kill(entireProcessTree: true); } catch { }
+                AppLogger.Warn("ReproductorViewModel", "Captura de frame cancelada por timeout (30 s)");
+                _ = WeakReferenceMessenger.Default.Send(new Messages.MostrarDialogoRequestMessage(
+                    "Error", "La captura del frame tardó demasiado (30 s). Inténtalo de nuevo.", false, "AlertCircleOutline", "#EF4444"));
+                return;
+            }
+
+            if (proceso.ExitCode == 0 && File.Exists(dialogo.FileName))
+            {
+                _ = WeakReferenceMessenger.Default.Send(new Messages.MostrarDialogoRequestMessage(
+                    "Frame capturado", $"Imagen guardada en:\n{dialogo.FileName}", false, "CameraOutline", "#4CAF50"));
+            }
+            else
+            {
+                // CAP-02: exponer un extracto del stderr real para que el usuario pueda diagnosticar
+                string detalle = string.IsNullOrWhiteSpace(stderr) ? "" : $"\n\n{stderr.Trim()}";
+                if (detalle.Length > 320) detalle = detalle[..320] + "…";
+                AppLogger.Debug("ReproductorViewModel", $"ffmpeg falló al capturar frame: {stderr}");
+                _ = WeakReferenceMessenger.Default.Send(new Messages.MostrarDialogoRequestMessage(
+                    "Error", $"No se pudo capturar el frame.{detalle}", false, "AlertCircleOutline", "#EF4444"));
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("ReproductorViewModel", $"Error capturando frame: {ex.Message}");
+        }
+    }
+
     public async Task GuardarProgresoActualAsync(bool forzarProgresoCero = false)
     {
         if (_animeId <= 0 || _episodio <= 0) return;
+
+        // FUN-011: un solo guardado a la vez. Si el tick de 5 s llega con otro en curso,
+        // se descarta (el siguiente tick guardará el estado más reciente).
+        if (!_guardadoLock.Wait(0)) return;
+
+        // FUN-017: snapshot de identidad al iniciar — un guardado que termina después de
+        // cambiar de episodio no debe notificar el progreso del episodio viejo bajo el ID
+        // del nuevo (antes _animeId/_episodio se leían en el momento del envío).
+        int animeId = _animeId;
+        int episodio = _episodio;
+        string rutaVideo = _rutaVideo;
 
         try
         {
@@ -940,9 +1057,9 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
             var resultado = await _playbackState.GuardarProgresoAsync(new DatosProgresoReproduccion
             {
-                AnimeId = _animeId,
-                NumeroEpisodio = _episodio,
-                RutaVideo = _rutaVideo,
+                AnimeId = animeId,
+                NumeroEpisodio = episodio,
+                RutaVideo = rutaVideo,
                 PosicionSegundos = curSec,
                 DuracionSegundos = durSec,
                 ForzarProgresoCero = forzarProgresoCero,
@@ -951,11 +1068,15 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
             // Notificar a DetalleViewModel para actualizar la barra de progreso en vivo
             WeakReferenceMessenger.Default.Send(new Messages.EpisodioActualizadoMensaje(
-                _animeId, _episodio, _fueMarcadoComoVisto, resultado.ProgresoSegundos, resultado.TotalSegundos));
+                animeId, episodio, _fueMarcadoComoVisto, resultado.ProgresoSegundos, resultado.TotalSegundos));
         }
         catch (Exception ex)
         {
             AppLogger.Debug("ReproductorViewModel", $"Error al guardar progreso actual: {ex.Message}");
+        }
+        finally
+        {
+            _guardadoLock.Release();
         }
     }
 
@@ -1003,6 +1124,15 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                     {
                         bool esReanudacion = _seekPendienteAlAbrir < 0 && _posicionInicioSegundos > 5;
                         double posToSeek = _seekPendienteAlAbrir >= 0 ? _seekPendienteAlAbrir : _posicionInicioSegundos;
+
+                        // FUN-006: nunca buscar más allá de la duración real del archivo que se
+                        // está reproduciendo (un archivo reemplazado por otro más corto haría
+                        // que el seek quedara fuera de rango y el video terminara al instante).
+                        if (durSeconds > 0 && posToSeek >= durSeconds)
+                        {
+                            posToSeek = Math.Max(0, durSeconds - 1.0);
+                        }
+
                         _seekPendienteAlAbrir = -1;
                         _posicionInicioSegundos = 0;
 
@@ -1036,16 +1166,6 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                             TiempoTotalTexto = tDur.ToString(tDur.Hours > 0 ? @"hh\:mm\:ss" : @"mm\:ss");
                             _durationCached = true;
                             TiempoCombinadoTexto = $"{TiempoActualTexto} / {TiempoTotalTexto}";
-
-                            // Sprite Sheet de hover: aquí YA tenemos la duración real y el
-                            // video decodificando; lanzarlo antes (OpenCompleted) generaba
-                            // el sheet con duración 0/desconocida y competía con la
-                            // inicialización del decoder.
-                            if (!_spritesheetPreparado && !string.IsNullOrWhiteSpace(_rutaVideo))
-                            {
-                                _spritesheetPreparado = true;
-                                _hoverThumbnailService?.PrepararSpritesheet(_rutaVideo, durSeconds);
-                            }
                         }
 
                         // Durante la ventana de settle tras un seek, el reproductor aún reporta la
@@ -1072,8 +1192,8 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
                     double porcentaje = durSeconds > 0 ? curSeconds / durSeconds : 0;
 
-                    // Auto-Tracking al 90%
-                    if (porcentaje >= 0.90 && !_fueMarcadoComoVisto)
+                    // Auto-Tracking al umbral configurado (FUN-003: antes fijo en 90%)
+                    if (porcentaje >= UmbralMarcadoVistoActual && !_fueMarcadoComoVisto)
                     {
                         await RealizarAutoTrackingAsync();
                     }
@@ -1088,7 +1208,11 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                             if (AutoSkipIntroOutro && !_skipAutoEjecutados.Contains(skipKey))
                             {
                                 _skipAutoEjecutados.Add(skipKey);
-                                Seek(skip.Interval.EndTime + 0.2);
+                                // FUN-007: el salto automático se acota al final del video
+                                // (igual que el manual) para no disparar Ended prematuramente.
+                                double destino = skip.Interval.EndTime + 0.2;
+                                if (TotalSeconds > 0 && destino > TotalSeconds) destino = TotalSeconds;
+                                Seek(destino);
                                 MostrarSkipButton = false;
                                 MostrarSkipIntro = false;
                                 _currentActiveSkip = null;
@@ -1131,7 +1255,11 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                 {
                     // Al finalizar, resetear progreso a 0
                     _ = GuardarProgresoActualAsync(forzarProgresoCero: true);
-                    if (!_fueMarcadoComoVisto)
+
+                    // FUN-012: solo marcar como visto si se alcanzó el final REAL del archivo:
+                    // un video truncado/corrupto también dispara Ended antes de tiempo.
+                    bool llegoAlFinalReal = TotalSeconds > 0 && CurrentSeconds >= TotalSeconds * UmbralMarcadoVistoActual;
+                    if (!_fueMarcadoComoVisto && llegoAlFinalReal)
                     {
                         await RealizarAutoTrackingAsync();
                     }
@@ -1228,18 +1356,11 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         // Idempotente: Cerrar() dispone y OnVistaActualChanged también dispone al navegar fuera
         if (_disposeHecho) return;
         _disposeHecho = true;
+        GC.SuppressFinalize(this);
 
         _ = GuardarProgresoActualAsync();
 
         CancelarSeekPendiente();
-
-        try
-        {
-            _hoverCts?.Cancel();
-            _hoverCts?.Dispose();
-            _hoverCts = null;
-        }
-        catch { }
 
         try
         {
@@ -1252,6 +1373,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         try
         {
             _trackingCts?.Cancel();
+            _trackingCts?.Dispose();
         }
         catch { }
         _trackingCts = null;

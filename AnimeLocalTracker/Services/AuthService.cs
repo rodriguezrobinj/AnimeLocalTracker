@@ -17,9 +17,13 @@ public class AuthService : IAuthService
     private const string ClientId = "48217";
     
     public string? Token { get; private set; }
+
+    // SEC-01: el POST /token solo es válido una vez por intento de login (anti-replay).
+    private bool _tokenEntregado;
     
-    // Ruta donde guardaremos el token para que no inicies sesión cada vez que abras la app
-    private readonly string _rutaToken = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AnimeLocalTracker", "anilist_token.txt");
+    // Ruta donde guardaremos el token para que no inicies sesión cada vez que abras la app.
+    // Ubicado en la carpeta de datos (fuera del directorio de instalación de Velopack).
+    private readonly string _rutaToken = AppDataPaths.TokenPath;
 
     public bool EstaAutenticado() => File.Exists(_rutaToken) && ObtenerTokenGuardado() != string.Empty;
     
@@ -58,6 +62,9 @@ public class AuthService : IAuthService
             AppLogger.Error("AuthService", "No se pudo iniciar el listener local en el puerto 5050. Puede que el puerto esté ocupado por otra instancia.", ex);
             return false;
         }
+
+        // SEC-01: cada intento de login reinicia el guard de un solo uso.
+        _tokenEntregado = false;
 
         string expectedState = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
 
@@ -129,7 +136,7 @@ public class AuthService : IAuthService
                     byte[] buffer = Encoding.UTF8.GetBytes(html);
                     response.ContentType = "text/html; charset=utf-8";
                     response.ContentLength64 = buffer.Length;
-                    await response.OutputStream.WriteAsync(buffer, 0, buffer.Length);
+                    await response.OutputStream.WriteAsync(buffer.AsMemory(0, buffer.Length));
                     response.OutputStream.Close();
                 }
                 else if (request.Url?.AbsolutePath == "/token" && request.HttpMethod == "POST")
@@ -140,12 +147,18 @@ public class AuthService : IAuthService
                     // Referer válidos (p.ej. script local, DNS rebinding) se rechaza.
                     string origin = request.Headers["Origin"] ?? string.Empty;
                     string referer = request.Headers["Referer"] ?? string.Empty;
-                    bool origenValido = origin.Equals("http://localhost:5050", StringComparison.OrdinalIgnoreCase)
-                                        || referer.StartsWith("http://localhost:5050", StringComparison.OrdinalIgnoreCase);
-                    if (!origenValido)
+                    if (!EsOrigenLocal(origin) && !EsOrigenLocal(referer))
                     {
                         AppLogger.Warn("AuthService", "POST /token rechazado: Origin/Referer no coincide con el listener local.");
                         response.StatusCode = 403;
+                        response.OutputStream.Close();
+                        continue;
+                    }
+
+                    if (_tokenEntregado)
+                    {
+                        // SEC-01: un segundo POST /token (replay tras capturar el token) se rechaza.
+                        response.StatusCode = 410;
                         response.OutputStream.Close();
                         continue;
                     }
@@ -162,12 +175,13 @@ public class AuthService : IAuthService
 
                         if (!string.IsNullOrEmpty(receivedState) && receivedState == expectedState && !string.IsNullOrWhiteSpace(receivedToken))
                         {
+                            _tokenEntregado = true;
                             tokenCapturado = receivedToken;
                             response.StatusCode = 200;
                             byte[] okMsg = Encoding.UTF8.GetBytes("{\"success\":true}");
                             response.ContentType = "application/json";
                             response.ContentLength64 = okMsg.Length;
-                            await response.OutputStream.WriteAsync(okMsg, 0, okMsg.Length);
+                            await response.OutputStream.WriteAsync(okMsg.AsMemory(0, okMsg.Length));
                             response.OutputStream.Close();
                             break;
                         }
@@ -255,5 +269,19 @@ public class AuthService : IAuthService
         }
         
         WeakReferenceMessenger.Default.Send(new UsuarioDesconectadoMensaje());
+    }
+
+    /// <summary>
+    /// Valida que un header Origin/Referer sea exactamente el listener local del flujo
+    /// OAuth (http://localhost:5050). Una comparación por prefijo de cadena aceptaría
+    /// hosts evasivos como "localhost:5050.evil.com"; aquí se compara el Uri parseado
+    /// (esquema + host + puerto exactos).
+    /// </summary>
+    internal static bool EsOrigenLocal(string? valor)
+    {
+        return Uri.TryCreate(valor, UriKind.Absolute, out var uri)
+               && uri.Scheme == Uri.UriSchemeHttp
+               && uri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase)
+               && uri.Port == 5050;
     }
 }

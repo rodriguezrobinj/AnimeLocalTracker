@@ -19,7 +19,7 @@ public partial class AgregarAnimeViewModel : ObservableObject,
 {
     private readonly IAnimeTrackingService _animeTrackingService;
     private readonly IDatabaseService _databaseService;
-    private readonly ISettingsService _settingsService;
+    private readonly AnimeLibraryService _animeLibraryService;
     private readonly IDialogService _dialogService;
 
     [ObservableProperty]
@@ -47,7 +47,7 @@ public partial class AgregarAnimeViewModel : ObservableObject,
             {
                 OnPropertyChanged(nameof(TieneTextoBusqueda));
                 BusquedaSinResultados = false;
-                EjecutarBusquedaEnVivo(value);
+                _ = EjecutarBusquedaEnVivoAsync(value);
             }
         }
     }
@@ -60,12 +60,12 @@ public partial class AgregarAnimeViewModel : ObservableObject,
     public AgregarAnimeViewModel(
         IAnimeTrackingService animeTrackingService,
         IDatabaseService databaseService,
-        ISettingsService settingsService,
+        AnimeLibraryService animeLibraryService,
         IDialogService dialogService)
     {
         _animeTrackingService = animeTrackingService;
         _databaseService = databaseService;
-        _settingsService = settingsService;
+        _animeLibraryService = animeLibraryService;
         _dialogService = dialogService;
 
         // Registro vía IRecipient<AnimeAñadidoMensaje>: una sola suscripción.
@@ -149,7 +149,7 @@ public partial class AgregarAnimeViewModel : ObservableObject,
         }
     }
 
-    private async void EjecutarBusquedaEnVivo(string busqueda)
+    private async Task EjecutarBusquedaEnVivoAsync(string busqueda)
     {
         if (string.IsNullOrWhiteSpace(busqueda) || busqueda.Trim().Length < 2)
         {
@@ -221,10 +221,10 @@ public partial class AgregarAnimeViewModel : ObservableObject,
         {
             item.EstaGuardando = true;
 
-            // Validar si ya existe en la biblioteca
-            var animesGuardados = await _databaseService.ObtenerTodosLosAnimesAsync();
-            var animeExistente = animesGuardados.FirstOrDefault(a => a.AniListId == animeAPI.Id);
-            if (animeExistente != null)
+            // ARQ-02: la lógica de alta vive en AnimeLibraryService (un solo punto de verdad)
+            var nuevoAnime = await _animeLibraryService.CrearYGuardarAnimeAsync(animeAPI, titulo);
+
+            if (nuevoAnime == null)
             {
                 item.EstaEnBiblioteca = true;
                 _animesEnBibliotecaIds.Add(animeAPI.Id);
@@ -237,64 +237,8 @@ public partial class AgregarAnimeViewModel : ObservableObject,
                 return;
             }
 
-            string nombreSeguro = string.Join("_", titulo.Split(Path.GetInvalidFileNameChars()));
-            string rutaBaseVideos = _settingsService.ObtenerRutaBaseAnimes();
-            string nuevaRutaCarpeta = Path.Combine(rutaBaseVideos, nombreSeguro);
-
-            if (!Directory.Exists(nuevaRutaCarpeta))
-            {
-                Directory.CreateDirectory(nuevaRutaCarpeta);
-            }
-
-            int episodiosEmitidos = 0;
-            string estadoAnime = animeAPI.Status?.ToUpperInvariant() ?? "UNKNOWN";
-
-            if (estadoAnime == "NOT_YET_RELEASED")
-            {
-                episodiosEmitidos = 0;
-            }
-            else if (estadoAnime == "RELEASING")
-            {
-                if (animeAPI.NextAiringEpisode != null)
-                {
-                    episodiosEmitidos = Math.Max(0, animeAPI.NextAiringEpisode.Episode - 1);
-                }
-                else
-                {
-                    episodiosEmitidos = animeAPI.Episodes ?? 0;
-                }
-            }
-            else // FINISHED, etc.
-            {
-                episodiosEmitidos = animeAPI.Episodes ?? 0;
-            }
-
-            var titulosAlt = new List<string>();
-            if (!string.IsNullOrWhiteSpace(animeAPI.Title?.English)) titulosAlt.Add(animeAPI.Title.English);
-            if (!string.IsNullOrWhiteSpace(animeAPI.Title?.UserPreferred) && animeAPI.Title.UserPreferred != titulo) titulosAlt.Add(animeAPI.Title.UserPreferred);
-            if (animeAPI.Synonyms != null) titulosAlt.AddRange(animeAPI.Synonyms.Where(s => !string.IsNullOrWhiteSpace(s)));
-
-            var nuevoAnime = new AnimeItem
-            {
-                AniListId = animeAPI.Id,
-                MalId = animeAPI.IdMal,
-                Titulo = titulo,
-                NombresAlternativos = string.Join(" | ", titulosAlt.Distinct()),
-                Sinopsis = animeAPI.Description ?? string.Empty,
-                Generos = animeAPI.Genres != null ? string.Join(", ", animeAPI.Genres) : string.Empty,
-                Estado = animeAPI.Status ?? "UNKNOWN",
-                TotalEpisodios = episodiosEmitidos,
-                UrlPortada = animeAPI.CoverImage?.ExtraLarge ?? string.Empty,
-                RutaCarpeta = nuevaRutaCarpeta
-            };
-
-            await _databaseService.GuardarAnimeAsync(nuevoAnime);
-
             item.EstaEnBiblioteca = true;
             _animesEnBibliotecaIds.Add(animeAPI.Id);
-
-            // Notificar a la biblioteca y al resto de la aplicación
-            WeakReferenceMessenger.Default.Send(new AnimeAñadidoMensaje(nuevoAnime));
 
             await _dialogService.MostrarDialogoAsync(
                 "¡Anime Añadido!",

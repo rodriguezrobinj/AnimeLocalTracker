@@ -44,4 +44,24 @@ public class AuthServiceTests
         
         WeakReferenceMessenger.Default.Unregister<UsuarioDesconectadoMensaje>(this);
     }
+
+    [Theory]
+    [InlineData("http://localhost:5050/", true)]
+    [InlineData("http://localhost:5050", true)]
+    [InlineData("http://localhost:5050/callback", true)]
+    [InlineData("http://localhost:5050.evil.com/callback", false)]
+    [InlineData("http://localhost:5050x/", false)]
+    [InlineData("http://localhost:5051/", false)]
+    [InlineData("http://127.0.0.1:5050/", false)]
+    [InlineData("https://localhost:5050/", false)]
+    [InlineData("", false)]
+    [InlineData(null, false)]
+    public void EsOrigenLocal_DeberiaAceptarSoloElListenerExacto(string? valor, bool esperado)
+    {
+        // Act
+        bool resultado = AuthService.EsOrigenLocal(valor);
+
+        // Assert
+        resultado.Should().Be(esperado);
+    }
 }
