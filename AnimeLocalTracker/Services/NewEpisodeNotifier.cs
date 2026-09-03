@@ -89,6 +89,45 @@ public class NewEpisodeNotifier
         return nuevos.Count;
     }
 
+    /// <summary>
+    /// FUN-008: monitoreo periódico de episodios nuevos. Primer chequeo a los 3 segundos
+    /// (tras cargar la biblioteca) y luego cada <paramref name="periodicidad"/> mientras la
+    /// app siga abierta. Antes solo se comprobaba UNA vez al arrancar.
+    /// </summary>
+    public void IniciarMonitoreoPeriodico(TimeSpan periodicidad)
+    {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(3));
+                await EjecutarPasadaSeguraAsync();
+
+                while (true)
+                {
+                    await Task.Delay(periodicidad);
+                    await EjecutarPasadaSeguraAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Debug("NewEpisodeNotifier", $"Monitoreo periódico terminó: {ex.Message}");
+            }
+        });
+    }
+
+    private async Task EjecutarPasadaSeguraAsync()
+    {
+        try
+        {
+            await BuscarYNotificarNuevosAsync();
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("NewEpisodeNotifier", $"Error en pasada de episodios nuevos: {ex.Message}");
+        }
+    }
+
     private HashSet<string> CargarNotificados()
     {
         try

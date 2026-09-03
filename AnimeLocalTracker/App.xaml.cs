@@ -388,20 +388,10 @@ public partial class App : Application
             var mainWindow = ServiceProvider.GetRequiredService<MainWindow>();
             mainWindow.Show();
 
-            // Notificaciones de episodios nuevos (diferido para no competir con la carga)
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    await Task.Delay(3000);
-                    var notifier = ServiceProvider.GetService<NewEpisodeNotifier>();
-                    if (notifier != null)
-                    {
-                        await notifier.BuscarYNotificarNuevosAsync();
-                    }
-                }
-                catch { }
-            });
+            // Notificaciones de episodios nuevos: primer chequeo a los 3 s y luego cada
+            // 30 min mientras la app esté abierta (FUN-008: antes solo UNA vez al arrancar).
+            var notifier = ServiceProvider.GetService<NewEpisodeNotifier>();
+            notifier?.IniciarMonitoreoPeriodico(TimeSpan.FromMinutes(30));
         }
         catch (Exception ex)
         {

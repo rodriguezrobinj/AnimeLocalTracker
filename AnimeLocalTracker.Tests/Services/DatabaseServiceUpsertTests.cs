@@ -60,6 +60,60 @@ public class DatabaseServiceUpsertTests : IDisposable
     }
 
     [Fact]
+    public async Task ImportarBibliotecaJsonAsync_ConAniListIdDuplicados_DeberiaConservarElUltimoYAvisar()
+    {
+        // Arrange (FUN-013)
+        await _sut.InicializarBaseDatosAsync();
+        var rutaJson = Path.Combine(Path.GetTempPath(), $"import_dup_{Guid.NewGuid():N}.json");
+        try
+        {
+            var backup = new DatabaseService.BibliotecaBackup
+            {
+                Animes = new List<AnimeItem>
+                {
+                    new() { AniListId = 42, Titulo = "Titulo Viejo" },
+                    new() { AniListId = 42, Titulo = "Titulo Nuevo" }
+                }
+            };
+            await File.WriteAllTextAsync(rutaJson, System.Text.Json.JsonSerializer.Serialize(backup));
+
+            // Act
+            int importados = await _sut.ImportarBibliotecaJsonAsync(rutaJson);
+
+            // Assert: un solo anime y gana la última entrada del JSON
+            importados.Should().Be(1);
+            using var conexion = new SQLiteConnection(_tempDbPath);
+            var animes = conexion.Table<AnimeItem>().ToList();
+            animes.Should().ContainSingle();
+            animes[0].Titulo.Should().Be("Titulo Nuevo");
+        }
+        finally
+        {
+            try { if (File.Exists(rutaJson)) File.Delete(rutaJson); } catch { }
+        }
+    }
+
+    [Fact]
+    public async Task ImportarBibliotecaJsonAsync_ConJsonInvalido_DeberiaLanzarConMensajeClaro()
+    {
+        // Arrange (FUN-013)
+        await _sut.InicializarBaseDatosAsync();
+        var rutaJson = Path.Combine(Path.GetTempPath(), $"import_inv_{Guid.NewGuid():N}.json");
+        await File.WriteAllTextAsync(rutaJson, "{ esto no es json valido");
+        try
+        {
+            // Act & Assert: un JSON malformado no llega como error genérico al ViewModel
+            var act = async () => await _sut.ImportarBibliotecaJsonAsync(rutaJson);
+            await act.Should().ThrowAsync<InvalidDataException>()
+                .WithMessage("*JSON de biblioteca válido*");
+        }
+        finally
+        {
+            try { if (File.Exists(rutaJson)) File.Delete(rutaJson); } catch { }
+        }
+    }
+
+    [Fact]
     public async Task CrearBackupRotativo_DeberiaCrearCopiaValidaYRotar()
     {
         // Arrange

@@ -315,7 +315,19 @@ public class DatabaseService : IDatabaseService, IDisposable
             throw new InvalidDataException("El archivo de importación supera el límite de 50 MB.");
 
         var json = await File.ReadAllTextAsync(rutaOrigen);
-        var backup = System.Text.Json.JsonSerializer.Deserialize<BibliotecaBackup>(json);
+
+        // FUN-013: un JSON con tipos inválidos o malformado debe fallar con mensaje claro
+        // (antes la JsonException llegaba al ViewModel como un error genérico "Error").
+        BibliotecaBackup? backup;
+        try
+        {
+            backup = System.Text.Json.JsonSerializer.Deserialize<BibliotecaBackup>(json);
+        }
+        catch (System.Text.Json.JsonException ex)
+        {
+            AppLogger.Error("DatabaseService", "Import: el archivo no es un JSON de biblioteca válido", ex);
+            throw new InvalidDataException("El archivo seleccionado no es un JSON de biblioteca válido de AnimeLocalTracker.");
+        }
         if (backup?.Animes == null) return 0;
 
         // IMP-02: saneado semántico — solo filas coherentes entran a la base
@@ -336,14 +348,24 @@ public class DatabaseService : IDatabaseService, IDisposable
         if (descartados > 0)
             AppLogger.Warn("DatabaseService", $"Import: {descartados} filas descartadas por validación");
 
+        // FUN-013: AniListId duplicados DENTRO del propio JSON — antes el InsertOrReplace
+        // hacía que el último pisara al primero en silencio. Ahora se avisa y gana el último.
+        var agrupadosPorId = animesValidos.GroupBy(a => a.AniListId).ToList();
+        int idsDuplicados = agrupadosPorId.Count(g => g.Count() > 1);
+        if (idsDuplicados > 0)
+        {
+            AppLogger.Warn("DatabaseService", $"Import: {idsDuplicados} AniListId duplicados en el JSON; se conserva la última entrada de cada uno.");
+        }
+        var animesUnicos = agrupadosPorId.Select(g => g.Last()).ToList();
+
         // IMP-03: todo o nada — una sola transacción; cualquier fallo revierte el lote completo
         await _conexion.RunInTransactionAsync(db =>
         {
-            foreach (var anime in animesValidos) db.InsertOrReplace(anime);
+            foreach (var anime in animesUnicos) db.InsertOrReplace(anime);
             AplicarUpsertRegistros(db, registrosValidos);
         });
 
-        return animesValidos.Count;
+        return animesUnicos.Count;
     }
 
     private static bool EsAnimeImportable(AnimeItem a)
