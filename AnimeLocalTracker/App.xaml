@@ -65,7 +65,9 @@
             <SolidColorBrush x:Key="Brush.BorderStrong" Color="#2D3748" />   <!-- bordes de inputs -->
             <SolidColorBrush x:Key="Brush.TextPrimary" Color="#E2E8F0" />
             <SolidColorBrush x:Key="Brush.TextSecondary" Color="#9CA3AF" />
-            <SolidColorBrush x:Key="Brush.TextTertiary" Color="#6B7280" />
+            <!-- UX-02: #6B7280 no alcanzaba 4.5:1 sobre las superficies oscuras en texto
+                 pequeño (9-13 px); #94A3B8 cumple AA conservando la jerarquía. -->
+            <SolidColorBrush x:Key="Brush.TextTertiary" Color="#94A3B8" />
             <SolidColorBrush x:Key="Brush.Accent" Color="#60A5FA" />
             <SolidColorBrush x:Key="Brush.AccentStrong" Color="#3B82F6" />
             <SolidColorBrush x:Key="Brush.AccentSoft" Color="#93C5FD" />
@@ -167,9 +169,10 @@
                 <Setter Property="Opacity" Value="0.85"/>
             </Style>
             <!-- Botones de acción de página -->
+            <!-- UX-03: blanco sobre #3B82F6 daba 3.68:1 (< 4.5 AA); #2563EB sube a ~5.1:1. -->
             <Style x:Key="AppPrimaryButton" TargetType="Button" BasedOn="{StaticResource MaterialDesignRaisedButton}">
-                <Setter Property="Background" Value="{DynamicResource Brush.AccentStrong}"/>
-                <Setter Property="BorderBrush" Value="{DynamicResource Brush.AccentStrong}"/>
+                <Setter Property="Background" Value="#2563EB"/>
+                <Setter Property="BorderBrush" Value="#2563EB"/>
                 <Setter Property="Foreground" Value="White"/>
             </Style>
             <Style x:Key="AppOutlinedButton" TargetType="Button" BasedOn="{StaticResource MaterialDesignOutlinedButton}">
