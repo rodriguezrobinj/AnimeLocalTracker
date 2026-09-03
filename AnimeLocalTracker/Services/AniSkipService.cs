@@ -69,7 +69,9 @@ public class AniSkipService : IAniSkipService
                 }
             }
 
-            BoundedCache.Insert(_skipCache, cacheKey, [], MaxSkipCacheEntries, TimeSpan.FromMinutes(15));
+            // INT-05: un fallo puntual (429 tras reintentos, 5xx) no debe bloquear el salto
+            // OP/ED durante 15 min: se cachea vacío solo 5 min y se reintenta antes.
+            BoundedCache.Insert(_skipCache, cacheKey, [], MaxSkipCacheEntries, TimeSpan.FromMinutes(5));
             return [];
         }
         catch (OperationCanceledException)

@@ -304,9 +304,10 @@ public partial class App : Application
             AppDataPaths.MigrarDesdeInstalacionAntigua();
 
             // Aplicar el idioma guardado (ES/EN) antes de construir la UI
+            ISettingsService? settingsService = null;
             try
             {
-                var settingsService = ServiceProvider.GetRequiredService<ISettingsService>();
+                settingsService = ServiceProvider.GetRequiredService<ISettingsService>();
                 LocalizationService.Instance.Idioma = settingsService.ObtenerConfiguracion()?.Idioma ?? "es";
             }
             catch { }
@@ -337,13 +338,35 @@ public partial class App : Application
             // ventana; DatabaseService captura y registra sus propios errores.
             _ = dbService.CrearBackupRotativoAsync();
 
-            // Iniciar sincronización periódica en segundo plano
+            // Iniciar sincronización periódica en segundo plano.
+            // FUN-005: el intervalo es el configurado (ya no 5 min fijos) y se reinicia al guardar.
             var syncService = ServiceProvider.GetRequiredService<ISyncService>();
-            syncService.IniciarSincronizacionPeriodica(TimeSpan.FromMinutes(5));
+            var configuracion = settingsService?.ObtenerConfiguracion();
+            int intervaloMinutos = Math.Clamp(configuracion?.IntervaloSincronizacionMinutos ?? 5, 1, 1440);
+            syncService.IniciarSincronizacionPeriodica(TimeSpan.FromMinutes(intervaloMinutos));
+            if (settingsService != null)
+            {
+                settingsService.ConfiguracionModificada += cfg =>
+                {
+                    if (cfg?.IntervaloSincronizacionMinutos > 0)
+                    {
+                        syncService.IniciarSincronizacionPeriodica(TimeSpan.FromMinutes(cfg.IntervaloSincronizacionMinutos));
+                        AppLogger.Info("App", $"Intervalo de sincronización actualizado a {cfg.IntervaloSincronizacionMinutos} min.");
+                    }
+                };
+            }
 
-            // Iniciar verificación de actualizaciones automáticas en segundo plano
+            // Verificación de actualizaciones automáticas en segundo plano (4 h), salvo que
+            // el usuario la desactive con "Buscar actualizaciones al iniciar".
             var updateService = ServiceProvider.GetRequiredService<IUpdateService>();
-            updateService.IniciarVerificacionSegundoPlano(TimeSpan.FromHours(4));
+            if (configuracion?.BuscarActualizacionesAlIniciar ?? true)
+            {
+                updateService.IniciarVerificacionSegundoPlano(TimeSpan.FromHours(4));
+            }
+            else
+            {
+                AppLogger.Info("App", "Comprobación automática de actualizaciones desactivada por configuración.");
+            }
 
             // Pre-calentar el demonio de Python en segundo plano (Zero-Lag en primera entrada a un anime)
             _ = Task.Run(async () =>
