@@ -15,6 +15,34 @@ public partial class MainWindow : Window, IVentanaPrincipal
     {
         InitializeComponent();
         DataContext = viewModel;
+
+        // UX-05: al abrir un diálogo modal, el foco se mueve al botón Aceptar para que
+        // el teclado (Enter/Esc) funcione de inmediato y no quede en la página subyacente.
+        viewModel.PropertyChanged += (s, e) =>
+        {
+            if (e.PropertyName == nameof(MainViewModel.DialogoVisible) && viewModel.DialogoVisible)
+            {
+                Dispatcher.BeginInvoke(
+                    System.Windows.Threading.DispatcherPriority.Input,
+                    () => BtnDialogoAceptar?.Focus());
+            }
+        };
+    }
+
+    /// <summary>
+    /// UX-05: Esc cierra el diálogo abierto (antes el foco podía quedar bajo el overlay
+    /// y Esc llegaba a la página de detrás, p. ej. cerrando el reproductor).
+    /// </summary>
+    private void Window_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key == System.Windows.Input.Key.Escape && DataContext is MainViewModel vm && vm.DialogoVisible)
+        {
+            if (vm.CancelarDialogoCommand.CanExecute(null))
+            {
+                vm.CancelarDialogoCommand.Execute(null);
+            }
+            e.Handled = true;
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════
