@@ -301,4 +301,47 @@ public class DownloadServiceTests
             try { if (File.Exists(destino)) File.Delete(destino); } catch { }
         }
     }
+
+    [Fact]
+    public async Task DownloadVideoAsync_AlReanudarSinSoporteDeRangos_DeberiaReiniciarEnVezDeCorromper()
+    {
+        // Arrange (FUN-014): archivo parcial en disco y servidor que ignora Range (200 en vez de 206)
+        var destino = Path.Combine(Path.GetTempPath(), $"no206_{Guid.NewGuid():N}.mp4");
+        await File.WriteAllBytesAsync(destino, "01234"u8.ToArray());
+
+        byte[] cuerpoCompleto = "0123456789"u8.ToArray();
+        var handlerMock = new Mock<HttpMessageHandler>();
+        handlerMock.Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>())
+            .Returns<HttpRequestMessage, CancellationToken>((req, _) =>
+            {
+                var respuesta = new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                {
+                    Content = new ByteArrayContent(cuerpoCompleto)
+                };
+                respuesta.Content.Headers.ContentLength = cuerpoCompleto.Length;
+                return Task.FromResult(respuesta);
+            });
+
+        var factoryMock = new Mock<IHttpClientFactory>();
+        factoryMock.Setup(f => f.CreateClient(It.IsAny<string>())).Returns(new HttpClient(handlerMock.Object));
+        var sut = new DownloadService(factoryMock.Object, sourceResolver: _sourceResolverMock.Object, settingsService: _settingsServiceMock.Object);
+
+        try
+        {
+            // Act: reanudar contra un servidor que no respeta el Range
+            await sut.DownloadVideoAsync("https://cdn.example.com/video.mp4", destino);
+
+            // Assert: el archivo final es el cuerpo completo, sin doblar el parcial
+            var contenido = await File.ReadAllBytesAsync(destino);
+            contenido.Should().Equal(cuerpoCompleto);
+        }
+        finally
+        {
+            try { if (File.Exists(destino)) File.Delete(destino); } catch { }
+        }
+    }
 }

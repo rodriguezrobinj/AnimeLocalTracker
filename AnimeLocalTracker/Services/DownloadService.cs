@@ -345,7 +345,8 @@ public class DownloadService : IDownloadService
                     {
                         if (state.IsPaused || state.Cts.IsCancellationRequested) return;
 
-                        Debug.WriteLine($"[DownloadService] No se encontró enlace para '{state.AnimeTitulo}' Ep {state.NumeroEpisodio}.");
+                        // FUN-016: trazabilidad del ciclo de descarga en app.log (antes solo Debug)
+                        AppLogger.Warn("DownloadService", $"No se encontró enlace para '{state.AnimeTitulo}' Ep {state.NumeroEpisodio}.");
                         _activeDownloads.TryRemove(key, out _);
                         WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, 0, isDownloading: false, isCompleted: false, isPaused: false, "", $"No se encontró el episodio {state.NumeroEpisodio} en el servidor.", state.AnimeTitulo));
                         return;
@@ -371,7 +372,7 @@ public class DownloadService : IDownloadService
             }
             catch (OperationCanceledException)
             {
-                Debug.WriteLine($"[DownloadService] Descarga interrumpida: {state.AnimeTitulo} Ep {state.NumeroEpisodio}. Pausado: {state.IsPaused}");
+                AppLogger.Info("DownloadService", $"Descarga interrumpida: {state.AnimeTitulo} Ep {state.NumeroEpisodio}. Pausado: {state.IsPaused}");
                 if (!state.IsPaused)
                 {
                     _stateStore.EliminarArchivosTemporales(state.RutaTemporal);
@@ -382,11 +383,11 @@ public class DownloadService : IDownloadService
             {
                 if (state.IsPaused || state.Cts.IsCancellationRequested)
                 {
-                    Debug.WriteLine($"[DownloadService] Descarga pausada generó excepción esperada: {ex.Message}");
+                    AppLogger.Debug("DownloadService", $"Descarga pausada generó excepción esperada: {ex.Message}");
                     return;
                 }
 
-                Debug.WriteLine($"[DownloadService] Error descargando {state.AnimeTitulo} Ep {state.NumeroEpisodio}: {ex.Message}");
+                AppLogger.Error("DownloadService", $"Error descargando {state.AnimeTitulo} Ep {state.NumeroEpisodio}", ex);
                 _stateStore.EliminarArchivosTemporales(state.RutaTemporal);
                 _activeDownloads.TryRemove(key, out _);
                 WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, 0, isDownloading: false, isCompleted: false, isPaused: false, "", ex.Message, state.AnimeTitulo));
@@ -674,7 +675,17 @@ public class DownloadService : IDownloadService
         using var response = await _httpClient.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         response.EnsureSuccessStatusCode();
 
-        if (totalBytes <= 0)
+        // FUN-014: si reanudamos con un archivo parcial (Range enviado) pero el servidor
+        // responde 200 en vez de 206, el cuerpo empieza en CERO: hacer append sobre el
+        // parcial corrompería el archivo. Se reinicia la descarga desde cero.
+        if (existingLength > 0 && response.StatusCode != System.Net.HttpStatusCode.PartialContent)
+        {
+            AppLogger.Warn("DownloadService", "El servidor ignoró la cabecera Range (200 en vez de 206): la descarga se reinicia desde cero para evitar corrupción (FUN-014).");
+            EliminarParcialSeguro(destinationPath);
+            existingLength = 0;
+            totalBytes = response.Content.Headers.ContentLength ?? -1L;
+        }
+        else if (totalBytes <= 0)
         {
             totalBytes = response.Content.Headers.ContentLength ?? -1L;
             if (existingLength > 0) totalBytes += existingLength; // Adjust total if resumed

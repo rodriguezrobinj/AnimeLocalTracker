@@ -27,6 +27,9 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     private readonly ISkipTimesCoordinator _skipCoordinator;
     private CancellationTokenSource? _skipCts;
 
+    // FUN-011: serializa los guardados periódicos de progreso (un guardado a la vez).
+    private readonly SemaphoreSlim _guardadoLock = new(1, 1);
+
     [ObservableProperty]
     private Player _player = null!;
 
@@ -753,7 +756,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     {
         try
         {
-            var previo = await _playbackState.ObtenerPosicionParaReanudarAsync(animeId, episodio);
+            var previo = await _playbackState.ObtenerPosicionParaReanudarAsync(animeId, episodio, _rutaVideo);
             if (previo.HasValue)
             {
                 var (posicion, duracion) = previo.Value;
@@ -1027,6 +1030,17 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     {
         if (_animeId <= 0 || _episodio <= 0) return;
 
+        // FUN-011: un solo guardado a la vez. Si el tick de 5 s llega con otro en curso,
+        // se descarta (el siguiente tick guardará el estado más reciente).
+        if (!_guardadoLock.Wait(0)) return;
+
+        // FUN-017: snapshot de identidad al iniciar — un guardado que termina después de
+        // cambiar de episodio no debe notificar el progreso del episodio viejo bajo el ID
+        // del nuevo (antes _animeId/_episodio se leían en el momento del envío).
+        int animeId = _animeId;
+        int episodio = _episodio;
+        string rutaVideo = _rutaVideo;
+
         try
         {
             double curSec = 0;
@@ -1043,9 +1057,9 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
             var resultado = await _playbackState.GuardarProgresoAsync(new DatosProgresoReproduccion
             {
-                AnimeId = _animeId,
-                NumeroEpisodio = _episodio,
-                RutaVideo = _rutaVideo,
+                AnimeId = animeId,
+                NumeroEpisodio = episodio,
+                RutaVideo = rutaVideo,
                 PosicionSegundos = curSec,
                 DuracionSegundos = durSec,
                 ForzarProgresoCero = forzarProgresoCero,
@@ -1054,11 +1068,15 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
             // Notificar a DetalleViewModel para actualizar la barra de progreso en vivo
             WeakReferenceMessenger.Default.Send(new Messages.EpisodioActualizadoMensaje(
-                _animeId, _episodio, _fueMarcadoComoVisto, resultado.ProgresoSegundos, resultado.TotalSegundos));
+                animeId, episodio, _fueMarcadoComoVisto, resultado.ProgresoSegundos, resultado.TotalSegundos));
         }
         catch (Exception ex)
         {
             AppLogger.Debug("ReproductorViewModel", $"Error al guardar progreso actual: {ex.Message}");
+        }
+        finally
+        {
+            _guardadoLock.Release();
         }
     }
 
@@ -1106,6 +1124,15 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                     {
                         bool esReanudacion = _seekPendienteAlAbrir < 0 && _posicionInicioSegundos > 5;
                         double posToSeek = _seekPendienteAlAbrir >= 0 ? _seekPendienteAlAbrir : _posicionInicioSegundos;
+
+                        // FUN-006: nunca buscar más allá de la duración real del archivo que se
+                        // está reproduciendo (un archivo reemplazado por otro más corto haría
+                        // que el seek quedara fuera de rango y el video terminara al instante).
+                        if (durSeconds > 0 && posToSeek >= durSeconds)
+                        {
+                            posToSeek = Math.Max(0, durSeconds - 1.0);
+                        }
+
                         _seekPendienteAlAbrir = -1;
                         _posicionInicioSegundos = 0;
 

@@ -41,13 +41,22 @@ public class PlaybackStateService : IPlaybackStateService
         }
     }
 
-    public async Task<(double Posicion, double Duracion)?> ObtenerPosicionParaReanudarAsync(int animeId, int episodio)
+    public async Task<(double Posicion, double Duracion)?> ObtenerPosicionParaReanudarAsync(int animeId, int episodio, string? rutaVideoActual = null)
     {
         var registros = await _databaseService.ObtenerRegistrosPorAnimeAsync(animeId);
         var reg = registros?.FirstOrDefault(r => r.NumeroEpisodio == episodio);
 
         if (reg == null || reg.ProgresoSegundos <= MinimoSegundosParaReanudar)
             return null;
+
+        // FUN-006: si el archivo del episodio cambió (fue reemplazado por otro), la posición
+        // guardada corresponde al archivo viejo y no debe reanudarse a ciegas.
+        if (!string.IsNullOrWhiteSpace(reg.RutaArchivo)
+            && !string.IsNullOrWhiteSpace(rutaVideoActual)
+            && !reg.RutaArchivo.Equals(rutaVideoActual, StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
 
         // Si ya terminó (>= 95%) o la duración no está registrada con progreso avanzado, no reanudar
         if (reg.TotalSegundos > 0 && reg.ProgresoSegundos >= reg.TotalSegundos * UmbralVisto)
