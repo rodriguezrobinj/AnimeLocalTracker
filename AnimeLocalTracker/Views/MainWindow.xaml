@@ -328,16 +328,16 @@
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
-                        <Button WindowChrome.IsHitTestVisibleInChrome="True" Click="BtnPantallaCompleta_Click" Width="45" Height="45" Style="{StaticResource MaterialDesignFlatButton}" Padding="0" Foreground="{DynamicResource MaterialDesignBodyLight}" ToolTip="{Binding [Nav_PantallaCompleta], Source={x:Static loc:LocalizationService.Instance}}">
+                        <Button WindowChrome.IsHitTestVisibleInChrome="True" Click="BtnPantallaCompleta_Click" Width="45" Height="45" Style="{StaticResource MaterialDesignFlatButton}" Padding="0" Foreground="{DynamicResource MaterialDesignBodyLight}" ToolTip="{Binding [Nav_PantallaCompleta], Source={x:Static loc:LocalizationService.Instance}}" AutomationProperties.Name="Pantalla completa">
                             <materialDesign:PackIcon Kind="Fullscreen" />
                         </Button>
-                        <Button WindowChrome.IsHitTestVisibleInChrome="True" Click="BtnMinimizar_Click" Width="45" Height="45" Style="{StaticResource MaterialDesignFlatButton}" Padding="0" Foreground="{DynamicResource MaterialDesignBodyLight}">
+                        <Button WindowChrome.IsHitTestVisibleInChrome="True" Click="BtnMinimizar_Click" Width="45" Height="45" Style="{StaticResource MaterialDesignFlatButton}" Padding="0" Foreground="{DynamicResource MaterialDesignBodyLight}" AutomationProperties.Name="Minimizar">
                             <materialDesign:PackIcon Kind="WindowMinimize" />
                         </Button>
-                        <Button WindowChrome.IsHitTestVisibleInChrome="True" Click="BtnMaximizar_Click" Width="45" Height="45" Style="{StaticResource MaterialDesignFlatButton}" Padding="0" Foreground="{DynamicResource MaterialDesignBodyLight}" IsEnabled="False">
+                        <Button WindowChrome.IsHitTestVisibleInChrome="True" Click="BtnMaximizar_Click" Width="45" Height="45" Style="{StaticResource MaterialDesignFlatButton}" Padding="0" Foreground="{DynamicResource MaterialDesignBodyLight}" IsEnabled="False" AutomationProperties.Name="Maximizar">
                             <materialDesign:PackIcon Kind="WindowMaximize" />
                         </Button>
-                        <Button WindowChrome.IsHitTestVisibleInChrome="True" Click="BtnCerrar_Click" Width="45" Height="45" Style="{StaticResource MaterialDesignFlatButton}" Padding="0" Foreground="{DynamicResource MaterialDesignBodyLight}">
+                        <Button WindowChrome.IsHitTestVisibleInChrome="True" Click="BtnCerrar_Click" Width="45" Height="45" Style="{StaticResource MaterialDesignFlatButton}" Padding="0" Foreground="{DynamicResource MaterialDesignBodyLight}" AutomationProperties.Name="Cerrar aplicación">
                             <materialDesign:PackIcon Kind="Close" />
                         </Button>
                     </StackPanel>

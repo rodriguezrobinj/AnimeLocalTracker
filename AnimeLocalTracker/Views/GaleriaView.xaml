@@ -64,7 +64,8 @@
                               Style="{StaticResource MaterialDesignActionToggleButton}"
                               Background="{DynamicResource Brush.Surface1}" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1"
                               Margin="0,0,10,0"
-                              ToolTip="Selección múltiple" Width="40" Height="40">
+                              ToolTip="Selección múltiple" Width="40" Height="40"
+                              AutomationProperties.Name="Selección múltiple">
                     <materialDesign:ToggleButtonAssist.OnContent>
                         <materialDesign:PackIcon Kind="Close" Width="18" Height="18" Foreground="White"/>
                     </materialDesign:ToggleButtonAssist.OnContent>
@@ -76,7 +77,8 @@
                         Style="{StaticResource MaterialDesignFloatingActionMiniLightButton}"
                         Background="{DynamicResource Brush.Surface1}" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1"
                         Width="40" Height="40" Padding="0" Margin="0,0,10,0"
-                        ToolTip="Actualizar datos desde la nube">
+                        ToolTip="Actualizar datos desde la nube"
+                        AutomationProperties.Name="Actualizar datos desde la nube">
                     <materialDesign:PackIcon Kind="Sync" Width="18" Height="18" Foreground="{DynamicResource Brush.Success}"/>
                 </Button>
 
