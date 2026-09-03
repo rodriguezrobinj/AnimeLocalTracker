@@ -88,12 +88,16 @@ jobs:
         pip-audit
 
     - name: NuGet SCA Audit (dotnet)
-      run: dotnet list AnimeLocalTracker/AnimeLocalTracker.csproj package --vulnerable --include-transitive
+      run: |
+        dotnet restore AnimeLocalTracker/AnimeLocalTracker.csproj --nologo
+        dotnet list AnimeLocalTracker/AnimeLocalTracker.csproj package --vulnerable --include-transitive
 
     # SEC-09: el proyecto de tests también se audita (arrastraba transitivas
     # vulnerables System.Net.Http/Text.RegularExpressions 4.3.0 fuera del radar).
     - name: NuGet SCA Audit (dotnet Tests)
-      run: dotnet list AnimeLocalTracker.Tests/AnimeLocalTracker.Tests.csproj package --vulnerable --include-transitive
+      run: |
+        dotnet restore AnimeLocalTracker.Tests/AnimeLocalTracker.Tests.csproj --nologo
+        dotnet list AnimeLocalTracker.Tests/AnimeLocalTracker.Tests.csproj package --vulnerable --include-transitive
 
     - name: Build Rust Native Library
       run: |
