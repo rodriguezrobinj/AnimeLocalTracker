@@ -368,25 +368,26 @@ public partial class GaleriaViewModel : ObservableObject,
                     a.EpisodiosVistos = 0;
                 }
 
+                // FUN-018: la migración de estado solo persiste cuando el estado CAMBIA de
+                // verdad (antes se escribía la BD por cada anime en cada carga de biblioteca).
                 if (string.IsNullOrEmpty(a.EstadoUsuario) || a.EstadoUsuario == "PLANNING")
                 {
+                    string estadoAnterior = a.EstadoUsuario;
                     int episodiosVistos = a.EpisodiosVistos;
 
                     if (episodiosVistos > 0)
                     {
-                        if (a.TotalEpisodios > 0 && episodiosVistos >= a.TotalEpisodios)
-                        {
-                            a.EstadoUsuario = "COMPLETED";
-                        }
-                        else
-                        {
-                            a.EstadoUsuario = "CURRENT";
-                        }
-                        await _databaseService.ActualizarAnimeAsync(a);
+                        a.EstadoUsuario = (a.TotalEpisodios > 0 && episodiosVistos >= a.TotalEpisodios)
+                            ? "COMPLETED"
+                            : "CURRENT";
                     }
                     else if (string.IsNullOrEmpty(a.EstadoUsuario))
                     {
                         a.EstadoUsuario = "PLANNING";
+                    }
+
+                    if (!string.Equals(estadoAnterior, a.EstadoUsuario, StringComparison.Ordinal))
+                    {
                         await _databaseService.ActualizarAnimeAsync(a);
                     }
                 }

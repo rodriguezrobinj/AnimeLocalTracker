@@ -182,9 +182,13 @@ public partial class ConfiguracionViewModel : ObservableObject
                 RutaBaseAnimes = nuevaRuta;
                 CalcularEspacioDisco(nuevaRuta);
 
+                // FUN-009: la carpeta base NO reubica los animes existentes — avisarlo de forma
+                // explícita para que el usuario no crea que sus colecciones se movieron.
                 await _dialogService.MostrarDialogoAsync(
                     "Almacenamiento Actualizado",
-                    $"La carpeta principal de animes se ha configurado a:\n{nuevaRuta}",
+                    $"La carpeta principal de animes se ha configurado a:\n{nuevaRuta}\n\n" +
+                    "Los animes ya existentes conservan su carpeta actual: para que la app los " +
+                    "encuentre, deberán estar (o copiarse) dentro de la nueva carpeta base.",
                     false,
                     "FolderCheck",
                     "#4CAF50");

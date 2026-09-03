@@ -616,7 +616,19 @@ public class DownloadService : IDownloadService
                     while (segment.CurrentOffset <= segment.End)
                     {
                         int bytesToRead = (int)Math.Min(buffer.Length, segment.End - segment.CurrentOffset + 1);
-                        int read = await stream.ReadAsync(buffer.AsMemory(0, bytesToRead), cancellationToken);
+
+                        int read;
+                        try
+                        {
+                            // FUN-015: watchdog de inactividad — 60 s sin recibir datos abortan el segmento.
+                            using var idleCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                            idleCts.CancelAfter(TimeSpan.FromSeconds(60));
+                            read = await stream.ReadAsync(buffer.AsMemory(0, bytesToRead), idleCts.Token);
+                        }
+                        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+                        {
+                            throw new IOException("La descarga se detuvo por inactividad (60 s sin recibir datos del servidor).");
+                        }
                         if (read == 0) break;
 
                         await RandomAccess.WriteAsync(fileHandle, buffer.AsMemory(0, read), segment.CurrentOffset, cancellationToken);
@@ -644,6 +656,12 @@ public class DownloadService : IDownloadService
         }
         catch (OperationCanceledException)
         {
+            await _stateStore.GuardarAsync(statePath, stateInfo);
+            throw;
+        }
+        catch (IOException)
+        {
+            // FUN-015: ante inactividad se conserva el estado para poder reanudar después.
             await _stateStore.GuardarAsync(statePath, stateInfo);
             throw;
         }
@@ -713,7 +731,18 @@ public class DownloadService : IDownloadService
 
         do
         {
-            var read = await contentStream.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken);
+            int read;
+            try
+            {
+                // FUN-015: watchdog de inactividad — 60 s sin datos abortan la descarga secuencial.
+                using var idleCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                idleCts.CancelAfter(TimeSpan.FromSeconds(60));
+                read = await contentStream.ReadAsync(buffer.AsMemory(0, buffer.Length), idleCts.Token);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                throw new IOException("La descarga se detuvo por inactividad (60 s sin recibir datos del servidor).");
+            }
             if (read == 0)
             {
                 isMoreToRead = false;

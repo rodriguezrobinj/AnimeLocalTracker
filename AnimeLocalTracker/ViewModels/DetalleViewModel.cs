@@ -249,6 +249,21 @@ public partial class DetalleViewModel : ObservableObject,
                                         ProgresoSegundos = episodio.ProgresoSegundos,
                                         TotalSegundos = episodio.TotalSegundos
                                     };
+
+                                    // FUN-019: si el episodio ya estaba visto o a medias (registro
+                                    // previo sin archivo local), la descarga NO debe resetear ese
+                                    // estado: el guardado solo añade los metadatos del archivo nuevo.
+                                    var registroPrevio = (await _databaseService.ObtenerRegistrosPorAnimeAsync(reg.AniListId).ConfigureAwait(false))
+                                        ?.FirstOrDefault(r => r.NumeroEpisodio == reg.NumeroEpisodio);
+                                    if (registroPrevio != null)
+                                    {
+                                        reg.VistoLocal = registroPrevio.VistoLocal;
+                                        reg.FavoritoLocal = registroPrevio.FavoritoLocal;
+                                        reg.ProgresoSegundos = registroPrevio.ProgresoSegundos;
+                                        reg.TotalSegundos = registroPrevio.TotalSegundos;
+                                        reg.UltimaReproduccion = registroPrevio.UltimaReproduccion;
+                                    }
+
                                     await _databaseService.GuardarRegistroEpisodioAsync(reg).ConfigureAwait(false);
                                 }
                                 catch { }
