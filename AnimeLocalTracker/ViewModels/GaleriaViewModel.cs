@@ -494,6 +494,7 @@ public partial class GaleriaViewModel : ObservableObject,
                     {
                         var episodios = (await _fileScannerService.EscanearEpisodiosAsync(anime.RutaCarpeta!))
                             .Where(e => !string.IsNullOrWhiteSpace(e.RutaCompleta))
+                            .Where(e => e.NumeroEpisodio > 0) // FUN-004: sin número no es candidato
                             .OrderBy(e => e.NumeroEpisodio)
                             .ToList();
 

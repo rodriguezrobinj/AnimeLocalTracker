@@ -120,7 +120,12 @@ public partial class EpisodioItem : ObservableObject
 
     public double PorcentajeProgreso => TotalSegundos > 0 ? Math.Clamp(ProgresoSegundos / TotalSegundos, 0.0, 1.0) : 0.0;
     
-    public bool TieneProgresoGuardado => ProgresoSegundos > 5 && !Visto && (TotalSegundos <= 0 || ProgresoSegundos < TotalSegundos * 0.95);
+    // FUN-003/FUN-010: el umbral de "terminado" coincide con el default del ajuste
+    // "marcar como visto" (90%); UltimaReproduccion permite reanudar el último visto.
+    public bool TieneProgresoGuardado => ProgresoSegundos > 5 && !Visto && (TotalSegundos <= 0 || ProgresoSegundos < TotalSegundos * 0.90);
+
+    [Ignore]
+    public DateTime UltimaReproduccion { get; set; }
 
     public string ProgresoFormateado
     {

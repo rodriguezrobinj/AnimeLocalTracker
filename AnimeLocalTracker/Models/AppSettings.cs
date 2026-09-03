@@ -13,8 +13,10 @@ public class AppSettings
     public int DescargasSimultaneas { get; set; } = 3;
     public int IntervaloSincronizacionMinutos { get; set; } = 5;
     public bool BuscarActualizacionesAlIniciar { get; set; } = true;
-    /// <summary>Porcentaje reproducido a partir del cual un episodio se marca como visto (1-100).</summary>
-    public int UmbralMarcadoVisto { get; set; } = 95;
+    /// <summary>Porcentaje reproducido a partir del cual un episodio se marca como visto (1-100).
+    /// FUN-003: este valor ES el que gobierna el auto-marcado (el producto se anunció al 90%
+    /// en el README; antes el ajuste era ignorado y el disparo estaba fijo en 90%).</summary>
+    public int UmbralMarcadoVisto { get; set; } = 90;
     /// <summary>Notifica episodios nuevos detectados en las carpetas de la biblioteca.</summary>
     public bool NotificarNuevosEpisodios { get; set; } = true;
     /// <summary>Idioma de la interfaz: "es" o "en".</summary>

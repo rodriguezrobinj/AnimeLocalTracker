@@ -198,6 +198,19 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         }
     }
 
+    /// <summary>
+    /// FUN-003: umbral configurable de "marcado como visto" (AppSettings.UmbralMarcadoVisto,
+    /// 1-100 → 0-1). Antes el auto-marcado estaba fijo en 90% y el ajuste de la UI era decorativo.
+    /// </summary>
+    private double UmbralMarcadoVistoActual
+    {
+        get
+        {
+            int porcentaje = _settingsService?.ObtenerConfiguracion()?.UmbralMarcadoVisto ?? 90;
+            return Math.Clamp(porcentaje, 1, 100) / 100.0;
+        }
+    }
+
     private void OnVolumenChanged(int value)
     {
         if (Player?.Audio != null)
@@ -1152,8 +1165,8 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
                     double porcentaje = durSeconds > 0 ? curSeconds / durSeconds : 0;
 
-                    // Auto-Tracking al 90%
-                    if (porcentaje >= 0.90 && !_fueMarcadoComoVisto)
+                    // Auto-Tracking al umbral configurado (FUN-003: antes fijo en 90%)
+                    if (porcentaje >= UmbralMarcadoVistoActual && !_fueMarcadoComoVisto)
                     {
                         await RealizarAutoTrackingAsync();
                     }
@@ -1168,7 +1181,11 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                             if (AutoSkipIntroOutro && !_skipAutoEjecutados.Contains(skipKey))
                             {
                                 _skipAutoEjecutados.Add(skipKey);
-                                Seek(skip.Interval.EndTime + 0.2);
+                                // FUN-007: el salto automático se acota al final del video
+                                // (igual que el manual) para no disparar Ended prematuramente.
+                                double destino = skip.Interval.EndTime + 0.2;
+                                if (TotalSeconds > 0 && destino > TotalSeconds) destino = TotalSeconds;
+                                Seek(destino);
                                 MostrarSkipButton = false;
                                 MostrarSkipIntro = false;
                                 _currentActiveSkip = null;
@@ -1211,7 +1228,11 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                 {
                     // Al finalizar, resetear progreso a 0
                     _ = GuardarProgresoActualAsync(forzarProgresoCero: true);
-                    if (!_fueMarcadoComoVisto)
+
+                    // FUN-012: solo marcar como visto si se alcanzó el final REAL del archivo:
+                    // un video truncado/corrupto también dispara Ended antes de tiempo.
+                    bool llegoAlFinalReal = TotalSeconds > 0 && CurrentSeconds >= TotalSeconds * UmbralMarcadoVistoActual;
+                    if (!_fueMarcadoComoVisto && llegoAlFinalReal)
                     {
                         await RealizarAutoTrackingAsync();
                     }

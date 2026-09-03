@@ -363,6 +363,7 @@ public partial class DetalleViewModel : ObservableObject,
                     Favorito = memoria != null && memoria.FavoritoLocal,
                     ProgresoSegundos = memoria?.ProgresoSegundos ?? 0,
                     TotalSegundos = memoria?.TotalSegundos ?? 0,
+                    UltimaReproduccion = memoria?.UltimaReproduccion ?? DateTime.MinValue,
                     IsDownloading = estaDescargando,
                     DownloadProgress = prog,
                     Resolucion = resolucionCache,
@@ -890,8 +891,12 @@ public partial class DetalleViewModel : ObservableObject,
     {
         if (_todosLosEpisodios.Count == 0) return;
 
-        // Reproducir el episodio que se dejó a medias con progreso guardado
-        var epEnCurso = _todosLosEpisodios.FirstOrDefault(e => e.TieneProgresoGuardado);
+        // FUN-010: reanudar el episodio dejado a medias MÁS RECIENTE (antes se elegía el de
+        // menor número con progreso, ignorando UltimaReproduccion).
+        var epEnCurso = _todosLosEpisodios
+            .Where(e => e.TieneProgresoGuardado)
+            .OrderByDescending(e => e.UltimaReproduccion)
+            .FirstOrDefault();
         if (epEnCurso != null)
         {
             await ReproducirEpisodio(epEnCurso);

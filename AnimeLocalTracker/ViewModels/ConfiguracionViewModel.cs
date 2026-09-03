@@ -91,7 +91,7 @@ public partial class ConfiguracionViewModel : ObservableObject
         SubtitulosPorDefecto = config.SubtitulosPorDefecto;
         DescargasSimultaneas = config.DescargasSimultaneas;
         IntervaloSincronizacionMinutos = config.IntervaloSincronizacionMinutos;
-        UmbralMarcadoVisto = config.UmbralMarcadoVisto is >= 1 and <= 100 ? config.UmbralMarcadoVisto : 95;
+        UmbralMarcadoVisto = config.UmbralMarcadoVisto is >= 1 and <= 100 ? config.UmbralMarcadoVisto : 90;
         NotificarNuevosEpisodios = config.NotificarNuevosEpisodios;
         Idioma = config.Idioma == "en" ? "en" : "es";
         VelocidadReproduccionDefecto = config.VelocidadReproduccionDefecto is >= 0.5 and <= 2.0 ? config.VelocidadReproduccionDefecto : 1.0;

@@ -109,6 +109,14 @@ public class PlaybackStateService : IPlaybackStateService
 
     public async Task<bool> MarcarComoVistoYSincronizarAsync(int animeId, int episodio, string rutaVideo, double duracionSegundos)
     {
+        // FUN-004: un episodio sin número (0 = archivo sin dígitos) nunca debe marcarse ni
+        // sincronizarse: empujar progress=0 a AniList reseteaba el progreso real del usuario.
+        if (animeId <= 0 || episodio <= 0)
+        {
+            AppLogger.Warn("PlaybackStateService", $"Marcado como visto ignorado para episodio inválido (anime {animeId}, ep {episodio}).");
+            return false;
+        }
+
         try
         {
             // 1. Guardar localmente
