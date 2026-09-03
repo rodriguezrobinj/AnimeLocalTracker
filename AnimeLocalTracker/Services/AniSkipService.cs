@@ -25,6 +25,20 @@ public class AniSkipService : IAniSkipService
     public AniSkipService(HttpClient httpClient)
     {
         _httpClient = httpClient;
+
+        // INT-02: las consultas de AniSkip son GETs ligeros — 30 s son suficientes
+        // (el default de 100 s dejaba la llamada colgada demasiado tiempo).
+        try
+        {
+            if (_httpClient.Timeout.TotalSeconds >= 100)
+            {
+                _httpClient.Timeout = TimeSpan.FromSeconds(30);
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn("AniSkipService", $"No se pudo ajustar el timeout del HttpClient: {ex.Message}");
+        }
     }
 
     public async Task<List<AniSkipResult>> ObtenerSkipTimesAsync(int malId, int episodio, double duracionSegundos = 0, CancellationToken ct = default)

@@ -221,6 +221,7 @@ public class AniListTrackingService : IAnimeTrackingService
 
         // 2. Lotes de 50 (máximo perPage de AniList para la conexión media)
         const int TamanoLote = 50;
+        int fallosLote = 0;
         foreach (var chunk in pendientes.Chunk(TamanoLote))
         {
             try
@@ -259,6 +260,7 @@ public class AniListTrackingService : IAnimeTrackingService
 
                 if (!response.IsSuccessStatusCode)
                 {
+                    fallosLote++;
                     AppLogger.Warn("AniListTrackingService", $"Lote de animes ({chunk.Length} ids) falló con HTTP {(int)response.StatusCode}.");
                     continue;
                 }
@@ -266,13 +268,18 @@ public class AniListTrackingService : IAnimeTrackingService
                 var content = await response.Content.ReadAsStringAsync();
                 if (content.Contains("\"errors\""))
                 {
+                    fallosLote++;
                     AppLogger.Warn("AniListTrackingService", $"AniList devolvió error en lote de animes: {Truncar(content)}");
                     continue;
                 }
 
                 var result = JsonSerializer.Deserialize<AniListResponse>(content, JsonOptions);
                 var medias = result?.Data?.Page?.Media;
-                if (medias == null) continue;
+                if (medias == null)
+                {
+                    fallosLote++;
+                    continue;
+                }
 
                 foreach (var media in medias)
                 {
@@ -282,16 +289,27 @@ public class AniListTrackingService : IAnimeTrackingService
             }
             catch (OperationCanceledException)
             {
+                fallosLote++;
                 AppLogger.Warn("AniListTrackingService", $"Timeout al obtener lote de animes de AniList.");
             }
             catch (HttpRequestException ex)
             {
+                fallosLote++;
                 AppLogger.Warn("AniListTrackingService", $"Fallo de red al conectar con AniList (lote): {ex.Message}");
             }
             catch (Exception ex)
             {
+                fallosLote++;
                 AppLogger.Error("AniListTrackingService", $"Error al obtener lote de animes", ex);
             }
+        }
+
+        // INT-01: la actualización parcial ya no es silenciosa — si algún lote falló, el
+        // usuario lo verá reflejado en el log con el alcance exacto.
+        int totalLotes = (int)Math.Ceiling(pendientes.Count / (double)TamanoLote);
+        if (fallosLote > 0)
+        {
+            AppLogger.Warn("AniListTrackingService", $"Actualización de biblioteca parcial: {fallosLote}/{totalLotes} lote(s) fallido(s); {resultado.Count}/{idsUnicos.Count} animes disponibles.");
         }
 
         return resultado;
