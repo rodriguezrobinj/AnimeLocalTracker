@@ -331,6 +331,7 @@ public class DownloadService : IDownloadService
         _ = Task.Run(async () =>
         {
             bool slotAdquirido = false;
+            int reintentosResolucion = 0;
             try
             {
                 await AdquirirSlotAsync(state.Cts.Token);
@@ -338,30 +339,51 @@ public class DownloadService : IDownloadService
 
                 if (state.Cts.IsCancellationRequested || state.IsPaused) return;
 
-                if (string.IsNullOrEmpty(state.VideoUrl))
+                IProgress<double>? progress = null;
+                bool descargaCompletada = false;
+
+                // El enlace ya resuelto puede ser rechazado por el servidor (firma caducada,
+                // 403/404/410): se re-resuelve UNA vez con un enlace nuevo antes de fallar.
+                while (!descargaCompletada)
                 {
-                    state.VideoUrl = await _sourceResolver.BuscarUrlEpisodioAsync(state.Titulos, state.NumeroEpisodio, state.AniListId, state.Cts.Token);
+                    if (state.Cts.IsCancellationRequested || state.IsPaused) return;
+
                     if (string.IsNullOrEmpty(state.VideoUrl))
                     {
-                        if (state.IsPaused || state.Cts.IsCancellationRequested) return;
+                        state.VideoUrl = await _sourceResolver.BuscarUrlEpisodioAsync(state.Titulos, state.NumeroEpisodio, state.AniListId, state.Cts.Token);
+                        if (string.IsNullOrEmpty(state.VideoUrl))
+                        {
+                            if (state.IsPaused || state.Cts.IsCancellationRequested) return;
 
-                        // FUN-016: trazabilidad del ciclo de descarga en app.log (antes solo Debug)
-                        AppLogger.Warn("DownloadService", $"No se encontró enlace para '{state.AnimeTitulo}' Ep {state.NumeroEpisodio}.");
-                        _activeDownloads.TryRemove(key, out _);
-                        WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, 0, isDownloading: false, isCompleted: false, isPaused: false, "", $"No se encontró el episodio {state.NumeroEpisodio} en el servidor.", state.AnimeTitulo));
-                        return;
+                            // FUN-016: trazabilidad del ciclo de descarga en app.log (antes solo Debug)
+                            AppLogger.Warn("DownloadService", $"No se encontró enlace para '{state.AnimeTitulo}' Ep {state.NumeroEpisodio}.");
+                            _activeDownloads.TryRemove(key, out _);
+                            WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, 0, isDownloading: false, isCompleted: false, isPaused: false, "", $"No se encontró el episodio {state.NumeroEpisodio} en el servidor.", state.AnimeTitulo));
+                            return;
+                        }
+                    }
+
+                    if (state.Cts.IsCancellationRequested || state.IsPaused) return;
+
+                    progress ??= new Progress<double>(p =>
+                    {
+                        state.Progreso = p;
+                        WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, p, isDownloading: true, isCompleted: false, isPaused: false, state.RutaDestino, null, state.AnimeTitulo));
+                    });
+
+                    try
+                    {
+                        await DownloadVideoAsync(state.VideoUrl, state.RutaTemporal, progress, state.Cts.Token);
+                        descargaCompletada = true;
+                    }
+                    catch (Exception ex) when (EsRechazoDeEnlace(ex) && reintentosResolucion == 0 && !state.IsPaused && !state.Cts.IsCancellationRequested)
+                    {
+                        reintentosResolucion++;
+                        AppLogger.Warn("DownloadService", $"El servidor rechazó el enlace de '{state.AnimeTitulo}' Ep {state.NumeroEpisodio} ({(int?)((HttpRequestException)ex).StatusCode}): re-resolviendo el episodio (intento 2).");
+                        EliminarParcialSeguro(state.RutaTemporal);
+                        state.VideoUrl = null;
                     }
                 }
-
-                if (state.Cts.IsCancellationRequested || state.IsPaused) return;
-
-                var progress = new Progress<double>(p =>
-                {
-                    state.Progreso = p;
-                    WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, p, isDownloading: true, isCompleted: false, isPaused: false, state.RutaDestino, null, state.AnimeTitulo));
-                });
-
-                await DownloadVideoAsync(state.VideoUrl, state.RutaTemporal, progress, state.Cts.Token);
 
                 if (File.Exists(state.RutaDestino)) File.Delete(state.RutaDestino);
                 File.Move(state.RutaTemporal, state.RutaDestino);
@@ -799,6 +821,18 @@ public class DownloadService : IDownloadService
         {
             AppLogger.Debug("DownloadService", $"No se pudo limpiar el archivo parcial tras el corte de seguridad: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// HTTP 403/404/410 del servidor de video = el enlace firmado ya no sirve (caducado,
+    /// geo-bloqueado o eliminado): no es un fallo definitivo, merece re-resolver.
+    /// </summary>
+    private static bool EsRechazoDeEnlace(Exception ex)
+    {
+        return ex is HttpRequestException hre
+               && hre.StatusCode is System.Net.HttpStatusCode.Forbidden
+                   or System.Net.HttpStatusCode.NotFound
+                   or System.Net.HttpStatusCode.Gone;
     }
 
     private static string SanitizarUrlParaLog(string url)
