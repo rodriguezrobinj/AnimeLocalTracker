@@ -45,7 +45,7 @@ public class NewEpisodeNotifier
         var config = _settingsService.ObtenerConfiguracion();
         if (config == null || !config.NotificarNuevosEpisodios) return 0;
 
-        var animes = await _databaseService.ObtenerTodosLosAnimesAsync() ?? new List<Models.AnimeItem>();
+        var animes = await _databaseService.ObtenerAnimesLigerosAsync() ?? new List<Models.AnimeItem>();
         if (animes.Count == 0) return 0;
 
         var registros = await _databaseService.ObtenerTodosLosRegistrosAsync() ?? new List<Models.RegistroEpisodio>();

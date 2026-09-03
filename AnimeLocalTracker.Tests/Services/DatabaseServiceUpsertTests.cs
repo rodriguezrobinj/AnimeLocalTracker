@@ -38,12 +38,15 @@ public class DatabaseServiceUpsertTests : IDisposable
         // Act
         await _sut.InicializarBaseDatosAsync();
 
-        // Assert (ARC-06): user_version avanza y el esquema de la migración v1 existe
+        // Assert (ARC-06): user_version avanza y el esquema de cada migración existe
         using var conexion = new SQLiteConnection(_tempDbPath);
-        conexion.ExecuteScalar<int>("PRAGMA user_version;").Should().BeGreaterThanOrEqualTo(1);
+        conexion.ExecuteScalar<int>("PRAGMA user_version;").Should().BeGreaterThanOrEqualTo(2);
         conexion.ExecuteScalar<string>(
                 "SELECT sql FROM sqlite_master WHERE type='index' AND name='IX_RegistroEpisodio_AnimeEp'")
             .Should().NotBeNullOrEmpty("la migración v1 debe crear el índice compuesto");
+        conexion.ExecuteScalar<string>(
+                "SELECT sql FROM sqlite_master WHERE type='index' AND name='IX_RegistroEpisodio_SyncCola'")
+            .Should().NotBeNullOrEmpty("la migración v2 debe crear el índice de la cola de sincronización (PERF-10)");
     }
 
     [Fact]

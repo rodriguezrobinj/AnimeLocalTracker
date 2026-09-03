@@ -206,6 +206,8 @@ public class MainViewModelTests : IDisposable
         // Arrange
         _dbMock.Setup(d => d.ObtenerTodosLosAnimesAsync())
             .ReturnsAsync(new List<AnimeItem> { new() { AniListId = 999, Titulo = "Test Anime" } });
+        // PERF-03: la comprobación de existencia ya no carga la biblioteca completa
+        _dbMock.Setup(d => d.ExisteAnimeAsync(It.IsAny<int>())).ReturnsAsync(true);
         var sut = CreateSut();
 
         // Act

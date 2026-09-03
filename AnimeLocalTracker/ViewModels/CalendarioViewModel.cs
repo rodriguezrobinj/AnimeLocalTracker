@@ -56,7 +56,9 @@ public partial class CalendarioViewModel : ObservableObject, IDisposable
             EstaCargando = true;
             LimpiarListas();
 
-            var animes = await _databaseService.ObtenerTodosLosAnimesAsync();
+            // PERF-02: proyección ligera (sin Sinopsis) para la lista del calendario.
+            var animes = await _databaseService.ObtenerAnimesLigerosAsync();
+            foreach (var a in animes) a.ResolverPortadaLocal();
             TotalAnimesEnEmision = animes.Count(a => a.Estado.Equals("RELEASING", StringComparison.OrdinalIgnoreCase));
             
             // GroupBy: tolera AniListIds duplicados en la BD (ToDictionary lanzaría excepción

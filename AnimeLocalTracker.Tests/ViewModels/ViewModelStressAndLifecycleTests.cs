@@ -43,6 +43,7 @@ public class ViewModelStressAndLifecycleTests
         _downloadMock.Setup(d => d.ObtenerDescargasActivas()).Returns(new List<DescargaItem>());
 
         _dbMock.Setup(d => d.ObtenerTodosLosAnimesAsync()).ReturnsAsync(new List<AnimeItem>());
+        _dbMock.Setup(d => d.ObtenerAnimesLigerosAsync()).ReturnsAsync(new List<AnimeItem>());
         _dbMock.Setup(d => d.ObtenerTodosLosRegistrosAsync()).ReturnsAsync(new List<RegistroEpisodio>());
 
         services.AddSingleton<GaleriaViewModel>();
@@ -85,6 +86,7 @@ public class ViewModelStressAndLifecycleTests
         }).ToList();
 
         _dbMock.Setup(d => d.ObtenerTodosLosAnimesAsync()).ReturnsAsync(animes);
+        _dbMock.Setup(d => d.ObtenerAnimesLigerosAsync()).ReturnsAsync(animes);
 
         DateTime lunes = DateTime.UtcNow.Date;
         while (lunes.DayOfWeek != DayOfWeek.Monday) lunes = lunes.AddDays(-1);

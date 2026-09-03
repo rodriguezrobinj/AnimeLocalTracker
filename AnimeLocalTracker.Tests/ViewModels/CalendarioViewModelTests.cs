@@ -33,6 +33,13 @@ public class CalendarioViewModelTests
                 new() { AniListId = 21, Estado = "RELEASING", UrlPortada = "onepiece.png" },
                 new() { AniListId = 154587, Estado = "FINISHED", UrlPortada = "frieren.png" }
             });
+        dbMock.Setup(d => d.ObtenerAnimesLigerosAsync())
+            .ReturnsAsync(new List<AnimeItem>
+            {
+                new() { AniListId = 21, Estado = "RELEASING", UrlPortada = "onepiece.png" },
+                new() { AniListId = 21, Estado = "RELEASING", UrlPortada = "onepiece.png" },
+                new() { AniListId = 154587, Estado = "FINISHED", UrlPortada = "frieren.png" }
+            });
 
         var trackingMock = new Mock<IAnimeTrackingService>();
         trackingMock
@@ -62,6 +69,8 @@ public class CalendarioViewModelTests
 
         var dbMock = new Mock<IDatabaseService>();
         dbMock.Setup(d => d.ObtenerTodosLosAnimesAsync())
+            .ReturnsAsync(new List<AnimeItem> { animeLocal });
+        dbMock.Setup(d => d.ObtenerAnimesLigerosAsync())
             .ReturnsAsync(new List<AnimeItem> { animeLocal });
 
         var trackingMock = new Mock<IAnimeTrackingService>();
@@ -97,6 +106,7 @@ public class CalendarioViewModelTests
         // Arrange
         var dbMock = new Mock<IDatabaseService>();
         dbMock.Setup(d => d.ObtenerTodosLosAnimesAsync()).ReturnsAsync(new List<AnimeItem>());
+        dbMock.Setup(d => d.ObtenerAnimesLigerosAsync()).ReturnsAsync(new List<AnimeItem>());
 
         var trackingMock = new Mock<IAnimeTrackingService>();
 
@@ -117,6 +127,7 @@ public class CalendarioViewModelTests
         // Arrange
         var dbMock = new Mock<IDatabaseService>();
         dbMock.Setup(d => d.ObtenerTodosLosAnimesAsync()).ReturnsAsync(new List<AnimeItem>());
+        dbMock.Setup(d => d.ObtenerAnimesLigerosAsync()).ReturnsAsync(new List<AnimeItem>());
         var trackingMock = new Mock<IAnimeTrackingService>();
 
         var vm = new CalendarioViewModel(dbMock.Object, trackingMock.Object);

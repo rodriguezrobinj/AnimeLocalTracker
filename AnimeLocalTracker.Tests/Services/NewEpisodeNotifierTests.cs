@@ -50,6 +50,11 @@ public class NewEpisodeNotifierTests : IDisposable
         {
             new() { AniListId = 1, Titulo = "Anime", RutaCarpeta = _tempDir }
         });
+        // PERF-02: el notificador usa la proyección ligera (sin Sinopsis)
+        _dbMock.Setup(d => d.ObtenerAnimesLigerosAsync()).ReturnsAsync(new List<AnimeItem>
+        {
+            new() { AniListId = 1, Titulo = "Anime", RutaCarpeta = _tempDir }
+        });
         _dbMock.Setup(d => d.ObtenerTodosLosRegistrosAsync()).ReturnsAsync(new List<RegistroEpisodio>());
         _scannerMock.Setup(s => s.EscanearEpisodiosAsync(It.IsAny<string>())).ReturnsAsync(
             Enumerable.Range(1, cantidadEpisodios).Select(i => new EpisodioItem { NumeroEpisodio = i }).ToList());

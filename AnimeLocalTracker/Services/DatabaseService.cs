@@ -80,7 +80,8 @@ public class DatabaseService : IDatabaseService, IDisposable
     /// </summary>
     private static readonly (int Version, string Descripcion, Func<SQLiteAsyncConnection, Task> Aplicar)[] Migraciones =
     {
-        (1, "esquema base (tablas AnimeItem/RegistroEpisodio + índice compuesto)", CrearEsquemaBaseAsync)
+        (1, "esquema base (tablas AnimeItem/RegistroEpisodio + índice compuesto)", CrearEsquemaBaseAsync),
+        (2, "índice de la cola de sincronización (VistoLocal, SincronizadoEnNube)", CrearIndiceColaSincronizacionAsync)
     };
 
     private static async Task EjecutarMigracionesPendientesAsync(SQLiteAsyncConnection conexion)
@@ -104,6 +105,16 @@ public class DatabaseService : IDatabaseService, IDisposable
 
         // ÍNDICE COMPUESTO PARA BÚSQUEDAS RÁPIDAS POR (AniListId, NumeroEpisodio)
         await conexion.ExecuteAsync("CREATE INDEX IF NOT EXISTS IX_RegistroEpisodio_AnimeEp ON RegistroEpisodio(AniListId, NumeroEpisodio);");
+    }
+
+    /// <summary>
+    /// PERF-10: la consulta de la cola de sincronización (VistoLocal=1 y SincronizadoEnNube=0)
+    /// barría la tabla completa (SCAN). Con este índice es un rango directo cuando la
+    /// biblioteca crezca a cientos de miles de registros.
+    /// </summary>
+    private static async Task CrearIndiceColaSincronizacionAsync(SQLiteAsyncConnection conexion)
+    {
+        await conexion.ExecuteAsync("CREATE INDEX IF NOT EXISTS IX_RegistroEpisodio_SyncCola ON RegistroEpisodio(VistoLocal, SincronizadoEnNube);");
     }
 
     /// <summary>
@@ -184,6 +195,36 @@ public class DatabaseService : IDatabaseService, IDisposable
             }
         });
         return animes;
+    }
+
+    /// <summary>
+    /// PERF-02: proyección ligera de la biblioteca para listas (calendario, notificador,
+    /// comprobaciones): omite la columna Sinopsis (hasta ~20 KB por anime en HTML) que
+    /// solo necesita la ficha de detalle.
+    /// </summary>
+    public async Task<List<AnimeItem>> ObtenerAnimesLigerosAsync()
+    {
+        var items = await _conexion.QueryAsync<AnimeItem>(
+            "SELECT AniListId, MalId, Titulo, NombresAlternativos, RutaCarpeta, UrlPortada, " +
+            "Generos, TotalEpisodios, Estado, EstadoUsuario FROM AnimeItem;");
+        foreach (var a in items)
+        {
+            a.ResolverPortadaLocal();
+        }
+        return items;
+    }
+
+    /// <summary>Devuelve la fila completa de un anime (incluida la Sinopsis) por su id.</summary>
+    public async Task<AnimeItem?> ObtenerAnimePorIdAsync(int aniListId)
+    {
+        return await _conexion.Table<AnimeItem>().FirstOrDefaultAsync(a => a.AniListId == aniListId);
+    }
+
+    /// <summary>PERF-03: comprueba la existencia sin cargar la biblioteca completa.</summary>
+    public async Task<bool> ExisteAnimeAsync(int aniListId)
+    {
+        return await _conexion.ExecuteScalarAsync<int>(
+                   "SELECT COUNT(*) FROM AnimeItem WHERE AniListId = ?", aniListId) > 0;
     }
     
     public async Task EliminarAnimeAsync(AnimeItem anime)
@@ -289,7 +330,8 @@ public class DatabaseService : IDatabaseService, IDisposable
             Registros = registros
         };
 
-        var json = System.Text.Json.JsonSerializer.Serialize(backup, JsonOpcionesIndentadas);
+        // PERF-07: la serialización (CPU) corre en el thread pool, no en el hilo de UI.
+        var json = await Task.Run(() => System.Text.Json.JsonSerializer.Serialize(backup, JsonOpcionesIndentadas));
 
         var destinoDir = Path.GetDirectoryName(rutaDestino);
         if (!string.IsNullOrEmpty(destinoDir)) Directory.CreateDirectory(destinoDir);
@@ -314,14 +356,15 @@ public class DatabaseService : IDatabaseService, IDisposable
         if (new FileInfo(rutaOrigen).Length > TopeImportacionBytes)
             throw new InvalidDataException("El archivo de importación supera el límite de 50 MB.");
 
-        var json = await File.ReadAllTextAsync(rutaOrigen);
+        // PERF-07: la lectura del archivo y el parseo (CPU) corren en el thread pool.
+        string json = await Task.Run(() => File.ReadAllText(rutaOrigen));
 
         // FUN-013: un JSON con tipos inválidos o malformado debe fallar con mensaje claro
         // (antes la JsonException llegaba al ViewModel como un error genérico "Error").
         BibliotecaBackup? backup;
         try
         {
-            backup = System.Text.Json.JsonSerializer.Deserialize<BibliotecaBackup>(json);
+            backup = await Task.Run(() => System.Text.Json.JsonSerializer.Deserialize<BibliotecaBackup>(json));
         }
         catch (System.Text.Json.JsonException ex)
         {

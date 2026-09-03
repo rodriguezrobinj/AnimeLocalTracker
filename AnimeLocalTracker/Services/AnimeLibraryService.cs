@@ -31,8 +31,9 @@ public class AnimeLibraryService
     /// <summary>¿El anime ya está en la biblioteca local?</summary>
     public async Task<bool> ExisteEnBibliotecaAsync(int aniListId)
     {
-        var animesGuardados = await _databaseService.ObtenerTodosLosAnimesAsync();
-        return animesGuardados.Any(a => a.AniListId == aniListId);
+        // PERF-03: antes se cargaba la biblioteca completa (+ File.Exists por anime)
+        // solo para comprobar un id.
+        return await _databaseService.ExisteAnimeAsync(aniListId);
     }
 
     /// <summary>
