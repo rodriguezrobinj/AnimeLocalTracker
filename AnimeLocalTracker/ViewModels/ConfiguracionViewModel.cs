@@ -286,6 +286,110 @@ public partial class ConfiguracionViewModel : ObservableObject
     }
 
     /// <summary>
+    /// PRI-01: borra TODOS los datos locales (biblioteca, historial, sesión de AniList,
+    /// portadas, miniaturas, backups y logs) y cierra la aplicación. La lista de AniList
+    /// en la nube NO se toca. Antes no existía ninguna forma de purgar los datos: ni la
+    /// desinstalación los borraba (viven en %LocalAppData%\AnimeLocalTrackerData a propósito).
+    /// </summary>
+    [RelayCommand]
+    public async Task BorrarTodosMisDatosAsync()
+    {
+        bool confirmarPrimero = await _dialogService.MostrarDialogoAsync(
+            "Borrar todos mis datos",
+            "Se eliminarán: tu biblioteca local (animes, historial de visionado y progreso), " +
+            "la sesión de AniList, las portadas, miniaturas, copias de seguridad y logs.\n\n" +
+            "Tu lista en la nube de AniList NO se toca. Esta acción NO se puede deshacer.",
+            true,
+            "DeleteForever",
+            "#EF4444");
+
+        if (!confirmarPrimero) return;
+
+        bool confirmarSegundo = await _dialogService.MostrarDialogoAsync(
+            "Última confirmación",
+            "¿Borrar TODOS tus datos locales ahora? La aplicación se cerrará y, al abrirla " +
+            "de nuevo, empezarás desde cero.",
+            true,
+            "Alert",
+            "#EF4444");
+
+        if (!confirmarSegundo) return;
+
+        try
+        {
+            // 1) Sesión de AniList (token cifrado con DPAPI)
+            _authService.CerrarSesion();
+
+            // 2) Biblioteca local (tablas completas en una transacción)
+            await _databaseService.VaciarBibliotecaAsync();
+
+            // 3) Datos satélite en disco
+            BorrarCarpetaSiExiste(AppDataPaths.CoversDir);
+            BorrarCarpetaSiExiste(AppDataPaths.ThumbnailsDir);
+            BorrarCarpetaSiExiste(Path.Combine(AppDataPaths.DataRoot, "Backups"));
+            BorrarCarpetaSiExiste(AppDataPaths.LogsDir);
+            BorrarArchivoSiExiste(AppDataPaths.TokenPath);
+            BorrarArchivoSiExiste(Path.Combine(AppDataPaths.DataRoot, "episodios_notificados.json"));
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("ConfiguracionViewModel", "Error al borrar todos los datos", ex);
+            await _dialogService.MostrarDialogoAsync(
+                "Error",
+                $"No se pudieron borrar todos los datos: {ex.Message}",
+                false,
+                "AlertCircle",
+                "#E53935");
+            return;
+        }
+
+        await _dialogService.MostrarDialogoAsync(
+            "Datos borrados",
+            "Todos tus datos locales se han eliminado correctamente. La aplicación se cerrará.",
+            false,
+            "CheckCircle",
+            "#4CAF50");
+
+        // Cerrar para que el arranque siguiente reconstruya todo desde cero.
+        var app = System.Windows.Application.Current;
+        if (app != null)
+        {
+            var dispatcher = app.Dispatcher;
+            if (!dispatcher.HasShutdownStarted)
+            {
+                dispatcher.Invoke(() => app!.Shutdown());
+            }
+        }
+    }
+
+    private static void BorrarCarpetaSiExiste(string directorio)
+    {
+        try
+        {
+            if (Directory.Exists(directorio))
+            {
+                Directory.Delete(directorio, recursive: true);
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn("ConfiguracionViewModel", $"No se pudo borrar '{directorio}': {ex.Message}");
+        }
+    }
+
+    private static void BorrarArchivoSiExiste(string ruta)
+    {
+        try
+        {
+            if (File.Exists(ruta)) File.Delete(ruta);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn("ConfiguracionViewModel", $"No se pudo borrar '{ruta}': {ex.Message}");
+        }
+    }
+
+    /// <summary>
     /// Mantenimiento: elimina miniaturas y portadas de animes/episodios que ya no existen
     /// en la biblioteca (liberan espacio sin tocar ningún episodio).
     /// </summary>

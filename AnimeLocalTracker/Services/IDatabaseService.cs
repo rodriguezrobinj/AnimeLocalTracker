@@ -34,4 +34,7 @@ public interface IDatabaseService
 
     // === ESCRITURAS MASIVAS (PERF-06): una transacción por lote en vez de N escrituras ===
     Task ActualizarAnimesAsync(IEnumerable<AnimeItem> animes);
+
+    // PRI-01: borrado total de la biblioteca local (tablas) para "Borrar todos mis datos".
+    Task VaciarBibliotecaAsync();
 }

@@ -490,6 +490,32 @@
                                 </Button>
                             </Grid>
                         </Border>
+
+                        <!-- PRI-01: borrado total de los datos locales (doble confirmación) -->
+                        <Border Background="#14181E" BorderBrush="#7F1D1D" BorderThickness="1" CornerRadius="10" MinHeight="56" Padding="16,10" Margin="0,10,0,0">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+                                    <TextBlock Text="Borrar todos mis datos" FontWeight="Bold" Foreground="White" FontSize="13"/>
+                                    <TextBlock Text="Elimina biblioteca, historial, sesión de AniList, portadas, miniaturas, backups y logs locales. Tu lista en la nube NO se toca." 
+                                               FontSize="11" Foreground="#F87171" TextWrapping="Wrap"/>
+                                </StackPanel>
+
+                                <Button Grid.Column="1" Command="{Binding BorrarTodosMisDatosCommand}"
+                                        Style="{StaticResource MaterialDesignOutlinedButton}" BorderBrush="#EF4444" Foreground="#F87171"
+                                        Height="38" Padding="14,0" VerticalAlignment="Center"
+                                        materialDesign:ButtonAssist.CornerRadius="8">
+                                    <StackPanel Orientation="Horizontal">
+                                        <materialDesign:PackIcon Kind="DeleteForever" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                        <TextBlock Text="Borrar datos" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="12"/>
+                                    </StackPanel>
+                                </Button>
+                            </Grid>
+                        </Border>
                     </StackPanel>
                 </materialDesign:Card>
 

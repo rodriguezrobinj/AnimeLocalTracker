@@ -624,4 +624,18 @@ public class DatabaseService : IDatabaseService, IDisposable
         // PERF-06: UpdateAll en una sola transacción (los animes ya existen en la BD).
         await _conexion.UpdateAllAsync(lista);
     }
+
+    /// <summary>
+    /// PRI-01: vacía las tablas de la biblioteca local (animes + registros) en una sola
+    /// transacción. El esquema y las migraciones se conservan; el backup rotativo se
+    /// regenerará vacío en el siguiente arranque.
+    /// </summary>
+    public async Task VaciarBibliotecaAsync()
+    {
+        await _conexion.RunInTransactionAsync(db =>
+        {
+            db.Execute("DELETE FROM RegistroEpisodio;");
+            db.Execute("DELETE FROM AnimeItem;");
+        });
+    }
 }
