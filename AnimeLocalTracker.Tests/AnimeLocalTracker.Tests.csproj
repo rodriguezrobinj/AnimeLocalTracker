@@ -13,7 +13,7 @@
   <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.0" />
     <PackageReference Include="FluentAssertions" Version="8.10.0" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.9.0" />
     <PackageReference Include="Moq" Version="4.20.72" />
     <!-- SEC-009: xunit 2.5.x arrastra transitivamente System.Net.Http 4.3.0 y
          System.Text.RegularExpressions 4.3.0 vía NETStandard.Library 1.6.1 (CVEs High).
