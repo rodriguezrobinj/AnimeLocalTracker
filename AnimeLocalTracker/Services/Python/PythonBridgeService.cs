@@ -236,11 +236,16 @@ namespace AnimeLocalTracker.Services.Python
         /// de la app) para que el daemon encuentre herramientas como ffmpeg instaladas por winget
         /// en WinGet\Links o los binarios ffmpeg.exe/ffprobe.exe distribuidos en la carpeta FFmpeg/ de la app.
         /// </summary>
-        private static bool _daemonDescartado;
+        /// <summary>
+        /// INT-04: en vez de descartar el daemon PARA SIEMPRE tras un handshake fallido, se
+        /// reintenta después de una pausa (backoff de 10 min). Un onefile lento que no llega
+        /// a saludar a tiempo puede lograrlo en el siguiente intento.
+        /// </summary>
+        private static DateTime _daemonProximoIntento = DateTime.MinValue;
 
         private async Task<bool> EnsureDaemonStartedAsync(CancellationToken ct)
         {
-            if (_daemonDescartado) return false;
+            if (DateTime.UtcNow < _daemonProximoIntento) return false;
             if (_daemonProcess != null && !_daemonProcess.HasExited)
                 return true;
 
@@ -249,7 +254,6 @@ namespace AnimeLocalTracker.Services.Python
             if (string.IsNullOrEmpty(_cachedExecutablePath))
             {
                 AppLogger.Debug("PythonBridge", "Daemon no disponible (sin ejecutable compilado); se usará el modo one-shot.");
-                _daemonDescartado = true;
                 return false;
             }
 
@@ -278,9 +282,10 @@ namespace AnimeLocalTracker.Services.Python
                 _daemonOut = proc.StandardOutput;
                 _daemonIn = proc.StandardInput;
 
-                // Consumir el saludo de forma no bloqueante antes del primer comando
+                // Consumir el saludo de forma no bloqueante antes del primer comando.
+                // INT-04: 20 s de margen (la extracción onefile + imports puede superar los 8 s).
                 using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                linkedCts.CancelAfter(TimeSpan.FromSeconds(8));
+                linkedCts.CancelAfter(TimeSpan.FromSeconds(20));
                 try
                 {
                     string? greetingLine = await _daemonOut.ReadLineAsync(linkedCts.Token).ConfigureAwait(false);
@@ -303,14 +308,15 @@ namespace AnimeLocalTracker.Services.Python
                         throw new InvalidOperationException("El saludo del daemon no incluyó protocolVersion.");
                     }
 
+                    _daemonProximoIntento = DateTime.MinValue;
                     return true;
                 }
                 catch (Exception initEx)
                 {
                     // El daemon no saludó a tiempo, crasheó o devolvió versión errónea:
-                    // descartarlo para esta sesión y usar one-shot de respaldo seguro.
-                    AppLogger.Warn("PythonBridge", $"Fallo en handshake del daemon: {initEx.Message}. Se usará modo one-shot.");
-                    _daemonDescartado = true;
+                    // backoff de 10 min (INT-04) y one-shot de respaldo mientras tanto.
+                    AppLogger.Warn("PythonBridge", $"Fallo en handshake del daemon: {initEx.Message}. Se usará modo one-shot y se reintentará en unos minutos.");
+                    _daemonProximoIntento = DateTime.UtcNow.AddMinutes(10);
                     CleanupDaemon();
                     return false;
                 }
@@ -318,7 +324,7 @@ namespace AnimeLocalTracker.Services.Python
             catch (Exception ex)
             {
                 AppLogger.Debug("PythonBridge", $"No se pudo iniciar el daemon Python: {ex.Message}");
-                _daemonDescartado = true;
+                _daemonProximoIntento = DateTime.UtcNow.AddMinutes(10);
                 _daemonProcess = null;
                 _daemonOut = null;
                 _daemonIn = null;
