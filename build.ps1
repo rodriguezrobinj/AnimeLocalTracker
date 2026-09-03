@@ -50,7 +50,15 @@ if (-not (Test-Path "$ffmpegDir\ffmpeg.exe") -or -not (Test-Path "$ffmpegDir\ffp
 function Invoke-Build {
     param([string]$Label)
     Write-Host "[build] $Label..." -ForegroundColor Cyan
-    & dotnet build "$root\AnimeLocalTracker.sln" -c $Configuration --nologo -v q -nodeReuse:false
+
+    # Compilación EXPLÍCITA y NO INCREMENTAL por proyecto (no `dotnet build` sobre la
+    # solución): el build de la solución podía terminar con "OK" dejando el ensamblado
+    # de tests AUSENTE (runner limpio, CI) u OBSOLETO (obj poblado en local) — el doble
+    # pase no lo garantizaba. --no-incremental fuerza siempre el producto final real.
+    # El proyecto de benchmarks se compila bajo demanda (workflow benchmarks.yml).
+    & dotnet build "$root\AnimeLocalTracker\AnimeLocalTracker.csproj" -c $Configuration --nologo -v q -nodeReuse:false --no-incremental
+    if ($LASTEXITCODE -ne 0) { return $false }
+    & dotnet build "$root\AnimeLocalTracker.Tests\AnimeLocalTracker.Tests.csproj" -c $Configuration --nologo -v q -nodeReuse:false --no-incremental
     if ($LASTEXITCODE -ne 0) { return $false }
     return $true
 }
@@ -68,6 +76,20 @@ $pasada2 = Invoke-Build "pasada 2"
 if (-not $pasada2) {
     Write-Host "[build] ERROR: la pasada 2 falló." -ForegroundColor Red
     exit 1
+}
+
+# Verificación de artefactos: el build puede reportar "OK" sin generar el ensamblado de
+# tests (observado en CI). Si falta, se reintenta con log DETALLADO para diagnosticar.
+$testsDll = Join-Path $root "AnimeLocalTracker.Tests\bin\$Configuration\net8.0-windows\AnimeLocalTracker.Tests.dll"
+if (-not (Test-Path $testsDll)) {
+    Write-Host "[build] ERROR: no se generó el ensamblado de tests ($testsDll)." -ForegroundColor Red
+    Write-Host "[build] Reintentando con salida detallada para diagnosticar..." -ForegroundColor Yellow
+    & dotnet build "$root\AnimeLocalTracker.Tests\AnimeLocalTracker.Tests.csproj" -c $Configuration --nologo -nodeReuse:false --no-incremental -v n 2>&1 | Select-Object -Last 100
+    if (-not (Test-Path $testsDll)) {
+        Write-Host "[build] ERROR: el ensamblado de tests sigue sin generarse." -ForegroundColor Red
+        exit 1
+    }
+    Write-Host "[build] AVISO: el ensamblado de tests se generó solo en el reintento detallado." -ForegroundColor DarkYellow
 }
 
 # Copiar librerías nativas si existen
