@@ -11,24 +11,57 @@
             <materialDesign:Card Margin="0,0,0,10" Background="#1B222C" UniformCornerRadius="8" Padding="0">
                 <Grid>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="60"/>
+                        <ColumnDefinition Width="56"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-                    
-                    <!-- Portada -->
-                    <Border Grid.Column="0" CornerRadius="8,0,0,8" ClipToBounds="True">
+
+                    <!-- Portada (recorte fijo, sin distorsión) -->
+                    <Border Grid.Column="0" CornerRadius="8,0,0,8" ClipToBounds="True" Height="72">
                         <Grid>
                             <Border Style="{StaticResource ShimmerEffectStyle}" />
-                            <Image Source="{Binding UrlPortada, TargetNullValue={x:Null}, FallbackValue={x:Null}, IsAsync=True}" Stretch="UniformToFill" Height="80" RenderOptions.BitmapScalingMode="HighQuality" SnapsToDevicePixels="True"/>
+                            <Image Source="{Binding UrlPortada, TargetNullValue={x:Null}, FallbackValue={x:Null}, IsAsync=True}"
+                                   Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" SnapsToDevicePixels="True"/>
                         </Grid>
                     </Border>
-                    
-                    <!-- Información -->
-                    <StackPanel Grid.Column="1" Margin="10,5">
-                        <TextBlock Text="{Binding HoraEmisionFormateada}" FontSize="12" FontWeight="Bold" Foreground="#34D399" Margin="0,0,0,2"/>
-                        <TextBlock Text="{Binding Titulo}" FontSize="12" FontWeight="SemiBold" Foreground="White" TextWrapping="Wrap" MaxHeight="35" TextTrimming="CharacterEllipsis"/>
-                        <TextBlock Text="{Binding NumeroEpisodio, StringFormat='Episodio {0}'}" FontSize="11" Foreground="#6B7280" Margin="0,4,0,0"/>
-                    </StackPanel>
+
+                    <!-- Información (compacta: filas fijas, sin desbordes) -->
+                    <Grid Grid.Column="1" Margin="8,5,6,5">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Fila 1: hora + indicadores circulares de estado (solo color) -->
+                        <StackPanel Grid.Row="0" Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding HoraEmisionFormateada}" FontSize="11.5" FontWeight="Bold" Foreground="#34D399" VerticalAlignment="Center"/>
+                            <!-- Ya emitido: punto ámbar -->
+                            <Ellipse Fill="#F59E0B" Width="8" Height="8" Margin="6,0,0,0" VerticalAlignment="Center"
+                                     Visibility="{Binding EstaEmitido, Converter={StaticResource BoolToVis}}" ToolTip="Ya emitido"/>
+                            <!-- Próximo: círculo con contorno azul -->
+                            <Ellipse Stroke="#3B82F6" StrokeThickness="1.5" Fill="Transparent" Width="8" Height="8" Margin="6,0,0,0" VerticalAlignment="Center"
+                                     Visibility="{Binding EstaEmitido, Converter={StaticResource InverseBoolToVis}}" ToolTip="Próximo"/>
+                        </StackPanel>
+
+                        <!-- Fila 2: título (hasta 2 líneas con recorte) -->
+                        <TextBlock Grid.Row="1" Text="{Binding Titulo}" FontSize="11.5" FontWeight="SemiBold" Foreground="White"
+                                   TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="28" Margin="0,1,0,0"/>
+
+                        <!-- Fila 3: episodio -->
+                        <TextBlock Grid.Row="2" Text="{Binding NumeroEpisodio, StringFormat='Episodio {0}'}" FontSize="10.5"
+                                   Foreground="#94A3B8" TextTrimming="CharacterEllipsis" Margin="0,1,0,0"/>
+                    </Grid>
+
+                    <!-- BOTÓN A TODA LA TARJETA: cubre 100% del cuadro (portada + info) -->
+                    <Button Grid.Column="0" Grid.ColumnSpan="2"
+                            Command="{Binding DataContext.AbrirAnimeCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                            CommandParameter="{Binding}"
+                            HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                            HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                            Background="Transparent" BorderThickness="0" Padding="0" Margin="0"
+                            Cursor="Hand" Panel.ZIndex="20"
+                            AutomationProperties.Name="{Binding Titulo, StringFormat=Ver {0} en la ficha}"
+                            ToolTip="Abrir la ficha del anime"/>
                 </Grid>
             </materialDesign:Card>
         </DataTemplate>

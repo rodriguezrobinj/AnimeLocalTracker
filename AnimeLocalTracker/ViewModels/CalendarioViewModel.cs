@@ -2,10 +2,12 @@ using System;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
+using AnimeLocalTracker.Messages;
 using AnimeLocalTracker.Models;
 using AnimeLocalTracker.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using CommunityToolkit.Mvvm.Messaging;
 
 namespace AnimeLocalTracker.ViewModels;
 
@@ -127,6 +129,31 @@ public partial class CalendarioViewModel : ObservableObject, IDisposable
     public bool EstaVacio =>
         Lunes.Count == 0 && Martes.Count == 0 && Miercoles.Count == 0 && Jueves.Count == 0 &&
         Viernes.Count == 0 && Sabado.Count == 0 && Domingo.Count == 0;
+
+    /// <summary>
+    /// Abre la ficha del anime directamente desde el calendario (clic en la tarjeta del
+    /// episodio). Si el anime no está en la biblioteca local, avisa y sugiere añadirlo.
+    /// </summary>
+    [RelayCommand]
+    private async Task AbrirAnimeAsync(AiringEpisode? episodio)
+    {
+        if (episodio?.AniListId is not > 0) return;
+
+        var anime = await _databaseService.ObtenerAnimePorIdAsync(episodio.AniListId);
+        if (anime == null)
+        {
+            _ = WeakReferenceMessenger.Default.Send(new MostrarDialogoRequestMessage(
+                "No está en tu biblioteca",
+                $"'{episodio.Titulo}' aún no está en tu biblioteca local.\n\nAñádelo desde la pestaña + para poder verlo o descargarlo.",
+                false,
+                "BookOpenPageVariantOutline",
+                "#60A5FA"));
+            return;
+        }
+
+        anime.ResolverPortadaLocal();
+        WeakReferenceMessenger.Default.Send(new NavegarMensaje_Detalle(anime));
+    }
 
     private void LimpiarListas()
     {
