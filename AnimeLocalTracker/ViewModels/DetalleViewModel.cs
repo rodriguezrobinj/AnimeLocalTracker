@@ -805,17 +805,18 @@ public partial class DetalleViewModel : ObservableObject,
         // 2. Borrar su miniatura
         try { if (File.Exists(rutaMiniatura)) File.Delete(rutaMiniatura); } catch { }
 
-        // 3. Quitar el registro de la base de datos
+        // 3. Conservar el registro en la base de datos: el historial es un registro
+        //    permanente — borrar el archivo NO debe borrar que se vio el episodio.
         try
         {
-            await _databaseService.EliminarRegistroEpisodioAsync(AnimeSeleccionado?.AniListId ?? 0, episodio.NumeroEpisodio);
+            await _databaseService.ConservarRegistroTrasEliminarArchivoAsync(AnimeSeleccionado?.AniListId ?? 0, episodio.NumeroEpisodio);
         }
         catch (Exception ex)
         {
-            AppLogger.Debug("DetalleViewModel", $"No se pudo eliminar el registro del episodio: {ex.Message}");
+            AppLogger.Debug("DetalleViewModel", $"No se pudo conservar el registro del episodio: {ex.Message}");
         }
 
-        // 4. Reiniciar el estado del item en la UI
+        // 4. Reiniciar en la UI solo lo relativo al archivo (visto/progreso/fecha se conservan)
         episodio.Descargado = false;
         episodio.RutaCompleta = string.Empty;
         episodio.RutaMiniatura = null;
@@ -824,9 +825,6 @@ public partial class DetalleViewModel : ObservableObject,
         episodio.CodecVideo = string.Empty;
         episodio.Fps = string.Empty;
         episodio.Es10Bit = false;
-        episodio.ProgresoSegundos = 0;
-        episodio.TotalSegundos = 0;
-        episodio.Visto = false;
 
         AplicarFiltrosYOrdenamiento();
 

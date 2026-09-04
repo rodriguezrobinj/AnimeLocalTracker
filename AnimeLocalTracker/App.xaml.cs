@@ -231,6 +231,9 @@ public partial class App : Application
 
         // Estadísticas personales
         services.AddSingleton<EstadisticasViewModel>();
+
+        // Historial de reproducción
+        services.AddSingleton<HistorialViewModel>();
     }
 
     private static Polly.IAsyncPolicy<System.Net.Http.HttpResponseMessage> GetRetryPolicy()

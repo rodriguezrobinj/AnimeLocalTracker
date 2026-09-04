@@ -18,6 +18,9 @@ public interface IDatabaseService
     Task GuardarAnimeAsync(AnimeItem anime);
     Task EliminarAnimeAsync(AnimeItem anime);
     Task EliminarRegistroEpisodioAsync(int aniListId, int numeroEpisodio);
+
+    /// <summary>Al borrar el archivo del disco se conserva el registro (historial).</summary>
+    Task ConservarRegistroTrasEliminarArchivoAsync(int aniListId, int numeroEpisodio);
     Task<bool> ExportarCopiaSeguridadAsync(string rutaDestino);
     Task<bool> RestaurarCopiaSeguridadAsync(string rutaOrigen);
     Task<int> ExportarBibliotecaJsonAsync(string rutaDestino);
@@ -28,6 +31,9 @@ public interface IDatabaseService
     Task GuardarRegistrosEpisodioBulkAsync(IEnumerable<RegistroEpisodio> registros);
     Task<List<RegistroEpisodio>> ObtenerRegistrosPorAnimeAsync(int aniListId);
     Task<List<RegistroEpisodio>> ObtenerTodosLosRegistrosAsync();
+    Task<List<RegistroEpisodio>> ObtenerHistorialEpisodiosAsync(int limite = 300);
+    Task LimpiarRegistroHistorialAsync(int aniListId, int numeroEpisodio);
+    Task LimpiarTodoElHistorialAsync();
     Task<List<RegistroEpisodio>> ObtenerEpisodiosNoSincronizadosAsync();
     Task MarcarEpisodiosSincronizadosAsync(IEnumerable<int> ids);
     Task ActualizarAnimeAsync(AnimeItem anime);

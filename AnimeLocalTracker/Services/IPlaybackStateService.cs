@@ -42,6 +42,8 @@ public interface IPlaybackStateService
     /// <summary>
     /// Marca el episodio como visto localmente (progreso a 0) y sincroniza con AniList si hay token.
     /// Devuelve true si el flujo completo terminó sin errores.
+    /// <paramref name="registrarReproduccion"/>: true solo cuando viene de reproducción real
+    /// (auto-track al terminar); el marcado manual no debe entrar al historial.
     /// </summary>
-    Task<bool> MarcarComoVistoYSincronizarAsync(int animeId, int episodio, string rutaVideo, double duracionSegundos);
+    Task<bool> MarcarComoVistoYSincronizarAsync(int animeId, int episodio, string rutaVideo, double duracionSegundos, bool registrarReproduccion = true);
 }

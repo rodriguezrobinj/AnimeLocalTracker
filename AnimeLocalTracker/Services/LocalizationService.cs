@@ -33,6 +33,7 @@ public sealed class LocalizationService : INotifyPropertyChanged
     private static readonly Dictionary<string, string> Es = new()
     {
         ["Nav_Galeria"] = "Galería",
+        ["Nav_Historial"] = "Historial",
         ["Nav_Agregar"] = "Agregar Anime",
         ["Nav_Calendario"] = "Calendario",
         ["Nav_Descargas"] = "Descargas",
@@ -154,6 +155,34 @@ public sealed class LocalizationService : INotifyPropertyChanged
         ["Cfg_RestaurarOk"] = "Biblioteca restaurada correctamente.",
         ["Cfg_RestaurarError"] = "No se pudo restaurar la copia (archivo inválido o corrupto).",
 
+        // === HISTORIAL ===
+        ["Hist_Titulo"] = "Historial de Reproducción",
+        ["Hist_Subtitulo"] = "Tus episodios en curso y vistos recientemente",
+        ["Hist_FiltroTodos"] = "Todos",
+        ["Hist_FiltroEnProgreso"] = "En progreso",
+        ["Hist_FiltroCompletados"] = "Completados",
+        ["Hist_BuscarPlaceholder"] = "Buscar en el historial...",
+        ["Hist_LimpiarHistorial"] = "Limpiar historial",
+        ["Hist_LimpiarTitulo"] = "¿Vaciar todo el historial?",
+        ["Hist_LimpiarMensaje"] = "Se restablecerá la fecha de reproducción y el progreso de todos los episodios. Tus archivos de video y tu biblioteca no se modificarán.",
+        ["Hist_Reanudar"] = "Reanudar",
+        ["Hist_VerAnime"] = "Ver detalles",
+        ["Hist_Quitar"] = "Quitar del historial",
+        ["Hist_MarcarVisto"] = "Marcar como visto",
+        ["Hist_MarcarNoVisto"] = "Marcar como no visto",
+        ["Hist_VacioTitulo"] = "Tu historial está vacío",
+        ["Hist_VacioSubtitulo"] = "Los episodios que reproduzcas o dejes a medias aparecerán aquí automáticamente.",
+        ["Hist_ExplorarGaleria"] = "Explorar biblioteca",
+        ["Hist_SinResultados"] = "No se encontraron episodios que coincidan con la búsqueda.",
+        ["Hist_ArchivoNoEncontrado"] = "El archivo de video ya no existe en la ruta registrada.",
+        ["Hist_FechaHoy"] = "Hoy",
+        ["Hist_FechaAyer"] = "Ayer",
+        ["Hist_FechaSemana"] = "Esta semana",
+        ["Hist_FechaMes"] = "Este mes",
+        ["Hist_FechaAnteriores"] = "Anteriores",
+        ["Hist_HaceMin"] = "Hace {0} min",
+        ["Hist_NoEnBiblioteca"] = "'{0}' ya no está en tu biblioteca local. Añádelo desde la pestaña + para poder verlo o descargarlo.",
+
         // === TÍTULO DE CONFIGURACIÓN (LOC-07) ===
         ["Cfg_Titulo"] = "Configuración y Preferencias",
         ["Cfg_TituloSub"] = "Personaliza el almacenamiento de tus animes, reproducción multimedia y sincronización con AniList"
@@ -162,6 +191,7 @@ public sealed class LocalizationService : INotifyPropertyChanged
     private static readonly Dictionary<string, string> En = new()
     {
         ["Nav_Galeria"] = "Library",
+        ["Nav_Historial"] = "History",
         ["Nav_Agregar"] = "Add Anime",
         ["Nav_Calendario"] = "Calendar",
         ["Nav_Descargas"] = "Downloads",
@@ -282,6 +312,34 @@ public sealed class LocalizationService : INotifyPropertyChanged
         ["Cfg_RestaurarConfirmacion"] = "The current library will be replaced by the selected backup. Continue?",
         ["Cfg_RestaurarOk"] = "Library restored successfully.",
         ["Cfg_RestaurarError"] = "Could not restore the backup (invalid or corrupt file).",
+
+        // === HISTORIAL ===
+        ["Hist_Titulo"] = "Watch History",
+        ["Hist_Subtitulo"] = "Your in-progress and recently watched episodes",
+        ["Hist_FiltroTodos"] = "All",
+        ["Hist_FiltroEnProgreso"] = "In Progress",
+        ["Hist_FiltroCompletados"] = "Completed",
+        ["Hist_BuscarPlaceholder"] = "Search history...",
+        ["Hist_LimpiarHistorial"] = "Clear history",
+        ["Hist_LimpiarTitulo"] = "Clear all history?",
+        ["Hist_LimpiarMensaje"] = "Playback dates and progress will be reset for all episodes. Your video files and library will remain unchanged.",
+        ["Hist_Reanudar"] = "Resume",
+        ["Hist_VerAnime"] = "View details",
+        ["Hist_Quitar"] = "Remove from history",
+        ["Hist_MarcarVisto"] = "Mark as watched",
+        ["Hist_MarcarNoVisto"] = "Mark as unwatched",
+        ["Hist_VacioTitulo"] = "Your history is empty",
+        ["Hist_VacioSubtitulo"] = "Episodes you watch or leave in progress will appear here automatically.",
+        ["Hist_ExplorarGaleria"] = "Explore library",
+        ["Hist_SinResultados"] = "No episodes matched your search.",
+        ["Hist_ArchivoNoEncontrado"] = "The video file no longer exists at the registered path.",
+        ["Hist_FechaHoy"] = "Today",
+        ["Hist_FechaAyer"] = "Yesterday",
+        ["Hist_FechaSemana"] = "This week",
+        ["Hist_FechaMes"] = "This month",
+        ["Hist_FechaAnteriores"] = "Earlier",
+        ["Hist_HaceMin"] = "{0} min ago",
+        ["Hist_NoEnBiblioteca"] = "'{0}' is no longer in your local library. Add it from the + tab to watch or download it.",
 
         // === SETTINGS TITLE (LOC-07) ===
         ["Cfg_Titulo"] = "Settings & Preferences",

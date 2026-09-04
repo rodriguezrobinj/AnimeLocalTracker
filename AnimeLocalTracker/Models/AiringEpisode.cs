@@ -1,8 +1,9 @@
 using System;
+using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace AnimeLocalTracker.Models;
 
-public class AiringEpisode
+public class AiringEpisode : ObservableObject
 {
     public int AniListId { get; set; }
     public string Titulo { get; set; } = string.Empty;
@@ -15,4 +16,13 @@ public class AiringEpisode
 
     /// <summary>True si la hora de emisión (hora local) ya pasó: el episodio está disponible/emitido.</summary>
     public bool EstaEmitido => FechaEmision.ToLocalTime() <= DateTime.Now;
+
+    /// <summary>
+    /// Notifica a la UI el cambio de estado cuando la hora de emisión se cruza en vivo
+    /// (el badge "EMITIDO/PRÓXIMO" quedaba obsoleto hasta el siguiente ACTUALIZAR).
+    /// </summary>
+    public void ActualizarEstadoEmitido()
+    {
+        OnPropertyChanged(nameof(EstaEmitido));
+    }
 }

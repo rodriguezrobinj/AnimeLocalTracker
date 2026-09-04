@@ -17,9 +17,10 @@ public partial class CalendarioViewModel : ObservableObject, IDisposable
     private readonly IAnimeTrackingService _animeTrackingService;
     private readonly SemaphoreSlim _cargaLock = new(1, 1);
 
-    // CA1001: el semáforo se libera en el cierre de la app (singleton DI)
+    // CA1001: el semáforo y el temporizador se liberan en el cierre de la app (singleton DI)
     public void Dispose()
     {
+        _temporizadorEstado?.Stop();
         _cargaLock.Dispose();
         GC.SuppressFinalize(this);
     }
@@ -43,8 +44,38 @@ public partial class CalendarioViewModel : ObservableObject, IDisposable
     {
         _databaseService = databaseService;
         _animeTrackingService = animeTrackingService;
-        
+
+        // Refresco en vivo del estado "EMITIDO": cada minuto se revalúa la hora de
+        // emisión para que el badge cambie sin necesidad de pulsar ACTUALIZAR.
+        _temporizadorEstado = CrearTemporizadorEstado();
+
         _ = CargarCalendarioAsync();
+    }
+
+    private readonly System.Windows.Threading.DispatcherTimer? _temporizadorEstado;
+
+    private System.Windows.Threading.DispatcherTimer? CrearTemporizadorEstado()
+    {
+        var app = System.Windows.Application.Current;
+        if (app == null || app.Dispatcher == null || app.Dispatcher.HasShutdownStarted) return null;
+
+        var timer = new System.Windows.Threading.DispatcherTimer(
+            TimeSpan.FromSeconds(60),
+            System.Windows.Threading.DispatcherPriority.Background,
+            (s, e) => RefrescarEstadosEmitidos(),
+            app.Dispatcher);
+        timer.Start();
+        return timer;
+    }
+
+    /// <summary>Revalúa y notifica el estado de emisión de todas las tarjetas visibles.</summary>
+    public void RefrescarEstadosEmitidos()
+    {
+        foreach (var episodio in Lunes.Concat(Martes).Concat(Miercoles).Concat(Jueves)
+                     .Concat(Viernes).Concat(Sabado).Concat(Domingo))
+        {
+            episodio.ActualizarEstadoEmitido();
+        }
     }
 
     [RelayCommand]
@@ -139,20 +170,27 @@ public partial class CalendarioViewModel : ObservableObject, IDisposable
     {
         if (episodio?.AniListId is not > 0) return;
 
-        var anime = await _databaseService.ObtenerAnimePorIdAsync(episodio.AniListId);
-        if (anime == null)
+        try
         {
-            _ = WeakReferenceMessenger.Default.Send(new MostrarDialogoRequestMessage(
-                "No está en tu biblioteca",
-                $"'{episodio.Titulo}' aún no está en tu biblioteca local.\n\nAñádelo desde la pestaña + para poder verlo o descargarlo.",
-                false,
-                "BookOpenPageVariantOutline",
-                "#60A5FA"));
-            return;
-        }
+            var anime = await _databaseService.ObtenerAnimePorIdAsync(episodio.AniListId);
+            if (anime == null)
+            {
+                _ = WeakReferenceMessenger.Default.Send(new MostrarDialogoRequestMessage(
+                    "No está en tu biblioteca",
+                    $"'{episodio.Titulo}' aún no está en tu biblioteca local.\n\nAñádelo desde la pestaña + para poder verlo o descargarlo.",
+                    false,
+                    "BookOpenPageVariantOutline",
+                    "#60A5FA"));
+                return;
+            }
 
-        anime.ResolverPortadaLocal();
-        WeakReferenceMessenger.Default.Send(new NavegarMensaje_Detalle(anime));
+            anime.ResolverPortadaLocal();
+            WeakReferenceMessenger.Default.Send(new NavegarMensaje_Detalle(anime));
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("CalendarioViewModel", $"Error al abrir el anime '{episodio.Titulo}' desde el calendario", ex);
+        }
     }
 
     private void LimpiarListas()

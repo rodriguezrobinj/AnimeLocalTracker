@@ -17,6 +17,7 @@ public interface INavigationService
     ConfiguracionViewModel ObtenerConfiguracion();
     AcercaDeViewModel ObtenerAcercaDe();
     EstadisticasViewModel ObtenerEstadisticas();
+    HistorialViewModel ObtenerHistorial();
     DetalleViewModel CrearDetalle();
     ReproductorViewModel CrearReproductor();
 }
@@ -37,6 +38,7 @@ public sealed class NavigationService : INavigationService
     public ConfiguracionViewModel ObtenerConfiguracion() => _serviceProvider.GetRequiredService<ConfiguracionViewModel>();
     public AcercaDeViewModel ObtenerAcercaDe() => _serviceProvider.GetRequiredService<AcercaDeViewModel>();
     public EstadisticasViewModel ObtenerEstadisticas() => _serviceProvider.GetRequiredService<EstadisticasViewModel>();
+    public HistorialViewModel ObtenerHistorial() => _serviceProvider.GetRequiredService<HistorialViewModel>();
     public DetalleViewModel CrearDetalle() => _serviceProvider.GetRequiredService<DetalleViewModel>();
     public ReproductorViewModel CrearReproductor() => _serviceProvider.GetRequiredService<ReproductorViewModel>();
 }

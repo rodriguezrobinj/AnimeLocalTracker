@@ -23,6 +23,7 @@ public class RegistroEpisodio
     // Reanudación de reproducción (Resume Playback):
     public double ProgresoSegundos { get; set; }
     public double TotalSegundos { get; set; }
+    [Indexed]
     public System.DateTime? UltimaReproduccion { get; set; }
 
     // Metadatos técnicos persistentes (ffprobe + miniaturas locales)

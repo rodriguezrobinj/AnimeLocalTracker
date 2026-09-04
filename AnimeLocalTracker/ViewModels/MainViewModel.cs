@@ -19,6 +19,7 @@ public partial class MainViewModel : ObservableObject,
     IRecipient<NavegarMensaje_Configuracion>,
     IRecipient<NavegarMensaje_AcercaDe>,
     IRecipient<NavegarMensaje_Estadisticas>,
+    IRecipient<NavegarMensaje_Historial>,
     IRecipient<AbrirBuscadorMensaje>,
     IRecipient<MostrarDialogoRequestMessage>,
     IRecipient<NavegarMensaje_Reproductor>,
@@ -43,6 +44,7 @@ public partial class MainViewModel : ObservableObject,
     [NotifyPropertyChangedFor(nameof(EsConfiguracionActiva))]
     [NotifyPropertyChangedFor(nameof(EsAcercaDeActivo))]
     [NotifyPropertyChangedFor(nameof(EsEstadisticasActivo))]
+    [NotifyPropertyChangedFor(nameof(EsHistorialActivo))]
     private ObservableObject _vistaActual = null!;
 
     public bool EsGaleriaActiva => VistaActual is GaleriaViewModel || VistaActual is DetalleViewModel;
@@ -52,6 +54,7 @@ public partial class MainViewModel : ObservableObject,
     public bool EsConfiguracionActiva => VistaActual is ConfiguracionViewModel;
     public bool EsAcercaDeActivo => VistaActual is AcercaDeViewModel;
     public bool EsEstadisticasActivo => VistaActual is EstadisticasViewModel;
+    public bool EsHistorialActivo => VistaActual is HistorialViewModel;
 
     // === BADGE DE DESCARGAS ===
     [ObservableProperty]
@@ -183,6 +186,14 @@ public partial class MainViewModel : ObservableObject,
     // ==========================================
     public void Receive(NavegarMensaje_Galeria message)
     {
+        // Si se abrió el Detalle desde el Calendario, "volver" regresa al calendario
+        // (flujo circular calendario → ficha → calendario, sin pasar por la galería).
+        if (_vistaAnteriorADetalleCalendario != null && VistaActual is DetalleViewModel)
+        {
+            VistaActual = _vistaAnteriorADetalleCalendario;
+            _vistaAnteriorADetalleCalendario = null;
+            return;
+        }
         VistaActual = _navigationService.ObtenerGaleria();
     }
 
@@ -193,6 +204,7 @@ public partial class MainViewModel : ObservableObject,
         try
         {
             var detalleVm = _navigationService.CrearDetalle();
+            _vistaAnteriorADetalleCalendario = VistaActual is CalendarioViewModel ? VistaActual : null;
             VistaActual = detalleVm;
             await detalleVm.InicializarAsync(message.AnimeSeleccionado);
         }
@@ -206,6 +218,7 @@ public partial class MainViewModel : ObservableObject,
     {
         var calendarioVm = _navigationService.ObtenerCalendario();
         VistaActual = calendarioVm;
+        calendarioVm.RefrescarEstadosEmitidos();
 
         // El calendario es singleton: si la carga inicial falló (red/rate-limit) o está vacío,
         // reintentar al navegar para que no quede pegado en columnas vacías.
@@ -267,6 +280,9 @@ public partial class MainViewModel : ObservableObject,
     // Vista a la que volver al salir del reproductor
     private ObservableObject? _vistaAnteriorAlReproductor;
 
+    // Flujo calendario → ficha: "volver" desde el Detalle regresa al calendario.
+    private ObservableObject? _vistaAnteriorADetalleCalendario;
+
     public void Receive(NavegarMensaje_VolverDelReproductor message)
     {
         if (_vistaAnteriorAlReproductor != null)
@@ -300,7 +316,9 @@ public partial class MainViewModel : ObservableObject,
     [RelayCommand]
     private void NavegarCalendario()
     {
-        VistaActual = _navigationService.ObtenerCalendario();
+        var calendarioVm = _navigationService.ObtenerCalendario();
+        VistaActual = calendarioVm;
+        calendarioVm.RefrescarEstadosEmitidos();
     }
 
     [RelayCommand]
@@ -365,6 +383,26 @@ public partial class MainViewModel : ObservableObject,
     public void Receive(NavegarMensaje_Estadisticas message)
     {
         _ = NavegarEstadisticas();
+    }
+
+    [RelayCommand]
+    private async Task NavegarHistorial()
+    {
+        try
+        {
+            var historialVm = _navigationService.ObtenerHistorial();
+            VistaActual = historialVm;
+            await historialVm.CargarHistorialAsync();
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("MainViewModel", "Error navegando a historial", ex);
+        }
+    }
+
+    public void Receive(NavegarMensaje_Historial message)
+    {
+        _ = NavegarHistorial();
     }
 
     public void Receive(AbrirBuscadorMensaje message)

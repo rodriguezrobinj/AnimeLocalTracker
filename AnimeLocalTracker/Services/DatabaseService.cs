@@ -81,7 +81,8 @@ public class DatabaseService : IDatabaseService, IDisposable
     private static readonly (int Version, string Descripcion, Func<SQLiteAsyncConnection, Task> Aplicar)[] Migraciones =
     {
         (1, "esquema base (tablas AnimeItem/RegistroEpisodio + índice compuesto)", CrearEsquemaBaseAsync),
-        (2, "índice de la cola de sincronización (VistoLocal, SincronizadoEnNube)", CrearIndiceColaSincronizacionAsync)
+        (2, "índice de la cola de sincronización (VistoLocal, SincronizadoEnNube)", CrearIndiceColaSincronizacionAsync),
+        (3, "índice de UltimaReproduccion para el historial", CrearIndiceUltimaReproduccionAsync)
     };
 
     private static async Task EjecutarMigracionesPendientesAsync(SQLiteAsyncConnection conexion)
@@ -115,6 +116,16 @@ public class DatabaseService : IDatabaseService, IDisposable
     private static async Task CrearIndiceColaSincronizacionAsync(SQLiteAsyncConnection conexion)
     {
         await conexion.ExecuteAsync("CREATE INDEX IF NOT EXISTS IX_RegistroEpisodio_SyncCola ON RegistroEpisodio(VistoLocal, SincronizadoEnNube);");
+    }
+
+    /// <summary>
+    /// v3: el atributo [Indexed] del modelo solo aplica a bases NUEVAS (CreateTable no
+    /// altera); esta migración crea el índice de UltimaReproduccion en bases existentes
+    /// para que las consultas del historial no hagan SCAN.
+    /// </summary>
+    private static async Task CrearIndiceUltimaReproduccionAsync(SQLiteAsyncConnection conexion)
+    {
+        await conexion.ExecuteAsync("CREATE INDEX IF NOT EXISTS IX_RegistroEpisodio_UltimaReproduccion ON RegistroEpisodio(UltimaReproduccion);");
     }
 
     /// <summary>
@@ -237,6 +248,27 @@ public class DatabaseService : IDatabaseService, IDisposable
     public async Task EliminarRegistroEpisodioAsync(int aniListId, int numeroEpisodio)
     {
         await _conexion.ExecuteAsync("DELETE FROM RegistroEpisodio WHERE AniListId = ? AND NumeroEpisodio = ?", aniListId, numeroEpisodio);
+    }
+
+    /// <summary>
+    /// El historial es un registro permanente: al borrar el archivo del disco se limpia
+    /// todo lo relacionado con el archivo (ruta, miniatura y metadatos técnicos), pero se
+    /// CONSERVAN visto, progreso, favorito, sincronización y fecha de reproducción.
+    /// </summary>
+    public async Task ConservarRegistroTrasEliminarArchivoAsync(int aniListId, int numeroEpisodio)
+    {
+        var existente = await _conexion.Table<RegistroEpisodio>()
+            .FirstOrDefaultAsync(r => r.AniListId == aniListId && r.NumeroEpisodio == numeroEpisodio);
+        if (existente == null) return;
+
+        existente.RutaArchivo = string.Empty;
+        existente.RutaMiniatura = null;
+        existente.Resolucion = string.Empty;
+        existente.CodecVideo = string.Empty;
+        existente.Fps = string.Empty;
+        existente.Es10Bit = false;
+
+        await _conexion.UpdateAsync(existente);
     }
 
     /// <summary>
@@ -477,7 +509,8 @@ public class DatabaseService : IDatabaseService, IDisposable
             existente.FavoritoLocal = registro.FavoritoLocal;
             existente.ProgresoSegundos = registro.ProgresoSegundos;
             existente.TotalSegundos = registro.TotalSegundos;
-            existente.UltimaReproduccion = registro.UltimaReproduccion ?? DateTime.UtcNow;
+            // NULL = sin reproducción real: NO se fabrica "ahora" (un marcado manual no es historial).
+            existente.UltimaReproduccion = registro.UltimaReproduccion ?? existente.UltimaReproduccion;
             if (!string.IsNullOrWhiteSpace(registro.RutaArchivo))
             {
                 existente.RutaArchivo = registro.RutaArchivo;
@@ -492,11 +525,8 @@ public class DatabaseService : IDatabaseService, IDisposable
         }
         else
         {
-            // Si es la primera vez, insertamos el nuevo registro
-            if (!registro.UltimaReproduccion.HasValue)
-            {
-                registro.UltimaReproduccion = DateTime.UtcNow;
-            }
+            // Si es la primera vez, insertamos el nuevo registro (la fecha solo la pone
+            // quien reproduce de verdad; los marcados manuales quedan sin fecha).
             await _conexion.InsertAsync(registro);
         }
     }
@@ -528,7 +558,7 @@ public class DatabaseService : IDatabaseService, IDisposable
             .GroupBy(r => (r.AniListId, r.NumeroEpisodio))
             .ToDictionary(g => g.Key, g => g.First());
 
-        var ahora = DateTime.UtcNow;
+        // (la fecha de reproducción la fija el llamador; aquí no se fabrica "ahora")
         var aInsertar = new List<RegistroEpisodio>();
         var aActualizar = new List<RegistroEpisodio>();
 
@@ -541,7 +571,8 @@ public class DatabaseService : IDatabaseService, IDisposable
                 existente.FavoritoLocal = registro.FavoritoLocal;
                 existente.ProgresoSegundos = registro.ProgresoSegundos;
                 existente.TotalSegundos = registro.TotalSegundos;
-                existente.UltimaReproduccion = registro.UltimaReproduccion ?? ahora;
+                // NULL = sin reproducción real: se conserva la fecha previa (no se inventa "ahora").
+                existente.UltimaReproduccion = registro.UltimaReproduccion ?? existente.UltimaReproduccion;
                 if (!string.IsNullOrWhiteSpace(registro.RutaArchivo))
                 {
                     existente.RutaArchivo = registro.RutaArchivo;
@@ -556,10 +587,7 @@ public class DatabaseService : IDatabaseService, IDisposable
             }
             else
             {
-                if (!registro.UltimaReproduccion.HasValue)
-                {
-                    registro.UltimaReproduccion = ahora;
-                }
+                // Registro nuevo: sin fecha (la pone solo la reproducción real).
                 aInsertar.Add(registro);
             }
         }
@@ -579,6 +607,27 @@ public class DatabaseService : IDatabaseService, IDisposable
     public async Task<List<RegistroEpisodio>> ObtenerTodosLosRegistrosAsync()
     {
         return await _conexion.Table<RegistroEpisodio>().ToListAsync();
+    }
+
+    public async Task<List<RegistroEpisodio>> ObtenerHistorialEpisodiosAsync(int limite = 300)
+    {
+        // Traer episodios reproducidos o en progreso ordenados por fecha de reproducción más reciente
+        return await _conexion.QueryAsync<RegistroEpisodio>(
+            "SELECT * FROM RegistroEpisodio WHERE UltimaReproduccion IS NOT NULL OR ProgresoSegundos > 0 ORDER BY UltimaReproduccion DESC LIMIT ?;",
+            limite);
+    }
+
+    public async Task LimpiarRegistroHistorialAsync(int aniListId, int numeroEpisodio)
+    {
+        await _conexion.ExecuteAsync(
+            "UPDATE RegistroEpisodio SET UltimaReproduccion = NULL, ProgresoSegundos = 0 WHERE AniListId = ? AND NumeroEpisodio = ?;",
+            aniListId, numeroEpisodio);
+    }
+
+    public async Task LimpiarTodoElHistorialAsync()
+    {
+        await _conexion.ExecuteAsync(
+            "UPDATE RegistroEpisodio SET UltimaReproduccion = NULL, ProgresoSegundos = 0 WHERE UltimaReproduccion IS NOT NULL OR ProgresoSegundos > 0;");
     }
 
     public async Task<List<RegistroEpisodio>> ObtenerEpisodiosNoSincronizadosAsync()

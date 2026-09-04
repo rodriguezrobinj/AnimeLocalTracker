@@ -40,13 +40,16 @@ public class DatabaseServiceUpsertTests : IDisposable
 
         // Assert (ARC-06): user_version avanza y el esquema de cada migración existe
         using var conexion = new SQLiteConnection(_tempDbPath);
-        conexion.ExecuteScalar<int>("PRAGMA user_version;").Should().BeGreaterThanOrEqualTo(2);
+        conexion.ExecuteScalar<int>("PRAGMA user_version;").Should().BeGreaterThanOrEqualTo(3);
         conexion.ExecuteScalar<string>(
                 "SELECT sql FROM sqlite_master WHERE type='index' AND name='IX_RegistroEpisodio_AnimeEp'")
             .Should().NotBeNullOrEmpty("la migración v1 debe crear el índice compuesto");
         conexion.ExecuteScalar<string>(
                 "SELECT sql FROM sqlite_master WHERE type='index' AND name='IX_RegistroEpisodio_SyncCola'")
             .Should().NotBeNullOrEmpty("la migración v2 debe crear el índice de la cola de sincronización (PERF-10)");
+        conexion.ExecuteScalar<string>(
+                "SELECT sql FROM sqlite_master WHERE type='index' AND name='IX_RegistroEpisodio_UltimaReproduccion'")
+            .Should().NotBeNullOrEmpty("la migración v3 debe crear el índice del historial");
     }
 
     [Fact]
@@ -300,8 +303,10 @@ public class DatabaseServiceUpsertTests : IDisposable
         var registros = await _sut.ObtenerRegistrosPorAnimeAsync(200);
         registros.Should().HaveCount(10);
         registros.Count(r => r.VistoLocal).Should().Be(5);
-        registros.Where(r => r.NumeroEpisodio <= 5).Should().OnlyContain(r => r.UltimaReproduccion != null,
-            "los actualizados deben recibir UltimaReproduccion");
+        registros.Where(r => r.NumeroEpisodio <= 5).Should().OnlyContain(r => r.UltimaReproduccion == null,
+            "sin reproducción real el registro conserva fecha NULL (el marcado manual no es historial)");
+        registros.Where(r => r.NumeroEpisodio > 5).Should().OnlyContain(r => r.UltimaReproduccion == null,
+            "un registro nuevo sin fecha no debe fabricar 'ahora'");
     }
 
     [Fact]
