@@ -12,4 +12,7 @@ public class AiringEpisode
     
     public DayOfWeek DiaSemana => FechaEmision.ToLocalTime().DayOfWeek;
     public string HoraEmisionFormateada => FechaEmision.ToLocalTime().ToString("HH:mm");
+
+    /// <summary>True si la hora de emisión (hora local) ya pasó: el episodio está disponible/emitido.</summary>
+    public bool EstaEmitido => FechaEmision.ToLocalTime() <= DateTime.Now;
 }

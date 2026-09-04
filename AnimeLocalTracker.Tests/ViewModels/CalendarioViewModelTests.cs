@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using AnimeLocalTracker.Messages;
 using AnimeLocalTracker.Models;
 using AnimeLocalTracker.Services;
 using AnimeLocalTracker.ViewModels;
+using CommunityToolkit.Mvvm.Messaging;
 using FluentAssertions;
 using Moq;
 using Xunit;
@@ -140,5 +142,68 @@ public class CalendarioViewModelTests
 
         // Assert: no debe lanzar excepción por SemaphoreSlim ya liberado
         vm.EstaCargando.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task AbrirAnimeAsync_ConAnimeEnBiblioteca_DeberiaEnviarNavegacionADetalle()
+    {
+        // Arrange: el anime existe en la biblioteca local
+        var animeGuardado = new AnimeItem { AniListId = 42, Titulo = "One Piece", UrlPortada = "cover.png" };
+        var dbMock = new Mock<IDatabaseService>();
+        dbMock.Setup(d => d.ObtenerAnimesLigerosAsync()).ReturnsAsync(new List<AnimeItem>());
+        dbMock.Setup(d => d.ObtenerAnimePorIdAsync(42)).ReturnsAsync(animeGuardado);
+        var vm = new CalendarioViewModel(dbMock.Object, new Mock<IAnimeTrackingService>().Object);
+        await EsperarCargaInicialAsync(vm);
+
+        AnimeItem? recibido = null;
+        WeakReferenceMessenger.Default.Register<NavegarMensaje_Detalle>(this, (r, m) => recibido = m.AnimeSeleccionado);
+        try
+        {
+            // Act
+            await vm.AbrirAnimeCommand.ExecuteAsync(new AiringEpisode { AniListId = 42, Titulo = "One Piece" });
+
+            // Assert: navega a la ficha del anime directamente desde el calendario
+            recibido.Should().BeSameAs(animeGuardado);
+        }
+        finally
+        {
+            WeakReferenceMessenger.Default.Unregister<NavegarMensaje_Detalle>(this);
+        }
+    }
+
+    [Fact]
+    public async Task AbrirAnimeAsync_ConAnimeFueraDeLaBiblioteca_DeberiaAvisar()
+    {
+        // Arrange: la BD no contiene el anime
+        var dbMock = new Mock<IDatabaseService>();
+        dbMock.Setup(d => d.ObtenerAnimesLigerosAsync()).ReturnsAsync(new List<AnimeItem>());
+        dbMock.Setup(d => d.ObtenerAnimePorIdAsync(999)).ReturnsAsync((AnimeItem?)null);
+        var vm = new CalendarioViewModel(dbMock.Object, new Mock<IAnimeTrackingService>().Object);
+        await EsperarCargaInicialAsync(vm);
+
+        bool avisoRecibido = false;
+        WeakReferenceMessenger.Default.Register<MostrarDialogoRequestMessage>(this, (r, m) => avisoRecibido = true);
+        try
+        {
+            // Act
+            await vm.AbrirAnimeCommand.ExecuteAsync(new AiringEpisode { AniListId = 999, Titulo = "Inexistente" });
+
+            // Assert: avisa y no navega a ningún detalle
+            avisoRecibido.Should().BeTrue();
+        }
+        finally
+        {
+            WeakReferenceMessenger.Default.Unregister<MostrarDialogoRequestMessage>(this);
+        }
+    }
+
+    [Fact]
+    public void EstaEmitido_ConHoraPasada_DeberiaSerTrue_YConHoraFutura_False()
+    {
+        var pasado = new AiringEpisode { FechaEmision = DateTime.Now.AddMinutes(-5) };
+        var futuro = new AiringEpisode { FechaEmision = DateTime.Now.AddHours(2) };
+
+        pasado.EstaEmitido.Should().BeTrue();
+        futuro.EstaEmitido.Should().BeFalse();
     }
 }
