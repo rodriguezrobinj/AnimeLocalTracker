@@ -116,7 +116,7 @@ public class PlaybackStateService : IPlaybackStateService
         return new ResultadoGuardadoProgreso(progresoAGuardar, durSec);
     }
 
-    public async Task<bool> MarcarComoVistoYSincronizarAsync(int animeId, int episodio, string rutaVideo, double duracionSegundos)
+    public async Task<bool> MarcarComoVistoYSincronizarAsync(int animeId, int episodio, string rutaVideo, double duracionSegundos, bool registrarReproduccion = true)
     {
         // FUN-004: un episodio sin número (0 = archivo sin dígitos) nunca debe marcarse ni
         // sincronizarse: empujar progress=0 a AniList reseteaba el progreso real del usuario.
@@ -132,11 +132,13 @@ public class PlaybackStateService : IPlaybackStateService
             var registros = await _databaseService.ObtenerRegistrosPorAnimeAsync(animeId);
             var registro = registros?.FirstOrDefault(r => r.NumeroEpisodio == episodio);
 
+            // El "historial" refleja VISIONADO REAL: solo la reproducción (auto-track al
+            // terminar de ver) registra la fecha; el marcado manual no debe parecer visto hoy.
             if (registro != null)
             {
                 registro.VistoLocal = true;
                 registro.ProgresoSegundos = 0; // Al marcarse como visto, el progreso se limpia a 0
-                registro.UltimaReproduccion = DateTime.UtcNow;
+                registro.UltimaReproduccion = registrarReproduccion ? DateTime.UtcNow : registro.UltimaReproduccion;
             }
             else
             {
@@ -147,7 +149,7 @@ public class PlaybackStateService : IPlaybackStateService
                     RutaArchivo = rutaVideo,
                     VistoLocal = true,
                     ProgresoSegundos = 0,
-                    UltimaReproduccion = DateTime.UtcNow
+                    UltimaReproduccion = registrarReproduccion ? DateTime.UtcNow : null
                 };
             }
             await _databaseService.GuardarRegistroEpisodioAsync(registro);
