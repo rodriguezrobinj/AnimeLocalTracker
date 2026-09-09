@@ -34,6 +34,7 @@ public sealed class LocalizationService : INotifyPropertyChanged
     {
         ["Nav_Galeria"] = "Galería",
         ["Nav_Historial"] = "Historial",
+        ["Nav_Actualizaciones"] = "Actualizaciones",
         ["Nav_Agregar"] = "Agregar Anime",
         ["Nav_Calendario"] = "Calendario",
         ["Nav_Descargas"] = "Descargas",
@@ -183,6 +184,19 @@ public sealed class LocalizationService : INotifyPropertyChanged
         ["Hist_HaceMin"] = "Hace {0} min",
         ["Hist_NoEnBiblioteca"] = "'{0}' ya no está en tu biblioteca local. Añádelo desde la pestaña + para poder verlo o descargarlo.",
 
+        // === ACTUALIZACIONES ===
+        ["Act_Titulo"] = "Actualizaciones",
+        ["Act_Subtitulo"] = "Capítulos recién emitidos de tus animes en emisión",
+        ["Act_Descargar"] = "Descargar",
+        ["Act_Reproducir"] = "Reproducir episodio",
+        ["Act_Descargado"] = "Descargado",
+        ["Act_EpisodioFormato"] = "Episodio {0}",
+        ["Act_BotonActualizar"] = "ACTUALIZAR",
+        ["Act_VerAnime"] = "Ver ficha del anime",
+        ["Act_VacioTitulo"] = "Sin capítulos recientes",
+        ["Act_VacioSub"] = "Aquí verás los capítulos recién emitidos en los últimos 7 días de los animes en emisión de tu biblioteca.",
+        ["Act_HaceDias"] = "Hace {0} días",
+
         // === TÍTULO DE CONFIGURACIÓN (LOC-07) ===
         ["Cfg_Titulo"] = "Configuración y Preferencias",
         ["Cfg_TituloSub"] = "Personaliza el almacenamiento de tus animes, reproducción multimedia y sincronización con AniList"
@@ -192,6 +206,7 @@ public sealed class LocalizationService : INotifyPropertyChanged
     {
         ["Nav_Galeria"] = "Library",
         ["Nav_Historial"] = "History",
+        ["Nav_Actualizaciones"] = "Updates",
         ["Nav_Agregar"] = "Add Anime",
         ["Nav_Calendario"] = "Calendar",
         ["Nav_Descargas"] = "Downloads",
@@ -340,6 +355,19 @@ public sealed class LocalizationService : INotifyPropertyChanged
         ["Hist_FechaAnteriores"] = "Earlier",
         ["Hist_HaceMin"] = "{0} min ago",
         ["Hist_NoEnBiblioteca"] = "'{0}' is no longer in your local library. Add it from the + tab to watch or download it.",
+
+        // === ACTUALIZACIONES ===
+        ["Act_Titulo"] = "Updates",
+        ["Act_Subtitulo"] = "Recently aired episodes of your ongoing anime",
+        ["Act_Descargar"] = "Download",
+        ["Act_Reproducir"] = "Play episode",
+        ["Act_Descargado"] = "Downloaded",
+        ["Act_EpisodioFormato"] = "Episode {0}",
+        ["Act_BotonActualizar"] = "REFRESH",
+        ["Act_VerAnime"] = "View anime details",
+        ["Act_VacioTitulo"] = "No recent episodes",
+        ["Act_VacioSub"] = "Here you'll see recently aired episodes from the past 7 days of the releasing anime in your library.",
+        ["Act_HaceDias"] = "{0} days ago",
 
         // === SETTINGS TITLE (LOC-07) ===
         ["Cfg_Titulo"] = "Settings & Preferences",

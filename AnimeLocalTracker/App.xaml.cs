@@ -234,6 +234,9 @@ public partial class App : Application
 
         // Historial de reproducción
         services.AddSingleton<HistorialViewModel>();
+
+        // Actualizaciones (episodios recién emitidos con descarga directa)
+        services.AddSingleton<ActualizacionesViewModel>();
     }
 
     private static Polly.IAsyncPolicy<System.Net.Http.HttpResponseMessage> GetRetryPolicy()
