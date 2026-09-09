@@ -1,0 +1,47 @@
+# Antigravity IDE ignore rules for AnimeLocalTracker
+
+# Build artifacts and binaries
+[Bb]in/
+[Oo]bj/
+[Rr]elease/
+[Rr]eleases/
+publish/
+installer_output/
+*.dll
+*.exe
+*.pdb
+*.nupkg
+
+# Native and Python build targets
+native/**/target/
+tools/python/.venv/
+tools/python/build/
+tools/python/dist/
+*.spec
+__pycache__/
+*.pyc
+
+# IDE caches and user state
+.vs/
+.idea/
+.vscode/
+*.suo
+*.user
+
+# Large logs and benchmark outputs
+*.log
+[Ll]ogs/
+BenchmarkDotNet.Artifacts/
+BenchmarkHistory/
+
+# Historical markdown audit documents (prevent heavy token indexing)
+AUDITORIA_BLOQUE*.md
+AUDITORIA_INTEGRAL.md
+NOTA_CAMBIOS_REMEDIACION_*.md
+RESUMEN_EJECUTIVO_REMEDIACION.md
+
+# Media files
+*.mp4
+*.mkv
+*.avi
+*.webm

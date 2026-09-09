@@ -20,6 +20,7 @@ public partial class MainViewModel : ObservableObject,
     IRecipient<NavegarMensaje_AcercaDe>,
     IRecipient<NavegarMensaje_Estadisticas>,
     IRecipient<NavegarMensaje_Historial>,
+    IRecipient<NavegarMensaje_Actualizaciones>,
     IRecipient<AbrirBuscadorMensaje>,
     IRecipient<MostrarDialogoRequestMessage>,
     IRecipient<NavegarMensaje_Reproductor>,
@@ -45,6 +46,7 @@ public partial class MainViewModel : ObservableObject,
     [NotifyPropertyChangedFor(nameof(EsAcercaDeActivo))]
     [NotifyPropertyChangedFor(nameof(EsEstadisticasActivo))]
     [NotifyPropertyChangedFor(nameof(EsHistorialActivo))]
+    [NotifyPropertyChangedFor(nameof(EsActualizacionesActivo))]
     private ObservableObject _vistaActual = null!;
 
     public bool EsGaleriaActiva => VistaActual is GaleriaViewModel || VistaActual is DetalleViewModel;
@@ -55,6 +57,7 @@ public partial class MainViewModel : ObservableObject,
     public bool EsAcercaDeActivo => VistaActual is AcercaDeViewModel;
     public bool EsEstadisticasActivo => VistaActual is EstadisticasViewModel;
     public bool EsHistorialActivo => VistaActual is HistorialViewModel;
+    public bool EsActualizacionesActivo => VistaActual is ActualizacionesViewModel;
 
     // === BADGE DE DESCARGAS ===
     [ObservableProperty]
@@ -403,6 +406,26 @@ public partial class MainViewModel : ObservableObject,
     public void Receive(NavegarMensaje_Historial message)
     {
         _ = NavegarHistorial();
+    }
+
+    [RelayCommand]
+    private async Task NavegarActualizaciones()
+    {
+        try
+        {
+            var actualizacionesVm = _navigationService.ObtenerActualizaciones();
+            VistaActual = actualizacionesVm;
+            await actualizacionesVm.CargarActualizacionesAsync();
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("MainViewModel", "Error navegando a actualizaciones", ex);
+        }
+    }
+
+    public void Receive(NavegarMensaje_Actualizaciones message)
+    {
+        _ = NavegarActualizaciones();
     }
 
     public void Receive(AbrirBuscadorMensaje message)
