@@ -45,6 +45,11 @@ public class EstadisticasViewTests
                 // Recursos de la app que las vistas referencian por StaticResource
                 app.Resources["AppText.PageTitle"] = new Style(typeof(TextBlock));
                 app.Resources["BoolToVis"] = new BooleanToVisibilityConverter();
+                app.Resources["InverseBoolToVis"] = new MaterialDesignThemes.Wpf.Converters.BooleanToVisibilityConverter
+                {
+                    TrueValue = Visibility.Collapsed,
+                    FalseValue = Visibility.Visible
+                };
                 // Estilos MaterialDesign (p. ej. MaterialDesignToolButton del reproductor)
                 app.Resources.MergedDictionaries.Add(new ResourceDictionary
                 {

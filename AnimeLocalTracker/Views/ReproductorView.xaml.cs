@@ -343,6 +343,13 @@ namespace AnimeLocalTracker.Views
 
         private void ReproductorView_PreviewMouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
+            if (DataContext is ReproductorViewModel vm && vm.EsModoMini)
+            {
+                vm.RestaurarFormatoHabitualCommand.Execute(null);
+                e.Handled = true;
+                return;
+            }
+
             // Segunda línea de defensa: el fix principal es ToggleFullScreenOnDoubleClick="False"
             // en FlyleafHost (su captura del mouse es nativa y no pasa por el routing de WPF).
             e.Handled = true;
@@ -403,15 +410,74 @@ namespace AnimeLocalTracker.Views
             }
             else if (k == vm.ObtenerTeclaPara("CapturarFrame"))
                 vm.CapturarFrameCommand.Execute(null);
+            else if (k == Key.P)
+                vm.AlternarModoMiniCommand.Execute(null);
             else if (k == vm.ObtenerTeclaPara("Cerrar"))
                 vm.CerrarCommand.Execute(null);
             else
                 ejecutado = false;
 
+
             if (ejecutado)
             {
                 e.Handled = true;
                 RegistrarActividad();
+            }
+        }
+
+        private bool _isDraggingMini;
+        private Point _dragStartPoint;
+        private double _startMarginRight;
+        private double _startMarginBottom;
+
+        private void BarraSuperior_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (DataContext is ViewModels.ReproductorViewModel vm && vm.EsModoMini)
+            {
+                _isDraggingMini = true;
+                
+                var window = Window.GetWindow(this);
+                if (window != null)
+                {
+                    _dragStartPoint = e.GetPosition(window);
+                    _startMarginRight = vm.MiniPlayerMargin.Right;
+                    _startMarginBottom = vm.MiniPlayerMargin.Bottom;
+                    ((UIElement)sender).CaptureMouse();
+                }
+            }
+        }
+
+        private void BarraSuperior_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (_isDraggingMini)
+            {
+                if (e.LeftButton != MouseButtonState.Pressed)
+                {
+                    _isDraggingMini = false;
+                    ((UIElement)sender).ReleaseMouseCapture();
+                    return;
+                }
+
+                if (DataContext is ViewModels.ReproductorViewModel vm)
+                {
+                    var window = Window.GetWindow(this);
+                    if (window != null)
+                    {
+                        Point currentPoint = e.GetPosition(window);
+                        double newRight = _startMarginRight - (currentPoint.X - _dragStartPoint.X);
+                        double newBottom = _startMarginBottom - (currentPoint.Y - _dragStartPoint.Y);
+                        vm.MiniPlayerMargin = new Thickness(0, 0, newRight, newBottom);
+                    }
+                }
+            }
+        }
+
+        private void BarraSuperior_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            if (_isDraggingMini)
+            {
+                _isDraggingMini = false;
+                ((UIElement)sender).ReleaseMouseCapture();
             }
         }
     }

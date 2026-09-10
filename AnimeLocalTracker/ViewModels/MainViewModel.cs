@@ -236,25 +236,37 @@ public partial class MainViewModel : ObservableObject,
         VistaActual = _navigationService.ObtenerDescargas();
     }
 
+    // === REPRODUCTOR IN-APP (EMBEBIDO) ===
+    [ObservableProperty]
+    private ReproductorViewModel? _reproductorActivo;
+
+    // Vista a la que volver al salir del reproductor
+    private ObservableObject? _vistaAnteriorAlReproductor;
+
+    // Flujo calendario → ficha: "volver" desde el Detalle regresa al calendario.
+    private ObservableObject? _vistaAnteriorADetalleCalendario;
+
     public void Receive(NavegarMensaje_Reproductor message) => _ = NavegarAlReproductorAsync(message);
 
     private async Task NavegarAlReproductorAsync(NavegarMensaje_Reproductor message)
     {
         try
         {
-            // Guardar la vista actual antes de navegar al reproductor
+            if (ReproductorActivo != null)
+            {
+                ReproductorActivo.Dispose();
+                ReproductorActivo = null;
+            }
+
             _vistaAnteriorAlReproductor = VistaActual;
 
             var viewModel = _navigationService.CrearReproductor();
             if (viewModel == null) return;
 
-            // 1. Crear el objeto Player antes de montar la vista para que FlyleafHost enlace un Player no nulo
             viewModel.AsegurarPlayerInicializado();
+            viewModel.EsModoMini = false;
+            ReproductorActivo = viewModel;
 
-            // 2. Montar la vista en el Visual Tree de WPF PRIMERO para que FlyleafHost capture el contexto Direct3D
-            VistaActual = viewModel;
-
-            // 3. Abrir el video con FlyleafHost ya activo en pantalla (elimina la pantalla negra por carrera)
             try
             {
                 await viewModel.CargarVideoAsync(message.RutaVideo, message.AnimeId, message.TituloAnime, message.Episodio, message.EpisodiosDisponibles);
@@ -272,22 +284,21 @@ public partial class MainViewModel : ObservableObject,
 
     partial void OnVistaActualChanged(ObservableObject? oldValue, ObservableObject newValue)
     {
-        // Al salir del reproductor por CUALQUIER vía (no solo el botón Cerrar), liberar su
-        // player: si queda vivo sigue reproduciendo audio en segundo plano (instancias fantasma).
-        if (oldValue is ReproductorViewModel reproductorAnterior && !ReferenceEquals(reproductorAnterior, newValue))
+        // Si el usuario navega a otra pestaña mientras el reproductor está activo en formato completo,
+        // pasa automáticamente a modo mini en la esquina para no interrumpir el video.
+        if (ReproductorActivo != null && !ReproductorActivo.EsModoMini)
         {
-            reproductorAnterior.Dispose();
+            ReproductorActivo.EsModoMini = true;
         }
     }
 
-    // Vista a la que volver al salir del reproductor
-    private ObservableObject? _vistaAnteriorAlReproductor;
-
-    // Flujo calendario → ficha: "volver" desde el Detalle regresa al calendario.
-    private ObservableObject? _vistaAnteriorADetalleCalendario;
-
     public void Receive(NavegarMensaje_VolverDelReproductor message)
     {
+        if (ReproductorActivo != null)
+        {
+            ReproductorActivo = null;
+        }
+
         if (_vistaAnteriorAlReproductor != null)
         {
             VistaActual = _vistaAnteriorAlReproductor;
@@ -298,6 +309,7 @@ public partial class MainViewModel : ObservableObject,
             VistaActual = _navigationService.ObtenerGaleria();
         }
     }
+
 
     [RelayCommand]
     private void NavegarGaleria()

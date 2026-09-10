@@ -114,6 +114,7 @@ public partial class App : Application
         services.AddSingleton<ISettingsService, SettingsService>();
         services.AddSingleton<IDialogService, DialogService>();
         services.AddSingleton<IAuthService, AuthService>();
+
         services.AddHttpClient();
 
         // SEC-03: el cliente "Downloader" (scraper + descargas) no sigue redirects a ciegas:

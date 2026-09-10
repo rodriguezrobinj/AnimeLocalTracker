@@ -199,8 +199,17 @@ public sealed class LocalizationService : INotifyPropertyChanged
 
         // === TÍTULO DE CONFIGURACIÓN (LOC-07) ===
         ["Cfg_Titulo"] = "Configuración y Preferencias",
-        ["Cfg_TituloSub"] = "Personaliza el almacenamiento de tus animes, reproducción multimedia y sincronización con AniList"
+        ["Cfg_TituloSub"] = "Personaliza el almacenamiento de tus animes, reproducción multimedia y sincronización con AniList",
+
+        // === MODO PIP / MINI REPRODUCTOR ===
+        ["Player_Pip"] = "Modo ventana flotante (P)",
+        ["Player_Mini"] = "Minimizar a mini-reproductor (P)",
+        ["Player_RestaurarFormato"] = "Restaurar formato habitual (P)",
+        ["Player_Cerrar"] = "Cerrar reproductor",
+        ["Player_RestaurarPip"] = "Restaurar reproductor",
+        ["Pip_Banner_Reproduciendo"] = "Reproduciendo en ventana flotante:"
     };
+
 
     private static readonly Dictionary<string, string> En = new()
     {
@@ -371,8 +380,17 @@ public sealed class LocalizationService : INotifyPropertyChanged
 
         // === SETTINGS TITLE (LOC-07) ===
         ["Cfg_Titulo"] = "Settings & Preferences",
-        ["Cfg_TituloSub"] = "Customize your anime storage, playback and AniList sync"
+        ["Cfg_TituloSub"] = "Customize your anime storage, playback and AniList sync",
+
+        // === PIP / MINI PLAYER MODE ===
+        ["Player_Pip"] = "Floating window mode (P)",
+        ["Player_Mini"] = "Minimize to mini-player (P)",
+        ["Player_RestaurarFormato"] = "Restore regular format (P)",
+        ["Player_Cerrar"] = "Close player",
+        ["Player_RestaurarPip"] = "Restore player",
+        ["Pip_Banner_Reproduciendo"] = "Playing in floating window:"
     };
+
 
     public string this[string key] =>
         _idioma == "en" && En.TryGetValue(key, out var en) ? en
