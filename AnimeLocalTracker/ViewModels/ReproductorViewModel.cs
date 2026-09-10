@@ -34,6 +34,9 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     private Player _player = null!;
 
     [ObservableProperty]
+    private bool _esModoMini;
+
+    [ObservableProperty]
     private string _tituloAnime = string.Empty;
 
     [ObservableProperty]
@@ -54,6 +57,9 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
     [ObservableProperty]
     private bool _autoSkipIntroOutro = false;
+
+    [ObservableProperty]
+    private Thickness _miniPlayerMargin = new Thickness(0, 0, 24, 24);
 
     [ObservableProperty]
     private bool _autoPlaySiguiente = true;
@@ -186,6 +192,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         _ventanaPrincipal = ventanaPrincipal;
 
         _playbackState = playbackStateService ?? new PlaybackStateService(databaseService, animeTrackingService, authService);
+
         _skipCoordinator = skipTimesCoordinator ?? new SkipTimesCoordinator(aniSkipService);
 
         if (_settingsService != null)
@@ -297,8 +304,37 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
     // En entornos de pruebas (headless) Flyleaf puede dejar su hilo maestro bloqueado y
     // cualquier construcción posterior de Config() se cuelga en Dispatcher.Invoke síncrono.
-    private static readonly bool _esEntornoPruebas = AppDomain.CurrentDomain.GetAssemblies()
-        .Any(a => a.GetName().Name?.StartsWith("xunit", StringComparison.OrdinalIgnoreCase) == true);
+    private static bool EsEntornoPruebas()
+    {
+        try
+        {
+            var proc = Process.GetCurrentProcess().ProcessName;
+            if (proc.Contains("testhost", StringComparison.OrdinalIgnoreCase) ||
+                proc.Contains("vstest", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            if (Environment.CommandLine.Contains("test", StringComparison.OrdinalIgnoreCase) ||
+                Environment.CommandLine.Contains("vstest", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            return AppDomain.CurrentDomain.GetAssemblies().Any(a =>
+            {
+                var name = a.GetName().Name;
+                return name != null && (
+                    name.StartsWith("xunit", StringComparison.OrdinalIgnoreCase) ||
+                    name.EndsWith(".Tests", StringComparison.OrdinalIgnoreCase) ||
+                    name.Contains("test", StringComparison.OrdinalIgnoreCase));
+            });
+        }
+        catch
+        {
+            return false;
+        }
+    }
 
     public void AsegurarPlayerInicializado()
     {
@@ -310,7 +346,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
     public virtual Player CreateOptimizedPlayer()
     {
-        if (_esEntornoPruebas)
+        if (EsEntornoPruebas())
         {
             return null!;
         }
@@ -629,6 +665,31 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             System.Windows.Threading.DispatcherPriority.Input,
             () => _ventanaPrincipal.Enfocar());
     }
+
+    [RelayCommand]
+    public void AlternarModoMini()
+    {
+        EsModoMini = !EsModoMini;
+        if (!EsModoMini)
+        {
+            MiniPlayerMargin = new Thickness(0, 0, 24, 24);
+        }
+    }
+
+    [RelayCommand]
+    public void MinimizarAMini()
+    {
+        EsModoMini = true;
+        MiniPlayerMargin = new Thickness(0, 0, 24, 24);
+    }
+
+    [RelayCommand]
+    public void RestaurarFormatoHabitual()
+    {
+        EsModoMini = false;
+        MiniPlayerMargin = new Thickness(0, 0, 24, 24);
+    }
+
 
     [RelayCommand]
     public void SelectSubtitleStream(object stream)
@@ -1329,6 +1390,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     [RelayCommand]
     public void Cerrar()
     {
+        EsModoMini = false;
         _ = GuardarProgresoActualAsync();
         Dispose();
         

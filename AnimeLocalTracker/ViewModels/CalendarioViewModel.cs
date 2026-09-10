@@ -57,7 +57,7 @@ public partial class CalendarioViewModel : ObservableObject, IDisposable
     private System.Windows.Threading.DispatcherTimer? CrearTemporizadorEstado()
     {
         var app = System.Windows.Application.Current;
-        if (app == null || app.Dispatcher == null || app.Dispatcher.HasShutdownStarted) return null;
+        if (app == null || app.Dispatcher == null || app.Dispatcher.HasShutdownStarted || app.MainWindow == null) return null;
 
         var timer = new System.Windows.Threading.DispatcherTimer(
             TimeSpan.FromSeconds(60),

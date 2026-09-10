@@ -277,7 +277,7 @@ public partial class GaleriaViewModel : ObservableObject,
         // la entrega del mensaje al resto de receptores suscritos.
         try
         {
-            if (System.Windows.Application.Current?.Dispatcher is { } d && !d.CheckAccess())
+            if (System.Windows.Application.Current?.Dispatcher is { } d && !d.CheckAccess() && System.Windows.Application.Current.MainWindow != null)
             {
                 d.InvokeAsync(() => Receive(message));
                 return;

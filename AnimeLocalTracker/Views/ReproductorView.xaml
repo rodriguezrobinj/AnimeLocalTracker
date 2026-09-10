@@ -5,8 +5,9 @@
         xmlns:fl="clr-namespace:FlyleafLib.Controls.WPF;assembly=FlyleafLib"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         xmlns:primitives="clr-namespace:System.Windows.Controls.Primitives;assembly=PresentationFramework"
+        xmlns:loc="clr-namespace:AnimeLocalTracker.Services"
         TextElement.Foreground="{DynamicResource MaterialDesignBody}"
-        Background="Black"
+        Background="Transparent"
         Focusable="True"
         PreviewMouseDoubleClick="ReproductorView_PreviewMouseDoubleClick"
         PreviewMouseLeftButtonDown="ReproductorView_PreviewMouseLeftButtonDown"
@@ -204,7 +205,8 @@
                 <Grid x:Name="OverlayControls" Background="Transparent" DataContext="{x:Null}">
                 
                 <!-- Gradiente Superior -->
-                <Grid VerticalAlignment="Top" Height="120">
+                <Grid VerticalAlignment="Top" Height="120"
+                      Visibility="{Binding EsModoMini, Converter={StaticResource InverseBoolToVis}}">
                     <Grid.Background>
                         <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
                             <GradientStop Color="#B3000000" Offset="0"/>
@@ -231,7 +233,8 @@
                 </Grid>
 
                 <!-- Barra Inferior Completa -->
-                <Grid VerticalAlignment="Bottom">
+                <Grid VerticalAlignment="Bottom"
+                      Visibility="{Binding EsModoMini, Converter={StaticResource InverseBoolToVis}}">
                     <Grid.Background>
                         <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
                             <GradientStop Color="#00000000" Offset="0"/>
@@ -289,7 +292,8 @@
                                 <ColumnDefinition Width="Auto"/> <!-- 6: Retroceder -->
                                 <ColumnDefinition Width="Auto"/> <!-- 7: Adelantar -->
                                 <ColumnDefinition Width="Auto"/> <!-- 8: Subtítulos -->
-                                <ColumnDefinition Width="Auto"/> <!-- 9: Fullscreen -->
+                                <ColumnDefinition Width="Auto"/> <!-- 9: PiP -->
+                                <ColumnDefinition Width="Auto"/> <!-- 10: Fullscreen -->
                             </Grid.ColumnDefinitions>
 
                             <!-- Episodio Anterior -->
@@ -504,12 +508,136 @@
                                 </Border>
                             </Popup>
                             
+                            <!-- Modo Mini Reproductor -->
+                            <Button Grid.Column="9" Command="{Binding MinimizarAMiniCommand}" Focusable="False"
+                                    ToolTip="{Binding [Player_Mini], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                    Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,4,0">
+                                <materialDesign:PackIcon Kind="PictureInPictureBottomRight" Width="26" Height="26" />
+                            </Button>
+
                             <!-- Fullscreen con ícono dinámico -->
-                            <Button Grid.Column="9" Command="{Binding ToggleFullscreenCommand}" Focusable="False" 
+                            <Button Grid.Column="10" Command="{Binding ToggleFullscreenCommand}" Focusable="False" 
                                     ToolTip="Pantalla completa (F11)"
                                     Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,0,0">
                                 <materialDesign:PackIcon Kind="{Binding FullscreenIcon}" Width="26" Height="26" />
                             </Button>
+                        </Grid>
+                    </Grid>
+                </Grid>
+
+                <!-- CONTROLES MODO MINI REPRODUCTOR (EMBEBIDO) -->
+                <Grid Visibility="{Binding EsModoMini, Converter={StaticResource BoolToVis}}" Background="Transparent">
+                    <!-- Barra Superior Mini -->
+                    <Grid VerticalAlignment="Top" Height="38">
+                        <Grid.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                <GradientStop Color="#E6000000" Offset="0"/>
+                                <GradientStop Color="#00000000" Offset="1"/>
+                            </LinearGradientBrush>
+                        </Grid.Background>
+                        <Grid Margin="10,4,6,0" Cursor="SizeAll"
+                              MouseLeftButtonDown="BarraSuperior_MouseLeftButtonDown"
+                              MouseMove="BarraSuperior_MouseMove"
+                              MouseLeftButtonUp="BarraSuperior_MouseLeftButtonUp">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Título anime y episodio compacto -->
+                            <TextBlock Grid.Column="0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                                       Foreground="White" FontSize="11" FontWeight="SemiBold" Margin="0,0,6,0">
+                                <Run Text="{Binding TituloAnime, Mode=OneWay}" FontWeight="Bold"/>
+                                <Run Text=" · " Foreground="#A0A0A0"/>
+                                <Run Text="{Binding TituloEpisodio, Mode=OneWay}" Foreground="#D0D0D0"/>
+                            </TextBlock>
+
+                            <!-- BOTÓN RESTAURAR FORMATO HABITUAL (REQUERIDO) -->
+                            <Button Grid.Column="1" Command="{Binding RestaurarFormatoHabitualCommand}" Focusable="False"
+                                    ToolTip="{Binding [Player_RestaurarFormato], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                    Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="30" Height="30" Margin="0,0,2,0"
+                                    AutomationProperties.Name="Restaurar formato habitual">
+                                <materialDesign:PackIcon Kind="Fullscreen" Width="18" Height="18" />
+                            </Button>
+
+                            <!-- Botón Cerrar Mini Reproductor -->
+                            <Button Grid.Column="2" Command="{Binding CerrarCommand}" Focusable="False"
+                                    ToolTip="{Binding [Player_Cerrar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                    Style="{StaticResource MaterialDesignToolButton}" Foreground="#EF4444" Width="30" Height="30"
+                                    AutomationProperties.Name="Cerrar reproductor">
+                                <materialDesign:PackIcon Kind="Close" Width="18" Height="18" />
+                            </Button>
+                        </Grid>
+                    </Grid>
+
+                    <!-- Barra Inferior Mini -->
+                    <Grid VerticalAlignment="Bottom" Height="50">
+                        <Grid.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                <GradientStop Color="#00000000" Offset="0"/>
+                                <GradientStop Color="#B3000000" Offset="0.4"/>
+                                <GradientStop Color="#E6000000" Offset="1"/>
+                            </LinearGradientBrush>
+                        </Grid.Background>
+
+                        <Grid Margin="10,0,10,4" VerticalAlignment="Bottom">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/> <!-- Scrubber mini -->
+                                <RowDefinition Height="Auto"/> <!-- Botones reproducción -->
+                            </Grid.RowDefinitions>
+
+                            <!-- Scrubber interactivo -->
+                            <Slider Grid.Row="0" Minimum="0" Maximum="{Binding TotalSeconds}" Value="{Binding CurrentSeconds, Mode=TwoWay}"
+                                    Style="{StaticResource TimelineSliderStyle}" Height="18" Margin="0,0,0,2"
+                                    IsMoveToPointEnabled="True" Focusable="False"
+                                    primitives:Thumb.DragStarted="Slider_DragStarted"
+                                    primitives:Thumb.DragDelta="Slider_DragDelta"
+                                    primitives:Thumb.DragCompleted="Slider_DragCompleted"
+                                    VerticalAlignment="Center" />
+
+                            <Grid Grid.Row="1">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/> <!-- Play/Pausa -->
+                                    <ColumnDefinition Width="Auto"/> <!-- -10s -->
+                                    <ColumnDefinition Width="Auto"/> <!-- +10s -->
+                                    <ColumnDefinition Width="Auto"/> <!-- Tiempo -->
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/> <!-- Mute -->
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Play/Pausa -->
+                                <Button Grid.Column="0" Command="{Binding TogglePlayPauseCommand}" Focusable="False"
+                                        ToolTip="Reproducir / Pausar (Espacio)"
+                                        Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="28" Height="28" Margin="0,0,2,0">
+                                    <materialDesign:PackIcon Kind="{Binding PlayPauseIcon}" Width="20" Height="20" />
+                                </Button>
+
+                                <!-- Retroceder 10s -->
+                                <Button Grid.Column="1" Command="{Binding Rewind10Command}" Focusable="False"
+                                        ToolTip="Retroceder 10s (←)"
+                                        Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="26" Height="26" Margin="0,0,2,0">
+                                    <materialDesign:PackIcon Kind="Rewind" Width="18" Height="18" />
+                                </Button>
+
+                                <!-- Adelantar 10s -->
+                                <Button Grid.Column="2" Command="{Binding Forward10Command}" Focusable="False"
+                                        ToolTip="Adelantar 10s (→)"
+                                        Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="26" Height="26" Margin="0,0,6,0">
+                                    <materialDesign:PackIcon Kind="FastForward" Width="18" Height="18" />
+                                </Button>
+
+                                <!-- Tiempo compacto -->
+                                <TextBlock Grid.Column="3" Text="{Binding TiempoCombinadoTexto}" Foreground="#D1D5DB"
+                                           VerticalAlignment="Center" FontSize="11" FontWeight="SemiBold"/>
+
+                                <!-- Botón Mute -->
+                                <Button Grid.Column="5" Command="{Binding ToggleMuteCommand}" Focusable="False"
+                                        ToolTip="Silenciar (M)"
+                                        Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="28" Height="28">
+                                    <materialDesign:PackIcon Kind="{Binding VolumenIcon}" Width="18" Height="18" />
+                                </Button>
+                            </Grid>
                         </Grid>
                     </Grid>
                 </Grid>

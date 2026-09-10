@@ -374,6 +374,44 @@
                 <!-- Sin margen superior para que el fondo (ej. desenfoque) cubra toda la ventana detrás de la barra de título -->
                 <ContentControl x:Name="ContenedorVistaPrincipal" Grid.Column="0" Grid.ColumnSpan="2"
                                 Content="{Binding VistaActual}" />
+
+                <!-- REPRODUCTOR IN-APP (EMBEBIDO DENTRO DE LA APLICACIÓN) -->
+                <!-- Ocupa toda la ventana en formato habitual, o se reduce a la esquina en formato mini -->
+                <Border Grid.Column="0" Grid.ColumnSpan="2" Panel.ZIndex="50" ClipToBounds="True">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <!-- Visible cuando hay un ReproductorActivo -->
+                                <DataTrigger Binding="{Binding ReproductorActivo, Converter={StaticResource NullToCollapsed}}" Value="Visible">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                    <Setter Property="HorizontalAlignment" Value="Stretch" />
+                                    <Setter Property="VerticalAlignment" Value="Stretch" />
+                                    <Setter Property="Margin" Value="0" />
+                                    <Setter Property="CornerRadius" Value="0" />
+                                    <Setter Property="BorderThickness" Value="0" />
+                                    <Setter Property="Background" Value="Black" />
+                                </DataTrigger>
+                                <!-- Si está en modo mini: flota en la esquina inferior derecha -->
+                                <DataTrigger Binding="{Binding ReproductorActivo.EsModoMini}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                    <Setter Property="HorizontalAlignment" Value="Right" />
+                                    <Setter Property="VerticalAlignment" Value="Bottom" />
+                                    <Setter Property="Width" Value="384" />
+                                    <Setter Property="Height" Value="216" />
+                                    <Setter Property="Margin" Value="{Binding ReproductorActivo.MiniPlayerMargin}" />
+                                    <Setter Property="CornerRadius" Value="8" />
+                                    <Setter Property="BorderThickness" Value="0" />
+                                    <Setter Property="Background" Value="Transparent" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+
+                    <ContentControl Content="{Binding ReproductorActivo}" />
+                </Border>
+
+
                 
                 <!-- BARRA DE TÍTULO CUSTOM -->
                 <Grid Grid.Column="0" Grid.ColumnSpan="2" x:Name="BarraTitulo" Height="45" Background="Transparent" VerticalAlignment="Top" Panel.ZIndex="20">
