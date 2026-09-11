@@ -38,6 +38,7 @@
       <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
       <PackageReference Include="Velopack" Version="1.2.0" />
       <PackageReference Include="VirtualizingWrapPanel" Version="2.5.4" />
+      <PackageReference Include="Vortice.XInput" Version="3.8.3" />
     </ItemGroup>
 
     <ItemGroup>

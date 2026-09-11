@@ -22,7 +22,6 @@ public partial class MainViewModel : ObservableObject,
     IRecipient<NavegarMensaje_Historial>,
     IRecipient<NavegarMensaje_Actualizaciones>,
     IRecipient<AbrirBuscadorMensaje>,
-    IRecipient<MostrarDialogoRequestMessage>,
     IRecipient<NavegarMensaje_Reproductor>,
     IRecipient<NavegarMensaje_VolverDelReproductor>,
     IRecipient<DescargaProgresoMensaje>,
@@ -33,6 +32,8 @@ public partial class MainViewModel : ObservableObject,
     private readonly AnimeLibraryService _animeLibraryService;
     private readonly IDownloadService _downloadService;
     private readonly IUpdateService _updateService;
+
+    public IDialogService DialogService { get; }
 
     public string VersionAppTexto => _updateService.ObtenerVersionActual();
 
@@ -66,22 +67,10 @@ public partial class MainViewModel : ObservableObject,
     [ObservableProperty]
     private bool _tieneDescargasActivas;
 
-    // === DIÁLOGOS CUSTOM ===
-    [ObservableProperty] private bool _dialogoVisible;
-    [ObservableProperty] private string _dialogoTitulo = "";
-    [ObservableProperty] private string _dialogoMensaje = "";
-    [ObservableProperty] private bool _dialogoEsConfirmacion;
-    [ObservableProperty] private string _dialogoIcono = "InformationOutline";
-    [ObservableProperty] private string _dialogoColor = "#3F51B5";
-    
-    private TaskCompletionSource<bool>? _dialogTcs;
+    // === DIÁLOGOS Y TOASTS ===
+    // Delegados a IDialogService (DialogService)
 
-    // === TOAST NOTIFICATIONS ===
-    [ObservableProperty] private bool _toastVisible;
-    [ObservableProperty] private string _toastTitulo = "";
-    [ObservableProperty] private string _toastMensaje = "";
-    [ObservableProperty] private string _toastIcono = "InformationOutline";
-    [ObservableProperty] private string _toastColor = "#3F51B5";
+
 
     // === BUSCADOR FLOTANTE ===
     [ObservableProperty] private bool _isDialogOpen;
@@ -107,13 +96,15 @@ public partial class MainViewModel : ObservableObject,
         IAnimeTrackingService animeTrackingService, 
         AnimeLibraryService animeLibraryService,
         IDownloadService downloadService,
-        IUpdateService updateService)
+        IUpdateService updateService,
+        IDialogService dialogService)
     {
         _navigationService = navigationService;
         _animeTrackingService = animeTrackingService;
         _animeLibraryService = animeLibraryService;
         _downloadService = downloadService;
         _updateService = updateService;
+        DialogService = dialogService;
 
         WeakReferenceMessenger.Default.RegisterAll(this);
 
@@ -128,10 +119,10 @@ public partial class MainViewModel : ObservableObject,
         var update = await _updateService.ComprobarActualizacionesAsync(esManual: true);
         if (update != null)
         {
-            string nuevaVersion = update.TargetFullRelease?.Version.ToNormalizedString() ?? "nueva versión";
-            bool confirmar = await MostrarDialogoLocalAsync(
-                "Nueva versión disponible",
-                $"Se encontró la versión {nuevaVersion}. ¿Deseas descargarla e instalarla ahora?",
+            string nuevaVersion = update.TargetFullRelease?.Version.ToNormalizedString() ?? LocalizationService.T("Msg_NuevaVersion");
+            bool confirmar = await DialogService.MostrarDialogoAsync(
+                LocalizationService.T("Dlg_NuevaVersion"),
+                string.Format(LocalizationService.T("Dlg_EncontroVersion"), nuevaVersion),
                 true,
                 "Update",
                 "#2196F3");
@@ -156,22 +147,12 @@ public partial class MainViewModel : ObservableObject,
     {
         if (message.Cantidad <= 0) return;
 
-        ToastTitulo = LocalizationService.T("Notif_NuevosEpisodios");
-        ToastMensaje = $"{message.Cantidad} {LocalizationService.T("Notif_ResumenNuevos")}\n{message.Resumen}";
-        ToastIcono = "NewReleases";
-        ToastColor = "#4CAF50";
-        ToastVisible = true;
-
-        // Ocultar automáticamente después de 6 segundos
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                await Task.Delay(6000);
-                System.Windows.Application.Current?.Dispatcher?.Invoke(() => ToastVisible = false);
-            }
-            catch { }
-        });
+        DialogService.MostrarToast(
+            LocalizationService.T("Notif_NuevosEpisodios"),
+            $"{message.Cantidad} {LocalizationService.T("Notif_ResumenNuevos")}\n{message.Resumen}",
+            "NewReleases",
+            "#4CAF50"
+        );
     }
 
     private void ActualizarConteoDescargas()
@@ -445,101 +426,11 @@ public partial class MainViewModel : ObservableObject,
         NavegarAgregarAnime();
     }
 
-    public void Receive(MostrarDialogoRequestMessage message)
-    {
-        if (message.HasReceivedResponse)
-        {
-            return;
-        }
-
-        try
-        {
-            var dispatcher = System.Windows.Application.Current?.Dispatcher;
-            if (dispatcher != null && !dispatcher.CheckAccess())
-            {
-                // Marshaling al hilo de UI para evitar accesos cruzados (Flyleaf/descargas).
-                dispatcher.Invoke(() => ResponderDialogo(message));
-            }
-            else
-            {
-                ResponderDialogo(message);
-            }
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Debug("MainViewModel", $"Error respondiendo a MostrarDialogoRequestMessage: {ex.Message}");
-        }
-    }
-
-    private void ResponderDialogo(MostrarDialogoRequestMessage message)
-    {
-        if (message.HasReceivedResponse)
-        {
-            return;
-        }
-
-        // Respondemos a la petición asíncrona enviada por otros ViewModels
-        message.Reply(MostrarDialogoLocalAsync(message.Titulo, message.Mensaje, message.EsConfirmacion, message.Icono, message.Color));
-    }
-
     // ==========================================
     // LÓGICA DE DIÁLOGOS
+    // Delegada a IDialogService.
     // ==========================================
-    private async Task<bool> MostrarDialogoLocalAsync(string titulo, string mensaje, bool esConfirmacion, string icono, string color)
-    {
-        if (!esConfirmacion)
-        {
-            // Si no es confirmación, mostrar una notificación (Toast) residual
-            ToastTitulo = titulo;
-            ToastMensaje = mensaje;
-            ToastIcono = icono;
-            ToastColor = color;
-            ToastVisible = true;
-            
-            // Ocultar automáticamente después de 3.5 segundos
-            _ = Task.Run(async () => 
-            {
-                try
-                {
-                    await Task.Delay(3500);
-                    System.Windows.Application.Current?.Dispatcher?.Invoke(() => ToastVisible = false);
-                }
-                catch (Exception ex)
-                {
-                    AppLogger.Debug("MainViewModel", $"Error al ocultar toast: {ex.Message}");
-                }
-            });
-            
-            // Retorna true automáticamente porque no requiere la interacción del usuario
-            return true;
-        }
-
-        // Si es confirmación, mostrar el diálogo bloqueante estándar
-        DialogoTitulo = titulo;
-        DialogoMensaje = mensaje;
-        DialogoEsConfirmacion = esConfirmacion;
-        DialogoIcono = icono;
-        DialogoColor = color;
-        
-        DialogoVisible = true;
-        
-        _dialogTcs = new TaskCompletionSource<bool>();
-        return await _dialogTcs.Task;
-    }
-
-    [RelayCommand]
-    private void AceptarDialogo()
-    {
-        DialogoVisible = false;
-        _dialogTcs?.TrySetResult(true);
-    }
-
-    [RelayCommand]
-    private void CancelarDialogo()
-    {
-        DialogoVisible = false;
-        _dialogTcs?.TrySetResult(false);
-    }
+    
     
     [RelayCommand]
     private void CerrarDialogoBusqueda()
@@ -642,7 +533,10 @@ public partial class MainViewModel : ObservableObject,
                 await Task.Delay(250); // Permitir que la animación de cierre termine
                 TextoBusqueda = string.Empty;
                 ResultadosBusqueda.Clear();
-                await MostrarDialogoLocalAsync("Anime Existente", $"El anime '{animeAPI.Title.Romaji}' ya se encuentra en tu biblioteca.", false, "InformationOutline", "#FF9800");
+                await DialogService.MostrarDialogoAsync(
+                    LocalizationService.T("Dlg_AnimeExistente"), 
+                    string.Format(LocalizationService.T("Dlg_AnimeExistenteMsj"), animeAPI.Title.Romaji), 
+                    false, "InformationOutline", "#FF9800");
                 return;
             }
 
@@ -651,12 +545,18 @@ public partial class MainViewModel : ObservableObject,
             TextoBusqueda = string.Empty;
             ResultadosBusqueda.Clear();
 
-            await MostrarDialogoLocalAsync("Anime Añadido", $"Carpeta creada automáticamente en:\n{nuevoAnime.RutaCarpeta}", false, "FolderPlusOutline", "#4CAF50");
+            await DialogService.MostrarDialogoAsync(
+                LocalizationService.T("Dlg_AnimeAnadido"), 
+                string.Format(LocalizationService.T("Dlg_AnimeAnadidoMsj"), nuevoAnime.RutaCarpeta), 
+                false, "FolderPlusOutline", "#4CAF50");
         }
         catch (Exception ex)
         {
             AppLogger.Error("MainViewModel", $"Error al crear/añadir anime '{animeAPI?.Title?.Romaji}'", ex);
-            await MostrarDialogoLocalAsync("Error", $"No se pudo añadir el anime: {ex.Message}", false, "AlertCircleOutline", "#E53935");
+            await DialogService.MostrarDialogoAsync(
+                LocalizationService.T("Dlg_ErrorTitulo"), 
+                string.Format(LocalizationService.T("Dlg_ErrorAnadirAnime"), ex.Message), 
+                false, "AlertCircleOutline", "#E53935");
         }
     }
 }

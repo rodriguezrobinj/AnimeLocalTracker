@@ -300,6 +300,7 @@
                             <Button Grid.Column="0" Command="{Binding AnteriorEpisodioCommand}" Focusable="False"
                                     IsEnabled="{Binding TieneEpisodioAnterior}"
                                     ToolTip="{Binding EpisodioAnteriorTooltip}"
+                                    AutomationProperties.Name="{Binding EpisodioAnteriorTooltip}"
                                     Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="36" Height="36" Margin="0,0,2,0">
                                 <materialDesign:PackIcon Kind="SkipPrevious" Width="24" Height="24" />
                             </Button>
@@ -307,6 +308,7 @@
                             <!-- Play/Pause -->
                             <Button Grid.Column="1" Command="{Binding TogglePlayPauseCommand}" Focusable="False" 
                                     ToolTip="Reproducir / Pausar (Espacio)"
+                                    AutomationProperties.Name="Reproducir o Pausar"
                                     Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,2,0">
                                 <materialDesign:PackIcon Kind="{Binding PlayPauseIcon}" Width="28" Height="28" />
                             </Button>
@@ -315,13 +317,14 @@
                             <Button Grid.Column="2" Command="{Binding SiguienteEpisodioCommand}" Focusable="False"
                                     IsEnabled="{Binding TieneEpisodioSiguiente}"
                                     ToolTip="{Binding EpisodioSiguienteTooltip}"
+                                    AutomationProperties.Name="{Binding EpisodioSiguienteTooltip}"
                                     Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="36" Height="36" Margin="0,0,8,0">
                                 <materialDesign:PackIcon Kind="SkipNext" Width="24" Height="24" />
                             </Button>
 
                             <!-- Contenedor Volumen Animado -->
                             <StackPanel Grid.Column="3" Orientation="Horizontal" x:Name="VolumePanel" Background="Transparent" Margin="0,0,10,0">
-                                <Button Command="{Binding ToggleMuteCommand}" Focusable="False" Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40">
+                                <Button Command="{Binding ToggleMuteCommand}" Focusable="False" Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" AutomationProperties.Name="Silenciar o reactivar sonido">
                                     <materialDesign:PackIcon Kind="{Binding VolumenIcon}" Width="24" Height="24" />
                                 </Button>
                                 <Slider Minimum="0" Maximum="100" Value="{Binding Volumen, Mode=TwoWay}"
@@ -425,6 +428,7 @@
                             <!-- Retroceder 10s -->
                             <Button Grid.Column="6" Command="{Binding Rewind10Command}" Focusable="False" 
                                     ToolTip="Retroceder 10s (←)"
+                                    AutomationProperties.Name="Retroceder 10 segundos"
                                     Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,5,0">
                                 <materialDesign:PackIcon Kind="Rewind" Width="26" Height="26" />
                             </Button>
@@ -432,6 +436,7 @@
                             <!-- Adelantar 10s -->
                             <Button Grid.Column="7" Command="{Binding Forward10Command}" Focusable="False" 
                                     ToolTip="Adelantar 10s (→)"
+                                    AutomationProperties.Name="Adelantar 10 segundos"
                                     Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,10,0">
                                 <materialDesign:PackIcon Kind="FastForward" Width="26" Height="26" />
                             </Button>
@@ -439,6 +444,7 @@
                             <!-- Subtítulos (Menú Manual) -->
                             <Button x:Name="SubtitlesButton" Grid.Column="8" Focusable="False"
                                     ToolTip="Subtítulos"
+                                    AutomationProperties.Name="Menú de subtítulos"
                                     PreviewMouseLeftButtonDown="SubtitlesButton_PreviewMouseLeftButtonDown"
                                     Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,5,0">
                                 <materialDesign:PackIcon Kind="{Binding SubtitulosIcon}" Width="26" Height="26" />
@@ -511,6 +517,7 @@
                             <!-- Modo Mini Reproductor -->
                             <Button Grid.Column="9" Command="{Binding MinimizarAMiniCommand}" Focusable="False"
                                     ToolTip="{Binding [Player_Mini], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                    AutomationProperties.Name="Modo ventana flotante"
                                     Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,4,0">
                                 <materialDesign:PackIcon Kind="PictureInPictureBottomRight" Width="26" Height="26" />
                             </Button>
@@ -518,6 +525,7 @@
                             <!-- Fullscreen con ícono dinámico -->
                             <Button Grid.Column="10" Command="{Binding ToggleFullscreenCommand}" Focusable="False" 
                                     ToolTip="Pantalla completa (F11)"
+                                    AutomationProperties.Name="Alternar pantalla completa"
                                     Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,0,0">
                                 <materialDesign:PackIcon Kind="{Binding FullscreenIcon}" Width="26" Height="26" />
                             </Button>
@@ -609,6 +617,7 @@
                                 <!-- Play/Pausa -->
                                 <Button Grid.Column="0" Command="{Binding TogglePlayPauseCommand}" Focusable="False"
                                         ToolTip="Reproducir / Pausar (Espacio)"
+                                        AutomationProperties.Name="Reproducir o Pausar"
                                         Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="28" Height="28" Margin="0,0,2,0">
                                     <materialDesign:PackIcon Kind="{Binding PlayPauseIcon}" Width="20" Height="20" />
                                 </Button>
@@ -616,6 +625,7 @@
                                 <!-- Retroceder 10s -->
                                 <Button Grid.Column="1" Command="{Binding Rewind10Command}" Focusable="False"
                                         ToolTip="Retroceder 10s (←)"
+                                        AutomationProperties.Name="Retroceder 10 segundos"
                                         Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="26" Height="26" Margin="0,0,2,0">
                                     <materialDesign:PackIcon Kind="Rewind" Width="18" Height="18" />
                                 </Button>
@@ -623,6 +633,7 @@
                                 <!-- Adelantar 10s -->
                                 <Button Grid.Column="2" Command="{Binding Forward10Command}" Focusable="False"
                                         ToolTip="Adelantar 10s (→)"
+                                        AutomationProperties.Name="Adelantar 10 segundos"
                                         Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="26" Height="26" Margin="0,0,6,0">
                                     <materialDesign:PackIcon Kind="FastForward" Width="18" Height="18" />
                                 </Button>
@@ -634,6 +645,7 @@
                                 <!-- Botón Mute -->
                                 <Button Grid.Column="5" Command="{Binding ToggleMuteCommand}" Focusable="False"
                                         ToolTip="Silenciar (M)"
+                                        AutomationProperties.Name="Silenciar o reactivar sonido"
                                         Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="28" Height="28">
                                     <materialDesign:PackIcon Kind="{Binding VolumenIcon}" Width="18" Height="18" />
                                 </Button>

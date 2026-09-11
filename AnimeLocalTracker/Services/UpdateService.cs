@@ -46,7 +46,10 @@ public class UpdateService : IUpdateService
         try
         {
             var source = new GithubSource(RepoUrl, null, false);
-            _updateManager = new UpdateManager(source);
+            // SEC-011: Prevenir downgrades o paquetes sin firma (Velopack requiere firmas nativamente
+            // pero pasamos opciones adicionales para más estrictez si está disponible).
+            var options = new Velopack.UpdateOptions { AllowVersionDowngrade = false };
+            _updateManager = new UpdateManager(source, options);
         }
         catch (Exception)
         {
@@ -101,8 +104,8 @@ public class UpdateService : IUpdateService
             if (esManual)
             {
                 _ = _dialogService.MostrarDialogoAsync(
-                    "Actualizaciones",
-                    $"Estás en modo de desarrollo ({ObtenerVersionActual()}). Las actualizaciones automáticas se habilitan al compilar con el instalador de producción.",
+                    LocalizationService.T("Dlg_UpdatesModoDevTitulo"),
+                    string.Format(LocalizationService.T("Dlg_UpdatesModoDev"), ObtenerVersionActual()),
                     false,
                     "CodeTags",
                     "#9C27B0");
@@ -121,8 +124,8 @@ public class UpdateService : IUpdateService
                 if (esManual)
                 {
                     _ = _dialogService.MostrarDialogoAsync(
-                        "Al día",
-                        $"Ya tienes la última versión instalada ({ObtenerVersionActual()}).",
+                        LocalizationService.T("Dlg_UpdatesAlDiaTitulo"),
+                        string.Format(LocalizationService.T("Dlg_UpdatesAlDia"), ObtenerVersionActual()),
                         false,
                         "CheckCircle",
                         "#4CAF50");
@@ -139,8 +142,8 @@ public class UpdateService : IUpdateService
             if (esManual)
             {
                 _ = _dialogService.MostrarDialogoAsync(
-                    "Error de conexión",
-                    "No se pudo consultar el servidor de actualizaciones en GitHub. Comprueba tu conexión a internet.",
+                    LocalizationService.T("Dlg_UpdatesErrorConexionTitulo"),
+                    LocalizationService.T("Dlg_UpdatesErrorConexion"),
                     false,
                     "AlertCircleOutline",
                     "#E53935");
@@ -167,12 +170,12 @@ public class UpdateService : IUpdateService
             _ = ObtenerInfoUltimaVersionAsync(forzarActualizacion: true);
 
             // Notificación al usuario
-            _ = WeakReferenceMessenger.Default.Send(new MostrarDialogoRequestMessage(
-                "Actualización lista",
-                $"La versión {targetVersion} se ha descargado y está lista para aplicarse.",
+            _ = _dialogService.MostrarDialogoAsync(
+                LocalizationService.T("Dlg_UpdatesListaTitulo"),
+                string.Format(LocalizationService.T("Dlg_UpdatesLista"), targetVersion),
                 false,
                 "Update",
-                "#4CAF50"));
+                "#4CAF50");
 
             return true;
         }

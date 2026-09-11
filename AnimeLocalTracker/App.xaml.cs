@@ -114,6 +114,7 @@ public partial class App : Application
         services.AddSingleton<ISettingsService, SettingsService>();
         services.AddSingleton<IDialogService, DialogService>();
         services.AddSingleton<IAuthService, AuthService>();
+        services.AddSingleton<IGamepadService, GamepadService>();
 
         services.AddHttpClient();
 
@@ -400,6 +401,10 @@ public partial class App : Application
             // con todas sus dependencias ya inyectadas.
             var mainWindow = ServiceProvider.GetRequiredService<MainWindow>();
             mainWindow.Show();
+
+            // Iniciar servicio de gamepad
+            var gamepad = ServiceProvider.GetService<IGamepadService>();
+            gamepad?.Iniciar();
 
             // Notificaciones de episodios nuevos: primer chequeo a los 3 s y luego cada
             // 30 min mientras la app esté abierta (FUN-008: antes solo UNA vez al arrancar).

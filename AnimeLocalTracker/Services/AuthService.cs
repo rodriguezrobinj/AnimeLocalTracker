@@ -54,7 +54,7 @@ public class AuthService : IAuthService
         using var listener = new HttpListener();
         try
         {
-            listener.Prefixes.Add("http://localhost:5050/");
+            listener.Prefixes.Add("http://127.0.0.1:5050/");
             listener.Start();
         }
         catch (Exception ex)
@@ -142,7 +142,7 @@ public class AuthService : IAuthService
                 else if (request.Url?.AbsolutePath == "/token" && request.HttpMethod == "POST")
                 {
                     // SEC-01 (defensa en profundidad): solo aceptar POST provenientes de la
-                    // propia página de callback servida en http://localhost:5050. Los navegadores
+                    // propia página de callback servida en http://127.0.0.1:5050. Los navegadores
                     // envían el header Origin en todo POST (mismo o cross-origin); sin Origin ni
                     // Referer válidos (p.ej. script local, DNS rebinding) se rechaza.
                     string origin = request.Headers["Origin"] ?? string.Empty;
@@ -273,15 +273,15 @@ public class AuthService : IAuthService
 
     /// <summary>
     /// Valida que un header Origin/Referer sea exactamente el listener local del flujo
-    /// OAuth (http://localhost:5050). Una comparación por prefijo de cadena aceptaría
-    /// hosts evasivos como "localhost:5050.evil.com"; aquí se compara el Uri parseado
+    /// OAuth (http://127.0.0.1:5050). Una comparación por prefijo de cadena aceptaría
+    /// hosts evasivos como "127.0.0.1:5050.evil.com"; aquí se compara el Uri parseado
     /// (esquema + host + puerto exactos).
     /// </summary>
     internal static bool EsOrigenLocal(string? valor)
     {
         return Uri.TryCreate(valor, UriKind.Absolute, out var uri)
                && uri.Scheme == Uri.UriSchemeHttp
-               && uri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase)
+               && uri.Host.Equals("127.0.0.1", StringComparison.OrdinalIgnoreCase)
                && uri.Port == 5050;
     }
 }
