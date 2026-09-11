@@ -285,14 +285,15 @@ public partial class GaleriaViewModel : ObservableObject,
 
             if (!BibliotecaLocales.Any(a => a.AniListId == message.NuevoAnime.AniListId))
             {
-                message.NuevoAnime.PortadaImagen = _imageCacheService.ObtenerPortada(message.NuevoAnime.AniListId, message.NuevoAnime.UrlPortada);
+                _ = _imageCacheService.ObtenerPortada(message.NuevoAnime.AniListId, message.NuevoAnime.UrlPortada);
+                message.NuevoAnime.NotificarPortadaActualizada();
                 BibliotecaLocales.Add(message.NuevoAnime);
                 ActualizarGenerosDisponibles();
                 OnPropertyChanged(nameof(BibliotecaVacia));
                 OnPropertyChanged(nameof(TotalAnimesBiblioteca));
                 OnPropertyChanged(nameof(ConteoFiltradosTexto));
 
-                if (message.NuevoAnime.PortadaImagen == null && !string.IsNullOrWhiteSpace(message.NuevoAnime.UrlPortada))
+                if (_imageCacheService.ObtenerPortadaEnMemoria(message.NuevoAnime.AniListId) == null && !string.IsNullOrWhiteSpace(message.NuevoAnime.UrlPortada))
                 {
                     _ = Task.Run(async () =>
                     {
@@ -301,7 +302,7 @@ public partial class GaleriaViewModel : ObservableObject,
                             var img = await _imageCacheService.ObtenerPortadaAsync(message.NuevoAnime.AniListId, message.NuevoAnime.UrlPortada);
                             if (img != null)
                             {
-                                System.Windows.Application.Current?.Dispatcher?.Invoke(() => message.NuevoAnime.PortadaImagen = img);
+                                System.Windows.Application.Current?.Dispatcher?.Invoke(() => message.NuevoAnime.NotificarPortadaActualizada());
                             }
                         }
                         catch (Exception ex)
@@ -395,7 +396,8 @@ public partial class GaleriaViewModel : ObservableObject,
                 // Precarga ultra-rápida desde caché en memoria (0ms en scroll).
                 // RND-01: los hits de disco/red se cargan en segundo plano por
                 // CargarPortadasFaltantesEnSegundoPlanoAsync para no bloquear la UI.
-                a.PortadaImagen = _imageCacheService.ObtenerPortadaEnMemoria(a.AniListId);
+                // a.PortadaImagen fue reemplazado por AnimeCoverMultiConverter.
+                a.ResolverPortadaLocal();
             }
 
             BibliotecaLocales = new ObservableCollection<AnimeItem>(animes);
@@ -425,7 +427,7 @@ public partial class GaleriaViewModel : ObservableObject,
 
     private async Task CargarPortadasFaltantesEnSegundoPlanoAsync(IEnumerable<AnimeItem> animes)
     {
-        var faltantes = animes.Where(a => a.PortadaImagen == null && !string.IsNullOrWhiteSpace(a.UrlPortada)).ToList();
+        var faltantes = animes.Where(a => _imageCacheService.ObtenerPortadaEnMemoria(a.AniListId) == null && !string.IsNullOrWhiteSpace(a.UrlPortada)).ToList();
         if (faltantes.Count == 0) return;
 
         foreach (var anime in faltantes)
@@ -436,11 +438,11 @@ public partial class GaleriaViewModel : ObservableObject,
                 if (System.Windows.Application.Current?.Dispatcher != null && !System.Windows.Application.Current.Dispatcher.CheckAccess())
                 {
                     // RND-03: InvokeAsync para no bloquear el hilo de pool contra la UI
-                    _ = System.Windows.Application.Current.Dispatcher.InvokeAsync(() => anime.PortadaImagen = img);
+                    _ = System.Windows.Application.Current.Dispatcher.InvokeAsync(() => anime.NotificarPortadaActualizada());
                 }
                 else
                 {
-                    anime.PortadaImagen = img;
+                    anime.NotificarPortadaActualizada();
                 }
             }
         }

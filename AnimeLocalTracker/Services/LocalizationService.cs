@@ -143,6 +143,25 @@ public sealed class LocalizationService : INotifyPropertyChanged
         ["Dlg_Cancelar"] = "CANCELAR",
         ["Dlg_Aceptar"] = "ACEPTAR",
 
+        // === DIÁLOGOS (LOC-04) ===
+        ["Dlg_NuevaVersion"] = "Nueva versión disponible",
+        ["Dlg_EncontroVersion"] = "Se encontró la versión {0}. ¿Deseas descargarla e instalarla ahora?",
+        ["Dlg_AnimeExistente"] = "Anime Existente",
+        ["Dlg_AnimeExistenteMsj"] = "El anime '{0}' ya se encuentra en tu biblioteca.",
+        ["Dlg_AnimeAnadido"] = "Anime Añadido",
+        ["Dlg_AnimeAnadidoMsj"] = "Carpeta creada automáticamente en:\n{0}",
+        ["Dlg_ErrorTitulo"] = "Error",
+        ["Dlg_ErrorAnadirAnime"] = "No se pudo añadir el anime: {0}",
+        ["Msg_NuevaVersion"] = "nueva versión",
+        ["Dlg_UpdatesModoDevTitulo"] = "Actualizaciones",
+        ["Dlg_UpdatesModoDev"] = "Estás en modo de desarrollo ({0}). Las actualizaciones automáticas se habilitan al compilar con el instalador de producción.",
+        ["Dlg_UpdatesAlDiaTitulo"] = "Al día",
+        ["Dlg_UpdatesAlDia"] = "Ya tienes la última versión instalada ({0}).",
+        ["Dlg_UpdatesErrorConexionTitulo"] = "Error de conexión",
+        ["Dlg_UpdatesErrorConexion"] = "No se pudo consultar el servidor de actualizaciones en GitHub. Comprueba tu conexión a internet.",
+        ["Dlg_UpdatesListaTitulo"] = "Actualización lista",
+        ["Dlg_UpdatesLista"] = "La versión {0} se ha descargado y está lista para aplicarse.",
+
         // === CONFIGURACIÓN (LOC-02) ===
         ["Cfg_CambiarCarpetaTip"] = "Elegir una nueva carpeta de almacenamiento",
         ["Cfg_ExploradorTip"] = "Abrir en el Explorador de Windows",
@@ -323,6 +342,25 @@ public sealed class LocalizationService : INotifyPropertyChanged
         ["Nav_PantallaCompleta"] = "Fullscreen (F11)",
         ["Dlg_Cancelar"] = "CANCEL",
         ["Dlg_Aceptar"] = "OK",
+
+        // === DIÁLOGOS (LOC-04) ===
+        ["Dlg_NuevaVersion"] = "New version available",
+        ["Dlg_EncontroVersion"] = "Version {0} found. Do you want to download and install it now?",
+        ["Dlg_AnimeExistente"] = "Anime Exists",
+        ["Dlg_AnimeExistenteMsj"] = "The anime '{0}' is already in your library.",
+        ["Dlg_AnimeAnadido"] = "Anime Added",
+        ["Dlg_AnimeAnadidoMsj"] = "Folder automatically created at:\n{0}",
+        ["Dlg_ErrorTitulo"] = "Error",
+        ["Dlg_ErrorAnadirAnime"] = "Could not add the anime: {0}",
+        ["Msg_NuevaVersion"] = "new version",
+        ["Dlg_UpdatesModoDevTitulo"] = "Updates",
+        ["Dlg_UpdatesModoDev"] = "You are in development mode ({0}). Automatic updates are enabled when compiling with the production installer.",
+        ["Dlg_UpdatesAlDiaTitulo"] = "Up to date",
+        ["Dlg_UpdatesAlDia"] = "You already have the latest version installed ({0}).",
+        ["Dlg_UpdatesErrorConexionTitulo"] = "Connection Error",
+        ["Dlg_UpdatesErrorConexion"] = "Could not reach the update server on GitHub. Check your internet connection.",
+        ["Dlg_UpdatesListaTitulo"] = "Update ready",
+        ["Dlg_UpdatesLista"] = "Version {0} has been downloaded and is ready to be applied.",
 
         // === SETTINGS (LOC-02) ===
         ["Cfg_CambiarCarpetaTip"] = "Choose a new storage folder",

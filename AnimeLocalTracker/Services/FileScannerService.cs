@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using AnimeLocalTracker.Models;
 
@@ -11,12 +10,6 @@ namespace AnimeLocalTracker.Services;
 public partial class FileScannerService : IFileScannerService
 {
     private static readonly HashSet<string> VideoExtensions = new(StringComparer.OrdinalIgnoreCase) { ".mkv", ".mp4", ".avi" };
-
-    [GeneratedRegex(@"(?:\b(?:E|EP|Episode|Episodio|Cap|Capitulo)[\s._-]*|[\[\(-])(\d{1,4})(?:[\]\)-]|\b|$)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
-    private static partial Regex PatronExplicitoRegex();
-
-    [GeneratedRegex(@"(?<!\d)(\d{1,4})(?!\d)", RegexOptions.CultureInvariant)]
-    private static partial Regex PatronGenericoRegex();
 
     public async Task<List<EpisodioItem>> EscanearEpisodiosAsync(string carpeta)
     {
@@ -90,22 +83,15 @@ public partial class FileScannerService : IFileScannerService
 
     public static int ExtraerNumeroEpisodio(string nombre)
     {
-        // 1. Patrón explícito de episodio: "Ep 05", "E05", "Episode 05", "Episodio 05", "Cap 05"
-        var matchExplicito = PatronExplicitoRegex().Match(nombre);
-        if (matchExplicito.Success && int.TryParse(matchExplicito.Groups[1].Value, out int epExp))
+        var parsed = Native.NativeMethods.ParseFilename(nombre);
+        if (parsed != null && !string.IsNullOrWhiteSpace(parsed.EpisodeNumber))
         {
-            if (epExp is not 480 and not 720 and not 1080 and not 2160)
-                return epExp;
-        }
-
-        // 2. Patrón genérico: busca números de 1 a 4 dígitos excluyendo resoluciones comunes
-        var matches = PatronGenericoRegex().Matches(nombre);
-        foreach (Match m in matches)
-        {
-            if (int.TryParse(m.Groups[1].Value, out int num))
+            if (int.TryParse(parsed.EpisodeNumber, out int ep))
             {
-                if (num is not 480 and not 720 and not 1080 and not 2160)
-                    return num;
+                if (ep is not 480 and not 720 and not 1080 and not 2160)
+                {
+                    return ep;
+                }
             }
         }
 

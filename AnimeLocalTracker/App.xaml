@@ -53,6 +53,7 @@
             <conv:StringEqualsConverter x:Key="StringEquals" />
             <conv:ZeroToVisibilityConverter x:Key="ZeroToVis" />
             <conv:NullToCollapsedConverter x:Key="NullToCollapsed" />
+            <conv:AnimeCoverMultiConverter x:Key="AnimeCoverMulti" />
 
             <!-- ═══════════════════════════════════════════════════════════════ -->
             <!--  SISTEMA DE DISEÑO (tokens canónicos = paleta de DetalleView)  -->

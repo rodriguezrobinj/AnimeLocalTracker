@@ -56,11 +56,7 @@ public partial class AnimeItem : ObservableObject
     [ObservableProperty]
     private bool _estaSeleccionado;
 
-    // Imagen en memoria congelada (optimización 60fps)
-    [property: Ignore]
-    [property: JsonIgnore]
-    [ObservableProperty]
-    private System.Windows.Media.ImageSource? _portadaImagen;
+
 
     // === PROPIEDADES DE PROGRESO LOCAL ===
     [property: Ignore]

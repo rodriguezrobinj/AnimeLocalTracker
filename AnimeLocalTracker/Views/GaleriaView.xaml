@@ -513,7 +513,8 @@
                  VirtualizingPanel.ScrollUnit="Pixel"
                  VirtualizingPanel.CacheLengthUnit="Item"
                  VirtualizingPanel.CacheLength="4,4"
-                 RenderOptions.ClearTypeHint="Enabled">
+                 RenderOptions.ClearTypeHint="Enabled"
+                 KeyboardNavigation.DirectionalNavigation="Continue">
             <ListBox.ItemsPanel>
                 <ItemsPanelTemplate>
                     <vwp:VirtualizingWrapPanel Orientation="Horizontal" SpacingMode="None" />
@@ -570,6 +571,28 @@
                                             </BeginStoryboard>
                                         </Trigger.ExitActions>
                                     </Trigger>
+                                    
+                                    <!-- Trigger para Navegación por Teclado o Mando -->
+                                    <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                                        <Setter Property="materialDesign:ElevationAssist.Elevation" Value="Dp8" />
+                                        <Setter Property="BorderBrush" Value="#3B82F6" />
+                                        <Trigger.EnterActions>
+                                            <BeginStoryboard>
+                                                <Storyboard>
+                                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" To="1.04" Duration="0:0:0.12" />
+                                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" To="1.04" Duration="0:0:0.12" />
+                                                </Storyboard>
+                                            </BeginStoryboard>
+                                        </Trigger.EnterActions>
+                                        <Trigger.ExitActions>
+                                            <BeginStoryboard>
+                                                <Storyboard>
+                                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" To="1.0" Duration="0:0:0.12" />
+                                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" To="1.0" Duration="0:0:0.12" />
+                                                </Storyboard>
+                                            </BeginStoryboard>
+                                        </Trigger.ExitActions>
+                                    </Trigger>
                                 </Style.Triggers>
                             </Style>
                         </materialDesign:Card.Style>
@@ -591,7 +614,14 @@
                                 <Border Background="#1B222C" CornerRadius="14" />
 
                                 <!-- Portada precargada y congelada en memoria con escalado de alta definición -->
-                                <Image Source="{Binding PortadaImagen}" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" SnapsToDevicePixels="True" />
+                                <Image Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" SnapsToDevicePixels="True">
+                                    <Image.Source>
+                                        <MultiBinding Converter="{StaticResource AnimeCoverMulti}">
+                                            <Binding Path="." />
+                                            <Binding Path="PortadaVisible" />
+                                        </MultiBinding>
+                                    </Image.Source>
+                                </Image>
 
                                 <!-- OVERLAY DE SELECCIÓN -->
                                 <Border Background="#66000000" Visibility="{Binding EstaSeleccionado, Converter={StaticResource BoolToVis}}"/>
