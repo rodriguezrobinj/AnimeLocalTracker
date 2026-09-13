@@ -548,15 +548,26 @@
                                                    Visibility="{Binding Descargado, Converter={StaticResource BoolToVis}}"/>
 
                                         <!-- ACCIÓN: DESCARGAR / REPRODUCIR / DESCARGANDO -->
-                                        <Grid Grid.Column="4" Width="34" Height="34" VerticalAlignment="Center">
+                                        <StackPanel Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Center">
                                             
-                                            <!-- 1. DESCARGADO: ICONO QUE ABRE EL MENÚ DEL EPISODIO -->
+                                            <!-- 1a. DESCARGADO: BOTÓN DIRECTO PARA REPRODUCIR -->
+                                            <Button Command="{Binding DataContext.ReproducirEpisodioCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}"
+                                                    Style="{StaticResource MaterialDesignIconButton}" Width="34" Height="34"
+                                                    ToolTip="Reproducir episodio"
+                                                    AutomationProperties.Name="Reproducir episodio"
+                                                    Visibility="{Binding Descargado, Converter={StaticResource BoolToVis}}"
+                                                    Margin="0,0,4,0">
+                                                <materialDesign:PackIcon Kind="PlayCircle" Foreground="#60A5FA" Width="28" Height="28" VerticalAlignment="Center"/>
+                                            </Button>
+
+                                            <!-- 1b. DESCARGADO: ICONO QUE ABRE EL MENÚ DEL EPISODIO -->
                                             <Button Click="BotonEpisodioDescargado_Click"
                                                     Style="{StaticResource MaterialDesignIconButton}" Width="34" Height="34"
-                                                    ToolTip="Descargado (Clic para reproducir o eliminar)"
-                                                    AutomationProperties.Name="Episodio descargado: reproducir o eliminar"
+                                                    ToolTip="Opciones (Eliminar, etc.)"
+                                                    AutomationProperties.Name="Opciones de episodio descargado"
                                                     Visibility="{Binding Descargado, Converter={StaticResource BoolToVis}}">
-                                                <materialDesign:PackIcon Kind="CheckCircle" Foreground="#60A5FA" Width="24" Height="24" VerticalAlignment="Center"/>
+                                                <materialDesign:PackIcon Kind="CheckCircle" Foreground="#10B981" Width="24" Height="24" VerticalAlignment="Center"/>
                                             </Button>
 
                                             <!-- 2. DESCARGANDO O EN COLA -->
@@ -603,7 +614,7 @@
                                                 </Button.Style>
                                                 <materialDesign:PackIcon Kind="DownloadCircleOutline" Foreground="#60A5FA" Width="24" Height="24" VerticalAlignment="Center"/>
                                             </Button>
-                                        </Grid>
+                                        </StackPanel>
                                     </Grid>
                                 </Border>
                                 
