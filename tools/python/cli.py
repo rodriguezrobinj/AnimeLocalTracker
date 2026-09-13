@@ -91,6 +91,42 @@ def process_command(command: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         width = int(payload.get("width", 240))
         return Thumbnail.generate_thumbnail(video_path, output_path, timestamp, width)
 
+    elif command == "run-plugin":
+        plugin_path = payload.get("plugin_path", "")
+        func_name = payload.get("func_name", "")
+        args_dict = payload.get("args", {})
+        
+        try:
+            import importlib.util
+            import os
+            
+            if not os.path.isfile(plugin_path):
+                return {"success": False, "error": f"El archivo de plugin no existe: {plugin_path}"}
+                
+            module_name = os.path.splitext(os.path.basename(plugin_path))[0]
+            spec = importlib.util.spec_from_file_location(module_name, plugin_path)
+            if spec is None or spec.loader is None:
+                return {"success": False, "error": "No se pudo cargar la especificación del plugin."}
+                
+            plugin_module = importlib.util.module_from_spec(spec)
+            
+            # Agregar temporalmente al path por si requiere dependencias relativas
+            plugin_dir = os.path.dirname(plugin_path)
+            if plugin_dir not in sys.path:
+                sys.path.insert(0, plugin_dir)
+                
+            spec.loader.exec_module(plugin_module)
+            
+            if not hasattr(plugin_module, func_name):
+                return {"success": False, "error": f"La función '{func_name}' no existe en el plugin '{module_name}'."}
+                
+            func = getattr(plugin_module, func_name)
+            result = func(**args_dict)
+            return {"success": True, "result": result}
+            
+        except Exception as e:
+            return {"success": False, "error": f"Error ejecutando plugin: {str(e)}"}
+
     elif command == "ping":
         return {"success": True, "version": "1.0.0", "engine": "AnimeTrackerTools Python"}
 

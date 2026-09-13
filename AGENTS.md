@@ -46,6 +46,7 @@ Para tareas estructurales grandes, leer el bloque correspondiente antes de tocar
 - **Búsqueda focalizada**: leer fragmentos/símbolos específicos, no volcados completos de archivos grandes.
 - **Explicaciones con ejemplos prácticos**: traducir lo técnico a situaciones reales de la app (reproducción, galería, descargas, sync AniList) en lenguaje claro.
 - **Flake conocido del build WPF**: si `obj` queda con BAMLs bloqueados (MC1000/BG1002/MC3072 espurios) o el exe no se regenera tras "OK": matar procesos `dotnet`/`MSBuild`/`testhost` colgados y borrar `obj` del proyecto antes de reconstruir.
+- **Verificación del ejecutable**: Siempre debes asegurarte de que el ejecutable se haya generado/actualizado correctamente y exista en `AnimeLocalTracker\bin\Debug\net8.0-windows\AnimeLocalTracker.exe` tras compilar.
 
 ## Reglas Modulares y Skills (.agents/)
 

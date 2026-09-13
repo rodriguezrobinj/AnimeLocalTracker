@@ -60,7 +60,8 @@ public class PipNavigationTests : IDisposable
             _trackingMock.Object,
             _libraryService,
             _downloadMock.Object,
-            _updateMock.Object);
+            _updateMock.Object,
+            new Mock<IDialogService>().Object);
     }
 
     private ReproductorViewModel CreateReproductorVm()

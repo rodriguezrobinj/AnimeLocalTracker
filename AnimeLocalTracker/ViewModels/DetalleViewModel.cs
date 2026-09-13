@@ -30,6 +30,7 @@ public partial class DetalleViewModel : ObservableObject,
     private readonly IDialogService _dialogService;
     private readonly IDownloadService _downloadService;
     private readonly PythonEpisodeEnricher? _enricher;
+    private readonly IPluginService? _pluginService;
 
     // Evita pasadas concurrentes de enriquecimiento (entrar/salir de la vista rápido
     // lanzaba varios ExtractFrame simultáneos sobre los mismos archivos).
@@ -128,7 +129,8 @@ public partial class DetalleViewModel : ObservableObject,
         IFileScannerService fileScannerService,
         IDialogService dialogService,
         IDownloadService downloadService,
-        PythonEpisodeEnricher? enricher = null)
+        PythonEpisodeEnricher? enricher = null,
+        IPluginService? pluginService = null)
     {
         _animeTrackingService = animeTrackingService;
         _databaseService = databaseService;
@@ -137,6 +139,7 @@ public partial class DetalleViewModel : ObservableObject,
         _dialogService = dialogService;
         _downloadService = downloadService;
         _enricher = enricher;
+        _pluginService = pluginService;
         
         WeakReferenceMessenger.Default.Register<UsuarioLogeadoMensaje>(this);
         WeakReferenceMessenger.Default.Register<UsuarioDesconectadoMensaje>(this);
@@ -874,6 +877,35 @@ public partial class DetalleViewModel : ObservableObject,
             }
 
             VolverAGaleria();
+        }
+    }
+    
+    [RelayCommand]
+    private async Task AnalizarOpenings()
+    {
+        if (AnimeSeleccionado == null || _pluginService == null) return;
+        var descargados = _todosLosEpisodios.Where(e => e.Descargado && File.Exists(e.RutaCompleta)).ToList();
+        if (descargados.Count < 2)
+        {
+            await _dialogService.MostrarDialogoAsync("Info", "Se necesitan al menos 2 episodios descargados para analizar el opening por audio.", false, "InformationOutline", "#60A5FA");
+            return;
+        }
+
+        await _dialogService.MostrarDialogoAsync("Analizando", "Esto tardará unos segundos. Iniciaremos un análisis cruzado del audio de los primeros 2 episodios para buscar el OP...", false, "InformationOutline", "#60A5FA");
+        
+        var pluginRes = await _pluginService.EjecutarPluginAsync<object, AnimeLocalTracker.Services.SkipTimesCoordinator.AudioSkipResult>(
+            "audio_skip_plugin.py", 
+            "detect_opening", 
+            new { video_paths = descargados.Take(2).Select(e => e.RutaCompleta).ToArray() }
+        );
+        
+        if (pluginRes != null && pluginRes.Found)
+        {
+            await _dialogService.MostrarDialogoAsync("OP Encontrado", $"Opening detectado de {pluginRes.IntroEstimatedStart}s a {pluginRes.IntroEstimatedEnd}s.", false, "CheckCircle", "#10B981");
+        }
+        else
+        {
+            await _dialogService.MostrarDialogoAsync("No se encontró OP", "El plugin de audio no pudo encontrar un OP común entre estos episodios.", false, "CloseCircle", "#EF4444");
         }
     }
     

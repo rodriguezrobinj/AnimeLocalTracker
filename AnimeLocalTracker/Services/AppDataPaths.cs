@@ -20,6 +20,7 @@ public static class AppDataPaths
     public static string LogsDir { get; } = Path.Combine(DataRoot, "Logs");
     public static string CoversDir { get; } = Path.Combine(DataRoot, "Covers");
     public static string ThumbnailsDir { get; } = Path.Combine(DataRoot, "Thumbnails");
+    public static string PluginsFolder { get; } = Path.Combine(DataRoot, "Plugins");
     public static string BibliotecaDb { get; } = Path.Combine(DataRoot, "biblioteca.db");
     public static string TokenPath { get; } = Path.Combine(DataRoot, "anilist_token.txt");
     public static string SettingsPath { get; } = Path.Combine(DataRoot, "settings.json");
@@ -60,6 +61,7 @@ public static class AppDataPaths
             MoverCarpetaSiExiste(Path.Combine(antigua, "Covers"), CoversDir);
             MoverCarpetaSiExiste(Path.Combine(antigua, "Thumbnails"), ThumbnailsDir);
             MoverCarpetaSiExiste(Path.Combine(antigua, "Logs"), LogsDir);
+            Directory.CreateDirectory(PluginsFolder); // Asegurar que exista la carpeta de plugins
 
             AppLogger.Info("AppDataPaths", "Datos migrados correctamente a la nueva ubicación segura.");
         }

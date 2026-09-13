@@ -278,6 +278,18 @@
                                     <TextBlock Text="Carpeta" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="11"/>
                                 </StackPanel>
                             </Button>
+
+                            <!-- DETECTAR OP (Plugin de Audio) -->
+                            <Button Command="{Binding AnalizarOpeningsCommand}"
+                                    Style="{StaticResource MaterialDesignOutlinedButton}"
+                                    BorderBrush="#60A5FA" Foreground="#60A5FA"
+                                    Height="34" Padding="10,0" Margin="8,0,0,0"
+                                    ToolTip="Analizar audios usando el Plugin para detectar Openings">
+                                <StackPanel Orientation="Horizontal">
+                                    <materialDesign:PackIcon Kind="Magnify" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                    <TextBlock Text="Detectar OP" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="11"/>
+                                </StackPanel>
+                            </Button>
                         </StackPanel>
 
                         <!-- BOTONES DE ACCIÓN MASIVA (Cápsulas modernas) -->

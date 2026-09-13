@@ -22,70 +22,45 @@ public class SkipTimesCoordinator : ISkipTimesCoordinator
 
     public async Task<IReadOnlyList<AniSkipResult>> CargarSkipTimesAsync(int animeId, int episodio, double duracionSegundos, string? rutaVideoLocal = null, CancellationToken ct = default)
     {
-        // Fuente 1: AniSkip API (comunitaria, requiere MAL ID)
-        if (_aniSkipService != null && animeId > 0 && episodio > 0)
-        {
-            try
-            {
-                // ARC-05: el mapeo AniListId→MAL ID se memoiza dentro de IAniSkipService
-                // (caché única compartida por toda la app, con tope de 2000 entradas).
-                var malId = await _aniSkipService.ObtenerMalIdDesdeAniListAsync(animeId, ct);
-                if (malId.HasValue && malId.Value > 0)
-                {
-                    var results = await _aniSkipService.ObtenerSkipTimesAsync(malId.Value, episodio, duracionSegundos, ct);
-                    if (results != null && results.Count > 0)
-                    {
-                        AppLogger.Info("SkipTimesCoordinator", $"AniSkip: {results.Count} segmentos cargados para MAL ID {malId.Value}, Ep {episodio}");
-                        return results;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Debug("SkipTimesCoordinator", $"Error cargando skip times de AniSkip: {ex.Message}");
-            }
-        }
-
-        // Fuente 2: Detección local por escenas (Python/ffmpeg) si tenemos el video local
+        // FUENTE DE PRUEBA: Plugin de Detección por Audio
         if (!string.IsNullOrWhiteSpace(rutaVideoLocal) && _pythonBridge != null)
         {
             try
             {
                 if (await _pythonBridge.IsAvailableAsync())
                 {
-                    var scenes = await _pythonBridge.ExecuteCommandAsync<object, SceneDetectResult>(
-                        "detect-scenes",
-                        new { video_path = rutaVideoLocal, max_seconds = 300 },
-                        ct
-                    );
-
-                    if (scenes != null && scenes.Success && scenes.Confidence > 0)
+                    string dir = Path.GetDirectoryName(rutaVideoLocal)!;
+                    var otroVideo = Directory.GetFiles(dir, "*.*").FirstOrDefault(f => f != rutaVideoLocal && (f.EndsWith(".mkv") || f.EndsWith(".mp4")));
+                    
+                    if (otroVideo != null)
                     {
-                        var locales = new List<AniSkipResult>();
-                        if (scenes.IntroStart.HasValue && scenes.IntroEnd.HasValue)
+                        var pluginPath = Path.Combine(AppDataPaths.PluginsFolder, "audio_skip_plugin.py");
+                        var payload = new
                         {
-                            locales.Add(CrearSkip("op", scenes.IntroStart.Value, scenes.IntroEnd.Value));
-                        }
-                        if (scenes.EndingStart.HasValue && scenes.EndingEnd.HasValue)
+                            plugin_path = pluginPath,
+                            func_name = "detect_opening",
+                            args = new { video_paths = new[] { rutaVideoLocal, otroVideo } }
+                        };
+                        
+                        // PluginDaemonResponse<AudioSkipResult> (mismo esquema de SceneDetectResult pero con intro_estimated_start)
+                        var pluginRes = await _pythonBridge.ExecuteCommandAsync<object, AnimeLocalTracker.Services.PluginDaemonResponse<AudioSkipResult>>("run-plugin", payload, ct);
+                        
+                        if (pluginRes != null && pluginRes.Success && pluginRes.Result != null && pluginRes.Result.Found)
                         {
-                            locales.Add(CrearSkip("ed", scenes.EndingStart.Value, scenes.EndingEnd.Value));
-                        }
-
-                        if (locales.Count > 0)
-                        {
-                            AppLogger.Info("SkipTimesCoordinator", $"Detección local: {locales.Count} segmentos para '{Path.GetFileName(rutaVideoLocal)}'");
+                            var r = pluginRes.Result;
+                            var locales = new List<AniSkipResult>();
+                            locales.Add(CrearSkip("op", r.IntroEstimatedStart, r.IntroEstimatedEnd));
+                            
+                            AppLogger.Info("SkipTimesCoordinator", $"PLUGIN AUDIO: Opening detectado [{r.IntroEstimatedStart} - {r.IntroEstimatedEnd}] (Conf: {r.Confidence})");
                             return locales;
                         }
                     }
                 }
             }
-            catch (OperationCanceledException)
-            {
-                // Cancelación esperada al navegar o cambiar de episodio
-            }
+            catch (OperationCanceledException) { }
             catch (Exception ex)
             {
-                AppLogger.Debug("SkipTimesCoordinator", $"Error en detección local de escenas: {ex.Message}");
+                AppLogger.Debug("SkipTimesCoordinator", $"Error en plugin de audio local: {ex.Message}");
             }
         }
 
@@ -110,13 +85,13 @@ public class SkipTimesCoordinator : ISkipTimesCoordinator
             currentSeconds < s.Interval.EndTime - margenFinalSegundos);
     }
 
-    private class SceneDetectResult
+    public class AudioSkipResult
     {
-        public bool Success { get; set; }
+        public bool Found { get; set; }
+        public double IntroEstimatedStart { get; set; }
+        public double IntroEstimatedEnd { get; set; }
         public double Confidence { get; set; }
-        public double? IntroStart { get; set; }
-        public double? IntroEnd { get; set; }
-        public double? EndingStart { get; set; }
-        public double? EndingEnd { get; set; }
+        public string? Source { get; set; }
     }
+
 }

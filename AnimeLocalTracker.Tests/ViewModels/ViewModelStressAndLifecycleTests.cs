@@ -52,9 +52,10 @@ public class ViewModelStressAndLifecycleTests
         services.AddSingleton<ConfiguracionViewModel>();
         services.AddSingleton<AnimeLibraryService>();
         services.AddSingleton<CacheMaintenanceService>();
+        services.AddSingleton(new Mock<IPluginService>().Object);
 
         var sp = services.BuildServiceProvider();
-        var sut = new MainViewModel(new NavigationService(sp), _trackingMock.Object, sp.GetRequiredService<AnimeLibraryService>(), _downloadMock.Object, _updateMock.Object);
+        var sut = new MainViewModel(new NavigationService(sp), _trackingMock.Object, sp.GetRequiredService<AnimeLibraryService>(), _downloadMock.Object, _updateMock.Object, new Mock<IDialogService>().Object);
 
         // Act: Conmutar 100 veces entre todas las vistas principales
         for (int i = 0; i < 100; i++)

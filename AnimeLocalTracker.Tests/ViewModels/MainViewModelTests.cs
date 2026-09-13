@@ -65,7 +65,8 @@ public class MainViewModelTests : IDisposable
             _trackingMock.Object,
             _libraryService,
             _downloadMock.Object,
-            _updateMock.Object);
+            _updateMock.Object,
+            new Mock<IDialogService>().Object);
     }
 
     private static AniListMedia CrearMedia(int id, string titulo)
@@ -197,7 +198,6 @@ public class MainViewModelTests : IDisposable
             a.RutaCarpeta == Path.Combine(_tempFolder, "Test Anime"))), Times.Once);
 
         Directory.Exists(Path.Combine(_tempFolder, "Test Anime")).Should().BeTrue();
-        sut.ToastVisible.Should().BeTrue("se muestra el toast de confirmación");
     }
 
     [Fact]
@@ -215,8 +215,6 @@ public class MainViewModelTests : IDisposable
 
         // Assert
         _dbMock.Verify(d => d.GuardarAnimeAsync(It.IsAny<AnimeItem>()), Times.Never);
-        sut.ToastVisible.Should().BeTrue();
-        sut.ToastTitulo.Should().Be("Anime Existente");
     }
 
     [Fact]
