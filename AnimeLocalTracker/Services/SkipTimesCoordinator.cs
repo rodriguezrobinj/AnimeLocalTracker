@@ -42,7 +42,7 @@ public class SkipTimesCoordinator : ISkipTimesCoordinator
                             args = new { video_paths = new[] { rutaVideoLocal, otroVideo } }
                         };
                         
-                        // PluginDaemonResponse<AudioSkipResult> (mismo esquema de SceneDetectResult pero con intro_estimated_start)
+                        // PluginDaemonResponse<AudioSkipResult>
                         var pluginRes = await _pythonBridge.ExecuteCommandAsync<object, AnimeLocalTracker.Services.PluginDaemonResponse<AudioSkipResult>>("run-plugin", payload, ct);
                         
                         if (pluginRes != null && pluginRes.Success && pluginRes.Result != null && pluginRes.Result.Found)
@@ -61,6 +61,16 @@ public class SkipTimesCoordinator : ISkipTimesCoordinator
             catch (Exception ex)
             {
                 AppLogger.Debug("SkipTimesCoordinator", $"Error en plugin de audio local: {ex.Message}");
+            }
+        }
+
+        // FALLBACK: Si no hay otro video local o el plugin falla, usamos la nube (AniSkip)
+        if (_aniSkipService != null && animeId > 0 && episodio > 0)
+        {
+            var malId = await _aniSkipService.ObtenerMalIdDesdeAniListAsync(animeId, ct);
+            if (malId.HasValue)
+            {
+                return await _aniSkipService.ObtenerSkipTimesAsync(malId.Value, episodio, duracionSegundos, ct);
             }
         }
 
