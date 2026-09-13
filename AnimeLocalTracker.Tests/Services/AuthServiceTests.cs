@@ -52,7 +52,7 @@ public class AuthServiceTests
     [InlineData("http://127.0.0.1:5050.evil.com/callback", false)]
     [InlineData("http://127.0.0.1:5050x/", false)]
     [InlineData("http://127.0.0.1:5051/", false)]
-    [InlineData("http://localhost:5050/", false)]
+    [InlineData("http://localhost:5050/", true)]
     [InlineData("https://127.0.0.1:5050/", false)]
     [InlineData("", false)]
     [InlineData(null, false)]

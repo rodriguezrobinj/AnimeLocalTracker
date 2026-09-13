@@ -115,7 +115,10 @@ public class AuthService : IAuthService
                                     
                                     fetch('/token', {
                                         method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
+                                        headers: { 
+                                            'Content-Type': 'application/json',
+                                            'X-Requested-With': 'AnimeLocalTracker'
+                                        },
                                         body: JSON.stringify({ token: token, state: state })
                                     })
                                     .then(r => {
@@ -142,14 +145,17 @@ public class AuthService : IAuthService
                 else if (request.Url?.AbsolutePath == "/token" && request.HttpMethod == "POST")
                 {
                     // SEC-01 (defensa en profundidad): solo aceptar POST provenientes de la
-                    // propia página de callback servida en http://127.0.0.1:5050. Los navegadores
-                    // envían el header Origin en todo POST (mismo o cross-origin); sin Origin ni
-                    // Referer válidos (p.ej. script local, DNS rebinding) se rechaza.
+                    // propia página de callback servida en el listener. Los navegadores enfocados
+                    // en privacidad (ej. Brave) pueden omitir Origin/Referer. Por ello, requerimos
+                    // un custom header (X-Requested-With) o que el Origin/Referer sea local.
+                    // Los ataques CSRF cross-origin no pueden enviar custom headers sin un preflight OPTIONS.
+                    string customHeader = request.Headers["X-Requested-With"] ?? string.Empty;
                     string origin = request.Headers["Origin"] ?? string.Empty;
                     string referer = request.Headers["Referer"] ?? string.Empty;
-                    if (!EsOrigenLocal(origin) && !EsOrigenLocal(referer))
+                    
+                    if (customHeader != "AnimeLocalTracker" && !EsOrigenLocal(origin) && !EsOrigenLocal(referer))
                     {
-                        AppLogger.Warn("AuthService", "POST /token rechazado: Origin/Referer no coincide con el listener local.");
+                        AppLogger.Warn("AuthService", "POST /token rechazado: Falta header custom y Origin/Referer no coincide con el listener local.");
                         response.StatusCode = 403;
                         response.OutputStream.Close();
                         continue;
@@ -281,7 +287,7 @@ public class AuthService : IAuthService
     {
         return Uri.TryCreate(valor, UriKind.Absolute, out var uri)
                && uri.Scheme == Uri.UriSchemeHttp
-               && uri.Host.Equals("127.0.0.1", StringComparison.OrdinalIgnoreCase)
+               && (uri.Host.Equals("127.0.0.1", StringComparison.OrdinalIgnoreCase) || uri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase))
                && uri.Port == 5050;
     }
 }
