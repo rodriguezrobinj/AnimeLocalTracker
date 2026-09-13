@@ -28,45 +28,53 @@ def detect_opening(video_paths: List[str]) -> Dict[str, Any]:
             return {"success": False, "error": "No se pudo extraer el audio (posible archivo sin pista de audio)."}
             
         # Para encontrar la coincidencia, hacemos una correlación cruzada de las envolventes
-        # Buscaremos una ventana de 90 segundos (900 muestras) en env1 y su mejor coincidencia en env2.
-        window_size = 90 * 10
+        # Buscaremos una ventana de 85 segundos (850 muestras) en env1 y su mejor coincidencia en env2.
+        window_size = 85 * 10
         if len(env1) < window_size or len(env2) < window_size:
             return {"success": False, "error": "Los videos son demasiado cortos para tener un OP normal."}
             
+        # Precomputar rolling mean y rolling std de env2
+        env2_sum = np.convolve(env2, np.ones(window_size), mode='valid')
+        env2_sq_sum = np.convolve(env2**2, np.ones(window_size), mode='valid')
+        env2_mean = env2_sum / window_size
+        env2_var = (env2_sq_sum / window_size) - env2_mean**2
+        env2_var[env2_var < 0] = 0
+        env2_std = np.sqrt(env2_var)
+        env2_std[env2_std < 1e-5] = 1e-5
+        
         best_score = -1
         best_start1 = -1
         
         # Deslizamiento en pasos de 1 segundo (10 muestras)
         for i in range(0, len(env1) - window_size, 10):
             segment = env1[i:i+window_size]
-            # Normalizar segmento
-            seg_norm = segment - np.mean(segment)
-            seg_std = np.std(seg_norm)
+            seg_mean = np.mean(segment)
+            seg_std = np.std(segment)
             if seg_std < 1e-5:
                 continue
-            seg_norm = seg_norm / seg_std
+            seg_norm = (segment - seg_mean) / seg_std
             
             # Correlación cruzada con env2 completo
-            # np.correlate da la similitud en cada posible desplazamiento
-            corr = np.correlate(env2 - np.mean(env2), seg_norm, mode='valid')
-            max_idx = np.argmax(corr)
-            max_val = corr[max_idx]
+            corr = np.correlate(env2, seg_norm, mode='valid')
             
-            # Un score perfecto teóricamente sería proporcional a window_size
-            score = max_val / window_size
+            # Pearson correlation
+            pearson = corr / (window_size * env2_std)
             
-            if score > best_score:
-                best_score = score
+            max_idx = np.argmax(pearson)
+            max_val = pearson[max_idx]
+            
+            if max_val > best_score:
+                best_score = max_val
                 best_start1 = i
                 
         # Si el score es muy bajo, no encontramos un Opening común (tal vez distintos OP o no hay OP)
-        # Umbral heurístico
-        if best_score < 0.2:
+        # Umbral heurístico (Pearson > 0.4 es muy significativo para audio de 85s)
+        if best_score < 0.4:
             return {"success": True, "found": False, "confidence": best_score}
             
         # Convertimos los índices de vuelta a segundos
         op_start_sec = best_start1 / 10.0
-        op_end_sec = op_start_sec + 90.0
+        op_end_sec = op_start_sec + 85.0
         
         return {
             "success": True,
