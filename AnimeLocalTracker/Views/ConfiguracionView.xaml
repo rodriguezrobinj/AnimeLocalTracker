@@ -519,6 +519,58 @@
                     </StackPanel>
                 </materialDesign:Card>
 
+                <!-- 4. SECCIÓN PLUGINS (NUEVO) -->
+                <materialDesign:Card Background="#121212" BorderBrush="#262D38" BorderThickness="1" UniformCornerRadius="16" Margin="0,0,0,20" Padding="22" materialDesign:ElevationAssist.Elevation="Dp0">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                            <Border Background="#1E293B" CornerRadius="8" Width="34" Height="34" Margin="0,0,10,0" VerticalAlignment="Center">
+                                <materialDesign:PackIcon Kind="Puzzle" Foreground="#8B5CF6" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="Plugins y Extensiones" FontSize="16" FontWeight="Bold" Foreground="White"/>
+                                <TextBlock Text="Scrapers y herramientas de la comunidad (Python)" FontSize="11" Foreground="#9CA3AF"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <Border Background="#14181E" BorderBrush="#262D38" BorderThickness="1" CornerRadius="10" MinHeight="56" Padding="16,10">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+                                    <!-- Lista de plugins si hay -->
+                                    <ItemsControl ItemsSource="{Binding PluginsInstalados}" Margin="0,0,0,4">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal" Margin="0,2">
+                                                    <materialDesign:PackIcon Kind="FileCode" Foreground="#8B5CF6" Width="14" Height="14" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                                    <TextBlock Text="{Binding}" Foreground="White" FontSize="13" VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    
+                                    <!-- Mensaje si no hay plugins -->
+                                    <TextBlock Text="No hay plugins instalados." Foreground="#9CA3AF" FontSize="12" FontStyle="Italic"
+                                               Visibility="{Binding PluginsInstalados.Count, Converter={StaticResource ZeroToVis}}"/>
+                                </StackPanel>
+
+                                <Button Grid.Column="1" Command="{Binding AbrirCarpetaPluginsCommand}"
+                                        Style="{StaticResource MaterialDesignOutlinedButton}" BorderBrush="#262D38" Foreground="#E2E8F0"
+                                        Height="38" Padding="14,0" VerticalAlignment="Center"
+                                        materialDesign:ButtonAssist.CornerRadius="8">
+                                    <StackPanel Orientation="Horizontal">
+                                        <materialDesign:PackIcon Kind="FolderOpen" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                        <TextBlock Text="Abrir Carpeta" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="12"/>
+                                    </StackPanel>
+                                </Button>
+                            </Grid>
+                        </Border>
+                    </StackPanel>
+                </materialDesign:Card>
+
             </StackPanel>
         </ScrollViewer>
     </Grid>

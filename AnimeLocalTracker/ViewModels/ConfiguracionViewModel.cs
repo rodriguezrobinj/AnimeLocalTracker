@@ -18,6 +18,10 @@ public partial class ConfiguracionViewModel : ObservableObject
     private readonly IDatabaseService _databaseService;
     private readonly IDialogService _dialogService;
     private readonly CacheMaintenanceService _cacheMaintenanceService;
+    private readonly IPluginService _pluginService;
+
+    // === PLUGINS ===
+    [ObservableProperty] private System.Collections.ObjectModel.ObservableCollection<string> _pluginsInstalados = new();
 
     // === ALMACENAMIENTO ===
     [ObservableProperty] private string _rutaBaseAnimes = string.Empty;
@@ -71,13 +75,15 @@ public partial class ConfiguracionViewModel : ObservableObject
         IAuthService authService,
         IDatabaseService databaseService,
         IDialogService dialogService,
-        CacheMaintenanceService cacheMaintenanceService)
+        CacheMaintenanceService cacheMaintenanceService,
+        IPluginService pluginService)
     {
         _settingsService = settingsService;
         _authService = authService;
         _databaseService = databaseService;
         _dialogService = dialogService;
         _cacheMaintenanceService = cacheMaintenanceService;
+        _pluginService = pluginService;
 
         CargarDatosConfiguracion();
     }
@@ -101,6 +107,24 @@ public partial class ConfiguracionViewModel : ObservableObject
         CalcularEspacioDisco(RutaBaseAnimes);
         _ = ActualizarEstadisticasBibliotecaAsync();
         ActualizarEstadoAutenticacion();
+        CargarPlugins();
+    }
+
+    public void CargarPlugins()
+    {
+        try
+        {
+            PluginsInstalados.Clear();
+            var plugins = _pluginService.ObtenerPluginsInstalados();
+            foreach (var plugin in plugins)
+            {
+                PluginsInstalados.Add(plugin);
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("ConfiguracionViewModel", "Error cargando plugins", ex);
+        }
     }
 
     private void ActualizarEstadoAutenticacion()
@@ -232,6 +256,27 @@ public partial class ConfiguracionViewModel : ObservableObject
         catch (Exception ex)
         {
             AppLogger.Error("ConfiguracionViewModel", "Error abriendo carpeta en explorador", ex);
+        }
+    }
+
+    [RelayCommand]
+    public void AbrirCarpetaPlugins()
+    {
+        try
+        {
+            var ruta = AppDataPaths.PluginsFolder;
+            if (Directory.Exists(ruta))
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = ruta,
+                    UseShellExecute = true
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("ConfiguracionViewModel", "Error abriendo carpeta de plugins", ex);
         }
     }
 

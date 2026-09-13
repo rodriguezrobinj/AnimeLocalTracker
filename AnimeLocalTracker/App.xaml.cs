@@ -115,6 +115,7 @@ public partial class App : Application
         services.AddSingleton<IDialogService, DialogService>();
         services.AddSingleton<IAuthService, AuthService>();
         services.AddSingleton<IGamepadService, GamepadService>();
+        services.AddSingleton<IPluginService, PluginService>();
 
         services.AddHttpClient();
 

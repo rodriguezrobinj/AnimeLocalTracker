@@ -928,7 +928,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         // 1. Asegurar que Player existe antes de configurar el nuevo archivo
         AsegurarPlayerInicializado();
 
-        if (Player != null && (Player.Status == Status.Playing || Player.Status == Status.Paused))
+        if (Player != null && Player.Status != Status.Stopped && Player.Status != Status.NothingSpecial)
         {
             try
             {

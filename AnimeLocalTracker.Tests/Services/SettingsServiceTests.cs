@@ -185,13 +185,16 @@ public class SettingsServiceTests : IDisposable
 
         authMock.Setup(a => a.EstaAutenticado()).Returns(true);
 
+        var pluginMock = new Mock<IPluginService>();
+
         // Act
         var vm = new ConfiguracionViewModel(
             settingsMock.Object, 
             authMock.Object, 
             dbMock.Object, 
             dialogMock.Object,
-            new CacheMaintenanceService(dbMock.Object));
+            new CacheMaintenanceService(dbMock.Object),
+            pluginMock.Object);
 
         // Assert
         vm.RutaBaseAnimes.Should().Be(@"D:\AnimesTest");
