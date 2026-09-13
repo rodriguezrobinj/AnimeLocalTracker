@@ -1312,7 +1312,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                         }
                     }
                 }
-                else if (Player?.Status == Status.Ended)
+                else if (Player?.Status == Status.Ended && _haCompletadoOpen)
                 {
                     // Al finalizar, resetear progreso a 0
                     _ = GuardarProgresoActualAsync(forzarProgresoCero: true);
