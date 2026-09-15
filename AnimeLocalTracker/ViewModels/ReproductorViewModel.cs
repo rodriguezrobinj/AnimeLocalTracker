@@ -1004,7 +1004,8 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
     /// <summary>
     /// Captura el frame actual del episodio y lo guarda como PNG en la ubicación
-    /// elegida por el usuario (usa el ffmpeg embebido, a resolución completa).
+    /// elegida por el usuario. La invocación de ffmpeg vive en FrameCaptureService
+    /// (sin estado compartido con el reproductor, extraído para reducir el tamaño de este VM).
     /// </summary>
     [RelayCommand]
     private async Task CapturarFrameAsync()
@@ -1022,69 +1023,20 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
         if (dialogo.ShowDialog() != true) return;
 
-        try
+        var resultado = await FrameCaptureService.CapturarFrameAsync(_rutaVideo, posicion, dialogo.FileName);
+
+        if (resultado.Exito)
         {
-            // Buscar el ffmpeg embebido de la app (ya está en el PATH del proceso)
-            string ffmpeg = "ffmpeg";
-            string embebido = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "FFmpeg", "ffmpeg.exe");
-            if (File.Exists(embebido)) ffmpeg = embebido;
-
-            var psi = new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = ffmpeg,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardError = true
-            };
-            psi.ArgumentList.Add("-y");
-            psi.ArgumentList.Add("-nostdin");
-            // Sec: acota la asignación de memoria por bloque en ffmpeg (2 GB)
-            psi.ArgumentList.Add("-max_alloc"); psi.ArgumentList.Add("2147483648");
-            psi.ArgumentList.Add("-loglevel"); psi.ArgumentList.Add("error");
-            psi.ArgumentList.Add("-ss"); psi.ArgumentList.Add(posicion.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture));
-            psi.ArgumentList.Add("-i"); psi.ArgumentList.Add(_rutaVideo);
-            psi.ArgumentList.Add("-frames:v"); psi.ArgumentList.Add("1");
-            psi.ArgumentList.Add("-q:v"); psi.ArgumentList.Add("2");
-            psi.ArgumentList.Add(dialogo.FileName);
-
-            using var proceso = System.Diagnostics.Process.Start(psi)!;
-            string stderr = await proceso.StandardError.ReadToEndAsync();
-
-            // CAP-01: timeout de 30 s — un ffmpeg colgado (ruta de red, codec raro, AV)
-            // no puede dejar procesos huérfanos acumulándose en segundo plano
-            using var timeoutCts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(30));
-            try
-            {
-                await proceso.WaitForExitAsync(timeoutCts.Token);
-            }
-            catch (OperationCanceledException)
-            {
-                try { proceso.Kill(entireProcessTree: true); } catch { }
-                AppLogger.Warn("ReproductorViewModel", "Captura de frame cancelada por timeout (30 s)");
-                _ = WeakReferenceMessenger.Default.Send(new Messages.MostrarDialogoRequestMessage(
-                    "Error", "La captura del frame tardó demasiado (30 s). Inténtalo de nuevo.", false, "AlertCircleOutline", "#EF4444"));
-                return;
-            }
-
-            if (proceso.ExitCode == 0 && File.Exists(dialogo.FileName))
-            {
-                _ = WeakReferenceMessenger.Default.Send(new Messages.MostrarDialogoRequestMessage(
-                    "Frame capturado", $"Imagen guardada en:\n{dialogo.FileName}", false, "CameraOutline", "#4CAF50"));
-            }
-            else
-            {
-                // CAP-02: exponer un extracto del stderr real para que el usuario pueda diagnosticar
-                string detalle = string.IsNullOrWhiteSpace(stderr) ? "" : $"\n\n{stderr.Trim()}";
-                if (detalle.Length > 320) detalle = detalle[..320] + "…";
-                AppLogger.Debug("ReproductorViewModel", $"ffmpeg falló al capturar frame: {stderr}");
-                _ = WeakReferenceMessenger.Default.Send(new Messages.MostrarDialogoRequestMessage(
-                    "Error", $"No se pudo capturar el frame.{detalle}", false, "AlertCircleOutline", "#EF4444"));
-            }
+            _ = WeakReferenceMessenger.Default.Send(new Messages.MostrarDialogoRequestMessage(
+                "Frame capturado", $"Imagen guardada en:\n{dialogo.FileName}", false, "CameraOutline", "#4CAF50"));
         }
-        catch (Exception ex)
+        else if (resultado.MensajeUsuario != null)
         {
-            AppLogger.Debug("ReproductorViewModel", $"Error capturando frame: {ex.Message}");
+            _ = WeakReferenceMessenger.Default.Send(new Messages.MostrarDialogoRequestMessage(
+                "Error", resultado.MensajeUsuario, false, "AlertCircleOutline", "#EF4444"));
         }
+        // Si MensajeUsuario es null (excepción no anticipada al lanzar ffmpeg): falla
+        // silenciosa igual que antes, ya queda registrada en el log por el servicio.
     }
 
     public async Task GuardarProgresoActualAsync(bool forzarProgresoCero = false)

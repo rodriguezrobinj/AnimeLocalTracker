@@ -129,4 +129,21 @@ public partial class AcercaDeViewModel : ObservableObject
             AppLogger.Error("AcercaDeViewModel", "Error abriendo repositorio en navegador", ex);
         }
     }
+
+    [RelayCommand]
+    public void AbrirReportarProblema()
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = $"{RepositorioUrl}/issues/new",
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("AcercaDeViewModel", "Error abriendo GitHub Issues en navegador", ex);
+        }
+    }
 }

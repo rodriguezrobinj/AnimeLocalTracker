@@ -417,12 +417,13 @@
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="15,0,0,0">
                         <materialDesign:PackIcon Kind="PlayCircle" Foreground="#3B82F6" Width="20" Height="20" VerticalAlignment="Center" Margin="0,0,8,0"/>
                         <TextBlock Text="AnimeTracker" FontWeight="Bold" Foreground="{DynamicResource MaterialDesignBodyLight}" VerticalAlignment="Center" FontSize="14"/>
-                        <Button Command="{Binding BuscarActualizacionesManualCommand}" 
+                        <Button Command="{Binding BuscarActualizacionesManualCommand}"
                                 WindowChrome.IsHitTestVisibleInChrome="True"
                                 ToolTip="{Binding [Nav_ComprobarUpdates], Source={x:Static loc:LocalizationService.Instance}}"
-                                Style="{StaticResource MaterialDesignFlatButton}" 
+                                AutomationProperties.Name="{Binding [Nav_ComprobarUpdates], Source={x:Static loc:LocalizationService.Instance}}"
+                                Style="{StaticResource MaterialDesignFlatButton}"
                                 Padding="8,2" Height="22" Margin="12,0,0,0"
-                                Background="#1E293B" Foreground="#93C5FD" 
+                                Background="#1E293B" Foreground="#93C5FD"
                                 materialDesign:ButtonAssist.CornerRadius="11">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="Update" Width="13" Height="13" VerticalAlignment="Center" Margin="0,0,4,0"/>

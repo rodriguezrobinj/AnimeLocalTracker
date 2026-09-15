@@ -125,6 +125,7 @@ public Task<bool> ExisteAnimeAsync(int aniListId) => Task.FromResult(false);
 public Task ActualizarAnimesAsync(IEnumerable<AnimeItem> animes) => Task.CompletedTask;
         public Task EliminarAnimeAsync(AnimeItem anime) => Task.CompletedTask;
         public Task EliminarRegistroEpisodioAsync(int aniListId, int numeroEpisodio) => Task.CompletedTask;
+        public Task ConservarRegistroTrasEliminarArchivoAsync(int aniListId, int numeroEpisodio) => Task.CompletedTask;
         public Task<bool> ExportarCopiaSeguridadAsync(string rutaDestino) => Task.FromResult(true);
         public Task<bool> RestaurarCopiaSeguridadAsync(string rutaOrigen) => Task.FromResult(true);
         public Task<int> ExportarBibliotecaJsonAsync(string rutaDestino) => Task.FromResult(0);
@@ -133,9 +134,13 @@ public Task ActualizarAnimesAsync(IEnumerable<AnimeItem> animes) => Task.Complet
         public Task GuardarRegistrosEpisodioBulkAsync(IEnumerable<RegistroEpisodio> registros) => Task.CompletedTask;
         public Task<List<RegistroEpisodio>> ObtenerRegistrosPorAnimeAsync(int aniListId) => Task.FromResult(new List<RegistroEpisodio>());
         public Task<List<RegistroEpisodio>> ObtenerTodosLosRegistrosAsync() => Task.FromResult(new List<RegistroEpisodio>());
+        public Task<List<RegistroEpisodio>> ObtenerHistorialEpisodiosAsync(int limite = 300) => Task.FromResult(new List<RegistroEpisodio>());
+        public Task LimpiarRegistroHistorialAsync(int aniListId, int numeroEpisodio) => Task.CompletedTask;
+        public Task LimpiarTodoElHistorialAsync() => Task.CompletedTask;
         public Task<List<RegistroEpisodio>> ObtenerEpisodiosNoSincronizadosAsync() => Task.FromResult(new List<RegistroEpisodio>());
         public Task MarcarEpisodiosSincronizadosAsync(IEnumerable<int> ids) => Task.CompletedTask;
         public Task ActualizarAnimeAsync(AnimeItem anime) => Task.CompletedTask;
+        public Task VaciarBibliotecaAsync() => Task.CompletedTask;
     }
 
     private class DummyTrackingService : IAnimeTrackingService

@@ -27,12 +27,17 @@ if ($Target -eq "all" -or $Target -eq "tests") {
         Write-Host "Todas las pruebas se ejecutaron correctamente y se registraron en: $testResultFile" -ForegroundColor Green
     } else {
         Write-Host "Ocurrieron errores en las pruebas." -ForegroundColor Red
+        exit $LASTEXITCODE
     }
 }
 
 if ($Target -eq "all" -or $Target -eq "benchmarks") {
     Write-Host "`n[2/2] Ejecutando Benchmarks en modo Release..." -ForegroundColor Yellow
     dotnet run --project "AnimeLocalTracker.Benchmarks\AnimeLocalTracker.Benchmarks.csproj" -c Release -- $BenchmarkCategory
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Los benchmarks fallaron (build o ejecución)." -ForegroundColor Red
+        exit $LASTEXITCODE
+    }
 }
 
 if ($Target -eq "history") {

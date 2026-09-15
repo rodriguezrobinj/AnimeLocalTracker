@@ -136,17 +136,33 @@
                             <TextBlock Text="{Binding LicenciaTexto}" FontSize="11" Foreground="#6B7280" Margin="0,4,0,0"/>
                         </StackPanel>
 
-                        <Button Grid.Column="1" Command="{Binding AbrirRepositorioGitHubCommand}"
-                                Style="{StaticResource MaterialDesignOutlinedButton}"
-                                BorderBrush="#3B82F6" Foreground="#93C5FD"
-                                Height="40" Padding="18,0" VerticalAlignment="Center"
-                                materialDesign:ButtonAssist.CornerRadius="8"
-                                ToolTip="{Binding [Acerca_AbrirRepositorioTip], Source={x:Static loc:LocalizationService.Instance}}">
-                            <StackPanel Orientation="Horizontal">
-                                <materialDesign:PackIcon Kind="OpenInNew" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                <TextBlock Text="{Binding [Acerca_VerGitHub], Source={x:Static loc:LocalizationService.Instance}}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="12"/>
-                            </StackPanel>
-                        </Button>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button Command="{Binding AbrirReportarProblemaCommand}"
+                                    Style="{StaticResource MaterialDesignOutlinedButton}"
+                                    BorderBrush="#475569" Foreground="#CBD5E1"
+                                    Height="40" Padding="18,0" VerticalAlignment="Center" Margin="0,0,10,0"
+                                    materialDesign:ButtonAssist.CornerRadius="8"
+                                    ToolTip="{Binding [Acerca_ReportarProblemaTip], Source={x:Static loc:LocalizationService.Instance}}"
+                                    AutomationProperties.Name="{Binding [Acerca_ReportarProblema], Source={x:Static loc:LocalizationService.Instance}}">
+                                <StackPanel Orientation="Horizontal">
+                                    <materialDesign:PackIcon Kind="BugOutline" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                    <TextBlock Text="{Binding [Acerca_ReportarProblema], Source={x:Static loc:LocalizationService.Instance}}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="12"/>
+                                </StackPanel>
+                            </Button>
+
+                            <Button Command="{Binding AbrirRepositorioGitHubCommand}"
+                                    Style="{StaticResource MaterialDesignOutlinedButton}"
+                                    BorderBrush="#3B82F6" Foreground="#93C5FD"
+                                    Height="40" Padding="18,0" VerticalAlignment="Center"
+                                    materialDesign:ButtonAssist.CornerRadius="8"
+                                    ToolTip="{Binding [Acerca_AbrirRepositorioTip], Source={x:Static loc:LocalizationService.Instance}}"
+                                    AutomationProperties.Name="{Binding [Acerca_VerGitHub], Source={x:Static loc:LocalizationService.Instance}}">
+                                <StackPanel Orientation="Horizontal">
+                                    <materialDesign:PackIcon Kind="OpenInNew" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                    <TextBlock Text="{Binding [Acerca_VerGitHub], Source={x:Static loc:LocalizationService.Instance}}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="12"/>
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
                     </Grid>
                 </materialDesign:Card>
 

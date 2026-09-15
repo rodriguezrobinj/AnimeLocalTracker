@@ -40,7 +40,8 @@
                 <!-- Botón Qué Veo Hoy -->
                 <Button Command="{Binding ElegirQueVerHoyCommand}"
                         Style="{StaticResource AppOutlinedButton}" Margin="0,0,10,0" Height="40" Padding="14,0"
-                        ToolTip="{Binding [Gal_QueVerTip], Source={x:Static loc:LocalizationService.Instance}}">
+                        ToolTip="{Binding [Gal_QueVerTip], Source={x:Static loc:LocalizationService.Instance}}"
+                        AutomationProperties.Name="{Binding [Gal_QueVeoHoy], Source={x:Static loc:LocalizationService.Instance}}">
                     <Grid>
                         <!-- Estado Normal -->
                         <StackPanel Orientation="Horizontal" Visibility="{Binding EstaBuscandoQueVer, Converter={StaticResource InverseBoolToVis}}">
@@ -87,7 +88,8 @@
                 <Button Command="{Binding ConectarAniListCommand}"
                         Style="{StaticResource AppPrimaryButton}" Height="40" Padding="14,0"
                         Visibility="{Binding EstaConectado, Converter={StaticResource InverseBoolToVis}}"
-                        ToolTip="{Binding [Gal_ConectarTip], Source={x:Static loc:LocalizationService.Instance}}">
+                        ToolTip="{Binding [Gal_ConectarTip], Source={x:Static loc:LocalizationService.Instance}}"
+                        AutomationProperties.Name="{Binding [Gal_Conectar], Source={x:Static loc:LocalizationService.Instance}}">
                     <StackPanel Orientation="Horizontal">
                         <materialDesign:PackIcon Kind="CloudUpload" Margin="0,0,8,0" VerticalAlignment="Center" Width="18" Height="18"/>
                         <TextBlock Text="{Binding [Gal_Conectar], Source={x:Static loc:LocalizationService.Instance}}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="12.5"/>
@@ -154,10 +156,11 @@
                             <Grid Margin="0,40,0,0" Height="46" VerticalAlignment="Top">
                                 <!-- Subtle separator line -->
                                 <Border BorderBrush="#1AFFFFFF" BorderThickness="0,1,0,0" Margin="12,0"/>
-                                <Button Command="{Binding DesconectarAniListCommand}" 
+                                <Button Command="{Binding DesconectarAniListCommand}"
                                         Style="{StaticResource MaterialDesignFlatButton}" Foreground="#FF5252"
                                         Height="46" Padding="24,0" Margin="0"
-                                        materialDesign:ButtonAssist.CornerRadius="0,0,16,16">
+                                        materialDesign:ButtonAssist.CornerRadius="0,0,16,16"
+                                        AutomationProperties.Name="{Binding [Cfg_CerrarSesion], Source={x:Static loc:LocalizationService.Instance}}">
                                     <StackPanel Orientation="Horizontal">
                                         <materialDesign:PackIcon Kind="Logout" Margin="0,0,8,0" VerticalAlignment="Center" Width="20" Height="20"/>
                                         <TextBlock Text="{Binding [Cfg_CerrarSesion], Source={x:Static loc:LocalizationService.Instance}}" VerticalAlignment="Center" FontWeight="Bold"/>
@@ -167,11 +170,12 @@
                         </Border>
                     </Canvas>
                     
-                    <Button x:Name="UserMenuToggle" 
+                    <Button x:Name="UserMenuToggle"
                             Command="{Binding ToggleMenuUsuarioCommand}"
                             Height="40" MinWidth="180" VerticalAlignment="Top"
                             Cursor="Hand" ToolTip="{Binding [Gal_CuentaSincronizadaTip], Source={x:Static loc:LocalizationService.Instance}}"
-                            Background="Transparent" BorderThickness="0" Padding="24,4" Panel.ZIndex="2">
+                            Background="Transparent" BorderThickness="0" Padding="24,4" Panel.ZIndex="2"
+                            AutomationProperties.Name="{Binding NombreUsuarioAniList}">
                         <Button.Template>
                             <ControlTemplate TargetType="Button">
                                 <Border Background="Transparent">
@@ -278,7 +282,8 @@
                 <!-- Botón Desplegable de Filtros y Ordenación -->
                 <ToggleButton Grid.Column="1" IsChecked="{Binding PanelFiltrosVisible}"
                               Height="44" Padding="14,0" Cursor="Hand" VerticalAlignment="Center"
-                              ToolTip="{Binding [Gal_FiltrosTip], Source={x:Static loc:LocalizationService.Instance}}">
+                              ToolTip="{Binding [Gal_FiltrosTip], Source={x:Static loc:LocalizationService.Instance}}"
+                              AutomationProperties.Name="{Binding [Gal_Filtros], Source={x:Static loc:LocalizationService.Instance}}">
                     <ToggleButton.Style>
                         <Style TargetType="ToggleButton" BasedOn="{StaticResource MaterialDesignOutlinedButton}">
                             <Setter Property="BorderBrush" Value="{DynamicResource Brush.BorderStrong}"/>
@@ -309,28 +314,28 @@
                     </StackPanel>
                 </ToggleButton>
 
-                <!-- Chips de Estado a la derecha -->
-                <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                    <RadioButton Content="{Binding [Hist_FiltroTodos], Source={x:Static loc:LocalizationService.Instance}}" Margin="0,0,6,0" IsChecked="{Binding EsFiltroTodos, Mode=OneWay}" GroupName="FiltroEstado"
+                <!-- Chips de Estado a la derecha (WrapPanel: baja a una 2ª línea en vez de solaparse/recortarse con ventanas angostas) -->
+                <WrapPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <RadioButton Content="{Binding [Hist_FiltroTodos], Source={x:Static loc:LocalizationService.Instance}}" Margin="0,0,6,4" IsChecked="{Binding EsFiltroTodos, Mode=OneWay}" GroupName="FiltroEstado"
                                  Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="Todos"
                                  Style="{StaticResource MaterialDesignTabRadioButton}"
                                  Height="34" Padding="14,0" FontSize="13" FontWeight="SemiBold"/>
 
-                    <RadioButton Content="{Binding [Gal_FiltroViendo], Source={x:Static loc:LocalizationService.Instance}}" Margin="0,0,6,0" IsChecked="{Binding EsFiltroViendo, Mode=OneWay}" GroupName="FiltroEstado"
+                    <RadioButton Content="{Binding [Gal_FiltroViendo], Source={x:Static loc:LocalizationService.Instance}}" Margin="0,0,6,4" IsChecked="{Binding EsFiltroViendo, Mode=OneWay}" GroupName="FiltroEstado"
                                  Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="Viendo"
                                  Style="{StaticResource MaterialDesignTabRadioButton}"
                                  Height="34" Padding="14,0" FontSize="13" FontWeight="SemiBold"/>
 
-                    <RadioButton Content="{Binding [Hist_FiltroCompletados], Source={x:Static loc:LocalizationService.Instance}}" Margin="0,0,6,0" IsChecked="{Binding EsFiltroCompletados, Mode=OneWay}" GroupName="FiltroEstado"
+                    <RadioButton Content="{Binding [Hist_FiltroCompletados], Source={x:Static loc:LocalizationService.Instance}}" Margin="0,0,6,4" IsChecked="{Binding EsFiltroCompletados, Mode=OneWay}" GroupName="FiltroEstado"
                                  Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="Completados"
                                  Style="{StaticResource MaterialDesignTabRadioButton}"
                                  Height="34" Padding="14,0" FontSize="13" FontWeight="SemiBold"/>
 
-                    <RadioButton Content="{Binding [Gal_FiltroPlaneando], Source={x:Static loc:LocalizationService.Instance}}" Margin="0,0,0,0" IsChecked="{Binding EsFiltroPlaneando, Mode=OneWay}" GroupName="FiltroEstado"
+                    <RadioButton Content="{Binding [Gal_FiltroPlaneando], Source={x:Static loc:LocalizationService.Instance}}" Margin="0,0,0,4" IsChecked="{Binding EsFiltroPlaneando, Mode=OneWay}" GroupName="FiltroEstado"
                                  Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="Planeando"
                                  Style="{StaticResource MaterialDesignTabRadioButton}"
                                  Height="34" Padding="14,0" FontSize="13" FontWeight="SemiBold"/>
-                </StackPanel>
+                </WrapPanel>
             </Grid>
 
             <!-- Panel Expansible de Filtros Avanzados (Desplegable) -->
@@ -600,9 +605,10 @@
     
                         <!-- Botón interactivo para abrir detalle -->
                         <Button Command="{Binding DataContext.AbrirDetalleCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
-                                CommandParameter="{Binding}" 
-                                Padding="0" Background="Transparent" BorderThickness="0" Height="265" 
-                                HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch">
+                                CommandParameter="{Binding}"
+                                Padding="0" Background="Transparent" BorderThickness="0" Height="265"
+                                HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                                AutomationProperties.Name="{Binding Titulo}">
                             <Button.Template>
                                 <ControlTemplate TargetType="Button">
                                     <Border Background="Transparent">
