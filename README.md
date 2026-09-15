@@ -51,7 +51,7 @@ Olvida los reproductores externos o reproductores web lentos.
 * **Calendario de Emisión Semanal:** Cuenta regresiva y horarios de estreno sincronizados con la emisión en Japón.
 
 ### 📥 6. Gestor Integrado de Descargas
-* Descarga episodios directamente desde la aplicación con monitoreo de velocidad en vivo, barra de progreso y notificaciones al completar.
+* **Cola de descargas inteligente:** Descarga episodios directamente desde la aplicación con monitoreo de velocidad de red en tiempo real, barras de progreso dinámicas, control de pausas y notificaciones al completar.
 
 ### 🛡️ 7. UX Pulida al Milímetro y Estabilidad Inquebrantable
 * **Memoria Visual Infalible:** ¿Dejaste un capítulo a la mitad? El sistema inteligente de tracking local-first recuerda tu posición exacta al milisegundo y lo refleja en la interfaz visualmente, sin errores.
@@ -125,8 +125,7 @@ Correctas: 327 | Fallidas: 0 | Omitidas: 0 | Duración: ~45s
 
 > Además del gate de cobertura del CI (≥45 % líneas / ≥30 % ramas), el pipeline ejecuta
 > SCA bloqueante (NuGet/cargo/pip), `clippy -D warnings`, tests pytest del daemon Python y
-> benchmarks comparativos contra historial (workflow manual/semanal). El historial de
-> cambios por versión se mantiene en [`CHANGELOG.md`](CHANGELOG.md).
+> benchmarks comparativos contra historial (workflow manual/semanal).
 
 ---
 
