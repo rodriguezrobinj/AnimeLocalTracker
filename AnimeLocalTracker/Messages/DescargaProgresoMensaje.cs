@@ -11,8 +11,9 @@ public class DescargaProgresoMensaje
     public string RutaArchivo { get; }
     public string? Error { get; }
     public string AnimeTitulo { get; }
+    public string VelocidadDescarga { get; }
 
-    public DescargaProgresoMensaje(int aniListId, int numeroEpisodio, double progreso, bool isDownloading, bool isCompleted, bool isPaused, string rutaArchivo, string? error = null, string animeTitulo = "")
+    public DescargaProgresoMensaje(int aniListId, int numeroEpisodio, double progreso, bool isDownloading, bool isCompleted, bool isPaused, string rutaArchivo, string? error = null, string animeTitulo = "", string velocidadDescarga = "")
     {
         AniListId = aniListId;
         NumeroEpisodio = numeroEpisodio;
@@ -23,5 +24,6 @@ public class DescargaProgresoMensaje
         RutaArchivo = rutaArchivo;
         Error = error;
         AnimeTitulo = animeTitulo;
+        VelocidadDescarga = velocidadDescarga;
     }
 }

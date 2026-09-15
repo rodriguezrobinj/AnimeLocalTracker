@@ -9,7 +9,7 @@ namespace AnimeLocalTracker.Services;
 public interface IDownloadService
 {
     Task<string?> GetVideoUrlAsync(string pageUrl, CancellationToken cancellationToken = default);
-    Task DownloadVideoAsync(string videoUrl, string destinationPath, IProgress<double>? progress = null, CancellationToken cancellationToken = default);
+    Task DownloadVideoAsync(string videoUrl, string destinationPath, IProgress<(double Progress, double Speed)>? progress = null, CancellationToken cancellationToken = default);
     bool EstaDescargando(int aniListId, int numeroEpisodio, out double progreso);
     Task IniciarDescargaEpisodioAsync(int aniListId, string animeTitulo, string carpetaDestino, int numeroEpisodio, IEnumerable<string>? titulosAlternativos = null);
     void CancelarDescarga(int aniListId, int numeroEpisodio);

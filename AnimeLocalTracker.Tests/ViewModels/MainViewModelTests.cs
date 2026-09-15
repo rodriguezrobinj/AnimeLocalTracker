@@ -19,7 +19,8 @@ namespace AnimeLocalTracker.Tests.ViewModels;
 /// </summary>
 public class MainViewModelTests : IDisposable
 {
-    private readonly Mock<INavigationService> _navigationServiceMock = new();
+    private readonly Mock<IServiceProvider> _spMock = new();
+    private readonly NavigationService _navigationService;
     private readonly Mock<IAnimeTrackingService> _trackingMock = new();
     private readonly Mock<IDownloadService> _downloadMock = new();
     private readonly Mock<IUpdateService> _updateMock = new();
@@ -40,7 +41,7 @@ public class MainViewModelTests : IDisposable
         _downloadMock.Setup(d => d.ObtenerDescargasActivas()).Returns(new List<DescargaItem>());
         _libraryService = new AnimeLibraryService(_dbMock.Object, _settingsMock.Object);
 
-        // Vista por defecto al arrancar: el ctor pide la Galería al NavigationService
+        // Vista por defecto al arrancar: el ctor pide la Galera al NavigationService
         _galeriaVm = new GaleriaViewModel(
             _trackingMock.Object,
             _dbMock.Object,
@@ -49,19 +50,23 @@ public class MainViewModelTests : IDisposable
             new Mock<IHttpClientFactory>().Object,
             new Mock<IImageCacheService>().Object,
             new Mock<IFileScannerService>().Object);
-        _navigationServiceMock.Setup(n => n.ObtenerGaleria()).Returns(_galeriaVm);
+
+        _spMock.Setup(sp => sp.GetService(typeof(GaleriaViewModel))).Returns(_galeriaVm);
+        _navigationService = new NavigationService(_spMock.Object);
     }
 
     public void Dispose()
     {
         GC.SuppressFinalize(this);
         try { if (Directory.Exists(_tempFolder)) Directory.Delete(_tempFolder, true); } catch { }
+        CommunityToolkit.Mvvm.Messaging.WeakReferenceMessenger.Default.UnregisterAll(this);
+        CommunityToolkit.Mvvm.Messaging.WeakReferenceMessenger.Default.UnregisterAll(_navigationService);
     }
 
     private MainViewModel CreateSut()
     {
         return new MainViewModel(
-            _navigationServiceMock.Object,
+            _navigationService,
             _trackingMock.Object,
             _libraryService,
             _downloadMock.Object,
@@ -81,21 +86,21 @@ public class MainViewModelTests : IDisposable
         };
     }
 
-    // === NAVEGACIÓN ===
+    // === NAVEGACION ===
 
     [Fact]
     public void Receive_Descargas_DeberiaCambiarLaVistaActual()
     {
         // Arrange
         var descargasVm = new DescargasViewModel(_downloadMock.Object);
-        _navigationServiceMock.Setup(n => n.ObtenerDescargas()).Returns(descargasVm);
+        _spMock.Setup(sp => sp.GetService(typeof(DescargasViewModel))).Returns(descargasVm);
         var sut = CreateSut();
 
         // Act
-        sut.Receive(new AnimeLocalTracker.Messages.NavegarMensaje_Descargas());
+        CommunityToolkit.Mvvm.Messaging.IMessengerExtensions.Send(CommunityToolkit.Mvvm.Messaging.WeakReferenceMessenger.Default, new AnimeLocalTracker.Messages.NavegarMensaje_Descargas());
 
         // Assert
-        sut.VistaActual.Should().BeSameAs(descargasVm);
+        sut.Navigation.VistaActual.Should().BeSameAs(descargasVm);
     }
 
     [Fact]
@@ -104,15 +109,17 @@ public class MainViewModelTests : IDisposable
         // Arrange
         var sut = CreateSut();
         var otra = new DescargasViewModel(_downloadMock.Object);
-        _navigationServiceMock.Setup(n => n.ObtenerDescargas()).Returns(otra);
-        sut.Receive(new AnimeLocalTracker.Messages.NavegarMensaje_Descargas());
-        sut.VistaActual.Should().BeSameAs(otra);
+        _spMock.Setup(sp => sp.GetService(typeof(DescargasViewModel))).Returns(otra);
+        CommunityToolkit.Mvvm.Messaging.IMessengerExtensions.Send(CommunityToolkit.Mvvm.Messaging.WeakReferenceMessenger.Default, new AnimeLocalTracker.Messages.NavegarMensaje_Descargas());
+        sut.Navigation.VistaActual.Should().BeSameAs(otra);
+
+        _spMock.Setup(sp => sp.GetService(typeof(GaleriaViewModel))).Returns(_galeriaVm);
 
         // Act
-        sut.Receive(new AnimeLocalTracker.Messages.NavegarMensaje_Galeria());
+        CommunityToolkit.Mvvm.Messaging.IMessengerExtensions.Send(CommunityToolkit.Mvvm.Messaging.WeakReferenceMessenger.Default, new AnimeLocalTracker.Messages.NavegarMensaje_Galeria());
 
         // Assert
-        sut.VistaActual.Should().BeSameAs(_galeriaVm);
+        sut.Navigation.VistaActual.Should().BeSameAs(_galeriaVm);
     }
 
     // === BÚSQUEDA EN VIVO (debounce 400 ms) ===

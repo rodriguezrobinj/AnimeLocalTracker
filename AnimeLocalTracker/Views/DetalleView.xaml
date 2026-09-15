@@ -410,7 +410,7 @@
 
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <Border Padding="10,8" Background="Transparent" Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=ListBox}}">
+                                <Border Padding="10,8" Background="Transparent" Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=ListBox}}" AutomationProperties.Name="{Binding ResumenAccesible}">
                                     <!-- Menú contextual de la fila: se abre con clic izquierdo SOLO sobre el
                                          icono de episodio descargado (o con clic derecho en la fila) -->
                                     <Border.ContextMenu>
@@ -514,8 +514,8 @@
 
                                         <!-- PUNTO NO VISTO + MARCADOR BOOKMARK -->
                                         <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0">
-                                            <Ellipse Width="6" Height="6" Fill="#60A5FA" VerticalAlignment="Center" Margin="0,0,8,0"
-                                                     Visibility="{Binding Visto, Converter={StaticResource InverseBoolToVis}}"/>
+                                            <Ellipse x:Name="PuntoNoVisto" Width="6" Height="6" Fill="#60A5FA" VerticalAlignment="Center" Margin="0,0,8,0"
+                                                     Visibility="Visible"/>
 
                                             <Button Command="{Binding DataContext.AlternarFavoritoEpisodioCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                     CommandParameter="{Binding}"
@@ -527,9 +527,9 @@
                                         </StackPanel>
 
                                         <!-- MINIATURA DEL EPISODIO (generada vía Python/ffmpeg) -->
-                                        <Border Grid.Column="1" Width="72" Height="40" CornerRadius="5" Margin="0,0,10,0"
+                                        <Border x:Name="BorderMiniatura" Grid.Column="1" Width="72" Height="40" CornerRadius="5" Margin="0,0,10,0"
                                                 Background="#1F2937" BorderBrush="#2D333B" BorderThickness="1" VerticalAlignment="Center"
-                                                Visibility="{Binding RutaMiniatura, Converter={StaticResource NullToCollapsed}}">
+                                                Visibility="Visible">
                                             <Image Source="{Binding RutaMiniatura}" Stretch="UniformToFill" 
                                                    RenderOptions.BitmapScalingMode="HighQuality">
                                                 <Image.Clip>
@@ -543,8 +543,8 @@
                                             <TextBlock x:Name="TextoTitulo" Text="{Binding TituloVisual}" 
                                                        Foreground="White" FontSize="14" FontWeight="SemiBold"/>
                                             
-                                            <StackPanel Orientation="Horizontal" Margin="0,3,0,0"
-                                                        Visibility="{Binding TieneProgresoGuardado, Converter={StaticResource BoolToVis}}">
+                                            <StackPanel x:Name="PanelProgreso" Orientation="Horizontal" Margin="0,3,0,0"
+                                                        Visibility="Visible">
                                                 <ProgressBar Value="{Binding PorcentajeProgreso, Mode=OneWay}" Maximum="1.0" 
                                                              Height="3" Width="85" Background="#33FFFFFF" Foreground="#60A5FA" 
                                                              VerticalAlignment="Center" Margin="0,0,6,0"
@@ -553,9 +553,9 @@
                                             </StackPanel>
 
                                             <!-- BADGE TÉCNICO (metadata ffprobe vía Python) -->
-                                            <Border CornerRadius="4" Background="#1F2937" BorderBrush="#2D333B" BorderThickness="1"
+                                            <Border x:Name="BadgeTecnico" CornerRadius="4" Background="#1F2937" BorderBrush="#2D333B" BorderThickness="1"
                                                     Padding="6,2" Margin="0,4,0,0" HorizontalAlignment="Left"
-                                                    Visibility="{Binding BadgeTecnico, Converter={StaticResource NullToCollapsed}}">
+                                                    Visibility="Visible">
                                                 <TextBlock Text="{Binding BadgeTecnico}" Foreground="#9CA3AF" FontSize="10" FontWeight="Medium"/>
                                             </Border>
                                         </StackPanel>
@@ -638,11 +638,24 @@
                                 </Border>
                                 
                                 <DataTemplate.Triggers>
-                                    <!-- ESTADO VISTO: TÍTULO ATENUADO -->
+                                    <!-- ESTADO VISTO: TÍTULO ATENUADO Y OCULTAR PUNTO AZUL -->
                                     <DataTrigger Binding="{Binding Visto}" Value="True">
                                         <Setter TargetName="TextoTitulo" Property="Foreground" Value="#6B7280" />
                                         <Setter TargetName="TextoTitulo" Property="Opacity" Value="0.6" />
                                         <Setter TargetName="TextoTitulo" Property="FontWeight" Value="Normal" />
+                                        <Setter TargetName="PuntoNoVisto" Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                    
+                                    <DataTrigger Binding="{Binding RutaMiniatura}" Value="{x:Null}">
+                                        <Setter TargetName="BorderMiniatura" Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                    
+                                    <DataTrigger Binding="{Binding TieneProgresoGuardado}" Value="False">
+                                        <Setter TargetName="PanelProgreso" Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                    
+                                    <DataTrigger Binding="{Binding BadgeTecnico}" Value="{x:Null}">
+                                        <Setter TargetName="BadgeTecnico" Property="Visibility" Value="Collapsed" />
                                     </DataTrigger>
                                     
                                     <!-- ESTADO FAVORITO: BOOKMARK ACTIVO AZUL -->

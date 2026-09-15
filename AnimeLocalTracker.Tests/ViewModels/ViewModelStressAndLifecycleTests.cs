@@ -60,17 +60,17 @@ public class ViewModelStressAndLifecycleTests
         // Act: Conmutar 100 veces entre todas las vistas principales
         for (int i = 0; i < 100; i++)
         {
-            sut.Receive(new NavegarMensaje_Calendario());
-            sut.EsCalendarioActivo.Should().BeTrue();
+            sut.Navigation.Receive(new NavegarMensaje_Calendario());
+            sut.Navigation.EsCalendarioActivo.Should().BeTrue();
 
-            sut.Receive(new NavegarMensaje_Descargas());
-            sut.EsDescargasActivas.Should().BeTrue();
+            sut.Navigation.Receive(new NavegarMensaje_Descargas());
+            sut.Navigation.EsDescargasActivas.Should().BeTrue();
 
-            sut.Receive(new NavegarMensaje_Configuracion());
-            sut.EsConfiguracionActiva.Should().BeTrue();
+            sut.Navigation.Receive(new NavegarMensaje_Configuracion());
+            sut.Navigation.EsConfiguracionActiva.Should().BeTrue();
 
-            sut.Receive(new NavegarMensaje_Galeria());
-            sut.EsGaleriaActiva.Should().BeTrue();
+            sut.Navigation.Receive(new NavegarMensaje_Galeria());
+            sut.Navigation.EsGaleriaActiva.Should().BeTrue();
         }
     }
 

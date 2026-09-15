@@ -393,7 +393,25 @@ public sealed class LocalizationService : INotifyPropertyChanged
         ["Win_BtnPantallaCompleta"] = "Pantalla completa",
         ["Win_BtnMinimizar"] = "Minimizar",
         ["Win_BtnMaximizar"] = "Maximizar",
-        ["Win_BtnCerrarApp"] = "Cerrar aplicación"
+        ["Win_BtnCerrarApp"] = "Cerrar aplicación",
+
+        // === NUEVAS CLAVES PARA DETALLES Y FILTROS ===
+        ["Filtro_Todos"] = "Todos",
+        ["Filtro_Descargados"] = "Descargados",
+        ["Filtro_Vistos"] = "Vistos",
+        ["Filtro_NoVistos"] = "No Vistos",
+        ["Filtro_Favoritos"] = "Favoritos",
+        ["Estado_Viendo"] = "Viendo",
+        ["Estado_Finalizado"] = "Finalizado",
+        ["Estado_EnPausa"] = "En Pausa",
+        ["Estado_Abandonado"] = "Abandonado",
+        ["Estado_Planeando"] = "Planeando",
+        ["Det_SinEpisodiosNoEstrenado"] = "Anime aún no estrenado",
+        ["Det_SinEpisodiosNoEstrenadoSub"] = "Este anime aún no cuenta con episodios emitidos.",
+        ["Det_SinEpisodios"] = "No hay episodios para mostrar",
+        ["Det_SinEpisodiosSub"] = "No se encontraron episodios para este anime.",
+        ["Det_SinEpisodiosFiltro"] = "No hay episodios con este filtro",
+        ["Det_SinEpisodiosFiltroSub"] = "No se encontraron episodios en la categoría '{0}'."
     };
 
 
@@ -760,7 +778,25 @@ public sealed class LocalizationService : INotifyPropertyChanged
         ["Win_BtnPantallaCompleta"] = "Fullscreen",
         ["Win_BtnMinimizar"] = "Minimize",
         ["Win_BtnMaximizar"] = "Maximize",
-        ["Win_BtnCerrarApp"] = "Close application"
+        ["Win_BtnCerrarApp"] = "Close application",
+
+        // === NEW KEYS FOR DETAILS AND FILTERS ===
+        ["Filtro_Todos"] = "All",
+        ["Filtro_Descargados"] = "Downloaded",
+        ["Filtro_Vistos"] = "Watched",
+        ["Filtro_NoVistos"] = "Unwatched",
+        ["Filtro_Favoritos"] = "Favorites",
+        ["Estado_Viendo"] = "Watching",
+        ["Estado_Finalizado"] = "Completed",
+        ["Estado_EnPausa"] = "Paused",
+        ["Estado_Abandonado"] = "Dropped",
+        ["Estado_Planeando"] = "Planning",
+        ["Det_SinEpisodiosNoEstrenado"] = "Anime not aired yet",
+        ["Det_SinEpisodiosNoEstrenadoSub"] = "This anime does not have aired episodes yet.",
+        ["Det_SinEpisodios"] = "No episodes to show",
+        ["Det_SinEpisodiosSub"] = "No episodes found for this anime.",
+        ["Det_SinEpisodiosFiltro"] = "No episodes match this filter",
+        ["Det_SinEpisodiosFiltroSub"] = "No episodes found in the '{0}' category."
     };
 
 
