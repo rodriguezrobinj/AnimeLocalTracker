@@ -9,6 +9,7 @@ using Xunit;
 
 namespace AnimeLocalTracker.Tests.Services;
 
+[Collection("NavigationServiceTests")]
 public class UpdateServiceTests
 {
     private readonly Mock<IDialogService> _dialogMock = new();
@@ -86,13 +87,27 @@ public class UpdateServiceTests
         services.AddSingleton<AnimeLibraryService>();
 
         var sp = services.BuildServiceProvider();
-        var sut = new MainViewModel(new NavigationService(sp), trackingMock.Object, sp.GetRequiredService<AnimeLibraryService>(), downloadMock.Object, updateMock.Object, dialogMock.Object);
+        var navigationService = new NavigationService(sp);
+        try
+        {
+            var sut = new MainViewModel(navigationService, trackingMock.Object, sp.GetRequiredService<AnimeLibraryService>(), downloadMock.Object, updateMock.Object, dialogMock.Object);
 
-        // Act
-        await sut.BuscarActualizacionesManualCommand.ExecuteAsync(null);
+            // Act
+            await sut.BuscarActualizacionesManualCommand.ExecuteAsync(null);
 
-        // Assert
-        updateMock.Verify(u => u.ComprobarActualizacionesAsync(true), Times.Once);
+            // Assert
+            updateMock.Verify(u => u.ComprobarActualizacionesAsync(true), Times.Once);
+        }
+        finally
+        {
+            // NavigationService se registra en WeakReferenceMessenger.Default (estático de
+            // proceso) en su constructor — sin este unregister, la instancia sigue viva y
+            // puede recibir mensajes de OTROS tests que corran después, lanzando excepciones
+            // porque este ServiceProvider de prueba no tiene todos los ViewModels registrados
+            // (fue la causa raíz confirmada de un fallo intermitente en CI: DescargasViewModel/
+            // GaleriaViewModel sin registrar aquí, alcanzados por un mensaje de otro test).
+            CommunityToolkit.Mvvm.Messaging.WeakReferenceMessenger.Default.UnregisterAll(navigationService);
+        }
     }
 
     [Fact]
