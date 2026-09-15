@@ -32,15 +32,14 @@ public partial class DetalleViewModel : ObservableObject,
     private readonly PythonEpisodeEnricher? _enricher;
     private readonly IPluginService? _pluginService;
 
-    // Evita pasadas concurrentes de enriquecimiento (entrar/salir de la vista rápido
-    // lanzaba varios ExtractFrame simultáneos sobre los mismos archivos).
-    private readonly SemaphoreSlim _enriquecimientoGate = new(1, 1);
+    // Enriquecimiento de metadata/miniaturas de episodios (extraído a EpisodeEnrichmentCoordinator).
+    private readonly EpisodeEnrichmentCoordinator _enrichmentCoordinator = new();
 
-    // CA1001: el gate de enriquecimiento se libera al descartar el ViewModel
-    // (los transients no los dispone el contenedor; lo hace el GC vía finalizador del semáforo)
+    // CA1001: el coordinador de enriquecimiento (posee un SemaphoreSlim) se libera al
+    // descartar el ViewModel (los transients no los dispone el contenedor).
     public void Dispose()
     {
-        _enriquecimientoGate.Dispose();
+        _enrichmentCoordinator.Dispose();
         GC.SuppressFinalize(this);
     }
     
@@ -421,135 +420,12 @@ public partial class DetalleViewModel : ObservableObject,
     /// <summary>
     /// Enriquecer los episodios locales que aún no tienen metadata técnica o miniatura vía
     /// el bridge Python y guardar el resultado en SQLite para visitas instantáneas futuras.
-    /// TODO el trabajo pesado (ffprobe, ffmpeg, SQLite) corre en el thread pool; al hilo de
-    /// UI solo se le manda el repintado final vía Dispatcher. Antes este método se ejecutaba
-    /// en el hilo de UI (los await del hilo llamador reanudaban en el SynchronizationContext)
-    /// y cada episodio lanzaba un proceso ffmpeg síncrono → congelamiento total de la vista.
+    /// La implementación vive en EpisodeEnrichmentCoordinator (extraída para reducir el
+    /// tamaño de este ViewModel); aquí solo se le pasan las dependencias necesarias.
     /// </summary>
-    private async Task EnriquecerEpisodiosEnSegundoPlanoAsync(int aniListId)
-    {
-        // Coalescing: si ya hay una pasada en curso, no abrir otra en paralelo.
-        if (!_enriquecimientoGate.Wait(0)) return;
-
-        try
-        {
-            await Task.Run(async () =>
-            {
-                var pendientes = _todosLosEpisodios
-                    .Where(e => e.Descargado && !string.IsNullOrWhiteSpace(e.RutaCompleta) && System.IO.File.Exists(e.RutaCompleta) &&
-                                (string.IsNullOrEmpty(e.RutaMiniatura) || string.IsNullOrEmpty(e.Resolucion)))
-                    .ToList();
-
-                if (pendientes.Count == 0) return;
-
-                // Importante: NO esperar aquí el ping al daemon Python (si está frío puede
-                // tardar 2-8 s). La extracción Rust de miniaturas no depende de Python:
-                // se resuelve pythonDisponible de forma diferida, solo si se necesita.
-                bool pythonDisponible = false;
-
-                // ── FASE 1: Miniaturas 1×1 con Rust FFI. Cada episodio se extrae, persiste y
-                //    se refleja en la UI ANTES de pasar al siguiente: la primera miniatura
-                //    aparece en ~1s y el resto van apareciendo de forma secuencial apenas
-                //    cada una termina (sin esperar a que se generen todas). ──
-                var sinMiniatura = pendientes.Where(e => string.IsNullOrEmpty(e.RutaMiniatura)).ToList();
-                if (sinMiniatura.Count > 0)
-                {
-                    bool huboCambiosMiniatura = false;
-
-                    if (NativeMethods.IsAvailable)
-                    {
-                        foreach (var ep in sinMiniatura)
-                        {
-                            string outPath = PythonEpisodeEnricher.ObtenerRutaMiniaturaEsperada(ep.RutaCompleta);
-                            // Timestamp corto (2s): el keyframe previo cae en los primeros
-                            // segundos del video, así el decode intermedio (frames entre el
-                            // keyframe y el punto exacto) es mínimo → miniatura casi instantánea.
-                            bool ok = NativeMethods.ExtractFrame(ep.RutaCompleta, outPath, 2.0, 320);
-
-                            if (ok && File.Exists(outPath) && new FileInfo(outPath).Length > 0)
-                            {
-                                ep.RutaMiniatura = outPath;
-                                huboCambiosMiniatura = true;
-
-                                // Mostrar esta miniatura YA y persistirla antes de seguir
-                                await PersistirRegistrosAsync(aniListId, new[] { ep }).ConfigureAwait(false);
-                                var disp = System.Windows.Application.Current?.Dispatcher;
-                                if (disp != null && !disp.HasShutdownStarted)
-                                {
-                                    SolicitarRefrescoEpisodios();
-                                }
-                            }
-                        }
-                    }
-
-                    // Fallback individual SOLO si Rust no estuvo disponible (resolver el ping
-                    // de Python aquí, de forma diferida, sin bloquear la extracción Rust)
-                    if (!huboCambiosMiniatura)
-                    {
-                        pythonDisponible = _enricher != null && await _enricher.EstáDisponibleAsync().ConfigureAwait(false);
-                        if (pythonDisponible)
-                        {
-                            foreach (var ep in sinMiniatura)
-                            {
-                                await _enricher!.GenerarMiniaturaAsync(ep).ConfigureAwait(false);
-                                if (!string.IsNullOrEmpty(ep.RutaMiniatura)) huboCambiosMiniatura = true;
-                            }
-
-                            if (huboCambiosMiniatura)
-                            {
-                                await PersistirRegistrosAsync(aniListId, sinMiniatura).ConfigureAwait(false);
-                                var disp = System.Windows.Application.Current?.Dispatcher;
-                                if (disp != null && !disp.HasShutdownStarted)
-                                {
-                                    SolicitarRefrescoEpisodios();
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // ── FASE 2: Metadata técnica (ffprobe vía daemon Python) en segundo plano diferido ──
-                var sinMetadata = pendientes.Where(e => string.IsNullOrEmpty(e.Resolucion)).ToList();
-                if (sinMetadata.Count > 0)
-                {
-                    if (!pythonDisponible)
-                        pythonDisponible = _enricher != null && await _enricher.EstáDisponibleAsync().ConfigureAwait(false);
-                    if (pythonDisponible)
-                    {
-                        foreach (var ep in sinMetadata)
-                        {
-                            await _enricher!.EnriquecerEpisodioAsync(ep).ConfigureAwait(false);
-
-                        if (!string.IsNullOrEmpty(ep.Resolucion))
-                        {
-                            await PersistirRegistrosAsync(aniListId, new[] { ep }).ConfigureAwait(false);
-
-                            var disp = System.Windows.Application.Current?.Dispatcher;
-                            if (disp != null && !disp.HasShutdownStarted)
-                            {
-                                SolicitarRefrescoEpisodios();
-                            }
-                        }
-
-                        // Pausa de cortesía para no saturar CPU en segundo plano
-                        await Task.Delay(20).ConfigureAwait(false);
-                        }
-                    }
-                }
-
-                // PERF-05: vaciar el lote de persistencia acumulado del enriquecimiento
-                await VaciarPersistenciaPendienteAsync().ConfigureAwait(false);
-            }).ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Debug("DetalleViewModel", $"Error en enriquecimiento de fondo: {ex.Message}");
-        }
-        finally
-        {
-            _enriquecimientoGate.Release();
-        }
-    }
+    private Task EnriquecerEpisodiosEnSegundoPlanoAsync(int aniListId) =>
+        _enrichmentCoordinator.EnriquecerEnSegundoPlanoAsync(
+            aniListId, _todosLosEpisodios, _enricher, _databaseService, SolicitarRefrescoEpisodios);
 
     // PERF-01: refrescos coalescidos de la lista de episodios — varios episodios pueden
     // completar su miniatura casi a la vez; repintar la lista completa por cada uno era
@@ -573,81 +449,6 @@ public partial class DetalleViewModel : ObservableObject,
             _refrescoListaEpisodiosPendiente = false;
             AplicarFiltrosYOrdenamiento();
         });
-    }
-
-    // PERF-05: la persistencia del enriquecimiento se acumula y se escribe por lotes
-    // (antes 1 SELECT + 1 write por episodio; ahora 1 transacción por lote de 20).
-    private readonly object _persistenciaLock = new();
-    private readonly List<RegistroEpisodio> _persistenciaPendiente = new();
-    private const int PersistenciaLoteMax = 20;
-
-    /// <summary>
-    /// Persiste los episodios con miniatura/metadata recién generada en SQLite para
-    /// que las siguientes visitas al anime sean instantáneas (sin regenerar).
-    /// </summary>
-    private async Task PersistirRegistrosAsync(int aniListId, IEnumerable<EpisodioItem> episodios)
-    {
-        List<RegistroEpisodio>? loteAEnviar = null;
-
-        lock (_persistenciaLock)
-        {
-            foreach (var ep in episodios)
-            {
-                _persistenciaPendiente.Add(new RegistroEpisodio
-                {
-                    AniListId = aniListId,
-                    NumeroEpisodio = ep.NumeroEpisodio,
-                    RutaArchivo = ep.RutaCompleta,
-                    Resolucion = ep.Resolucion,
-                    CodecVideo = ep.CodecVideo,
-                    Fps = ep.Fps,
-                    Es10Bit = ep.Es10Bit,
-                    RutaMiniatura = ep.RutaMiniatura,
-                    VistoLocal = ep.Visto,
-                    FavoritoLocal = ep.Favorito,
-                    ProgresoSegundos = ep.ProgresoSegundos,
-                    TotalSegundos = ep.TotalSegundos
-                });
-            }
-
-            if (_persistenciaPendiente.Count >= PersistenciaLoteMax)
-            {
-                loteAEnviar = new List<RegistroEpisodio>(_persistenciaPendiente);
-                _persistenciaPendiente.Clear();
-            }
-        }
-
-        if (loteAEnviar != null)
-        {
-            try
-            {
-                await _databaseService.GuardarRegistrosEpisodioBulkAsync(loteAEnviar).ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Debug("DetalleViewModel", $"Error persistiendo lote de enriquecimiento: {ex.Message}");
-            }
-        }
-    }
-
-    private async Task VaciarPersistenciaPendienteAsync()
-    {
-        List<RegistroEpisodio>? pendiente = null;
-        lock (_persistenciaLock)
-        {
-            if (_persistenciaPendiente.Count == 0) return;
-            pendiente = new List<RegistroEpisodio>(_persistenciaPendiente);
-            _persistenciaPendiente.Clear();
-        }
-
-        try
-        {
-            await _databaseService.GuardarRegistrosEpisodioBulkAsync(pendiente).ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Debug("DetalleViewModel", $"Error vaciando persistencia de enriquecimiento: {ex.Message}");
-        }
     }
 
     /// <summary>
