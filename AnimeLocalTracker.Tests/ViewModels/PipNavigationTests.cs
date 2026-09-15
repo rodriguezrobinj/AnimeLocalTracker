@@ -14,7 +14,8 @@ namespace AnimeLocalTracker.Tests.ViewModels;
 
 public class PipNavigationTests : IDisposable
 {
-    private readonly Mock<INavigationService> _navigationServiceMock = new();
+    private readonly Mock<IServiceProvider> _spMock = new();
+    private readonly NavigationService _navigationService;
     private readonly Mock<IAnimeTrackingService> _trackingMock = new();
     private readonly Mock<IDownloadService> _downloadMock = new();
     private readonly Mock<IUpdateService> _updateMock = new();
@@ -44,19 +45,23 @@ public class PipNavigationTests : IDisposable
             new Mock<IHttpClientFactory>().Object,
             new Mock<IImageCacheService>().Object,
             new Mock<IFileScannerService>().Object);
-        _navigationServiceMock.Setup(n => n.ObtenerGaleria()).Returns(_galeriaVm);
+
+        _spMock.Setup(sp => sp.GetService(typeof(GaleriaViewModel))).Returns(_galeriaVm);
+        _navigationService = new NavigationService(_spMock.Object);
     }
 
     public void Dispose()
     {
         GC.SuppressFinalize(this);
         try { if (Directory.Exists(_tempFolder)) Directory.Delete(_tempFolder, true); } catch { }
+        CommunityToolkit.Mvvm.Messaging.WeakReferenceMessenger.Default.UnregisterAll(this);
+        CommunityToolkit.Mvvm.Messaging.WeakReferenceMessenger.Default.UnregisterAll(_navigationService);
     }
 
     private MainViewModel CreateMainVm()
     {
         return new MainViewModel(
-            _navigationServiceMock.Object,
+            _navigationService,
             _trackingMock.Object,
             _libraryService,
             _downloadMock.Object,
@@ -140,14 +145,14 @@ public class PipNavigationTests : IDisposable
         // Arrange
         var mainVm = CreateMainVm();
         using var repVm = CreateReproductorVm();
-        mainVm.ReproductorActivo = repVm;
+        mainVm.Navigation.ReproductorActivo = repVm;
 
         // Act
-        mainVm.Receive(new NavegarMensaje_VolverDelReproductor());
+        CommunityToolkit.Mvvm.Messaging.IMessengerExtensions.Send(CommunityToolkit.Mvvm.Messaging.WeakReferenceMessenger.Default, new NavegarMensaje_VolverDelReproductor());
 
         // Assert
-        mainVm.ReproductorActivo.Should().BeNull();
-        mainVm.VistaActual.Should().BeSameAs(_galeriaVm);
+        mainVm.Navigation.ReproductorActivo.Should().BeNull();
+        mainVm.Navigation.VistaActual.Should().BeSameAs(_galeriaVm);
     }
 
     [Fact]
@@ -157,16 +162,16 @@ public class PipNavigationTests : IDisposable
         var mainVm = CreateMainVm();
         using var repVm = CreateReproductorVm();
         repVm.EsModoMini = false;
-        mainVm.ReproductorActivo = repVm;
+        mainVm.Navigation.ReproductorActivo = repVm;
 
         var mockDescargasVm = new DescargasViewModel(_downloadMock.Object);
-        _navigationServiceMock.Setup(n => n.ObtenerDescargas()).Returns(mockDescargasVm);
+        _spMock.Setup(sp => sp.GetService(typeof(DescargasViewModel))).Returns(mockDescargasVm);
 
-        // Act: usuario cambia a pestaña de descargas mientras el reproductor está abierto
+        // Act: usuario cambia a pestaa de descargas mientras el reproductor estǭ abierto
         mainVm.NavegarDescargasCommand.Execute(null);
 
-        // Assert: no se interrumpe la reproducción, sino que se acopla a la esquina
+        // Assert: no se interrumpe la reproduccin, sino que se acopla a la esquina
         repVm.EsModoMini.Should().BeTrue();
-        mainVm.VistaActual.Should().BeSameAs(mockDescargasVm);
+        mainVm.Navigation.VistaActual.Should().BeSameAs(mockDescargasVm);
     }
 }

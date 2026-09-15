@@ -11,19 +11,7 @@ using AnimeLocalTracker.Messages;
 namespace AnimeLocalTracker.ViewModels;
 
 public partial class MainViewModel : ObservableObject, 
-    IRecipient<NavegarMensaje_Galeria>,
-    IRecipient<NavegarMensaje_AgregarAnime>,
-    IRecipient<NavegarMensaje_Detalle>,
-    IRecipient<NavegarMensaje_Calendario>,
-    IRecipient<NavegarMensaje_Descargas>,
-    IRecipient<NavegarMensaje_Configuracion>,
-    IRecipient<NavegarMensaje_AcercaDe>,
-    IRecipient<NavegarMensaje_Estadisticas>,
-    IRecipient<NavegarMensaje_Historial>,
-    IRecipient<NavegarMensaje_Actualizaciones>,
     IRecipient<AbrirBuscadorMensaje>,
-    IRecipient<NavegarMensaje_Reproductor>,
-    IRecipient<NavegarMensaje_VolverDelReproductor>,
     IRecipient<DescargaProgresoMensaje>,
     IRecipient<NuevosEpisodiosMensaje>
 {
@@ -33,32 +21,10 @@ public partial class MainViewModel : ObservableObject,
     private readonly IDownloadService _downloadService;
     private readonly IUpdateService _updateService;
 
+    public NavigationService Navigation => (NavigationService)_navigationService;
     public IDialogService DialogService { get; }
 
     public string VersionAppTexto => _updateService.ObtenerVersionActual();
-
-    // === NAVEGACIÓN (ViewModel-First) ===
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(EsGaleriaActiva))]
-    [NotifyPropertyChangedFor(nameof(EsAgregarAnimeActivo))]
-    [NotifyPropertyChangedFor(nameof(EsCalendarioActivo))]
-    [NotifyPropertyChangedFor(nameof(EsDescargasActivas))]
-    [NotifyPropertyChangedFor(nameof(EsConfiguracionActiva))]
-    [NotifyPropertyChangedFor(nameof(EsAcercaDeActivo))]
-    [NotifyPropertyChangedFor(nameof(EsEstadisticasActivo))]
-    [NotifyPropertyChangedFor(nameof(EsHistorialActivo))]
-    [NotifyPropertyChangedFor(nameof(EsActualizacionesActivo))]
-    private ObservableObject _vistaActual = null!;
-
-    public bool EsGaleriaActiva => VistaActual is GaleriaViewModel || VistaActual is DetalleViewModel;
-    public bool EsAgregarAnimeActivo => VistaActual is AgregarAnimeViewModel;
-    public bool EsCalendarioActivo => VistaActual is CalendarioViewModel;
-    public bool EsDescargasActivas => VistaActual is DescargasViewModel;
-    public bool EsConfiguracionActiva => VistaActual is ConfiguracionViewModel;
-    public bool EsAcercaDeActivo => VistaActual is AcercaDeViewModel;
-    public bool EsEstadisticasActivo => VistaActual is EstadisticasViewModel;
-    public bool EsHistorialActivo => VistaActual is HistorialViewModel;
-    public bool EsActualizacionesActivo => VistaActual is ActualizacionesViewModel;
 
     // === BADGE DE DESCARGAS ===
     [ObservableProperty]
@@ -66,11 +32,6 @@ public partial class MainViewModel : ObservableObject,
 
     [ObservableProperty]
     private bool _tieneDescargasActivas;
-
-    // === DIÁLOGOS Y TOASTS ===
-    // Delegados a IDialogService (DialogService)
-
-
 
     // === BUSCADOR FLOTANTE ===
     [ObservableProperty] private bool _isDialogOpen;
@@ -108,8 +69,8 @@ public partial class MainViewModel : ObservableObject,
 
         WeakReferenceMessenger.Default.RegisterAll(this);
 
-        // Cargamos la vista inicial
-        VistaActual = _navigationService.ObtenerGaleria();
+        // Cargamos la vista inicial a través del servicio de navegación
+        WeakReferenceMessenger.Default.Send(new NavegarMensaje_Galeria());
         ActualizarConteoDescargas();
     }
 
@@ -165,273 +126,38 @@ public partial class MainViewModel : ObservableObject,
         });
     }
 
-    // ==========================================
-    // RECEPTORES DE MENSAJES
-    // ==========================================
-    public void Receive(NavegarMensaje_Galeria message)
-    {
-        // Si se abrió el Detalle desde el Calendario, "volver" regresa al calendario
-        // (flujo circular calendario → ficha → calendario, sin pasar por la galería).
-        if (_vistaAnteriorADetalleCalendario != null && VistaActual is DetalleViewModel)
-        {
-            VistaActual = _vistaAnteriorADetalleCalendario;
-            _vistaAnteriorADetalleCalendario = null;
-            return;
-        }
-        VistaActual = _navigationService.ObtenerGaleria();
-    }
-
-    public void Receive(NavegarMensaje_Detalle message) => _ = InicializarDetalleAsync(message);
-
-    private async Task InicializarDetalleAsync(NavegarMensaje_Detalle message)
-    {
-        try
-        {
-            var detalleVm = _navigationService.CrearDetalle();
-            _vistaAnteriorADetalleCalendario = VistaActual is CalendarioViewModel ? VistaActual : null;
-            VistaActual = detalleVm;
-            await detalleVm.InicializarAsync(message.AnimeSeleccionado);
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Error("MainViewModel", "Error al inicializar la vista de detalle", ex);
-        }
-    }
-
-    public void Receive(NavegarMensaje_Calendario message)
-    {
-        var calendarioVm = _navigationService.ObtenerCalendario();
-        VistaActual = calendarioVm;
-        calendarioVm.RefrescarEstadosEmitidos();
-
-        // El calendario es singleton: si la carga inicial falló (red/rate-limit) o está vacío,
-        // reintentar al navegar para que no quede pegado en columnas vacías.
-        if (calendarioVm.EstaVacio && !calendarioVm.EstaCargando)
-        {
-            calendarioVm.CargarCalendarioCommand.Execute(null);
-        }
-    }
-
-    public void Receive(NavegarMensaje_Descargas message)
-    {
-        VistaActual = _navigationService.ObtenerDescargas();
-    }
-
-    // === REPRODUCTOR IN-APP (EMBEBIDO) ===
-    [ObservableProperty]
-    private ReproductorViewModel? _reproductorActivo;
-
-    // Vista a la que volver al salir del reproductor
-    private ObservableObject? _vistaAnteriorAlReproductor;
-
-    // Flujo calendario → ficha: "volver" desde el Detalle regresa al calendario.
-    private ObservableObject? _vistaAnteriorADetalleCalendario;
-
-    public void Receive(NavegarMensaje_Reproductor message) => _ = NavegarAlReproductorAsync(message);
-
-    private async Task NavegarAlReproductorAsync(NavegarMensaje_Reproductor message)
-    {
-        try
-        {
-            if (ReproductorActivo != null)
-            {
-                ReproductorActivo.Dispose();
-                ReproductorActivo = null;
-            }
-
-            _vistaAnteriorAlReproductor = VistaActual;
-
-            var viewModel = _navigationService.CrearReproductor();
-            if (viewModel == null) return;
-
-            viewModel.AsegurarPlayerInicializado();
-            viewModel.EsModoMini = false;
-            ReproductorActivo = viewModel;
-
-            try
-            {
-                await viewModel.CargarVideoAsync(message.RutaVideo, message.AnimeId, message.TituloAnime, message.Episodio, message.EpisodiosDisponibles);
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Error("MainViewModel", $"Error al cargar el video '{message.RutaVideo}'", ex);
-            }
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Error("MainViewModel", "Error al procesar NavegarMensaje_Reproductor", ex);
-        }
-    }
-
-    partial void OnVistaActualChanged(ObservableObject? oldValue, ObservableObject newValue)
-    {
-        // Si el usuario navega a otra pestaña mientras el reproductor está activo en formato completo,
-        // pasa automáticamente a modo mini en la esquina para no interrumpir el video.
-        if (ReproductorActivo != null && !ReproductorActivo.EsModoMini)
-        {
-            ReproductorActivo.EsModoMini = true;
-        }
-    }
-
-    public void Receive(NavegarMensaje_VolverDelReproductor message)
-    {
-        if (ReproductorActivo != null)
-        {
-            ReproductorActivo = null;
-        }
-
-        if (_vistaAnteriorAlReproductor != null)
-        {
-            VistaActual = _vistaAnteriorAlReproductor;
-            _vistaAnteriorAlReproductor = null;
-        }
-        else
-        {
-            VistaActual = _navigationService.ObtenerGaleria();
-        }
-    }
-
+    [RelayCommand]
+    private void NavegarGaleria() => WeakReferenceMessenger.Default.Send(new NavegarMensaje_Galeria());
 
     [RelayCommand]
-    private void NavegarGaleria()
-    {
-        VistaActual = _navigationService.ObtenerGaleria();
-    }
+    private void NavegarAgregarAnime() => WeakReferenceMessenger.Default.Send(new NavegarMensaje_AgregarAnime());
 
     [RelayCommand]
-    private void NavegarAgregarAnime()
-    {
-        VistaActual = _navigationService.ObtenerAgregarAnime();
-    }
-
-    public void Receive(NavegarMensaje_AgregarAnime message)
-    {
-        NavegarAgregarAnime();
-    }
+    private void NavegarCalendario() => WeakReferenceMessenger.Default.Send(new NavegarMensaje_Calendario());
 
     [RelayCommand]
-    private void NavegarCalendario()
-    {
-        var calendarioVm = _navigationService.ObtenerCalendario();
-        VistaActual = calendarioVm;
-        calendarioVm.RefrescarEstadosEmitidos();
-    }
+    private void NavegarDescargas() => WeakReferenceMessenger.Default.Send(new NavegarMensaje_Descargas());
 
     [RelayCommand]
-    private void NavegarDescargas()
-    {
-        VistaActual = _navigationService.ObtenerDescargas();
-    }
+    private void NavegarConfiguracion() => WeakReferenceMessenger.Default.Send(new NavegarMensaje_Configuracion());
 
     [RelayCommand]
-    private void NavegarConfiguracion()
-    {
-        try
-        {
-            VistaActual = _navigationService.ObtenerConfiguracion();
-        }
-        catch (Exception ex)
-        {
-            // AppLogger escribe en %LocalAppData%: seguro incluso instalado en Program Files.
-            // (Antes se escribía un crash.log relativo al EXE, lo que lanzaba dentro del catch.)
-            AppLogger.Error("MainViewModel", "Error navegando a configuración", ex);
-        }
-    }
-
-    public void Receive(NavegarMensaje_Configuracion message)
-    {
-        NavegarConfiguracion();
-    }
+    private void NavegarAcercaDe() => WeakReferenceMessenger.Default.Send(new NavegarMensaje_AcercaDe());
 
     [RelayCommand]
-    private void NavegarAcercaDe()
-    {
-        try 
-        {
-            VistaActual = _navigationService.ObtenerAcercaDe();
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Error("MainViewModel", "Error navegando a acerca de", ex);
-        }
-    }
-
-    public void Receive(NavegarMensaje_AcercaDe message)
-    {
-        NavegarAcercaDe();
-    }
+    private void NavegarEstadisticas() => WeakReferenceMessenger.Default.Send(new NavegarMensaje_Estadisticas());
 
     [RelayCommand]
-    private async Task NavegarEstadisticas()
-    {
-        try
-        {
-            var estadisticasVm = _navigationService.ObtenerEstadisticas();
-            VistaActual = estadisticasVm;
-            await estadisticasVm.CargarEstadisticasAsync();
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Error("MainViewModel", "Error navegando a estadísticas", ex);
-        }
-    }
-
-    public void Receive(NavegarMensaje_Estadisticas message)
-    {
-        _ = NavegarEstadisticas();
-    }
+    private void NavegarHistorial() => WeakReferenceMessenger.Default.Send(new NavegarMensaje_Historial());
 
     [RelayCommand]
-    private async Task NavegarHistorial()
-    {
-        try
-        {
-            var historialVm = _navigationService.ObtenerHistorial();
-            VistaActual = historialVm;
-            await historialVm.CargarHistorialAsync();
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Error("MainViewModel", "Error navegando a historial", ex);
-        }
-    }
-
-    public void Receive(NavegarMensaje_Historial message)
-    {
-        _ = NavegarHistorial();
-    }
-
-    [RelayCommand]
-    private async Task NavegarActualizaciones()
-    {
-        try
-        {
-            var actualizacionesVm = _navigationService.ObtenerActualizaciones();
-            VistaActual = actualizacionesVm;
-            await actualizacionesVm.CargarActualizacionesAsync();
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Error("MainViewModel", "Error navegando a actualizaciones", ex);
-        }
-    }
-
-    public void Receive(NavegarMensaje_Actualizaciones message)
-    {
-        _ = NavegarActualizaciones();
-    }
+    private void NavegarActualizaciones() => WeakReferenceMessenger.Default.Send(new NavegarMensaje_Actualizaciones());
 
     public void Receive(AbrirBuscadorMensaje message)
     {
         NavegarAgregarAnime();
     }
 
-    // ==========================================
-    // LÓGICA DE DIÁLOGOS
-    // Delegada a IDialogService.
-    // ==========================================
-    
-    
     [RelayCommand]
     private void CerrarDialogoBusqueda()
     {
@@ -439,11 +165,6 @@ public partial class MainViewModel : ObservableObject,
         IsDialogOpen = false;
     }
 
-    /// <summary>
-    /// Cancela de forma segura cualquier búsqueda pendiente.
-    /// Solo cancela el token — no dispone el CTS inmediatamente,
-    /// ya que tareas async previas aún pueden referenciar el token.
-    /// </summary>
     private void CancelarBusquedaPendiente()
     {
         try
@@ -452,10 +173,6 @@ public partial class MainViewModel : ObservableObject,
         }
         catch (ObjectDisposedException) { }
     }
-
-    // ==========================================
-    // LÓGICA DE BÚSQUEDA Y CREACIÓN DE ANIME
-    // ==========================================
 
     private async Task EjecutarBusquedaEnVivoAsyncCore(string busqueda)
     {
@@ -468,10 +185,8 @@ public partial class MainViewModel : ObservableObject,
             return;
         }
 
-        // Cancelar la búsqueda anterior (solo Cancel, nunca Dispose desde aquí)
         CancelarBusquedaPendiente();
 
-        // Crear un nuevo CTS para esta búsqueda
         var cts = new System.Threading.CancellationTokenSource();
         _searchCts = cts;
 
@@ -480,7 +195,6 @@ public partial class MainViewModel : ObservableObject,
             IsSearching = true;
             await Task.Delay(400, cts.Token);
 
-            // Verificar si mientras esperábamos, otra búsqueda nos canceló
             if (cts.Token.IsCancellationRequested) return;
 
             var resultados = await _animeTrackingService.BuscarAnimesEnVivoAsync(busqueda, cts.Token);
@@ -494,24 +208,17 @@ public partial class MainViewModel : ObservableObject,
             }
             BusquedaSinResultados = ResultadosBusqueda.Count == 0;
         }
-        catch (OperationCanceledException)
-        {
-            // Normal: el usuario escribió otro carácter y cancelamos esta búsqueda.
-        }
+        catch (OperationCanceledException) { }
         catch (Exception ex)
         {
             AppLogger.Error("MainViewModel", $"Error durante la búsqueda en vivo para '{busqueda}'", ex);
         }
         finally
         {
-            // Solo actualizar IsSearching si ESTE CTS sigue siendo el activo.
-            // Si _searchCts ya apunta a otro objeto, otra búsqueda tomó el control.
             if (ReferenceEquals(_searchCts, cts))
             {
                 IsSearching = false;
             }
-
-            // Ahora sí es seguro disponer: ya salimos de todas las operaciones async.
             cts.Dispose();
         }
     }
@@ -523,14 +230,12 @@ public partial class MainViewModel : ObservableObject,
 
         try
         {
-            // ARQ-02: toda la lógica de creación (validación, carpeta, episodios, persistencia)
-            // vive en AnimeLibraryService; este ViewModel solo gestiona su estado de UI.
             var nuevoAnime = await _animeLibraryService.CrearYGuardarAnimeAsync(animeAPI, animeAPI.Title.Romaji);
 
             if (nuevoAnime == null)
             {
                 IsDialogOpen = false;
-                await Task.Delay(250); // Permitir que la animación de cierre termine
+                await Task.Delay(250);
                 TextoBusqueda = string.Empty;
                 ResultadosBusqueda.Clear();
                 await DialogService.MostrarDialogoAsync(
@@ -541,7 +246,7 @@ public partial class MainViewModel : ObservableObject,
             }
 
             IsDialogOpen = false;
-            await Task.Delay(250); // Permitir que la animación de cierre termine antes de limpiar
+            await Task.Delay(250);
             TextoBusqueda = string.Empty;
             ResultadosBusqueda.Clear();
 

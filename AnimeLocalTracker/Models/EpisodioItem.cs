@@ -9,6 +9,10 @@ public partial class EpisodioItem : ObservableObject
     // Nombre que se mostrará en pantalla (Ej: "Episodio 1")
     public string TituloVisual => $"Episodio {NumeroEpisodio}"; 
     
+    // Resumen para accesibilidad (lectores de pantalla)
+    public string ResumenAccesible => $"Episodio {NumeroEpisodio}: {(Visto ? "Visto" : "No visto")}. {(Descargado ? "Descargado" : "No descargado")}.";
+
+    
     public string TituloArchivo { get; set; } = string.Empty;
     public string RutaCompleta { get; set; } = string.Empty;
     public int NumeroEpisodio { get; set; }

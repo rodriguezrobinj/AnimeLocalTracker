@@ -54,7 +54,7 @@
                             <!-- BOTÓN BIBLIOTECA (GALERÍA) -->
                             <Grid Margin="0,8">
                                 <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"
-                                           Visibility="{Binding EsGaleriaActiva, Converter={StaticResource BoolToVis}}"/>
+                                           Visibility="{Binding Navigation.EsGaleriaActiva, Converter={StaticResource BoolToVis}}"/>
                                 <Button Command="{Binding NavegarGaleriaCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{Binding [Nav_Galeria], Source={x:Static loc:LocalizationService.Instance}}" AutomationProperties.Name="{Binding [Nav_Galeria], Source={x:Static loc:LocalizationService.Instance}}" TabIndex="1">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
@@ -63,7 +63,7 @@
                                             <Trigger Property="IsMouseOver" Value="True">
                                                 <Setter Property="Background" Value="#1B222C"/>
                                             </Trigger>
-                                                <DataTrigger Binding="{Binding EsGaleriaActiva}" Value="True">
+                                                <DataTrigger Binding="{Binding Navigation.EsGaleriaActiva}" Value="True">
                                                     <Setter Property="Background" Value="#1E293B"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
@@ -74,7 +74,7 @@
                                             <Style TargetType="materialDesign:PackIcon">
                                                 <Setter Property="Foreground" Value="#6B7280"/>
                                                 <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding EsGaleriaActiva}" Value="True">
+                                                    <DataTrigger Binding="{Binding Navigation.EsGaleriaActiva}" Value="True">
                                                         <Setter Property="Foreground" Value="#60A5FA"/>
                                                     </DataTrigger>
                                                 </Style.Triggers>
@@ -87,7 +87,7 @@
                             <!-- BOTÓN HISTORIAL -->
                             <Grid Margin="0,8">
                                 <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"
-                                           Visibility="{Binding EsHistorialActivo, Converter={StaticResource BoolToVis}}"/>
+                                           Visibility="{Binding Navigation.EsHistorialActivo, Converter={StaticResource BoolToVis}}"/>
                                 <Button Command="{Binding NavegarHistorialCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{Binding [Nav_Historial], Source={x:Static loc:LocalizationService.Instance}}" AutomationProperties.Name="{Binding [Nav_Historial], Source={x:Static loc:LocalizationService.Instance}}" TabIndex="2">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
@@ -96,7 +96,7 @@
                                                 <Trigger Property="IsMouseOver" Value="True">
                                                     <Setter Property="Background" Value="#1B222C"/>
                                                 </Trigger>
-                                                <DataTrigger Binding="{Binding EsHistorialActivo}" Value="True">
+                                                <DataTrigger Binding="{Binding Navigation.EsHistorialActivo}" Value="True">
                                                     <Setter Property="Background" Value="#1E293B"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
@@ -107,7 +107,7 @@
                                             <Style TargetType="materialDesign:PackIcon">
                                                 <Setter Property="Foreground" Value="#6B7280"/>
                                                 <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding EsHistorialActivo}" Value="True">
+                                                    <DataTrigger Binding="{Binding Navigation.EsHistorialActivo}" Value="True">
                                                         <Setter Property="Foreground" Value="#60A5FA"/>
                                                     </DataTrigger>
                                                 </Style.Triggers>
@@ -120,7 +120,7 @@
                             <!-- BOTÓN ACTUALIZACIONES (EPISODIOS NUEVOS) -->
                             <Grid Margin="0,8">
                                 <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"
-                                           Visibility="{Binding EsActualizacionesActivo, Converter={StaticResource BoolToVis}}"/>
+                                           Visibility="{Binding Navigation.EsActualizacionesActivo, Converter={StaticResource BoolToVis}}"/>
                                 <Button Command="{Binding NavegarActualizacionesCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{Binding [Nav_Actualizaciones], Source={x:Static loc:LocalizationService.Instance}}" AutomationProperties.Name="{Binding [Nav_Actualizaciones], Source={x:Static loc:LocalizationService.Instance}}" TabIndex="3">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
@@ -129,7 +129,7 @@
                                                 <Trigger Property="IsMouseOver" Value="True">
                                                     <Setter Property="Background" Value="#1B222C"/>
                                                 </Trigger>
-                                                <DataTrigger Binding="{Binding EsActualizacionesActivo}" Value="True">
+                                                <DataTrigger Binding="{Binding Navigation.EsActualizacionesActivo}" Value="True">
                                                     <Setter Property="Background" Value="#1E293B"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
@@ -140,7 +140,7 @@
                                             <Style TargetType="materialDesign:PackIcon">
                                                 <Setter Property="Foreground" Value="#6B7280"/>
                                                 <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding EsActualizacionesActivo}" Value="True">
+                                                    <DataTrigger Binding="{Binding Navigation.EsActualizacionesActivo}" Value="True">
                                                         <Setter Property="Foreground" Value="#60A5FA"/>
                                                     </DataTrigger>
                                                 </Style.Triggers>
@@ -153,7 +153,7 @@
                             <!-- BOTÓN AÑADIR ANIME / EXPLORAR -->
                             <Grid Margin="0,8">
                                 <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"
-                                           Visibility="{Binding EsAgregarAnimeActivo, Converter={StaticResource BoolToVis}}"/>
+                                           Visibility="{Binding Navigation.EsAgregarAnimeActivo, Converter={StaticResource BoolToVis}}"/>
                                 <Button Command="{Binding NavegarAgregarAnimeCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{Binding [Nav_Agregar], Source={x:Static loc:LocalizationService.Instance}}" AutomationProperties.Name="{Binding [Nav_Agregar], Source={x:Static loc:LocalizationService.Instance}}" TabIndex="4">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
@@ -162,7 +162,7 @@
                                             <Trigger Property="IsMouseOver" Value="True">
                                                 <Setter Property="Background" Value="#1B222C"/>
                                             </Trigger>
-                                                <DataTrigger Binding="{Binding EsAgregarAnimeActivo}" Value="True">
+                                                <DataTrigger Binding="{Binding Navigation.EsAgregarAnimeActivo}" Value="True">
                                                     <Setter Property="Background" Value="#1E293B"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
@@ -173,7 +173,7 @@
                                             <Style TargetType="materialDesign:PackIcon">
                                                 <Setter Property="Foreground" Value="#6B7280"/>
                                                 <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding EsAgregarAnimeActivo}" Value="True">
+                                                    <DataTrigger Binding="{Binding Navigation.EsAgregarAnimeActivo}" Value="True">
                                                         <Setter Property="Foreground" Value="#60A5FA"/>
                                                     </DataTrigger>
                                                 </Style.Triggers>
@@ -186,7 +186,7 @@
                             <!-- BOTÓN CALENDARIO -->
                             <Grid Margin="0,8">
                                 <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"
-                                           Visibility="{Binding EsCalendarioActivo, Converter={StaticResource BoolToVis}}"/>
+                                           Visibility="{Binding Navigation.EsCalendarioActivo, Converter={StaticResource BoolToVis}}"/>
                                 <Button Command="{Binding NavegarCalendarioCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{Binding [Nav_Calendario], Source={x:Static loc:LocalizationService.Instance}}" AutomationProperties.Name="{Binding [Nav_Calendario], Source={x:Static loc:LocalizationService.Instance}}" TabIndex="5">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
@@ -195,7 +195,7 @@
                                             <Trigger Property="IsMouseOver" Value="True">
                                                 <Setter Property="Background" Value="#1B222C"/>
                                             </Trigger>
-                                                <DataTrigger Binding="{Binding EsCalendarioActivo}" Value="True">
+                                                <DataTrigger Binding="{Binding Navigation.EsCalendarioActivo}" Value="True">
                                                     <Setter Property="Background" Value="#1E293B"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
@@ -206,7 +206,7 @@
                                             <Style TargetType="materialDesign:PackIcon">
                                                 <Setter Property="Foreground" Value="#6B7280"/>
                                                 <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding EsCalendarioActivo}" Value="True">
+                                                    <DataTrigger Binding="{Binding Navigation.EsCalendarioActivo}" Value="True">
                                                         <Setter Property="Foreground" Value="#60A5FA"/>
                                                     </DataTrigger>
                                                 </Style.Triggers>
@@ -219,7 +219,7 @@
                             <!-- BOTÓN ESTADÍSTICAS -->
                             <Grid Margin="0,8">
                                 <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"
-                                           Visibility="{Binding EsEstadisticasActivo, Converter={StaticResource BoolToVis}}"/>
+                                           Visibility="{Binding Navigation.EsEstadisticasActivo, Converter={StaticResource BoolToVis}}"/>
                                 <Button Command="{Binding NavegarEstadisticasCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{Binding [Nav_Estadisticas], Source={x:Static loc:LocalizationService.Instance}}" AutomationProperties.Name="{Binding [Nav_Estadisticas], Source={x:Static loc:LocalizationService.Instance}}" TabIndex="6">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
@@ -228,7 +228,7 @@
                                                 <Trigger Property="IsMouseOver" Value="True">
                                                     <Setter Property="Background" Value="#1B222C"/>
                                                 </Trigger>
-                                                <DataTrigger Binding="{Binding EsEstadisticasActivo}" Value="True">
+                                                <DataTrigger Binding="{Binding Navigation.EsEstadisticasActivo}" Value="True">
                                                     <Setter Property="Background" Value="#1E293B"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
@@ -239,7 +239,7 @@
                                             <Style TargetType="materialDesign:PackIcon">
                                                 <Setter Property="Foreground" Value="#6B7280"/>
                                                 <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding EsEstadisticasActivo}" Value="True">
+                                                    <DataTrigger Binding="{Binding Navigation.EsEstadisticasActivo}" Value="True">
                                                         <Setter Property="Foreground" Value="#60A5FA"/>
                                                     </DataTrigger>
                                                 </Style.Triggers>
@@ -252,7 +252,7 @@
                             <!-- BOTÓN COLA DE DESCARGAS -->
                             <Grid Margin="0,8">
                                 <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"
-                                           Visibility="{Binding EsDescargasActivas, Converter={StaticResource BoolToVis}}"/>
+                                           Visibility="{Binding Navigation.EsDescargasActivas, Converter={StaticResource BoolToVis}}"/>
                                 <Button Command="{Binding NavegarDescargasCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{Binding [Nav_Descargas], Source={x:Static loc:LocalizationService.Instance}}" AutomationProperties.Name="{Binding [Nav_Descargas], Source={x:Static loc:LocalizationService.Instance}}" TabIndex="7">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
@@ -261,7 +261,7 @@
                                             <Trigger Property="IsMouseOver" Value="True">
                                                 <Setter Property="Background" Value="#1B222C"/>
                                             </Trigger>
-                                                <DataTrigger Binding="{Binding EsDescargasActivas}" Value="True">
+                                                <DataTrigger Binding="{Binding Navigation.EsDescargasActivas}" Value="True">
                                                     <Setter Property="Background" Value="#1E293B"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
@@ -272,7 +272,7 @@
                                             <Style TargetType="materialDesign:PackIcon">
                                                 <Setter Property="Foreground" Value="#6B7280"/>
                                                 <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding EsDescargasActivas}" Value="True">
+                                                    <DataTrigger Binding="{Binding Navigation.EsDescargasActivas}" Value="True">
                                                         <Setter Property="Foreground" Value="#60A5FA"/>
                                                     </DataTrigger>
                                                 </Style.Triggers>
@@ -302,7 +302,7 @@
                             <!-- BOTÓN CONFIGURACIÓN -->
                             <Grid Margin="0,4">
                                 <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"
-                                           Visibility="{Binding EsConfiguracionActiva, Converter={StaticResource BoolToVis}}"/>
+                                           Visibility="{Binding Navigation.EsConfiguracionActiva, Converter={StaticResource BoolToVis}}"/>
                                 <Button Command="{Binding NavegarConfiguracionCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{Binding [Nav_Configuracion], Source={x:Static loc:LocalizationService.Instance}}" AutomationProperties.Name="{Binding [Nav_Configuracion], Source={x:Static loc:LocalizationService.Instance}}" TabIndex="8">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
@@ -311,7 +311,7 @@
                                             <Trigger Property="IsMouseOver" Value="True">
                                                 <Setter Property="Background" Value="#1B222C"/>
                                             </Trigger>
-                                                <DataTrigger Binding="{Binding EsConfiguracionActiva}" Value="True">
+                                                <DataTrigger Binding="{Binding Navigation.EsConfiguracionActiva}" Value="True">
                                                     <Setter Property="Background" Value="#1E293B"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
@@ -322,7 +322,7 @@
                                             <Style TargetType="materialDesign:PackIcon">
                                                 <Setter Property="Foreground" Value="#6B7280"/>
                                                 <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding EsConfiguracionActiva}" Value="True">
+                                                    <DataTrigger Binding="{Binding Navigation.EsConfiguracionActiva}" Value="True">
                                                         <Setter Property="Foreground" Value="#60A5FA"/>
                                                     </DataTrigger>
                                                 </Style.Triggers>
@@ -335,7 +335,7 @@
                             <!-- BOTÓN ACERCA DE -->
                             <Grid Margin="0,4">
                                 <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"
-                                           Visibility="{Binding EsAcercaDeActivo, Converter={StaticResource BoolToVis}}"/>
+                                           Visibility="{Binding Navigation.EsAcercaDeActivo, Converter={StaticResource BoolToVis}}"/>
                                 <Button Command="{Binding NavegarAcercaDeCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{Binding [Nav_AcercaDe], Source={x:Static loc:LocalizationService.Instance}}" AutomationProperties.Name="{Binding [Nav_AcercaDe], Source={x:Static loc:LocalizationService.Instance}}" TabIndex="9">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
@@ -344,7 +344,7 @@
                                             <Trigger Property="IsMouseOver" Value="True">
                                                 <Setter Property="Background" Value="#1B222C"/>
                                             </Trigger>
-                                                <DataTrigger Binding="{Binding EsAcercaDeActivo}" Value="True">
+                                                <DataTrigger Binding="{Binding Navigation.EsAcercaDeActivo}" Value="True">
                                                     <Setter Property="Background" Value="#1E293B"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
@@ -355,7 +355,7 @@
                                             <Style TargetType="materialDesign:PackIcon">
                                                 <Setter Property="Foreground" Value="#6B7280"/>
                                                 <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding EsAcercaDeActivo}" Value="True">
+                                                    <DataTrigger Binding="{Binding Navigation.EsAcercaDeActivo}" Value="True">
                                                         <Setter Property="Foreground" Value="#60A5FA"/>
                                                     </DataTrigger>
                                                 </Style.Triggers>
@@ -372,7 +372,7 @@
                      VM→Vista de App.xaml según la VistaActual (ARC-04). -->
                 <!-- Sin margen superior para que el fondo (ej. desenfoque) cubra toda la ventana detrás de la barra de título -->
                 <ContentControl x:Name="ContenedorVistaPrincipal" Grid.Column="0" Grid.ColumnSpan="2"
-                                Content="{Binding VistaActual}" />
+                                Content="{Binding Navigation.VistaActual}" />
 
                 <!-- REPRODUCTOR IN-APP (EMBEBIDO DENTRO DE LA APLICACIÓN) -->
                 <!-- Ocupa toda la ventana en formato habitual, o se reduce a la esquina en formato mini -->
@@ -382,7 +382,7 @@
                             <Setter Property="Visibility" Value="Collapsed" />
                             <Style.Triggers>
                                 <!-- Visible cuando hay un ReproductorActivo -->
-                                <DataTrigger Binding="{Binding ReproductorActivo, Converter={StaticResource NullToCollapsed}}" Value="Visible">
+                                <DataTrigger Binding="{Binding Navigation.ReproductorActivo, Converter={StaticResource NullToCollapsed}}" Value="Visible">
                                     <Setter Property="Visibility" Value="Visible" />
                                     <Setter Property="HorizontalAlignment" Value="Stretch" />
                                     <Setter Property="VerticalAlignment" Value="Stretch" />
@@ -392,13 +392,13 @@
                                     <Setter Property="Background" Value="Black" />
                                 </DataTrigger>
                                 <!-- Si está en modo mini: flota en la esquina inferior derecha -->
-                                <DataTrigger Binding="{Binding ReproductorActivo.EsModoMini}" Value="True">
+                                <DataTrigger Binding="{Binding Navigation.ReproductorActivo.EsModoMini}" Value="True">
                                     <Setter Property="Visibility" Value="Visible" />
                                     <Setter Property="HorizontalAlignment" Value="Right" />
                                     <Setter Property="VerticalAlignment" Value="Bottom" />
                                     <Setter Property="Width" Value="384" />
                                     <Setter Property="Height" Value="216" />
-                                    <Setter Property="Margin" Value="{Binding ReproductorActivo.MiniPlayerMargin}" />
+                                    <Setter Property="Margin" Value="{Binding Navigation.ReproductorActivo.MiniPlayerMargin}" />
                                     <Setter Property="CornerRadius" Value="8" />
                                     <Setter Property="BorderThickness" Value="0" />
                                     <Setter Property="Background" Value="Transparent" />
@@ -407,7 +407,7 @@
                         </Style>
                     </Border.Style>
 
-                    <ContentControl Content="{Binding ReproductorActivo}" />
+                    <ContentControl Content="{Binding Navigation.ReproductorActivo}" />
                 </Border>
 
 

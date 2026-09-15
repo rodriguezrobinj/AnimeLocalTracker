@@ -22,7 +22,11 @@ public partial class DescargaItem : ObservableObject
     [NotifyPropertyChangedFor(nameof(EstaEnEspera))]
     private bool _isPaused;
 
-    public string ProgresoTexto => IsPaused ? $"Pausado ({Progreso:F0}%)" : (Progreso > 0 ? $"{Progreso:F0}%" : "En espera...");
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ProgresoTexto))]
+    private string _velocidadDescarga = string.Empty;
+
+    public string ProgresoTexto => IsPaused ? $"Pausado ({Progreso:F0}%)" : (Progreso > 0 ? $"{Progreso:F0}%{(string.IsNullOrEmpty(VelocidadDescarga) ? "" : $" - {VelocidadDescarga}")}" : "En espera...");
     public bool EstaEnEspera => Progreso <= 0.0 && !IsPaused;
 
     [ObservableProperty]

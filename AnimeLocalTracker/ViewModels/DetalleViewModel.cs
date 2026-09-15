@@ -55,12 +55,18 @@ public partial class DetalleViewModel : ObservableObject,
     private bool _ordenAscendente = false;
 
     [ObservableProperty]
-    private string _filtroEpisodios = "Todos";
+    private string _filtroEpisodios = LocalizationService.T("Filtro_Todos");
 
-    public string[] OpcionesFiltro { get; } = ["Todos", "Descargados", "Vistos", "No Vistos", "Favoritos"];
+    public string[] OpcionesFiltro { get; } = [
+        LocalizationService.T("Filtro_Todos"), 
+        LocalizationService.T("Filtro_Descargados"), 
+        LocalizationService.T("Filtro_Vistos"), 
+        LocalizationService.T("Filtro_NoVistos"), 
+        LocalizationService.T("Filtro_Favoritos")
+    ];
 
-    [ObservableProperty] private string _mensajeSinEpisodios = "No hay episodios para mostrar";
-    [ObservableProperty] private string _subtituloSinEpisodios = "El filtro actual no encontró coincidencias.";
+    [ObservableProperty] private string _mensajeSinEpisodios = LocalizationService.T("Det_SinEpisodios");
+    [ObservableProperty] private string _subtituloSinEpisodios = LocalizationService.T("Det_SinEpisodiosSub");
 
     // === ACCIONES HERO Y DETALLES ===
     [ObservableProperty] private bool _sinopsisExpandida = false;
@@ -117,8 +123,14 @@ public partial class DetalleViewModel : ObservableObject,
     [ObservableProperty] private float _editPuntaje;
     [ObservableProperty] private DateTime? _editFechaInicio;
     [ObservableProperty] private DateTime? _editFechaFin;
-    [ObservableProperty] private string _editEstadoVisual = "Viendo";
-    public List<string> OpcionesEstadoVisual { get; } = ["Viendo", "Finalizado", "En Pausa", "Abandonado", "Planeando"];
+    [ObservableProperty] private string _editEstadoVisual = LocalizationService.T("Estado_Viendo");
+    public List<string> OpcionesEstadoVisual { get; } = [
+        LocalizationService.T("Estado_Viendo"), 
+        LocalizationService.T("Estado_Finalizado"), 
+        LocalizationService.T("Estado_EnPausa"), 
+        LocalizationService.T("Estado_Abandonado"), 
+        LocalizationService.T("Estado_Planeando")
+    ];
 
     [ObservableProperty] private bool _estaConectado;
 
@@ -169,6 +181,7 @@ public partial class DetalleViewModel : ObservableObject,
                     {
                         episodio.TotalSegundos = message.TotalSegundos;
                     }
+                    AnimeSeleccionado.EpisodiosVistos = _todosLosEpisodios.Count(e => e.Visto);
                     AplicarFiltrosYOrdenamiento();
                 });
             }
@@ -180,6 +193,7 @@ public partial class DetalleViewModel : ObservableObject,
                 {
                     episodio.TotalSegundos = message.TotalSegundos;
                 }
+                AnimeSeleccionado.EpisodiosVistos = _todosLosEpisodios.Count(e => e.Visto);
             }
         }
     }
@@ -305,6 +319,7 @@ public partial class DetalleViewModel : ObservableObject,
 
         // 1. CARGA RÁPIDA DE BASE DE DATOS Y DISCO (SIN INTERNET)
         var registrosGuardados = await _databaseService.ObtenerRegistrosPorAnimeAsync(anime.AniListId);
+        anime.EpisodiosVistos = registrosGuardados.Count(r => r.VistoLocal);
         
         // Escaneamos la carpeta local si existe
         List<EpisodioItem> encontrados = new();
@@ -728,13 +743,13 @@ public partial class DetalleViewModel : ObservableObject,
             EpisodiosDelAnime.Clear();
             if (AnimeSeleccionado != null && (AnimeSeleccionado.Estado == "NOT_YET_RELEASED" || AnimeSeleccionado.TotalEpisodios == 0))
             {
-                MensajeSinEpisodios = "Anime aún no estrenado";
-                SubtituloSinEpisodios = "Este anime aún no cuenta con episodios emitidos.";
+                MensajeSinEpisodios = LocalizationService.T("Det_SinEpisodiosNoEstrenado");
+                SubtituloSinEpisodios = LocalizationService.T("Det_SinEpisodiosNoEstrenadoSub");
             }
             else
             {
-                MensajeSinEpisodios = "No hay episodios para mostrar";
-                SubtituloSinEpisodios = "No se encontraron episodios para este anime.";
+                MensajeSinEpisodios = LocalizationService.T("Det_SinEpisodios");
+                SubtituloSinEpisodios = LocalizationService.T("Det_SinEpisodiosSub");
             }
             return;
         }
@@ -747,8 +762,8 @@ public partial class DetalleViewModel : ObservableObject,
 
         if (EpisodiosDelAnime.Count == 0)
         {
-            MensajeSinEpisodios = "No hay episodios con este filtro";
-            SubtituloSinEpisodios = $"No se encontraron episodios en la categoría '{FiltroEpisodios}'.";
+            MensajeSinEpisodios = LocalizationService.T("Det_SinEpisodiosFiltro");
+            SubtituloSinEpisodios = string.Format(LocalizationService.T("Det_SinEpisodiosFiltroSub"), FiltroEpisodios);
         }
 
         TieneCapituloEnProgreso = _todosLosEpisodios != null && _todosLosEpisodios.Any(e => e.TieneProgresoGuardado);

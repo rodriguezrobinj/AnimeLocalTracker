@@ -339,7 +339,7 @@ public class DownloadService : IDownloadService
 
                 if (state.Cts.IsCancellationRequested || state.IsPaused) return;
 
-                IProgress<double>? progress = null;
+                IProgress<(double Progress, double Speed)>? progress = null;
                 bool descargaCompletada = false;
 
                 // El enlace ya resuelto puede ser rechazado por el servidor (firma caducada,
@@ -365,10 +365,11 @@ public class DownloadService : IDownloadService
 
                     if (state.Cts.IsCancellationRequested || state.IsPaused) return;
 
-                    progress ??= new Progress<double>(p =>
+                    progress ??= new Progress<(double Progress, double Speed)>(p =>
                     {
-                        state.Progreso = p;
-                        WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, p, isDownloading: true, isCompleted: false, isPaused: false, state.RutaDestino, null, state.AnimeTitulo));
+                        state.Progreso = p.Progress;
+                        string speedText = FormatearVelocidad(p.Speed);
+                        WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, p.Progress, isDownloading: true, isCompleted: false, isPaused: false, state.RutaDestino, null, state.AnimeTitulo, speedText));
                     });
 
                     try
@@ -468,7 +469,7 @@ public class DownloadService : IDownloadService
         public string? Error { get; set; }
     }
 
-    public async Task DownloadVideoAsync(string videoUrl, string destinationPath, IProgress<double>? progress = null, CancellationToken cancellationToken = default)
+    public async Task DownloadVideoAsync(string videoUrl, string destinationPath, IProgress<(double Progress, double Speed)>? progress = null, CancellationToken cancellationToken = default)
     {
         // Hardening INT-01 (defensa en profundidad): el punto de descarga solo acepta
         // https sin credenciales, venga la URL de donde venga (scraper, yt-dlp o entrada).
@@ -563,7 +564,7 @@ public class DownloadService : IDownloadService
         }
     }
 
-    private async Task DownloadSegmentedParallelAsync(string videoUrl, string destinationPath, long totalBytes, IProgress<double>? progress, CancellationToken cancellationToken)
+    private async Task DownloadSegmentedParallelAsync(string videoUrl, string destinationPath, long totalBytes, IProgress<(double Progress, double Speed)>? progress, CancellationToken cancellationToken)
     {
         string statePath = destinationPath + ".state";
         DownloadStateInfo stateInfo = await _stateStore.CargarOInicializarAsync(statePath, totalBytes, SegmentosParalelos);
@@ -612,6 +613,8 @@ public class DownloadService : IDownloadService
         long totalDownloaded = stateInfo.Segments.Sum(s => s.CurrentOffset - s.Start);
         double lastReportedPercentage = -1.0;
         var lastReportTime = DateTime.UtcNow;
+        long lastReportedTotalBytes = totalDownloaded;
+        object progressLock = new object();
 
         var tasks = new Task[SegmentosParalelos];
 
@@ -662,19 +665,30 @@ public class DownloadService : IDownloadService
                         {
                             double percent = Math.Clamp((double)currentTotal / totalBytes * 100.0, 0.0, 100.0);
                             var now = DateTime.UtcNow;
-                            if (percent - lastReportedPercentage >= 0.5 || (now - lastReportTime).TotalMilliseconds >= 150 || currentTotal == totalBytes)
+                            bool shouldReport = false;
+                            double speed = 0;
+
+                            lock(progressLock)
                             {
-                                lastReportedPercentage = percent;
-                                lastReportTime = now;
-                                progress.Report(percent);
+                                var timeElapsed = (now - lastReportTime).TotalSeconds;
+                                if (percent - lastReportedPercentage >= 0.5 || timeElapsed >= 0.15 || currentTotal == totalBytes)
+                                {
+                                    speed = timeElapsed > 0 ? (currentTotal - lastReportedTotalBytes) / timeElapsed : 0;
+                                    lastReportedPercentage = percent;
+                                    lastReportTime = now;
+                                    lastReportedTotalBytes = currentTotal;
+                                    shouldReport = true;
+                                }
                             }
+
+                            if (shouldReport) progress.Report((percent, speed));
                         }
                     }
                 }, cancellationToken);
             }
 
             await Task.WhenAll(tasks);
-            progress?.Report(100.0);
+            progress?.Report((100.0, 0));
         }
         catch (OperationCanceledException)
         {
@@ -689,7 +703,7 @@ public class DownloadService : IDownloadService
         }
     }
 
-    private async Task DownloadSequentialAsync(string videoUrl, string destinationPath, long totalBytes, IProgress<double>? progress, CancellationToken cancellationToken)
+    private async Task DownloadSequentialAsync(string videoUrl, string destinationPath, long totalBytes, IProgress<(double Progress, double Speed)>? progress, CancellationToken cancellationToken)
     {
         long existingLength = 0;
         if (File.Exists(destinationPath))
@@ -699,7 +713,7 @@ public class DownloadService : IDownloadService
 
         if (totalBytes > 0 && existingLength >= totalBytes)
         {
-            progress?.Report(100.0);
+            progress?.Report((100.0, 0));
             return;
         }
 
@@ -750,6 +764,7 @@ public class DownloadService : IDownloadService
         bool superoLimite = false;
         var lastReportedPercentage = -1.0;
         var lastReportTime = DateTime.UtcNow;
+        var lastReportedTotalBytes = totalRead;
 
         do
         {
@@ -787,11 +802,14 @@ public class DownloadService : IDownloadService
                     {
                         double currentPercentage = Math.Clamp((double)totalRead / totalBytes * 100, 0.0, 100.0);
                         var now = DateTime.UtcNow;
-                        if (currentPercentage - lastReportedPercentage >= 0.5 || (now - lastReportTime).TotalMilliseconds >= 150 || totalRead == totalBytes)
+                        var timeElapsed = (now - lastReportTime).TotalSeconds;
+                        if (currentPercentage - lastReportedPercentage >= 0.5 || timeElapsed >= 0.15 || totalRead == totalBytes)
                         {
+                            double speed = timeElapsed > 0 ? (totalRead - lastReportedTotalBytes) / timeElapsed : 0;
                             lastReportedPercentage = currentPercentage;
                             lastReportTime = now;
-                            progress.Report(currentPercentage);
+                            lastReportedTotalBytes = totalRead;
+                            progress.Report((currentPercentage, speed));
                         }
                     }
                 }
@@ -807,7 +825,7 @@ public class DownloadService : IDownloadService
 
         if (canReportProgress && progress != null)
         {
-            progress.Report(100.0);
+            progress.Report((100.0, 0));
         }
     }
 
@@ -840,5 +858,14 @@ public class DownloadService : IDownloadService
         if (string.IsNullOrWhiteSpace(url)) return "(vacía)";
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)) return "(url no parseable)";
         return $"{uri.Scheme}://{uri.Authority}{uri.AbsolutePath}";
+    }
+
+    private static string FormatearVelocidad(double bytesPerSecond)
+    {
+        if (bytesPerSecond < 1024)
+            return $"{bytesPerSecond:F0} B/s";
+        if (bytesPerSecond < 1024 * 1024)
+            return $"{bytesPerSecond / 1024:F1} KB/s";
+        return $"{bytesPerSecond / (1024 * 1024):F2} MB/s";
     }
 }

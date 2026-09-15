@@ -63,6 +63,7 @@ public partial class DescargasViewModel : ObservableObject, IRecipient<DescargaP
                 item.IsPaused = message.IsPaused;
                 item.RutaArchivo = message.RutaArchivo;
                 item.Error = message.Error;
+                item.VelocidadDescarga = message.VelocidadDescarga ?? string.Empty;
 
                 if (message.IsCompleted)
                 {
@@ -104,7 +105,8 @@ public partial class DescargasViewModel : ObservableObject, IRecipient<DescargaP
                     Progreso = message.Progreso,
                     IsDownloading = true,
                     IsCompleted = false,
-                    IsPaused = message.IsPaused
+                    IsPaused = message.IsPaused,
+                    VelocidadDescarga = message.VelocidadDescarga ?? string.Empty
                 };
                 ColaDescargas.Add(nuevo);
                 ActualizarConteo();
