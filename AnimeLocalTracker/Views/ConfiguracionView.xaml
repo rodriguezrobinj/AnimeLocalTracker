@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
              xmlns:loc="clr-namespace:AnimeLocalTracker.Services"
+             xmlns:sys="clr-namespace:System;assembly=mscorlib"
              TextElement.Foreground="{DynamicResource MaterialDesignBody}"
              Background="Transparent">
 
@@ -373,12 +374,36 @@
                                 </StackPanel>
                                 <ComboBox Grid.Column="1" HorizontalAlignment="Right" SelectedValue="{Binding VelocidadReproduccionDefecto}"
                                           SelectedValuePath="Tag" Height="38" MinWidth="110">
-                                    <ComboBoxItem Content="0.5x" Tag="0.5"/>
-                                    <ComboBoxItem Content="0.75x" Tag="0.75"/>
-                                    <ComboBoxItem Content="1x" Tag="1.0"/>
-                                    <ComboBoxItem Content="1.25x" Tag="1.25"/>
-                                    <ComboBoxItem Content="1.5x" Tag="1.5"/>
-                                    <ComboBoxItem Content="2x" Tag="2.0"/>
+                                    <ComboBoxItem Content="0.5x">
+                                        <ComboBoxItem.Tag>
+                                            <sys:Double>0.5</sys:Double>
+                                        </ComboBoxItem.Tag>
+                                    </ComboBoxItem>
+                                    <ComboBoxItem Content="0.75x">
+                                        <ComboBoxItem.Tag>
+                                            <sys:Double>0.75</sys:Double>
+                                        </ComboBoxItem.Tag>
+                                    </ComboBoxItem>
+                                    <ComboBoxItem Content="1x">
+                                        <ComboBoxItem.Tag>
+                                            <sys:Double>1.0</sys:Double>
+                                        </ComboBoxItem.Tag>
+                                    </ComboBoxItem>
+                                    <ComboBoxItem Content="1.25x">
+                                        <ComboBoxItem.Tag>
+                                            <sys:Double>1.25</sys:Double>
+                                        </ComboBoxItem.Tag>
+                                    </ComboBoxItem>
+                                    <ComboBoxItem Content="1.5x">
+                                        <ComboBoxItem.Tag>
+                                            <sys:Double>1.5</sys:Double>
+                                        </ComboBoxItem.Tag>
+                                    </ComboBoxItem>
+                                    <ComboBoxItem Content="2x">
+                                        <ComboBoxItem.Tag>
+                                            <sys:Double>2.0</sys:Double>
+                                        </ComboBoxItem.Tag>
+                                    </ComboBoxItem>
                                 </ComboBox>
                             </Grid>
                         </Border>
