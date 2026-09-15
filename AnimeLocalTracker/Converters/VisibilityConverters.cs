@@ -45,3 +45,21 @@ public class NullToCollapsedConverter : IValueConverter
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
         => Binding.DoNothing;
 }
+
+/// <summary>
+/// string.Format(values[0], values[1]) donde values[0] es la plantilla localizada (con "{0}") y
+/// values[1] el valor a insertar. Permite localizar badges tipo "{0} Nuevos" bindeados directo al
+/// ítem de una lista (no a un ViewModel con método propio), refrescando también al cambiar idioma
+/// porque values[0] viene de LocalizationService, que eleva PropertyChanged("Item[]").
+/// </summary>
+public class LocalizedFormatConverter : IMultiValueConverter
+{
+    public object Convert(object?[] values, Type targetType, object? parameter, CultureInfo culture)
+    {
+        if (values.Length < 2 || values[0] is not string formato) return string.Empty;
+        return string.Format(culture, formato, values[1]);
+    }
+
+    public object[] ConvertBack(object? value, Type[] targetTypes, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+}

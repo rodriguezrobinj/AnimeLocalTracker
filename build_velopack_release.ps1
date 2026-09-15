@@ -48,7 +48,7 @@ if (Test-Path $publishDir) {
 
 # 2.1 Compilar el motor Python (AnimeTrackerTools.exe) si el codigo cambio
 Write-Host "[2/5] Compilando motor Python (PyInstaller)..." -ForegroundColor Green
-$vtoolsExe = "$PSScriptRoot\AnimeLocalTracker\Tools\AnimeTrackerTools.exe"
+$vtoolsExe = "$PSScriptRoot\AnimeLocalTracker\Tools\AnimeTrackerTools\AnimeTrackerTools.exe"
 $pythonChanged = $false
 if (Test-Path $vtoolsExe) {
     $lastPyWrite = (Get-ChildItem "$PSScriptRoot\tools\python" -Recurse -Include *.py,pyproject.toml -File |

@@ -2,6 +2,7 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+             xmlns:loc="clr-namespace:AnimeLocalTracker.Services"
              TextElement.Foreground="{DynamicResource MaterialDesignBody}"
              Background="#121212">
 
@@ -71,10 +72,10 @@
                                     Style="{StaticResource MaterialDesignFlatButton}"
                                     Padding="4,8" Height="Auto"
                                     materialDesign:ButtonAssist.CornerRadius="8"
-                                    ToolTip="En biblioteca (Clic para eliminar de la biblioteca)">
+                                    ToolTip="{Binding [Det_EnBibliotecaTip], Source={x:Static loc:LocalizationService.Instance}}">
                                 <StackPanel HorizontalAlignment="Center">
                                     <materialDesign:PackIcon Kind="Heart" Width="20" Height="20" HorizontalAlignment="Center" Foreground="#F43F5E"/>
-                                    <TextBlock Text="Biblioteca" FontSize="11" FontWeight="SemiBold" Foreground="#E2E8F0" Margin="0,4,0,0" HorizontalAlignment="Center" TextAlignment="Center"/>
+                                    <TextBlock Text="{Binding [Det_Biblioteca], Source={x:Static loc:LocalizationService.Instance}}" FontSize="11" FontWeight="SemiBold" Foreground="#E2E8F0" Margin="0,4,0,0" HorizontalAlignment="Center" TextAlignment="Center"/>
                                 </StackPanel>
                             </Button>
 
@@ -84,10 +85,10 @@
                                     Visibility="{Binding EstaConectado, Converter={StaticResource BoolToVis}}"
                                     Padding="4,8" Height="Auto"
                                     materialDesign:ButtonAssist.CornerRadius="8"
-                                    ToolTip="Gestionar seguimiento y progreso en AniList">
+                                    ToolTip="{Binding [Det_SeguimientoTip], Source={x:Static loc:LocalizationService.Instance}}">
                                 <StackPanel HorizontalAlignment="Center">
                                     <materialDesign:PackIcon Kind="Sync" Width="20" Height="20" HorizontalAlignment="Center" Foreground="#60A5FA"/>
-                                    <TextBlock Text="Seguimiento" FontSize="11" FontWeight="SemiBold" Foreground="#E2E8F0" Margin="0,4,0,0" HorizontalAlignment="Center" TextAlignment="Center"/>
+                                    <TextBlock Text="{Binding [Det_Seguimiento], Source={x:Static loc:LocalizationService.Instance}}" FontSize="11" FontWeight="SemiBold" Foreground="#E2E8F0" Margin="0,4,0,0" HorizontalAlignment="Center" TextAlignment="Center"/>
                                 </StackPanel>
                             </Button>
 
@@ -96,10 +97,10 @@
                                     Style="{StaticResource MaterialDesignFlatButton}"
                                     Padding="4,8" Height="Auto"
                                     materialDesign:ButtonAssist.CornerRadius="8"
-                                    ToolTip="Abrir ficha oficial en el navegador web">
+                                    ToolTip="{Binding [Det_WebViewTip], Source={x:Static loc:LocalizationService.Instance}}">
                                 <StackPanel HorizontalAlignment="Center">
                                     <materialDesign:PackIcon Kind="Earth" Width="20" Height="20" HorizontalAlignment="Center" Foreground="#60A5FA"/>
-                                    <TextBlock Text="WebView" FontSize="11" FontWeight="SemiBold" Foreground="#E2E8F0" Margin="0,4,0,0" HorizontalAlignment="Center" TextAlignment="Center"/>
+                                    <TextBlock Text="{Binding [Det_WebView], Source={x:Static loc:LocalizationService.Instance}}" FontSize="11" FontWeight="SemiBold" Foreground="#E2E8F0" Margin="0,4,0,0" HorizontalAlignment="Center" TextAlignment="Center"/>
                                 </StackPanel>
                             </Button>
                         </UniformGrid>
@@ -253,8 +254,14 @@
                         </Grid.ColumnDefinitions>
 
                         <!-- CONTEO DE EPISODIOS -->
-                        <TextBlock Grid.Column="0" Text="{Binding EpisodiosDelAnime.Count, StringFormat='{}{0} episodios'}" 
-                                   FontSize="17" FontWeight="Bold" Foreground="White" VerticalAlignment="Center" Margin="0,0,15,0"/>
+                        <TextBlock Grid.Column="0" FontSize="17" FontWeight="Bold" Foreground="White" VerticalAlignment="Center" Margin="0,0,15,0">
+                            <TextBlock.Text>
+                                <MultiBinding Converter="{StaticResource LocalizedFormat}">
+                                    <Binding Path="[Det_EpisodiosFormato]" Source="{x:Static loc:LocalizationService.Instance}" />
+                                    <Binding Path="EpisodiosDelAnime.Count" />
+                                </MultiBinding>
+                            </TextBlock.Text>
+                        </TextBlock>
 
                         <!-- FILTROS Y ORDENACIÓN -->
                         <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
@@ -265,17 +272,17 @@
                             <ToggleButton IsChecked="{Binding OrdenAscendente}" Style="{StaticResource MaterialDesignActionToggleButton}"
                                           Content="{materialDesign:PackIcon Kind=SortDescending, Size=18}"
                                           materialDesign:ToggleButtonAssist.OnContent="{materialDesign:PackIcon Kind=SortAscending, Size=18}"
-                                          ToolTip="Cambiar orden ascendente/descendente" Width="34" Height="34" Background="#1F242C" BorderBrush="#2D333B" BorderThickness="1" Foreground="White" />
+                                          ToolTip="{Binding [Det_OrdenTip], Source={x:Static loc:LocalizationService.Instance}}" Width="34" Height="34" Background="#1F242C" BorderBrush="#2D333B" BorderThickness="1" Foreground="White" />
 
                             <!-- CARPETA DEL ANIME (acción única, no por episodio) -->
                             <Button Command="{Binding AbrirCarpetaAnimeCommand}"
                                     Style="{StaticResource MaterialDesignOutlinedButton}"
                                     BorderBrush="#34D399" Foreground="#34D399"
                                     Height="34" Padding="10,0" Margin="8,0,0,0"
-                                    ToolTip="Abrir la carpeta del anime en el Explorador">
+                                    ToolTip="{Binding [Det_CarpetaTip], Source={x:Static loc:LocalizationService.Instance}}">
                                 <StackPanel Orientation="Horizontal">
                                     <materialDesign:PackIcon Kind="FolderOpen" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                                    <TextBlock Text="Carpeta" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="11"/>
+                                    <TextBlock Text="{Binding [Det_Carpeta], Source={x:Static loc:LocalizationService.Instance}}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="11"/>
                                 </StackPanel>
                             </Button>
 
@@ -284,10 +291,10 @@
                                     Style="{StaticResource MaterialDesignOutlinedButton}"
                                     BorderBrush="#60A5FA" Foreground="#60A5FA"
                                     Height="34" Padding="10,0" Margin="8,0,0,0"
-                                    ToolTip="Analizar audios usando el Plugin para detectar Openings">
+                                    ToolTip="{Binding [Det_DetectarOpTip], Source={x:Static loc:LocalizationService.Instance}}">
                                 <StackPanel Orientation="Horizontal">
                                     <materialDesign:PackIcon Kind="Magnify" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                                    <TextBlock Text="Detectar OP" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="11"/>
+                                    <TextBlock Text="{Binding [Det_DetectarOp], Source={x:Static loc:LocalizationService.Instance}}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="11"/>
                                 </StackPanel>
                             </Button>
                         </StackPanel>
@@ -301,10 +308,10 @@
                                     Style="{StaticResource MaterialDesignOutlinedButton}"
                                     BorderBrush="#10B981" Foreground="#34D399"
                                     Height="34" Padding="10,0" Margin="0,0,6,0"
-                                    ToolTip="Marcar episodios seleccionados (o todos) como vistos">
+                                    ToolTip="{Binding [Det_MarcarVistosTip], Source={x:Static loc:LocalizationService.Instance}}">
                                 <StackPanel Orientation="Horizontal">
                                     <materialDesign:PackIcon Kind="CheckAll" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                                    <TextBlock Text="Vistos" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="11"/>
+                                    <TextBlock Text="{Binding [Det_Vistos], Source={x:Static loc:LocalizationService.Instance}}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="11"/>
                                 </StackPanel>
                             </Button>
 
@@ -314,10 +321,10 @@
                                     Style="{StaticResource MaterialDesignOutlinedButton}"
                                     BorderBrush="#EF4444" Foreground="#F87171"
                                     Height="34" Padding="10,0" Margin="0,0,6,0"
-                                    ToolTip="Marcar episodios seleccionados (o todos) como no vistos">
+                                    ToolTip="{Binding [Det_MarcarNoVistosTip], Source={x:Static loc:LocalizationService.Instance}}">
                                 <StackPanel Orientation="Horizontal">
                                     <materialDesign:PackIcon Kind="EyeOffOutline" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                                    <TextBlock Text="No vistos" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="11"/>
+                                    <TextBlock Text="{Binding [Det_NoVistos], Source={x:Static loc:LocalizationService.Instance}}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="11"/>
                                 </StackPanel>
                             </Button>
 
@@ -326,10 +333,10 @@
                                     Style="{StaticResource MaterialDesignOutlinedButton}"
                                     BorderBrush="#60A5FA" Foreground="#93C5FD"
                                     Height="34" Padding="10,0"
-                                    ToolTip="Actualizar información y episodios desde AniList">
+                                    ToolTip="{Binding [Det_ActualizarTip], Source={x:Static loc:LocalizationService.Instance}}">
                                 <StackPanel Orientation="Horizontal">
                                     <materialDesign:PackIcon Kind="Refresh" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                                    <TextBlock Text="Actualizar" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="11"/>
+                                    <TextBlock Text="{Binding [Det_Actualizar], Source={x:Static loc:LocalizationService.Instance}}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="11"/>
                                 </StackPanel>
                             </Button>
 
@@ -338,7 +345,7 @@
                                     Style="{StaticResource MaterialDesignOutlinedButton}"
                                     BorderBrush="#F59E0B" Foreground="#FBBF24"
                                     Height="34" Padding="10,0" Margin="6,0,0,0"
-                                    ToolTip="Detectar archivos duplicados por hash perceptual">
+                                    ToolTip="{Binding [Det_DuplicadosTip], Source={x:Static loc:LocalizationService.Instance}}">
                                 <StackPanel Orientation="Horizontal">
                                     <materialDesign:PackIcon Kind="ContentDuplicate" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,5,0"
                                                              Visibility="{Binding EstaAnalizandoDuplicados, Converter={StaticResource InverseBoolToVis}}"/>
@@ -350,10 +357,10 @@
                                     <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" FontSize="11">
                                         <TextBlock.Style>
                                             <Style TargetType="TextBlock">
-                                                <Setter Property="Text" Value="Duplicados"/>
+                                                <Setter Property="Text" Value="{Binding [Det_Duplicados], Source={x:Static loc:LocalizationService.Instance}}"/>
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding EstaAnalizandoDuplicados}" Value="True">
-                                                        <Setter Property="Text" Value="Analizando..."/>
+                                                        <Setter Property="Text" Value="{Binding [Det_Analizando], Source={x:Static loc:LocalizationService.Instance}}"/>
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
@@ -474,7 +481,7 @@
                                                     </Setter>
                                                 </Style>
                                             </ContextMenu.Resources>
-                                            <MenuItem Header="Reproducir episodio"
+                                            <MenuItem Header="{Binding [Act_Reproducir], Source={x:Static loc:LocalizationService.Instance}}"
                                                       Command="{Binding PlacementTarget.Tag.ReproducirEpisodioCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                                       CommandParameter="{Binding}">
                                                 <MenuItem.Icon>
@@ -482,7 +489,7 @@
                                                 </MenuItem.Icon>
                                             </MenuItem>
                                             <Separator/>
-                                            <MenuItem Header="Eliminar episodio del disco"
+                                            <MenuItem Header="{Binding [Det_EliminarEpisodio], Source={x:Static loc:LocalizationService.Instance}}"
                                                       Command="{Binding PlacementTarget.Tag.EliminarEpisodioCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                                       CommandParameter="{Binding}">
                                                 <MenuItem.Icon>
@@ -513,8 +520,8 @@
                                             <Button Command="{Binding DataContext.AlternarFavoritoEpisodioCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                     CommandParameter="{Binding}"
                                                     Style="{StaticResource MaterialDesignIconButton}" Width="26" Height="26" Padding="0"
-                                                    ToolTip="Marcar como favorito / guardado"
-                                                    AutomationProperties.Name="Marcar como favorito o guardado">
+                                                    ToolTip="{Binding [Det_FavoritoTip], Source={x:Static loc:LocalizationService.Instance}}"
+                                                    AutomationProperties.Name="{Binding [Det_FavoritoTip], Source={x:Static loc:LocalizationService.Instance}}">
                                                 <materialDesign:PackIcon x:Name="IconoBookmark" Kind="BookmarkOutline" Foreground="#6B7280" Width="17" Height="17" VerticalAlignment="Center"/>
                                             </Button>
                                         </StackPanel>
@@ -566,8 +573,8 @@
                                             <Button Command="{Binding DataContext.ReproducirEpisodioCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                     CommandParameter="{Binding}"
                                                     Style="{StaticResource MaterialDesignIconButton}" Width="34" Height="34"
-                                                    ToolTip="Reproducir episodio"
-                                                    AutomationProperties.Name="Reproducir episodio"
+                                                    ToolTip="{Binding [Act_Reproducir], Source={x:Static loc:LocalizationService.Instance}}"
+                                                    AutomationProperties.Name="{Binding [Act_Reproducir], Source={x:Static loc:LocalizationService.Instance}}"
                                                     Visibility="{Binding Descargado, Converter={StaticResource BoolToVis}}"
                                                     Margin="0,0,4,0">
                                                 <materialDesign:PackIcon Kind="PlayCircle" Foreground="#60A5FA" Width="28" Height="28" VerticalAlignment="Center"/>
@@ -576,15 +583,15 @@
                                             <!-- 1b. DESCARGADO: ICONO QUE ABRE EL MENÚ DEL EPISODIO -->
                                             <Button Click="BotonEpisodioDescargado_Click"
                                                     Style="{StaticResource MaterialDesignIconButton}" Width="34" Height="34"
-                                                    ToolTip="Opciones (Eliminar, etc.)"
-                                                    AutomationProperties.Name="Opciones de episodio descargado"
+                                                    ToolTip="{Binding [Det_OpcionesTip], Source={x:Static loc:LocalizationService.Instance}}"
+                                                    AutomationProperties.Name="{Binding [Det_OpcionesNombre], Source={x:Static loc:LocalizationService.Instance}}"
                                                     Visibility="{Binding Descargado, Converter={StaticResource BoolToVis}}">
                                                 <materialDesign:PackIcon Kind="CheckCircle" Foreground="#10B981" Width="24" Height="24" VerticalAlignment="Center"/>
                                             </Button>
 
                                             <!-- 2. DESCARGANDO O EN COLA -->
                                             <Grid Width="34" Height="34" VerticalAlignment="Center" HorizontalAlignment="Center"
-                                                  ToolTip="Descargando episodio"
+                                                  ToolTip="{Binding [Det_DescargandoTip], Source={x:Static loc:LocalizationService.Instance}}"
                                                   Visibility="{Binding IsDownloading, Converter={StaticResource BoolToVis}}">
                                                 
                                                 <Ellipse Width="24" Height="24" Stroke="#33FFFFFF" StrokeThickness="3" 
@@ -610,7 +617,7 @@
                                             <Button Command="{Binding DataContext.DescargarEpisodioCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                     CommandParameter="{Binding}"
                                                     Width="34" Height="34"
-                                                    ToolTip="Descargar episodio">
+                                                    ToolTip="{Binding [Det_DescargarEpisodioTip], Source={x:Static loc:LocalizationService.Instance}}">
                                                 <Button.Style>
                                                     <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
                                                         <Setter Property="Visibility" Value="Visible"/>
@@ -673,10 +680,10 @@
                             materialDesign:ElevationAssist.Elevation="Dp6"
                             HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,20,15"
                             Visibility="{Binding TieneCapituloEnProgreso, Converter={StaticResource BoolToVis}}"
-                            ToolTip="Continuar reproduciendo el episodio en progreso">
+                            ToolTip="{Binding [Det_ReanudarTip], Source={x:Static loc:LocalizationService.Instance}}">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                             <materialDesign:PackIcon Kind="Play" Width="18" Height="18" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                            <TextBlock Text="Reanudar" FontWeight="Bold" FontSize="13" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding [Hist_Reanudar], Source={x:Static loc:LocalizationService.Instance}}" FontWeight="Bold" FontSize="13" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
                 </Grid>
@@ -764,13 +771,13 @@
                         </Border>
 
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                            <TextBlock Text="Actualizar en AniList" FontSize="16" FontWeight="Bold" Foreground="White"/>
-                            <TextBlock Text="Sincroniza tu progreso y puntuación con la nube" FontSize="11" Foreground="#9CA3AF" Margin="0,2,0,0"/>
+                            <TextBlock Text="{Binding [Det_ActualizarAniListTitulo], Source={x:Static loc:LocalizationService.Instance}}" FontSize="16" FontWeight="Bold" Foreground="White"/>
+                            <TextBlock Text="{Binding [Det_ActualizarAniListSub], Source={x:Static loc:LocalizationService.Instance}}" FontSize="11" Foreground="#9CA3AF" Margin="0,2,0,0"/>
                         </StackPanel>
 
                         <Button Grid.Column="2" Command="{Binding CerrarEditorSeguimientoCommand}"
                                 Style="{StaticResource MaterialDesignIconButton}" Width="32" Height="32" Padding="0"
-                                ToolTip="Cerrar ventana">
+                                ToolTip="{Binding [Det_CerrarVentanaTip], Source={x:Static loc:LocalizationService.Instance}}">
                             <materialDesign:PackIcon Kind="Close" Width="18" Height="18" Foreground="#9CA3AF"/>
                         </Button>
                     </Grid>
@@ -784,15 +791,15 @@
 
                         <!-- ESTADO -->
                         <StackPanel Grid.Column="0" Margin="0,0,8,0">
-                            <TextBlock Text="Estado" FontSize="11" FontWeight="SemiBold" Foreground="#9CA3AF" Margin="0,0,0,5"/>
-                            <ComboBox ItemsSource="{Binding OpcionesEstadoVisual}" 
+                            <TextBlock Text="{Binding [Det_Estado], Source={x:Static loc:LocalizationService.Instance}}" FontSize="11" FontWeight="SemiBold" Foreground="#9CA3AF" Margin="0,0,0,5"/>
+                            <ComboBox ItemsSource="{Binding OpcionesEstadoVisual}"
                                       SelectedItem="{Binding EditEstadoVisual}"
                                       Height="38"/>
                         </StackPanel>
 
                         <!-- EPISODIOS VISTOS (VALIDADO) -->
                         <StackPanel Grid.Column="1" Margin="8,0,0,0">
-                            <TextBlock Text="Episodios Vistos" FontSize="11" FontWeight="SemiBold" Foreground="#9CA3AF" Margin="0,0,0,5"/>
+                            <TextBlock Text="{Binding [Det_EpisodiosVistos], Source={x:Static loc:LocalizationService.Instance}}" FontSize="11" FontWeight="SemiBold" Foreground="#9CA3AF" Margin="0,0,0,5"/>
                             <TextBox Text="{Binding EditProgresoTexto, UpdateSourceTrigger=PropertyChanged}" 
                                      Style="{StaticResource MaterialDesignOutlinedTextBox}"
                                      materialDesign:TextFieldAssist.UnderlineBrush="#3B82F6"
@@ -806,7 +813,7 @@
                     <!-- FILA 2: PUNTUACIÓN (0-100) SIN ESTRELLA Y CON SLIDER CENTRADO -->
                     <StackPanel Margin="0,0,0,14">
                         <Grid Margin="0,0,0,6">
-                            <TextBlock Text="Puntuación" FontSize="11" FontWeight="SemiBold" Foreground="#9CA3AF" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding [Det_Puntuacion], Source={x:Static loc:LocalizationService.Instance}}" FontSize="11" FontWeight="SemiBold" Foreground="#9CA3AF" VerticalAlignment="Center"/>
 
                             <Border HorizontalAlignment="Right" Background="#14181E" BorderBrush="#2D3748" BorderThickness="1" CornerRadius="6" Padding="8,2">
                                 <StackPanel Orientation="Horizontal">
@@ -829,7 +836,7 @@
                         </Grid.ColumnDefinitions>
                         
                         <StackPanel Grid.Column="0" Margin="0,0,8,0">
-                            <TextBlock Text="Fecha de Inicio" FontSize="11" FontWeight="SemiBold" Foreground="#9CA3AF" Margin="0,0,0,5"/>
+                            <TextBlock Text="{Binding [Det_FechaInicio], Source={x:Static loc:LocalizationService.Instance}}" FontSize="11" FontWeight="SemiBold" Foreground="#9CA3AF" Margin="0,0,0,5"/>
                             <DatePicker SelectedDate="{Binding EditFechaInicio}" 
                                         Style="{StaticResource MaterialDesignOutlinedDatePicker}"
                                         materialDesign:TextFieldAssist.UnderlineBrush="#3B82F6"
@@ -838,7 +845,7 @@
                         </StackPanel>
                         
                         <StackPanel Grid.Column="1" Margin="8,0,0,0">
-                            <TextBlock Text="Fecha de Fin" FontSize="11" FontWeight="SemiBold" Foreground="#9CA3AF" Margin="0,0,0,5"/>
+                            <TextBlock Text="{Binding [Det_FechaFin], Source={x:Static loc:LocalizationService.Instance}}" FontSize="11" FontWeight="SemiBold" Foreground="#9CA3AF" Margin="0,0,0,5"/>
                             <DatePicker SelectedDate="{Binding EditFechaFin}" 
                                         Style="{StaticResource MaterialDesignOutlinedDatePicker}"
                                         materialDesign:TextFieldAssist.UnderlineBrush="#3B82F6"
@@ -854,7 +861,7 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
 
-                        <Button Grid.Column="0" Content="Cancelar" Command="{Binding CerrarEditorSeguimientoCommand}" 
+                        <Button Grid.Column="0" Content="{Binding [Gal_Cancelar], Source={x:Static loc:LocalizationService.Instance}}" Command="{Binding CerrarEditorSeguimientoCommand}"
                                 Style="{StaticResource MaterialDesignOutlinedButton}" 
                                 BorderBrush="#374151" Foreground="#9CA3AF" Height="44" Padding="18,0"
                                 FontSize="13"
@@ -867,7 +874,7 @@
                                 materialDesign:ButtonAssist.CornerRadius="8">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Center">
                                 <materialDesign:PackIcon Kind="CloudUpload" Width="18" Height="18" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                <TextBlock Text="Guardar en AniList" FontWeight="Bold" FontSize="13" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding [Det_GuardarAniList], Source={x:Static loc:LocalizationService.Instance}}" FontWeight="Bold" FontSize="13" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
                     </Grid>

@@ -4,7 +4,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         xmlns:loc="clr-namespace:AnimeLocalTracker.Services"
-        Title="Mi Biblioteca" Height="700" Width="1100"
+        Title="{Binding [Win_Titulo], Source={x:Static loc:LocalizationService.Instance}}" Height="700" Width="1100"
         WindowStartupLocation="CenterScreen"
         TextElement.Foreground="{DynamicResource MaterialDesignBody}"
         Background="#121212"
@@ -25,16 +25,15 @@
     </Window.Resources>
     
     <Grid x:Name="RootLayout">
-        <materialDesign:DialogHost IsOpen="{Binding IsDialogOpen}" CloseOnClickAway="True">
-            <materialDesign:DialogHost.DialogContent>
-                <Border Background="#161B22" BorderBrush="#262D38" BorderThickness="1" CornerRadius="18" Padding="24" />
-            </materialDesign:DialogHost.DialogContent>
-
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="65" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
+        <!-- Sin materialDesign:DialogHost: el diálogo modal real de la app es el custom de más abajo
+             (DialogService.DialogoVisible); este DialogHost era código muerto (IsDialogOpen nunca se
+             pone en true) y su capa de cobertura interceptaba clics de forma intermitente en toda la
+             ventana, incluidos los combobox (bug de "solo una franja del combobox responde"). -->
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="65" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
 
                 <!-- SIDEBAR -->
                 <Border Grid.Column="0" Background="Transparent" BorderBrush="#1AFFFFFF" BorderThickness="0,0,1,0" Panel.ZIndex="10">
@@ -433,16 +432,16 @@
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
-                        <Button WindowChrome.IsHitTestVisibleInChrome="True" Click="BtnPantallaCompleta_Click" Width="45" Height="45" Style="{StaticResource MaterialDesignFlatButton}" Padding="0" Foreground="{DynamicResource MaterialDesignBodyLight}" ToolTip="{Binding [Nav_PantallaCompleta], Source={x:Static loc:LocalizationService.Instance}}" AutomationProperties.Name="Pantalla completa">
+                        <Button WindowChrome.IsHitTestVisibleInChrome="True" Click="BtnPantallaCompleta_Click" Width="45" Height="45" Style="{StaticResource MaterialDesignFlatButton}" Padding="0" Foreground="{DynamicResource MaterialDesignBodyLight}" ToolTip="{Binding [Nav_PantallaCompleta], Source={x:Static loc:LocalizationService.Instance}}" AutomationProperties.Name="{Binding [Win_BtnPantallaCompleta], Source={x:Static loc:LocalizationService.Instance}}">
                             <materialDesign:PackIcon Kind="Fullscreen" />
                         </Button>
-                        <Button WindowChrome.IsHitTestVisibleInChrome="True" Click="BtnMinimizar_Click" Width="45" Height="45" Style="{StaticResource MaterialDesignFlatButton}" Padding="0" Foreground="{DynamicResource MaterialDesignBodyLight}" AutomationProperties.Name="Minimizar">
+                        <Button WindowChrome.IsHitTestVisibleInChrome="True" Click="BtnMinimizar_Click" Width="45" Height="45" Style="{StaticResource MaterialDesignFlatButton}" Padding="0" Foreground="{DynamicResource MaterialDesignBodyLight}" AutomationProperties.Name="{Binding [Win_BtnMinimizar], Source={x:Static loc:LocalizationService.Instance}}">
                             <materialDesign:PackIcon Kind="WindowMinimize" />
                         </Button>
-                        <Button WindowChrome.IsHitTestVisibleInChrome="True" Click="BtnMaximizar_Click" Width="45" Height="45" Style="{StaticResource MaterialDesignFlatButton}" Padding="0" Foreground="{DynamicResource MaterialDesignBodyLight}" IsEnabled="False" AutomationProperties.Name="Maximizar">
+                        <Button WindowChrome.IsHitTestVisibleInChrome="True" Click="BtnMaximizar_Click" Width="45" Height="45" Style="{StaticResource MaterialDesignFlatButton}" Padding="0" Foreground="{DynamicResource MaterialDesignBodyLight}" IsEnabled="False" AutomationProperties.Name="{Binding [Win_BtnMaximizar], Source={x:Static loc:LocalizationService.Instance}}">
                             <materialDesign:PackIcon Kind="WindowMaximize" />
                         </Button>
-                        <Button WindowChrome.IsHitTestVisibleInChrome="True" Click="BtnCerrar_Click" Width="45" Height="45" Style="{StaticResource MaterialDesignFlatButton}" Padding="0" Foreground="{DynamicResource MaterialDesignBodyLight}" AutomationProperties.Name="Cerrar aplicación">
+                        <Button WindowChrome.IsHitTestVisibleInChrome="True" Click="BtnCerrar_Click" Width="45" Height="45" Style="{StaticResource MaterialDesignFlatButton}" Padding="0" Foreground="{DynamicResource MaterialDesignBodyLight}" AutomationProperties.Name="{Binding [Win_BtnCerrarApp], Source={x:Static loc:LocalizationService.Instance}}">
                             <materialDesign:PackIcon Kind="Close" />
                         </Button>
                     </StackPanel>
@@ -452,9 +451,10 @@
                 <Grid Visibility="{Binding DialogService.DialogoVisible, Converter={StaticResource BoolToVis}}" 
                       Grid.Column="0" Grid.ColumnSpan="2"
                       Background="#B2000000" Panel.ZIndex="2000">
-                    <materialDesign:Card Width="400" VerticalAlignment="Center" HorizontalAlignment="Center" 
-                                         UniformCornerRadius="14" Background="{DynamicResource MaterialDesignPaper}" 
-                                         materialDesign:ElevationAssist.Elevation="Dp8" Padding="25">
+                    <materialDesign:Card Width="400" VerticalAlignment="Center" HorizontalAlignment="Center"
+                                         UniformCornerRadius="14" Background="{DynamicResource MaterialDesignPaper}"
+                                         materialDesign:ElevationAssist.Elevation="Dp8" Padding="25"
+                                         KeyboardNavigation.TabNavigation="Cycle">
                         <StackPanel>
                             <!-- Header con Ícono y Título -->
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
@@ -521,8 +521,7 @@
                         </StackPanel>
                     </materialDesign:Card>
                 </Border>
-            </Grid>
-        </materialDesign:DialogHost>
+        </Grid>
 
     </Grid>
 </Window>

@@ -2,6 +2,7 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+             xmlns:loc="clr-namespace:AnimeLocalTracker.Services"
              TextElement.Foreground="{DynamicResource MaterialDesignBody}"
              Background="Transparent">
 
@@ -37,10 +38,10 @@
                             <TextBlock Text="{Binding HoraEmisionFormateada}" FontSize="11.5" FontWeight="Bold" Foreground="#34D399" VerticalAlignment="Center"/>
                             <!-- Ya emitido: punto ámbar -->
                             <Ellipse Fill="#F59E0B" Width="8" Height="8" Margin="6,0,0,0" VerticalAlignment="Center"
-                                     Visibility="{Binding EstaEmitido, Converter={StaticResource BoolToVis}}" ToolTip="Ya emitido"/>
+                                     Visibility="{Binding EstaEmitido, Converter={StaticResource BoolToVis}}" ToolTip="{Binding [Cal_YaEmitidoTip], Source={x:Static loc:LocalizationService.Instance}}"/>
                             <!-- Próximo: círculo con contorno azul -->
                             <Ellipse Stroke="#3B82F6" StrokeThickness="1.5" Fill="Transparent" Width="8" Height="8" Margin="6,0,0,0" VerticalAlignment="Center"
-                                     Visibility="{Binding EstaEmitido, Converter={StaticResource InverseBoolToVis}}" ToolTip="Próximo"/>
+                                     Visibility="{Binding EstaEmitido, Converter={StaticResource InverseBoolToVis}}" ToolTip="{Binding [Cal_ProximoTip], Source={x:Static loc:LocalizationService.Instance}}"/>
                         </StackPanel>
 
                         <!-- Fila 2: título (hasta 2 líneas con recorte) -->
@@ -60,8 +61,14 @@
                             HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
                             Background="Transparent" BorderThickness="0" Padding="0" Margin="0"
                             Cursor="Hand" Panel.ZIndex="20"
-                            AutomationProperties.Name="{Binding Titulo, StringFormat=Ver {0} en la ficha}"
-                            ToolTip="Abrir la ficha del anime"/>
+                            ToolTip="{Binding [Cal_AbrirFichaTip], Source={x:Static loc:LocalizationService.Instance}}">
+                        <AutomationProperties.Name>
+                            <MultiBinding Converter="{StaticResource LocalizedFormat}">
+                                <Binding Path="[Cal_AbrirFichaAuto]" Source="{x:Static loc:LocalizationService.Instance}" />
+                                <Binding Path="Titulo" />
+                            </MultiBinding>
+                        </AutomationProperties.Name>
+                    </Button>
                 </Grid>
             </materialDesign:Card>
         </DataTemplate>
@@ -84,7 +91,7 @@
         <!-- Header -->
         <Grid Grid.Row="0" Margin="0,0,0,20">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <TextBlock Text="Calendario de Emisión" Style="{StaticResource AppText.PageTitle}" VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding [Cal_Titulo], Source={x:Static loc:LocalizationService.Instance}}" Style="{StaticResource AppText.PageTitle}" VerticalAlignment="Center"/>
                 
                 <!-- BADGE CONTEO EN EMISIÓN -->
                 <Border Style="{StaticResource AppBadge}" Margin="14,0,0,0" 
@@ -96,7 +103,7 @@
             <Button Command="{Binding CargarCalendarioCommand}" HorizontalAlignment="Right" Style="{StaticResource MaterialDesignOutlinedButton}">
                 <StackPanel Orientation="Horizontal">
                     <materialDesign:PackIcon Kind="Refresh" Margin="0,0,5,0" VerticalAlignment="Center"/>
-                    <TextBlock Text="ACTUALIZAR" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding [Act_BotonActualizar], Source={x:Static loc:LocalizationService.Instance}}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
         </Grid>
@@ -123,16 +130,16 @@
             <Border Grid.Column="0" Margin="5" Background="#14181E" BorderBrush="#262D38" BorderThickness="1" CornerRadius="12" Padding="10">
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,4">
-                        <TextBlock Text="LUNES" Style="{StaticResource DayHeaderStyle}" Margin="0"/>
+                        <TextBlock Text="{Binding [Cal_Lunes], Source={x:Static loc:LocalizationService.Instance}}" Style="{StaticResource DayHeaderStyle}" Margin="0"/>
                         <Border Background="#3B82F6" CornerRadius="6" Padding="6,2" Margin="8,2,0,0" VerticalAlignment="Center"
                                 Visibility="{Binding DiaActual, Converter={StaticResource StringEquals}, ConverterParameter=LUNES}">
-                            <TextBlock Text="HOY" FontSize="10" FontWeight="Bold" Foreground="White"/>
+                            <TextBlock Text="{Binding [Cal_Hoy], Source={x:Static loc:LocalizationService.Instance}}" FontSize="10" FontWeight="Bold" Foreground="White"/>
                         </Border>
                         <Border Background="#1E293B" CornerRadius="8" Padding="6,2" Margin="6,2,0,0" VerticalAlignment="Center">
                             <TextBlock Text="{Binding Lunes.Count}" FontSize="10" FontWeight="Bold" Foreground="#60A5FA"/>
                         </Border>
                     </StackPanel>
-                    <TextBlock DockPanel.Dock="Top" Text="Sin episodios" FontSize="11" Foreground="#6B7280" Opacity="0.6"
+                    <TextBlock DockPanel.Dock="Top" Text="{Binding [Cal_SinEpisodios], Source={x:Static loc:LocalizationService.Instance}}" FontSize="11" Foreground="#6B7280" Opacity="0.6"
                                HorizontalAlignment="Center" Margin="0,2,0,8"
                                Visibility="{Binding Lunes.Count, Converter={StaticResource ZeroToVis}}"/>
                     <ScrollViewer VerticalScrollBarVisibility="Hidden" PanningMode="VerticalOnly">
@@ -145,16 +152,16 @@
             <Border Grid.Column="1" Margin="5" Background="#14181E" BorderBrush="#262D38" BorderThickness="1" CornerRadius="12" Padding="10">
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,4">
-                        <TextBlock Text="MARTES" Style="{StaticResource DayHeaderStyle}" Margin="0"/>
+                        <TextBlock Text="{Binding [Cal_Martes], Source={x:Static loc:LocalizationService.Instance}}" Style="{StaticResource DayHeaderStyle}" Margin="0"/>
                         <Border Background="#3B82F6" CornerRadius="6" Padding="6,2" Margin="8,2,0,0" VerticalAlignment="Center"
                                 Visibility="{Binding DiaActual, Converter={StaticResource StringEquals}, ConverterParameter=MARTES}">
-                            <TextBlock Text="HOY" FontSize="10" FontWeight="Bold" Foreground="White"/>
+                            <TextBlock Text="{Binding [Cal_Hoy], Source={x:Static loc:LocalizationService.Instance}}" FontSize="10" FontWeight="Bold" Foreground="White"/>
                         </Border>
                         <Border Background="#1E293B" CornerRadius="8" Padding="6,2" Margin="6,2,0,0" VerticalAlignment="Center">
                             <TextBlock Text="{Binding Martes.Count}" FontSize="10" FontWeight="Bold" Foreground="#60A5FA"/>
                         </Border>
                     </StackPanel>
-                    <TextBlock DockPanel.Dock="Top" Text="Sin episodios" FontSize="11" Foreground="#6B7280" Opacity="0.6"
+                    <TextBlock DockPanel.Dock="Top" Text="{Binding [Cal_SinEpisodios], Source={x:Static loc:LocalizationService.Instance}}" FontSize="11" Foreground="#6B7280" Opacity="0.6"
                                HorizontalAlignment="Center" Margin="0,2,0,8"
                                Visibility="{Binding Martes.Count, Converter={StaticResource ZeroToVis}}"/>
                     <ScrollViewer VerticalScrollBarVisibility="Hidden" PanningMode="VerticalOnly">
@@ -167,16 +174,16 @@
             <Border Grid.Column="2" Margin="5" Background="#14181E" BorderBrush="#262D38" BorderThickness="1" CornerRadius="12" Padding="10">
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,4">
-                        <TextBlock Text="MIÉRCOLES" Style="{StaticResource DayHeaderStyle}" Margin="0"/>
+                        <TextBlock Text="{Binding [Cal_Miercoles], Source={x:Static loc:LocalizationService.Instance}}" Style="{StaticResource DayHeaderStyle}" Margin="0"/>
                         <Border Background="#3B82F6" CornerRadius="6" Padding="6,2" Margin="8,2,0,0" VerticalAlignment="Center"
                                 Visibility="{Binding DiaActual, Converter={StaticResource StringEquals}, ConverterParameter=MIÉRCOLES}">
-                            <TextBlock Text="HOY" FontSize="10" FontWeight="Bold" Foreground="White"/>
+                            <TextBlock Text="{Binding [Cal_Hoy], Source={x:Static loc:LocalizationService.Instance}}" FontSize="10" FontWeight="Bold" Foreground="White"/>
                         </Border>
                         <Border Background="#1E293B" CornerRadius="8" Padding="6,2" Margin="6,2,0,0" VerticalAlignment="Center">
                             <TextBlock Text="{Binding Miercoles.Count}" FontSize="10" FontWeight="Bold" Foreground="#60A5FA"/>
                         </Border>
                     </StackPanel>
-                    <TextBlock DockPanel.Dock="Top" Text="Sin episodios" FontSize="11" Foreground="#6B7280" Opacity="0.6"
+                    <TextBlock DockPanel.Dock="Top" Text="{Binding [Cal_SinEpisodios], Source={x:Static loc:LocalizationService.Instance}}" FontSize="11" Foreground="#6B7280" Opacity="0.6"
                                HorizontalAlignment="Center" Margin="0,2,0,8"
                                Visibility="{Binding Miercoles.Count, Converter={StaticResource ZeroToVis}}"/>
                     <ScrollViewer VerticalScrollBarVisibility="Hidden" PanningMode="VerticalOnly">
@@ -189,16 +196,16 @@
             <Border Grid.Column="3" Margin="5" Background="#14181E" BorderBrush="#262D38" BorderThickness="1" CornerRadius="12" Padding="10">
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,4">
-                        <TextBlock Text="JUEVES" Style="{StaticResource DayHeaderStyle}" Margin="0"/>
+                        <TextBlock Text="{Binding [Cal_Jueves], Source={x:Static loc:LocalizationService.Instance}}" Style="{StaticResource DayHeaderStyle}" Margin="0"/>
                         <Border Background="#3B82F6" CornerRadius="6" Padding="6,2" Margin="8,2,0,0" VerticalAlignment="Center"
                                 Visibility="{Binding DiaActual, Converter={StaticResource StringEquals}, ConverterParameter=JUEVES}">
-                            <TextBlock Text="HOY" FontSize="10" FontWeight="Bold" Foreground="White"/>
+                            <TextBlock Text="{Binding [Cal_Hoy], Source={x:Static loc:LocalizationService.Instance}}" FontSize="10" FontWeight="Bold" Foreground="White"/>
                         </Border>
                         <Border Background="#1E293B" CornerRadius="8" Padding="6,2" Margin="6,2,0,0" VerticalAlignment="Center">
                             <TextBlock Text="{Binding Jueves.Count}" FontSize="10" FontWeight="Bold" Foreground="#60A5FA"/>
                         </Border>
                     </StackPanel>
-                    <TextBlock DockPanel.Dock="Top" Text="Sin episodios" FontSize="11" Foreground="#6B7280" Opacity="0.6"
+                    <TextBlock DockPanel.Dock="Top" Text="{Binding [Cal_SinEpisodios], Source={x:Static loc:LocalizationService.Instance}}" FontSize="11" Foreground="#6B7280" Opacity="0.6"
                                HorizontalAlignment="Center" Margin="0,2,0,8"
                                Visibility="{Binding Jueves.Count, Converter={StaticResource ZeroToVis}}"/>
                     <ScrollViewer VerticalScrollBarVisibility="Hidden" PanningMode="VerticalOnly">
@@ -211,16 +218,16 @@
             <Border Grid.Column="4" Margin="5" Background="#14181E" BorderBrush="#262D38" BorderThickness="1" CornerRadius="12" Padding="10">
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,4">
-                        <TextBlock Text="VIERNES" Style="{StaticResource DayHeaderStyle}" Margin="0"/>
+                        <TextBlock Text="{Binding [Cal_Viernes], Source={x:Static loc:LocalizationService.Instance}}" Style="{StaticResource DayHeaderStyle}" Margin="0"/>
                         <Border Background="#3B82F6" CornerRadius="6" Padding="6,2" Margin="8,2,0,0" VerticalAlignment="Center"
                                 Visibility="{Binding DiaActual, Converter={StaticResource StringEquals}, ConverterParameter=VIERNES}">
-                            <TextBlock Text="HOY" FontSize="10" FontWeight="Bold" Foreground="White"/>
+                            <TextBlock Text="{Binding [Cal_Hoy], Source={x:Static loc:LocalizationService.Instance}}" FontSize="10" FontWeight="Bold" Foreground="White"/>
                         </Border>
                         <Border Background="#1E293B" CornerRadius="8" Padding="6,2" Margin="6,2,0,0" VerticalAlignment="Center">
                             <TextBlock Text="{Binding Viernes.Count}" FontSize="10" FontWeight="Bold" Foreground="#60A5FA"/>
                         </Border>
                     </StackPanel>
-                    <TextBlock DockPanel.Dock="Top" Text="Sin episodios" FontSize="11" Foreground="#6B7280" Opacity="0.6"
+                    <TextBlock DockPanel.Dock="Top" Text="{Binding [Cal_SinEpisodios], Source={x:Static loc:LocalizationService.Instance}}" FontSize="11" Foreground="#6B7280" Opacity="0.6"
                                HorizontalAlignment="Center" Margin="0,2,0,8"
                                Visibility="{Binding Viernes.Count, Converter={StaticResource ZeroToVis}}"/>
                     <ScrollViewer VerticalScrollBarVisibility="Hidden" PanningMode="VerticalOnly">
@@ -233,16 +240,16 @@
             <Border Grid.Column="5" Margin="5" Background="#14181E" BorderBrush="#262D38" BorderThickness="1" CornerRadius="12" Padding="10">
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,4">
-                        <TextBlock Text="SÁBADO" Style="{StaticResource DayHeaderStyle}" Margin="0"/>
+                        <TextBlock Text="{Binding [Cal_Sabado], Source={x:Static loc:LocalizationService.Instance}}" Style="{StaticResource DayHeaderStyle}" Margin="0"/>
                         <Border Background="#3B82F6" CornerRadius="6" Padding="6,2" Margin="8,2,0,0" VerticalAlignment="Center"
                                 Visibility="{Binding DiaActual, Converter={StaticResource StringEquals}, ConverterParameter=SÁBADO}">
-                            <TextBlock Text="HOY" FontSize="10" FontWeight="Bold" Foreground="White"/>
+                            <TextBlock Text="{Binding [Cal_Hoy], Source={x:Static loc:LocalizationService.Instance}}" FontSize="10" FontWeight="Bold" Foreground="White"/>
                         </Border>
                         <Border Background="#1E293B" CornerRadius="8" Padding="6,2" Margin="6,2,0,0" VerticalAlignment="Center">
                             <TextBlock Text="{Binding Sabado.Count}" FontSize="10" FontWeight="Bold" Foreground="#60A5FA"/>
                         </Border>
                     </StackPanel>
-                    <TextBlock DockPanel.Dock="Top" Text="Sin episodios" FontSize="11" Foreground="#6B7280" Opacity="0.6"
+                    <TextBlock DockPanel.Dock="Top" Text="{Binding [Cal_SinEpisodios], Source={x:Static loc:LocalizationService.Instance}}" FontSize="11" Foreground="#6B7280" Opacity="0.6"
                                HorizontalAlignment="Center" Margin="0,2,0,8"
                                Visibility="{Binding Sabado.Count, Converter={StaticResource ZeroToVis}}"/>
                     <ScrollViewer VerticalScrollBarVisibility="Hidden" PanningMode="VerticalOnly">
@@ -255,16 +262,16 @@
             <Border Grid.Column="6" Margin="5" Background="#14181E" BorderBrush="#262D38" BorderThickness="1" CornerRadius="12" Padding="10">
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,4">
-                        <TextBlock Text="DOMINGO" Style="{StaticResource DayHeaderStyle}" Margin="0"/>
+                        <TextBlock Text="{Binding [Cal_Domingo], Source={x:Static loc:LocalizationService.Instance}}" Style="{StaticResource DayHeaderStyle}" Margin="0"/>
                         <Border Background="#3B82F6" CornerRadius="6" Padding="6,2" Margin="8,2,0,0" VerticalAlignment="Center"
                                 Visibility="{Binding DiaActual, Converter={StaticResource StringEquals}, ConverterParameter=DOMINGO}">
-                            <TextBlock Text="HOY" FontSize="10" FontWeight="Bold" Foreground="White"/>
+                            <TextBlock Text="{Binding [Cal_Hoy], Source={x:Static loc:LocalizationService.Instance}}" FontSize="10" FontWeight="Bold" Foreground="White"/>
                         </Border>
                         <Border Background="#1E293B" CornerRadius="8" Padding="6,2" Margin="6,2,0,0" VerticalAlignment="Center">
                             <TextBlock Text="{Binding Domingo.Count}" FontSize="10" FontWeight="Bold" Foreground="#60A5FA"/>
                         </Border>
                     </StackPanel>
-                    <TextBlock DockPanel.Dock="Top" Text="Sin episodios" FontSize="11" Foreground="#6B7280" Opacity="0.6"
+                    <TextBlock DockPanel.Dock="Top" Text="{Binding [Cal_SinEpisodios], Source={x:Static loc:LocalizationService.Instance}}" FontSize="11" Foreground="#6B7280" Opacity="0.6"
                                HorizontalAlignment="Center" Margin="0,2,0,8"
                                Visibility="{Binding Domingo.Count, Converter={StaticResource ZeroToVis}}"/>
                     <ScrollViewer VerticalScrollBarVisibility="Hidden" PanningMode="VerticalOnly">

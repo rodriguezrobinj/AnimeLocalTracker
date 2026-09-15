@@ -16,6 +16,21 @@
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
 
+        <!-- Foco visible por teclado (UX-001/004): mismo color #3B82F6 que GaleriaView/AgregarAnimeView,
+             pero vía FocusVisualStyle en vez de un trigger IsKeyboardFocusWithin sobre el template, porque
+             estos son botones de icono transparentes sobre video con plantilla de MaterialDesignToolButton
+             (ripple), no cards con borde propio. El adorner se dibuja igual sin depender de esa plantilla. -->
+        <Style x:Key="PlayerFocusVisual">
+            <Setter Property="Control.Template">
+                <Setter.Value>
+                    <ControlTemplate>
+                        <Rectangle Margin="-2" Stroke="#3B82F6" StrokeThickness="2"
+                                   RadiusX="6" RadiusY="6" SnapsToDevicePixels="True" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- Estilo para la parte reproducida (Blanco sólido conectado sin fisuras con el centro del Thumb) -->
         <Style x:Key="TimelinePlayedRepeatButtonStyle" TargetType="{x:Type RepeatButton}">
             <Setter Property="OverridesDefaultStyle" Value="true" />
@@ -121,8 +136,9 @@
         <!-- Estilo completo del Slider de la Línea de Tiempo -->
         <Style x:Key="TimelineSliderStyle" TargetType="{x:Type Slider}">
             <Setter Property="OverridesDefaultStyle" Value="True" />
-            <Setter Property="IsTabStop" Value="False" />
-            <Setter Property="Focusable" Value="False" />
+            <Setter Property="IsTabStop" Value="True" />
+            <Setter Property="Focusable" Value="True" />
+            <Setter Property="FocusVisualStyle" Value="{StaticResource PlayerFocusVisual}" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Height" Value="24" />
             <Setter Property="Template">
@@ -219,9 +235,10 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <!-- Back Arrow -->
-                        <Button Grid.Column="0" Command="{Binding CerrarCommand}" Focusable="False"
+                        <Button Grid.Column="0" Command="{Binding CerrarCommand}" Focusable="True"
+                                FocusVisualStyle="{StaticResource PlayerFocusVisual}"
                                 Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="50" Height="50" Margin="0,0,15,0"
-                                AutomationProperties.Name="Volver a la ficha del anime">
+                                AutomationProperties.Name="{Binding [Player_VolverFicha], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
                             <materialDesign:PackIcon Kind="ArrowLeft" Width="36" Height="36" />
                         </Button>
                         <!-- Titulos Netflix Style -->
@@ -251,12 +268,13 @@
                         </Grid.RowDefinitions>
 
                         <!-- Botón Skip Intro / Outro (AniSkip API Crunchyroll / Netflix Style) -->
-                        <Button Grid.Row="0" Command="{Binding SkipIntroOutroCommand}" Focusable="False"
+                        <Button Grid.Row="0" Command="{Binding SkipIntroOutroCommand}" Focusable="True"
+                                FocusVisualStyle="{StaticResource PlayerFocusVisual}"
                                 Visibility="{Binding MostrarSkipButton, Converter={StaticResource BooleanToVisibilityConverter}}"
                                 HorizontalAlignment="Right" Margin="0,0,0,14"
                                 Background="#E616181F" Foreground="White" BorderBrush="#55FFFFFF" BorderThickness="1"
                                 Padding="16,8" Cursor="Hand" materialDesign:ButtonAssist.CornerRadius="8"
-                                ToolTip="Saltar segmento (Atajo: S)">
+                                ToolTip="{Binding [Player_SaltarSegmento], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
                             <Button.Effect>
                                 <DropShadowEffect Color="Black" BlurRadius="14" ShadowDepth="3" Opacity="0.7"/>
                             </Button.Effect>
@@ -272,7 +290,8 @@
                                   PreviewMouseLeftButtonDown="ProgressBarArea_PreviewMouseLeftButtonDown">
                                 <Slider x:Name="SliderTiempo" Minimum="0" Maximum="{Binding TotalSeconds}" Value="{Binding CurrentSeconds, Mode=TwoWay}"
                                         Style="{StaticResource TimelineSliderStyle}"
-                                        IsMoveToPointEnabled="True" Focusable="False"
+                                        AutomationProperties.Name="{Binding [Player_ProgresoEpisodio], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                        IsMoveToPointEnabled="True" Focusable="True"
                                         primitives:Thumb.DragStarted="Slider_DragStarted"
                                         primitives:Thumb.DragDelta="Slider_DragDelta"
                                         primitives:Thumb.DragCompleted="Slider_DragCompleted"
@@ -297,7 +316,8 @@
                             </Grid.ColumnDefinitions>
 
                             <!-- Episodio Anterior -->
-                            <Button Grid.Column="0" Command="{Binding AnteriorEpisodioCommand}" Focusable="False"
+                            <Button Grid.Column="0" Command="{Binding AnteriorEpisodioCommand}" Focusable="True"
+                                    FocusVisualStyle="{StaticResource PlayerFocusVisual}"
                                     IsEnabled="{Binding TieneEpisodioAnterior}"
                                     ToolTip="{Binding EpisodioAnteriorTooltip}"
                                     AutomationProperties.Name="{Binding EpisodioAnteriorTooltip}"
@@ -306,15 +326,17 @@
                             </Button>
 
                             <!-- Play/Pause -->
-                            <Button Grid.Column="1" Command="{Binding TogglePlayPauseCommand}" Focusable="False" 
-                                    ToolTip="Reproducir / Pausar (Espacio)"
-                                    AutomationProperties.Name="Reproducir o Pausar"
+                            <Button Grid.Column="1" Command="{Binding TogglePlayPauseCommand}" Focusable="True"
+                                    FocusVisualStyle="{StaticResource PlayerFocusVisual}"
+                                    ToolTip="{Binding [Player_PlayPausaTooltip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                    AutomationProperties.Name="{Binding [Atajo_PlayPausa], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
                                     Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,2,0">
                                 <materialDesign:PackIcon Kind="{Binding PlayPauseIcon}" Width="28" Height="28" />
                             </Button>
 
                             <!-- Episodio Siguiente -->
-                            <Button Grid.Column="2" Command="{Binding SiguienteEpisodioCommand}" Focusable="False"
+                            <Button Grid.Column="2" Command="{Binding SiguienteEpisodioCommand}" Focusable="True"
+                                    FocusVisualStyle="{StaticResource PlayerFocusVisual}"
                                     IsEnabled="{Binding TieneEpisodioSiguiente}"
                                     ToolTip="{Binding EpisodioSiguienteTooltip}"
                                     AutomationProperties.Name="{Binding EpisodioSiguienteTooltip}"
@@ -324,11 +346,13 @@
 
                             <!-- Contenedor Volumen Animado -->
                             <StackPanel Grid.Column="3" Orientation="Horizontal" x:Name="VolumePanel" Background="Transparent" Margin="0,0,10,0">
-                                <Button Command="{Binding ToggleMuteCommand}" Focusable="False" Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" AutomationProperties.Name="Silenciar o reactivar sonido">
+                                <Button Command="{Binding ToggleMuteCommand}" Focusable="True" FocusVisualStyle="{StaticResource PlayerFocusVisual}" Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" AutomationProperties.Name="{Binding [Player_SilenciarToggle], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
                                     <materialDesign:PackIcon Kind="{Binding VolumenIcon}" Width="24" Height="24" />
                                 </Button>
-                                <Slider Minimum="0" Maximum="100" Value="{Binding Volumen, Mode=TwoWay}"
-                                        VerticalAlignment="Center" Focusable="False" Cursor="Hand"
+                                <Slider x:Name="SliderVolumen" Minimum="0" Maximum="100" Value="{Binding Volumen, Mode=TwoWay}"
+                                        AutomationProperties.Name="{Binding [Player_Volumen], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                        VerticalAlignment="Center" Focusable="True"
+                                        FocusVisualStyle="{StaticResource PlayerFocusVisual}" Cursor="Hand"
                                         IsMoveToPointEnabled="True">
                                     <Slider.Resources>
                                         <!-- Thumb limpio sin halo ni ripple circular -->
@@ -415,6 +439,28 @@
                                                         </BeginStoryboard>
                                                     </DataTrigger.ExitActions>
                                                 </DataTrigger>
+                                                <!-- Mismo reveal que el hover, pero por foco de teclado (UX-001):
+                                                     sin esto, el slider de volumen quedaría focuseable con ancho 0 (invisible). -->
+                                                <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=StackPanel}, Path=IsKeyboardFocusWithin}" Value="True">
+                                                    <DataTrigger.EnterActions>
+                                                        <BeginStoryboard>
+                                                            <Storyboard>
+                                                                <DoubleAnimation Storyboard.TargetProperty="Width" To="80" Duration="0:0:0.2" />
+                                                                <ThicknessAnimation Storyboard.TargetProperty="Margin" To="5,0,10,0" Duration="0:0:0.2" />
+                                                                <DoubleAnimation Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.2" />
+                                                            </Storyboard>
+                                                        </BeginStoryboard>
+                                                    </DataTrigger.EnterActions>
+                                                    <DataTrigger.ExitActions>
+                                                        <BeginStoryboard>
+                                                            <Storyboard>
+                                                                <DoubleAnimation Storyboard.TargetProperty="Width" To="0" Duration="0:0:0.2" />
+                                                                <ThicknessAnimation Storyboard.TargetProperty="Margin" To="0,0,0,0" Duration="0:0:0.2" />
+                                                                <DoubleAnimation Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.2" />
+                                                            </Storyboard>
+                                                        </BeginStoryboard>
+                                                    </DataTrigger.ExitActions>
+                                                </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
                                     </Slider.Style>
@@ -426,26 +472,30 @@
                                        Foreground="White" VerticalAlignment="Center" FontSize="13" FontWeight="Bold" Margin="5,0,0,0" Opacity="0.9"/>
                                        
                             <!-- Retroceder 10s -->
-                            <Button Grid.Column="6" Command="{Binding Rewind10Command}" Focusable="False" 
-                                    ToolTip="Retroceder 10s (←)"
-                                    AutomationProperties.Name="Retroceder 10 segundos"
+                            <Button Grid.Column="6" Command="{Binding Rewind10Command}" Focusable="True"
+                                    FocusVisualStyle="{StaticResource PlayerFocusVisual}"
+                                    ToolTip="{Binding [Player_Retroceder10Tooltip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                    AutomationProperties.Name="{Binding [Atajo_Retroceder10], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
                                     Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,5,0">
                                 <materialDesign:PackIcon Kind="Rewind" Width="26" Height="26" />
                             </Button>
 
                             <!-- Adelantar 10s -->
-                            <Button Grid.Column="7" Command="{Binding Forward10Command}" Focusable="False" 
-                                    ToolTip="Adelantar 10s (→)"
-                                    AutomationProperties.Name="Adelantar 10 segundos"
+                            <Button Grid.Column="7" Command="{Binding Forward10Command}" Focusable="True"
+                                    FocusVisualStyle="{StaticResource PlayerFocusVisual}"
+                                    ToolTip="{Binding [Player_Adelantar10Tooltip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                    AutomationProperties.Name="{Binding [Atajo_Adelantar10], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
                                     Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,10,0">
                                 <materialDesign:PackIcon Kind="FastForward" Width="26" Height="26" />
                             </Button>
 
                             <!-- Subtítulos (Menú Manual) -->
-                            <Button x:Name="SubtitlesButton" Grid.Column="8" Focusable="False"
-                                    ToolTip="Subtítulos"
-                                    AutomationProperties.Name="Menú de subtítulos"
+                            <Button x:Name="SubtitlesButton" Grid.Column="8" Focusable="True"
+                                    FocusVisualStyle="{StaticResource PlayerFocusVisual}"
+                                    ToolTip="{Binding [Player_Subtitulos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                    AutomationProperties.Name="{Binding [Player_MenuSubtitulos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
                                     PreviewMouseLeftButtonDown="SubtitlesButton_PreviewMouseLeftButtonDown"
+                                    Click="SubtitlesButton_Click"
                                     Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,5,0">
                                 <materialDesign:PackIcon Kind="{Binding SubtitulosIcon}" Width="26" Height="26" />
                             </Button>
@@ -490,10 +540,10 @@
                                     </Border.Resources>
 
                                     <StackPanel>
-                                        <TextBlock Text="Subtítulos" Foreground="Gray" FontSize="12" FontWeight="Bold" Margin="15,0,0,10" />
+                                        <TextBlock Text="{Binding [Player_Subtitulos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Foreground="Gray" FontSize="12" FontWeight="Bold" Margin="15,0,0,10" />
 
                                         <!-- Apagar -->
-                                        <Button Content="Apagar" Command="{Binding TurnOffSubtitlesCommand}" Click="SubtitleMenuItem_Click" Style="{StaticResource MenuItemButton}"/>
+                                        <Button Content="{Binding [Player_ApagarSubtitulos], Source={x:Static loc:LocalizationService.Instance}}" Command="{Binding TurnOffSubtitlesCommand}" Click="SubtitleMenuItem_Click" Style="{StaticResource MenuItemButton}"/>
 
                                         <!-- Lista de streams disponibles -->
                                         <ItemsControl ItemsSource="{Binding Player.Subtitles.Streams}">
@@ -515,17 +565,19 @@
                             </Popup>
                             
                             <!-- Modo Mini Reproductor -->
-                            <Button Grid.Column="9" Command="{Binding MinimizarAMiniCommand}" Focusable="False"
+                            <Button Grid.Column="9" Command="{Binding MinimizarAMiniCommand}" Focusable="True"
+                                    FocusVisualStyle="{StaticResource PlayerFocusVisual}"
                                     ToolTip="{Binding [Player_Mini], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                    AutomationProperties.Name="Modo ventana flotante"
+                                    AutomationProperties.Name="{Binding [Player_ModoFlotante], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
                                     Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,4,0">
                                 <materialDesign:PackIcon Kind="PictureInPictureBottomRight" Width="26" Height="26" />
                             </Button>
 
                             <!-- Fullscreen con ícono dinámico -->
-                            <Button Grid.Column="10" Command="{Binding ToggleFullscreenCommand}" Focusable="False" 
-                                    ToolTip="Pantalla completa (F11)"
-                                    AutomationProperties.Name="Alternar pantalla completa"
+                            <Button Grid.Column="10" Command="{Binding ToggleFullscreenCommand}" Focusable="True"
+                                    FocusVisualStyle="{StaticResource PlayerFocusVisual}"
+                                    ToolTip="{Binding [Player_PantallaCompletaTooltip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                    AutomationProperties.Name="{Binding [Atajo_PantallaCompleta], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
                                     Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,0,0">
                                 <materialDesign:PackIcon Kind="{Binding FullscreenIcon}" Width="26" Height="26" />
                             </Button>
@@ -562,18 +614,20 @@
                             </TextBlock>
 
                             <!-- BOTÓN RESTAURAR FORMATO HABITUAL (REQUERIDO) -->
-                            <Button Grid.Column="1" Command="{Binding RestaurarFormatoHabitualCommand}" Focusable="False"
+                            <Button Grid.Column="1" Command="{Binding RestaurarFormatoHabitualCommand}" Focusable="True"
+                                    FocusVisualStyle="{StaticResource PlayerFocusVisual}"
                                     ToolTip="{Binding [Player_RestaurarFormato], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
                                     Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="30" Height="30" Margin="0,0,2,0"
-                                    AutomationProperties.Name="Restaurar formato habitual">
+                                    AutomationProperties.Name="{Binding [Player_RestaurarFormatoNombre], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
                                 <materialDesign:PackIcon Kind="Fullscreen" Width="18" Height="18" />
                             </Button>
 
                             <!-- Botón Cerrar Mini Reproductor -->
-                            <Button Grid.Column="2" Command="{Binding CerrarCommand}" Focusable="False"
+                            <Button Grid.Column="2" Command="{Binding CerrarCommand}" Focusable="True"
+                                    FocusVisualStyle="{StaticResource PlayerFocusVisual}"
                                     ToolTip="{Binding [Player_Cerrar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
                                     Style="{StaticResource MaterialDesignToolButton}" Foreground="#EF4444" Width="30" Height="30"
-                                    AutomationProperties.Name="Cerrar reproductor">
+                                    AutomationProperties.Name="{Binding [Player_Cerrar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
                                 <materialDesign:PackIcon Kind="Close" Width="18" Height="18" />
                             </Button>
                         </Grid>
@@ -598,7 +652,8 @@
                             <!-- Scrubber interactivo -->
                             <Slider Grid.Row="0" Minimum="0" Maximum="{Binding TotalSeconds}" Value="{Binding CurrentSeconds, Mode=TwoWay}"
                                     Style="{StaticResource TimelineSliderStyle}" Height="18" Margin="0,0,0,2"
-                                    IsMoveToPointEnabled="True" Focusable="False"
+                                    AutomationProperties.Name="{Binding [Player_ProgresoEpisodio], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                    IsMoveToPointEnabled="True" Focusable="True"
                                     primitives:Thumb.DragStarted="Slider_DragStarted"
                                     primitives:Thumb.DragDelta="Slider_DragDelta"
                                     primitives:Thumb.DragCompleted="Slider_DragCompleted"
@@ -615,25 +670,28 @@
                                 </Grid.ColumnDefinitions>
 
                                 <!-- Play/Pausa -->
-                                <Button Grid.Column="0" Command="{Binding TogglePlayPauseCommand}" Focusable="False"
-                                        ToolTip="Reproducir / Pausar (Espacio)"
-                                        AutomationProperties.Name="Reproducir o Pausar"
+                                <Button Grid.Column="0" Command="{Binding TogglePlayPauseCommand}" Focusable="True"
+                                        FocusVisualStyle="{StaticResource PlayerFocusVisual}"
+                                        ToolTip="{Binding [Player_PlayPausaTooltip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                        AutomationProperties.Name="{Binding [Atajo_PlayPausa], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
                                         Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="28" Height="28" Margin="0,0,2,0">
                                     <materialDesign:PackIcon Kind="{Binding PlayPauseIcon}" Width="20" Height="20" />
                                 </Button>
 
                                 <!-- Retroceder 10s -->
-                                <Button Grid.Column="1" Command="{Binding Rewind10Command}" Focusable="False"
-                                        ToolTip="Retroceder 10s (←)"
-                                        AutomationProperties.Name="Retroceder 10 segundos"
+                                <Button Grid.Column="1" Command="{Binding Rewind10Command}" Focusable="True"
+                                        FocusVisualStyle="{StaticResource PlayerFocusVisual}"
+                                        ToolTip="{Binding [Player_Retroceder10Tooltip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                        AutomationProperties.Name="{Binding [Atajo_Retroceder10], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
                                         Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="26" Height="26" Margin="0,0,2,0">
                                     <materialDesign:PackIcon Kind="Rewind" Width="18" Height="18" />
                                 </Button>
 
                                 <!-- Adelantar 10s -->
-                                <Button Grid.Column="2" Command="{Binding Forward10Command}" Focusable="False"
-                                        ToolTip="Adelantar 10s (→)"
-                                        AutomationProperties.Name="Adelantar 10 segundos"
+                                <Button Grid.Column="2" Command="{Binding Forward10Command}" Focusable="True"
+                                        FocusVisualStyle="{StaticResource PlayerFocusVisual}"
+                                        ToolTip="{Binding [Player_Adelantar10Tooltip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                        AutomationProperties.Name="{Binding [Atajo_Adelantar10], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
                                         Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="26" Height="26" Margin="0,0,6,0">
                                     <materialDesign:PackIcon Kind="FastForward" Width="18" Height="18" />
                                 </Button>
@@ -643,9 +701,10 @@
                                            VerticalAlignment="Center" FontSize="11" FontWeight="SemiBold"/>
 
                                 <!-- Botón Mute -->
-                                <Button Grid.Column="5" Command="{Binding ToggleMuteCommand}" Focusable="False"
-                                        ToolTip="Silenciar (M)"
-                                        AutomationProperties.Name="Silenciar o reactivar sonido"
+                                <Button Grid.Column="5" Command="{Binding ToggleMuteCommand}" Focusable="True"
+                                        FocusVisualStyle="{StaticResource PlayerFocusVisual}"
+                                        ToolTip="{Binding [Player_SilenciarTooltip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                        AutomationProperties.Name="{Binding [Player_SilenciarToggle], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
                                         Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="28" Height="28">
                                     <materialDesign:PackIcon Kind="{Binding VolumenIcon}" Width="18" Height="18" />
                                 </Button>
