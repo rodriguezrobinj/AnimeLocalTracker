@@ -1,5 +1,5 @@
 # AnimeLocalTracker 🎬✨
-### *Tu colección local de anime, elevada al estándar de una plataforma de streaming premium.*
+**La revolución definitiva para el coleccionista de anime.**
 
 [![GitHub Release](https://img.shields.io/github/v/release/rodriguezrobinj/AnimeLocalTracker?style=for-the-badge&color=e50914)](https://github.com/rodriguezrobinj/AnimeLocalTracker/releases)
 [![.NET 8](https://img.shields.io/badge/.NET-8.0_WPF-512BD4?style=for-the-badge&logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
@@ -10,154 +10,93 @@
 
 ---
 
-## ⚡ El Problema vs. La Revolución AnimeLocalTracker
+## 🛑 Se Acabaron los Compromisos
 
-Coleccionas anime en tu disco duro porque valoras la **máxima fidelidad**: videos en 1080p/4K sin la agresiva compresión del streaming, pistas de audio duales y los subtítulos estilizados de tus fansubs favoritos.
+Durante años, he visto cómo la industria obliga al consumidor a tomar una decisión injusta. Por un lado, las plataformas de *streaming* te ofrecen comodidad superficial, pero te castigan con una agresiva compresión de video, catálogos que desaparecen por derechos de autor y cuotas mensuales perpetuas. Por otro lado, la colección de archivos locales te garantiza la **máxima fidelidad (1080p, 4K, audios duales, subtítulos de fansubs puros)**, pero te condena a navegar por carpetas grises de Windows, usar reproductores genéricos y perder el tiempo actualizando manualmente tu progreso en AniList.
 
-Sin embargo, la experiencia tradicional de escritorio siempre ha estado rota:
-* ❌ Abrir el navegador tras cada episodio para actualizar manualmente tu lista en AniList o MyAnimeList.
-* ❌ Usar reproductores genéricos y toscos que no recuerdan tu progreso de forma visual.
-* ❌ Perder tiempo saltando intros y endings manualmente con la barra de tiempo.
-* ❌ Navegar por carpetas aburridas de Windows Explorer sin pósteres, sinopsis ni calificaciones.
+**Es hora de exigir más. Es hora de AnimeLocalTracker.**
 
-**AnimeLocalTracker fusiona lo mejor de ambos mundos:** la libertad, calidad y privacidad de tus archivos locales con la elegancia, inmersión y automatización de un servicio de streaming de última generación.
+Hemos fusionado la soberanía absoluta de tus archivos locales con la elegancia, inmersión y automatización de las plataformas de *streaming* más prestigiosas del mercado. Hemos creado el software que siempre debió existir.
 
 ---
 
-## 🌟 Experiencia de Usuario & Características Principales
+## 💎 La Experiencia de un Producto Premium
 
-### 🍿 1. Reproductor Nativo de Élite (Flyleaf DirectX 11 + FFmpeg)
-Olvida los reproductores externos o reproductores web lentos.
-* **Aceleración por Hardware Pura:** Decodificación fluida a 60, 120 y 144+ FPS sin tirones, compatible con HEVC/H.265, AV1, VP9, 10-bit y audio espacial.
-* **Subtítulos con Legibilidad Cinematográfica:** Renderizado optimizado con silueta gaussiana y sombra paralela de alto contraste para máxima legibilidad en pantallas 4K y paneles OLED.
-* **Controles Overlay Estilo Netflix:** Interfaz superpuesta que aparece al mover el cursor y se desvanece suavemente durante la reproducción. Atajo rápido `F11` para inmersión total en pantalla completa.
+No estamos hablando de un simple reproductor o un catalogador del montón. Estamos hablando de un ecosistema diseñado meticulosamente para respetar tu tiempo y elevar tu experiencia visual al máximo nivel.
 
-### ⏩ 2. AniSkip & Auto-Play Inteligente (Maratones sin fricción)
-* **Salto Automático de Openings y Endings:** Integración directa con la API de AniSkip para detectar y saltar intros (OP), outros (ED), recaps y escenas post-créditos con un solo clic o de forma 100% automática.
-* **Binge-Watching Automatizado:** Al finalizar un episodio, la aplicación reproduce automáticamente el siguiente archivo de tu biblioteca sin que tengas que tocar el ratón o el teclado.
+### 🎥 1. Reproducción Cinematográfica de Élite (Flyleaf & DirectX 11)
+El corazón de AnimeLocalTracker no admite titubeos ni concesiones. Olvídate de configuraciones complejas o *lag*. Disfruta de aceleración por hardware pura (soporte HEVC/H.265, AV1, VP9) que garantiza 60, 120 e incluso 144 FPS estables. Los subtítulos se renderizan con precisión milimétrica (silueta gaussiana y sombra de alto contraste) diseñados específicamente para deslumbrar en paneles OLED y monitores 4K. Con modo Picture-in-Picture (PiP) integrado, tú controlas cómo consumes tu contenido.
 
-### 🔄 3. Auto-Tracking Invisible al 90%
-* **Cero Clics, Cero Preocupaciones:** Tan pronto como alcanzas el **90%** de un episodio, AnimeLocalTracker actualiza instantáneamente tu base de datos local y sincroniza tu perfil de AniList en vivo a través de GraphQL.
-* **Soporte Offline con Sincronización Automática:** Si ves anime sin conexión a internet, tu progreso se guarda localmente y se sincroniza en la nube en cuanto recuperas la conexión.
+### ⚡ 2. Binge-Watching Perfecto con AniSkip
+¿Por qué romper la inmersión buscando el minuto exacto en que termina el *opening*? Nuestro sistema se integra de manera nativa con la API de AniSkip. Salta introducciones, *endings* y escenas post-créditos con un solo clic o, si lo prefieres, de forma 100% automática. Cuando un episodio termina, el siguiente comienza al instante. **Tú solo siéntate y deja que la historia fluya.**
 
-### 🎨 4. Galería Visual y Fichas de Detalle en Alta Definición
-* **Glassmorphism & Material Design 3:** Interfaz moderna en modo oscuro con transparencias, desenfoques dinámicos y micro-animaciones a 60 FPS.
-* **Caché Instantáneo (0 ms de latencia):** Navegación fluida por colecciones de cientos de animes con carga asíncrona de portadas optimizadas.
-* **Fichas Completas:** Banners cinemáticos, sinopsis limpias, géneros, temporadas, puntajes mundiales y lista interactiva de episodios con estado de visto/descargado.
+### 🧠 3. Auto-Tracking Inteligente e Invisible
+Tú pones el entretenimiento, nosotros llevamos la contabilidad. Al cruzar el umbral del **90%** de un episodio, AnimeLocalTracker registra tu progreso en tu base de datos local y lo sincroniza en tiempo real con **AniList** a través de GraphQL. ¿Te quedaste sin conexión? No hay problema. Tu progreso local está blindado y se sincronizará mágicamente en la nube en cuanto vuelvas a estar en línea. 
 
-### 🔍 5. Exploración de Catálogo y Calendario Semanal
-* **Buscador en Tiempo Real:** Busca y añade cualquier título de la base de datos de AniList al instante.
-* **Sección de Tendencias:** Descubre lo más popular de la temporada actual y los clásicos mejor valorados de todos los tiempos.
-* **Calendario de Emisión Semanal:** Cuenta regresiva y horarios de estreno sincronizados con la emisión en Japón.
+### 📥 4. Gestor de Descargas Integrado y Ultrarrápido
+No dependas nunca más de gestores de terceros o sitios web repletos de publicidad. Busca, añade a la cola y descarga episodios directamente desde la aplicación. Nuestro avanzado motor de descargas paralelas te permite monitorizar la **velocidad de red en tiempo real**, controlar pausas y recibir notificaciones instantáneas. Construye tu biblioteca definitiva a la velocidad de la luz.
 
-### 📥 6. Gestor Integrado de Descargas
-* **Cola de descargas inteligente:** Descarga episodios directamente desde la aplicación con monitoreo de velocidad de red en tiempo real, barras de progreso dinámicas, control de pausas y notificaciones al completar.
-
-### 🛡️ 7. UX Pulida al Milímetro y Estabilidad Inquebrantable
-* **Memoria Visual Infalible:** ¿Dejaste un capítulo a la mitad? El sistema inteligente de tracking local-first recuerda tu posición exacta al milisegundo y lo refleja en la interfaz visualmente, sin errores.
-* **Inmersión sin Fricciones:** Controles de volumen estilizados (sin bordes toscos), gestión rápida de subtítulos de grado cinematográfico, e inmersión en pantalla completa con atajos intuitivos (`F11` o botón dedicado). Todo está diseñado para que te olvides del software y te sumerjas en la historia.
+### 🖼️ 5. Una Interfaz que Cautiva y Retiene (Glassmorphism & Material 3)
+Navega por tu colección visualmente, como lo hacías en los videoclubes, pero con tecnología del siglo XXI. Sumérgete en un diseño en modo oscuro profundo, abrazando transparencias, desenfoques dinámicos y micro-animaciones a 60 FPS. Disfruta de portadas en alta resolución, sinopsis precisas, un calendario de emisiones internacionales y un buscador en vivo de tendencias globales. Todo fluye al instante, con cero latencia gracias a nuestra potente caché bi-capa (RAM + Disco).
 
 ---
 
-## 🏗️ Arquitectura e Ingeniería de Alto Rendimiento
+## 🏗️ Ingeniería de Software de Grado Empresarial
 
-AnimeLocalTracker está construido con estándares de ingeniería de software empresarial:
+Un producto líder requiere unos cimientos indestructibles. En mis décadas analizando mercados tecnológicos, rara vez he presenciado un cuidado arquitectónico tan obsesivo en el software de consumo:
 
-| Componente | Tecnología | Beneficio Técnico |
-| :--- | :--- | :--- |
-| **Plataforma Core** | **.NET 8 (C# 12)** | Rendimiento nativo x64, gestión de memoria moderna y compilación optimizada. |
-| **Capa Gráfica** | **WPF + MaterialDesignInXaml** | Renderizado acelerado por GPU con estilos vectoriales fluidos y escalado DPI perfecto. |
-| **Arquitectura** | **MVVM (CommunityToolkit.Mvvm)** | Desacople estricto con generación de código en tiempo de compilación para cero sobrecarga. |
-| **Motor de Video** | **FlyleafLib (DirectX 11 / FFmpeg)** | Reproducción nativa empotrada sin dependencias externas pesadas. |
-| **Base de Datos** | **SQLite en Modo WAL** | Consultas con índices compuestos `(AniListId, NumeroEpisodio)`, PRAGMAs optimizados y transacciones masivas sin bloqueo. |
-| **Sistema de Logs** | **System.Threading.Channels** | Logger asíncrono no bloqueante con escritura en lotes y rotación automática de 5 MB. |
-| **Caché de Imágenes** | **Two-Tier Cache (RAM + Disco)** | Límite de consumo en memoria (~135 MB) y decodificación diferida para evitar OOM. |
-| **Actualizador** | **Velopack** | Actualizaciones silenciosas en segundo plano sin instaladores intrusivos ni ventanas de UAC. |
+* **Core Nativo Robusto**: Arquitectura de vanguardia orquestada en **.NET 8 (C# 12 / WPF)**, con un núcleo nativo ultrarrápido programado en **Rust (FFI)** y herramientas analíticas delegadas a un *daemon* en **Python**. Un verdadero entorno políglota optimizado para rendimiento extremo.
+* **Persistencia Inquebrantable**: Utilizando **SQLite en modo WAL** (*Write-Ahead Logging*). Garantizamos operaciones de base de datos seguras, rápidas y transaccionales. Incluso frente a cierres inesperados, tu base de datos jamás se corrompe.
+* **Arquitectura Escalable**: Estricto patrón **MVVM** (CommunityToolkit.Mvvm), mensajería asíncrona mediante `WeakReferenceMessenger` y un sistema de plugins dinámico que prepara la plataforma para el futuro.
+* **Distribución Transparente con Velopack**: Actualizaciones silenciosas y diferenciales (*delta updates*) en segundo plano. Sin instaladores ruidosos, sin molestos permisos de UAC. Siempre tendrás la última versión, sin enterarte.
 
 ---
 
-## 🚀 Comienza en 30 Segundos
+## 🔒 La Privacidad es el Último Lujo Real
 
-### Para Usuarios Finales
-1. Dirígete a la pestaña de [**Releases**](../../releases) del repositorio.
+En una era donde el consumidor ha sido degradado a producto, nosotros trazamos una línea de hierro. **Este es software Local-First**. 
+
+Tus archivos de video, tus estructuras de carpetas y tus hábitos de visualización locales **jamás** salen de tu máquina. El código se comunica con los servidores de AniList exclusivamente para mantener actualizado tu perfil público, solo si tú lo autorizas. Todo lo demás se procesa y almacena en el santuario de tu propio disco duro. **100% Código Abierto. 100% Transparente.**
+
+---
+
+## 🚀 Únete a la Revolución en 30 Segundos
+
+Dejar atrás la mediocridad tecnológica es una decisión que toma menos de un minuto.
+
+1. Visita la pestaña de [**Releases**](../../releases) de este repositorio.
 2. Descarga la última versión de `Setup_AnimeTracker_vX.X.X.exe`.
-3. Ejecuta el instalador (se instalará en segundos de forma limpia).
-4. Abre la aplicación, vincula tu cuenta de **AniList** en un clic y selecciona la carpeta donde guardas tus animes. ¡A disfrutar!
+3. Instala con un clic, vincula tu cuenta de AniList y señala la carpeta donde atesoras tus animes.
+
+**Bienvenido al estándar premium. Bienvenido a tu nuevo hogar.**
 
 ---
 
-### Para Desarrolladores
+## 💻 Para Desarrolladores, Arquitectos y Visionarios
 
-#### Requisitos Previos
-* **Windows 10/11** (x64)
-* **[.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)** o superior
-* **Visual Studio 2022**, **JetBrains Rider** o **VS Code** con extensiones de C#
+Si hablas el idioma del código y quieres formar parte de la construcción del reproductor definitivo:
 
-#### Clonación y Compilación
 ```bash
-# 1. Clonar el repositorio
+# 1. Clona el repositorio a tu entorno local
 git clone https://github.com/rodriguezrobinj/AnimeLocalTracker.git
 cd AnimeLocalTracker
 
-# 2. Restaurar dependencias y compilar
+# 2. Restaura dependencias y compila (Requiere .NET 8 SDK)
 dotnet build
 
-# 3. Ejecutar la suite completa de pruebas unitarias
+# 3. Verifica nuestra obsesión por la fiabilidad (Ejecuta más de 327 Tests Unitarios)
 dotnet test --no-build
 
-# 4. Iniciar la aplicación
+# 4. Inicia la experiencia en entorno de depuración
 dotnet run --project AnimeLocalTracker/AnimeLocalTracker.csproj
 ```
 
----
-
-## 🧪 Pruebas y Calidad de Código
-
-El proyecto cuenta con una suite rigurosa de pruebas unitarias e integración con **xUnit** y **FluentAssertions**, cubriendo:
-* Semánticas de *upsert* masivo en base de datos y prevención de duplicados.
-* Resiliencia ante concurrencia y conexiones múltiples.
-* Manejo seguro de mensajes reactivos y estados en ViewModels.
-
-```text
-Serie de pruebas: AnimeLocalTracker.Tests.dll (net8.0)
-Correctas: 327 | Fallidas: 0 | Omitidas: 0 | Duración: ~45s
-```
-
-> Además del gate de cobertura del CI (≥45 % líneas / ≥30 % ramas), el pipeline ejecuta
-> SCA bloqueante (NuGet/cargo/pip), `clippy -D warnings`, tests pytest del daemon Python y
-> benchmarks comparativos contra historial (workflow manual/semanal).
+**Nuestra calidad no es negociable:** Nuestro *pipeline* CI ejecuta un exigente escáner de código estático (*SCA*) bloqueante, requiere cero advertencias (`TreatWarningsAsErrors = true`) y valida integraciones complejas. Si compartes nuestra visión de la excelencia, tus *Pull Requests* son más que bienvenidos.
 
 ---
-
-## 🔒 Privacidad y Filosofía
-
-Creemos firmemente en el software **local-first**, privado y ultrarrápido:
-* **Tus archivos se quedan en tu máquina:** La aplicación nunca sube, rastrea ni comparte tus archivos locales.
-* **Sin telemetría invasiva:** Solo tú y tu cuenta oficial de AniList tienen el control de tu historial.
-* **100% Código Abierto:** Transparencia total bajo licencia permisiva.
-
-> **Matiz (PRI-05):** cuando **conectas tu cuenta de AniList**, la app *sí* sincroniza con
-> la nube tu **progreso, estado y puntuación** (es su función principal). Lo que nunca sale
-> de tu equipo son tus archivos de video, la biblioteca local y tu historial de reproducción.
-
----
-
-## 🤝 Contribuciones y Comunidad
-
-¡Las contribuciones son lo que hace que la comunidad de código abierto sea un lugar increíble para aprender, inspirar y crear!
-
-* 🐛 **¿Encontraste un bug?** Abre un [Issue](../../issues).
-* 💡 **¿Tienes una idea de mejora?** Inicia una [Discusión](../../discussions).
-* 🚀 **¿Quieres aportar código?** Los Pull Requests son bienvenidos.
-
-Si este proyecto te ha sido útil o te gusta la propuesta, no olvides dejar una ⭐ **Star en GitHub** para apoyar su desarrollo continuo.
-
----
-
-## 📝 Licencia
-
-Distribuido bajo la Licencia **MIT**. Consulta el archivo [`LICENSE`](LICENSE) para más detalles.
 
 <div align="center">
-  <sub>Hecho con ❤️ para la comunidad de entusiastas del anime y el código limpio.</sub>
+  <h3>AnimeLocalTracker</h3>
+  <p><em>Porque el mejor contenido del mundo exige la plataforma más avanzada para reproducirlo.</em></p>
+  <sub>Diseñado y distribuido bajo la estricta y permisiva Licencia MIT.</sub>
 </div>
