@@ -12,6 +12,7 @@ using Xunit;
 
 namespace AnimeLocalTracker.Tests.ViewModels;
 
+[Collection("NavigationServiceTests")]
 public class PipNavigationTests : IDisposable
 {
     private readonly Mock<IServiceProvider> _spMock = new();

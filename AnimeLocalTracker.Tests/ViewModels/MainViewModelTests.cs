@@ -17,6 +17,7 @@ namespace AnimeLocalTracker.Tests.ViewModels;
 /// DEV-06: MainViewModel (el más grande y sin cubrir): navegación entre vistas,
 /// búsqueda en vivo con debounce y alta de anime vía AnimeLibraryService.
 /// </summary>
+[Collection("NavigationServiceTests")]
 public class MainViewModelTests : IDisposable
 {
     private readonly Mock<IServiceProvider> _spMock = new();

@@ -14,6 +14,7 @@ using Xunit;
 
 namespace AnimeLocalTracker.Tests.ViewModels;
 
+[Collection("NavigationServiceTests")]
 public class ViewModelStressAndLifecycleTests
 {
     private readonly Mock<IAnimeTrackingService> _trackingMock = new();
@@ -55,22 +56,34 @@ public class ViewModelStressAndLifecycleTests
         services.AddSingleton(new Mock<IPluginService>().Object);
 
         var sp = services.BuildServiceProvider();
-        var sut = new MainViewModel(new NavigationService(sp), _trackingMock.Object, sp.GetRequiredService<AnimeLibraryService>(), _downloadMock.Object, _updateMock.Object, new Mock<IDialogService>().Object);
-
-        // Act: Conmutar 100 veces entre todas las vistas principales
-        for (int i = 0; i < 100; i++)
+        var navigationService = new NavigationService(sp);
+        try
         {
-            sut.Navigation.Receive(new NavegarMensaje_Calendario());
-            sut.Navigation.EsCalendarioActivo.Should().BeTrue();
+            var sut = new MainViewModel(navigationService, _trackingMock.Object, sp.GetRequiredService<AnimeLibraryService>(), _downloadMock.Object, _updateMock.Object, new Mock<IDialogService>().Object);
 
-            sut.Navigation.Receive(new NavegarMensaje_Descargas());
-            sut.Navigation.EsDescargasActivas.Should().BeTrue();
+            // Act: Conmutar 100 veces entre todas las vistas principales
+            for (int i = 0; i < 100; i++)
+            {
+                sut.Navigation.Receive(new NavegarMensaje_Calendario());
+                sut.Navigation.EsCalendarioActivo.Should().BeTrue();
 
-            sut.Navigation.Receive(new NavegarMensaje_Configuracion());
-            sut.Navigation.EsConfiguracionActiva.Should().BeTrue();
+                sut.Navigation.Receive(new NavegarMensaje_Descargas());
+                sut.Navigation.EsDescargasActivas.Should().BeTrue();
 
-            sut.Navigation.Receive(new NavegarMensaje_Galeria());
-            sut.Navigation.EsGaleriaActiva.Should().BeTrue();
+                sut.Navigation.Receive(new NavegarMensaje_Configuracion());
+                sut.Navigation.EsConfiguracionActiva.Should().BeTrue();
+
+                sut.Navigation.Receive(new NavegarMensaje_Galeria());
+                sut.Navigation.EsGaleriaActiva.Should().BeTrue();
+            }
+        }
+        finally
+        {
+            // NavigationService se registra en WeakReferenceMessenger.Default (estático de
+            // proceso) en su constructor — sin este unregister, la instancia sigue viva y
+            // puede recibir mensajes de OTROS tests que corran después, lanzando excepciones
+            // porque este ServiceProvider de prueba no tiene todos los ViewModels registrados.
+            WeakReferenceMessenger.Default.UnregisterAll(navigationService);
         }
     }
 
