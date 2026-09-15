@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using AnimeLocalTracker.Services;
@@ -131,6 +132,13 @@ namespace AnimeLocalTracker.Views
             InputManager.Current.PreProcessInput -= InputManager_PreProcessInput;
             _fadeTimer.Stop();
             Mouse.OverrideCursor = null;
+
+            if (_isDraggingMini)
+            {
+                _isDraggingMini = false;
+                _miniMarginPendiente = false;
+                CompositionTarget.Rendering -= MiniDrag_CompositionTargetRendering;
+            }
 
             // StaysOpen=True: cerrar manualmente al salir del reproductor
             if (SubtitlesPopup != null)
@@ -326,6 +334,15 @@ namespace AnimeLocalTracker.Views
             RegistrarActividad();
         }
 
+        // Activación por teclado (Enter/Espacio con el botón enfocado): el toggle por mouse va por
+        // PreviewMouseLeftButtonDown de arriba, que marca e.Handled=true y evita que este Click
+        // también dispare por clic (solo llega aquí vía teclado).
+        private void SubtitlesButton_Click(object sender, RoutedEventArgs e)
+        {
+            SubtitlesPopup.IsOpen = !SubtitlesPopup.IsOpen;
+            RegistrarActividad();
+        }
+
         private void SubtitleMenuItem_Click(object sender, RoutedEventArgs e)
         {
             // Elegir una opción cierra el menú por completo (el Command se ejecuta igualmente)
@@ -429,13 +446,15 @@ namespace AnimeLocalTracker.Views
         private Point _dragStartPoint;
         private double _startMarginRight;
         private double _startMarginBottom;
+        private Thickness _pendingMiniMargin;
+        private bool _miniMarginPendiente;
 
         private void BarraSuperior_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             if (DataContext is ViewModels.ReproductorViewModel vm && vm.EsModoMini)
             {
                 _isDraggingMini = true;
-                
+
                 var window = Window.GetWindow(this);
                 if (window != null)
                 {
@@ -443,6 +462,12 @@ namespace AnimeLocalTracker.Views
                     _startMarginRight = vm.MiniPlayerMargin.Right;
                     _startMarginBottom = vm.MiniPlayerMargin.Bottom;
                     ((UIElement)sender).CaptureMouse();
+                    // Aplicar el Margin como máximo una vez por frame renderizado (no en cada MouseMove
+                    // crudo, que dispara muchas más veces por segundo de las que la superficie nativa del
+                    // FlyleafHost puede seguir): sin este throttle, el video queda "atrasado" respecto al
+                    // contenedor WPF durante el arrastre (efecto de sombra/recorte descuadrado) y solo
+                    // se resincroniza cuando el layout se asienta al soltar el mouse.
+                    CompositionTarget.Rendering += MiniDrag_CompositionTargetRendering;
                 }
             }
         }
@@ -453,22 +478,28 @@ namespace AnimeLocalTracker.Views
             {
                 if (e.LeftButton != MouseButtonState.Pressed)
                 {
-                    _isDraggingMini = false;
-                    ((UIElement)sender).ReleaseMouseCapture();
+                    DetenerDragMini((UIElement)sender);
                     return;
                 }
 
-                if (DataContext is ViewModels.ReproductorViewModel vm)
+                var window = Window.GetWindow(this);
+                if (window != null)
                 {
-                    var window = Window.GetWindow(this);
-                    if (window != null)
-                    {
-                        Point currentPoint = e.GetPosition(window);
-                        double newRight = _startMarginRight - (currentPoint.X - _dragStartPoint.X);
-                        double newBottom = _startMarginBottom - (currentPoint.Y - _dragStartPoint.Y);
-                        vm.MiniPlayerMargin = new Thickness(0, 0, newRight, newBottom);
-                    }
+                    Point currentPoint = e.GetPosition(window);
+                    double newRight = _startMarginRight - (currentPoint.X - _dragStartPoint.X);
+                    double newBottom = _startMarginBottom - (currentPoint.Y - _dragStartPoint.Y);
+                    _pendingMiniMargin = new Thickness(0, 0, newRight, newBottom);
+                    _miniMarginPendiente = true;
                 }
+            }
+        }
+
+        private void MiniDrag_CompositionTargetRendering(object? sender, EventArgs e)
+        {
+            if (_miniMarginPendiente && DataContext is ViewModels.ReproductorViewModel vm)
+            {
+                vm.MiniPlayerMargin = _pendingMiniMargin;
+                _miniMarginPendiente = false;
             }
         }
 
@@ -476,9 +507,22 @@ namespace AnimeLocalTracker.Views
         {
             if (_isDraggingMini)
             {
-                _isDraggingMini = false;
-                ((UIElement)sender).ReleaseMouseCapture();
+                DetenerDragMini((UIElement)sender);
             }
+        }
+
+        private void DetenerDragMini(UIElement elementoConCaptura)
+        {
+            _isDraggingMini = false;
+            CompositionTarget.Rendering -= MiniDrag_CompositionTargetRendering;
+            // Aplicar cualquier posición pendiente para que la posición final coincida exactamente
+            // con donde soltó el mouse el usuario, en vez de quedarse en el último frame renderizado.
+            if (_miniMarginPendiente && DataContext is ViewModels.ReproductorViewModel vm)
+            {
+                vm.MiniPlayerMargin = _pendingMiniMargin;
+                _miniMarginPendiente = false;
+            }
+            elementoConCaptura.ReleaseMouseCapture();
         }
     }
 }

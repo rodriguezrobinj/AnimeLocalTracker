@@ -340,10 +340,8 @@ public partial class ConfiguracionViewModel : ObservableObject
     public async Task BorrarTodosMisDatosAsync()
     {
         bool confirmarPrimero = await _dialogService.MostrarDialogoAsync(
-            "Borrar todos mis datos",
-            "Se eliminarán: tu biblioteca local (animes, historial de visionado y progreso), " +
-            "la sesión de AniList, las portadas, miniaturas, copias de seguridad y logs.\n\n" +
-            "Tu lista en la nube de AniList NO se toca. Esta acción NO se puede deshacer.",
+            LocalizationService.T("Cfg_BorrarDatosTitulo"),
+            LocalizationService.T("Cfg_BorrarDatosConfirmacionMsj"),
             true,
             "DeleteForever",
             "#EF4444");
@@ -351,9 +349,8 @@ public partial class ConfiguracionViewModel : ObservableObject
         if (!confirmarPrimero) return;
 
         bool confirmarSegundo = await _dialogService.MostrarDialogoAsync(
-            "Última confirmación",
-            "¿Borrar TODOS tus datos locales ahora? La aplicación se cerrará y, al abrirla " +
-            "de nuevo, empezarás desde cero.",
+            LocalizationService.T("Cfg_UltimaConfirmacionTitulo"),
+            LocalizationService.T("Cfg_UltimaConfirmacionMsj"),
             true,
             "Alert",
             "#EF4444");

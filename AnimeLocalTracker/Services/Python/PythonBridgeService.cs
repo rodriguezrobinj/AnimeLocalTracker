@@ -358,10 +358,14 @@ namespace AnimeLocalTracker.Services.Python
             string baseDir = AppDomain.CurrentDomain.BaseDirectory;
 
             // 1. Buscar binario compilado embebido AnimeTrackerTools.exe
+            // (--onedir: el exe vive en una subcarpeta con su nombre junto a sus dependencias,
+            // no suelto en Tools/; se mantienen las rutas antiguas por compatibilidad con builds previos)
             string[] possibleBinaryPaths =
             {
+                Path.Combine(baseDir, "Tools", "AnimeTrackerTools", "AnimeTrackerTools.exe"),
                 Path.Combine(baseDir, "Tools", "AnimeTrackerTools.exe"),
                 Path.Combine(baseDir, "AnimeTrackerTools.exe"),
+                Path.Combine(Directory.GetCurrentDirectory(), "AnimeLocalTracker", "Tools", "AnimeTrackerTools", "AnimeTrackerTools.exe"),
                 Path.Combine(Directory.GetCurrentDirectory(), "AnimeLocalTracker", "Tools", "AnimeTrackerTools.exe")
             };
 

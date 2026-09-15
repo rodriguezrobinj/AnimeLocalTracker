@@ -5,8 +5,11 @@ import sys
 
 def build_standalone_binary():
     """
-    Compila tools/python/cli.py en un ejecutable binario único autónomo (Zero-Setup)
-    ubicado en AnimeLocalTracker/Tools/AnimeTrackerTools.exe
+    Compila tools/python/cli.py en un ejecutable autónomo (Zero-Setup), empaquetado
+    como carpeta (--onedir) en AnimeLocalTracker/Tools/AnimeTrackerTools/AnimeTrackerTools.exe.
+    Se usa --onedir en vez de --onefile para evitar la extracción a un directorio
+    temporal en cada arranque, causa raíz de fallos de handshake observados en producción
+    con el onefile de 73MB (ver PythonBridgeService.ResolveExecutable).
     """
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(os.path.dirname(script_dir))
@@ -23,7 +26,7 @@ def build_standalone_binary():
         sys.executable, "-m", "PyInstaller",
         "--noconfirm",
         "--clean",
-        "--onefile",
+        "--onedir",
         "--name", "AnimeTrackerTools",
         "--distpath", tools_output_dir,
         "--workpath", build_dir,
@@ -33,7 +36,7 @@ def build_standalone_binary():
     
     res = subprocess.run(cmd, cwd=script_dir)
     if res.returncode == 0:
-        exe_path = os.path.join(tools_output_dir, "AnimeTrackerTools.exe")
+        exe_path = os.path.join(tools_output_dir, "AnimeTrackerTools", "AnimeTrackerTools.exe")
         print(f"[Build] ¡Compilado exitosamente! Binario generado en: {exe_path}")
         
         # Limpieza de temporales

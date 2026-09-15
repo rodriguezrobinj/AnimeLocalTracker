@@ -66,7 +66,7 @@ namespace AnimeLocalTracker.Services.Python
 
                     var noReconocidos = new List<(FileInfo File, EpisodioItem Item)>();
 
-                    // 1. Fase ultrarrápida en memoria usando Regex nativo (0ms)
+                    // 1. Fase ultrarrápida en memoria usando el motor nativo Rust FFI (anitomy), no regex (0ms)
                     foreach (var fileInfo in archivos)
                     {
                         string nombreSinExtension = Path.GetFileNameWithoutExtension(fileInfo.Name);

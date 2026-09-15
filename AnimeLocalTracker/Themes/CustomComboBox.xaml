@@ -159,13 +159,21 @@
                             </Grid>
                         </Border>
 
-                        <!-- 2. Capa ToggleButton invisible para capturar el clic sobre toda la caja -->
+                        <!-- 2. Capa ToggleButton invisible para capturar el clic sobre toda la caja.
+                             Width/Height atados explícitamente a MainRoot (no solo Stretch): con cajas
+                             cuyo ancho final depende de contenido bindeado tardío (ComboBox de Idioma,
+                             etc.) el Stretch por Arrange no estaba cubriendo el área real, dejando solo
+                             una franja angosta clicable (bug reportado: "solo una franja del combobox
+                             abre el menú"). El binding de tamaño se re-evalúa ante cualquier cambio de
+                             ActualWidth/ActualHeight de MainRoot, sea cual sea la causa del desajuste. -->
                         <ToggleButton x:Name="PART_ToggleButton"
                                       Focusable="False"
                                       IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
                                       ClickMode="Press"
-                                      HorizontalAlignment="Stretch"
-                                      VerticalAlignment="Stretch"
+                                      Width="{Binding ActualWidth, ElementName=MainRoot}"
+                                      Height="{Binding ActualHeight, ElementName=MainRoot}"
+                                      HorizontalAlignment="Left"
+                                      VerticalAlignment="Top"
                                       Cursor="Hand">
                             <ToggleButton.Template>
                                 <ControlTemplate TargetType="{x:Type ToggleButton}">

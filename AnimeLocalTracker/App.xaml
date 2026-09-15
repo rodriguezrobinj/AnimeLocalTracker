@@ -54,6 +54,7 @@
             <conv:ZeroToVisibilityConverter x:Key="ZeroToVis" />
             <conv:NullToCollapsedConverter x:Key="NullToCollapsed" />
             <conv:AnimeCoverMultiConverter x:Key="AnimeCoverMulti" />
+            <conv:LocalizedFormatConverter x:Key="LocalizedFormat" />
 
             <!-- ═══════════════════════════════════════════════════════════════ -->
             <!--  SISTEMA DE DISEÑO (tokens canónicos = paleta de DetalleView)  -->

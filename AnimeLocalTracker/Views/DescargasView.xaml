@@ -2,6 +2,7 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+             xmlns:loc="clr-namespace:AnimeLocalTracker.Services"
              TextElement.Foreground="{DynamicResource MaterialDesignBody}"
              Background="Transparent">
 
@@ -26,7 +27,7 @@
         <!-- HEADER SUPERIOR -->
         <Grid Grid.Row="0" Margin="0,0,0,20">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <TextBlock Text="Cola de descargas" Style="{StaticResource AppText.PageTitle}" VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding [Desc_Titulo], Source={x:Static loc:LocalizationService.Instance}}" Style="{StaticResource AppText.PageTitle}" VerticalAlignment="Center"/>
 
                 <!-- BADGE CONTEO -->
                 <Border Style="{StaticResource AppBadge}" Margin="14,0,0,0" VerticalAlignment="Center"
@@ -44,8 +45,8 @@
                               Padding="0,0,20,0"
                               Visibility="{Binding TieneDescargas, Converter={StaticResource BoolToVis}}">
                     <StackPanel>
-                        <!-- ENCABEZADO DE GRUPO (AnimeAv1) -->
-                        <TextBlock Text="AnimeAv1" FontSize="15" FontWeight="SemiBold" Foreground="#6B7280" Margin="10,0,0,15"/>
+                        <!-- ENCABEZADO DE GRUPO (placeholder fijo, no viene de datos reales) -->
+                        <TextBlock Text="{Binding [Desc_GrupoEjemplo], Source={x:Static loc:LocalizationService.Instance}}" FontSize="15" FontWeight="SemiBold" Foreground="#6B7280" Margin="10,0,0,15"/>
 
                         <ItemsControl ItemsSource="{Binding ColaDescargas}"
                                       VirtualizingPanel.IsVirtualizing="True"
@@ -91,7 +92,7 @@
                                                         <Border Background="#33F59E0B" BorderBrush="#66F59E0B" BorderThickness="1" CornerRadius="6"
                                                                 Padding="7,2" Margin="8,0,0,0" VerticalAlignment="Center"
                                                                 Visibility="{Binding IsPaused, Converter={StaticResource BoolToVis}}">
-                                                            <TextBlock Text="En pausa" FontSize="10" FontWeight="Bold" Foreground="#F59E0B"/>
+                                                            <TextBlock Text="{Binding [Desc_EnPausa], Source={x:Static loc:LocalizationService.Instance}}" FontSize="10" FontWeight="Bold" Foreground="#F59E0B"/>
                                                         </Border>
                                                     </StackPanel>
                                                     <TextBlock Text="{Binding ProgresoTexto}" FontWeight="Bold" FontSize="14" Foreground="#60A5FA"
@@ -115,7 +116,7 @@
                                                 <Button Command="{Binding DataContext.AlternarPausaDescargaCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                         CommandParameter="{Binding}"
                                                         Style="{StaticResource MaterialDesignIconButton}" Width="36" Height="36"
-                                                        AutomationProperties.Name="Pausar o reanudar descarga">
+                                                        AutomationProperties.Name="{Binding [Desc_PausarReanudarTip], Source={x:Static loc:LocalizationService.Instance}}">
                                                     <materialDesign:PackIcon Foreground="#60A5FA" Width="22" Height="22">
                                                         <materialDesign:PackIcon.Style>
                                                             <Style TargetType="materialDesign:PackIcon">
@@ -133,9 +134,9 @@
                                                 <!-- BOTÓN CANCELAR -->
                                                 <Button Command="{Binding DataContext.CancelarDescargaCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                         CommandParameter="{Binding}"
-                                                        Style="{StaticResource MaterialDesignIconButton}" Width="36" Height="36" 
-                                                        ToolTip="Cancelar descarga" Margin="4,0,0,0"
-                                                        AutomationProperties.Name="Cancelar descarga">
+                                                        Style="{StaticResource MaterialDesignIconButton}" Width="36" Height="36"
+                                                        ToolTip="{Binding [Desc_CancelarTip], Source={x:Static loc:LocalizationService.Instance}}" Margin="4,0,0,0"
+                                                        AutomationProperties.Name="{Binding [Desc_CancelarTip], Source={x:Static loc:LocalizationService.Instance}}">
                                                     <materialDesign:PackIcon Kind="TrashCanOutline" Foreground="#F87171" Width="20" Height="20"/>
                                                 </Button>
                                             </StackPanel>
@@ -153,8 +154,8 @@
                     <Border Background="#1E293B" CornerRadius="40" Width="80" Height="80" HorizontalAlignment="Center" Margin="0,0,0,16">
                         <materialDesign:PackIcon Kind="CloudDownloadOutline" Width="40" Height="40" Foreground="#6B7280" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
-                    <TextBlock Text="No hay descargas en curso" Style="{StaticResource AppEmptyTitle}" Margin="0,0,0,6"/>
-                    <TextBlock Text="Los capítulos que pongas a descargar se mostrarán aquí en tiempo real." Style="{StaticResource AppEmptyText}"/>
+                    <TextBlock Text="{Binding [Desc_VacioTitulo], Source={x:Static loc:LocalizationService.Instance}}" Style="{StaticResource AppEmptyTitle}" Margin="0,0,0,6"/>
+                    <TextBlock Text="{Binding [Desc_VacioSub], Source={x:Static loc:LocalizationService.Instance}}" Style="{StaticResource AppEmptyText}"/>
                 </StackPanel>
 
                 <!-- BOTONES FLOTANTES DE ACCIONES (SEPARADOS) -->
@@ -197,10 +198,10 @@
                             <TextBlock FontWeight="Bold" FontSize="14" VerticalAlignment="Center">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
-                                        <Setter Property="Text" Value="Pausar todas" />
+                                        <Setter Property="Text" Value="{Binding [Desc_PausarTodas], Source={x:Static loc:LocalizationService.Instance}}" />
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding TodasPausadas}" Value="True">
-                                                <Setter Property="Text" Value="Reanudar todas" />
+                                                <Setter Property="Text" Value="{Binding [Desc_ReanudarTodas], Source={x:Static loc:LocalizationService.Instance}}" />
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
@@ -216,7 +217,7 @@
                                 Background="#1E293B" BorderBrush="#2D3748" BorderThickness="1"
                                 Click="MenuOpcionesBtn_Click"
                                 PreviewMouseLeftButtonDown="MenuOpcionesBtn_PreviewMouseLeftButtonDown"
-                                Cursor="Hand" ToolTip="Más opciones">
+                                Cursor="Hand" ToolTip="{Binding [Desc_MasOpcionesTip], Source={x:Static loc:LocalizationService.Instance}}">
                             <Button.Template>
                                 <ControlTemplate TargetType="Button">
                                     <Border x:Name="btnBorder"
@@ -285,7 +286,7 @@
                                     </Button.Style>
                                     <StackPanel Orientation="Horizontal">
                                         <materialDesign:PackIcon Kind="TrashCanOutline" Width="18" Height="18" Foreground="#EF4444" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                                        <TextBlock Text="Cancelar todas las descargas" Foreground="#EF4444" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding [Desc_CancelarTodas], Source={x:Static loc:LocalizationService.Instance}}" Foreground="#EF4444" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </Button>
                             </Border>

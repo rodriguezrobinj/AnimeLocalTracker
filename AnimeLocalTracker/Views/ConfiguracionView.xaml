@@ -500,8 +500,8 @@
                                 </Grid.ColumnDefinitions>
 
                                 <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
-                                    <TextBlock Text="Borrar todos mis datos" FontWeight="Bold" Foreground="White" FontSize="13"/>
-                                    <TextBlock Text="Elimina biblioteca, historial, sesión de AniList, portadas, miniaturas, backups y logs locales. Tu lista en la nube NO se toca." 
+                                    <TextBlock Text="{Binding [Cfg_BorrarDatosTitulo], Source={x:Static loc:LocalizationService.Instance}}" FontWeight="Bold" Foreground="White" FontSize="13"/>
+                                    <TextBlock Text="{Binding [Cfg_BorrarDatosSub], Source={x:Static loc:LocalizationService.Instance}}"
                                                FontSize="11" Foreground="#F87171" TextWrapping="Wrap"/>
                                 </StackPanel>
 
@@ -511,7 +511,7 @@
                                         materialDesign:ButtonAssist.CornerRadius="8">
                                     <StackPanel Orientation="Horizontal">
                                         <materialDesign:PackIcon Kind="DeleteForever" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                        <TextBlock Text="Borrar datos" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="12"/>
+                                        <TextBlock Text="{Binding [Cfg_BtnBorrarDatos], Source={x:Static loc:LocalizationService.Instance}}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="12"/>
                                     </StackPanel>
                                 </Button>
                             </Grid>
@@ -527,8 +527,8 @@
                                 <materialDesign:PackIcon Kind="Puzzle" Foreground="#8B5CF6" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <StackPanel VerticalAlignment="Center">
-                                <TextBlock Text="Plugins y Extensiones" FontSize="16" FontWeight="Bold" Foreground="White"/>
-                                <TextBlock Text="Scrapers y herramientas de la comunidad (Python)" FontSize="11" Foreground="#9CA3AF"/>
+                                <TextBlock Text="{Binding [Cfg_Plugins], Source={x:Static loc:LocalizationService.Instance}}" FontSize="16" FontWeight="Bold" Foreground="White"/>
+                                <TextBlock Text="{Binding [Cfg_PluginsSub], Source={x:Static loc:LocalizationService.Instance}}" FontSize="11" Foreground="#9CA3AF"/>
                             </StackPanel>
                         </StackPanel>
 
@@ -553,7 +553,7 @@
                                     </ItemsControl>
                                     
                                     <!-- Mensaje si no hay plugins -->
-                                    <TextBlock Text="No hay plugins instalados." Foreground="#9CA3AF" FontSize="12" FontStyle="Italic"
+                                    <TextBlock Text="{Binding [Cfg_SinPlugins], Source={x:Static loc:LocalizationService.Instance}}" Foreground="#9CA3AF" FontSize="12" FontStyle="Italic"
                                                Visibility="{Binding PluginsInstalados.Count, Converter={StaticResource ZeroToVis}}"/>
                                 </StackPanel>
 
@@ -563,7 +563,7 @@
                                         materialDesign:ButtonAssist.CornerRadius="8">
                                     <StackPanel Orientation="Horizontal">
                                         <materialDesign:PackIcon Kind="FolderOpen" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                        <TextBlock Text="Abrir Carpeta" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="12"/>
+                                        <TextBlock Text="{Binding [Cfg_AbrirCarpetaPlugins], Source={x:Static loc:LocalizationService.Instance}}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="12"/>
                                     </StackPanel>
                                 </Button>
                             </Grid>
