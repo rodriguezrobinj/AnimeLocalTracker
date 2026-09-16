@@ -20,6 +20,8 @@ public class DownloadService : IDownloadService
     private const string UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
     private const int SegmentosParalelos = 6;
     private const int LimiteDescargasPorDefecto = 3;
+    // FUN-017: máximo de reintentos automáticos ante cortes de red transitorios antes de abandonar.
+    private const int MaxReintentosDescargaTransitoria = 5;
     // SEC-03: tope de seguridad por archivo en el modo secuencial (el segmentado ya lo acota).
     private const long MaxArchivoDescargaBytes = 35L * 1024 * 1024 * 1024;
 
@@ -332,6 +334,7 @@ public class DownloadService : IDownloadService
         {
             bool slotAdquirido = false;
             int reintentosResolucion = 0;
+            int reintentosDescarga = 0;
             try
             {
                 await AdquirirSlotAsync(state.Cts.Token);
@@ -384,6 +387,17 @@ public class DownloadService : IDownloadService
                         EliminarParcialSeguro(state.RutaTemporal);
                         state.VideoUrl = null;
                     }
+                    // FUN-017: los cortes de red (timeouts, conexión reiniciada, inactividad) son
+                    // habituales en servidores de streaming gratuitos y no implican que el enlace
+                    // sea inválido. Se reintenta varias veces conservando el progreso (el .state y
+                    // el archivo parcial no se borran) en vez de abandonar la descarga a la primera.
+                    catch (Exception ex) when (EsErrorTransitorioDeRed(ex) && reintentosDescarga < MaxReintentosDescargaTransitoria && !state.IsPaused && !state.Cts.IsCancellationRequested)
+                    {
+                        reintentosDescarga++;
+                        var espera = TimeSpan.FromSeconds(Math.Min(2 * reintentosDescarga, 15));
+                        AppLogger.Warn("DownloadService", $"Fallo transitorio de red descargando '{state.AnimeTitulo}' Ep {state.NumeroEpisodio} (intento {reintentosDescarga}/{MaxReintentosDescargaTransitoria}): {ex.Message}. Reintentando en {espera.TotalSeconds:F0}s sin perder el progreso.");
+                        await Task.Delay(espera, state.Cts.Token);
+                    }
                 }
 
                 if (File.Exists(state.RutaDestino)) File.Delete(state.RutaDestino);
@@ -411,7 +425,9 @@ public class DownloadService : IDownloadService
                 }
 
                 AppLogger.Error("DownloadService", $"Error descargando {state.AnimeTitulo} Ep {state.NumeroEpisodio}", ex);
-                _stateStore.EliminarArchivosTemporales(state.RutaTemporal);
+                // FUN-017: no se borra el archivo parcial ni el .state aquí — ya se agotaron los
+                // reintentos automáticos, pero conservar el progreso permite que un reintento manual
+                // del usuario retome la descarga en vez de empezar desde cero.
                 _activeDownloads.TryRemove(key, out _);
                 WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, 0, isDownloading: false, isCompleted: false, isPaused: false, "", ex.Message, state.AnimeTitulo));
             }
@@ -582,7 +598,7 @@ public class DownloadService : IDownloadService
             var driveInfo = new DriveInfo(driveRoot);
             if (driveInfo.IsReady && driveInfo.AvailableFreeSpace < totalBytes + 100 * 1024 * 1024)
             {
-                throw new IOException($"Espacio insuficiente en disco para descargar el archivo. Se requieren {totalBytes / (1024 * 1024)} MB y solo hay {driveInfo.AvailableFreeSpace / (1024 * 1024)} MB libres.");
+                throw new DownloadAbortDefinitivoException($"Espacio insuficiente en disco para descargar el archivo. Se requieren {totalBytes / (1024 * 1024)} MB y solo hay {driveInfo.AvailableFreeSpace / (1024 * 1024)} MB libres.");
             }
         }
         catch (IOException) { throw; }
@@ -701,6 +717,13 @@ public class DownloadService : IDownloadService
             await _stateStore.GuardarAsync(statePath, stateInfo);
             throw;
         }
+        catch (HttpRequestException)
+        {
+            // FUN-017: cortes de conexión o errores del servidor (reset, 5xx) a media descarga
+            // también deben conservar el progreso de los segmentos para poder reanudar.
+            await _stateStore.GuardarAsync(statePath, stateInfo);
+            throw;
+        }
     }
 
     private async Task DownloadSequentialAsync(string videoUrl, string destinationPath, long totalBytes, IProgress<(double Progress, double Speed)>? progress, CancellationToken cancellationToken)
@@ -750,7 +773,7 @@ public class DownloadService : IDownloadService
         if (totalBytes > MaxArchivoDescargaBytes)
         {
             EliminarParcialSeguro(destinationPath);
-            throw new IOException($"El tamaño declarado del video supera el límite de seguridad de {MaxArchivoDescargaBytes / (1024.0 * 1024 * 1024):F0} GB.");
+            throw new DownloadAbortDefinitivoException($"El tamaño declarado del video supera el límite de seguridad de {MaxArchivoDescargaBytes / (1024.0 * 1024 * 1024):F0} GB.");
         }
 
         var canReportProgress = totalBytes > 0 && progress != null;
@@ -820,7 +843,7 @@ public class DownloadService : IDownloadService
         if (superoLimite)
         {
             EliminarParcialSeguro(destinationPath);
-            throw new IOException($"El archivo descargado superó el límite de seguridad de {MaxArchivoDescargaBytes / (1024.0 * 1024 * 1024):F0} GB.");
+            throw new DownloadAbortDefinitivoException($"El archivo descargado superó el límite de seguridad de {MaxArchivoDescargaBytes / (1024.0 * 1024 * 1024):F0} GB.");
         }
 
         if (canReportProgress && progress != null)
@@ -851,6 +874,24 @@ public class DownloadService : IDownloadService
                && hre.StatusCode is System.Net.HttpStatusCode.Forbidden
                    or System.Net.HttpStatusCode.NotFound
                    or System.Net.HttpStatusCode.Gone;
+    }
+
+    /// <summary>
+    /// FUN-017: corte de red o de servidor que suele ser pasajero (timeout, inactividad,
+    /// conexión reiniciada, 5xx) y vale la pena reintentar sin perder el progreso ya
+    /// descargado. Excluye los cortes de seguridad definitivos (tamaño/espacio en disco),
+    /// marcados con <see cref="DownloadAbortDefinitivoException"/>, que no deben reintentarse.
+    /// </summary>
+    private static bool EsErrorTransitorioDeRed(Exception ex)
+    {
+        if (ex is DownloadAbortDefinitivoException) return false;
+        return ex is IOException or HttpRequestException or TaskCanceledException;
+    }
+
+    /// <summary>Corte de seguridad definitivo (límite de tamaño, espacio en disco insuficiente): no se reintenta.</summary>
+    private sealed class DownloadAbortDefinitivoException : IOException
+    {
+        public DownloadAbortDefinitivoException(string message) : base(message) { }
     }
 
     private static string SanitizarUrlParaLog(string url)
