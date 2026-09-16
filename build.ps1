@@ -80,15 +80,24 @@ if (-not $pasada2) {
 
 # Verificación de artefactos: el build puede reportar "OK" sin generar el ensamblado de
 # tests (observado en CI). Si falta, se reintenta con log DETALLADO para diagnosticar.
-$testsDll = Join-Path $root "AnimeLocalTracker.Tests\bin\$Configuration\net8.0-windows10.0.26100.0\AnimeLocalTracker.Tests.dll"
-if (-not (Test-Path $testsDll)) {
-    $testsDll = Join-Path $root "AnimeLocalTracker.Tests\bin\$Configuration\net8.0-windows\AnimeLocalTracker.Tests.dll"
+function Get-TestsDll {
+    $candidates = @(
+        (Join-Path $root "AnimeLocalTracker.Tests\bin\$Configuration\net8.0-windows10.0.26100.0\AnimeLocalTracker.Tests.dll"),
+        (Join-Path $root "AnimeLocalTracker.Tests\bin\$Configuration\net8.0-windows\AnimeLocalTracker.Tests.dll")
+    )
+    foreach ($cand in $candidates) {
+        if (Test-Path $cand) { return $cand }
+    }
+    return $null
 }
-if (-not (Test-Path $testsDll)) {
-    Write-Host "[build] ERROR: no se generó el ensamblado de tests ($testsDll)." -ForegroundColor Red
+
+$testsDll = Get-TestsDll
+if (-not $testsDll) {
+    Write-Host "[build] ERROR: no se generó el ensamblado de tests." -ForegroundColor Red
     Write-Host "[build] Reintentando con salida detallada para diagnosticar..." -ForegroundColor Yellow
     & dotnet build "$root\AnimeLocalTracker.Tests\AnimeLocalTracker.Tests.csproj" -c $Configuration --nologo -nodeReuse:false --no-incremental -v n 2>&1 | Select-Object -Last 100
-    if (-not (Test-Path $testsDll)) {
+    $testsDll = Get-TestsDll
+    if (-not $testsDll) {
         Write-Host "[build] ERROR: el ensamblado de tests sigue sin generarse." -ForegroundColor Red
         exit 1
     }

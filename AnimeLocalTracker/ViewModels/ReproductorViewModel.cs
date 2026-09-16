@@ -60,9 +60,6 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     private bool _autoSkipIntroOutro = false;
 
     [ObservableProperty]
-    private Thickness _miniPlayerMargin = new Thickness(0, 0, 24, 24);
-
-    [ObservableProperty]
     private bool _autoPlaySiguiente = true;
 
     // Control de volumen y mute
@@ -124,7 +121,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         set => SetProperty(ref _tieneEpisodioSiguiente, value);
     }
 
-    private string _episodioAnteriorTooltip = "Episodio anterior (P)";
+    private string _episodioAnteriorTooltip = "Episodio anterior (B)";
     public string EpisodioAnteriorTooltip
     {
         get => _episodioAnteriorTooltip;
@@ -720,25 +717,33 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     [RelayCommand]
     public void AlternarModoMini()
     {
-        EsModoMini = !EsModoMini;
-        if (!EsModoMini)
+        if (EsModoMini)
         {
-            MiniPlayerMargin = new Thickness(0, 0, 24, 24);
+            RestaurarFormatoHabitual();
+        }
+        else
+        {
+            MinimizarAMini();
         }
     }
 
+    /// <summary>
+    /// PIP-01: además de conmutar el flag que muestra los controles compactos, encoge la
+    /// VENTANA de verdad (Topmost, sin chrome, anclada a la esquina) vía IVentanaPrincipal —
+    /// así el video sigue visible por encima de otras apps, no solo de otras pestañas de esta.
+    /// </summary>
     [RelayCommand]
     public void MinimizarAMini()
     {
         EsModoMini = true;
-        MiniPlayerMargin = new Thickness(0, 0, 24, 24);
+        _ventanaPrincipal?.EntrarModoPiP();
     }
 
     [RelayCommand]
     public void RestaurarFormatoHabitual()
     {
         EsModoMini = false;
-        MiniPlayerMargin = new Thickness(0, 0, 24, 24);
+        _ventanaPrincipal?.SalirModoPiP();
     }
 
 
@@ -838,7 +843,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         var anterior = ObtenerAnteriorEpisodio();
         TieneEpisodioAnterior = anterior != null && !string.IsNullOrWhiteSpace(anterior.RutaCompleta);
         EpisodioAnteriorTooltip = TieneEpisodioAnterior
-            ? $"Anterior: Episodio {anterior!.NumeroEpisodio} (P)"
+            ? $"Anterior: Episodio {anterior!.NumeroEpisodio} (B)"
             : "No hay episodio anterior";
 
         _smtc?.ActualizarNavegacionDisponible(TieneEpisodioSiguiente, TieneEpisodioAnterior);
@@ -1048,7 +1053,11 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             "Retroceder10" => "Left",
             "SaltarIntro" => "S",
             "SiguienteEpisodio" => "N",
-            "AnteriorEpisodio" => "P",
+            // PIP-01: "P" pasa a ser el atajo de Modo Mini/PiP (los tooltips ya lo anunciaban
+            // así desde antes, pero el atajo real estaba tomado por AnteriorEpisodio — nunca
+            // llegaba a activarse). AnteriorEpisodio se mueve a "B" para liberar "P".
+            "AnteriorEpisodio" => "B",
+            "ModoMini" => "P",
             "Cerrar" => "Escape",
             "CapturarFrame" => "C",
             _ => string.Empty
@@ -1407,6 +1416,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     public void Cerrar()
     {
         EsModoMini = false;
+        _ventanaPrincipal?.SalirModoPiP();
         _ = GuardarProgresoActualAsync();
         Dispose();
         

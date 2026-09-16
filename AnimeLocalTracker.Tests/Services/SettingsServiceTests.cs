@@ -166,6 +166,68 @@ public class SettingsServiceTests : IDisposable
     }
 
     [Fact]
+    public void SettingsService_AtajoAnteriorEpisodioLegadoEnP_DeberiaMigrarABYLiberarPParaModoMini()
+    {
+        // Arrange (PIP-01): settings.json guardado antes de que existiera "ModoMini" — tiene
+        // "AnteriorEpisodio": "P" (el default viejo) persistido, sin ningún "ModoMini". Antes de
+        // esta migración, SanitizarAtajos conservaba ese "P" en AnteriorEpisodio Y llenaba
+        // ModoMini con su propio default ("P" también) → el mismo choque de teclas persistía
+        // en cualquier instalación existente, aunque el código ya defina "P" solo para ModoMini.
+        File.WriteAllText(_tempSettingsFile, """
+        {
+          "RutaBaseAnimes": "C:\\Anime",
+          "Atajos": {
+            "PlayPausa": "Space",
+            "PantallaCompleta": "F11",
+            "Silenciar": "M",
+            "SubirVolumen": "Up",
+            "BajarVolumen": "Down",
+            "Adelantar10": "Right",
+            "Retroceder10": "Left",
+            "SaltarIntro": "S",
+            "SiguienteEpisodio": "N",
+            "AnteriorEpisodio": "P",
+            "Cerrar": "Escape",
+            "CapturarFrame": "C"
+          }
+        }
+        """);
+
+        // Act
+        var sut = new SettingsService(_tempSettingsFile);
+        var atajos = sut.ObtenerConfiguracion().Atajos;
+
+        // Assert
+        atajos["AnteriorEpisodio"].Should().Be("B", "el legado en P se migra para no chocar con ModoMini");
+        atajos["ModoMini"].Should().Be("P", "P queda libre para Modo Mini/PiP tras la migración");
+    }
+
+    [Fact]
+    public void SettingsService_AtajoAnteriorEpisodioPersonalizadoAP_ConModoMiniYaPresente_NoDeberiaMigrar()
+    {
+        // Arrange: un settings.json que YA tiene "ModoMini" (no es legado) y el usuario eligió "P"
+        // explícitamente para Anterior — SanitizarAtajos ya resuelve este choque normalmente
+        // (primera ocurrencia gana), la migración no debe interferir en instalaciones no-legadas.
+        File.WriteAllText(_tempSettingsFile, """
+        {
+          "RutaBaseAnimes": "C:\\Anime",
+          "Atajos": {
+            "AnteriorEpisodio": "P",
+            "ModoMini": "I"
+          }
+        }
+        """);
+
+        // Act
+        var sut = new SettingsService(_tempSettingsFile);
+        var atajos = sut.ObtenerConfiguracion().Atajos;
+
+        // Assert
+        atajos["AnteriorEpisodio"].Should().Be("P");
+        atajos["ModoMini"].Should().Be("I");
+    }
+
+    [Fact]
     public void ConfiguracionViewModel_CargarDatos_DeberiaReflejarAjustesDeSettingsService()
     {
         // Arrange

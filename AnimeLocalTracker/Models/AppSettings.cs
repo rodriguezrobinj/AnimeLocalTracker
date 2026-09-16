@@ -27,7 +27,9 @@ public class AppSettings
     /// <summary>
     /// Atajos de teclado configurables del reproductor: acción → tecla.
     /// Claves: PlayPausa, PantallaCompleta, Silenciar, SubirVolumen, BajarVolumen,
-    /// Adelantar10, Retroceder10, SaltarIntro, SiguienteEpisodio, AnteriorEpisodio, Cerrar.
+    /// Adelantar10, Retroceder10, SaltarIntro, SiguienteEpisodio, AnteriorEpisodio, ModoMini, Cerrar.
+    /// PIP-01: AnteriorEpisodio se movió de "P" a "B" — "P" queda para Modo Mini/PiP (los
+    /// tooltips de esa función ya prometían "(P)" desde antes de que existiera este atajo).
     /// </summary>
     public Dictionary<string, string> Atajos { get; set; } = new()
     {
@@ -40,7 +42,8 @@ public class AppSettings
         ["Retroceder10"] = "Left",
         ["SaltarIntro"] = "S",
         ["SiguienteEpisodio"] = "N",
-        ["AnteriorEpisodio"] = "P",
+        ["AnteriorEpisodio"] = "B",
+        ["ModoMini"] = "P",
         ["Cerrar"] = "Escape",
         ["CapturarFrame"] = "C"
     };
