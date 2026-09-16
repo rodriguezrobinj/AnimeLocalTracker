@@ -318,7 +318,12 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
         // después de él — así dragon-ball-z (rechazado por malId) lleva directo al
         // movie-14 sin depender del orden/limite del catálogo. Presupuesto total:
         // MaxMediaProbes peticiones de media.
-        const int MaxMediaProbes = 25;
+        // FUN-018: se sube de 25 a 40 como margen adicional — con los términos ya
+        // ordenados por especificidad, el candidato correcto casi siempre cae dentro
+        // del presupuesto, pero franquicias con muchos títulos alternativos (romaji,
+        // inglés, nativo, sinónimos de AniList) pueden aportar varios candidatos
+        // igual de precisos antes de llegar al bueno.
+        const int MaxMediaProbes = 40;
         int probes = 0;
         var probados = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var encolados = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -392,49 +397,116 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
             }
         }
 
-        foreach (var titulo in titulosLista)
+        // FUN-018: no todos los términos son igual de fiables. El título completo y el
+        // subtítulo distintivo casi siempre apuntan al anime correcto; las colas de 2-3
+        // palabras genéricas (ej. "Play Fighting Games") matchean animes sin ninguna
+        // relación por palabras sueltas y llenan el catálogo de ruido. Antes se buscaba
+        // título por título (agotando TODOS los términos, incluidos los genéricos, de un
+        // título antes de pasar al siguiente), lo que podía enterrar el candidato correcto
+        // de un título más preciso (ej. el nombre nativo) detrás de decenas de resultados
+        // ruidosos de un término genérico de OTRO título — y el presupuesto de sondeos
+        // (MaxMediaProbes en ObtenerEmbedsEpisodioAsync) se agotaba antes de llegarle.
+        // Se ordenan TODOS los términos de TODOS los títulos por especificidad para que
+        // los más fiables se busquen primero sin importar de qué título vengan.
+        var terminosVistos = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var terminosOrdenados = titulosLista
+            .SelectMany(GenerarTerminosBusquedaConPrioridad)
+            .Where(t => terminosVistos.Add(t.Termino))
+            .OrderBy(t => t.Prioridad);
+
+        foreach (var (termino, _) in terminosOrdenados)
         {
-            foreach (var termino in GenerarTerminosBusqueda(titulo))
+            try
             {
-                try
+                string searchUrl = $"https://animeav1.com/catalogo?search={Uri.EscapeDataString(termino)}";
+                using var req = new HttpRequestMessage(HttpMethod.Get, searchUrl);
+                req.Headers.Add("User-Agent", UserAgent);
+
+                using var res = await _httpClient.SendAsync(req, ct);
+                if (!res.IsSuccessStatusCode) continue;
+
+                var html = await res.Content.ReadAsStringAsync(ct);
+                // Sin gate de heurística aquí: el veredicto (malId exacto o
+                // nombres con rapidfuzz/C#) decide por cada media. La heurística
+                // de slugs rechazaba películas correctas ("movie-N-") cuando el
+                // malId no era comparable.
+                int nuevos = 0;
+                foreach (string discoveredSlug in AnimeAv1HtmlParser.ExtraerSlugs(html))
                 {
-                    string searchUrl = $"https://animeav1.com/catalogo?search={Uri.EscapeDataString(termino)}";
-                    using var req = new HttpRequestMessage(HttpMethod.Get, searchUrl);
-                    req.Headers.Add("User-Agent", UserAgent);
-
-                    using var res = await _httpClient.SendAsync(req, ct);
-                    if (!res.IsSuccessStatusCode) continue;
-
-                    var html = await res.Content.ReadAsStringAsync(ct);
-                    // Sin gate de heurística aquí: el veredicto (malId exacto o
-                    // nombres con rapidfuzz/C#) decide por cada media. La heurística
-                    // de slugs rechazaba películas correctas ("movie-N-") cuando el
-                    // malId no era comparable.
-                    int nuevos = 0;
-                    foreach (string discoveredSlug in AnimeAv1HtmlParser.ExtraerSlugs(html))
+                    if (vistos.Add(discoveredSlug))
                     {
-                        if (vistos.Add(discoveredSlug))
-                        {
-                            slugs.Add(discoveredSlug);
-                            nuevos++;
-                        }
-                    }
-                    // Diagnóstico: solo se loguea cuando un término aporta slugs nuevos
-                    // (los 0s por variante inundaban el log: ~40 líneas por anime).
-                    if (nuevos > 0)
-                    {
-                        AppLogger.Debug("AnimeAv1VideoSourceResolver",
-                            $"Búsqueda de catálogo '{termino}': {nuevos} slugs nuevos ({slugs.Count} totales).");
+                        slugs.Add(discoveredSlug);
+                        nuevos++;
                     }
                 }
-                catch (Exception ex)
+                // Diagnóstico: solo se loguea cuando un término aporta slugs nuevos
+                // (los 0s por variante inundaban el log: ~40 líneas por anime).
+                if (nuevos > 0)
                 {
-                    Debug.WriteLine($"[AnimeAv1VideoSourceResolver] Error en búsqueda de catálogo para '{termino}': {ex.Message}");
+                    AppLogger.Debug("AnimeAv1VideoSourceResolver",
+                        $"Búsqueda de catálogo '{termino}': {nuevos} slugs nuevos ({slugs.Count} totales).");
                 }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[AnimeAv1VideoSourceResolver] Error en búsqueda de catálogo para '{termino}': {ex.Message}");
             }
         }
 
         return slugs;
+    }
+
+    private readonly record struct TerminoConPrioridad(string Termino, int Prioridad);
+
+    /// <summary>
+    /// Igual que <see cref="GenerarTerminosBusqueda"/> pero etiqueta cada término con su
+    /// especificidad (0 = más fiable, mayor = más genérico/propenso a falsos positivos),
+    /// para poder ordenar la búsqueda entre TODOS los títulos por fiabilidad.
+    /// </summary>
+    private static List<TerminoConPrioridad> GenerarTerminosBusquedaConPrioridad(string titulo)
+    {
+        var resultado = new List<TerminoConPrioridad>();
+        if (string.IsNullOrWhiteSpace(titulo)) return resultado;
+
+        void Agregar(string termino, int prioridad)
+        {
+            termino = termino.Trim();
+            if (!string.IsNullOrWhiteSpace(termino) &&
+                !resultado.Any(r => r.Termino.Equals(termino, StringComparison.OrdinalIgnoreCase)))
+            {
+                resultado.Add(new TerminoConPrioridad(termino, prioridad));
+            }
+        }
+
+        // 0: título completo — el más fiable
+        Agregar(titulo, 0);
+
+        var partes = titulo.Split([':', '-', '–', '~', '('], StringSplitOptions.RemoveEmptyEntries);
+        if (partes.Length > 1)
+        {
+            // 1: subtítulo tras ':' — suele ser lo más distintivo de la franquicia
+            Agregar(partes[1], 1);
+            // 1: parte principal antes de ':'
+            Agregar(partes[0], 1);
+        }
+
+        var palabras = titulo.Split([' '], StringSplitOptions.RemoveEmptyEntries)
+                             .Where(p => p.Length > 2)
+                             .ToList();
+
+        if (palabras.Count > 0)
+        {
+            // 2: primeras 2-3 palabras
+            Agregar(string.Join(" ", palabras.Take(3)), 2);
+        }
+
+        if (palabras.Count >= 3)
+        {
+            // 3: últimas 2-3 palabras — la más genérica y propensa a falsos positivos
+            Agregar(string.Join(" ", palabras.TakeLast(3)), 3);
+        }
+
+        return resultado;
     }
 
     /// <summary>Info del media del sitio (malId, títulos, episodios reales, HTML crudo para relations).</summary>
