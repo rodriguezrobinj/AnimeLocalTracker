@@ -49,6 +49,19 @@ public partial class AnimeItem : ObservableObject
     [ObservableProperty]
     private string _estadoUsuario = string.Empty;
 
+    // Temporada de estreno ("WINTER", "SPRING", "SUMMER", "FALL") y año, capturados de
+    // AniList al añadir el anime — alimentan los filtros de temporada/año de la galería.
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(TemporadaVisual))]
+    private string _temporada = string.Empty;
+
+    [ObservableProperty]
+    private int _anioLanzamiento;
+
+    // Favorito individual por anime (independiente del estado Viendo/Completado/Planeando).
+    [ObservableProperty]
+    private bool _esFavorito;
+
 #pragma warning disable CS0657 // 'property' target is forwarded to the generated property by CommunityToolkit.Mvvm
     // Estado transitorio para la UI de Selección Múltiple
     [property: Ignore]
@@ -91,9 +104,20 @@ public partial class AnimeItem : ObservableObject
     [JsonIgnore]
     public string EstadoVisual => Estado == "RELEASING" ? "En Emisión" : (Estado == "FINISHED" ? "Finalizado" : "Desconocido");
     
-    [Ignore] 
+    [Ignore]
     [JsonIgnore]
     public string ColorEstado => Estado == "RELEASING" ? "#4CAF50" : "#9E9E9E";
+
+    [Ignore]
+    [JsonIgnore]
+    public string TemporadaVisual => Temporada switch
+    {
+        "WINTER" => "Invierno",
+        "SPRING" => "Primavera",
+        "SUMMER" => "Verano",
+        "FALL" => "Otoño",
+        _ => string.Empty
+    };
     
     [Ignore]
     [JsonIgnore]

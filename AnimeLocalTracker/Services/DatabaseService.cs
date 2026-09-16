@@ -82,7 +82,8 @@ public class DatabaseService : IDatabaseService, IDisposable
     {
         (1, "esquema base (tablas AnimeItem/RegistroEpisodio + índice compuesto)", CrearEsquemaBaseAsync),
         (2, "índice de la cola de sincronización (VistoLocal, SincronizadoEnNube)", CrearIndiceColaSincronizacionAsync),
-        (3, "índice de UltimaReproduccion para el historial", CrearIndiceUltimaReproduccionAsync)
+        (3, "índice de UltimaReproduccion para el historial", CrearIndiceUltimaReproduccionAsync),
+        (4, "columnas Temporada/AnioLanzamiento/EsFavorito en AnimeItem", AgregarColumnasTemporadaFavoritoAsync)
     };
 
     private static async Task EjecutarMigracionesPendientesAsync(SQLiteAsyncConnection conexion)
@@ -126,6 +127,16 @@ public class DatabaseService : IDatabaseService, IDisposable
     private static async Task CrearIndiceUltimaReproduccionAsync(SQLiteAsyncConnection conexion)
     {
         await conexion.ExecuteAsync("CREATE INDEX IF NOT EXISTS IX_RegistroEpisodio_UltimaReproduccion ON RegistroEpisodio(UltimaReproduccion);");
+    }
+
+    /// <summary>
+    /// v4: sqlite-net migra automáticamente las columnas nuevas del modelo con
+    /// ALTER TABLE ADD COLUMN cuando la tabla ya existe (CreateTableAsync es idempotente
+    /// en bases nuevas, donde la migración 1 ya las creó).
+    /// </summary>
+    private static async Task AgregarColumnasTemporadaFavoritoAsync(SQLiteAsyncConnection conexion)
+    {
+        await conexion.CreateTableAsync<AnimeItem>();
     }
 
     /// <summary>

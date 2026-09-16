@@ -313,6 +313,7 @@ public partial class DetalleViewModel : ObservableObject,
     {
         EstaConectado = _authService.EstaAutenticado();
         AnimeSeleccionado = anime;
+        EsFavoritoAnime = anime.EsFavorito;
         _todosLosEpisodios.Clear();
         EpisodiosDelAnime.Clear();
 
@@ -791,10 +792,15 @@ public partial class DetalleViewModel : ObservableObject,
         SinopsisExpandida = !SinopsisExpandida;
     }
 
+    /// <summary>Favorito individual por anime (no un estado/categoría): persiste en AnimeItem.EsFavorito.</summary>
     [RelayCommand]
-    private void AlternarFavoritoAnime()
+    private async Task AlternarFavoritoAnimeAsync()
     {
-        EsFavoritoAnime = !EsFavoritoAnime;
+        if (AnimeSeleccionado == null) return;
+
+        AnimeSeleccionado.EsFavorito = !AnimeSeleccionado.EsFavorito;
+        EsFavoritoAnime = AnimeSeleccionado.EsFavorito;
+        await _databaseService.ActualizarAnimeAsync(AnimeSeleccionado);
     }
 
     [RelayCommand]

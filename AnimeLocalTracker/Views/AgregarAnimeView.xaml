@@ -76,11 +76,16 @@
         <!--  TÍTULO DE SECCIÓN DINÁMICO                                  -->
         <!-- ═══════════════════════════════════════════════════════════════ -->
         <Grid Grid.Row="1" Margin="0,8,0,16">
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <materialDesign:PackIcon Kind="Fire" Width="20" Height="20" Foreground="#F59E0B" 
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                <materialDesign:PackIcon Kind="Fire" Width="20" Height="20" Foreground="#F59E0B"
                                          VerticalAlignment="Center" Margin="0,0,8,0"
                                          Visibility="{Binding MostrandoTendencias, Converter={StaticResource BoolToVis}}"/>
-                <materialDesign:PackIcon Kind="FilterVariant" Width="20" Height="20" Foreground="#60A5FA" 
+                <materialDesign:PackIcon Kind="FilterVariant" Width="20" Height="20" Foreground="#60A5FA"
                                          VerticalAlignment="Center" Margin="0,0,8,0"
                                          Visibility="{Binding MostrandoTendencias, Converter={StaticResource InverseBoolToVis}}"/>
                 <TextBlock Text="{Binding TituloSeccion}" Style="{StaticResource AppText.Section}" VerticalAlignment="Center"/>
@@ -92,6 +97,24 @@
                                VerticalAlignment="Center" HorizontalAlignment="Center"/>
                 </Border>
             </StackPanel>
+
+            <!-- FILTROS DE TEMPORADA Y AÑO (sobre los resultados de búsqueda/tendencias) -->
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                <ComboBox ItemsSource="{Binding TemporadasDisponibles}"
+                          SelectedItem="{Binding TemporadaSeleccionada}"
+                          ToolTip="{Binding [Add_TemporadaTip], Source={x:Static loc:LocalizationService.Instance}}"
+                          Height="34" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                <ComboBox ItemsSource="{Binding AniosDisponibles}"
+                          SelectedItem="{Binding AnioSeleccionado}"
+                          ToolTip="{Binding [Add_AnioTip], Source={x:Static loc:LocalizationService.Instance}}"
+                          Height="34" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                <Button Command="{Binding LimpiarFiltrosTemporadaCommand}"
+                        Visibility="{Binding HayFiltrosTemporadaActivos, Converter={StaticResource BoolToVis}}"
+                        Style="{StaticResource MaterialDesignIconButton}" Width="34" Height="34" Padding="0"
+                        ToolTip="{Binding [Add_LimpiarFiltrosTemporada], Source={x:Static loc:LocalizationService.Instance}}">
+                    <materialDesign:PackIcon Kind="FilterRemoveOutline" Width="18" Height="18" Foreground="#9CA3AF"/>
+                </Button>
+            </StackPanel>
         </Grid>
 
         <!-- ═══════════════════════════════════════════════════════════════ -->
@@ -99,16 +122,16 @@
         <!-- ═══════════════════════════════════════════════════════════════ -->
         <Grid Grid.Row="2">
             <!-- Spinner de Carga -->
-            <StackPanel Visibility="{Binding IsSearching, Converter={StaticResource BoolToVis}}" 
+            <StackPanel Visibility="{Binding IsSearching, Converter={StaticResource BoolToVis}}"
                         HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,60,0,60" Panel.ZIndex="10">
-                <ProgressBar Style="{StaticResource MaterialDesignCircularProgressBar}" 
-                             Value="0" IsIndeterminate="True" 
+                <ProgressBar Style="{StaticResource MaterialDesignCircularProgressBar}"
+                             Value="0" IsIndeterminate="True"
                              Foreground="#60A5FA" Width="48" Height="48"/>
                 <TextBlock Text="{Binding [Add_Cargando], Source={x:Static loc:LocalizationService.Instance}}" Foreground="#9CA3AF" FontSize="14" Margin="0,16,0,0" HorizontalAlignment="Center" FontWeight="SemiBold"/>
             </StackPanel>
 
-            <!-- Estado Vacío / Sin Resultados -->
-            <StackPanel Visibility="{Binding BusquedaSinResultados, Converter={StaticResource BoolToVis}}" 
+            <!-- Estado Vacío / Sin Resultados (búsqueda vacía o filtro de temporada/año sin coincidencias) -->
+            <StackPanel Visibility="{Binding MostrarSinResultados, Converter={StaticResource BoolToVis}}"
                         VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,60,0,60">
                 <Border Background="#1E293B" CornerRadius="40" Width="80" Height="80" HorizontalAlignment="Center" Margin="0,0,0,16">
                     <materialDesign:PackIcon Kind="MagnifyClose" Width="40" Height="40" Foreground="#6B7280" HorizontalAlignment="Center" VerticalAlignment="Center"/>
@@ -116,8 +139,19 @@
                 <TextBlock Text="{Binding [Add_SinResultadosTitulo], Source={x:Static loc:LocalizationService.Instance}}" FontSize="18" Foreground="#E2E8F0" FontWeight="Bold" HorizontalAlignment="Center"/>
                 <TextBlock Text="{Binding [Add_SinResultadosSub], Source={x:Static loc:LocalizationService.Instance}}"
                            FontSize="13" Foreground="#9CA3AF" HorizontalAlignment="Center" Margin="0,6,0,0" TextAlignment="Center"/>
-                <Button Command="{Binding CargarTendenciasCommand}" 
-                        Style="{StaticResource MaterialDesignOutlinedButton}" 
+                <Button Command="{Binding LimpiarFiltrosTemporadaCommand}"
+                        Visibility="{Binding SinResultadosFiltrados, Converter={StaticResource BoolToVis}}"
+                        Style="{StaticResource MaterialDesignOutlinedButton}"
+                        BorderBrush="#3B82F6" Foreground="#60A5FA" Margin="0,18,0,0"
+                        HorizontalAlignment="Center">
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon Kind="FilterRemoveOutline" Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding [Add_LimpiarFiltrosTemporada], Source={x:Static loc:LocalizationService.Instance}}" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                    </StackPanel>
+                </Button>
+                <Button Command="{Binding CargarTendenciasCommand}"
+                        Visibility="{Binding SinResultadosFiltrados, Converter={StaticResource InverseBoolToVis}}"
+                        Style="{StaticResource MaterialDesignOutlinedButton}"
                         BorderBrush="#3B82F6" Foreground="#60A5FA" Margin="0,18,0,0"
                         HorizontalAlignment="Center">
                     <StackPanel Orientation="Horizontal">
@@ -127,7 +161,7 @@
                 </Button>
             </StackPanel>
 
-            <ListBox ItemsSource="{Binding Resultados}"
+            <ListBox ItemsSource="{Binding ResultadosFiltrados}"
                      Background="Transparent" BorderThickness="0"
                      KeyboardNavigation.DirectionalNavigation="Continue"
                      KeyboardNavigation.TabNavigation="Continue"
@@ -142,8 +176,8 @@
                      VirtualizingPanel.CacheLengthUnit="Item"
                      VirtualizingPanel.CacheLength="4,4"
                      RenderOptions.ClearTypeHint="Enabled"
-                     Padding="0,0,8,20"
-                     Visibility="{Binding BusquedaSinResultados, Converter={StaticResource InverseBoolToVis}}">
+                     Padding="0,0,16,20"
+                     Visibility="{Binding MostrarSinResultados, Converter={StaticResource InverseBoolToVis}}">
                 <ListBox.ItemsPanel>
                     <ItemsPanelTemplate>
                         <vwp:VirtualizingWrapPanel Orientation="Horizontal" ItemSize="220, 375" SpacingMode="Uniform" />
@@ -222,8 +256,12 @@
 
                                 <!-- PORTADA CON BADGES -->
                                 <Grid Grid.Row="0">
+                                    <!-- Efecto "bones": shimmer de fondo mientras la portada carga;
+                                         la imagen, al cargar, la cubre por completo. -->
+                                    <Border Style="{StaticResource ShimmerEffectStyle}" />
+
                                     <!-- Portada con imagen asíncrona en alta calidad -->
-                                    <Image Source="{Binding PortadaUrl, IsAsync=True, TargetNullValue={x:Null}, FallbackValue={x:Null}}" 
+                                    <Image Source="{Binding PortadaUrl, IsAsync=True, TargetNullValue={x:Null}, FallbackValue={x:Null}}"
                                            Stretch="UniformToFill" 
                                            RenderOptions.BitmapScalingMode="HighQuality"
                                            RenderOptions.EdgeMode="Aliased"
@@ -255,9 +293,15 @@
                                         </Border>
 
                                         <!-- Año -->
-                                        <Border Background="#99000000" CornerRadius="4" Padding="5,2"
+                                        <Border Background="#99000000" CornerRadius="4" Padding="5,2" Margin="0,0,6,0"
                                                 Visibility="{Binding TieneAño, Converter={StaticResource BoolToVis}}">
                                             <TextBlock Text="{Binding AñoTexto}" FontSize="10" FontWeight="SemiBold" Foreground="#9CA3AF"/>
+                                        </Border>
+
+                                        <!-- Temporada -->
+                                        <Border Background="#99000000" CornerRadius="4" Padding="5,2"
+                                                Visibility="{Binding TieneTemporada, Converter={StaticResource BoolToVis}}">
+                                            <TextBlock Text="{Binding TemporadaTexto}" FontSize="10" FontWeight="SemiBold" Foreground="#9CA3AF"/>
                                         </Border>
                                     </StackPanel>
                                 </Grid>

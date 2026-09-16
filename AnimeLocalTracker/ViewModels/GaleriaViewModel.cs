@@ -1,5 +1,6 @@
 using System;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
@@ -42,7 +43,7 @@ public partial class GaleriaViewModel : ObservableObject,
     [NotifyPropertyChangedFor(nameof(ConteoFiltradosTexto))]
     [NotifyCanExecuteChangedFor(nameof(ElegirQueVerHoyCommand))]
     private ObservableCollection<AnimeItem> _bibliotecaLocales = [];
-    
+
     public ICollectionView? BibliotecaFiltrada { get; private set; }
 
     [ObservableProperty]
@@ -74,6 +75,38 @@ public partial class GaleriaViewModel : ObservableObject,
     [NotifyPropertyChangedFor(nameof(CantidadFiltrosAvanzadosActivos))]
     [NotifyPropertyChangedFor(nameof(TieneFiltrosAvanzadosActivos))]
     private string _generoSeleccionado = "Todos los géneros";
+
+    // --- FILTROS DE TEMPORADA Y AÑO ---
+    public const string TodasLasTemporadas = "Todas las temporadas";
+    public const string TodosLosAños = "Todos los años";
+
+    [ObservableProperty]
+    private ObservableCollection<string> _temporadasDisponibles = [TodasLasTemporadas];
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HayFiltrosActivos))]
+    [NotifyPropertyChangedFor(nameof(ConteoFiltradosTexto))]
+    [NotifyPropertyChangedFor(nameof(CantidadFiltrosAvanzadosActivos))]
+    [NotifyPropertyChangedFor(nameof(TieneFiltrosAvanzadosActivos))]
+    private string _temporadaSeleccionada = TodasLasTemporadas;
+
+    [ObservableProperty]
+    private ObservableCollection<string> _aniosDisponibles = [TodosLosAños];
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HayFiltrosActivos))]
+    [NotifyPropertyChangedFor(nameof(ConteoFiltradosTexto))]
+    [NotifyPropertyChangedFor(nameof(CantidadFiltrosAvanzadosActivos))]
+    [NotifyPropertyChangedFor(nameof(TieneFiltrosAvanzadosActivos))]
+    private string _anioSeleccionado = TodosLosAños;
+
+    // --- FAVORITO INDIVIDUAL POR ANIME (no es un estado/categoría) ---
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HayFiltrosActivos))]
+    [NotifyPropertyChangedFor(nameof(ConteoFiltradosTexto))]
+    [NotifyPropertyChangedFor(nameof(CantidadFiltrosAvanzadosActivos))]
+    [NotifyPropertyChangedFor(nameof(TieneFiltrosAvanzadosActivos))]
+    private bool _soloFavoritos;
 
     public static readonly string[] OpcionesOrdenacion =
     [
@@ -114,8 +147,11 @@ public partial class GaleriaViewModel : ObservableObject,
         !string.IsNullOrWhiteSpace(TextoBusqueda) ||
         FiltroEstado != "Todos" ||
         (GeneroSeleccionado != "Todos los géneros" && GeneroSeleccionado != "Todos") ||
+        TemporadaSeleccionada != TodasLasTemporadas ||
+        AnioSeleccionado != TodosLosAños ||
         SoloConEpisodiosPendientes ||
-        SoloConCarpetaLocal;
+        SoloConCarpetaLocal ||
+        SoloFavoritos;
 
     public int CantidadFiltrosAvanzadosActivos
     {
@@ -124,11 +160,17 @@ public partial class GaleriaViewModel : ObservableObject,
             int count = 0;
             if (!string.IsNullOrWhiteSpace(GeneroSeleccionado) && GeneroSeleccionado != "Todos los géneros" && GeneroSeleccionado != "Todos")
                 count++;
+            if (TemporadaSeleccionada != TodasLasTemporadas)
+                count++;
+            if (AnioSeleccionado != TodosLosAños)
+                count++;
             if (CriterioOrdenSeleccionado != "Título (A - Z)")
                 count++;
             if (SoloConEpisodiosPendientes)
                 count++;
             if (SoloConCarpetaLocal)
+                count++;
+            if (SoloFavoritos)
                 count++;
             return count;
         }
@@ -163,6 +205,27 @@ public partial class GaleriaViewModel : ObservableObject,
     }
 
     partial void OnGeneroSeleccionadoChanged(string value)
+    {
+        BibliotecaFiltrada?.Refresh();
+        OnPropertyChanged(nameof(SinResultados));
+        OnPropertyChanged(nameof(ConteoFiltradosTexto));
+    }
+
+    partial void OnTemporadaSeleccionadaChanged(string value)
+    {
+        BibliotecaFiltrada?.Refresh();
+        OnPropertyChanged(nameof(SinResultados));
+        OnPropertyChanged(nameof(ConteoFiltradosTexto));
+    }
+
+    partial void OnAnioSeleccionadoChanged(string value)
+    {
+        BibliotecaFiltrada?.Refresh();
+        OnPropertyChanged(nameof(SinResultados));
+        OnPropertyChanged(nameof(ConteoFiltradosTexto));
+    }
+
+    partial void OnSoloFavoritosChanged(bool value)
     {
         BibliotecaFiltrada?.Refresh();
         OnPropertyChanged(nameof(SinResultados));
@@ -209,8 +272,11 @@ public partial class GaleriaViewModel : ObservableObject,
         TextoBusqueda = string.Empty;
         FiltroEstado = "Todos";
         GeneroSeleccionado = "Todos los géneros";
+        TemporadaSeleccionada = TodasLasTemporadas;
+        AnioSeleccionado = TodosLosAños;
         SoloConEpisodiosPendientes = false;
         SoloConCarpetaLocal = false;
+        SoloFavoritos = false;
         CriterioOrdenSeleccionado = "Título (A - Z)";
 
         BibliotecaFiltrada?.Refresh();
@@ -289,6 +355,7 @@ public partial class GaleriaViewModel : ObservableObject,
                 message.NuevoAnime.NotificarPortadaActualizada();
                 BibliotecaLocales.Add(message.NuevoAnime);
                 ActualizarGenerosDisponibles();
+                ActualizarTemporadasYAniosDisponibles();
                 OnPropertyChanged(nameof(BibliotecaVacia));
                 OnPropertyChanged(nameof(TotalAnimesBiblioteca));
                 OnPropertyChanged(nameof(ConteoFiltradosTexto));
@@ -402,6 +469,7 @@ public partial class GaleriaViewModel : ObservableObject,
 
             BibliotecaLocales = new ObservableCollection<AnimeItem>(animes);
             ActualizarGenerosDisponibles();
+            ActualizarTemporadasYAniosDisponibles();
 
             BibliotecaFiltrada = CollectionViewSource.GetDefaultView(BibliotecaLocales);
             BibliotecaFiltrada.Filter = FiltrarAnime;
@@ -414,6 +482,7 @@ public partial class GaleriaViewModel : ObservableObject,
             OnPropertyChanged(nameof(ConteoFiltradosTexto));
 
             _ = CargarPortadasFaltantesEnSegundoPlanoAsync(animes);
+            _ = CargarTemporadasYAniosFaltantesEnSegundoPlanoAsync(animes);
 
             await CargarPerfilUsuarioAsync();
             OnPropertyChanged(nameof(BibliotecaVacia));
@@ -422,6 +491,67 @@ public partial class GaleriaViewModel : ObservableObject,
         {
             // Sin esto, un fallo de BD al arrancar deja la galería vacía y en silencio
             AppLogger.Error("GaleriaViewModel", "Error al cargar la biblioteca", ex);
+        }
+    }
+
+    /// <summary>
+    /// Backfill en segundo plano de Temporada/AnioLanzamiento para animes que ya estaban
+    /// en la biblioteca ANTES de esta funcionalidad (por eso los combos de la galería
+    /// aparecían vacíos: nunca se capturó esa info al añadirlos). Mismo patrón que
+    /// CargarPortadasFaltantesEnSegundoPlanoAsync: no bloquea el arranque de la galería.
+    /// </summary>
+    private async Task CargarTemporadasYAniosFaltantesEnSegundoPlanoAsync(IEnumerable<AnimeItem> animes)
+    {
+        var faltantes = animes.Where(a => string.IsNullOrWhiteSpace(a.Temporada) && a.AnioLanzamiento <= 0).ToList();
+        if (faltantes.Count == 0) return;
+
+        try
+        {
+            var datos = await _animeTrackingService.ObtenerAnimesPorIdsLoteAsync(faltantes.Select(a => a.AniListId));
+            if (datos.Count == 0) return;
+
+            var actualizaciones = new List<(AnimeItem Anime, string Temporada, int Anio)>();
+            foreach (var anime in faltantes)
+            {
+                if (!datos.TryGetValue(anime.AniListId, out var media)) continue;
+
+                string temporada = media.Season ?? string.Empty;
+                int anio = media.StartDate?.Year ?? 0;
+                if (string.IsNullOrEmpty(temporada) && anio <= 0) continue;
+
+                actualizaciones.Add((anime, temporada, anio));
+            }
+
+            if (actualizaciones.Count == 0) return;
+
+            void AplicarCambios()
+            {
+                foreach (var (anime, temporada, anio) in actualizaciones)
+                {
+                    anime.Temporada = temporada;
+                    anime.AnioLanzamiento = anio;
+                }
+                ActualizarTemporadasYAniosDisponibles();
+                BibliotecaFiltrada?.Refresh();
+            }
+
+            // RND-03: mutar propiedades de AnimeItem (enlazadas a la UI) requiere el hilo
+            // de UI; la escritura en BD, no.
+            var dispatcher = System.Windows.Application.Current?.Dispatcher;
+            if (dispatcher != null && !dispatcher.CheckAccess())
+            {
+                await dispatcher.InvokeAsync(AplicarCambios);
+            }
+            else
+            {
+                AplicarCambios();
+            }
+
+            await _databaseService.ActualizarAnimesAsync(actualizaciones.Select(a => a.Anime));
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("GaleriaViewModel", $"Error al completar temporada/año en segundo plano: {ex.Message}");
         }
     }
 
@@ -617,6 +747,51 @@ public partial class GaleriaViewModel : ObservableObject,
         }
     }
 
+    // Orden cronológico de temporada (no alfabético): Invierno → Primavera → Verano → Otoño
+    private static readonly string[] OrdenTemporadas = ["WINTER", "SPRING", "SUMMER", "FALL"];
+
+    private static string TemporadaATexto(string codigo) => codigo switch
+    {
+        "WINTER" => "Invierno",
+        "SPRING" => "Primavera",
+        "SUMMER" => "Verano",
+        "FALL" => "Otoño",
+        _ => codigo
+    };
+
+    public void ActualizarTemporadasYAniosDisponibles()
+    {
+        var temporadasUnicas = BibliotecaLocales
+            .Where(a => !string.IsNullOrWhiteSpace(a.Temporada))
+            .Select(a => a.Temporada)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var nuevaListaTemporadas = new List<string> { TodasLasTemporadas };
+        nuevaListaTemporadas.AddRange(
+            OrdenTemporadas.Where(t => temporadasUnicas.Contains(t, StringComparer.OrdinalIgnoreCase))
+                           .Select(TemporadaATexto));
+
+        string prevTemporada = TemporadaSeleccionada;
+        TemporadasDisponibles = new ObservableCollection<string>(nuevaListaTemporadas);
+        TemporadaSeleccionada = nuevaListaTemporadas.Contains(prevTemporada) ? prevTemporada : TodasLasTemporadas;
+
+        var aniosUnicos = BibliotecaLocales
+            .Where(a => a.AnioLanzamiento > 0)
+            .Select(a => a.AnioLanzamiento)
+            .Distinct()
+            .OrderByDescending(a => a)
+            .Select(a => a.ToString())
+            .ToList();
+
+        var nuevaListaAnios = new List<string> { TodosLosAños };
+        nuevaListaAnios.AddRange(aniosUnicos);
+
+        string prevAnio = AnioSeleccionado;
+        AniosDisponibles = new ObservableCollection<string>(nuevaListaAnios);
+        AnioSeleccionado = nuevaListaAnios.Contains(prevAnio) ? prevAnio : TodosLosAños;
+    }
+
     public void AplicarOrdenacion(string? criterio = null)
     {
         if (BibliotecaFiltrada == null) return;
@@ -722,6 +897,30 @@ public partial class GaleriaViewModel : ObservableObject,
             }
         }
 
+        // 6. Filtro por temporada de estreno
+        if (TemporadaSeleccionada != TodasLasTemporadas)
+        {
+            if (anime.TemporadaVisual != TemporadaSeleccionada)
+            {
+                return false;
+            }
+        }
+
+        // 7. Filtro por año de estreno
+        if (AnioSeleccionado != TodosLosAños)
+        {
+            if (anime.AnioLanzamiento <= 0 || anime.AnioLanzamiento.ToString() != AnioSeleccionado)
+            {
+                return false;
+            }
+        }
+
+        // 8. Filtro: solo favoritos (individual por anime, no un estado/categoría)
+        if (SoloFavoritos && !anime.EsFavorito)
+        {
+            return false;
+        }
+
         return true;
     }
 
@@ -748,6 +947,64 @@ public partial class GaleriaViewModel : ObservableObject,
     private void AñadirAnimeManual()
     {
         WeakReferenceMessenger.Default.Send(new NavegarMensaje_AgregarAnime());
+    }
+
+    /// <summary>Favorito individual por anime: no altera EstadoUsuario ni ningún otro filtro/categoría.</summary>
+    [RelayCommand]
+    private async Task AlternarFavoritoAsync(AnimeItem? anime)
+    {
+        if (anime == null) return;
+
+        anime.EsFavorito = !anime.EsFavorito;
+        await _databaseService.ActualizarAnimeAsync(anime);
+
+        if (SoloFavoritos)
+        {
+            BibliotecaFiltrada?.Refresh();
+            OnPropertyChanged(nameof(SinResultados));
+            OnPropertyChanged(nameof(ConteoFiltradosTexto));
+        }
+    }
+
+    [RelayCommand]
+    private async Task EliminarAnimeAsync(AnimeItem? anime)
+    {
+        if (anime == null) return;
+
+        bool confirmacion = await _dialogService.MostrarDialogoAsync(
+            "Eliminar de la biblioteca",
+            $"¿Deseas eliminar '{anime.Titulo}' de tu biblioteca local?",
+            true, "HeartBrokenOutline", "#EF4444");
+
+        if (!confirmacion) return;
+
+        // Opción extra: borrar también los archivos del disco (mismo flujo que DetalleViewModel)
+        bool borrarArchivos = await _dialogService.MostrarDialogoAsync(
+            "¿Borrar también los archivos?",
+            $"¿Deseas eliminar también la carpeta con los episodios descargados del disco?\n\n'{(string.IsNullOrWhiteSpace(anime.RutaCarpeta) ? "sin carpeta local" : anime.RutaCarpeta)}'\n\nElige NO para conservar los archivos y solo quitar el anime de la biblioteca.",
+            true, "FolderOutline", "#EF4444");
+
+        string? carpeta = anime.RutaCarpeta;
+
+        await _databaseService.EliminarAnimeAsync(anime);
+        BibliotecaLocales.Remove(anime);
+        ActualizarGenerosDisponibles();
+        ActualizarTemporadasYAniosDisponibles();
+        OnPropertyChanged(nameof(BibliotecaVacia));
+        OnPropertyChanged(nameof(TotalAnimesBiblioteca));
+        OnPropertyChanged(nameof(ConteoFiltradosTexto));
+
+        if (borrarArchivos && !string.IsNullOrWhiteSpace(carpeta) && Directory.Exists(carpeta))
+        {
+            try
+            {
+                Directory.Delete(carpeta, recursive: true);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Debug("GaleriaViewModel", $"No se pudo borrar la carpeta del anime: {ex.Message}");
+            }
+        }
     }
 
     private bool _menuUsuarioAbierto;
@@ -847,6 +1104,20 @@ public partial class GaleriaViewModel : ObservableObject,
             anime.TotalEpisodios = episodiosEmitidos;
             anime.Estado = datosFrescos.Status ?? "UNKNOWN";
 
+            // Backfill de Temporada/AnioLanzamiento para animes añadidos antes de esta
+            // funcionalidad (mismos datos que ya trae este lote, sin llamadas extra).
+            if (string.IsNullOrWhiteSpace(anime.Temporada) && anime.AnioLanzamiento <= 0)
+            {
+                string temporadaFresca = datosFrescos.Season ?? string.Empty;
+                int anioFresco = datosFrescos.StartDate?.Year ?? 0;
+                if (!string.IsNullOrEmpty(temporadaFresca) || anioFresco > 0)
+                {
+                    anime.Temporada = temporadaFresca;
+                    anime.AnioLanzamiento = anioFresco;
+                    cambio = true;
+                }
+            }
+
             // El estado personal del usuario viene embebido en la misma consulta loteada
             // (mediaListEntry del usuario autenticado): sin llamadas extra por anime.
             if (token != null && datosFrescos.MediaListEntry != null && !string.IsNullOrEmpty(datosFrescos.MediaListEntry.Status))
@@ -864,8 +1135,10 @@ public partial class GaleriaViewModel : ObservableObject,
         if (modificados.Count > 0)
         {
             await _databaseService.ActualizarAnimesAsync(modificados);
+            ActualizarTemporadasYAniosDisponibles();
+            BibliotecaFiltrada?.Refresh();
         }
-        
+
         TextoProgreso = "¡Actualización completada con éxito!";
         await Task.Delay(2000); 
         EstaActualizando = false;

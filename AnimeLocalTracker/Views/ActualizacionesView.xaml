@@ -106,7 +106,7 @@
                         <Border Background="{DynamicResource Brush.Surface1}"
                                 BorderBrush="{DynamicResource Brush.Border}"
                                 BorderThickness="1" CornerRadius="12"
-                                Padding="12,10" Margin="0,0,0,10" ClipToBounds="True">
+                                Padding="12,10" Margin="0,0,10,10" ClipToBounds="True">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="90"/>
@@ -124,7 +124,8 @@
                                     <Border Width="80" Height="45" CornerRadius="6" ClipToBounds="True"
                                             Background="#1E293B" HorizontalAlignment="Left" VerticalAlignment="Center">
                                         <Grid>
-                                            <Border Background="#161B22">
+                                            <!-- Efecto "bones" mientras carga la portada -->
+                                            <Border Style="{StaticResource ShimmerEffectStyle}">
                                                 <materialDesign:PackIcon Kind="MoviePlayOutline" Foreground="#475569" Width="22" Height="22"
                                                                          HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                             </Border>

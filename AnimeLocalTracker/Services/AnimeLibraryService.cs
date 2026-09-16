@@ -77,7 +77,9 @@ public class AnimeLibraryService
             Estado = animeAPI.Status ?? "UNKNOWN",
             TotalEpisodios = episodiosEmitidos,
             Generos = animeAPI.Genres != null ? string.Join(", ", animeAPI.Genres) : string.Empty,
-            Sinopsis = animeAPI.Description ?? string.Empty
+            Sinopsis = animeAPI.Description ?? string.Empty,
+            Temporada = animeAPI.Season ?? string.Empty,
+            AnioLanzamiento = animeAPI.StartDate?.Year ?? 0
         };
 
         await _databaseService.GuardarAnimeAsync(nuevoAnime);
