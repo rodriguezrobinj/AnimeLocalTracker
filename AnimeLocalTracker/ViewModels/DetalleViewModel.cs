@@ -752,7 +752,8 @@ public partial class DetalleViewModel : ObservableObject,
                 AnimeSeleccionado.AniListId,
                 AnimeSeleccionado.Titulo,
                 episodio.NumeroEpisodio,
-                EpisodiosDisponibles: episodiosDisponibles
+                EpisodiosDisponibles: episodiosDisponibles,
+                RutaPortada: AnimeSeleccionado.PortadaVisible
             ));
         }
         catch (System.Exception ex)

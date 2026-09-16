@@ -2,8 +2,12 @@
 
     <PropertyGroup>
         <OutputType>WinExe</OutputType>
-        <TargetFramework>net8.0-windows</TargetFramework>
-        <SupportedOSPlatformVersion>7.0</SupportedOSPlatformVersion>
+        <!-- SMT-01: TFM con versión de Windows SDK (compilación) para proyectar SystemMediaTransportControls
+             (Controles Multimedia del Sistema). TargetPlatformMinVersion fija el mínimo real en ejecución
+             (Windows 10 1809/17763, donde ISystemMediaTransportControlsInterop ya está disponible) para no
+             elevar el requisito de SO de toda la app solo por compilar contra un SDK más nuevo. -->
+        <TargetFramework>net8.0-windows10.0.26100.0</TargetFramework>
+        <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
         <UseWPF>true</UseWPF>

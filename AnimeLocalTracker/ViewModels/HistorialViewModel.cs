@@ -187,7 +187,8 @@ public partial class HistorialViewModel : ObservableObject, IRecipient<EpisodioA
             item.RutaArchivo,
             item.AniListId,
             item.TituloAnime,
-            item.NumeroEpisodio));
+            item.NumeroEpisodio,
+            RutaPortada: item.RutaPortada));
     }
 
     [RelayCommand]

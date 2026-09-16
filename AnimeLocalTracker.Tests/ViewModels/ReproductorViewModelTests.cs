@@ -599,4 +599,86 @@ public class ReproductorViewModelTests
 
         sut.Dispose();
     }
+
+    // === SMT-01: Controles Multimedia del Sistema (SMTC) ===
+
+    private ReproductorViewModel CreateSutConSmtc(Mock<ISystemMediaControlsService> smtcMock)
+    {
+        return new ReproductorViewModel(
+            _dbMock.Object, _trackingMock.Object, _authMock.Object,
+            aniSkipService: null, settingsService: null, playbackStateService: null,
+            skipTimesCoordinator: null, ventanaPrincipal: null,
+            systemMediaControlsService: smtcMock.Object);
+    }
+
+    [Fact]
+    public void CargarVideo_DeberiaActualizarMetadatosYNavegacionEnSmtc()
+    {
+        // Arrange
+        var smtcMock = new Mock<ISystemMediaControlsService>();
+        var sut = CreateSutConSmtc(smtcMock);
+        var lista = new List<EpisodioItem>
+        {
+            new() { NumeroEpisodio = 1, RutaCompleta = "C:\\Anime\\Ep01.mkv" },
+            new() { NumeroEpisodio = 2, RutaCompleta = "C:\\Anime\\Ep02.mkv" },
+            new() { NumeroEpisodio = 3, RutaCompleta = "C:\\Anime\\Ep03.mkv" }
+        };
+
+        // Act
+        sut.CargarVideo("C:\\Anime\\Ep02.mkv", 101, "Frieren", 2, lista, "https://cdn.example/frieren.jpg");
+
+        // Assert: overlay nativo con título/episodio/portada del episodio que arranca
+        smtcMock.Verify(s => s.ActualizarMetadatos("Frieren", 2, "https://cdn.example/frieren.jpg"), Times.Once);
+
+        // Assert: Episodio 2 tiene anterior y siguiente -> ambos botones habilitados
+        smtcMock.Verify(s => s.ActualizarNavegacionDisponible(true, true), Times.Once);
+
+        sut.Dispose();
+    }
+
+    [Fact]
+    public void Dispose_DeberiaDeshabilitarSmtcYDesuscribirEventos()
+    {
+        // Arrange
+        var smtcMock = new Mock<ISystemMediaControlsService>();
+        var sut = CreateSutConSmtc(smtcMock);
+
+        // Act
+        sut.Dispose();
+
+        // Assert
+        smtcMock.Verify(s => s.Deshabilitar(), Times.Once);
+    }
+
+    [Fact]
+    public void BotonesSmtc_SinApplicationCurrent_NoDeberianLanzarExcepcion()
+    {
+        // Arrange: en el host de pruebas no existe System.Windows.Application.Current, así que
+        // los handlers de SMTC (que saltan al Dispatcher de WPF antes de tocar el Player) deben
+        // degradar a no-op en vez de lanzar NullReferenceException.
+        var smtcMock = new Mock<ISystemMediaControlsService>();
+        var sut = CreateSutConSmtc(smtcMock);
+
+        // Act
+        var accion = () =>
+        {
+            smtcMock.Raise(s => s.PlayRequested += null, EventArgs.Empty);
+            smtcMock.Raise(s => s.PauseRequested += null, EventArgs.Empty);
+            smtcMock.Raise(s => s.NextRequested += null, EventArgs.Empty);
+            smtcMock.Raise(s => s.PreviousRequested += null, EventArgs.Empty);
+        };
+
+        // Assert
+        accion.Should().NotThrow();
+
+        sut.Dispose();
+    }
+
+    [Fact]
+    public void SystemMediaControlsService_InicializarConIntPtrZero_NoLanzaExcepcion()
+    {
+        var smtcService = new SystemMediaControlsService();
+        var accion = () => smtcService.Inicializar(IntPtr.Zero);
+        accion.Should().NotThrow();
+    }
 }

@@ -705,7 +705,8 @@ public partial class GaleriaViewModel : ObservableObject,
                 seleccion.Anime.AniListId,
                 seleccion.Anime.Titulo,
                 seleccion.SiguienteEpisodio.NumeroEpisodio,
-                EpisodiosDisponibles: seleccion.TodosDisponibles
+                EpisodiosDisponibles: seleccion.TodosDisponibles,
+                RutaPortada: seleccion.Anime.PortadaVisible
             ));
         }
         catch (Exception ex)

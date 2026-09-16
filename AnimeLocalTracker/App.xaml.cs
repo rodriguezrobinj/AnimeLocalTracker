@@ -145,6 +145,10 @@ public partial class App : Application
         // Persistencia del progreso de reproducción (reanudar, guardar, auto-tracking)
         services.AddSingleton<IPlaybackStateService, PlaybackStateService>();
 
+        // SMT-01: Controles Multimedia del Sistema (SMTC) — teclas de medios/auriculares
+        // Bluetooth y overlay nativo de Windows. Un único SMTC por ventana principal.
+        services.AddSingleton<ISystemMediaControlsService, SystemMediaControlsService>();
+
         // Orquestación de skip-times (resolución MAL ID + reglas de evaluación)
         services.AddSingleton<ISkipTimesCoordinator, SkipTimesCoordinator>();
         services.AddSingleton<IMediaEnrichmentService, MediaEnrichmentService>();
