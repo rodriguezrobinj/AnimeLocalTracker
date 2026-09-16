@@ -391,16 +391,12 @@
                                     <Setter Property="BorderThickness" Value="0" />
                                     <Setter Property="Background" Value="Black" />
                                 </DataTrigger>
-                                <!-- Si está en modo mini: flota en la esquina inferior derecha -->
+                                <!-- PIP-01: en modo mini/PiP la VENTANA (no este Border) ya es el recuadro
+                                     compacto anclado a la esquina de la pantalla (ver MainWindow.EntrarModoPiP);
+                                     aquí solo hacen falta esquinas redondeadas y fondo transparente para que
+                                     el vídeo se vea bien en un recuadro chico. -->
                                 <DataTrigger Binding="{Binding Navigation.ReproductorActivo.EsModoMini}" Value="True">
-                                    <Setter Property="Visibility" Value="Visible" />
-                                    <Setter Property="HorizontalAlignment" Value="Right" />
-                                    <Setter Property="VerticalAlignment" Value="Bottom" />
-                                    <Setter Property="Width" Value="384" />
-                                    <Setter Property="Height" Value="216" />
-                                    <Setter Property="Margin" Value="{Binding Navigation.ReproductorActivo.MiniPlayerMargin}" />
                                     <Setter Property="CornerRadius" Value="8" />
-                                    <Setter Property="BorderThickness" Value="0" />
                                     <Setter Property="Background" Value="Transparent" />
                                 </DataTrigger>
                             </Style.Triggers>

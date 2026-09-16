@@ -681,4 +681,84 @@ public class ReproductorViewModelTests
         var accion = () => smtcService.Inicializar(IntPtr.Zero);
         accion.Should().NotThrow();
     }
+
+    // === PIP-01: Picture-in-Picture (ventana real, siempre encima) ===
+
+    private ReproductorViewModel CreateSutConVentana(Mock<IVentanaPrincipal> ventanaMock)
+    {
+        return new ReproductorViewModel(
+            _dbMock.Object, _trackingMock.Object, _authMock.Object,
+            aniSkipService: null, settingsService: null, playbackStateService: null,
+            skipTimesCoordinator: null, ventanaPrincipal: ventanaMock.Object);
+    }
+
+    [Fact]
+    public void MinimizarAMini_DeberiaEntrarEnModoPiPDeLaVentana()
+    {
+        // Arrange
+        var ventanaMock = new Mock<IVentanaPrincipal>();
+        var sut = CreateSutConVentana(ventanaMock);
+
+        // Act
+        sut.MinimizarAMiniCommand.Execute(null);
+
+        // Assert
+        sut.EsModoMini.Should().BeTrue();
+        ventanaMock.Verify(v => v.EntrarModoPiP(), Times.Once);
+
+        sut.Dispose();
+    }
+
+    [Fact]
+    public void RestaurarFormatoHabitual_DeberiaSalirDelModoPiPDeLaVentana()
+    {
+        // Arrange
+        var ventanaMock = new Mock<IVentanaPrincipal>();
+        var sut = CreateSutConVentana(ventanaMock);
+        sut.MinimizarAMiniCommand.Execute(null);
+
+        // Act
+        sut.RestaurarFormatoHabitualCommand.Execute(null);
+
+        // Assert
+        sut.EsModoMini.Should().BeFalse();
+        ventanaMock.Verify(v => v.SalirModoPiP(), Times.Once);
+
+        sut.Dispose();
+    }
+
+    [Fact]
+    public void AlternarModoMini_DeberiaAlternarEntrarYSalirDePiP()
+    {
+        // Arrange
+        var ventanaMock = new Mock<IVentanaPrincipal>();
+        var sut = CreateSutConVentana(ventanaMock);
+
+        // Act: primera vez -> entra
+        sut.AlternarModoMiniCommand.Execute(null);
+        // Act: segunda vez -> sale
+        sut.AlternarModoMiniCommand.Execute(null);
+
+        // Assert
+        ventanaMock.Verify(v => v.EntrarModoPiP(), Times.Once);
+        ventanaMock.Verify(v => v.SalirModoPiP(), Times.Once);
+
+        sut.Dispose();
+    }
+
+    [Fact]
+    public void Cerrar_EnModoPiP_DeberiaSalirDelModoPiPDeLaVentana()
+    {
+        // Arrange: bug reportado — cerrar el reproductor mientras está en PiP dejaba la
+        // ventana principal encogida/Topmost para siempre (sin nada dentro que la restaurara).
+        var ventanaMock = new Mock<IVentanaPrincipal>();
+        var sut = CreateSutConVentana(ventanaMock);
+        sut.MinimizarAMiniCommand.Execute(null);
+
+        // Act
+        sut.CerrarCommand.Execute(null);
+
+        // Assert
+        ventanaMock.Verify(v => v.SalirModoPiP(), Times.Once);
+    }
 }

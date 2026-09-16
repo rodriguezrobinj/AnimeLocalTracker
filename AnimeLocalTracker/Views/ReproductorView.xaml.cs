@@ -133,13 +133,6 @@ namespace AnimeLocalTracker.Views
             _fadeTimer.Stop();
             Mouse.OverrideCursor = null;
 
-            if (_isDraggingMini)
-            {
-                _isDraggingMini = false;
-                _miniMarginPendiente = false;
-                CompositionTarget.Rendering -= MiniDrag_CompositionTargetRendering;
-            }
-
             // StaysOpen=True: cerrar manualmente al salir del reproductor
             if (SubtitlesPopup != null)
             {
@@ -427,7 +420,7 @@ namespace AnimeLocalTracker.Views
             }
             else if (k == vm.ObtenerTeclaPara("CapturarFrame"))
                 vm.CapturarFrameCommand.Execute(null);
-            else if (k == Key.P)
+            else if (k == vm.ObtenerTeclaPara("ModoMini"))
                 vm.AlternarModoMiniCommand.Execute(null);
             else if (k == vm.ObtenerTeclaPara("Cerrar"))
                 vm.CerrarCommand.Execute(null);
@@ -442,87 +435,18 @@ namespace AnimeLocalTracker.Views
             }
         }
 
-        private bool _isDraggingMini;
-        private Point _dragStartPoint;
-        private double _startMarginRight;
-        private double _startMarginBottom;
-        private Thickness _pendingMiniMargin;
-        private bool _miniMarginPendiente;
-
+        /// <summary>
+        /// PIP-01: en modo Mini/PiP la barra superior arrastra la VENTANA real de Windows
+        /// (Window.DragMove ya se encarga del seguimiento del mouse y del release) — antes
+        /// ajustaba un Margin dentro de la ventana porque el recuadro "mini" era un elemento
+        /// interno; ahora la ventana misma es el recuadro.
+        /// </summary>
         private void BarraSuperior_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            if (DataContext is ViewModels.ReproductorViewModel vm && vm.EsModoMini)
+            if (DataContext is ViewModels.ReproductorViewModel vm && vm.EsModoMini && e.LeftButton == MouseButtonState.Pressed)
             {
-                _isDraggingMini = true;
-
-                var window = Window.GetWindow(this);
-                if (window != null)
-                {
-                    _dragStartPoint = e.GetPosition(window);
-                    _startMarginRight = vm.MiniPlayerMargin.Right;
-                    _startMarginBottom = vm.MiniPlayerMargin.Bottom;
-                    ((UIElement)sender).CaptureMouse();
-                    // Aplicar el Margin como máximo una vez por frame renderizado (no en cada MouseMove
-                    // crudo, que dispara muchas más veces por segundo de las que la superficie nativa del
-                    // FlyleafHost puede seguir): sin este throttle, el video queda "atrasado" respecto al
-                    // contenedor WPF durante el arrastre (efecto de sombra/recorte descuadrado) y solo
-                    // se resincroniza cuando el layout se asienta al soltar el mouse.
-                    CompositionTarget.Rendering += MiniDrag_CompositionTargetRendering;
-                }
+                Window.GetWindow(this)?.DragMove();
             }
-        }
-
-        private void BarraSuperior_MouseMove(object sender, MouseEventArgs e)
-        {
-            if (_isDraggingMini)
-            {
-                if (e.LeftButton != MouseButtonState.Pressed)
-                {
-                    DetenerDragMini((UIElement)sender);
-                    return;
-                }
-
-                var window = Window.GetWindow(this);
-                if (window != null)
-                {
-                    Point currentPoint = e.GetPosition(window);
-                    double newRight = _startMarginRight - (currentPoint.X - _dragStartPoint.X);
-                    double newBottom = _startMarginBottom - (currentPoint.Y - _dragStartPoint.Y);
-                    _pendingMiniMargin = new Thickness(0, 0, newRight, newBottom);
-                    _miniMarginPendiente = true;
-                }
-            }
-        }
-
-        private void MiniDrag_CompositionTargetRendering(object? sender, EventArgs e)
-        {
-            if (_miniMarginPendiente && DataContext is ViewModels.ReproductorViewModel vm)
-            {
-                vm.MiniPlayerMargin = _pendingMiniMargin;
-                _miniMarginPendiente = false;
-            }
-        }
-
-        private void BarraSuperior_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
-        {
-            if (_isDraggingMini)
-            {
-                DetenerDragMini((UIElement)sender);
-            }
-        }
-
-        private void DetenerDragMini(UIElement elementoConCaptura)
-        {
-            _isDraggingMini = false;
-            CompositionTarget.Rendering -= MiniDrag_CompositionTargetRendering;
-            // Aplicar cualquier posición pendiente para que la posición final coincida exactamente
-            // con donde soltó el mouse el usuario, en vez de quedarse en el último frame renderizado.
-            if (_miniMarginPendiente && DataContext is ViewModels.ReproductorViewModel vm)
-            {
-                vm.MiniPlayerMargin = _pendingMiniMargin;
-                _miniMarginPendiente = false;
-            }
-            elementoConCaptura.ReleaseMouseCapture();
         }
     }
 }

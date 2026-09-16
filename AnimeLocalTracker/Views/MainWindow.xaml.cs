@@ -10,8 +10,23 @@ namespace AnimeLocalTracker.Views;
 public partial class MainWindow : Window, IVentanaPrincipal
 {
     public bool IsFullScreen { get; private set; }
+    public bool EsModoPiP { get; private set; }
 
     private System.Windows.Shell.WindowChrome? _chromeCache;
+
+    // PIP-01: estado a restaurar al salir del modo Picture-in-Picture.
+    private WindowState _estadoPrevioPiP;
+    private Rect _restoreBoundsPiP;
+    private ResizeMode _resizeModePrevioPiP;
+    private bool _fullscreenPrevioPiP;
+    private double _minWidthPrevioPiP;
+    private double _minHeightPrevioPiP;
+
+    private const double AnchoPiP = 420;
+    private const double AltoPiP = 236;
+    private const double MargenPiP = 16;
+    private const double MinAnchoPiP = 240;
+    private const double MinAltoPiP = 135;
 
     public MainWindow(MainViewModel viewModel)
     {
@@ -75,7 +90,7 @@ public partial class MainWindow : Window, IVentanaPrincipal
     private IntPtr WindowProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
         // WM_GETMINMAXINFO = 0x0024
-        if (msg == 0x0024 && !IsFullScreen)
+        if (msg == 0x0024 && !IsFullScreen && !EsModoPiP)
         {
             var mmi = Marshal.PtrToStructure<MINMAXINFO>(lParam);
             IntPtr monitor = MonitorFromWindow(hwnd, 2); // MONITOR_DEFAULTTONEAREST
@@ -141,6 +156,9 @@ public partial class MainWindow : Window, IVentanaPrincipal
 
     private void EntrarPantallaCompleta()
     {
+        // Pantalla completa y PiP son excluyentes.
+        if (EsModoPiP) SalirModoPiP();
+
         IsFullScreen = true; // Desactiva WM_GETMINMAXINFO → permite cubrir toda la pantalla
 
         // 1. Guardar y quitar WindowChrome (es el que impide cubrir la barra de tareas)
@@ -182,7 +200,112 @@ public partial class MainWindow : Window, IVentanaPrincipal
             System.Windows.Shell.WindowChrome.SetWindowChrome(this, _chromeCache);
         }
     }
-    
+
+    // ═══════════════════════════════════════════════════════════════
+    //  PIP-01: Picture-in-Picture — recuadro compacto, siempre encima,
+    //  anclado a la esquina inferior derecha del área de trabajo.
+    // ═══════════════════════════════════════════════════════════════
+
+    public void EntrarModoPiP()
+    {
+        if (EsModoPiP) return;
+        EsModoPiP = true;
+
+        // PiP y pantalla completa son excluyentes.
+        _fullscreenPrevioPiP = IsFullScreen;
+        if (IsFullScreen) SalirPantallaCompleta();
+
+        // 1. Guardar estado para restaurar al salir (RestoreBounds sobrevive aunque la
+        //    ventana esté maximizada, a diferencia de Left/Top/Width/Height directos).
+        _estadoPrevioPiP = WindowState;
+        _restoreBoundsPiP = RestoreBounds;
+        _resizeModePrevioPiP = ResizeMode;
+        _minWidthPrevioPiP = MinWidth;
+        _minHeightPrevioPiP = MinHeight;
+
+        // 2. Ocultar la barra de título custom (no cabe y no aplica en un recuadro tan chico)
+        BarraTitulo.Visibility = Visibility.Collapsed;
+
+        // MinWidth/MinHeight de la ventana normal son 800x600 (ver MainWindow.xaml): sin bajarlos
+        // primero, WPF recorta el Width/Height del PiP de vuelta a 800x600 silenciosamente.
+        MinWidth = MinAnchoPiP;
+        MinHeight = MinAltoPiP;
+
+        // 3. Dar un borde de agarre real para poder redimensionar (en modo normal
+        //    ResizeBorderThickness=0 porque el chrome custom no lo necesita).
+        _chromeCache ??= System.Windows.Shell.WindowChrome.GetWindowChrome(this);
+        System.Windows.Shell.WindowChrome.SetWindowChrome(this, new System.Windows.Shell.WindowChrome
+        {
+            CaptionHeight = 0,
+            ResizeBorderThickness = new Thickness(6),
+            CornerRadius = new CornerRadius(8),
+            GlassFrameThickness = new Thickness(0),
+            UseAeroCaptionButtons = false
+        });
+
+        // 4. Encoger, fijar encima de las demás ventanas y anclar a la esquina inferior derecha.
+        WindowState = WindowState.Normal;
+        ResizeMode = ResizeMode.CanResizeWithGrip;
+        Topmost = true;
+
+        AplicarTamanioYPosicionPiP();
+
+        // La transición Maximized→Normal no siempre ha asentado RestoreBounds/el layout nativo
+        // en este mismo tick (se observó Left/Top mal calculados justo tras un arranque en frío);
+        // reaplicar una vez que WPF termina el ciclo de layout actual garantiza la posición final.
+        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, AplicarTamanioYPosicionPiP);
+    }
+
+    private void AplicarTamanioYPosicionPiP()
+    {
+        if (!EsModoPiP) return;
+
+        var area = SystemParameters.WorkArea;
+        Width = AnchoPiP;
+        Height = AltoPiP;
+        Left = area.Right - AnchoPiP - MargenPiP;
+        Top = area.Bottom - AltoPiP - MargenPiP;
+    }
+
+    public void SalirModoPiP()
+    {
+        if (!EsModoPiP) return;
+        EsModoPiP = false;
+
+        Topmost = false;
+        ResizeMode = _resizeModePrevioPiP;
+        BarraTitulo.Visibility = Visibility.Visible;
+        MinWidth = _minWidthPrevioPiP;
+        MinHeight = _minHeightPrevioPiP;
+
+        if (_chromeCache != null)
+        {
+            System.Windows.Shell.WindowChrome.SetWindowChrome(this, _chromeCache);
+        }
+
+        WindowState = _estadoPrevioPiP;
+        if (_estadoPrevioPiP == WindowState.Normal)
+        {
+            Left = _restoreBoundsPiP.Left;
+            Top = _restoreBoundsPiP.Top;
+            Width = _restoreBoundsPiP.Width;
+            Height = _restoreBoundsPiP.Height;
+        }
+        else if (_estadoPrevioPiP == WindowState.Maximized)
+        {
+            // Igual que SalirPantallaCompleta: forzar el ciclo Normal→Maximized para que el
+            // hook WM_GETMINMAXINFO vuelva a limitar al área de trabajo (sin tapar la taskbar).
+            WindowState = WindowState.Normal;
+            WindowState = WindowState.Maximized;
+        }
+
+        if (_fullscreenPrevioPiP)
+        {
+            _fullscreenPrevioPiP = false;
+            EntrarPantallaCompleta();
+        }
+    }
+
     private void Window_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
         if (e.Key == System.Windows.Input.Key.F11)

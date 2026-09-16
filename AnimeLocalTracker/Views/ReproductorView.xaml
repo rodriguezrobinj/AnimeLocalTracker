@@ -596,9 +596,7 @@
                             </LinearGradientBrush>
                         </Grid.Background>
                         <Grid Margin="10,4,6,0" Cursor="SizeAll"
-                              MouseLeftButtonDown="BarraSuperior_MouseLeftButtonDown"
-                              MouseMove="BarraSuperior_MouseMove"
-                              MouseLeftButtonUp="BarraSuperior_MouseLeftButtonUp">
+                              MouseLeftButtonDown="BarraSuperior_MouseLeftButtonDown">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>

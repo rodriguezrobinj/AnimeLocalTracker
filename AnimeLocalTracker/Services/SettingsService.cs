@@ -49,8 +49,14 @@ public class SettingsService : ISettingsService
                         {
                             config.RutaBaseAnimes = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), "Anime");
                         }
+                        // PIP-01: settings.json guardados antes de que existiera "ModoMini" tienen
+                        // "AnteriorEpisodio": "P" persistido (el default viejo) — migrar ANTES de
+                        // sanear, o SanitizarAtajos mantendría ese "P" y además llenaría "ModoMini"
+                        // con su nuevo default ("P" también), recreando el mismo choque de teclas.
+                        bool migrado = MigrarAtajoAnteriorEpisodioLegado(config);
                         // ATA-01: el settings.json puede estar editado a mano — sanear los atajos
                         SanitizarAtajos(config);
+                        if (migrado) GuardarEnDiscoInterno(config);
                         return config;
                     }
                 }
@@ -72,6 +78,25 @@ public class SettingsService : ISettingsService
         {
             return _configuracion;
         }
+    }
+
+    /// <summary>
+    /// PIP-01: migra el atajo legado de "AnteriorEpisodio" ("P") a su nuevo default ("B") cuando
+    /// detecta un settings.json de antes de que existiera "ModoMini" — así "P" queda libre para
+    /// el atajo de Modo Mini/PiP sin pisar la personalización de un usuario que sí eligió "P" él mismo
+    /// para Anterior (ese caso ya no tendría "P" en el archivo sin también tener "ModoMini").
+    /// </summary>
+    private static bool MigrarAtajoAnteriorEpisodioLegado(AppSettings config)
+    {
+        if (config.Atajos != null
+            && config.Atajos.TryGetValue("AnteriorEpisodio", out var anterior)
+            && string.Equals(anterior, "P", StringComparison.OrdinalIgnoreCase)
+            && !config.Atajos.ContainsKey("ModoMini"))
+        {
+            config.Atajos["AnteriorEpisodio"] = "B";
+            return true;
+        }
+        return false;
     }
 
     /// <summary>
