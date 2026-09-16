@@ -909,6 +909,102 @@ public partial class DetalleViewModel : ObservableObject,
         AplicarFiltrosYOrdenamiento();
     }
 
+    /// <summary>
+    /// Alterna el estado visto/no visto de un único episodio desde el menú contextual.
+    /// </summary>
+    [RelayCommand]
+    private async Task AlternarVistoEpisodioAsync(EpisodioItem? episodio)
+    {
+        if (episodio == null || AnimeSeleccionado == null) return;
+
+        episodio.Visto = !episodio.Visto;
+
+        var registro = new RegistroEpisodio
+        {
+            AniListId = AnimeSeleccionado.AniListId,
+            NumeroEpisodio = episodio.NumeroEpisodio,
+            VistoLocal = episodio.Visto,
+            FavoritoLocal = episodio.Favorito,
+            RutaArchivo = episodio.RutaCompleta ?? string.Empty
+        };
+
+        await _databaseService.GuardarRegistroEpisodioAsync(registro);
+        AnimeSeleccionado.EpisodiosVistos = _todosLosEpisodios.Count(e => e.Visto);
+        await _databaseService.ActualizarAnimeAsync(AnimeSeleccionado);
+        WeakReferenceMessenger.Default.Send(new EpisodioActualizadoMensaje(AnimeSeleccionado.AniListId, episodio.NumeroEpisodio, episodio.Visto, 0, 0));
+        AplicarFiltrosYOrdenamiento();
+    }
+
+    /// <summary>
+    /// Marca como vistos el episodio seleccionado y todos los anteriores (&lt;= N).
+    /// </summary>
+    [RelayCommand]
+    private async Task MarcarAnterioresVistosAsync(EpisodioItem? episodio)
+    {
+        if (episodio == null || AnimeSeleccionado == null) return;
+
+        var aMarcar = _todosLosEpisodios
+            .Where(e => e.NumeroEpisodio <= episodio.NumeroEpisodio && !e.Visto)
+            .ToList();
+
+        if (aMarcar.Count == 0) return;
+
+        var listaRegistros = new List<RegistroEpisodio>(aMarcar.Count);
+        foreach (var ep in aMarcar)
+        {
+            ep.Visto = true;
+            listaRegistros.Add(new RegistroEpisodio
+            {
+                AniListId = AnimeSeleccionado.AniListId,
+                NumeroEpisodio = ep.NumeroEpisodio,
+                VistoLocal = true,
+                FavoritoLocal = ep.Favorito,
+                RutaArchivo = ep.RutaCompleta ?? string.Empty
+            });
+        }
+
+        await _databaseService.GuardarRegistrosEpisodioBulkAsync(listaRegistros);
+        AnimeSeleccionado.EpisodiosVistos = _todosLosEpisodios.Count(e => e.Visto);
+        await _databaseService.ActualizarAnimeAsync(AnimeSeleccionado);
+        WeakReferenceMessenger.Default.Send(new EpisodioActualizadoMensaje(AnimeSeleccionado.AniListId, 0, false, 0, 0));
+        AplicarFiltrosYOrdenamiento();
+    }
+
+    /// <summary>
+    /// Marca toda la temporada / serie completa del anime como vista.
+    /// </summary>
+    [RelayCommand]
+    private async Task MarcarTemporadaCompletaAsync()
+    {
+        if (AnimeSeleccionado == null) return;
+
+        var aMarcar = _todosLosEpisodios
+            .Where(e => !e.Visto)
+            .ToList();
+
+        if (aMarcar.Count == 0) return;
+
+        var listaRegistros = new List<RegistroEpisodio>(aMarcar.Count);
+        foreach (var ep in aMarcar)
+        {
+            ep.Visto = true;
+            listaRegistros.Add(new RegistroEpisodio
+            {
+                AniListId = AnimeSeleccionado.AniListId,
+                NumeroEpisodio = ep.NumeroEpisodio,
+                VistoLocal = true,
+                FavoritoLocal = ep.Favorito,
+                RutaArchivo = ep.RutaCompleta ?? string.Empty
+            });
+        }
+
+        await _databaseService.GuardarRegistrosEpisodioBulkAsync(listaRegistros);
+        AnimeSeleccionado.EpisodiosVistos = _todosLosEpisodios.Count(e => e.Visto);
+        await _databaseService.ActualizarAnimeAsync(AnimeSeleccionado);
+        WeakReferenceMessenger.Default.Send(new EpisodioActualizadoMensaje(AnimeSeleccionado.AniListId, 0, false, 0, 0));
+        AplicarFiltrosYOrdenamiento();
+    }
+
     [RelayCommand]
     private async Task ActualizarAnimeActualAsync()
     {
