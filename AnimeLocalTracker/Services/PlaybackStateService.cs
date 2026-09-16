@@ -29,14 +29,18 @@ public class PlaybackStateService : IPlaybackStateService
     }
 
     /// <summary>
-    /// Umbral configurable de "marcado visto" (AppSettings.UmbralMarcadoVisto, 1-100);
-    /// si no hay configuración disponible se usa el valor por defecto 95%.
+    /// Umbral configurable de "marcado visto" (AppSettings.UmbralMarcadoVisto, 1-100); si no
+    /// hay configuración disponible se usa el valor por defecto 90% — el mismo fallback que
+    /// ReproductorViewModel.UmbralMarcadoVistoActual y que AppSettings.UmbralMarcadoVisto.
+    /// Deben coincidir: si este servicio usara un umbral más estricto que el del reproductor,
+    /// un guardado de progreso entre ambos umbrales podría revertir un episodio recién marcado
+    /// como visto (mitigado además por el chequeo de FueMarcadoComoVisto en GuardarProgresoAsync).
     /// </summary>
     private double UmbralVisto
     {
         get
         {
-            int porcentaje = _settingsService?.ObtenerConfiguracion()?.UmbralMarcadoVisto ?? 95;
+            int porcentaje = _settingsService?.ObtenerConfiguracion()?.UmbralMarcadoVisto ?? 90;
             return Math.Clamp(porcentaje, 1, 100) / 100.0;
         }
     }
@@ -90,9 +94,16 @@ public class PlaybackStateService : IPlaybackStateService
             {
                 registro.RutaArchivo = datos.RutaVideo;
             }
-            // Si el usuario reanuda un capítulo "visto" pero lo deja a medias, 
-            // le quitamos la marca de "visto" para que se vea la barra de progreso.
-            if (progresoAGuardar > 0 && (durSec <= 0 || progresoAGuardar < durSec * UmbralVisto))
+            // Si el usuario reanuda un capítulo "visto" pero lo deja a medias, le quitamos
+            // la marca de "visto" para que se vea la barra de progreso — PERO nunca si el
+            // reproductor ya determinó en ESTA sesión que se completó (datos.FueMarcadoComoVisto).
+            // Sin este chequeo, el guardado periódico (cada 5s) o el guardado al cambiar de
+            // episodio podían revertir a "no visto" un episodio recién marcado: su propio
+            // umbral (95% por defecto) es más estricto que el del reproductor (90% por
+            // defecto), así que en la ventana 90-95% este guardado deshacía el marcado que
+            // RealizarAutoTrackingAsync acababa de confirmar — el síntoma exacto al ver
+            // capítulos seguidos sin volver a la ficha del anime.
+            if (!datos.FueMarcadoComoVisto && progresoAGuardar > 0 && (durSec <= 0 || progresoAGuardar < durSec * UmbralVisto))
             {
                 registro.VistoLocal = false;
             }

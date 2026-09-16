@@ -97,4 +97,72 @@ public class PlaybackStateServiceTests
         resultado.Should().NotBeNull();
         resultado!.Value.Posicion.Should().Be(3000);
     }
+
+    [Fact]
+    public async Task GuardarProgresoAsync_ConFueMarcadoComoVisto_NoDeberiaRevertirVistoLocal()
+    {
+        // Arrange: el reproductor ya determinó (vía RealizarAutoTrackingAsync) que el episodio
+        // se vio, pero el guardado periódico llega con una posición justo por debajo del umbral
+        // propio de este servicio (p. ej. entre el 90% del reproductor y un umbral más estricto
+        // aquí, o simplemente una lectura de Player.CurTime un instante antes de cruzarlo).
+        // Antes de la corrección, esta condición desmarcaba VistoLocal a pesar de que el llamador
+        // ya había confirmado el visionado — el bug reportado al ver capítulos seguidos.
+        var registro = new RegistroEpisodio
+        {
+            AniListId = 16498,
+            NumeroEpisodio = 5,
+            ProgresoSegundos = 0,
+            TotalSegundos = 6000,
+            VistoLocal = true
+        };
+        _dbMock.Setup(d => d.ObtenerRegistrosPorAnimeAsync(16498))
+            .ReturnsAsync(new List<RegistroEpisodio> { registro });
+        var sut = CrearSut();
+
+        // Act: posición al 92% (por debajo de un umbral hipotético más estricto), pero el
+        // reproductor ya marcó el episodio como visto.
+        await sut.GuardarProgresoAsync(new DatosProgresoReproduccion
+        {
+            AnimeId = 16498,
+            NumeroEpisodio = 5,
+            PosicionSegundos = 5520,
+            DuracionSegundos = 6000,
+            FueMarcadoComoVisto = true
+        });
+
+        // Assert: VistoLocal debe seguir true — este guardado no debe revertirlo.
+        registro.VistoLocal.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task GuardarProgresoAsync_SinFueMarcadoComoVisto_SiDeberiaRevertirVistoLocalAMedias()
+    {
+        // Arrange: caso legítimo — el usuario reanuda un capítulo ya visto y lo deja a medias
+        // (el reproductor NUNCA lo marcó como visto en esta sesión). Debe seguir quitando la
+        // marca para que la barra de progreso se muestre correctamente.
+        var registro = new RegistroEpisodio
+        {
+            AniListId = 16498,
+            NumeroEpisodio = 5,
+            ProgresoSegundos = 0,
+            TotalSegundos = 6000,
+            VistoLocal = true
+        };
+        _dbMock.Setup(d => d.ObtenerRegistrosPorAnimeAsync(16498))
+            .ReturnsAsync(new List<RegistroEpisodio> { registro });
+        var sut = CrearSut();
+
+        // Act
+        await sut.GuardarProgresoAsync(new DatosProgresoReproduccion
+        {
+            AnimeId = 16498,
+            NumeroEpisodio = 5,
+            PosicionSegundos = 3000,
+            DuracionSegundos = 6000,
+            FueMarcadoComoVisto = false
+        });
+
+        // Assert
+        registro.VistoLocal.Should().BeFalse();
+    }
 }
