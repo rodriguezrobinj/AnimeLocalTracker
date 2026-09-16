@@ -16,26 +16,6 @@ public partial class MainWindow : Window, IVentanaPrincipal
         InitializeComponent();
         DataContext = viewModel;
 
-        // DIAGNOSTICO TEMPORAL 2: quitar tras depurar.
-        this.PreviewMouseLeftButtonDown += (s, e) =>
-        {
-            var pt = e.GetPosition(this);
-            var hit = System.Windows.Media.VisualTreeHelper.HitTest(this, pt);
-            var sb = new System.Text.StringBuilder();
-            sb.Append($"Click at ({pt.X:F0},{pt.Y:F0}) -> ");
-            var el = hit?.VisualHit as System.Windows.DependencyObject;
-            int depth = 0;
-            while (el != null && depth < 10)
-            {
-                var name = (el as FrameworkElement)?.Name;
-                var iht = (el as UIElement)?.IsHitTestVisible;
-                sb.Append($"{el.GetType().Name}{(string.IsNullOrEmpty(name) ? "" : $"[{name}]")}(IHTV={iht}) < ");
-                el = System.Windows.Media.VisualTreeHelper.GetParent(el);
-                depth++;
-            }
-            AppLogger.Info("HitTestDiag2", sb.ToString());
-        };
-
         // UX-05: al abrir un diálogo modal, el foco se mueve al botón Aceptar para que
         // el teclado (Enter/Esc) funcione de inmediato y no quede en la página subyacente.
         viewModel.DialogService.PropertyChanged += (s, e) =>
