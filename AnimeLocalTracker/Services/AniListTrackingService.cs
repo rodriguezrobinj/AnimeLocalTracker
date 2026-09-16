@@ -275,6 +275,8 @@ public class AniListTrackingService : IAnimeTrackingService
                             genres
                             episodes
                             status
+                            startDate { year month day }
+                            season
                             nextAiringEpisode { episode }
                             mediaListEntry {
                                 id
@@ -607,6 +609,7 @@ public class AniListTrackingService : IAnimeTrackingService
                         genres
                         episodes
                         startDate { year month day }
+                        season
                         nextAiringEpisode { episode }
                     }
                 }
@@ -673,6 +676,7 @@ public class AniListTrackingService : IAnimeTrackingService
                         genres
                         episodes
                         startDate { year month day }
+                        season
                         nextAiringEpisode { episode }
                     }
                 }

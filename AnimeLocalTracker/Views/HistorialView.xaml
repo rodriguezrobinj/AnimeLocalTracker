@@ -178,7 +178,7 @@
                         <Border Background="{DynamicResource Brush.Surface1}"
                                 BorderBrush="{DynamicResource Brush.Border}"
                                 BorderThickness="1" CornerRadius="12"
-                                Padding="14,10" Margin="0,0,0,10"
+                                Padding="14,10" Margin="0,0,10,10"
                                 ClipToBounds="True">
                             <Grid>
                                 <Grid.ColumnDefinitions>
@@ -195,9 +195,10 @@
                                         Background="#1E293B" BorderBrush="#262D38" BorderThickness="1"
                                         ClipToBounds="True" HorizontalAlignment="Left">
                                     <Grid>
-                                        <!-- PLACEHOLDER SIEMPRE DE FONDO: la imagen (si carga) lo cubre;
-                                             si falta o falla, el icono queda visible -->
-                                        <Border Background="#161B22">
+                                        <!-- PLACEHOLDER SIEMPRE DE FONDO (efecto "bones" mientras carga la
+                                             miniatura/portada): la imagen, al cargar, lo cubre; si falta o
+                                             falla, el icono queda visible sobre el shimmer -->
+                                        <Border Style="{StaticResource ShimmerEffectStyle}">
                                             <materialDesign:PackIcon Kind="MoviePlayOutline" Foreground="#475569" Width="28" Height="28" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False"/>
                                         </Border>
 

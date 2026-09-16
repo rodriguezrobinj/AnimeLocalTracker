@@ -35,6 +35,10 @@ public partial class AnimeBusquedaItem : ObservableObject
 
     public bool TieneAño => Media?.StartDate?.Year != null;
 
+    public string TemporadaTexto => Media?.FormattedSeason ?? "";
+
+    public bool TieneTemporada => !string.IsNullOrEmpty(TemporadaTexto);
+
     public string EstadoTexto => Media?.FormattedStatus ?? "Desconocido";
 
     public string EstadoColor => Media?.StatusColorBrush ?? "#2196F3";

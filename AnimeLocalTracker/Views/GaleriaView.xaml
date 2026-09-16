@@ -349,17 +349,31 @@
                     </Grid.ColumnDefinitions>
 
                     <!-- Izquierda: Selectores y Toggles -->
-                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <WrapPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                         <!-- Selector de Género -->
-                        <ComboBox ItemsSource="{Binding GenerosDisponibles}" 
+                        <ComboBox ItemsSource="{Binding GenerosDisponibles}"
                                   SelectedItem="{Binding GeneroSeleccionado}"
-                                  Height="36" Margin="0,0,10,0"
+                                  Height="36" Margin="0,0,10,4"
+                                  VerticalAlignment="Center"/>
+
+                        <!-- Selector de Temporada -->
+                        <ComboBox ItemsSource="{Binding TemporadasDisponibles}"
+                                  SelectedItem="{Binding TemporadaSeleccionada}"
+                                  ToolTip="{Binding [Gal_TemporadaTip], Source={x:Static loc:LocalizationService.Instance}}"
+                                  Height="36" Margin="0,0,10,4"
+                                  VerticalAlignment="Center"/>
+
+                        <!-- Selector de Año -->
+                        <ComboBox ItemsSource="{Binding AniosDisponibles}"
+                                  SelectedItem="{Binding AnioSeleccionado}"
+                                  ToolTip="{Binding [Gal_AnioTip], Source={x:Static loc:LocalizationService.Instance}}"
+                                  Height="36" Margin="0,0,10,4"
                                   VerticalAlignment="Center"/>
 
                         <!-- Selector de Ordenación -->
-                        <ComboBox ItemsSource="{Binding ListaOpcionesOrdenacion}" 
+                        <ComboBox ItemsSource="{Binding ListaOpcionesOrdenacion}"
                                   SelectedItem="{Binding CriterioOrdenSeleccionado}"
-                                  Height="36" Margin="0,0,12,0"
+                                  Height="36" Margin="0,0,12,4"
                                   VerticalAlignment="Center"/>
 
                         <!-- Toggle: Solo con episodios pendientes -->
@@ -411,7 +425,32 @@
                                 <TextBlock Text="{Binding [Gal_ConCarpetaLocal], Source={x:Static loc:LocalizationService.Instance}}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
                             </StackPanel>
                         </ToggleButton>
-                    </StackPanel>
+
+                        <!-- Toggle: Solo favoritos (favorito individual por anime, no un estado) -->
+                        <ToggleButton IsChecked="{Binding SoloFavoritos}"
+                                      Height="36" Margin="0,0,8,4" Padding="12,0"
+                                      ToolTip="{Binding [Gal_SoloFavoritosTip], Source={x:Static loc:LocalizationService.Instance}}"
+                                      Cursor="Hand">
+                            <ToggleButton.Style>
+                                <Style TargetType="ToggleButton" BasedOn="{StaticResource MaterialDesignOutlinedButton}">
+                                    <Setter Property="Foreground" Value="{DynamicResource Brush.TextSecondary}"/>
+                                    <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}"/>
+                                    <Setter Property="Background" Value="Transparent"/>
+                                    <Style.Triggers>
+                                        <Trigger Property="IsChecked" Value="True">
+                                            <Setter Property="Foreground" Value="{DynamicResource Brush.Rose}"/>
+                                            <Setter Property="BorderBrush" Value="{DynamicResource Brush.Rose}"/>
+                                            <Setter Property="Background" Value="{DynamicResource Brush.Surface3}"/>
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ToggleButton.Style>
+                            <StackPanel Orientation="Horizontal">
+                                <materialDesign:PackIcon Kind="Heart" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding [Gal_Favoritos], Source={x:Static loc:LocalizationService.Instance}}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </ToggleButton>
+                    </WrapPanel>
 
                     <!-- Derecha: Limpiar y Conteo -->
                     <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
@@ -506,7 +545,7 @@
         </StackPanel>
 
         <!-- Lista virtualizada y acelerada por hardware (60fps+) -->
-        <ListBox x:Name="ListaGaleria" Grid.Row="2" ItemsSource="{Binding BibliotecaFiltrada}" Margin="-14,0,-14,0" Padding="0"
+        <ListBox x:Name="ListaGaleria" Grid.Row="2" ItemsSource="{Binding BibliotecaFiltrada}" Margin="-14,0,-14,0" Padding="0,0,14,0"
                  Visibility="{Binding BibliotecaVacia, Converter={StaticResource InverseBoolToVis}}"
                  Background="Transparent" BorderThickness="0" 
                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
@@ -549,7 +588,8 @@
                     <materialDesign:Card Width="180" Height="265" Margin="14"
                                          UniformCornerRadius="14" Background="#14181E"
                                          BorderBrush="#262D38" BorderThickness="1"
-                                         RenderTransformOrigin="0.5,0.5" ClipToBounds="True">
+                                         RenderTransformOrigin="0.5,0.5" ClipToBounds="True"
+                                         Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=ListBox}}">
                         <materialDesign:Card.RenderTransform>
                             <ScaleTransform ScaleX="1" ScaleY="1" />
                         </materialDesign:Card.RenderTransform>
@@ -602,7 +642,37 @@
                                 </Style.Triggers>
                             </Style>
                         </materialDesign:Card.Style>
-    
+
+                        <!-- Menú contextual (clic derecho): favorito y eliminar de la biblioteca -->
+                        <materialDesign:Card.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="{Binding [Gal_MarcarFavorito], Source={x:Static loc:LocalizationService.Instance}}"
+                                          Command="{Binding PlacementTarget.Tag.AlternarFavoritoCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                          CommandParameter="{Binding}"
+                                          Visibility="{Binding EsFavorito, Converter={StaticResource InverseBoolToVis}}">
+                                    <MenuItem.Icon>
+                                        <materialDesign:PackIcon Kind="HeartOutline" Foreground="#F43F5E"/>
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="{Binding [Gal_QuitarFavorito], Source={x:Static loc:LocalizationService.Instance}}"
+                                          Command="{Binding PlacementTarget.Tag.AlternarFavoritoCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                          CommandParameter="{Binding}"
+                                          Visibility="{Binding EsFavorito, Converter={StaticResource BoolToVis}}">
+                                    <MenuItem.Icon>
+                                        <materialDesign:PackIcon Kind="Heart" Foreground="#F43F5E"/>
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                                <Separator/>
+                                <MenuItem Header="{Binding [Gal_EliminarAnime], Source={x:Static loc:LocalizationService.Instance}}"
+                                          Command="{Binding PlacementTarget.Tag.EliminarAnimeCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                          CommandParameter="{Binding}">
+                                    <MenuItem.Icon>
+                                        <materialDesign:PackIcon Kind="DeleteOutline" Foreground="#F87171"/>
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                            </ContextMenu>
+                        </materialDesign:Card.ContextMenu>
+
                         <!-- Botón interactivo para abrir detalle -->
                         <Button Command="{Binding DataContext.AbrirDetalleCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
                                 CommandParameter="{Binding}"
@@ -619,6 +689,18 @@
                             <Grid>
                                 <!-- Fondo estático oscuro para carga instantánea sin animación infinita -->
                                 <Border Background="#1B222C" CornerRadius="14" />
+
+                                <!-- Efecto "bones": shimmer SOLO mientras la portada de ESTA tarjeta
+                                     no está aún en memoria (evita re-animar tarjetas ya cacheadas
+                                     durante el scroll virtualizado). -->
+                                <Border Style="{StaticResource ShimmerEffectStyle}" CornerRadius="14">
+                                    <Border.Visibility>
+                                        <MultiBinding Converter="{StaticResource AnimeCoverLoading}">
+                                            <Binding Path="." />
+                                            <Binding Path="PortadaVisible" />
+                                        </MultiBinding>
+                                    </Border.Visibility>
+                                </Border>
 
                                 <!-- Portada precargada y congelada en memoria con escalado de alta definición -->
                                 <Image Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" SnapsToDevicePixels="True">
@@ -649,6 +731,15 @@
                                     <!-- UX-03: texto oscuro sobre los chips claros (#4CAF50/#9E9E9E):
                                          el blanco daba 2.7:1; el oscuro supera 6:1 -->
                                     <TextBlock Text="{Binding EstadoVisual}" Foreground="#0B1220" FontSize="11" FontWeight="Bold"/>
+                                </Border>
+
+                                <!-- BADGE FAVORITO (individual por anime, debajo del chip de estado) -->
+                                <Border Background="#F43F5E" CornerRadius="11" Width="24" Height="24"
+                                        HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10,40,0,0"
+                                        Visibility="{Binding EsFavorito, Converter={StaticResource BoolToVis}}"
+                                        materialDesign:ElevationAssist.Elevation="Dp2"
+                                        ToolTip="{Binding [Gal_Favorito], Source={x:Static loc:LocalizationService.Instance}}">
+                                    <materialDesign:PackIcon Kind="Heart" Foreground="White" Width="13" Height="13" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 </Border>
 
                                 <!-- BADGE NUEVOS EPISODIOS -->

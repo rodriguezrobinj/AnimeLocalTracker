@@ -98,7 +98,11 @@ public class AniListMedia
     
     [JsonPropertyName("startDate")]
     public AniListFuzzyDate? StartDate { get; set; }
-    
+
+    // NUEVO: temporada de estreno (WINTER/SPRING/SUMMER/FALL) para filtrar por temporada/año
+    [JsonPropertyName("season")]
+    public string? Season { get; set; }
+
     [JsonPropertyName("status")]
     public string? Status { get; set; }
     
@@ -135,6 +139,16 @@ public class AniListMedia
 
     [JsonIgnore]
     public string FormattedYear => StartDate?.Year?.ToString() ?? "Año ?";
+
+    [JsonIgnore]
+    public string FormattedSeason => Season switch
+    {
+        "WINTER" => "Invierno",
+        "SPRING" => "Primavera",
+        "SUMMER" => "Verano",
+        "FALL" => "Otoño",
+        _ => string.Empty
+    };
 
     [JsonIgnore]
     public string FormattedGenres => Genres != null && Genres.Count > 0 

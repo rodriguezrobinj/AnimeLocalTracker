@@ -1049,10 +1049,15 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
         // FUN-017: snapshot de identidad al iniciar — un guardado que termina después de
         // cambiar de episodio no debe notificar el progreso del episodio viejo bajo el ID
-        // del nuevo (antes _animeId/_episodio se leían en el momento del envío).
+        // del nuevo (antes _animeId/_episodio se leían en el momento del envío). Esto incluye
+        // _fueMarcadoComoVisto: si no se captura aquí, la notificación posterior al await lee
+        // el campo YA reseteado a false por CargarVideoAsync del episodio siguiente (que arranca
+        // de inmediato tras este guardado en fire-and-forget) y le avisa a DetalleView que el
+        // capítulo que se acaba de terminar de ver "no está visto", aunque sí se guardó bien.
         int animeId = _animeId;
         int episodio = _episodio;
         string rutaVideo = _rutaVideo;
+        bool fueMarcadoComoVisto = _fueMarcadoComoVisto;
 
         try
         {
@@ -1076,12 +1081,12 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                 PosicionSegundos = curSec,
                 DuracionSegundos = durSec,
                 ForzarProgresoCero = forzarProgresoCero,
-                FueMarcadoComoVisto = _fueMarcadoComoVisto
+                FueMarcadoComoVisto = fueMarcadoComoVisto
             });
 
             // Notificar a DetalleViewModel para actualizar la barra de progreso en vivo
             WeakReferenceMessenger.Default.Send(new Messages.EpisodioActualizadoMensaje(
-                animeId, episodio, _fueMarcadoComoVisto, resultado.ProgresoSegundos, resultado.TotalSegundos));
+                animeId, episodio, fueMarcadoComoVisto, resultado.ProgresoSegundos, resultado.TotalSegundos));
         }
         catch (Exception ex)
         {

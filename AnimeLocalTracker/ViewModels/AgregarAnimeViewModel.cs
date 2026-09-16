@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows.Data;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
@@ -25,10 +27,119 @@ public partial class AgregarAnimeViewModel : ObservableObject,
     [ObservableProperty]
     private ObservableCollection<AnimeBusquedaItem> _resultados = [];
 
+    /// <summary>Vista filtrada de <see cref="Resultados"/> por temporada/año (la lista se pinta desde aquí).</summary>
+    public ICollectionView ResultadosFiltrados { get; }
+
+    // --- FILTROS DE TEMPORADA Y AÑO (sobre resultados de búsqueda/tendencias) ---
+    public const string TodasLasTemporadas = "Todas las temporadas";
+    public const string TodosLosAños = "Todos los años";
+
+    [ObservableProperty]
+    private ObservableCollection<string> _temporadasDisponibles = [TodasLasTemporadas];
+
+    [ObservableProperty]
+    private string _temporadaSeleccionada = TodasLasTemporadas;
+
+    [ObservableProperty]
+    private ObservableCollection<string> _aniosDisponibles = [TodosLosAños];
+
+    [ObservableProperty]
+    private string _anioSeleccionado = TodosLosAños;
+
+    public bool HayFiltrosTemporadaActivos => TemporadaSeleccionada != TodasLasTemporadas || AnioSeleccionado != TodosLosAños;
+
+    /// <summary>Sin coincidencias por temporada/año, aunque la búsqueda en sí trajo resultados.</summary>
+    public bool SinResultadosFiltrados => Resultados.Count > 0 && (ResultadosFiltrados?.IsEmpty ?? false);
+
+    public bool MostrarSinResultados => BusquedaSinResultados || SinResultadosFiltrados;
+
+    private void RefrescarFiltroTemporada()
+    {
+        ResultadosFiltrados.Refresh();
+        OnPropertyChanged(nameof(HayFiltrosTemporadaActivos));
+        OnPropertyChanged(nameof(SinResultadosFiltrados));
+        OnPropertyChanged(nameof(MostrarSinResultados));
+    }
+
+    partial void OnTemporadaSeleccionadaChanged(string value) => RefrescarFiltroTemporada();
+
+    partial void OnAnioSeleccionadoChanged(string value) => RefrescarFiltroTemporada();
+
+    [RelayCommand]
+    private void LimpiarFiltrosTemporada()
+    {
+        TemporadaSeleccionada = TodasLasTemporadas;
+        AnioSeleccionado = TodosLosAños;
+    }
+
+    private bool FiltrarPorTemporadaYAño(object obj)
+    {
+        if (obj is not AnimeBusquedaItem item) return true;
+
+        if (TemporadaSeleccionada != TodasLasTemporadas &&
+            item.TemporadaTexto != TemporadaSeleccionada)
+        {
+            return false;
+        }
+
+        if (AnioSeleccionado != TodosLosAños &&
+            item.AñoTexto != AnioSeleccionado)
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static string SeasonATexto(string codigo) => codigo switch
+    {
+        "WINTER" => "Invierno",
+        "SPRING" => "Primavera",
+        "SUMMER" => "Verano",
+        "FALL" => "Otoño",
+        _ => codigo
+    };
+
+    private void ActualizarTemporadasYAniosDisponibles()
+    {
+        var ordenTemporadas = new[] { "WINTER", "SPRING", "SUMMER", "FALL" };
+        var temporadasUnicas = Resultados
+            .Select(r => r.Media?.Season)
+            .Where(s => !string.IsNullOrWhiteSpace(s))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var nuevaListaTemporadas = new List<string> { TodasLasTemporadas };
+        nuevaListaTemporadas.AddRange(
+            ordenTemporadas.Where(t => temporadasUnicas.Contains(t, StringComparer.OrdinalIgnoreCase))
+                           .Select(SeasonATexto));
+
+        string prevTemporada = TemporadaSeleccionada;
+        TemporadasDisponibles = new ObservableCollection<string>(nuevaListaTemporadas);
+        TemporadaSeleccionada = nuevaListaTemporadas.Contains(prevTemporada) ? prevTemporada : TodasLasTemporadas;
+
+        var aniosUnicos = Resultados
+            .Select(r => r.Media?.StartDate?.Year)
+            .Where(y => y.HasValue)
+            .Select(y => y!.Value)
+            .Distinct()
+            .OrderByDescending(y => y)
+            .Select(y => y.ToString())
+            .ToList();
+
+        var nuevaListaAnios = new List<string> { TodosLosAños };
+        nuevaListaAnios.AddRange(aniosUnicos);
+
+        string prevAnio = AnioSeleccionado;
+        AniosDisponibles = new ObservableCollection<string>(nuevaListaAnios);
+        AnioSeleccionado = nuevaListaAnios.Contains(prevAnio) ? prevAnio : TodosLosAños;
+    }
+
     [ObservableProperty]
     private bool _isSearching;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(MostrarSinResultados))]
     private bool _busquedaSinResultados;
 
     [ObservableProperty]
@@ -71,6 +182,11 @@ public partial class AgregarAnimeViewModel : ObservableObject,
         // Registro vía IRecipient<AnimeAñadidoMensaje>: una sola suscripción.
         // (Antes había un lambda + Receive() duplicando la misma lógica.)
         WeakReferenceMessenger.Default.Register<AnimeAñadidoMensaje>(this);
+
+        // Resultados es una única instancia estable durante toda la vida del VM (solo se
+        // Clear()+Add() en cada búsqueda): la vista filtrada se crea una sola vez aquí.
+        ResultadosFiltrados = CollectionViewSource.GetDefaultView(Resultados);
+        ResultadosFiltrados.Filter = FiltrarPorTemporadaYAño;
 
         _ = CargarInicialAsync();
     }
@@ -131,6 +247,8 @@ public partial class AgregarAnimeViewModel : ObservableObject,
             }
 
             BusquedaSinResultados = Resultados.Count == 0;
+            ActualizarTemporadasYAniosDisponibles();
+            RefrescarFiltroTemporada();
         }
         catch (OperationCanceledException)
         {
@@ -185,6 +303,8 @@ public partial class AgregarAnimeViewModel : ObservableObject,
             }
 
             BusquedaSinResultados = Resultados.Count == 0;
+            ActualizarTemporadasYAniosDisponibles();
+            RefrescarFiltroTemporada();
         }
         catch (OperationCanceledException)
         {

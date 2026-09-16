@@ -185,7 +185,7 @@
                         <!-- 3. Popup Flotante Moderno -->
                         <Popup x:Name="PART_Popup"
                                Placement="Bottom"
-                               IsOpen="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                               IsOpen="{TemplateBinding IsDropDownOpen}"
                                AllowsTransparency="True"
                                Focusable="False"
                                StaysOpen="False"
