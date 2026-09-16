@@ -18,8 +18,9 @@ public partial class DetalleView : UserControl
     /// </summary>
     private void BotonEpisodioDescargado_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is Button boton && BuscarFila(boton)?.ContextMenu is { } menu)
+        if (sender is Button boton && BuscarFila(boton) is { } fila && fila.ContextMenu is { } menu)
         {
+            boton.Tag = fila.Tag;
             menu.PlacementTarget = boton;
             menu.Placement = PlacementMode.Bottom;
             menu.VerticalOffset = 6;

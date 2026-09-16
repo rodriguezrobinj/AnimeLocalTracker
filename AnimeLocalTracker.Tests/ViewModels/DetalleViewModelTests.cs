@@ -127,4 +127,101 @@ public class DetalleViewModelTests
         // Assert
         sut.EstaConectado.Should().BeTrue();
     }
+
+    [Fact]
+    public async Task MarcarAnterioresVistosCommand_DeberiaMarcarEpisodiosAnterioresOIguales()
+    {
+        // Arrange
+        var anime = new AnimeItem { AniListId = 300, Titulo = "One Piece", TotalEpisodios = 5 };
+        var sut = CreateSut();
+
+        _fileScannerServiceMock
+            .Setup(s => s.EscanearEpisodiosAsync(It.IsAny<string>()))
+            .ReturnsAsync(new List<EpisodioItem>());
+        _databaseServiceMock
+            .Setup(s => s.ObtenerRegistrosPorAnimeAsync(300))
+            .ReturnsAsync(new List<RegistroEpisodio>());
+
+        await sut.InicializarAsync(anime);
+
+        // Act: marcar hasta el episodio 3
+        var ep3 = sut.EpisodiosDelAnime.First(e => e.NumeroEpisodio == 3);
+        await sut.MarcarAnterioresVistosCommand.ExecuteAsync(ep3);
+
+        // Assert: 1, 2 y 3 deben quedar vistos; 4 y 5 no vistos
+        sut.EpisodiosDelAnime.First(e => e.NumeroEpisodio == 1).Visto.Should().BeTrue();
+        sut.EpisodiosDelAnime.First(e => e.NumeroEpisodio == 2).Visto.Should().BeTrue();
+        sut.EpisodiosDelAnime.First(e => e.NumeroEpisodio == 3).Visto.Should().BeTrue();
+        sut.EpisodiosDelAnime.First(e => e.NumeroEpisodio == 4).Visto.Should().BeFalse();
+        sut.EpisodiosDelAnime.First(e => e.NumeroEpisodio == 5).Visto.Should().BeFalse();
+        anime.EpisodiosVistos.Should().Be(3);
+
+        _databaseServiceMock.Verify(d => d.GuardarRegistrosEpisodioBulkAsync(
+            It.Is<IEnumerable<RegistroEpisodio>>(r => System.Linq.Enumerable.Count(r) == 3)), Times.Once);
+    }
+
+    [Fact]
+    public async Task MarcarTemporadaCompletaCommand_DeberiaMarcarTodosLosEpisodios()
+    {
+        // Arrange
+        var anime = new AnimeItem { AniListId = 300, Titulo = "One Piece", TotalEpisodios = 4 };
+        var sut = CreateSut();
+
+        _fileScannerServiceMock
+            .Setup(s => s.EscanearEpisodiosAsync(It.IsAny<string>()))
+            .ReturnsAsync(new List<EpisodioItem>());
+        _databaseServiceMock
+            .Setup(s => s.ObtenerRegistrosPorAnimeAsync(300))
+            .ReturnsAsync(new List<RegistroEpisodio>());
+
+        await sut.InicializarAsync(anime);
+
+        // Act
+        await sut.MarcarTemporadaCompletaCommand.ExecuteAsync(null);
+
+        // Assert
+        sut.EpisodiosDelAnime.Should().OnlyContain(e => e.Visto);
+        anime.EpisodiosVistos.Should().Be(4);
+
+        _databaseServiceMock.Verify(d => d.GuardarRegistrosEpisodioBulkAsync(
+            It.Is<IEnumerable<RegistroEpisodio>>(r => System.Linq.Enumerable.Count(r) == 4)), Times.Once);
+    }
+
+    [Fact]
+    public async Task AlternarVistoEpisodioCommand_DeberiaAlternarEstado()
+    {
+        // Arrange
+        var anime = new AnimeItem { AniListId = 400, Titulo = "Bleach", TotalEpisodios = 2 };
+        var sut = CreateSut();
+
+        _fileScannerServiceMock
+            .Setup(s => s.EscanearEpisodiosAsync(It.IsAny<string>()))
+            .ReturnsAsync(new List<EpisodioItem>());
+        _databaseServiceMock
+            .Setup(s => s.ObtenerRegistrosPorAnimeAsync(400))
+            .ReturnsAsync(new List<RegistroEpisodio>());
+
+        await sut.InicializarAsync(anime);
+
+        var ep1 = sut.EpisodiosDelAnime.First(e => e.NumeroEpisodio == 1);
+        ep1.Visto.Should().BeFalse();
+
+        // Act 1: marcar como visto
+        await sut.AlternarVistoEpisodioCommand.ExecuteAsync(ep1);
+
+        // Assert 1
+        ep1.Visto.Should().BeTrue();
+        anime.EpisodiosVistos.Should().Be(1);
+        _databaseServiceMock.Verify(d => d.GuardarRegistroEpisodioAsync(
+            It.Is<RegistroEpisodio>(r => r.NumeroEpisodio == 1 && r.VistoLocal)), Times.Once);
+
+        // Act 2: alternar a no visto
+        await sut.AlternarVistoEpisodioCommand.ExecuteAsync(ep1);
+
+        // Assert 2
+        ep1.Visto.Should().BeFalse();
+        anime.EpisodiosVistos.Should().Be(0);
+        _databaseServiceMock.Verify(d => d.GuardarRegistroEpisodioAsync(
+            It.Is<RegistroEpisodio>(r => r.NumeroEpisodio == 1 && !r.VistoLocal)), Times.Once);
+    }
 }

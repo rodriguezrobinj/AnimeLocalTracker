@@ -489,9 +489,40 @@
                                                 </MenuItem.Icon>
                                             </MenuItem>
                                             <Separator/>
+                                            <MenuItem Header="{Binding [Det_MarcarVisto], Source={x:Static loc:LocalizationService.Instance}}"
+                                                      Command="{Binding PlacementTarget.Tag.AlternarVistoEpisodioCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                      CommandParameter="{Binding}"
+                                                      Visibility="{Binding Visto, Converter={StaticResource InverseBoolToVis}}">
+                                                <MenuItem.Icon>
+                                                    <materialDesign:PackIcon Kind="Check" Foreground="#10B981" Width="16" Height="16"/>
+                                                </MenuItem.Icon>
+                                            </MenuItem>
+                                            <MenuItem Header="{Binding [Det_MarcarNoVisto], Source={x:Static loc:LocalizationService.Instance}}"
+                                                      Command="{Binding PlacementTarget.Tag.AlternarVistoEpisodioCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                      CommandParameter="{Binding}"
+                                                      Visibility="{Binding Visto, Converter={StaticResource BoolToVis}}">
+                                                <MenuItem.Icon>
+                                                    <materialDesign:PackIcon Kind="EyeOffOutline" Foreground="#9CA3AF" Width="16" Height="16"/>
+                                                </MenuItem.Icon>
+                                            </MenuItem>
+                                            <MenuItem Header="{Binding [Det_MarcarAnterioresVistos], Source={x:Static loc:LocalizationService.Instance}}"
+                                                      Command="{Binding PlacementTarget.Tag.MarcarAnterioresVistosCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                      CommandParameter="{Binding}">
+                                                <MenuItem.Icon>
+                                                    <materialDesign:PackIcon Kind="CheckAll" Foreground="#34D399" Width="16" Height="16"/>
+                                                </MenuItem.Icon>
+                                            </MenuItem>
+                                            <MenuItem Header="{Binding [Det_MarcarTemporadaCompleta], Source={x:Static loc:LocalizationService.Instance}}"
+                                                      Command="{Binding PlacementTarget.Tag.MarcarTemporadaCompletaCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                                                <MenuItem.Icon>
+                                                    <materialDesign:PackIcon Kind="PlaylistCheck" Foreground="#60A5FA" Width="16" Height="16"/>
+                                                </MenuItem.Icon>
+                                            </MenuItem>
+                                            <Separator/>
                                             <MenuItem Header="{Binding [Det_EliminarEpisodio], Source={x:Static loc:LocalizationService.Instance}}"
                                                       Command="{Binding PlacementTarget.Tag.EliminarEpisodioCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                                      CommandParameter="{Binding}">
+                                                      CommandParameter="{Binding}"
+                                                      Visibility="{Binding Descargado, Converter={StaticResource BoolToVis}}">
                                                 <MenuItem.Icon>
                                                     <materialDesign:PackIcon Kind="DeleteOutline" Foreground="#F87171" Width="16" Height="16"/>
                                                 </MenuItem.Icon>
