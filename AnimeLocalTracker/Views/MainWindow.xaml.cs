@@ -1,7 +1,9 @@
+using System;
 using System.Runtime.InteropServices;
 using System.Windows;
 using AnimeLocalTracker.Services;
 using AnimeLocalTracker.ViewModels;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace AnimeLocalTracker.Views;
 
@@ -54,9 +56,20 @@ public partial class MainWindow : Window, IVentanaPrincipal
     protected override void OnSourceInitialized(EventArgs e)
     {
         base.OnSourceInitialized(e);
-        var source = System.Windows.Interop.HwndSource.FromHwnd(
-            new System.Windows.Interop.WindowInteropHelper(this).Handle);
+        var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+        var source = System.Windows.Interop.HwndSource.FromHwnd(hwnd);
         source?.AddHook(WindowProc);
+
+        // SMT-01: SMTC se ata al HWND de la ventana principal una única vez, tan pronto
+        // como existe (no bloquea el arranque: falla en silencio en Windows < 1809).
+        try
+        {
+            App.ServiceProvider.GetService<ISystemMediaControlsService>()?.Inicializar(hwnd);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn("MainWindow", $"No se pudo inicializar los controles multimedia del sistema: {ex.Message}");
+        }
     }
 
     private IntPtr WindowProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)

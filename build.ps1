@@ -80,7 +80,10 @@ if (-not $pasada2) {
 
 # Verificación de artefactos: el build puede reportar "OK" sin generar el ensamblado de
 # tests (observado en CI). Si falta, se reintenta con log DETALLADO para diagnosticar.
-$testsDll = Join-Path $root "AnimeLocalTracker.Tests\bin\$Configuration\net8.0-windows\AnimeLocalTracker.Tests.dll"
+$testsDll = Join-Path $root "AnimeLocalTracker.Tests\bin\$Configuration\net8.0-windows10.0.26100.0\AnimeLocalTracker.Tests.dll"
+if (-not (Test-Path $testsDll)) {
+    $testsDll = Join-Path $root "AnimeLocalTracker.Tests\bin\$Configuration\net8.0-windows\AnimeLocalTracker.Tests.dll"
+}
 if (-not (Test-Path $testsDll)) {
     Write-Host "[build] ERROR: no se generó el ensamblado de tests ($testsDll)." -ForegroundColor Red
     Write-Host "[build] Reintentando con salida detallada para diagnosticar..." -ForegroundColor Yellow
@@ -138,15 +141,40 @@ if (Test-Path $rustDllPath) {
     Copy-NativeDll $rustDllPath "$root\AnimeLocalTracker\animetracker_core.dll" "raiz del proyecto"
     
     # 2) Binarios de app y tests si los directorios existen
-    $appBinDir = "$root\AnimeLocalTracker\bin\$Configuration\net8.0-windows"
-    $testsBinDir = "$root\AnimeLocalTracker.Tests\bin\$Configuration\net8.0-windows"
+    $appBinDirs = @(
+        "$root\AnimeLocalTracker\bin\$Configuration\net8.0-windows",
+        "$root\AnimeLocalTracker\bin\$Configuration\net8.0-windows10.0.26100.0"
+    )
+    $testsBinDirs = @(
+        "$root\AnimeLocalTracker.Tests\bin\$Configuration\net8.0-windows",
+        "$root\AnimeLocalTracker.Tests\bin\$Configuration\net8.0-windows10.0.26100.0"
+    )
 
-    if (Test-Path $appBinDir) {
-        Copy-NativeDll $rustDllPath (Join-Path $appBinDir "animetracker_core.dll") "bin de la app"
+    foreach ($dir in $appBinDirs) {
+        if (Test-Path $dir) {
+            Copy-NativeDll $rustDllPath (Join-Path $dir "animetracker_core.dll") "bin de la app ($dir)"
+        }
     }
-    if (Test-Path $testsBinDir) {
-        Copy-NativeDll $rustDllPath (Join-Path $testsBinDir "animetracker_core.dll") "bin de tests"
+    foreach ($dir in $testsBinDirs) {
+        if (Test-Path $dir) {
+            Copy-NativeDll $rustDllPath (Join-Path $dir "animetracker_core.dll") "bin de tests ($dir)"
+        }
     }
+}
+
+# Sincronizar salida hacia net8.0-windows para compatibilidad con Rider y atajos existentes
+$sdkAppDir = "$root\AnimeLocalTracker\bin\$Configuration\net8.0-windows10.0.26100.0"
+$legacyAppDir = "$root\AnimeLocalTracker\bin\$Configuration\net8.0-windows"
+if (Test-Path $sdkAppDir) {
+    if (-not (Test-Path $legacyAppDir)) { New-Item -ItemType Directory -Path $legacyAppDir -Force | Out-Null }
+    Copy-Item "$sdkAppDir\*" $legacyAppDir -Recurse -Force
+}
+
+$sdkTestsDir = "$root\AnimeLocalTracker.Tests\bin\$Configuration\net8.0-windows10.0.26100.0"
+$legacyTestsDir = "$root\AnimeLocalTracker.Tests\bin\$Configuration\net8.0-windows"
+if (Test-Path $sdkTestsDir) {
+    if (-not (Test-Path $legacyTestsDir)) { New-Item -ItemType Directory -Path $legacyTestsDir -Force | Out-Null }
+    Copy-Item "$sdkTestsDir\*" $legacyTestsDir -Recurse -Force
 }
 
 Write-Host "[build] OK ($Configuration)" -ForegroundColor Green

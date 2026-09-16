@@ -256,7 +256,7 @@ public sealed partial class NavigationService : ObservableObject, INavigationSer
 
             try
             {
-                await viewModel.CargarVideoAsync(message.RutaVideo, message.AnimeId, message.TituloAnime, message.Episodio, message.EpisodiosDisponibles);
+                await viewModel.CargarVideoAsync(message.RutaVideo, message.AnimeId, message.TituloAnime, message.Episodio, message.EpisodiosDisponibles, message.RutaPortada);
             }
             catch (Exception ex)
             {

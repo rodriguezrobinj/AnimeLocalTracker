@@ -192,7 +192,8 @@ public partial class ActualizacionesViewModel : ObservableObject, IDisposable, I
             item.RutaArchivo,
             item.AniListId,
             item.TituloAnime,
-            item.NumeroEpisodio));
+            item.NumeroEpisodio,
+            RutaPortada: item.RutaPortada));
     }
 
     [RelayCommand]

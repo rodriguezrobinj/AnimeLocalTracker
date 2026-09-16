@@ -25,6 +25,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     private readonly IVentanaPrincipal? _ventanaPrincipal;
     private readonly IPlaybackStateService _playbackState;
     private readonly ISkipTimesCoordinator _skipCoordinator;
+    private readonly ISystemMediaControlsService? _smtc;
     private CancellationTokenSource? _skipCts;
 
     // FUN-011: serializa los guardados periódicos de progreso (un guardado a la vez).
@@ -169,6 +170,8 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     private string _rutaVideo = string.Empty;
     public string RutaVideo => _rutaVideo;
 
+    private string? _rutaPortada;
+
     private bool _fueMarcadoComoVisto = false;
     
     // Cache para evitar recalcular duración en cada tick
@@ -186,7 +189,8 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         ISettingsService? settingsService = null,
         IPlaybackStateService? playbackStateService = null,
         ISkipTimesCoordinator? skipTimesCoordinator = null,
-        IVentanaPrincipal? ventanaPrincipal = null)
+        IVentanaPrincipal? ventanaPrincipal = null,
+        ISystemMediaControlsService? systemMediaControlsService = null)
     {
         _settingsService = settingsService;
         _ventanaPrincipal = ventanaPrincipal;
@@ -194,6 +198,20 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         _playbackState = playbackStateService ?? new PlaybackStateService(databaseService, animeTrackingService, authService);
 
         _skipCoordinator = skipTimesCoordinator ?? new SkipTimesCoordinator(aniSkipService);
+
+        // SMT-01: SMTC es un singleton (un único HWND); esta instancia se suscribe a sus
+        // botones mientras controla la reproducción y se desuscribe en Dispose(). Al ser
+        // ReproductorViewModel transient (una instancia nueva por navegación al reproductor),
+        // nunca hay dos VMs escuchando el mismo evento a la vez (NavigationService dispone el
+        // anterior antes de crear uno nuevo).
+        _smtc = systemMediaControlsService;
+        if (_smtc != null)
+        {
+            _smtc.PlayRequested += OnSmtcPlayRequested;
+            _smtc.PauseRequested += OnSmtcPauseRequested;
+            _smtc.NextRequested += OnSmtcNextRequested;
+            _smtc.PreviousRequested += OnSmtcPreviousRequested;
+        }
 
         if (_settingsService != null)
         {
@@ -414,6 +432,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                         player.Play();
                     }
                     PlayPauseIcon = "Pause";
+                    _smtc?.ActualizarEstadoReproduccion(true);
                 }
                 catch { }
 
@@ -450,22 +469,54 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
         if (Player.Status == Status.Playing)
         {
-            Player.Pause();
-            PlayPauseIcon = "Play";
-            _ = GuardarProgresoActualAsync();
+            Pausar();
         }
         else
         {
-            // Si el episodio terminó, reproducir de nuevo desde el inicio
-            if (Player.Status == Status.Ended)
-            {
-                try { Player.CurTime = 0; } catch (Exception ex) { AppLogger.Debug("ReproductorViewModel", $"No se pudo reiniciar posición: {ex.Message}"); }
-                _fueMarcadoComoVisto = false;
-            }
-            Player.Play();
-            PlayPauseIcon = "Pause";
+            Reproducir();
         }
     }
+
+    private void Pausar()
+    {
+        if (Player == null || Player.Status != Status.Playing) return;
+
+        Player.Pause();
+        PlayPauseIcon = "Play";
+        _smtc?.ActualizarEstadoReproduccion(false);
+        _ = GuardarProgresoActualAsync();
+    }
+
+    private void Reproducir()
+    {
+        if (Player == null || Player.Status == Status.Playing) return;
+
+        // Si el episodio terminó, reproducir de nuevo desde el inicio
+        if (Player.Status == Status.Ended)
+        {
+            try { Player.CurTime = 0; } catch (Exception ex) { AppLogger.Debug("ReproductorViewModel", $"No se pudo reiniciar posición: {ex.Message}"); }
+            _fueMarcadoComoVisto = false;
+        }
+        Player.Play();
+        PlayPauseIcon = "Pause";
+        _smtc?.ActualizarEstadoReproduccion(true);
+    }
+
+    /// <summary>
+    /// SMT-01: el evento ButtonPressed de SMTC llega en un hilo COM/MTA ajeno al Dispatcher
+    /// de WPF — nunca tocar Player ni propiedades observables sin saltar antes al hilo de UI.
+    /// </summary>
+    private void OnSmtcPlayRequested(object? sender, EventArgs e) =>
+        System.Windows.Application.Current?.Dispatcher?.BeginInvoke(Reproducir);
+
+    private void OnSmtcPauseRequested(object? sender, EventArgs e) =>
+        System.Windows.Application.Current?.Dispatcher?.BeginInvoke(Pausar);
+
+    private void OnSmtcNextRequested(object? sender, EventArgs e) =>
+        System.Windows.Application.Current?.Dispatcher?.BeginInvoke(SiguienteEpisodio);
+
+    private void OnSmtcPreviousRequested(object? sender, EventArgs e) =>
+        System.Windows.Application.Current?.Dispatcher?.BeginInvoke(AnteriorEpisodio);
     
     [RelayCommand]
     public void Rewind10()
@@ -780,15 +831,17 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     {
         var siguiente = ObtenerSiguienteEpisodio();
         TieneEpisodioSiguiente = siguiente != null && !string.IsNullOrWhiteSpace(siguiente.RutaCompleta);
-        EpisodioSiguienteTooltip = TieneEpisodioSiguiente 
-            ? $"Siguiente: Episodio {siguiente!.NumeroEpisodio} (N)" 
+        EpisodioSiguienteTooltip = TieneEpisodioSiguiente
+            ? $"Siguiente: Episodio {siguiente!.NumeroEpisodio} (N)"
             : "No hay siguiente episodio";
 
         var anterior = ObtenerAnteriorEpisodio();
         TieneEpisodioAnterior = anterior != null && !string.IsNullOrWhiteSpace(anterior.RutaCompleta);
-        EpisodioAnteriorTooltip = TieneEpisodioAnterior 
-            ? $"Anterior: Episodio {anterior!.NumeroEpisodio} (P)" 
+        EpisodioAnteriorTooltip = TieneEpisodioAnterior
+            ? $"Anterior: Episodio {anterior!.NumeroEpisodio} (P)"
             : "No hay episodio anterior";
+
+        _smtc?.ActualizarNavegacionDisponible(TieneEpisodioSiguiente, TieneEpisodioAnterior);
     }
 
     [RelayCommand]
@@ -797,7 +850,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         var siguiente = ObtenerSiguienteEpisodio();
         if (siguiente != null && !string.IsNullOrWhiteSpace(siguiente.RutaCompleta))
         {
-            CargarVideo(siguiente.RutaCompleta, _animeId, TituloAnime, siguiente.NumeroEpisodio, _episodiosDisponibles);
+            CargarVideo(siguiente.RutaCompleta, _animeId, TituloAnime, siguiente.NumeroEpisodio, _episodiosDisponibles, _rutaPortada);
         }
     }
 
@@ -807,7 +860,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         var anterior = ObtenerAnteriorEpisodio();
         if (anterior != null && !string.IsNullOrWhiteSpace(anterior.RutaCompleta))
         {
-            CargarVideo(anterior.RutaCompleta, _animeId, TituloAnime, anterior.NumeroEpisodio, _episodiosDisponibles);
+            CargarVideo(anterior.RutaCompleta, _animeId, TituloAnime, anterior.NumeroEpisodio, _episodiosDisponibles, _rutaPortada);
         }
     }
 
@@ -859,12 +912,12 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         }
     }
 
-    public void CargarVideo(string rutaVideo, int animeId, string tituloAnime, int episodio, List<EpisodioItem>? listaEpisodios = null)
+    public void CargarVideo(string rutaVideo, int animeId, string tituloAnime, int episodio, List<EpisodioItem>? listaEpisodios = null, string? rutaPortada = null)
     {
-        _ = CargarVideoAsync(rutaVideo, animeId, tituloAnime, episodio, listaEpisodios);
+        _ = CargarVideoAsync(rutaVideo, animeId, tituloAnime, episodio, listaEpisodios, rutaPortada);
     }
 
-    public async Task CargarVideoAsync(string rutaVideo, int animeId, string tituloAnime, int episodio, List<EpisodioItem>? listaEpisodios = null)
+    public async Task CargarVideoAsync(string rutaVideo, int animeId, string tituloAnime, int episodio, List<EpisodioItem>? listaEpisodios = null, string? rutaPortada = null)
     {
         _ = GuardarProgresoActualAsync();
 
@@ -899,9 +952,13 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         _rutaVideo = rutaVideo;
         _animeId = animeId;
         _episodio = episodio;
+        _rutaPortada = rutaPortada;
         TituloAnime = tituloAnime;
         TituloEpisodio = $"Episodio {episodio}";
         _fueMarcadoComoVisto = false;
+
+        // SMT-01: overlay nativo de Windows — título, episodio y portada del anime que arranca.
+        _smtc?.ActualizarMetadatos(tituloAnime, episodio, rutaPortada);
         _durationCached = false;
         _lastNotifiedSeconds = -1;
         _lastSavedSeconds = -1;
@@ -1271,6 +1328,8 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                 }
                 else if (Player?.Status == Status.Ended && _haCompletadoOpen)
                 {
+                    _smtc?.ActualizarEstadoReproduccion(false);
+
                     // Al finalizar, resetear progreso a 0
                     _ = GuardarProgresoActualAsync(forzarProgresoCero: true);
 
@@ -1376,6 +1435,15 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         if (_disposeHecho) return;
         _disposeHecho = true;
         GC.SuppressFinalize(this);
+
+        if (_smtc != null)
+        {
+            _smtc.PlayRequested -= OnSmtcPlayRequested;
+            _smtc.PauseRequested -= OnSmtcPauseRequested;
+            _smtc.NextRequested -= OnSmtcNextRequested;
+            _smtc.PreviousRequested -= OnSmtcPreviousRequested;
+            _smtc.Deshabilitar();
+        }
 
         _ = GuardarProgresoActualAsync();
 
