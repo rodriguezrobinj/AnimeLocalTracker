@@ -193,8 +193,9 @@
              como atributo XAML el compilador BAML lo mapea a la propiedad equivocada. -->
         <fl:FlyleafHost Player="{Binding Player}" x:Name="HostFlyleaf">
             <Grid>
-                <!-- Subtítulos optimizados: 2 TextBlocks en vez de 9 -->
                 <!-- Bindings vía ElementName: FlyleafHost sobrescribe el DataContext de su contenido -->
+
+                <!-- Subtítulos optimizados: 2 TextBlocks en vez de 9 -->
                 <Viewbox VerticalAlignment="Bottom" Margin="40,40,40,25" StretchDirection="DownOnly" MaxHeight="150" IsHitTestVisible="False">
                     <Grid MaxWidth="1200">
                         <Grid.Effect>
@@ -219,7 +220,22 @@
 
                 <!-- Controles Overlays -->
                 <Grid x:Name="OverlayControls" Background="Transparent" DataContext="{x:Null}">
-                
+
+                <!-- Cubre el frame de video mientras se aplica el seek de reanudación diferido,
+                     para que el episodio no se vea arrancar en 0:00 antes de saltar al punto guardado.
+                     Va DENTRO de OverlayControls (no directo en el Content del FlyleafHost) porque
+                     solo aquí el DataContext se resincroniza por código (ver DataContextChanged en
+                     el code-behind); en el Content raíz del host, un Binding normal se queda "pegado"
+                     al último valor sin refrescar cuando cambia (FlyleafHost gestiona ese DataContext
+                     aparte y no siempre repropaga PropertyChanged de descendientes). -->
+                <Grid Background="Black" IsHitTestVisible="False"
+                      Visibility="{Binding OcultarVideoInicio, Converter={StaticResource BoolToVis}}">
+                    <ProgressBar Style="{StaticResource MaterialDesignCircularProgressBar}"
+                                 IsIndeterminate="True" Width="44" Height="44"
+                                 Value="0" Foreground="#60A5FA"
+                                 HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Grid>
+
                 <!-- Gradiente Superior -->
                 <Grid VerticalAlignment="Top" Height="120"
                       Visibility="{Binding EsModoMini, Converter={StaticResource InverseBoolToVis}}">
