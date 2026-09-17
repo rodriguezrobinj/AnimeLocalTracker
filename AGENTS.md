@@ -28,7 +28,7 @@ Aplicación de escritorio **Windows** (.NET 8 WPF, MVVM). Stack: SQLite (WAL, sq
 ## Convenciones
 
 - Commits en español, conventional commits (`feat(área): ...`, `fix(área): ...`), con el ID del hallazgo cuando aplique.
-- Tests en `AnimeLocalTracker.Tests` (xUnit + FluentAssertions + Moq). No romper la suite (**350 tests**; al añadir features, añadir tests — el conteo aparece en README).
+- Tests en `AnimeLocalTracker.Tests` (xUnit + FluentAssertions + Moq). No romper la suite (**362 tests**; al añadir features, añadir tests — el conteo aparece en README).
 - Logs de la app: `%LocalAppData%\AnimeLocalTrackerData\Logs\app.log` — consultar antes de diagnosticar bugs.
 
 ## Documentación local (NO versionada, vive solo en disco)

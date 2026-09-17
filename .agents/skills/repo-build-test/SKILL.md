@@ -23,7 +23,7 @@ dotnet build AnimeLocalTracker.Tests/AnimeLocalTracker.Tests.csproj -c Debug --n
 dotnet test AnimeLocalTracker.Tests/AnimeLocalTracker.Tests.csproj -c Debug --no-build
 ```
 
-**Exe de prueba:** `AnimeLocalTracker\bin\Debug\net8.0-windows\AnimeLocalTracker.exe`.
+**Exe de prueba:** `AnimeLocalTracker\bin\Debug\net8.0-windows10.0.26100.0\AnimeLocalTracker.exe` (SMT-01: el TFM ahora incluye la versión del SDK de Windows, necesaria para System.Media.SystemMediaTransportControls — la carpeta cambió de `net8.0-windows` a `net8.0-windows10.0.26100.0`).
 Si tras un build "OK" el exe no existe/está viejo: buscar procesos colgados (`Get-Process | ? { $_.Name -match 'dotnet|MSBuild|VBCS|testhost' }`) → matar, borrar `obj` de la app y reconstruir (errores MC1000/BG1002/MC3072 espurios por BAML bloqueado/parcial).
 
 ## Criterios de Éxito Innegociables
