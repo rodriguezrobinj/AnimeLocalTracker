@@ -19,6 +19,7 @@ public class HistorialViewModelTests : IDisposable
     private readonly Mock<IDatabaseService> _dbMock;
     private readonly Mock<IPlaybackStateService> _playbackMock;
     private readonly Mock<IDialogService> _dialogMock;
+    private readonly Mock<IFileScannerService> _fileScannerMock;
     private readonly string _tempVideoFile;
 
     public HistorialViewModelTests()
@@ -26,6 +27,9 @@ public class HistorialViewModelTests : IDisposable
         _dbMock = new Mock<IDatabaseService>();
         _playbackMock = new Mock<IPlaybackStateService>();
         _dialogMock = new Mock<IDialogService>();
+        _fileScannerMock = new Mock<IFileScannerService>();
+        _fileScannerMock.Setup(f => f.EscanearEpisodiosAsync(It.IsAny<string>()))
+            .ReturnsAsync(new List<EpisodioItem>());
 
         _tempVideoFile = Path.Combine(Path.GetTempPath(), $"test_video_{Guid.NewGuid():N}.mp4");
         File.WriteAllText(_tempVideoFile, "dummy");
@@ -52,7 +56,7 @@ public class HistorialViewModelTests : IDisposable
         _dbMock.Setup(d => d.ObtenerAnimesLigerosAsync())
                .ReturnsAsync(animes ?? []);
 
-        return new HistorialViewModel(_dbMock.Object, _playbackMock.Object, _dialogMock.Object);
+        return new HistorialViewModel(_dbMock.Object, _playbackMock.Object, _dialogMock.Object, _fileScannerMock.Object);
     }
 
     [Fact]
@@ -195,7 +199,7 @@ public class HistorialViewModelTests : IDisposable
     }
 
     [Fact]
-    public void Reanudar_ArchivoExiste_DeberiaEnviarNavegarMensajeReproductor()
+    public async Task Reanudar_ArchivoExiste_DeberiaEnviarNavegarMensajeReproductor()
     {
         // Arrange
         var sut = CrearSut();
@@ -214,7 +218,7 @@ public class HistorialViewModelTests : IDisposable
         });
 
         // Act
-        sut.Reanudar(item);
+        await sut.ReanudarAsync(item);
 
         // Assert
         mensajeRecibido.Should().NotBeNull();
@@ -224,7 +228,48 @@ public class HistorialViewModelTests : IDisposable
     }
 
     [Fact]
-    public void Reanudar_ArchivoNoExiste_DeberiaMostrarDialogoError()
+    public async Task Reanudar_ArchivoExiste_DeberiaArmarListaDeEpisodiosParaNavegacion()
+    {
+        // Regresión: reproducir desde Historial dejaba el reproductor sin lista de
+        // episodios (a diferencia de la Ficha, que sí la arma), así que Anterior/Siguiente
+        // siempre aparecían deshabilitados aunque el anime tuviera más capítulos.
+        var anime = new AnimeItem { AniListId = 50, Titulo = "Test Anime", RutaCarpeta = @"C:\Anime\Test" };
+        _dbMock.Setup(d => d.ObtenerAnimePorIdAsync(50)).ReturnsAsync(anime);
+        _fileScannerMock.Setup(f => f.EscanearEpisodiosAsync(@"C:\Anime\Test"))
+            .ReturnsAsync(new List<EpisodioItem>
+            {
+                new() { NumeroEpisodio = 2, RutaCompleta = @"C:\Anime\Test\Ep02.mkv" },
+                new() { NumeroEpisodio = 3, RutaCompleta = _tempVideoFile },
+                new() { NumeroEpisodio = 4, RutaCompleta = @"C:\Anime\Test\Ep04.mkv" }
+            });
+
+        var sut = CrearSut();
+        var item = new HistorialItemViewModel
+        {
+            AniListId = 50,
+            NumeroEpisodio = 3,
+            TituloAnime = "Test Anime",
+            RutaArchivo = _tempVideoFile
+        };
+
+        NavegarMensaje_Reproductor? mensajeRecibido = null;
+        WeakReferenceMessenger.Default.Register<NavegarMensaje_Reproductor>(this, (r, m) =>
+        {
+            mensajeRecibido = m;
+        });
+
+        // Act
+        await sut.ReanudarAsync(item);
+
+        // Assert
+        mensajeRecibido.Should().NotBeNull();
+        mensajeRecibido!.EpisodiosDisponibles.Should().NotBeNull();
+        int[] numerosEsperados = { 2, 3, 4 };
+        mensajeRecibido.EpisodiosDisponibles!.Select(e => e.NumeroEpisodio).Should().BeEquivalentTo(numerosEsperados);
+    }
+
+    [Fact]
+    public async Task Reanudar_ArchivoNoExiste_DeberiaMostrarDialogoError()
     {
         // Arrange
         var sut = CrearSut();
@@ -237,7 +282,7 @@ public class HistorialViewModelTests : IDisposable
         };
 
         // Act
-        sut.Reanudar(item);
+        await sut.ReanudarAsync(item);
 
         // Assert
         _dialogMock.Verify(d => d.MostrarDialogoAsync(

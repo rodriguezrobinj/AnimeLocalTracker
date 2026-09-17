@@ -184,7 +184,10 @@ public sealed partial class NavigationService : ObservableObject, INavigationSer
         {
             var estadisticasVm = ObtenerEstadisticas();
             VistaActual = estadisticasVm;
-            await estadisticasVm.CargarEstadisticasAsync();
+            if (estadisticasVm.NecesitaRecargar())
+            {
+                await estadisticasVm.CargarEstadisticasAsync();
+            }
         }
         catch (Exception ex)
         {
@@ -203,7 +206,10 @@ public sealed partial class NavigationService : ObservableObject, INavigationSer
         {
             var historialVm = ObtenerHistorial();
             VistaActual = historialVm;
-            await historialVm.CargarHistorialAsync();
+            if (historialVm.NecesitaRecargar())
+            {
+                await historialVm.CargarHistorialAsync();
+            }
         }
         catch (Exception ex)
         {
@@ -222,7 +228,10 @@ public sealed partial class NavigationService : ObservableObject, INavigationSer
         {
             var actualizacionesVm = ObtenerActualizaciones();
             VistaActual = actualizacionesVm;
-            await actualizacionesVm.CargarActualizacionesAsync();
+            if (actualizacionesVm.NecesitaRecargar())
+            {
+                await actualizacionesVm.CargarActualizacionesAsync();
+            }
         }
         catch (Exception ex)
         {

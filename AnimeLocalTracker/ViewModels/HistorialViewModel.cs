@@ -28,6 +28,7 @@ public partial class HistorialViewModel : ObservableObject, IRecipient<EpisodioA
     private readonly IDatabaseService _databaseService;
     private readonly IPlaybackStateService _playbackStateService;
     private readonly IDialogService _dialogService;
+    private readonly IFileScannerService _fileScannerService;
 
     [ObservableProperty]
     private ObservableCollection<HistorialItemViewModel> _itemsHistorial = [];
@@ -68,14 +69,22 @@ public partial class HistorialViewModel : ObservableObject, IRecipient<EpisodioA
     public bool EstaVacio => !EstaCargando && ItemsHistorial.Count == 0;
     public bool SinResultadosBusqueda => !EstaCargando && ItemsHistorial.Count > 0 && ItemsFiltrados.Count == 0;
 
+    /// <summary>NAV-01: evita re-consultar la BD en cada visita a la pestaña — los items ya
+    /// se mantienen al día en vivo vía <see cref="Receive"/>, así que solo hace falta recargar
+    /// del todo si nunca se cargó o si pasó el cooldown (por si algo se perdió).</summary>
+    public bool NecesitaRecargar() =>
+        ItemsHistorial.Count == 0 || (DateTime.UtcNow - _ultimaRecargaUtc) >= CooldownRecarga;
+
     public HistorialViewModel(
         IDatabaseService databaseService,
         IPlaybackStateService playbackStateService,
-        IDialogService dialogService)
+        IDialogService dialogService,
+        IFileScannerService fileScannerService)
     {
         _databaseService = databaseService;
         _playbackStateService = playbackStateService;
         _dialogService = dialogService;
+        _fileScannerService = fileScannerService;
 
         WeakReferenceMessenger.Default.RegisterAll(this);
     }
@@ -103,7 +112,7 @@ public partial class HistorialViewModel : ObservableObject, IRecipient<EpisodioA
             EstaCargando = true;
             OnPropertyChanged(nameof(EstaVacio));
             OnPropertyChanged(nameof(SinResultadosBusqueda));
-            _ultimaRecargaPorMensaje = DateTime.UtcNow;
+            _ultimaRecargaUtc = DateTime.UtcNow;
 
             var registros = await _databaseService.ObtenerHistorialEpisodiosAsync(LimiteHistorial);
             var animes = await _databaseService.ObtenerAnimesLigerosAsync();
@@ -168,7 +177,7 @@ public partial class HistorialViewModel : ObservableObject, IRecipient<EpisodioA
     }
 
     [RelayCommand]
-    public void Reanudar(HistorialItemViewModel? item)
+    public async Task ReanudarAsync(HistorialItemViewModel? item)
     {
         if (item == null) return;
 
@@ -183,11 +192,31 @@ public partial class HistorialViewModel : ObservableObject, IRecipient<EpisodioA
             return;
         }
 
+        // NAV-03: el Historial solo guarda "los últimos N capítulos vistos", no la lista
+        // completa de episodios del anime — sin escanear la carpeta aquí, el reproductor
+        // abría el capítulo creyendo que no había anterior/siguiente (a diferencia de la
+        // Ficha, que ya tiene todos los episodios en memoria).
+        List<EpisodioItem> episodiosDisponibles = new();
+        try
+        {
+            var anime = await _databaseService.ObtenerAnimePorIdAsync(item.AniListId);
+            if (anime != null && !string.IsNullOrWhiteSpace(anime.RutaCarpeta))
+            {
+                episodiosDisponibles = await _fileScannerService.EscanearEpisodiosAsync(anime.RutaCarpeta)
+                    ?? new List<EpisodioItem>();
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("HistorialViewModel", $"No se pudo armar la lista de episodios para navegación de '{item.TituloAnime}': {ex.Message}");
+        }
+
         WeakReferenceMessenger.Default.Send(new NavegarMensaje_Reproductor(
             item.RutaArchivo,
             item.AniListId,
             item.TituloAnime,
             item.NumeroEpisodio,
+            EpisodiosDisponibles: episodiosDisponibles,
             RutaPortada: item.RutaPortada));
     }
 
@@ -351,14 +380,14 @@ public partial class HistorialViewModel : ObservableObject, IRecipient<EpisodioA
     // FIX: los guardados de progreso llegan cada ~5 s durante la reproducción; si el
     // episodio aún no está en la lista (anime nuevo), recargar en cada mensaje era un
     // bucle de SELECT+rebuild continuo. Se recarga como mucho una vez cada 30 s.
-    private DateTime _ultimaRecargaPorMensaje = DateTime.MinValue;
+    // NAV-01: el mismo cooldown también evita recargar en cada visita a la pestaña.
+    private static readonly TimeSpan CooldownRecarga = TimeSpan.FromSeconds(30);
+    private DateTime _ultimaRecargaUtc = DateTime.MinValue;
 
     private void RecargarConCooldown()
     {
         if (EstaCargando) return;
-        var ahora = DateTime.UtcNow;
-        if ((ahora - _ultimaRecargaPorMensaje).TotalSeconds < 30) return;
-        _ultimaRecargaPorMensaje = ahora;
+        if ((DateTime.UtcNow - _ultimaRecargaUtc) < CooldownRecarga) return;
         _ = CargarHistorialAsync();
     }
 
