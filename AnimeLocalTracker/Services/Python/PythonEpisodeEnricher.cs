@@ -63,16 +63,63 @@ public class PythonEpisodeEnricher
     {
         if (string.IsNullOrWhiteSpace(rutaCompleta)) return string.Empty;
         var thumbsDir = AppDataPaths.ThumbnailsDir;
-        
+
         byte[] hash = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(rutaCompleta.ToLowerInvariant()));
         string hex = Convert.ToHexString(hash).ToLowerInvariant();
         return Path.Combine(thumbsDir, $"{hex}.jpg");
     }
 
     /// <summary>
-    /// Devuelve la ruta de la miniatura si ya existe en disco y NO está corrupta (0 bytes),
-    /// de lo contrario null. Una miniaturas de 0 bytes (proceso ffmpeg interrumpido) se
-    /// borra para que se regenere en la próxima pasada.
+    /// BUG-02: un proceso ffmpeg interrumpido (Rust o Python) puede dejar un JPEG truncado
+    /// que NO está vacío (unos cientos/miles de bytes) pero tampoco es una imagen completa —
+    /// comprobar solo "Length == 0"/"Length > 0" dejaba esa miniatura rota marcada como
+    /// "ya generada" para siempre: ni un reintento en segundo plano ni pulsar "Actualizar"
+    /// la regeneraban jamás. Validar los marcadores JPEG (SOI al inicio, EOI al final) detecta
+    /// el caso típico de escritura cortada sin decodificar la imagen completa.
+    /// </summary>
+    public static bool EsMiniaturaValida(string path)
+    {
+        try
+        {
+            if (!File.Exists(path)) return false;
+            var info = new FileInfo(path);
+            // Una miniatura real (320px) nunca pesa unos pocos cientos de bytes.
+            if (info.Length < 512) return false;
+
+            using var stream = File.OpenRead(path);
+            Span<byte> inicio = stackalloc byte[3];
+            if (stream.Read(inicio) != 3) return false;
+            if (inicio[0] != 0xFF || inicio[1] != 0xD8 || inicio[2] != 0xFF) return false;
+
+            stream.Seek(-2, SeekOrigin.End);
+            Span<byte> fin = stackalloc byte[2];
+            if (stream.Read(fin) != 2) return false;
+            return fin[0] == 0xFF && fin[1] == 0xD9;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    // BUG-03: muchos rips de fansub tienen una cortinilla/watermark casi negra en los
+    // primeros segundos (bumper de intro). Un frame extraído ahí es un JPEG técnicamente
+    // válido pero visualmente inútil (se ve igual que "sin miniatura"). Un frame real de
+    // 320px de ancho jamás comprime tan pequeño — se usa como señal barata de "frame casi
+    // vacío" sin necesitar decodificar la imagen.
+    private const long TamanoMinimoContenidoReal = 4096;
+    private static readonly double[] TimestampsCandidatos = { 2.0, 10.0, 30.0 };
+
+    public static bool EsFrameDemasiadoVacio(string path)
+    {
+        try { return new FileInfo(path).Length < TamanoMinimoContenidoReal; }
+        catch { return true; }
+    }
+
+    /// <summary>
+    /// Devuelve la ruta de la miniatura si ya existe en disco, NO está corrupta/truncada y
+    /// tiene contenido real (no un frame casi negro de una cortinilla), de lo contrario null.
+    /// Una miniatura corrupta o casi vacía se borra para que se regenere en la próxima pasada.
     /// </summary>
     public static string? ObtenerRutaMiniaturaSiExiste(string rutaCompleta)
     {
@@ -80,12 +127,70 @@ public class PythonEpisodeEnricher
         string path = ObtenerRutaMiniaturaEsperada(rutaCompleta);
 
         if (!File.Exists(path)) return null;
-        if (new FileInfo(path).Length == 0)
+        if (!EsMiniaturaValida(path) || EsFrameDemasiadoVacio(path))
         {
             try { File.Delete(path); } catch { }
             return null;
         }
         return path;
+    }
+
+    /// <summary>
+    /// Extrae la miniatura del episodio probando varios timestamps si el primero cae en
+    /// un frame casi negro/vacío (ver <see cref="TimestampsCandidatos"/>), usando Rust FFI
+    /// como primera opción y el bridge Python como respaldo en cada timestamp. Se queda con
+    /// el primer frame que ya no parezca vacío; si ninguno lo logra, conserva el último
+    /// intento válido (mejor una miniatura "pobre" que ninguna). Devuelve true si quedó
+    /// alguna miniatura utilizable en <paramref name="outPath"/>.
+    /// </summary>
+    public async Task<bool> ExtraerMiniaturaAsync(string rutaVideo, string outPath, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(rutaVideo) || string.IsNullOrWhiteSpace(outPath)) return false;
+
+        try
+        {
+            // Ya hay una miniatura válida y con contenido real: nada que hacer.
+            if (EsMiniaturaValida(outPath) && !EsFrameDemasiadoVacio(outPath)) return true;
+
+            Directory.CreateDirectory(AppDataPaths.ThumbnailsDir);
+
+            bool huboExito = false;
+            foreach (var timestamp in TimestampsCandidatos)
+            {
+                bool extraido = Native.NativeMethods.IsAvailable
+                    && Native.NativeMethods.ExtractFrame(rutaVideo, outPath, timestamp, 320);
+
+                // BUG-02: si Rust falló o dejó un JPEG truncado a medias, intentar el
+                // bridge Python para ESTE mismo timestamp antes de pasar al siguiente.
+                if (!extraido || !EsMiniaturaValida(outPath))
+                {
+                    if (File.Exists(outPath)) { try { File.Delete(outPath); } catch { } }
+
+                    var result = await _pythonBridge.ExecuteCommandAsync<object, ThumbResult>(
+                        "generate-thumbnail",
+                        new { video_path = rutaVideo, output_path = outPath, timestamp = (int)timestamp },
+                        ct);
+
+                    extraido = result != null && result.Success && EsMiniaturaValida(outPath);
+                }
+
+                if (extraido)
+                {
+                    huboExito = true;
+                    if (!EsFrameDemasiadoVacio(outPath)) return true;
+                    // Frame válido pero casi vacío: se conserva por si es el mejor que
+                    // consigamos, y se prueba el siguiente timestamp por si hay algo mejor.
+                }
+            }
+
+            if (!huboExito) LimpiarMiniaturaCorrupta(rutaVideo);
+            return huboExito;
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("PythonEpisodeEnricher", $"Error extrayendo miniatura de {rutaVideo}: {ex.Message}");
+            return false;
+        }
     }
 
     /// <summary>
@@ -95,61 +200,15 @@ public class PythonEpisodeEnricher
     {
         if (episodio == null || string.IsNullOrWhiteSpace(episodio.RutaCompleta)) return;
 
-        try
+        string thumbPath = ObtenerRutaMiniaturaEsperada(episodio.RutaCompleta);
+        if (await ExtraerMiniaturaAsync(episodio.RutaCompleta, thumbPath, ct))
         {
-            var thumbsDir = AppDataPaths.ThumbnailsDir;
-            Directory.CreateDirectory(thumbsDir);
-
-            string thumbPath = ObtenerRutaMiniaturaEsperada(episodio.RutaCompleta);
-
-            if (File.Exists(thumbPath))
-            {
-                // Miniatura corrupta (0 bytes) de una escritura interrumpida: se descarta
-                // y se regenera en lugar de dejarla en la biblioteca con el icono roto.
-                var info = new FileInfo(thumbPath);
-                if (info.Length > 0)
-                {
-                    episodio.RutaMiniatura = thumbPath;
-                    return;
-                }
-                try { File.Delete(thumbPath); } catch { }
-            }
-
-            // Prioridad 1: Extracción nativa en Rust FFI (<15ms, sin sobrecarga de procesos)
-            bool extraido = false;
-            if (Native.NativeMethods.IsAvailable)
-            {
-                extraido = Native.NativeMethods.ExtractFrame(episodio.RutaCompleta, thumbPath, 30.0, 320);
-            }
-
-            // Prioridad 2: Fallback a Python Bridge si Rust no está presente
-            if (!extraido && !File.Exists(thumbPath))
-            {
-                var result = await _pythonBridge.ExecuteCommandAsync<object, ThumbResult>(
-                    "generate-thumbnail",
-                    new { video_path = episodio.RutaCompleta, output_path = thumbPath, timestamp = 30 },
-                    ct);
-
-                extraido = result != null && result.Success;
-            }
-
-            if (File.Exists(thumbPath) && new FileInfo(thumbPath).Length > 0)
-            {
-                episodio.RutaMiniatura = thumbPath;
-            }
-            else
-            {
-                LimpiarMiniaturaCorrupta(episodio.RutaCompleta);
-            }
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Debug("PythonEpisodeEnricher", $"Error generando miniatura de {episodio.TituloArchivo}: {ex.Message}");
+            episodio.RutaMiniatura = thumbPath;
         }
     }
 
     /// <summary>
-    /// Elimina miniaturas corruptas (0 bytes) de una ruta de video, dejando la caché limpia
+    /// Elimina miniaturas corruptas/truncadas de una ruta de video, dejando la caché limpia
     /// para que la próxima pasada las regenere.
     /// </summary>
     public static void LimpiarMiniaturaCorrupta(string rutaCompleta)
@@ -158,7 +217,7 @@ public class PythonEpisodeEnricher
         try
         {
             string thumbPath = ObtenerRutaMiniaturaEsperada(rutaCompleta);
-            if (File.Exists(thumbPath) && new FileInfo(thumbPath).Length == 0)
+            if (File.Exists(thumbPath) && !EsMiniaturaValida(thumbPath))
             {
                 File.Delete(thumbPath);
             }

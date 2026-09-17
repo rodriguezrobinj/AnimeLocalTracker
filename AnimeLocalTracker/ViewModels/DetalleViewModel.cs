@@ -228,16 +228,20 @@ public partial class DetalleViewModel : ObservableObject,
                             if (!string.IsNullOrWhiteSpace(episodio.RutaCompleta))
                             {
                                 string thumbPath = PythonEpisodeEnricher.ObtenerRutaMiniaturaEsperada(episodio.RutaCompleta);
-                                bool extraido = false;
-                                if (NativeMethods.IsAvailable)
+                                bool extraido;
+                                if (_enricher != null)
                                 {
-                                    extraido = NativeMethods.ExtractFrame(episodio.RutaCompleta, thumbPath, 2.0, 320);
+                                    // Rust primero, Python solo si hace falta, con reintento de
+                                    // timestamp si el frame cae en una cortinilla casi negra.
+                                    extraido = await _enricher.ExtraerMiniaturaAsync(episodio.RutaCompleta, thumbPath);
                                 }
-                                if (!extraido && _enricher != null)
+                                else
                                 {
-                                    await _enricher.GenerarMiniaturaAsync(episodio);
+                                    extraido = NativeMethods.IsAvailable
+                                               && NativeMethods.ExtractFrame(episodio.RutaCompleta, thumbPath, 2.0, 320)
+                                               && PythonEpisodeEnricher.EsMiniaturaValida(thumbPath);
                                 }
-                                if (File.Exists(thumbPath) && new FileInfo(thumbPath).Length > 0)
+                                if (extraido)
                                 {
                                     episodio.RutaMiniatura = thumbPath;
                                 }
@@ -369,8 +373,8 @@ public partial class DetalleViewModel : ObservableObject,
                 if (archivoLocal != null && !string.IsNullOrWhiteSpace(archivoLocal.RutaCompleta))
                 {
                     thumbCache = (!string.IsNullOrEmpty(memoria?.RutaMiniatura)
-                                  && System.IO.File.Exists(memoria.RutaMiniatura)
-                                  && new System.IO.FileInfo(memoria.RutaMiniatura).Length > 0)
+                                  && PythonEpisodeEnricher.EsMiniaturaValida(memoria.RutaMiniatura)
+                                  && !PythonEpisodeEnricher.EsFrameDemasiadoVacio(memoria.RutaMiniatura))
                         ? memoria.RutaMiniatura
                         : PythonEpisodeEnricher.ObtenerRutaMiniaturaSiExiste(archivoLocal.RutaCompleta);
 

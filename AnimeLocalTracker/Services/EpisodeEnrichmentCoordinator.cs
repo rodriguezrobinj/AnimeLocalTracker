@@ -66,56 +66,37 @@ public sealed class EpisodeEnrichmentCoordinator : IDisposable
                 // se resuelve pythonDisponible de forma diferida, solo si se necesita.
                 bool pythonDisponible = false;
 
-                // ── FASE 1: Miniaturas 1×1 con Rust FFI. Cada episodio se extrae, persiste y
-                //    se refleja en la UI ANTES de pasar al siguiente: la primera miniatura
-                //    aparece en ~1s y el resto van apareciendo de forma secuencial apenas
-                //    cada una termina (sin esperar a que se generen todas). ──
+                // ── FASE 1: Miniaturas. Cada episodio se extrae, persiste y se refleja en la
+                //    UI ANTES de pasar al siguiente: la primera miniatura aparece en ~1s y el
+                //    resto van apareciendo de forma secuencial apenas cada una termina (sin
+                //    esperar a que se generen todas). BUG-01/BUG-02/BUG-03: la extracción por
+                //    episodio (Rust primero, Python solo si hace falta, con reintento de
+                //    timestamp si el frame cae en una cortinilla casi negra) vive en
+                //    PythonEpisodeEnricher.ExtraerMiniaturaAsync — un episodio problemático
+                //    puntual ya no puede dejar sin miniatura a los demás del lote, ni quedar
+                //    él mismo atascado para siempre con un frame roto o casi vacío. ──
                 var sinMiniatura = pendientes.Where(e => string.IsNullOrEmpty(e.RutaMiniatura)).ToList();
-                if (sinMiniatura.Count > 0)
+                foreach (var ep in sinMiniatura)
                 {
-                    bool huboCambiosMiniatura = false;
-
-                    if (NativeMethods.IsAvailable)
+                    string outPath = PythonEpisodeEnricher.ObtenerRutaMiniaturaEsperada(ep.RutaCompleta);
+                    bool ok;
+                    if (enricher != null)
                     {
-                        foreach (var ep in sinMiniatura)
-                        {
-                            string outPath = PythonEpisodeEnricher.ObtenerRutaMiniaturaEsperada(ep.RutaCompleta);
-                            // Timestamp corto (2s): el keyframe previo cae en los primeros
-                            // segundos del video, así el decode intermedio (frames entre el
-                            // keyframe y el punto exacto) es mínimo → miniatura casi instantánea.
-                            bool ok = NativeMethods.ExtractFrame(ep.RutaCompleta, outPath, 2.0, 320);
-
-                            if (ok && File.Exists(outPath) && new FileInfo(outPath).Length > 0)
-                            {
-                                ep.RutaMiniatura = outPath;
-                                huboCambiosMiniatura = true;
-
-                                // Mostrar esta miniatura YA y persistirla antes de seguir
-                                await PersistirRegistrosAsync(databaseService, aniListId, new[] { ep }).ConfigureAwait(false);
-                                solicitarRefrescoEpisodios();
-                            }
-                        }
+                        ok = await enricher.ExtraerMiniaturaAsync(ep.RutaCompleta, outPath).ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        // Sin enricher (p. ej. en pruebas): solo Rust directo, sin reintento de timestamp.
+                        ok = NativeMethods.IsAvailable
+                             && NativeMethods.ExtractFrame(ep.RutaCompleta, outPath, 2.0, 320)
+                             && PythonEpisodeEnricher.EsMiniaturaValida(outPath);
                     }
 
-                    // Fallback individual SOLO si Rust no estuvo disponible (resolver el ping
-                    // de Python aquí, de forma diferida, sin bloquear la extracción Rust)
-                    if (!huboCambiosMiniatura)
+                    if (ok)
                     {
-                        pythonDisponible = enricher != null && await enricher.EstáDisponibleAsync().ConfigureAwait(false);
-                        if (pythonDisponible)
-                        {
-                            foreach (var ep in sinMiniatura)
-                            {
-                                await enricher!.GenerarMiniaturaAsync(ep).ConfigureAwait(false);
-                                if (!string.IsNullOrEmpty(ep.RutaMiniatura)) huboCambiosMiniatura = true;
-                            }
-
-                            if (huboCambiosMiniatura)
-                            {
-                                await PersistirRegistrosAsync(databaseService, aniListId, sinMiniatura).ConfigureAwait(false);
-                                solicitarRefrescoEpisodios();
-                            }
-                        }
+                        ep.RutaMiniatura = outPath;
+                        await PersistirRegistrosAsync(databaseService, aniListId, new[] { ep }).ConfigureAwait(false);
+                        solicitarRefrescoEpisodios();
                     }
                 }
 
