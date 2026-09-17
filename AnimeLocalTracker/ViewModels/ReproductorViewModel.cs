@@ -105,6 +105,13 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string _tiempoCombinadoTexto = "00:00 / 00:00";
     [ObservableProperty] private string _playPauseIcon = "Pause";
     [ObservableProperty] private bool _isDraggingSlider = false;
+
+    // Oculta el frame de video (queda solo la carátula/fondo) mientras se reanuda un episodio:
+    // el seek de reanudación se aplica diferido (ver AplicarSeekNativo) y sin esto se ve el video
+    // arrancar en el segundo 0 antes de saltar visiblemente al punto guardado.
+    [ObservableProperty] private bool _ocultarVideoInicio;
+    private DateTime _ocultarVideoDesdeUtc = DateTime.MinValue;
+    private static readonly TimeSpan MaxOcultarVideoInicio = TimeSpan.FromSeconds(5);
     
     // Navegación entre episodios
     private bool _tieneEpisodioAnterior;
@@ -1006,6 +1013,11 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         await VerificarProgresoPrevioAsync(animeId, episodio);
         _posicionInicioSegundos = _resumingPositionSeconds;
 
+        // Cubrir el video hasta que el seek de reanudación diferido se aplique de verdad
+        // (evita el "flash" del episodio arrancando en 0:00 antes de saltar al punto guardado).
+        OcultarVideoInicio = _posicionInicioSegundos > 5;
+        _ocultarVideoDesdeUtc = DateTime.UtcNow;
+
         // 3. Cargar marcas de skip de AniSkip en segundo plano
         _ = CargarSkipTimesAsync(animeId, episodio, currentSkipCts.Token);
 
@@ -1195,6 +1207,14 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         {
             try
             {
+                // Red de seguridad: si el seek de reanudación nunca llega a aplicarse (archivo
+                // que falla al abrir, nunca alcanza Status.Playing, etc.) no dejar el video
+                // oculto indefinidamente.
+                if (OcultarVideoInicio && DateTime.UtcNow - _ocultarVideoDesdeUtc > MaxOcultarVideoInicio)
+                {
+                    OcultarVideoInicio = false;
+                }
+
                 if (Player.Status == Status.Playing)
                 {
                     double curSeconds = TimeSpan.FromTicks(Player.CurTime).TotalSeconds;
@@ -1255,6 +1275,12 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                         // Durante la ventana de settle tras un seek, el reproductor aún reporta la
                         // posición vieja: no repintar para que la barra no "rebote" hacia atrás.
                         bool enSettleSeek = DateTime.UtcNow < _settleHastaUtc;
+
+                        // El seek de reanudación ya se asentó: revelar el video en el punto correcto.
+                        if (!enSettleSeek && OcultarVideoInicio)
+                        {
+                            OcultarVideoInicio = false;
+                        }
 
                         // Solo notificar si el cambio es significativo (> 0.3s)
                         if (!enSettleSeek && Math.Abs(curSeconds - _lastNotifiedSeconds) >= 0.3)
