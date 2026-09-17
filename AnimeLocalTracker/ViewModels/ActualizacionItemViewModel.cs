@@ -24,6 +24,25 @@ public partial class ActualizacionItemViewModel : ObservableObject
     private string _rutaArchivo = string.Empty;
 
     [ObservableProperty]
+    private string _tamanoArchivoFormateado = string.Empty;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(TieneProgresoGuardado))]
+    private bool _visto;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PorcentajeProgreso))]
+    [NotifyPropertyChangedFor(nameof(TieneProgresoGuardado))]
+    [NotifyPropertyChangedFor(nameof(ProgresoFormateado))]
+    private double _progresoSegundos;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PorcentajeProgreso))]
+    [NotifyPropertyChangedFor(nameof(TieneProgresoGuardado))]
+    [NotifyPropertyChangedFor(nameof(ProgresoFormateado))]
+    private double _totalSegundos;
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(EstaEnEspera))]
     [NotifyPropertyChangedFor(nameof(ProgresoDescargaActivo))]
     private bool _isDownloading;
@@ -35,6 +54,29 @@ public partial class ActualizacionItemViewModel : ObservableObject
 
     public bool EstaEnEspera => IsDownloading && DownloadProgress <= 0.0;
     public bool ProgresoDescargaActivo => IsDownloading && DownloadProgress > 0.0;
+
+    // === Progreso de reproducción (igual que EpisodioItem en la Ficha) ===
+    public double PorcentajeProgreso => TotalSegundos > 0 ? Math.Clamp(ProgresoSegundos / TotalSegundos, 0.0, 1.0) : 0.0;
+
+    // FUN-003/FUN-010: mismo umbral de "terminado" que en la Ficha (90%).
+    public bool TieneProgresoGuardado => ProgresoSegundos > 5 && !Visto && (TotalSegundos <= 0 || ProgresoSegundos < TotalSegundos * 0.90);
+
+    public string ProgresoFormateado
+    {
+        get
+        {
+            if (ProgresoSegundos <= 0) return string.Empty;
+            var tCur = TimeSpan.FromSeconds(ProgresoSegundos);
+            string curStr = tCur.ToString(tCur.Hours > 0 ? @"hh\:mm\:ss" : @"mm\:ss");
+            if (TotalSegundos > 0)
+            {
+                var tTot = TimeSpan.FromSeconds(TotalSegundos);
+                string totStr = tTot.ToString(tTot.Hours > 0 ? @"hh\:mm\:ss" : @"mm\:ss");
+                return $"{curStr} / {totStr}";
+            }
+            return curStr;
+        }
+    }
 
     public string EpisodioTexto => string.Format(LocalizationService.T("Act_EpisodioFormato"), NumeroEpisodio);
 
