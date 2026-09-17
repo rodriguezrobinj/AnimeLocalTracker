@@ -146,9 +146,18 @@
                                                    TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" MaxHeight="20"/>
                                     </Button>
                                     <StackPanel Orientation="Horizontal" Margin="0,4,0,0" VerticalAlignment="Center">
-                                        <TextBlock Text="{Binding EpisodioTexto}" FontWeight="SemiBold" FontSize="12.5" Foreground="#93C5FD" VerticalAlignment="Center"/>
+                                        <!-- PUNTO NO VISTO (igual que en la Ficha) -->
+                                        <Ellipse x:Name="PuntoNoVisto" Width="6" Height="6" Fill="#60A5FA" VerticalAlignment="Center" Margin="0,0,6,0"
+                                                 Visibility="Visible"/>
+                                        <TextBlock x:Name="TextoEpisodio" Text="{Binding EpisodioTexto}" FontWeight="SemiBold" FontSize="12.5" Foreground="#93C5FD" VerticalAlignment="Center"/>
                                         <TextBlock Text=" · " Foreground="#6B7280" FontSize="12.5" VerticalAlignment="Center"/>
                                         <TextBlock Text="{Binding FechaTexto}" FontSize="12" Foreground="#94A3B8" VerticalAlignment="Center"/>
+
+                                        <!-- TAMAÑO DE ARCHIVO DESCARGADO -->
+                                        <TextBlock Text=" · " Foreground="#6B7280" FontSize="12" VerticalAlignment="Center"
+                                                   Visibility="{Binding Descargado, Converter={StaticResource BoolToVis}}"/>
+                                        <TextBlock Text="{Binding TamanoArchivoFormateado}" FontSize="12" Foreground="#94A3B8" VerticalAlignment="Center"
+                                                   Visibility="{Binding Descargado, Converter={StaticResource BoolToVis}}"/>
 
                                         <!-- BADGE DESCARGADO -->
                                         <Border Background="#1E3A8A" CornerRadius="4" Padding="5,1.5" Margin="8,0,0,0" VerticalAlignment="Center"
@@ -159,6 +168,17 @@
                                                            FontSize="10.5" Foreground="#93C5FD" FontWeight="SemiBold" VerticalAlignment="Center"/>
                                             </StackPanel>
                                         </Border>
+
+                                        <!-- PROGRESO GUARDADO: capítulo a medio ver (misma línea que los demás
+                                             estados, para que la tarjeta no cambie de alto entre capítulos). -->
+                                        <StackPanel x:Name="PanelProgreso" Orientation="Horizontal" Margin="8,0,0,0"
+                                                    VerticalAlignment="Center" Visibility="Visible">
+                                            <ProgressBar Value="{Binding PorcentajeProgreso, Mode=OneWay}" Maximum="1.0"
+                                                         Height="3" Width="40" Background="#33FFFFFF" Foreground="#60A5FA"
+                                                         VerticalAlignment="Center" Margin="0,0,6,0"
+                                                         materialDesign:TransitionAssist.DisableTransitions="True"/>
+                                            <TextBlock Text="{Binding ProgresoFormateado}" Foreground="#93C5FD" FontSize="11" FontWeight="Medium" VerticalAlignment="Center"/>
+                                        </StackPanel>
                                     </StackPanel>
                                 </StackPanel>
 
@@ -222,6 +242,18 @@
                                 </Grid>
                             </Grid>
                         </Border>
+
+                        <DataTemplate.Triggers>
+                            <!-- ESTADO VISTO: ocultar el punto azul y atenuar el número de episodio -->
+                            <DataTrigger Binding="{Binding Visto}" Value="True">
+                                <Setter TargetName="PuntoNoVisto" Property="Visibility" Value="Collapsed"/>
+                                <Setter TargetName="TextoEpisodio" Property="Opacity" Value="0.6"/>
+                            </DataTrigger>
+
+                            <DataTrigger Binding="{Binding TieneProgresoGuardado}" Value="False">
+                                <Setter TargetName="PanelProgreso" Property="Visibility" Value="Collapsed"/>
+                            </DataTrigger>
+                        </DataTemplate.Triggers>
                     </DataTemplate>
                 </ListBox.Resources>
             </ListBox>

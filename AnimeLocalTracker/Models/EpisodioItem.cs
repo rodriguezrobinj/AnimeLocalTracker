@@ -148,18 +148,22 @@ public partial class EpisodioItem : ObservableObject
         }
     }
 
-    public void CalcularTamanoArchivo(long len)
+    public static string FormatearTamano(long len)
     {
         if (len >= 1024L * 1024 * 1024)
-            TamanoArchivoFormateado = $"{len / (1024.0 * 1024.0 * 1024.0):F1} GB";
-        else if (len >= 1024L * 1024)
-            TamanoArchivoFormateado = $"{len / (1024.0 * 1024.0):F0} MB";
-        else if (len >= 1024L)
-            TamanoArchivoFormateado = $"{len / 1024.0:F0} KB";
-        else if (len >= 0)
-            TamanoArchivoFormateado = $"{len} B";
-        else
-            TamanoArchivoFormateado = string.Empty;
+            return $"{len / (1024.0 * 1024.0 * 1024.0):F1} GB";
+        if (len >= 1024L * 1024)
+            return $"{len / (1024.0 * 1024.0):F0} MB";
+        if (len >= 1024L)
+            return $"{len / 1024.0:F0} KB";
+        if (len >= 0)
+            return $"{len} B";
+        return string.Empty;
+    }
+
+    public void CalcularTamanoArchivo(long len)
+    {
+        TamanoArchivoFormateado = FormatearTamano(len);
     }
 
     public void CalcularTamanoArchivo()
