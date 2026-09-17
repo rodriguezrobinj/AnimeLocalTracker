@@ -71,12 +71,20 @@ public partial class EstadisticasViewModel : ObservableObject
     [ObservableProperty] private bool _hayError;
     [ObservableProperty] private string _mensajeError = "";
 
+    // NAV-01: evita releer y reagregar toda la biblioteca en cada visita a la pestaña —
+    // se recarga como mucho una vez cada 30 s (mismo cooldown que Historial/Actualizaciones).
+    private static readonly TimeSpan CooldownRecarga = TimeSpan.FromSeconds(30);
+    private DateTime _ultimaCargaUtc = DateTime.MinValue;
+    public bool NecesitaRecargar() =>
+        HayError || (DateTime.UtcNow - _ultimaCargaUtc) >= CooldownRecarga;
+
     public async Task CargarEstadisticasAsync()
     {
         try
         {
             HayError = false;
             MensajeError = "";
+            _ultimaCargaUtc = DateTime.UtcNow;
             // PER-02: la carga y la agregación corren fuera del hilo de UI — si la
             // continuación reanudara en la UI, bibliotecas grandes congelarían la ventana.
             var datos = await Task.Run(async () =>
