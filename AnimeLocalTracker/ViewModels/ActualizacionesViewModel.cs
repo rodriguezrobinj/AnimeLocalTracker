@@ -83,9 +83,13 @@ public partial class ActualizacionesViewModel : ObservableObject, IDisposable, I
             _ultimaCargaUtc = DateTime.UtcNow;
             NotificarEstados();
 
-            // 1) Animes de la biblioteca en emisión (proyección ligera)
+            // 1) Animes de la biblioteca (proyección ligera). NO se filtra por Estado == RELEASING:
+            // al actualizar datos de AniList (Galería/Detalle) un anime que acaba de emitir su final
+            // pasa a FINISHED, y con ese filtro sus episodios de los últimos 7 días desaparecían del
+            // feed de golpe (y no volvían). El límite de "recién emitido" ya lo pone la ventana de 7
+            // días de la consulta a AniList, así que solo se excluyen los que aún no se estrenan.
             var animes = (await _databaseService.ObtenerAnimesLigerosAsync() ?? new List<AnimeItem>())
-                .Where(a => string.Equals(a.Estado, "RELEASING", StringComparison.OrdinalIgnoreCase))
+                .Where(a => !string.Equals(a.Estado, "NOT_YET_RELEASED", StringComparison.OrdinalIgnoreCase))
                 .ToList();
             var ids = animes.Select(a => a.AniListId).Distinct().ToList();
             if (ids.Count == 0)

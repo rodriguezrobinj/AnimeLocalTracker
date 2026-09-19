@@ -60,6 +60,34 @@ public class ActualizacionesViewModelTests
     }
 
     [Fact]
+    public async Task Cargar_AnimeQueYaTerminoDeEmitir_SigueMostrandoSusEpisodiosRecientes()
+    {
+        // Arrange: tras "Actualizar datos de AniList" el anime pasó de RELEASING a FINISHED
+        // (acaba de salir su final), pero ese episodio se emitió hace horas.
+        List<int>? idsConsultados = null;
+        _dbMock.Setup(d => d.ObtenerAnimesLigerosAsync()).ReturnsAsync(new List<AnimeItem>
+        {
+            new() { AniListId = 1, Titulo = "Ryoumin 0-Nin Start", Estado = "FINISHED", RutaCarpeta = @"C:\Anime\Ryoumin" },
+            new() { AniListId = 2, Titulo = "Serie que aún no sale", Estado = "NOT_YET_RELEASED", RutaCarpeta = @"C:\Anime\Futura" }
+        });
+        _dbMock.Setup(d => d.ObtenerTodosLosRegistrosAsync()).ReturnsAsync(new List<RegistroEpisodio>());
+        _trackingMock.Setup(t => t.ObtenerCalendarioEmisionAsync(It.IsAny<List<int>>(), It.IsAny<long>(), It.IsAny<long>()))
+            .Callback<List<int>, long, long>((ids, _, _) => idsConsultados = ids)
+            .ReturnsAsync(new List<AiringEpisode>
+            {
+                new() { AniListId = 1, NumeroEpisodio = 12, FechaEmision = DateTime.UtcNow.AddHours(-5) }
+            });
+        var sut = CrearSut();
+
+        // Act
+        await sut.CargarActualizacionesAsync();
+
+        // Assert: no desaparece del feed, y solo se excluye lo que aún no se estrena
+        sut.Items.Should().ContainSingle(i => i.AniListId == 1 && i.NumeroEpisodio == 12);
+        idsConsultados.Should().ContainSingle().Which.Should().Be(1);
+    }
+
+    [Fact]
     public async Task Cargar_ConEpisodioYaDescargado_DeberiaAparecerMarcadoComoDescargado()
     {
         // Arrange: el episodio ya tiene archivo local EN DISCO (aún sin fila en
