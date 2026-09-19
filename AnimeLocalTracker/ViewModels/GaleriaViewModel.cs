@@ -15,11 +15,12 @@ using AnimeLocalTracker.Messages;
 
 namespace AnimeLocalTracker.ViewModels;
 
-public partial class GaleriaViewModel : ObservableObject, 
-    IRecipient<UsuarioLogeadoMensaje>, 
-    IRecipient<AnimeAñadidoMensaje>, 
+public partial class GaleriaViewModel : ObservableObject,
+    IRecipient<UsuarioLogeadoMensaje>,
+    IRecipient<AnimeAñadidoMensaje>,
     IRecipient<UsuarioDesconectadoMensaje>,
-    IRecipient<EpisodioActualizadoMensaje>
+    IRecipient<EpisodioActualizadoMensaje>,
+    IRecipient<IdiomaCambiadoMensaje>
 {
     private readonly IAnimeTrackingService _animeTrackingService;
     private readonly IDatabaseService _databaseService;
@@ -66,19 +67,21 @@ public partial class GaleriaViewModel : ObservableObject,
     public bool EsFiltroPlaneando => FiltroEstado == "Planeando";
 
     // --- FILTROS AVANZADOS Y ORDENACIÓN ---
+    public static string TodosLosGeneros => LocalizationService.T("Gal_TodosLosGeneros");
+
     [ObservableProperty]
-    private ObservableCollection<string> _generosDisponibles = ["Todos los géneros"];
+    private ObservableCollection<string> _generosDisponibles = [TodosLosGeneros];
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HayFiltrosActivos))]
     [NotifyPropertyChangedFor(nameof(ConteoFiltradosTexto))]
     [NotifyPropertyChangedFor(nameof(CantidadFiltrosAvanzadosActivos))]
     [NotifyPropertyChangedFor(nameof(TieneFiltrosAvanzadosActivos))]
-    private string _generoSeleccionado = "Todos los géneros";
+    private string _generoSeleccionado = TodosLosGeneros;
 
     // --- FILTROS DE TEMPORADA Y AÑO ---
-    public const string TodasLasTemporadas = "Todas las temporadas";
-    public const string TodosLosAños = "Todos los años";
+    public static string TodasLasTemporadas => LocalizationService.T("Gal_TodasLasTemporadas");
+    public static string TodosLosAños => LocalizationService.T("Gal_TodosLosAnios");
 
     [ObservableProperty]
     private ObservableCollection<string> _temporadasDisponibles = [TodasLasTemporadas];
@@ -108,15 +111,15 @@ public partial class GaleriaViewModel : ObservableObject,
     [NotifyPropertyChangedFor(nameof(TieneFiltrosAvanzadosActivos))]
     private bool _soloFavoritos;
 
-    public static readonly string[] OpcionesOrdenacion =
+    public static string[] OpcionesOrdenacion =>
     [
-        "Título (A - Z)",
-        "Título (Z - A)",
-        "Mayor Progreso",
-        "Menor Progreso",
-        "Más Episodios",
-        "Menos Episodios",
-        "Más Recientes"
+        LocalizationService.T("Gal_OrdenTituloAZ"),
+        LocalizationService.T("Gal_OrdenTituloZA"),
+        LocalizationService.T("Gal_OrdenMayorProgreso"),
+        LocalizationService.T("Gal_OrdenMenorProgreso"),
+        LocalizationService.T("Gal_OrdenMasEpisodios"),
+        LocalizationService.T("Gal_OrdenMenosEpisodios"),
+        LocalizationService.T("Gal_OrdenMasRecientes")
     ];
 
     public string[] ListaOpcionesOrdenacion => OpcionesOrdenacion;
@@ -124,7 +127,7 @@ public partial class GaleriaViewModel : ObservableObject,
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CantidadFiltrosAvanzadosActivos))]
     [NotifyPropertyChangedFor(nameof(TieneFiltrosAvanzadosActivos))]
-    private string _criterioOrdenSeleccionado = "Título (A - Z)";
+    private string _criterioOrdenSeleccionado = OpcionesOrdenacion[0];
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HayFiltrosActivos))]
@@ -146,7 +149,7 @@ public partial class GaleriaViewModel : ObservableObject,
     public bool HayFiltrosActivos =>
         !string.IsNullOrWhiteSpace(TextoBusqueda) ||
         FiltroEstado != "Todos" ||
-        (GeneroSeleccionado != "Todos los géneros" && GeneroSeleccionado != "Todos") ||
+        (GeneroSeleccionado != TodosLosGeneros && GeneroSeleccionado != "Todos") ||
         TemporadaSeleccionada != TodasLasTemporadas ||
         AnioSeleccionado != TodosLosAños ||
         SoloConEpisodiosPendientes ||
@@ -158,13 +161,13 @@ public partial class GaleriaViewModel : ObservableObject,
         get
         {
             int count = 0;
-            if (!string.IsNullOrWhiteSpace(GeneroSeleccionado) && GeneroSeleccionado != "Todos los géneros" && GeneroSeleccionado != "Todos")
+            if (!string.IsNullOrWhiteSpace(GeneroSeleccionado) && GeneroSeleccionado != TodosLosGeneros && GeneroSeleccionado != "Todos")
                 count++;
             if (TemporadaSeleccionada != TodasLasTemporadas)
                 count++;
             if (AnioSeleccionado != TodosLosAños)
                 count++;
-            if (CriterioOrdenSeleccionado != "Título (A - Z)")
+            if (CriterioOrdenSeleccionado != OpcionesOrdenacion[0])
                 count++;
             if (SoloConEpisodiosPendientes)
                 count++;
@@ -183,15 +186,15 @@ public partial class GaleriaViewModel : ObservableObject,
         get
         {
             int total = BibliotecaLocales.Count;
-            if (total == 0) return "0 animes";
+            if (total == 0) return LocalizationService.T("Gal_ConteoCero");
 
             if (BibliotecaFiltrada == null || !HayFiltrosActivos)
             {
-                return total == 1 ? "1 anime" : $"{total} animes";
+                return total == 1 ? LocalizationService.T("Gal_ConteoUno") : string.Format(LocalizationService.T("Gal_ConteoVarios"), total);
             }
 
             int visibles = BibliotecaFiltrada.Cast<object>().Count();
-            return $"Mostrando {visibles} de {total} animes";
+            return string.Format(LocalizationService.T("Gal_ConteoFiltrado"), visibles, total);
         }
     }
 
@@ -271,25 +274,42 @@ public partial class GaleriaViewModel : ObservableObject,
     {
         TextoBusqueda = string.Empty;
         FiltroEstado = "Todos";
-        GeneroSeleccionado = "Todos los géneros";
+        GeneroSeleccionado = TodosLosGeneros;
         TemporadaSeleccionada = TodasLasTemporadas;
         AnioSeleccionado = TodosLosAños;
         SoloConEpisodiosPendientes = false;
         SoloConCarpetaLocal = false;
         SoloFavoritos = false;
-        CriterioOrdenSeleccionado = "Título (A - Z)";
+        CriterioOrdenSeleccionado = OpcionesOrdenacion[0];
 
         BibliotecaFiltrada?.Refresh();
-        AplicarOrdenacion("Título (A - Z)");
+        AplicarOrdenacion(OpcionesOrdenacion[0]);
         OnPropertyChanged(nameof(SinResultados));
         OnPropertyChanged(nameof(HayFiltrosActivos));
         OnPropertyChanged(nameof(ConteoFiltradosTexto));
         OnPropertyChanged(nameof(CantidadFiltrosAvanzadosActivos));
         OnPropertyChanged(nameof(TieneFiltrosAvanzadosActivos));
     }
-    
+
+    /// <summary>
+    /// LOC-08: re-genera los desplegables de filtros (género/temporada/año/orden), que son
+    /// listas de texto plano y no se refrescan solas al cambiar de idioma como sí lo hacen
+    /// los bindings a LocalizationService.Instance[Clave].
+    /// </summary>
+    private void AplicarCambioIdioma()
+    {
+        int ordenIdx = Array.IndexOf(OpcionesOrdenacion, CriterioOrdenSeleccionado);
+        OnPropertyChanged(nameof(ListaOpcionesOrdenacion));
+        CriterioOrdenSeleccionado = OpcionesOrdenacion[ordenIdx >= 0 ? ordenIdx : 0];
+
+        ActualizarGenerosDisponibles();
+        ActualizarTemporadasYAniosDisponibles();
+        BibliotecaFiltrada?.Refresh();
+        OnPropertyChanged(nameof(ConteoFiltradosTexto));
+    }
+
     [ObservableProperty] private bool _estaConectado;
-    [ObservableProperty] private string _nombreUsuarioAniList = "Usuario";
+    [ObservableProperty] private string _nombreUsuarioAniList = LocalizationService.T("Gal_UsuarioDefault");
     [ObservableProperty] private string? _avatarUsuarioAniList;
     
     [ObservableProperty] private bool _estaActualizando;
@@ -321,10 +341,15 @@ public partial class GaleriaViewModel : ObservableObject,
         WeakReferenceMessenger.Default.Register<AnimeAñadidoMensaje>(this);
         WeakReferenceMessenger.Default.Register<UsuarioDesconectadoMensaje>(this);
         WeakReferenceMessenger.Default.Register<EpisodioActualizadoMensaje>(this);
-        
+        WeakReferenceMessenger.Default.Register<IdiomaCambiadoMensaje>(this);
+
         _ = CargarBibliotecaAsync();
     }
-    
+
+    /// <summary>LOC-08 (via WeakReferenceMessenger, no suscripción directa al evento estático
+    /// de LocalizationService: eso acumulaba suscriptores para siempre en tests).</summary>
+    public void Receive(IdiomaCambiadoMensaje message) => AplicarCambioIdioma();
+
     public void Receive(UsuarioLogeadoMensaje message)
     {
         _ = CargarPerfilUsuarioAsync();
@@ -333,7 +358,7 @@ public partial class GaleriaViewModel : ObservableObject,
     public void Receive(UsuarioDesconectadoMensaje message)
     {
         EstaConectado = false;
-        NombreUsuarioAniList = "Usuario";
+        NombreUsuarioAniList = LocalizationService.T("Gal_UsuarioDefault");
         AvatarUsuarioAniList = null;
     }
 
@@ -606,8 +631,8 @@ public partial class GaleriaViewModel : ObservableObject,
             {
                 EstaBuscandoQueVer = false;
                 await _dialogService.MostrarDialogoAsync(
-                    "Qué veo hoy",
-                    "No tienes animes con carpeta local en la biblioteca.\n\nAgrega un anime con su carpeta de episodios para usar esta función.",
+                    LocalizationService.T("Gal_QueVeoHoyTitulo"),
+                    LocalizationService.T("Gal_QueVeoHoySinCarpetaMsj"),
                     false, "Dice", "#60A5FA");
                 return;
             }
@@ -691,8 +716,8 @@ public partial class GaleriaViewModel : ObservableObject,
             if (elegido == null)
             {
                 await _dialogService.MostrarDialogoAsync(
-                    "Qué veo hoy",
-                    "No se encontraron episodios sin ver en tu biblioteca local. ¡Disfruta de tu maratón!",
+                    LocalizationService.T("Gal_QueVeoHoyTitulo"),
+                    LocalizationService.T("Gal_QueVeoHoySinEpisodiosMsj"),
                     false, "EmoticonHappyOutline", "#4CAF50");
                 return;
             }
@@ -714,7 +739,7 @@ public partial class GaleriaViewModel : ObservableObject,
             EstaBuscandoQueVer = false;
             AppLogger.Error("GaleriaViewModel", "Error en Qué veo hoy", ex);
             await _dialogService.MostrarDialogoAsync(
-                "Qué veo hoy", "Ocurrió un error al buscar episodios.", false, "AlertCircleOutline", "#E53935");
+                LocalizationService.T("Gal_QueVeoHoyTitulo"), LocalizationService.T("Gal_QueVeoHoyErrorMsj"), false, "AlertCircleOutline", "#E53935");
         }
         finally
         {
@@ -732,7 +757,7 @@ public partial class GaleriaViewModel : ObservableObject,
             .OrderBy(g => g)
             .ToList();
 
-        var nuevaLista = new List<string> { "Todos los géneros" };
+        var nuevaLista = new List<string> { TodosLosGeneros };
         nuevaLista.AddRange(generosUnicos);
 
         string prevSeleccion = GeneroSeleccionado;
@@ -744,7 +769,7 @@ public partial class GaleriaViewModel : ObservableObject,
         }
         else
         {
-            GeneroSeleccionado = "Todos los géneros";
+            GeneroSeleccionado = TodosLosGeneros;
         }
     }
 
@@ -753,10 +778,10 @@ public partial class GaleriaViewModel : ObservableObject,
 
     private static string TemporadaATexto(string codigo) => codigo switch
     {
-        "WINTER" => "Invierno",
-        "SPRING" => "Primavera",
-        "SUMMER" => "Verano",
-        "FALL" => "Otoño",
+        "WINTER" => LocalizationService.T("Temporada_Invierno"),
+        "SPRING" => LocalizationService.T("Temporada_Primavera"),
+        "SUMMER" => LocalizationService.T("Temporada_Verano"),
+        "FALL" => LocalizationService.T("Temporada_Otonio"),
         _ => codigo
     };
 
@@ -798,34 +823,38 @@ public partial class GaleriaViewModel : ObservableObject,
         if (BibliotecaFiltrada == null) return;
         criterio ??= CriterioOrdenSeleccionado;
 
+        // LOC-08: el criterio es texto localizado (cambia con el idioma) — comparar por
+        // posición dentro de OpcionesOrdenacion en vez de contra literales en español.
+        int idx = Array.IndexOf(OpcionesOrdenacion, criterio);
+
         using (BibliotecaFiltrada.DeferRefresh())
         {
             BibliotecaFiltrada.SortDescriptions.Clear();
-            switch (criterio)
+            switch (idx)
             {
-                case "Título (A - Z)":
+                case 0: // Título (A - Z)
                     BibliotecaFiltrada.SortDescriptions.Add(new SortDescription(nameof(AnimeItem.Titulo), ListSortDirection.Ascending));
                     break;
-                case "Título (Z - A)":
+                case 1: // Título (Z - A)
                     BibliotecaFiltrada.SortDescriptions.Add(new SortDescription(nameof(AnimeItem.Titulo), ListSortDirection.Descending));
                     break;
-                case "Mayor Progreso":
+                case 2: // Mayor Progreso
                     BibliotecaFiltrada.SortDescriptions.Add(new SortDescription(nameof(AnimeItem.ProgresoPorcentaje), ListSortDirection.Descending));
                     BibliotecaFiltrada.SortDescriptions.Add(new SortDescription(nameof(AnimeItem.Titulo), ListSortDirection.Ascending));
                     break;
-                case "Menor Progreso":
+                case 3: // Menor Progreso
                     BibliotecaFiltrada.SortDescriptions.Add(new SortDescription(nameof(AnimeItem.ProgresoPorcentaje), ListSortDirection.Ascending));
                     BibliotecaFiltrada.SortDescriptions.Add(new SortDescription(nameof(AnimeItem.Titulo), ListSortDirection.Ascending));
                     break;
-                case "Más Episodios":
+                case 4: // Más Episodios
                     BibliotecaFiltrada.SortDescriptions.Add(new SortDescription(nameof(AnimeItem.TotalEpisodios), ListSortDirection.Descending));
                     BibliotecaFiltrada.SortDescriptions.Add(new SortDescription(nameof(AnimeItem.Titulo), ListSortDirection.Ascending));
                     break;
-                case "Menos Episodios":
+                case 5: // Menos Episodios
                     BibliotecaFiltrada.SortDescriptions.Add(new SortDescription(nameof(AnimeItem.TotalEpisodios), ListSortDirection.Ascending));
                     BibliotecaFiltrada.SortDescriptions.Add(new SortDescription(nameof(AnimeItem.Titulo), ListSortDirection.Ascending));
                     break;
-                case "Más Recientes":
+                case 6: // Más Recientes
                     BibliotecaFiltrada.SortDescriptions.Add(new SortDescription(nameof(AnimeItem.AniListId), ListSortDirection.Descending));
                     break;
                 default:
@@ -869,8 +898,8 @@ public partial class GaleriaViewModel : ObservableObject,
         }
 
         // 3. Filtro por género
-        if (!string.IsNullOrWhiteSpace(GeneroSeleccionado) && 
-            GeneroSeleccionado != "Todos los géneros" && 
+        if (!string.IsNullOrWhiteSpace(GeneroSeleccionado) &&
+            GeneroSeleccionado != TodosLosGeneros &&
             GeneroSeleccionado != "Todos")
         {
             if (string.IsNullOrWhiteSpace(anime.Generos) || 
@@ -934,7 +963,7 @@ public partial class GaleriaViewModel : ObservableObject,
             var perfil = await _animeTrackingService.ObtenerPerfilUsuarioAsync(token);
             if (perfil != null)
             {
-                NombreUsuarioAniList = perfil.Name ?? "Usuario";
+                NombreUsuarioAniList = perfil.Name ?? LocalizationService.T("Gal_UsuarioDefault");
                 AvatarUsuarioAniList = perfil.Avatar?.Large;
             }
         }
@@ -973,16 +1002,16 @@ public partial class GaleriaViewModel : ObservableObject,
         if (anime == null) return;
 
         bool confirmacion = await _dialogService.MostrarDialogoAsync(
-            "Eliminar de la biblioteca",
-            $"¿Deseas eliminar '{anime.Titulo}' de tu biblioteca local?",
+            LocalizationService.T("Bib_EliminarTitulo"),
+            string.Format(LocalizationService.T("Bib_EliminarMsj"), anime.Titulo),
             true, "HeartBrokenOutline", "#EF4444");
 
         if (!confirmacion) return;
 
         // Opción extra: borrar también los archivos del disco (mismo flujo que DetalleViewModel)
         bool borrarArchivos = await _dialogService.MostrarDialogoAsync(
-            "¿Borrar también los archivos?",
-            $"¿Deseas eliminar también la carpeta con los episodios descargados del disco?\n\n'{(string.IsNullOrWhiteSpace(anime.RutaCarpeta) ? "sin carpeta local" : anime.RutaCarpeta)}'\n\nElige NO para conservar los archivos y solo quitar el anime de la biblioteca.",
+            LocalizationService.T("Bib_BorrarArchivosTitulo"),
+            string.Format(LocalizationService.T("Bib_BorrarArchivosMsj"), string.IsNullOrWhiteSpace(anime.RutaCarpeta) ? LocalizationService.T("Bib_SinCarpetaLocal") : anime.RutaCarpeta),
             true, "FolderOutline", "#EF4444");
 
         string? carpeta = anime.RutaCarpeta;
@@ -1035,11 +1064,8 @@ public partial class GaleriaViewModel : ObservableObject,
         // PRI-02: consentimiento informado ANTES del OAuth — la primera vez se explica
         // qué se lee y qué se escribe en AniList (antes el navegador se abría sin copy).
         bool consentimiento = await _dialogService.MostrarDialogoAsync(
-            "Conectar con AniList",
-            "Al conectar, la app podrá:\n\n" +
-            "• LEER tu perfil y tu lista de AniList (títulos y progreso).\n" +
-            "• ESCRIBIR tu progreso (episodios vistos), estado y puntuación cuando los marques.\n\n" +
-            "Tus archivos de video nunca se suben y la app no tiene telemetría.",
+            LocalizationService.T("Gal_ConectarAniListTitulo"),
+            LocalizationService.T("Gal_ConectarAniListMsj"),
             true,
             "ShieldAccount",
             "#60A5FA");
@@ -1049,11 +1075,11 @@ public partial class GaleriaViewModel : ObservableObject,
         bool exito = await _authService.IniciarSesionAsync();
         if (exito)
         {
-            await _dialogService.MostrarDialogoAsync("Nube Activada", "¡Conectado a AniList exitosamente! Tu progreso ahora se sincronizará.", false, "CloudCheck", "#4CAF50");
+            await _dialogService.MostrarDialogoAsync(LocalizationService.T("Gal_NubeActivadaTitulo"), LocalizationService.T("Gal_NubeActivadaMsj"), false, "CloudCheck", "#4CAF50");
         }
         else
         {
-            await _dialogService.MostrarDialogoAsync("Autenticación Cancelada", "No se pudo iniciar sesión con AniList o el proceso fue cancelado.", false, "AlertCircle", "#FF5252");
+            await _dialogService.MostrarDialogoAsync(LocalizationService.T("Gal_AutenticacionCanceladaTitulo"), LocalizationService.T("Gal_AutenticacionCanceladaMsj"), false, "AlertCircle", "#FF5252");
         }
     }
 
@@ -1062,21 +1088,21 @@ public partial class GaleriaViewModel : ObservableObject,
     {
         MenuUsuarioAbierto = false; // Cierra el menú antes de desloguear
         _authService.CerrarSesion();
-        await _dialogService.MostrarDialogoAsync("Sesión Cerrada", "Te has desconectado de AniList correctamente.", false, "Logout", "#FF5252");
+        await _dialogService.MostrarDialogoAsync(LocalizationService.T("Gal_SesionCerradaTitulo"), LocalizationService.T("Gal_SesionCerradaMsj"), false, "Logout", "#FF5252");
     }
-    
+
     [RelayCommand]
     private async Task ActualizarBibliotecaAsync()
     {
-        if (EstaActualizando) return; 
-        
+        if (EstaActualizando) return;
+
         var listaAnimes = BibliotecaLocales.ToList();
         if (listaAnimes.Count == 0) return;
 
         EstaActualizando = true;
         ProgresoTotal = listaAnimes.Count;
         ProgresoActual = 0;
-        TextoProgreso = "Consultando AniList...";
+        TextoProgreso = LocalizationService.T("Gal_ConsultandoAniList");
 
         // RND-02: una consulta loteada (50 animes por request) reemplaza las ~300
         // llamadas seriales (anime + seguimiento por separado) con Task.Delay(250).
@@ -1090,7 +1116,7 @@ public partial class GaleriaViewModel : ObservableObject,
         {
             procesados++;
             ProgresoActual = procesados;
-            TextoProgreso = $"Sincronizando: {anime.Titulo} ({procesados}/{ProgresoTotal})";
+            TextoProgreso = string.Format(LocalizationService.T("Gal_SincronizandoFormato"), anime.Titulo, procesados, ProgresoTotal);
 
             if (!datosLote.TryGetValue(anime.AniListId, out var datosFrescos)) continue;
 
@@ -1140,7 +1166,7 @@ public partial class GaleriaViewModel : ObservableObject,
             BibliotecaFiltrada?.Refresh();
         }
 
-        TextoProgreso = "¡Actualización completada con éxito!";
+        TextoProgreso = LocalizationService.T("Gal_ActualizacionCompletada");
         await Task.Delay(2000); 
         EstaActualizando = false;
     }
