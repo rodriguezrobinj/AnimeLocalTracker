@@ -107,9 +107,9 @@ public partial class HistorialItemViewModel : ObservableObject
         if (local.Date == ahora.Date.AddDays(-1))
             return $"{LocalizationService.T("Hist_FechaAyer")} {local:HH:mm}";
         if (diferencia.TotalDays < 7)
-            return $"{local:dddd} {local:HH:mm}";
+            return $"{local.ToString("dddd", LocalizationService.Cultura)} {local:HH:mm}";
 
-        return local.ToString("d MMM yyyy", System.Globalization.CultureInfo.CurrentCulture);
+        return local.ToString("d MMM yyyy", LocalizationService.Cultura);
     }
 
     public static string CalcularGrupoTemporal(DateTime fechaGuardada)

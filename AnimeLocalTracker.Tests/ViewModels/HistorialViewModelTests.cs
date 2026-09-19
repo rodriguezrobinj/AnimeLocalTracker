@@ -428,4 +428,86 @@ public class HistorialViewModelTests : IDisposable
         item.VistoLocal.Should().BeTrue();
         item.ProgresoSegundos.Should().Be(0);
     }
+
+    [Fact]
+    public void Receive_ProgresoDelReproductor_SubeElItemAlPrincipioYActualizaLaFecha()
+    {
+        // Arrange: un episodio visto ayer, y otro más reciente encima en la lista
+        var sut = CrearSut();
+        var ayer = DateTime.UtcNow.AddDays(-1);
+        var reciente = new HistorialItemViewModel { AniListId = 1, NumeroEpisodio = 1, UltimaReproduccion = DateTime.UtcNow.AddHours(-2) };
+        var viejo = new HistorialItemViewModel { AniListId = 5, NumeroEpisodio = 3, UltimaReproduccion = ayer };
+        sut.ItemsHistorial.Add(reciente);
+        sut.ItemsHistorial.Add(viejo);
+
+        // Act: el reproductor guarda progreso del episodio viejo (lo estás viendo ahora)
+        sut.Receive(new EpisodioActualizadoMensaje(5, 3, false, 120, 1400));
+
+        // Assert: sube al principio con la hora de ahora, sin esperar a cambiar de pestaña
+        sut.ItemsHistorial[0].Should().BeSameAs(viejo);
+        viejo.UltimaReproduccion.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
+        viejo.ProgresoSegundos.Should().Be(120);
+        sut.ItemsAgrupados.OfType<HistorialItemViewModel>().First().Should().BeSameAs(viejo);
+    }
+
+    [Fact]
+    public void Receive_MarcadoManualDesdeDetalle_NoFabricaFechaNiReordena()
+    {
+        // Arrange
+        var sut = CrearSut();
+        var fecha = DateTime.UtcNow.AddDays(-3);
+        var primero = new HistorialItemViewModel { AniListId = 1, NumeroEpisodio = 1, UltimaReproduccion = DateTime.UtcNow.AddHours(-1) };
+        var item = new HistorialItemViewModel { AniListId = 5, NumeroEpisodio = 3, VistoLocal = true, UltimaReproduccion = fecha };
+        sut.ItemsHistorial.Add(primero);
+        sut.ItemsHistorial.Add(item);
+
+        // Act: Detalle avisa de un cambio manual (sin progreso ni duración)
+        sut.Receive(new EpisodioActualizadoMensaje(5, 3, true, 0, 0));
+
+        // Assert: el marcado manual no cuenta como visionado real (persistence.md #5)
+        item.UltimaReproduccion.Should().Be(fecha);
+        sut.ItemsHistorial[0].Should().BeSameAs(primero);
+    }
+
+    [Fact]
+    public async Task Receive_EpisodioNuevoEnReproduccion_RecargaAlInstanteSinEsperarElCooldown()
+    {
+        // Arrange: el historial se acaba de cargar (dentro del cooldown de 30 s) y está vacío
+        var sut = CrearSut();
+        await sut.CargarHistorialAsync();
+
+        _dbMock.Setup(d => d.ObtenerHistorialEpisodiosAsync(It.IsAny<int>()))
+               .ReturnsAsync([new RegistroEpisodio { AniListId = 9, NumeroEpisodio = 2, ProgresoSegundos = 30, TotalSegundos = 1400, UltimaReproduccion = DateTime.UtcNow }]);
+
+        // Act: empiezas a ver un episodio que nunca estuvo en el historial
+        sut.Receive(new EpisodioActualizadoMensaje(9, 2, false, 30, 1400));
+
+        // Assert: aparece sin cambiar de pestaña
+        await EsperarAsync(() => sut.ItemsHistorial.Count == 1);
+        sut.ItemsHistorial.Should().ContainSingle(i => i.AniListId == 9 && i.NumeroEpisodio == 2);
+    }
+
+    [Fact]
+    public async Task Receive_MismoEpisodioNuevoVariasVeces_NoRecargaEnBucle()
+    {
+        // Arrange: la BD todavía no devuelve el episodio (p. ej. no se pudo guardar)
+        var sut = CrearSut();
+        await sut.CargarHistorialAsync();
+        _dbMock.Invocations.Clear();
+
+        // Act: el reproductor sigue guardando progreso cada pocos segundos
+        for (int i = 0; i < 5; i++)
+        {
+            sut.Receive(new EpisodioActualizadoMensaje(9, 2, false, 30 + i, 1400));
+            await Task.Delay(50);
+        }
+
+        // Assert: solo una recarga por episodio, no un SELECT por cada guardado
+        _dbMock.Verify(d => d.ObtenerHistorialEpisodiosAsync(It.IsAny<int>()), Times.Once);
+    }
+
+    private static async Task EsperarAsync(Func<bool> condicion, int maxMs = 3000)
+    {
+        for (int t = 0; t < maxMs && !condicion(); t += 25) await Task.Delay(25);
+    }
 }
