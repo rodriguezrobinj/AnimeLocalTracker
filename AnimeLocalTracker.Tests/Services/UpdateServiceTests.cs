@@ -90,7 +90,10 @@ public class UpdateServiceTests
         var navigationService = new NavigationService(sp);
         try
         {
-            var sut = new MainViewModel(navigationService, trackingMock.Object, sp.GetRequiredService<AnimeLibraryService>(), downloadMock.Object, updateMock.Object, dialogMock.Object);
+            var sut = new MainViewModel(navigationService, trackingMock.Object, sp.GetRequiredService<AnimeLibraryService>(), downloadMock.Object, updateMock.Object, dialogMock.Object,
+                Mock.Of<IDatabaseService>(), Mock.Of<IFileScannerService>(),
+                new NewEpisodeNotifier(Mock.Of<IDatabaseService>(), Mock.Of<IFileScannerService>(), Mock.Of<ISettingsService>()),
+                Mock.Of<ISystemTrayService>());
 
             // Act
             await sut.BuscarActualizacionesManualCommand.ExecuteAsync(null);

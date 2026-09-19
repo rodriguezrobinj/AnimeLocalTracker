@@ -85,6 +85,15 @@ public partial class MainWindow : Window, IVentanaPrincipal
         {
             AppLogger.Warn("MainWindow", $"No se pudo inicializar los controles multimedia del sistema: {ex.Message}");
         }
+
+        try
+        {
+            App.ServiceProvider.GetService<ISystemTrayService>()?.Habilitar(this);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn("MainWindow", $"No se pudo inicializar el icono de la bandeja del sistema: {ex.Message}");
+        }
     }
 
     private IntPtr WindowProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
