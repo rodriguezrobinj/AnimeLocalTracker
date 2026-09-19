@@ -3,9 +3,21 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
              xmlns:loc="clr-namespace:AnimeLocalTracker.Services"
+             xmlns:mdxam="clr-namespace:MdXaml;assembly=MdXaml"
              TextElement.Foreground="{DynamicResource MaterialDesignBody}"
              Background="Transparent">
-    
+
+    <UserControl.Resources>
+        <!-- LOC-08/UI-Novedades: MdXaml trae su propio estilo "Standard" pensado para fondo
+             claro; se sobreescribe aquí para que el FlowDocument herede los colores oscuros
+             de la tarjeta en vez de imponer texto negro sobre fondo oscuro. -->
+        <Style x:Key="NovedadesMarkdownViewerStyle" TargetType="mdxam:MarkdownScrollViewer">
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="FontSize" Value="13"/>
+        </Style>
+    </UserControl.Resources>
+
     <Grid ClipToBounds="True" MaxWidth="1200">
         <Grid.Style>
             <Style TargetType="Grid">
@@ -95,7 +107,7 @@
                                     <materialDesign:PackIcon Kind="FileDocumentOutline" Foreground="#60A5FA" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 </Border>
                                 <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding TituloVersionTexto, StringFormat='Novedades: {0}'}" FontSize="16" FontWeight="Bold" Foreground="White"/>
+                                    <TextBlock Text="{Binding NovedadesTituloTexto}" FontSize="16" FontWeight="Bold" Foreground="White"/>
                                     <TextBlock Text="{Binding [Acerca_RegistroCambios], Source={x:Static loc:LocalizationService.Instance}}" FontSize="11" Foreground="#9CA3AF"/>
                                 </StackPanel>
                             </StackPanel>
@@ -107,12 +119,16 @@
 
                         <Border Background="#14181E" BorderBrush="#262D38" BorderThickness="1" CornerRadius="12" Padding="18,16">
                             <StackPanel>
-                                <ProgressBar IsIndeterminate="True" 
-                                             Visibility="{Binding IsCargandoNovedades, Converter={StaticResource BoolToVis}}" 
+                                <ProgressBar IsIndeterminate="True"
+                                             Visibility="{Binding IsCargandoNovedades, Converter={StaticResource BoolToVis}}"
                                              Height="3" VerticalAlignment="Top" Foreground="#60A5FA" Margin="0,0,0,12"
                                              materialDesign:TransitionAssist.DisableTransitions="True"/>
-                                <TextBlock Text="{Binding NovedadesTexto}" 
-                                           Foreground="#E2E8F0" FontSize="13" LineHeight="22" TextWrapping="Wrap" />
+                                <mdxam:MarkdownScrollViewer Markdown="{Binding NovedadesTexto}"
+                                                             MarkdownStyleName="Standard"
+                                                             Background="Transparent"
+                                                             Foreground="#E2E8F0"
+                                                             VerticalScrollBarVisibility="Disabled"
+                                                             Style="{StaticResource NovedadesMarkdownViewerStyle}"/>
                             </StackPanel>
                         </Border>
                     </StackPanel>

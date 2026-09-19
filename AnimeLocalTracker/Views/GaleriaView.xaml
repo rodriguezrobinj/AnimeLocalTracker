@@ -338,23 +338,39 @@
                 </WrapPanel>
             </Grid>
 
-            <!-- Panel Expansible de Filtros Avanzados (Desplegable) -->
-            <Border Grid.Row="1" Margin="0,12,0,0" Padding="16,10" 
+            <!-- Panel Expansible de Filtros Avanzados (Desplegable).
+                 UI-01: un WrapPanel único para selectores/toggles/"Limpiar filtros" evita el
+                 reflujo abrupto de una columna Grid Auto/Star, PERO el badge de conteo
+                 ("Mostrando X de Y animes") es el elemento más ancho del grupo y, si el resto
+                 ya llena la línea, terminaba flotando solo en una 2ª línea huérfana — igual de
+                 feo que el bug original. Se ancla con DockPanel.Dock="Right" fuera del
+                 WrapPanel: así SOLO los selectores/toggles se reflujan (como grupo, de forma
+                 predecible) y el conteo se queda fijo en la esquina derecha en su propia línea. -->
+            <Border Grid.Row="1" Margin="0,12,0,0" Padding="16,10"
                     Background="{DynamicResource Brush.Surface1}" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1"
                     CornerRadius="14" Visibility="{Binding PanelFiltrosVisible, Converter={StaticResource BoolToVis}}">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
+                <DockPanel LastChildFill="True">
+                    <!-- Badge Conteo Filtrados: anclado a la derecha, nunca flota solo -->
+                    <Border DockPanel.Dock="Right" Background="{DynamicResource Brush.Surface2}" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1"
+                            CornerRadius="8" Height="36" Padding="12,0" Margin="10,0,0,0" VerticalAlignment="Top">
+                        <TextBlock Text="{Binding ConteoFiltradosTexto}" Style="{StaticResource AppText.Caption}"
+                                   FontWeight="SemiBold" Foreground="{DynamicResource Brush.TextSecondary}" VerticalAlignment="Center"/>
+                    </Border>
 
-                    <!-- Izquierda: Selectores y Toggles -->
-                    <WrapPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                        <!-- Selector de Género -->
+                    <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <!-- Selector de Género: el valor real (GeneroSeleccionado, usado para filtrar
+                             contra AnimeItem.GenerosLista) sigue en inglés como lo entrega AniList —
+                             el ItemTemplate solo traduce lo que se MUESTRA. -->
                         <ComboBox ItemsSource="{Binding GenerosDisponibles}"
                                   SelectedItem="{Binding GeneroSeleccionado}"
                                   Height="36" Margin="0,0,10,4"
-                                  VerticalAlignment="Center"/>
+                                  VerticalAlignment="Center">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Converter={StaticResource GeneroTraducido}}"/>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
 
                         <!-- Selector de Temporada -->
                         <ComboBox ItemsSource="{Binding TemporadasDisponibles}"
@@ -450,31 +466,21 @@
                                 <TextBlock Text="{Binding [Gal_Favoritos], Source={x:Static loc:LocalizationService.Instance}}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
                             </StackPanel>
                         </ToggleButton>
-                    </WrapPanel>
 
-                    <!-- Derecha: Limpiar y Conteo -->
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                         <!-- Botón Limpiar Filtros -->
                         <Button Command="{Binding LimpiarFiltrosCommand}"
                                 Visibility="{Binding HayFiltrosActivos, Converter={StaticResource BoolToVis}}"
                                 Style="{StaticResource MaterialDesignFlatButton}"
                                 Foreground="{DynamicResource Brush.Rose}"
-                                Height="36" Padding="10,0" Margin="0,0,10,0"
+                                Height="36" Padding="10,0" Margin="0,0,10,4"
                                 ToolTip="{Binding [Gal_LimpiarFiltrosTip], Source={x:Static loc:LocalizationService.Instance}}">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="FilterRemoveOutline" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
                                 <TextBlock Text="{Binding [Gal_LimpiarFiltros], Source={x:Static loc:LocalizationService.Instance}}" FontSize="12" FontWeight="Bold" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
-
-                        <!-- Badge Conteo Filtrados -->
-                        <Border Background="{DynamicResource Brush.Surface2}" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1"
-                                CornerRadius="8" Height="36" Padding="12,0" VerticalAlignment="Center">
-                            <TextBlock Text="{Binding ConteoFiltradosTexto}" Style="{StaticResource AppText.Caption}"
-                                       FontWeight="SemiBold" Foreground="{DynamicResource Brush.TextSecondary}" VerticalAlignment="Center"/>
-                        </Border>
-                    </StackPanel>
-                </Grid>
+                    </WrapPanel>
+                </DockPanel>
             </Border>
         </Grid>
 
@@ -643,15 +649,83 @@
                             </Style>
                         </materialDesign:Card.Style>
 
-                        <!-- Menú contextual (clic derecho): favorito y eliminar de la biblioteca -->
+                        <!-- Menú contextual (clic derecho): favorito y eliminar de la biblioteca.
+                             Estilo oscuro propio (igual que el menú de episodio en DetalleView):
+                             el ContextMenu por defecto de WPF usa el tema claro del sistema y
+                             desentonaba por completo con el resto de la app. -->
                         <materialDesign:Card.ContextMenu>
-                            <ContextMenu>
+                            <ContextMenu Background="#151B29" BorderBrush="#2D333B" BorderThickness="1"
+                                         Padding="6" FontSize="12.5" Foreground="#E2E8F0" HasDropShadow="False">
+                                <ContextMenu.Resources>
+                                    <Style TargetType="ContextMenu">
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="ContextMenu">
+                                                    <Border Background="{TemplateBinding Background}"
+                                                            BorderBrush="{TemplateBinding BorderBrush}"
+                                                            BorderThickness="{TemplateBinding BorderThickness}"
+                                                            CornerRadius="10" Padding="6">
+                                                        <Border.Effect>
+                                                            <DropShadowEffect BlurRadius="18" ShadowDepth="3" Opacity="0.55" Color="#000000"/>
+                                                        </Border.Effect>
+                                                        <ScrollViewer>
+                                                            <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle"/>
+                                                        </ScrollViewer>
+                                                    </Border>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                    <Style TargetType="MenuItem">
+                                        <Setter Property="Foreground" Value="#E2E8F0"/>
+                                        <Setter Property="Background" Value="Transparent"/>
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="MenuItem">
+                                                    <Border x:Name="FondoItem" Background="{TemplateBinding Background}"
+                                                            CornerRadius="7" Padding="10,8">
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                                <ColumnDefinition Width="*"/>
+                                                            </Grid.ColumnDefinitions>
+                                                            <ContentPresenter Grid.Column="0" ContentSource="Icon" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                                            <ContentPresenter Grid.Column="1" ContentSource="Header" RecognizesAccessKey="True" VerticalAlignment="Center"/>
+                                                        </Grid>
+                                                    </Border>
+                                                    <ControlTemplate.Triggers>
+                                                        <Trigger Property="IsHighlighted" Value="True">
+                                                            <Setter TargetName="FondoItem" Property="Background" Value="#24344A"/>
+                                                        </Trigger>
+                                                        <Trigger Property="IsEnabled" Value="False">
+                                                            <Setter Property="Opacity" Value="0.45"/>
+                                                        </Trigger>
+                                                    </ControlTemplate.Triggers>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                    <Style TargetType="Separator">
+                                        <Setter Property="Background" Value="#2D333B"/>
+                                        <Setter Property="Height" Value="1"/>
+                                        <Setter Property="Margin" Value="8,4"/>
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="Separator">
+                                                    <Border Background="{TemplateBinding Background}"
+                                                            Height="{TemplateBinding Height}"
+                                                            Margin="{TemplateBinding Margin}"/>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </ContextMenu.Resources>
                                 <MenuItem Header="{Binding [Gal_MarcarFavorito], Source={x:Static loc:LocalizationService.Instance}}"
                                           Command="{Binding PlacementTarget.Tag.AlternarFavoritoCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                           CommandParameter="{Binding}"
                                           Visibility="{Binding EsFavorito, Converter={StaticResource InverseBoolToVis}}">
                                     <MenuItem.Icon>
-                                        <materialDesign:PackIcon Kind="HeartOutline" Foreground="#F43F5E"/>
+                                        <materialDesign:PackIcon Kind="HeartOutline" Foreground="#F43F5E" Width="16" Height="16"/>
                                     </MenuItem.Icon>
                                 </MenuItem>
                                 <MenuItem Header="{Binding [Gal_QuitarFavorito], Source={x:Static loc:LocalizationService.Instance}}"
@@ -659,7 +733,7 @@
                                           CommandParameter="{Binding}"
                                           Visibility="{Binding EsFavorito, Converter={StaticResource BoolToVis}}">
                                     <MenuItem.Icon>
-                                        <materialDesign:PackIcon Kind="Heart" Foreground="#F43F5E"/>
+                                        <materialDesign:PackIcon Kind="Heart" Foreground="#F43F5E" Width="16" Height="16"/>
                                     </MenuItem.Icon>
                                 </MenuItem>
                                 <Separator/>
@@ -667,7 +741,7 @@
                                           Command="{Binding PlacementTarget.Tag.EliminarAnimeCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                           CommandParameter="{Binding}">
                                     <MenuItem.Icon>
-                                        <materialDesign:PackIcon Kind="DeleteOutline" Foreground="#F87171"/>
+                                        <materialDesign:PackIcon Kind="DeleteOutline" Foreground="#F87171" Width="16" Height="16"/>
                                     </MenuItem.Icon>
                                 </MenuItem>
                             </ContextMenu>

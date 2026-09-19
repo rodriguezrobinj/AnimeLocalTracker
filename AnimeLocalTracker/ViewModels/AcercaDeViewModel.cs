@@ -9,7 +9,7 @@ using CommunityToolkit.Mvvm.Messaging;
 
 namespace AnimeLocalTracker.ViewModels;
 
-public partial class AcercaDeViewModel : ObservableObject
+public partial class AcercaDeViewModel : ObservableObject, IRecipient<IdiomaCambiadoMensaje>
 {
     private readonly IUpdateService _updateService;
     private readonly IDialogService _dialogService;
@@ -18,12 +18,18 @@ public partial class AcercaDeViewModel : ObservableObject
     public string VersionAppTexto => _updateService?.ObtenerVersionActual() ?? "1.0.0";
     public string RepositorioUrl => "https://github.com/rodriguezrobinj/AnimeLocalTracker";
     public string AutorTexto => "Robin Rodriguez";
-    public string LicenciaTexto => "Licencia MIT - Software de Código Abierto";
+    public string LicenciaTexto => LocalizationService.T("Acerca_LicenciaTexto");
 
-    [ObservableProperty] private string _tituloVersionTexto = "AnimeLocalTracker";
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(NovedadesTituloTexto))]
+    private string _tituloVersionTexto = "AnimeLocalTracker";
     [ObservableProperty] private string _fechaVersionTexto = string.Empty;
-    [ObservableProperty] private string _novedadesTexto = "• Gestor y reproductor nativo multimedia para colecciones de anime locales.\n• Auto-tracking local e integración bidireccional con AniList.\n• Motor acelerado por hardware con Flyleaf y DirectX.\n• Actualizaciones automáticas con Velopack y GitHub Releases.";
+    [ObservableProperty] private string _novedadesTexto = LocalizationService.T("Acerca_NovedadesDefault");
     [ObservableProperty] private bool _isCargandoNovedades = false;
+
+    /// <summary>"Novedades: {título}" / "What's new: {title}" — no puede ser un StringFormat de
+    /// XAML porque el prefijo también debe traducirse (LOC-08).</summary>
+    public string NovedadesTituloTexto => string.Format(LocalizationService.T("Acerca_NovedadesTituloFormato"), TituloVersionTexto);
 
     public AcercaDeViewModel(
         IUpdateService updateService,
@@ -32,8 +38,14 @@ public partial class AcercaDeViewModel : ObservableObject
         _updateService = updateService;
         _dialogService = dialogService;
 
+        WeakReferenceMessenger.Default.Register<IdiomaCambiadoMensaje>(this);
+
         _ = CargarNovedadesAsync();
     }
+
+    /// <summary>LOC-08: "Novedades: {título}" se compone en código, no vía binding a una
+    /// clave de LocalizationService, así que no se refresca sola al cambiar de idioma.</summary>
+    public void Receive(IdiomaCambiadoMensaje message) => OnPropertyChanged(nameof(NovedadesTituloTexto));
 
     public async Task CargarNovedadesAsync(bool forzar = false)
     {
@@ -48,7 +60,7 @@ public partial class AcercaDeViewModel : ObservableObject
                     TituloVersionTexto = !string.IsNullOrWhiteSpace(release.Titulo) ? release.Titulo : "AnimeLocalTracker";
                     NovedadesTexto = !string.IsNullOrWhiteSpace(release.NotasVersion) ? release.NotasVersion : NovedadesTexto;
                     FechaVersionTexto = release.FechaPublicacion.HasValue
-                        ? $"Publicado: {release.FechaPublicacion.Value:dd/MM/yyyy}"
+                        ? string.Format(LocalizationService.T("Acerca_PublicadoFormato"), release.FechaPublicacion.Value)
                         : string.Empty;
                 }
             }
@@ -73,10 +85,10 @@ public partial class AcercaDeViewModel : ObservableObject
             var update = await _updateService.ComprobarActualizacionesAsync(esManual: true);
             if (update != null)
             {
-                string nuevaVersion = update.TargetFullRelease?.Version.ToNormalizedString() ?? "nueva versión";
+                string nuevaVersion = update.TargetFullRelease?.Version.ToNormalizedString() ?? LocalizationService.T("Msg_NuevaVersion");
                 bool confirmar = await _dialogService.MostrarDialogoAsync(
-                    "¡Actualización Disponible!",
-                    $"Se encontró la versión {nuevaVersion}.\n\n¿Deseas descargarla e instalarla ahora automáticamente?",
+                    LocalizationService.T("Acerca_ActualizacionDisponibleTitulo"),
+                    string.Format(LocalizationService.T("Acerca_ActualizacionDisponibleMsj"), nuevaVersion),
                     true,
                     "DownloadCircle",
                     "#4CAF50");
@@ -94,8 +106,8 @@ public partial class AcercaDeViewModel : ObservableObject
             {
                 await CargarNovedadesAsync(forzar: true);
                 await _dialogService.MostrarDialogoAsync(
-                    "Aplicación Actualizada",
-                    $"Ya tienes instalada la versión más reciente ({VersionAppTexto}).",
+                    LocalizationService.T("Acerca_AplicacionActualizadaTitulo"),
+                    string.Format(LocalizationService.T("Acerca_AplicacionActualizadaMsj"), VersionAppTexto),
                     false,
                     "CheckCircleOutline",
                     "#4CAF50");
@@ -105,8 +117,8 @@ public partial class AcercaDeViewModel : ObservableObject
         {
             AppLogger.Error("AcercaDeViewModel", "Error buscando actualizaciones", ex);
             await _dialogService.MostrarDialogoAsync(
-                "Error de Actualización",
-                $"No se pudo comprobar la actualización: {ex.Message}",
+                LocalizationService.T("Acerca_ErrorActualizacionTitulo"),
+                string.Format(LocalizationService.T("Acerca_ErrorActualizacionMsj"), ex.Message),
                 false,
                 "AlertCircleOutline",
                 "#F44336");

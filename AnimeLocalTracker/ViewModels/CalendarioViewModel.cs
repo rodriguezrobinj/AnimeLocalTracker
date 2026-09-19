@@ -91,7 +91,17 @@ public partial class CalendarioViewModel : ObservableObject, IDisposable
 
             // PERF-02: proyección ligera (sin Sinopsis) para la lista del calendario.
             var animes = await _databaseService.ObtenerAnimesLigerosAsync();
-            foreach (var a in animes) a.ResolverPortadaLocal();
+
+            // PERF-03: ResolverPortadaLocal() hace un File.Exists por anime — con una
+            // biblioteca de cientos de animes eso es I/O de disco síncrono corriendo en el
+            // hilo de UI justo antes de pintar nada (el lag que se ve al abrir la pestaña).
+            // No toca nada de UI (solo un campo privado del modelo), así que es seguro
+            // resolverlo en un hilo de fondo.
+            await Task.Run(() =>
+            {
+                foreach (var a in animes) a.ResolverPortadaLocal();
+            });
+
             TotalAnimesEnEmision = animes.Count(a => a.Estado.Equals("RELEASING", StringComparison.OrdinalIgnoreCase));
             
             // GroupBy: tolera AniListIds duplicados en la BD (ToDictionary lanzaría excepción
@@ -176,8 +186,8 @@ public partial class CalendarioViewModel : ObservableObject, IDisposable
             if (anime == null)
             {
                 _ = WeakReferenceMessenger.Default.Send(new MostrarDialogoRequestMessage(
-                    "No está en tu biblioteca",
-                    $"'{episodio.Titulo}' aún no está en tu biblioteca local.\n\nAñádelo desde la pestaña + para poder verlo o descargarlo.",
+                    LocalizationService.T("Cal_NoEnBibliotecaTitulo"),
+                    string.Format(LocalizationService.T("Cal_NoEnBibliotecaMsj"), episodio.Titulo),
                     false,
                     "BookOpenPageVariantOutline",
                     "#60A5FA"));

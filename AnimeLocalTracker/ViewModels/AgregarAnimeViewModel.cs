@@ -17,7 +17,8 @@ using AnimeLocalTracker.Services;
 namespace AnimeLocalTracker.ViewModels;
 
 public partial class AgregarAnimeViewModel : ObservableObject,
-    IRecipient<AnimeAñadidoMensaje>
+    IRecipient<AnimeAñadidoMensaje>,
+    IRecipient<IdiomaCambiadoMensaje>
 {
     private readonly IAnimeTrackingService _animeTrackingService;
     private readonly IDatabaseService _databaseService;
@@ -31,8 +32,8 @@ public partial class AgregarAnimeViewModel : ObservableObject,
     public ICollectionView ResultadosFiltrados { get; }
 
     // --- FILTROS DE TEMPORADA Y AÑO (sobre resultados de búsqueda/tendencias) ---
-    public const string TodasLasTemporadas = "Todas las temporadas";
-    public const string TodosLosAños = "Todos los años";
+    public static string TodasLasTemporadas => LocalizationService.T("Gal_TodasLasTemporadas");
+    public static string TodosLosAños => LocalizationService.T("Gal_TodosLosAnios");
 
     [ObservableProperty]
     private ObservableCollection<string> _temporadasDisponibles = [TodasLasTemporadas];
@@ -93,10 +94,10 @@ public partial class AgregarAnimeViewModel : ObservableObject,
 
     private static string SeasonATexto(string codigo) => codigo switch
     {
-        "WINTER" => "Invierno",
-        "SPRING" => "Primavera",
-        "SUMMER" => "Verano",
-        "FALL" => "Otoño",
+        "WINTER" => LocalizationService.T("Temporada_Invierno"),
+        "SPRING" => LocalizationService.T("Temporada_Primavera"),
+        "SUMMER" => LocalizationService.T("Temporada_Verano"),
+        "FALL" => LocalizationService.T("Temporada_Otonio"),
         _ => codigo
     };
 
@@ -146,7 +147,7 @@ public partial class AgregarAnimeViewModel : ObservableObject,
     private bool _mostrandoTendencias = true;
 
     [ObservableProperty]
-    private string _tituloSeccion = "Tendencias de la temporada";
+    private string _tituloSeccion = LocalizationService.T("Add_TendenciasTemporada");
 
     private string _textoBusqueda = string.Empty;
     public string TextoBusqueda
@@ -182,6 +183,7 @@ public partial class AgregarAnimeViewModel : ObservableObject,
         // Registro vía IRecipient<AnimeAñadidoMensaje>: una sola suscripción.
         // (Antes había un lambda + Receive() duplicando la misma lógica.)
         WeakReferenceMessenger.Default.Register<AnimeAñadidoMensaje>(this);
+        WeakReferenceMessenger.Default.Register<IdiomaCambiadoMensaje>(this);
 
         // Resultados es una única instancia estable durante toda la vida del VM (solo se
         // Clear()+Add() en cada búsqueda): la vista filtrada se crea una sola vez aquí.
@@ -230,7 +232,7 @@ public partial class AgregarAnimeViewModel : ObservableObject,
         {
             IsSearching = true;
             MostrandoTendencias = true;
-            TituloSeccion = "Tendencias de la temporada";
+            TituloSeccion = LocalizationService.T("Add_TendenciasTemporada");
             BusquedaSinResultados = false;
 
             var tendencias = await _animeTrackingService.ObtenerAnimesTendenciaAsync(cts.Token);
@@ -283,7 +285,7 @@ public partial class AgregarAnimeViewModel : ObservableObject,
         {
             IsSearching = true;
             MostrandoTendencias = false;
-            TituloSeccion = $"Resultados para \"{busqueda.Trim()}\"";
+            TituloSeccion = string.Format(LocalizationService.T("Add_ResultadosParaFormato"), busqueda.Trim());
             BusquedaSinResultados = false;
 
             await Task.Delay(350, cts.Token);
@@ -349,8 +351,8 @@ public partial class AgregarAnimeViewModel : ObservableObject,
                 item.EstaEnBiblioteca = true;
                 _animesEnBibliotecaIds.Add(animeAPI.Id);
                 await _dialogService.MostrarDialogoAsync(
-                    "Anime Existente",
-                    $"El anime '{titulo}' ya se encuentra en tu biblioteca.",
+                    LocalizationService.T("Dlg_AnimeExistente"),
+                    string.Format(LocalizationService.T("Dlg_AnimeExistenteMsj"), titulo),
                     false,
                     "InformationOutline",
                     "#FF9800");
@@ -361,8 +363,8 @@ public partial class AgregarAnimeViewModel : ObservableObject,
             _animesEnBibliotecaIds.Add(animeAPI.Id);
 
             await _dialogService.MostrarDialogoAsync(
-                "¡Anime Añadido!",
-                $"'{titulo}' se ha añadido a tu biblioteca correctamente.",
+                LocalizationService.T("Add_AnimeAnadidoTitulo"),
+                string.Format(LocalizationService.T("Add_AnimeAnadidoMsj"), titulo),
                 false,
                 "CheckCircle",
                 "#4CAF50");
@@ -371,8 +373,8 @@ public partial class AgregarAnimeViewModel : ObservableObject,
         {
             AppLogger.Error("AgregarAnimeViewModel", $"Error al añadir anime '{titulo}'", ex);
             await _dialogService.MostrarDialogoAsync(
-                "Error al Añadir",
-                $"Ocurrió un error al añadir '{titulo}': {ex.Message}",
+                LocalizationService.T("Add_ErrorAlAnadirTitulo"),
+                string.Format(LocalizationService.T("Add_ErrorAlAnadirMsj"), titulo, ex.Message),
                 false,
                 "AlertCircle",
                 "#FF5252");
@@ -423,6 +425,17 @@ public partial class AgregarAnimeViewModel : ObservableObject,
         {
             AppLogger.Error("AgregarAnimeViewModel", "Error al procesar AnimeAñadidoMensaje", ex);
         }
+    }
+
+    /// <summary>LOC-08: regenera el título de sección y los desplegables de temporada/año
+    /// (texto plano, no se refrescan solos al cambiar de idioma).</summary>
+    public void Receive(IdiomaCambiadoMensaje message)
+    {
+        TituloSeccion = !MostrandoTendencias && TieneTextoBusqueda
+            ? string.Format(LocalizationService.T("Add_ResultadosParaFormato"), TextoBusqueda.Trim())
+            : LocalizationService.T("Add_TendenciasTemporada");
+        ActualizarTemporadasYAniosDisponibles();
+        RefrescarFiltroTemporada();
     }
 
     private void CancelarBusquedaPendiente()
