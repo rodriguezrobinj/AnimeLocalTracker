@@ -50,6 +50,8 @@ public class EstadisticasViewTests
                     TrueValue = Visibility.Collapsed,
                     FalseValue = Visibility.Visible
                 };
+                app.Resources["BoolToOpacity"] = new AnimeLocalTracker.Converters.BoolToOpacityConverter();
+                app.Resources["InverseBool"] = new AnimeLocalTracker.Converters.InverseBoolConverter();
                 // Estilos MaterialDesign (p. ej. MaterialDesignToolButton del reproductor)
                 app.Resources.MergedDictionaries.Add(new ResourceDictionary
                 {
