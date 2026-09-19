@@ -137,7 +137,7 @@ public partial class HistorialViewModel : ObservableObject, IRecipient<EpisodioA
                     AniListId = reg.AniListId,
                     NumeroEpisodio = reg.NumeroEpisodio,
                     TituloAnime = tituloAnime,
-                    TituloEpisodio = $"Episodio {reg.NumeroEpisodio}",
+                    TituloEpisodio = string.Format(LocalizationService.T("Act_EpisodioFormato"), reg.NumeroEpisodio),
                     RutaArchivo = reg.RutaArchivo,
                     RutaMiniatura = reg.RutaMiniatura,
                     RutaPortada = rutaPortada,
@@ -293,7 +293,10 @@ public partial class HistorialViewModel : ObservableObject, IRecipient<EpisodioA
         {
             await _databaseService.LimpiarRegistroHistorialAsync(item.AniListId, item.NumeroEpisodio);
             ItemsHistorial.Remove(item);
-            ItemsFiltrados.Remove(item);
+            // ItemsFiltrados es descartado/reconstruido por AplicarFiltro() (igual que ItemsAgrupados,
+            // que es lo que el ListBox realmente enlaza) — quitarlo aquí a mano no bastaba: el item
+            // seguía visible porque ItemsAgrupados nunca se refrescaba.
+            AplicarFiltro();
             ActualizarContadores();
             NotificarEstados();
         }
@@ -356,14 +359,21 @@ public partial class HistorialViewModel : ObservableObject, IRecipient<EpisodioA
         var item = ItemsHistorial.FirstOrDefault(i =>
             i.AniListId == message.AnimeId && i.NumeroEpisodio == message.NumeroEpisodio);
 
+        // Los mensajes del reproductor traen progreso/duración; los del marcado manual (Detalle)
+        // no — y el marcado manual no debe fabricar una fecha de visionado (ver persistence.md #5).
+        bool esReproduccionReal = message.ProgresoSegundos > 0 || message.TotalSegundos > 0;
+
         if (item != null)
         {
-            // La fecha NO se pisa en cada guardado de progreso (mostraba la hora del
-            // guardado en vez de la hora real en la que se vio el episodio): solo se
-            // actualiza cuando el episodio pasa a "visto" (momento real del visionado).
-            if (message.VistoLocal && !item.VistoLocal)
+            // Cada guardado de progreso del reproductor ya estampa UltimaReproduccion = ahora en
+            // la BD (PlaybackStateService), así que reflejarlo en memoria deja la lista igual que
+            // tras una recarga: la fila sube al principio y pasa de "Ayer" a "Hoy" en vivo.
+            if (esReproduccionReal || (message.VistoLocal && !item.VistoLocal))
             {
                 item.UltimaReproduccion = DateTime.UtcNow;
+
+                int indice = ItemsHistorial.IndexOf(item);
+                if (indice > 0) ItemsHistorial.Move(indice, 0);
             }
             item.VistoLocal = message.VistoLocal;
             item.ProgresoSegundos = message.ProgresoSegundos;
@@ -371,11 +381,25 @@ public partial class HistorialViewModel : ObservableObject, IRecipient<EpisodioA
             ActualizarContadores();
             AplicarFiltro();
         }
+        else if (esReproduccionReal)
+        {
+            // Episodio que aún no estaba en la lista (primera vez que se reproduce): recargar YA,
+            // sin esperar el cooldown de 30 s — pero una sola vez por episodio, para no volver al
+            // bucle de SELECT+rebuild en cada guardado de progreso (cada ~3 s).
+            var clave = (message.AnimeId, message.NumeroEpisodio);
+            if (clave != _ultimaClaveRecargada && !EstaCargando)
+            {
+                _ultimaClaveRecargada = clave;
+                _ = CargarHistorialAsync();
+            }
+        }
         else
         {
             RecargarConCooldown();
         }
     }
+
+    private (int AnimeId, int NumeroEpisodio) _ultimaClaveRecargada;
 
     // FIX: los guardados de progreso llegan cada ~5 s durante la reproducción; si el
     // episodio aún no está en la lista (anime nuevo), recargar en cada mensaje era un
