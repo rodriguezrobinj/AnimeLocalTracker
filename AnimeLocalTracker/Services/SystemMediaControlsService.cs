@@ -106,7 +106,7 @@ public class SystemMediaControlsService : ISystemMediaControlsService
             var updater = _smtc.DisplayUpdater;
             updater.Type = MediaPlaybackType.Video;
             updater.VideoProperties.Title = tituloAnime;
-            updater.VideoProperties.Subtitle = $"Episodio {numeroEpisodio}";
+            updater.VideoProperties.Subtitle = string.Format(LocalizationService.T("Act_EpisodioFormato"), numeroEpisodio);
 
             updater.Thumbnail = null;
             if (!string.IsNullOrWhiteSpace(rutaPortada) && Uri.TryCreate(rutaPortada, UriKind.Absolute, out var uri))

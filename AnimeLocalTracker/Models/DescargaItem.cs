@@ -10,7 +10,7 @@ public partial class DescargaItem : ObservableObject
     public string Fuente { get; set; } = "AnimeAv1";
     public string RutaArchivo { get; set; } = string.Empty;
 
-    public string TituloEpisodio => $"Episodio {NumeroEpisodio}";
+    public string TituloEpisodio => string.Format(AnimeLocalTracker.Services.LocalizationService.T("Act_EpisodioFormato"), NumeroEpisodio);
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ProgresoTexto))]

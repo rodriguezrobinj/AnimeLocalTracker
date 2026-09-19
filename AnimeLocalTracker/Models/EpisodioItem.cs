@@ -7,10 +7,14 @@ namespace AnimeLocalTracker.Models;
 public partial class EpisodioItem : ObservableObject 
 {
     // Nombre que se mostrará en pantalla (Ej: "Episodio 1")
-    public string TituloVisual => $"Episodio {NumeroEpisodio}"; 
-    
+    public string TituloVisual => string.Format(AnimeLocalTracker.Services.LocalizationService.T("Act_EpisodioFormato"), NumeroEpisodio);
+
     // Resumen para accesibilidad (lectores de pantalla)
-    public string ResumenAccesible => $"Episodio {NumeroEpisodio}: {(Visto ? "Visto" : "No visto")}. {(Descargado ? "Descargado" : "No descargado")}.";
+    public string ResumenAccesible => string.Format(
+        AnimeLocalTracker.Services.LocalizationService.T("Epi_ResumenAccesibleFormato"),
+        NumeroEpisodio,
+        Visto ? AnimeLocalTracker.Services.LocalizationService.T("Epi_AccVisto") : AnimeLocalTracker.Services.LocalizationService.T("Epi_AccNoVisto"),
+        Descargado ? AnimeLocalTracker.Services.LocalizationService.T("Act_Descargado") : AnimeLocalTracker.Services.LocalizationService.T("Epi_AccNoDescargado"));
 
     
     public string TituloArchivo { get; set; } = string.Empty;
@@ -90,6 +94,16 @@ public partial class EpisodioItem : ObservableObject
     {
         get => _rutaMiniatura;
         set => SetProperty(ref _rutaMiniatura, value);
+    }
+
+    // "Doctor de integridad": true solo tras un escaneo explícito que encontró el contenedor
+    // roto (ver DetalleViewModel.VerificarIntegridadAsync) — nunca se infiere automáticamente.
+    private bool _estaCorrupto;
+    [Ignore]
+    public bool EstaCorrupto
+    {
+        get => _estaCorrupto;
+        set => SetProperty(ref _estaCorrupto, value);
     }
 
     // Badge técnico para la UI: "1080p · HEVC · 10bit · 23.98fps"

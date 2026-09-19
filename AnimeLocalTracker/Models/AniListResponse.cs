@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Text.Json.Serialization;
 
 namespace AnimeLocalTracker.Models;
@@ -115,12 +116,12 @@ public class AniListMedia
     [JsonIgnore]
     public string FormattedStatus => Status switch
     {
-        "RELEASING" => "En Emisión",
-        "FINISHED" => "Finalizado",
-        "NOT_YET_RELEASED" => "Próximamente",
-        "CANCELLED" => "Cancelado",
-        "HIATUS" => "Pausado",
-        _ => "Desconocido"
+        "RELEASING" => AnimeLocalTracker.Services.LocalizationService.T("Media_EstadoEnEmision"),
+        "FINISHED" => AnimeLocalTracker.Services.LocalizationService.T("Media_EstadoFinalizado"),
+        "NOT_YET_RELEASED" => AnimeLocalTracker.Services.LocalizationService.T("Media_EstadoProximamente"),
+        "CANCELLED" => AnimeLocalTracker.Services.LocalizationService.T("Media_EstadoCancelado"),
+        "HIATUS" => AnimeLocalTracker.Services.LocalizationService.T("Media_EstadoPausado"),
+        _ => AnimeLocalTracker.Services.LocalizationService.T("Media_EstadoDesconocido")
     };
 
     [JsonIgnore]
@@ -135,25 +136,27 @@ public class AniListMedia
     };
 
     [JsonIgnore]
-    public string FormattedEpisodes => Episodes.HasValue ? $"{Episodes} episodios" : "Episodios: ?";
+    public string FormattedEpisodes => Episodes.HasValue
+        ? string.Format(AnimeLocalTracker.Services.LocalizationService.T("Det_EpisodiosFormato"), Episodes)
+        : AnimeLocalTracker.Services.LocalizationService.T("Media_EpisodiosDesconocido");
 
     [JsonIgnore]
-    public string FormattedYear => StartDate?.Year?.ToString() ?? "Año ?";
+    public string FormattedYear => StartDate?.Year?.ToString() ?? AnimeLocalTracker.Services.LocalizationService.T("Media_AnioDesconocido");
 
     [JsonIgnore]
     public string FormattedSeason => Season switch
     {
-        "WINTER" => "Invierno",
-        "SPRING" => "Primavera",
-        "SUMMER" => "Verano",
-        "FALL" => "Otoño",
+        "WINTER" => AnimeLocalTracker.Services.LocalizationService.T("Temporada_Invierno"),
+        "SPRING" => AnimeLocalTracker.Services.LocalizationService.T("Temporada_Primavera"),
+        "SUMMER" => AnimeLocalTracker.Services.LocalizationService.T("Temporada_Verano"),
+        "FALL" => AnimeLocalTracker.Services.LocalizationService.T("Temporada_Otonio"),
         _ => string.Empty
     };
 
     [JsonIgnore]
-    public string FormattedGenres => Genres != null && Genres.Count > 0 
-        ? string.Join(" • ", Genres) 
-        : "Sin géneros";
+    public string FormattedGenres => Genres != null && Genres.Count > 0
+        ? string.Join(" • ", Genres.Select(AnimeLocalTracker.Services.LocalizationService.TraducirGenero))
+        : AnimeLocalTracker.Services.LocalizationService.T("Media_SinGeneros");
 }
 
 public class AniListTitle

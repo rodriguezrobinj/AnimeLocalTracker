@@ -38,6 +38,17 @@
                 <Style.Triggers>
                     <EventTrigger RoutedEvent="Loaded">
                         <BeginStoryboard>
+                            <!-- PERF-04/PERF-06: "Forever" es correcto AQUÍ — el contrato de este estilo
+                                 es que quien lo use SIEMPRE oculte el Border (Visibility=Collapsed) en
+                                 cuanto la imagen real termine de cargar (ver ImageLoadingBehavior y/o
+                                 AnimeCoverLoadingConverter, según la vista). Un elemento Collapsed no se
+                                 compone ni se pinta, así que una animación "Forever" en él no cuesta nada
+                                 una vez oculto — el costo real vivía en dejarlo VISIBLE para siempre
+                                 (Calendario, antes de atarlo a ImageLoadingBehavior), no en la duración de
+                                 la animación en sí. Poner aquí un límite fijo (se probó RepeatBehavior=3x)
+                                 fue un error: rompía el caso de Galería, donde la carga a veces tarda más
+                                 de esa ventana y el shimmer se veía "congelado" (estático) en vez de
+                                 desaparecer o seguir animando hasta que la portada real esté lista. -->
                             <Storyboard RepeatBehavior="Forever">
                                 <DoubleAnimation Storyboard.TargetProperty="(Border.Background).(LinearGradientBrush.RelativeTransform).(TranslateTransform.X)"
                                                  From="-1" To="1" Duration="0:0:1.5" />
@@ -56,6 +67,10 @@
             <conv:AnimeCoverMultiConverter x:Key="AnimeCoverMulti" />
             <conv:AnimeCoverLoadingConverter x:Key="AnimeCoverLoading" />
             <conv:LocalizedFormatConverter x:Key="LocalizedFormat" />
+            <conv:GeneroTraducidoConverter x:Key="GeneroTraducido" />
+            <conv:BoolToOpacityConverter x:Key="BoolToOpacity" />
+            <conv:InverseBoolConverter x:Key="InverseBool" />
+            <conv:EpisodioActualBrushConverter x:Key="EpisodioActualBrush" />
 
             <!-- ═══════════════════════════════════════════════════════════════ -->
             <!--  SISTEMA DE DISEÑO (tokens canónicos = paleta de DetalleView)  -->

@@ -44,10 +44,10 @@ public class AniSkipResult
     [JsonIgnore]
     public string TextoBoton => SkipType switch
     {
-        "op" or "mixed-op" => "Saltar intro",
-        "ed" or "mixed-ed" => "Saltar ending",
-        "recap" => "Saltar resumen",
-        _ => "Saltar segmento"
+        "op" or "mixed-op" => AnimeLocalTracker.Services.LocalizationService.T("Skip_SaltarIntro"),
+        "ed" or "mixed-ed" => AnimeLocalTracker.Services.LocalizationService.T("Skip_SaltarEnding"),
+        "recap" => AnimeLocalTracker.Services.LocalizationService.T("Skip_SaltarResumen"),
+        _ => AnimeLocalTracker.Services.LocalizationService.T("Skip_SaltarSegmento")
     };
 
     [JsonIgnore]

@@ -24,3 +24,10 @@ public record AnimeAñadidoMensaje(AnimeItem NuevoAnime);
 public record UsuarioLogeadoMensaje();
 public record UsuarioDesconectadoMensaje();
 public record AbrirBuscadorMensaje();
+
+// LOC-08: notifica un cambio de Idioma vía WeakReferenceMessenger (referencias débiles, se
+// des-registran solas al recolectar el receptor) en vez de suscribirse directo al evento
+// estático de LocalizationService.Instance — esto último acumulaba suscriptores para
+// siempre (cada instancia creada, p. ej. en tests, quedaba viva indefinidamente) y producía
+// interferencia entre pruebas al correr en paralelo.
+public record IdiomaCambiadoMensaje();

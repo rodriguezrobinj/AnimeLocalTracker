@@ -96,14 +96,18 @@ public partial class AnimeItem : ObservableObject
 
     [Ignore]
     [JsonIgnore]
-    public string ProgresoEpisodiosTexto => $"{EpisodiosVistos} de {TotalEpisodios} vistos";
+    public string ProgresoEpisodiosTexto => string.Format(AnimeLocalTracker.Services.LocalizationService.T("Epi_ProgresoEpisodiosTexto"), EpisodiosVistos, TotalEpisodios);
 
 
     // === PROPIEDADES VISUALES (NO SE GUARDAN EN SQLITE) ===
     [Ignore] 
     [JsonIgnore]
-    public string EstadoVisual => Estado == "RELEASING" ? "En Emisión" : (Estado == "FINISHED" ? "Finalizado" : "Desconocido");
-    
+    public string EstadoVisual => Estado == "RELEASING"
+        ? AnimeLocalTracker.Services.LocalizationService.T("Media_EstadoEnEmision")
+        : (Estado == "FINISHED"
+            ? AnimeLocalTracker.Services.LocalizationService.T("Media_EstadoFinalizado")
+            : AnimeLocalTracker.Services.LocalizationService.T("Media_EstadoDesconocido"));
+
     [Ignore]
     [JsonIgnore]
     public string ColorEstado => Estado == "RELEASING" ? "#4CAF50" : "#9E9E9E";
@@ -112,10 +116,10 @@ public partial class AnimeItem : ObservableObject
     [JsonIgnore]
     public string TemporadaVisual => Temporada switch
     {
-        "WINTER" => "Invierno",
-        "SPRING" => "Primavera",
-        "SUMMER" => "Verano",
-        "FALL" => "Otoño",
+        "WINTER" => AnimeLocalTracker.Services.LocalizationService.T("Temporada_Invierno"),
+        "SPRING" => AnimeLocalTracker.Services.LocalizationService.T("Temporada_Primavera"),
+        "SUMMER" => AnimeLocalTracker.Services.LocalizationService.T("Temporada_Verano"),
+        "FALL" => AnimeLocalTracker.Services.LocalizationService.T("Temporada_Otonio"),
         _ => string.Empty
     };
     

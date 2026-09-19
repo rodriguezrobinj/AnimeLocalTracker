@@ -97,7 +97,7 @@ public class PlaybackStateService : IPlaybackStateService
             // Si el usuario reanuda un capítulo "visto" pero lo deja a medias, le quitamos
             // la marca de "visto" para que se vea la barra de progreso — PERO nunca si el
             // reproductor ya determinó en ESTA sesión que se completó (datos.FueMarcadoComoVisto).
-            // Sin este chequeo, el guardado periódico (cada 5s) o el guardado al cambiar de
+            // Sin este chequeo, el guardado periódico (cada 3s) o el guardado al cambiar de
             // episodio podían revertir a "no visto" un episodio recién marcado: su propio
             // umbral (95% por defecto) es más estricto que el del reproductor (90% por
             // defecto), así que en la ventana 90-95% este guardado deshacía el marcado que
