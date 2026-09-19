@@ -1,10 +1,15 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using AnimeLocalTracker.Controls;
 using AnimeLocalTracker.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 
 namespace AnimeLocalTracker.ViewModels;
 
@@ -15,10 +20,17 @@ namespace AnimeLocalTracker.ViewModels;
 public partial class EstadisticasViewModel : ObservableObject
 {
     private readonly IDatabaseService _databaseService;
+    private readonly IAnimeTrackingService _animeTrackingService;
+    private readonly IAuthService _authService;
+    private readonly IDialogService _dialogService;
 
-    public EstadisticasViewModel(IDatabaseService databaseService)
+    public EstadisticasViewModel(IDatabaseService databaseService, IAnimeTrackingService animeTrackingService,
+        IAuthService authService, IDialogService dialogService)
     {
         _databaseService = databaseService;
+        _animeTrackingService = animeTrackingService;
+        _authService = authService;
+        _dialogService = dialogService;
     }
 
     // === RESUMEN ===
@@ -57,11 +69,17 @@ public partial class EstadisticasViewModel : ObservableObject
     [ObservableProperty] private string _mejorAnio = "—";
     [ObservableProperty] private string _mejorAnioDetalle = "";
     [ObservableProperty] private string _horasPorMes = "0";
-    [ObservableProperty] private string _rachaMaxima = "0 días";
-    [ObservableProperty] private string _rachaActual = "0 días";
+    [ObservableProperty] private string _rachaMaxima = string.Format(LocalizationService.T("Stats_DiasFormato"), 0);
+    [ObservableProperty] private string _rachaActual = string.Format(LocalizationService.T("Stats_DiasFormato"), 0);
 
     // === TOP ANIMES ===
     [ObservableProperty] private List<TopAnime> _topAnimes = new();
+
+    // === LOGROS ===
+    [ObservableProperty] private List<Logro> _logros = new();
+
+    // === TARJETA WRAPPED ===
+    [ObservableProperty] private bool _generandoWrapped;
 
     // === DESGLOSES ===
     [ObservableProperty] private List<BarraDato> _vistosPorAnio = new();
@@ -101,7 +119,7 @@ public partial class EstadisticasViewModel : ObservableObject
             // visible en vez de dejar el panel con placeholders vacíos sin explicación.
             AppLogger.Error("EstadisticasViewModel", "Error cargando estadísticas", ex);
             HayError = true;
-            MensajeError = "No se pudieron cargar las estadísticas. Inténtalo de nuevo más tarde.";
+            MensajeError = LocalizationService.T("Stats_ErrorCargaMsj");
         }
     }
 
@@ -243,7 +261,7 @@ public partial class EstadisticasViewModel : ObservableObject
         var donutGeneros = generosParaDonut
             .Select((kv, i) => new DonutDato(kv.Key, kv.Value, paletaGeneros[i % paletaGeneros.Length]))
             .ToList();
-        if (resto > 0) donutGeneros.Add(new DonutDato("Otros", resto, "#4B5563"));
+        if (resto > 0) donutGeneros.Add(new DonutDato(LocalizationService.T("Stats_Otros"), resto, "#4B5563"));
         DonutGeneros = donutGeneros;
 
         // === INSIGHTS DEL ANALISTA ===
@@ -253,9 +271,9 @@ public partial class EstadisticasViewModel : ObservableObject
         {
             GeneroFavorito = generoFav.Key;
             double pct = TotalAnimes > 0 ? generoFav.Value * 100.0 / TotalAnimes : 0;
-            GeneroFavoritoDetalle = $"{generoFav.Value} animes · {pct:F0}% de tu colección";
+            GeneroFavoritoDetalle = string.Format(LocalizationService.T("Stats_GeneroFavoritoDetalleFormato"), generoFav.Value, pct);
             DonutGenerosCentro = generoFav.Key;
-            DonutGenerosSubcentro = $"favorito · {pct:F0}%";
+            DonutGenerosSubcentro = string.Format(LocalizationService.T("Stats_FavoritoPorcentaje"), pct);
         }
 
         // Anime más visto
@@ -266,8 +284,8 @@ public partial class EstadisticasViewModel : ObservableObject
             AnimeMasVisto = animeTop?.Titulo ?? $"Anime {top1.Key}";
             int totalDelAnime = animeTop?.TotalEpisodios ?? 0;
             AnimeMasVistoDetalle = totalDelAnime > 0
-                ? $"{top1.Count()} de {totalDelAnime} episodios"
-                : $"{top1.Count()} episodios vistos";
+                ? string.Format(LocalizationService.T("Stats_EpisodiosDeTotalFormato"), top1.Count(), totalDelAnime)
+                : string.Format(LocalizationService.T("Stats_EpisodiosVistosFormato"), top1.Count());
         }
 
         // Mejor año
@@ -279,7 +297,7 @@ public partial class EstadisticasViewModel : ObservableObject
         if (mejorAnio != null)
         {
             MejorAnio = mejorAnio.Key.ToString();
-            MejorAnioDetalle = $"{mejorAnio.Count()} episodios en {mejorAnio.Key}";
+            MejorAnioDetalle = string.Format(LocalizationService.T("Stats_EpisodiosEnAnioFormato"), mejorAnio.Count(), mejorAnio.Key);
         }
 
         // Horas por mes (desde el primer registro)
@@ -321,8 +339,165 @@ public partial class EstadisticasViewModel : ObservableObject
                 cursor = cursor.AddDays(-1);
             }
         }
-        RachaMaxima = $"{rachaMax} días";
-        RachaActual = $"{rachaActual} días";
+        RachaMaxima = string.Format(LocalizationService.T("Stats_DiasFormato"), rachaMax);
+        RachaActual = string.Format(LocalizationService.T("Stats_DiasFormato"), rachaActual);
+
+        // === LOGROS ===
+        // Búho Nocturno compara contra la hora local del reloj de pared. UltimaReproduccion
+        // llega de sqlite-net con Kind=Unspecified pero representa UTC (regla persistence.md #4):
+        // DateTime.ToLocalTime() ya asume UTC cuando Kind es Unspecified, así que no hace falta
+        // SpecifyKind explícito.
+        bool buhoNocturno = vistos.Any(r =>
+        {
+            if (!r.UltimaReproduccion.HasValue) return false;
+            int horaLocal = r.UltimaReproduccion.Value.ToLocalTime().Hour;
+            return horaLocal is >= 2 and < 5;
+        });
+
+        bool maratonero = porDia.Any(g => g.Key.HasValue && g.Count() >= 6);
+
+        bool completistaLegendario = animes.Any(a =>
+            a.TotalEpisodios > 50 && registrosPorAnime[a.AniListId].Count(r => r.VistoLocal) >= a.TotalEpisodios);
+
+        bool biografoOtaku = horas >= 100;
+
+        Logros = new List<Logro>
+        {
+            new("Run", "#FB923C", LocalizationService.T("Stats_LogroMaratonero"), LocalizationService.T("Stats_LogroMaratoneroDesc"), maratonero),
+            new("Owl", "#818CF8", LocalizationService.T("Stats_LogroBuhoNocturno"), LocalizationService.T("Stats_LogroBuhoNocturnoDesc"), buhoNocturno),
+            new("TrophyAward", "#FBBF24", LocalizationService.T("Stats_LogroCompletista"), LocalizationService.T("Stats_LogroCompletistaDesc"), completistaLegendario),
+            new("BookOpenPageVariant", "#34D399", LocalizationService.T("Stats_LogroBiografo"), LocalizationService.T("Stats_LogroBiografoDesc"), biografoOtaku),
+        };
+    }
+
+    /// <summary>
+    /// Compone la tarjeta "Anime Wrapped" renderizando AnimeWrappedCardView fuera de pantalla
+    /// (RenderTargetBitmap) — reutiliza los datos ya agregados por CalcularEstadisticas, sin
+    /// volver a tocar la base de datos. Guarda el PNG en Imágenes\AnimeLocalTracker y lo copia
+    /// al portapapeles para pegarlo directo en Discord/redes.
+    /// </summary>
+    [RelayCommand]
+    private async Task GenerarTarjetaResumenAsync()
+    {
+        if (GenerandoWrapped) return;
+        GenerandoWrapped = true;
+        try
+        {
+            var datos = await ConstruirDatosWrappedAsync();
+            byte[] png = RenderizarTarjetaWrapped(datos);
+
+            string carpeta = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "AnimeLocalTracker");
+            Directory.CreateDirectory(carpeta);
+            string ruta = Path.Combine(carpeta, $"AnimeWrapped_{DateTime.Now:yyyyMMdd_HHmmss}.png");
+            await File.WriteAllBytesAsync(ruta, png);
+
+            CopiarPngAlPortapapeles(png);
+
+            _dialogService.MostrarToast(
+                LocalizationService.T("Stats_Wrapped"),
+                string.Format(LocalizationService.T("Stats_WrappedListoFormato"), ruta),
+                "ImageMultiple", "#8B5CF6");
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("EstadisticasViewModel", "Error generando tarjeta Wrapped", ex);
+            _dialogService.MostrarToast(
+                LocalizationService.T("Stats_Wrapped"),
+                LocalizationService.T("Stats_WrappedErrorMsj"),
+                "AlertCircle", "#F87171");
+        }
+        finally
+        {
+            GenerandoWrapped = false;
+        }
+    }
+
+    private async Task<Models.WrappedCardData> ConstruirDatosWrappedAsync()
+    {
+        string nombreUsuario = LocalizationService.T("Gal_UsuarioDefault");
+        ImageSource? avatar = null;
+
+        string token = _authService.ObtenerTokenGuardado();
+        if (!string.IsNullOrEmpty(token))
+        {
+            var perfil = await _animeTrackingService.ObtenerPerfilUsuarioAsync(token);
+            if (perfil != null)
+            {
+                nombreUsuario = perfil.Name ?? nombreUsuario;
+                if (!string.IsNullOrWhiteSpace(perfil.Avatar?.Large))
+                {
+                    avatar = await CargarAvatarAsync(perfil.Avatar.Large);
+                }
+            }
+        }
+
+        return new Models.WrappedCardData
+        {
+            TituloCard = LocalizationService.T("Wrapped_Titulo"),
+            NombreUsuario = nombreUsuario,
+            Avatar = avatar,
+            HorasVistasTexto = HorasVistasTexto,
+            HorasLabel = LocalizationService.T("Wrapped_Horas"),
+            EpisodiosVistosTexto = TotalEpisodiosVistos.ToString(),
+            EpisodiosLabel = LocalizationService.T("Wrapped_Episodios"),
+            GeneroFavorito = GeneroFavorito,
+            GeneroLabel = LocalizationService.T("Wrapped_GeneroFavorito"),
+            RachaMaximaTexto = RachaMaxima,
+            RachaLabel = LocalizationService.T("Wrapped_RachaMaxima"),
+            TopAnimesLabel = LocalizationService.T("Wrapped_TopAnimes"),
+            TopAnimesTitulos = TopAnimes.Take(3).Select((t, i) => $"{i + 1}. {t.Titulo}").ToList(),
+            Footer = LocalizationService.T("Wrapped_Footer"),
+        };
+    }
+
+    // CacheOption.OnLoad fuerza la descarga+decodificación completa dentro de EndInit(), y
+    // Freeze() quita la afinidad de hilo — necesario porque esto corre en un hilo de fondo
+    // (Task.Run) para no bloquear la UI mientras se descarga el avatar de AniList.
+    private static async Task<ImageSource?> CargarAvatarAsync(string url)
+    {
+        try
+        {
+            return await Task.Run(() =>
+            {
+                var bmp = new BitmapImage();
+                bmp.BeginInit();
+                bmp.CacheOption = BitmapCacheOption.OnLoad;
+                bmp.UriSource = new Uri(url);
+                bmp.EndInit();
+                bmp.Freeze();
+                return (ImageSource)bmp;
+            });
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("EstadisticasViewModel", "Error descargando avatar para tarjeta Wrapped", ex);
+            return null;
+        }
+    }
+
+    private static byte[] RenderizarTarjetaWrapped(Models.WrappedCardData datos)
+    {
+        const int ancho = 1080, alto = 1350;
+        var vista = new Views.AnimeWrappedCardView { DataContext = datos };
+        vista.Measure(new Size(ancho, alto));
+        vista.Arrange(new Rect(0, 0, ancho, alto));
+        vista.UpdateLayout();
+
+        var rtb = new RenderTargetBitmap(ancho, alto, 96, 96, PixelFormats.Pbgra32);
+        rtb.Render(vista);
+
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(rtb));
+        using var ms = new MemoryStream();
+        encoder.Save(ms);
+        return ms.ToArray();
+    }
+
+    private static void CopiarPngAlPortapapeles(byte[] png)
+    {
+        using var ms = new MemoryStream(png);
+        var decoder = new PngBitmapDecoder(ms, BitmapCreateOptions.PreservePixelFormat, BitmapCacheOption.OnLoad);
+        Clipboard.SetImage(decoder.Frames[0]);
     }
 }
 
@@ -351,8 +526,8 @@ public class TopAnime
     public double AnchoBarra { get; set; }
 
     public string ProgresoTexto => TotalEpisodios > 0
-        ? $"{EpisodiosVistos} de {TotalEpisodios}"
-        : $"{EpisodiosVistos} vistos";
+        ? string.Format(LocalizationService.T("Stats_EpisodiosDeTotalFormato"), EpisodiosVistos, TotalEpisodios)
+        : string.Format(LocalizationService.T("Stats_EpisodiosVistosFormato"), EpisodiosVistos);
 
     public TopAnime(string titulo, int episodiosVistos, int totalEpisodios, int posicion)
     {
@@ -360,5 +535,25 @@ public class TopAnime
         EpisodiosVistos = episodiosVistos;
         TotalEpisodios = totalEpisodios;
         Posicion = posicion;
+    }
+}
+
+/// <summary>Insignia calculada dinámicamente a partir del historial (sin tabla/migración propia).</summary>
+public class Logro
+{
+    public string Icono { get; }
+    public string Color { get; }
+    public string Titulo { get; }
+    public string Descripcion { get; }
+    public bool Desbloqueado { get; }
+    public string EstadoTexto => LocalizationService.T(Desbloqueado ? "Stats_LogroDesbloqueado" : "Stats_LogroBloqueado");
+
+    public Logro(string icono, string color, string titulo, string descripcion, bool desbloqueado)
+    {
+        Icono = icono;
+        Color = color;
+        Titulo = titulo;
+        Descripcion = descripcion;
+        Desbloqueado = desbloqueado;
     }
 }

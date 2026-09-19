@@ -26,7 +26,7 @@ public class EstadisticasViewModelTests
         var dbMock = new Mock<IDatabaseService>();
         dbMock.Setup(d => d.ObtenerTodosLosAnimesAsync()).ReturnsAsync(animes ?? new List<AnimeItem>());
         dbMock.Setup(d => d.ObtenerTodosLosRegistrosAsync()).ReturnsAsync(registros ?? new List<RegistroEpisodio>());
-        return (new EstadisticasViewModel(dbMock.Object), dbMock);
+        return (new EstadisticasViewModel(dbMock.Object, Mock.Of<IAnimeTrackingService>(), Mock.Of<IAuthService>(), Mock.Of<IDialogService>()), dbMock);
     }
 
     [Fact]
@@ -110,7 +110,7 @@ public class EstadisticasViewModelTests
         // Arrange (EST-03)
         var dbMock = new Mock<IDatabaseService>();
         dbMock.Setup(d => d.ObtenerTodosLosAnimesAsync()).ThrowsAsync(new InvalidOperationException("db corrupta"));
-        var vm = new EstadisticasViewModel(dbMock.Object);
+        var vm = new EstadisticasViewModel(dbMock.Object, Mock.Of<IAnimeTrackingService>(), Mock.Of<IAuthService>(), Mock.Of<IDialogService>());
 
         // Act
         await vm.CargarEstadisticasAsync();
