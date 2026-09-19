@@ -700,6 +700,17 @@ public class DownloadService : IDownloadService
                             if (shouldReport) progress.Report((percent, speed));
                         }
                     }
+
+                    // FUN-018: si el servidor cierra la conexión antes de entregar todo el rango
+                    // pedido (frecuente en hosts gratuitos saturados), el stream devuelve 0 bytes
+                    // y el bucle de arriba salía en silencio dando el segmento por terminado — el
+                    // archivo final quedaba con un hueco de ceros (de la pre-asignación) sin que
+                    // ninguna excepción avisara. Tratarlo como corte transitorio de red reutiliza
+                    // el mismo reintento con backoff que ya existe para timeouts/5xx (ver FUN-017).
+                    if (segment.CurrentOffset <= segment.End)
+                    {
+                        throw new IOException($"El servidor cerró la conexión antes de completar el segmento (recibidos hasta el byte {segment.CurrentOffset} de {segment.End}).");
+                    }
                 }, cancellationToken);
             }
 
@@ -844,6 +855,16 @@ public class DownloadService : IDownloadService
         {
             EliminarParcialSeguro(destinationPath);
             throw new DownloadAbortDefinitivoException($"El archivo descargado superó el límite de seguridad de {MaxArchivoDescargaBytes / (1024.0 * 1024 * 1024):F0} GB.");
+        }
+
+        // FUN-018: mismo problema que en el modo segmentado — un cierre prematuro de conexión
+        // (host gratuito saturado) deja el stream en EOF (read == 0) antes de entregar todo el
+        // Content-Length declarado, y el bucle de arriba lo tomaba por una descarga terminada
+        // con normalidad. Si conocemos el tamaño esperado, validarlo evita mover un archivo
+        // truncado a la biblioteca como si estuviera completo.
+        if (totalBytes > 0 && totalRead < totalBytes)
+        {
+            throw new IOException($"El servidor cerró la conexión antes de completar la descarga (recibidos {totalRead} de {totalBytes} bytes).");
         }
 
         if (canReportProgress && progress != null)
