@@ -25,10 +25,14 @@ public class PluginService : IPluginService
             return new List<string>();
         }
 
+        // .py (script ejecutado por el daemon) y .dll (IProveedorVideo cargado en el arranque,
+        // ver CSharpPluginLoader) — ambos comparten la misma carpeta de "drop-in" plugins.
         return Directory.GetFiles(pluginsDir, "*.py")
+            .Concat(Directory.GetFiles(pluginsDir, "*.dll"))
             .Select(Path.GetFileName)
             .Where(f => f != null)
             .Select(f => f!)
+            .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
             .ToList();
     }
 
