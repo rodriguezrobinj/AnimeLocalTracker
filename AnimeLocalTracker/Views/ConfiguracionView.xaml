@@ -342,6 +342,21 @@
                             </Grid>
                         </Border>
 
+                        <!-- Fila: Minimizar a la bandeja del sistema -->
+                        <Border Background="#14181E" BorderBrush="#262D38" BorderThickness="1" CornerRadius="10" MinHeight="56" Padding="16,8" Margin="0,0,0,10">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="140"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding [Cfg_MinimizarBandeja], Source={x:Static loc:LocalizationService.Instance}}" FontWeight="SemiBold" Foreground="White" FontSize="13"/>
+                                    <TextBlock Text="{Binding [Cfg_MinimizarBandejaSub], Source={x:Static loc:LocalizationService.Instance}}" FontSize="11" Foreground="#9CA3AF" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <ToggleButton Grid.Column="1" HorizontalAlignment="Right" Margin="0,0,6,0" IsChecked="{Binding MinimizarABandejaAlCerrar}" Style="{StaticResource MaterialDesignSwitchToggleButton}" VerticalAlignment="Center"/>
+                            </Grid>
+                        </Border>
+
                         <!-- Fila: Idioma -->
                         <Border Background="#14181E" BorderBrush="#262D38" BorderThickness="1" CornerRadius="10" MinHeight="56" Padding="16,8" Margin="0,0,0,14">
                             <Grid>

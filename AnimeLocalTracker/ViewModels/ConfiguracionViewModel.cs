@@ -25,7 +25,7 @@ public partial class ConfiguracionViewModel : ObservableObject
 
     // === ALMACENAMIENTO ===
     [ObservableProperty] private string _rutaBaseAnimes = string.Empty;
-    [ObservableProperty] private string _espacioLibreTexto = "Calculando...";
+    [ObservableProperty] private string _espacioLibreTexto = LocalizationService.T("Cfg_EspacioCalculando");
     [ObservableProperty] private int _totalAnimesBiblioteca = 0;
 
     /// <summary>Contador localizado: "12 animes registrados" / "12 registered anime".</summary>
@@ -43,6 +43,7 @@ public partial class ConfiguracionViewModel : ObservableObject
     // === PREFERENCIAS DE USUARIO ===
     [ObservableProperty] private int _umbralMarcadoVisto = 95;
     [ObservableProperty] private bool _notificarNuevosEpisodios = true;
+    [ObservableProperty] private bool _minimizarABandejaAlCerrar = false;
     [ObservableProperty] private string _idioma = "es";
     [ObservableProperty] private double _velocidadReproduccionDefecto = 1.0;
 
@@ -64,11 +65,14 @@ public partial class ConfiguracionViewModel : ObservableObject
         OnPropertyChanged(nameof(IdiomaTexto));
         // LOC-04: el contador compone el texto localizado de forma no reactiva → refrescarlo aquí
         OnPropertyChanged(nameof(TotalAnimesTexto));
+        // LOC-08: avisa a los ViewModels con colecciones/texto compuesto en código (Galería,
+        // Agregar Anime, Acerca de) para que se regeneren en el nuevo idioma.
+        WeakReferenceMessenger.Default.Send(new IdiomaCambiadoMensaje());
     }
 
     // === AUTENTICACIÓN ANILIST ===
     [ObservableProperty] private bool _estaAutenticadoAniList;
-    [ObservableProperty] private string _estadoAutenticacionTexto = "No conectado";
+    [ObservableProperty] private string _estadoAutenticacionTexto = LocalizationService.T("Cfg_NoConectado");
 
     public ConfiguracionViewModel(
         ISettingsService settingsService,
@@ -99,6 +103,7 @@ public partial class ConfiguracionViewModel : ObservableObject
         IntervaloSincronizacionMinutos = config.IntervaloSincronizacionMinutos;
         UmbralMarcadoVisto = config.UmbralMarcadoVisto is >= 1 and <= 100 ? config.UmbralMarcadoVisto : 90;
         NotificarNuevosEpisodios = config.NotificarNuevosEpisodios;
+        MinimizarABandejaAlCerrar = config.MinimizarABandejaAlCerrar;
         Idioma = config.Idioma == "en" ? "en" : "es";
         VelocidadReproduccionDefecto = config.VelocidadReproduccionDefecto is >= 0.5 and <= 2.0 ? config.VelocidadReproduccionDefecto : 1.0;
         Atajos = config.Atajos ?? new Dictionary<string, string>();
@@ -130,9 +135,9 @@ public partial class ConfiguracionViewModel : ObservableObject
     private void ActualizarEstadoAutenticacion()
     {
         EstaAutenticadoAniList = _authService?.EstaAutenticado() ?? false;
-        EstadoAutenticacionTexto = EstaAutenticadoAniList 
-            ? "Conectado con AniList (Sincronización activa)" 
-            : "Sesión no iniciada (Modo Local Offline)";
+        EstadoAutenticacionTexto = EstaAutenticadoAniList
+            ? LocalizationService.T("Cfg_ConectadoSincronizacionActiva")
+            : LocalizationService.T("Cfg_SesionNoIniciadaOffline");
     }
 
     private async Task ActualizarEstadisticasBibliotecaAsync()
@@ -157,14 +162,14 @@ public partial class ConfiguracionViewModel : ObservableObject
         {
             if (string.IsNullOrWhiteSpace(ruta))
             {
-                EspacioLibreTexto = "Ruta no configurada";
+                EspacioLibreTexto = LocalizationService.T("Cfg_RutaNoConfigurada");
                 return;
             }
 
             var root = Path.GetPathRoot(ruta);
             if (string.IsNullOrWhiteSpace(root))
             {
-                EspacioLibreTexto = "Desconocido";
+                EspacioLibreTexto = LocalizationService.T("Cfg_Desconocido");
                 return;
             }
 
@@ -174,17 +179,17 @@ public partial class ConfiguracionViewModel : ObservableObject
                 double gbLibres = drive.AvailableFreeSpace / (1024.0 * 1024 * 1024);
                 double gbTotales = drive.TotalSize / (1024.0 * 1024 * 1024);
                 string etiqueta = !string.IsNullOrWhiteSpace(drive.VolumeLabel) ? $" ({drive.VolumeLabel})" : string.Empty;
-                EspacioLibreTexto = $"{gbLibres:F1} GB libres de {gbTotales:F1} GB{etiqueta}";
+                EspacioLibreTexto = string.Format(LocalizationService.T("Cfg_EspacioFormato"), gbLibres, gbTotales, etiqueta);
             }
             else
             {
-                EspacioLibreTexto = "Unidad no disponible";
+                EspacioLibreTexto = LocalizationService.T("Cfg_UnidadNoDisponible");
             }
         }
         catch (Exception ex)
         {
             AppLogger.Debug("ConfiguracionViewModel", $"Error al calcular espacio en disco: {ex.Message}");
-            EspacioLibreTexto = "Información no disponible";
+            EspacioLibreTexto = LocalizationService.T("Cfg_EspacioInfoNoDisponible");
         }
     }
 
@@ -195,7 +200,7 @@ public partial class ConfiguracionViewModel : ObservableObject
         {
             var dialog = new Microsoft.Win32.OpenFolderDialog
             {
-                Title = "Selecciona la carpeta donde guardarás tus colecciones de anime",
+                Title = LocalizationService.T("Cfg_SeleccionarCarpetaTitulo"),
                 InitialDirectory = Directory.Exists(RutaBaseAnimes) ? RutaBaseAnimes : Environment.GetFolderPath(Environment.SpecialFolder.MyVideos)
             };
 
@@ -209,10 +214,8 @@ public partial class ConfiguracionViewModel : ObservableObject
                 // FUN-009: la carpeta base NO reubica los animes existentes — avisarlo de forma
                 // explícita para que el usuario no crea que sus colecciones se movieron.
                 await _dialogService.MostrarDialogoAsync(
-                    "Almacenamiento Actualizado",
-                    $"La carpeta principal de animes se ha configurado a:\n{nuevaRuta}\n\n" +
-                    "Los animes ya existentes conservan su carpeta actual: para que la app los " +
-                    "encuentre, deberán estar (o copiarse) dentro de la nueva carpeta base.",
+                    LocalizationService.T("Cfg_AlmacenamientoActualizadoTitulo"),
+                    string.Format(LocalizationService.T("Cfg_AlmacenamientoActualizadoMsj"), nuevaRuta),
                     false,
                     "FolderCheck",
                     "#4CAF50");
@@ -222,8 +225,8 @@ public partial class ConfiguracionViewModel : ObservableObject
         {
             AppLogger.Error("ConfiguracionViewModel", "Error al seleccionar carpeta de animes", ex);
             await _dialogService.MostrarDialogoAsync(
-                "Error",
-                $"No se pudo cambiar la carpeta de almacenamiento: {ex.Message}",
+                LocalizationService.T("Dlg_ErrorTitulo"),
+                string.Format(LocalizationService.T("Cfg_ErrorCambiarCarpetaMsj"), ex.Message),
                 false,
                 "AlertCircle",
                 "#E53935");
@@ -246,8 +249,8 @@ public partial class ConfiguracionViewModel : ObservableObject
             else
             {
                 _ = _dialogService.MostrarDialogoAsync(
-                    "Carpeta no encontrada",
-                    $"La carpeta especificada no existe en disco:\n{RutaBaseAnimes}",
+                    LocalizationService.T("Cfg_CarpetaNoEncontradaTitulo"),
+                    string.Format(LocalizationService.T("Cfg_CarpetaNoEncontradaMsj"), RutaBaseAnimes),
                     false,
                     "FolderAlert",
                     "#FFA000");
@@ -293,6 +296,7 @@ public partial class ConfiguracionViewModel : ObservableObject
             config.IntervaloSincronizacionMinutos = IntervaloSincronizacionMinutos;
             config.UmbralMarcadoVisto = Math.Clamp(UmbralMarcadoVisto, 1, 100);
             config.NotificarNuevosEpisodios = NotificarNuevosEpisodios;
+            config.MinimizarABandejaAlCerrar = MinimizarABandejaAlCerrar;
             config.Idioma = Idioma == "en" ? "en" : "es";
             config.VelocidadReproduccionDefecto = VelocidadReproduccionDefecto is >= 0.5 and <= 2.0 ? VelocidadReproduccionDefecto : 1.0;
             config.Atajos = new Dictionary<string, string>(Atajos);
@@ -300,8 +304,8 @@ public partial class ConfiguracionViewModel : ObservableObject
             await _settingsService.GuardarConfiguracionAsync(config);
 
             await _dialogService.MostrarDialogoAsync(
-                "Preferencias Guardadas",
-                "Tus preferencias han sido guardadas correctamente.",
+                LocalizationService.T("Cfg_PreferenciasGuardadasTitulo"),
+                LocalizationService.T("Cfg_PreferenciasGuardadasMsj"),
                 false,
                 "CheckCircle",
                 "#4CAF50");
@@ -316,8 +320,8 @@ public partial class ConfiguracionViewModel : ObservableObject
     public async Task CerrarSesionAniListAsync()
     {
         bool confirmar = await _dialogService.MostrarDialogoAsync(
-            "Cerrar Sesión",
-            "¿Deseas desconectar tu cuenta de AniList? La aplicación continuará funcionando en modo offline local.",
+            LocalizationService.T("Cfg_CerrarSesion"),
+            LocalizationService.T("Cfg_CerrarSesionConfirmacionMsj"),
             true,
             "Logout",
             "#F44336");
@@ -377,8 +381,8 @@ public partial class ConfiguracionViewModel : ObservableObject
         {
             AppLogger.Error("ConfiguracionViewModel", "Error al borrar todos los datos", ex);
             await _dialogService.MostrarDialogoAsync(
-                "Error",
-                $"No se pudieron borrar todos los datos: {ex.Message}",
+                LocalizationService.T("Dlg_ErrorTitulo"),
+                string.Format(LocalizationService.T("Cfg_ErrorBorrarDatosMsj"), ex.Message),
                 false,
                 "AlertCircle",
                 "#E53935");
@@ -386,8 +390,8 @@ public partial class ConfiguracionViewModel : ObservableObject
         }
 
         await _dialogService.MostrarDialogoAsync(
-            "Datos borrados",
-            "Todos tus datos locales se han eliminado correctamente. La aplicación se cerrará.",
+            LocalizationService.T("Cfg_DatosBorradosTitulo"),
+            LocalizationService.T("Cfg_DatosBorradosMsj"),
             false,
             "CheckCircle",
             "#4CAF50");
@@ -439,8 +443,8 @@ public partial class ConfiguracionViewModel : ObservableObject
     public async Task LimpiarCacheAsync()
     {
         bool confirmar = await _dialogService.MostrarDialogoAsync(
-            "Limpiar caché de imágenes",
-            "¿Eliminar miniaturas y portadas de animes que ya no existen en tu biblioteca?\n\nEsto libera espacio en disco sin borrar ningún episodio.",
+            LocalizationService.T("Cfg_LimpiarCache"),
+            LocalizationService.T("Cfg_LimpiarCacheConfirmacionMsj"),
             true,
             "Broom",
             "#F59E0B");
@@ -452,9 +456,8 @@ public partial class ConfiguracionViewModel : ObservableObject
             var resultado = await _cacheMaintenanceService.LimpiarCacheHuerfanoAsync();
 
             await _dialogService.MostrarDialogoAsync(
-                "Limpieza completada",
-                $"Se liberaron {resultado.MegabytesLiberados:F1} MB\n" +
-                $"{resultado.MiniaturasBorradas} miniaturas y {resultado.PortadasBorradas} portadas eliminadas.",
+                LocalizationService.T("Cfg_LimpiezaCompletadaTitulo"),
+                string.Format(LocalizationService.T("Cfg_LimpiezaCompletadaMsj"), resultado.MegabytesLiberados, resultado.MiniaturasBorradas, resultado.PortadasBorradas),
                 false,
                 "CheckCircleOutline",
                 "#4CAF50");
@@ -462,7 +465,7 @@ public partial class ConfiguracionViewModel : ObservableObject
         catch (Exception ex)
         {
             AppLogger.Error("ConfiguracionViewModel", "Error limpiando caché de imágenes", ex);
-            await _dialogService.MostrarDialogoAsync("Error", "No se pudo completar la limpieza de caché.", false, "AlertCircleOutline", "#EF4444");
+            await _dialogService.MostrarDialogoAsync(LocalizationService.T("Dlg_ErrorTitulo"), LocalizationService.T("Cfg_LimpiezaErrorMsj"), false, "AlertCircleOutline", "#EF4444");
         }
     }
 

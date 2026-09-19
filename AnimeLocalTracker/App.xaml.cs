@@ -149,6 +149,10 @@ public partial class App : Application
         // Bluetooth y overlay nativo de Windows. Un único SMTC por ventana principal.
         services.AddSingleton<ISystemMediaControlsService, SystemMediaControlsService>();
 
+        services.AddSingleton<ISystemTrayService, SystemTrayService>();
+
+        services.AddSingleton<IVideoIntegrityService, VideoIntegrityService>();
+
         // Orquestación de skip-times (resolución MAL ID + reglas de evaluación)
         services.AddSingleton<ISkipTimesCoordinator, SkipTimesCoordinator>();
         services.AddSingleton<IMediaEnrichmentService, MediaEnrichmentService>();
@@ -215,11 +219,14 @@ public partial class App : Application
                 });
         });
         services.AddSingleton<ProveedorVideoAnimeAv1>();
-        services.AddSingleton<IVideoSourceResolver>(sp => new OrquestadorMultiProveedor(
-            new IProveedorVideo[]
-            {
-                sp.GetRequiredService<ProveedorVideoAnimeAv1>()
-            }));
+        services.AddSingleton<IVideoSourceResolver>(sp =>
+        {
+            // Plugins C# "drop-in": cualquier IProveedorVideo hallado en la carpeta de plugins
+            // se suma a los proveedores nativos — el orquestador no distingue entre ambos.
+            var proveedores = new List<IProveedorVideo> { sp.GetRequiredService<ProveedorVideoAnimeAv1>() };
+            proveedores.AddRange(CSharpPluginLoader.CargarProveedoresVideo(AppDataPaths.PluginsFolder));
+            return new OrquestadorMultiProveedor(proveedores);
+        });
 
         // Persistencia del estado de descargas segmentadas (.state)
         services.AddSingleton<IDownloadStateStore, DownloadStateStore>();

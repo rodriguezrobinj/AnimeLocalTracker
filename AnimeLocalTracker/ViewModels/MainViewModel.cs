@@ -20,6 +20,10 @@ public partial class MainViewModel : ObservableObject,
     private readonly AnimeLibraryService _animeLibraryService;
     private readonly IDownloadService _downloadService;
     private readonly IUpdateService _updateService;
+    private readonly IDatabaseService _databaseService;
+    private readonly IFileScannerService _fileScannerService;
+    private readonly NewEpisodeNotifier _newEpisodeNotifier;
+    private readonly ISystemTrayService _systemTrayService;
 
     public NavigationService Navigation => (NavigationService)_navigationService;
     public IDialogService DialogService { get; }
@@ -53,12 +57,16 @@ public partial class MainViewModel : ObservableObject,
     }
 
     public MainViewModel(
-        INavigationService navigationService, 
-        IAnimeTrackingService animeTrackingService, 
+        INavigationService navigationService,
+        IAnimeTrackingService animeTrackingService,
         AnimeLibraryService animeLibraryService,
         IDownloadService downloadService,
         IUpdateService updateService,
-        IDialogService dialogService)
+        IDialogService dialogService,
+        IDatabaseService databaseService,
+        IFileScannerService fileScannerService,
+        NewEpisodeNotifier newEpisodeNotifier,
+        ISystemTrayService systemTrayService)
     {
         _navigationService = navigationService;
         _animeTrackingService = animeTrackingService;
@@ -66,12 +74,72 @@ public partial class MainViewModel : ObservableObject,
         _downloadService = downloadService;
         _updateService = updateService;
         DialogService = dialogService;
+        _databaseService = databaseService;
+        _fileScannerService = fileScannerService;
+        _newEpisodeNotifier = newEpisodeNotifier;
+        _systemTrayService = systemTrayService;
+        _systemTrayService.ReanudarUltimoAnimeSolicitado += OnReanudarUltimoAnimeSolicitado;
+        _systemTrayService.BuscarNuevosEpisodiosSolicitado += OnBuscarNuevosEpisodiosSolicitado;
 
         WeakReferenceMessenger.Default.RegisterAll(this);
 
         // Cargamos la vista inicial a través del servicio de navegación
         WeakReferenceMessenger.Default.Send(new NavegarMensaje_Galeria());
         ActualizarConteoDescargas();
+    }
+
+    /// <summary>Menú "Reanudar último anime" de la bandeja del sistema: navega directo al
+    /// episodio más reciente del historial (mismo criterio que Historial: UltimaReproduccion
+    /// desc), replicando la construcción de EpisodiosDisponibles que hace HistorialViewModel.ReanudarAsync.</summary>
+    private async void OnReanudarUltimoAnimeSolicitado(object? sender, EventArgs e)
+    {
+        try
+        {
+            var recientes = await _databaseService.ObtenerHistorialEpisodiosAsync(1);
+            var registro = recientes.Count > 0 ? recientes[0] : null;
+            if (registro == null || string.IsNullOrWhiteSpace(registro.RutaArchivo) || !System.IO.File.Exists(registro.RutaArchivo))
+            {
+                _systemTrayService.MostrarNotificacion(LocalizationService.T("Tray_Titulo"), LocalizationService.T(
+                    registro == null ? "Tray_SinUltimoAnime" : "Tray_ArchivoNoEncontrado"));
+                return;
+            }
+
+            var anime = await _databaseService.ObtenerAnimePorIdAsync(registro.AniListId);
+            var episodiosDisponibles = new System.Collections.Generic.List<EpisodioItem>();
+            if (anime != null && !string.IsNullOrWhiteSpace(anime.RutaCarpeta))
+            {
+                try { episodiosDisponibles = await _fileScannerService.EscanearEpisodiosAsync(anime.RutaCarpeta) ?? new(); }
+                catch (Exception ex) { AppLogger.Debug("MainViewModel", $"No se pudo escanear episodios para reanudar desde bandeja: {ex.Message}"); }
+            }
+
+            WeakReferenceMessenger.Default.Send(new NavegarMensaje_Reproductor(
+                registro.RutaArchivo, registro.AniListId, anime?.Titulo ?? $"Anime {registro.AniListId}", registro.NumeroEpisodio,
+                EpisodiosDisponibles: episodiosDisponibles, RutaPortada: anime?.PortadaVisible));
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("MainViewModel", "Error reanudando último anime desde la bandeja", ex);
+        }
+    }
+
+    /// <summary>Menú "Buscar nuevos episodios" de la bandeja: dispara el mismo chequeo que corre
+    /// periódicamente en segundo plano, y confirma el resultado con una notificación nativa (la
+    /// ventana puede estar oculta, donde el toast normal de NuevosEpisodiosMensaje no se vería).</summary>
+    private async void OnBuscarNuevosEpisodiosSolicitado(object? sender, EventArgs e)
+    {
+        try
+        {
+            int encontrados = await _newEpisodeNotifier.BuscarYNotificarNuevosAsync();
+            _systemTrayService.MostrarNotificacion(
+                LocalizationService.T("Tray_Titulo"),
+                encontrados > 0
+                    ? string.Format(LocalizationService.T("Tray_NuevosEncontradosFormato"), encontrados)
+                    : LocalizationService.T("Tray_SinNuevos"));
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("MainViewModel", "Error buscando episodios nuevos desde la bandeja", ex);
+        }
     }
 
     [RelayCommand]

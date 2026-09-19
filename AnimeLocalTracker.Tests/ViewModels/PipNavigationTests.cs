@@ -67,7 +67,11 @@ public class PipNavigationTests : IDisposable
             _libraryService,
             _downloadMock.Object,
             _updateMock.Object,
-            new Mock<IDialogService>().Object);
+            new Mock<IDialogService>().Object,
+            Mock.Of<IDatabaseService>(),
+            Mock.Of<IFileScannerService>(),
+            new NewEpisodeNotifier(Mock.Of<IDatabaseService>(), Mock.Of<IFileScannerService>(), Mock.Of<ISettingsService>()),
+            Mock.Of<ISystemTrayService>());
     }
 
     private ReproductorViewModel CreateReproductorVm()
