@@ -172,7 +172,7 @@
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <Border Background="#1F242C" BorderBrush="#2D333B" BorderThickness="1" CornerRadius="8" Padding="10,4" Margin="0,0,6,6" VerticalAlignment="Center">
-                                        <TextBlock Text="{Binding}" Foreground="#9CA3AF" FontWeight="Medium" FontSize="11"/>
+                                        <TextBlock Text="{Binding Converter={StaticResource GeneroTraducido}}" Foreground="#9CA3AF" FontWeight="Medium" FontSize="11"/>
                                     </Border>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
@@ -236,14 +236,40 @@
                     </Grid.RowDefinitions>
 
                     <!-- BANNER PRÓXIMOS EPISODIOS (temporalidad AniList vs local) -->
-                    <Border Grid.Row="0" CornerRadius="8" Background="#111827" BorderBrush="#1D4ED8" BorderThickness="1"
-                            Padding="12,8" Margin="0,0,0,10"
-                            Visibility="{Binding TieneProximosEpisodios, Converter={StaticResource BoolToVis}}">
-                        <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="CalendarClock" Width="16" Height="16" Foreground="#60A5FA" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                            <TextBlock Text="{Binding ProximosEpisodiosTexto}" Foreground="#93C5FD" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                        </StackPanel>
-                    </Border>
+                    <StackPanel Grid.Row="0">
+                        <Border CornerRadius="8" Background="#111827" BorderBrush="#1D4ED8" BorderThickness="1"
+                                Padding="12,8" Margin="0,0,0,10"
+                                Visibility="{Binding TieneProximosEpisodios, Converter={StaticResource BoolToVis}}">
+                            <StackPanel Orientation="Horizontal">
+                                <materialDesign:PackIcon Kind="CalendarClock" Width="16" Height="16" Foreground="#60A5FA" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <TextBlock Text="{Binding ProximosEpisodiosTexto}" Foreground="#93C5FD" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- BANNER EPISODIOS FALTANTES (huecos silenciosos en la carpeta local) -->
+                        <Border CornerRadius="8" Background="#1F1708" BorderBrush="#B45309" BorderThickness="1"
+                                Padding="12,8" Margin="0,0,0,10"
+                                Visibility="{Binding HayEpisodiosFaltantes, Converter={StaticResource BoolToVis}}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <materialDesign:PackIcon Grid.Column="0" Kind="AlertOutline" Width="18" Height="18" Foreground="#FBBF24" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <TextBlock Grid.Column="1" Text="{Binding EpisodiosFaltantesTexto}" Foreground="#FCD34D" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                                <Button Grid.Column="2" Command="{Binding DescargarFaltantesCommand}"
+                                        Style="{StaticResource MaterialDesignOutlinedButton}"
+                                        BorderBrush="#FBBF24" Foreground="#FBBF24"
+                                        Height="30" Padding="10,0" Margin="10,0,0,0">
+                                    <StackPanel Orientation="Horizontal">
+                                        <materialDesign:PackIcon Kind="DownloadOutline" Width="14" Height="14" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                        <TextBlock Text="{Binding [Det_DescargarFaltantes], Source={x:Static loc:LocalizationService.Instance}}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="11"/>
+                                    </StackPanel>
+                                </Button>
+                            </Grid>
+                        </Border>
+                    </StackPanel>
 
                     <!-- CABECERA DE LA LISTA DE EPISODIOS -->
                     <Grid Grid.Row="1" Margin="0,0,0,15">
@@ -295,6 +321,30 @@
                                 <StackPanel Orientation="Horizontal">
                                     <materialDesign:PackIcon Kind="Magnify" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,5,0"/>
                                     <TextBlock Text="{Binding [Det_DetectarOp], Source={x:Static loc:LocalizationService.Instance}}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="11"/>
+                                </StackPanel>
+                            </Button>
+
+                            <!-- DOCTOR DE INTEGRIDAD DE VIDEO -->
+                            <Button Command="{Binding VerificarIntegridadCommand}"
+                                    Style="{StaticResource MaterialDesignOutlinedButton}"
+                                    BorderBrush="#FBBF24" Foreground="#FBBF24"
+                                    Height="34" Padding="10,0" Margin="8,0,0,0"
+                                    IsEnabled="{Binding VerificandoIntegridad, Converter={StaticResource InverseBool}}"
+                                    ToolTip="{Binding [Det_VerificarIntegridad], Source={x:Static loc:LocalizationService.Instance}}">
+                                <StackPanel Orientation="Horizontal">
+                                    <materialDesign:PackIcon Kind="ShieldSearch" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                    <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" FontSize="11">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Text" Value="{Binding [Det_VerificarIntegridad], Source={x:Static loc:LocalizationService.Instance}}"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding VerificandoIntegridad}" Value="True">
+                                                        <Setter Property="Text" Value="{Binding [Det_VerificandoIntegridad], Source={x:Static loc:LocalizationService.Instance}}"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
                                 </StackPanel>
                             </Button>
                         </StackPanel>
@@ -588,6 +638,17 @@
                                                     Padding="6,2" Margin="0,4,0,0" HorizontalAlignment="Left"
                                                     Visibility="Visible">
                                                 <TextBlock Text="{Binding BadgeTecnico}" Foreground="#9CA3AF" FontSize="10" FontWeight="Medium"/>
+                                            </Border>
+
+                                            <!-- BADGE ARCHIVO CORRUPTO (Doctor de Integridad) -->
+                                            <Border CornerRadius="4" Background="#3A1416" BorderBrush="#F87171" BorderThickness="1"
+                                                    Padding="6,2" Margin="0,4,0,0" HorizontalAlignment="Left"
+                                                    ToolTip="{Binding [Det_ArchivoCorruptoTip], Source={x:Static loc:LocalizationService.Instance}}"
+                                                    Visibility="{Binding EstaCorrupto, Converter={StaticResource BoolToVis}}">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <materialDesign:PackIcon Kind="AlertOctagonOutline" Width="11" Height="11" Foreground="#F87171" VerticalAlignment="Center" Margin="0,0,3,0"/>
+                                                    <TextBlock Text="{Binding [Det_ArchivoCorruptoBadge], Source={x:Static loc:LocalizationService.Instance}}" Foreground="#FCA5A5" FontSize="10" FontWeight="Medium"/>
+                                                </StackPanel>
                                             </Border>
                                         </StackPanel>
 

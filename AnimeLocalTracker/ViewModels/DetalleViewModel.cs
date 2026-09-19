@@ -31,6 +31,7 @@ public partial class DetalleViewModel : ObservableObject,
     private readonly IDownloadService _downloadService;
     private readonly PythonEpisodeEnricher? _enricher;
     private readonly IPluginService? _pluginService;
+    private readonly IVideoIntegrityService? _videoIntegrityService;
 
     // Enriquecimiento de metadata/miniaturas de episodios (extraído a EpisodeEnrichmentCoordinator).
     private readonly EpisodeEnrichmentCoordinator _enrichmentCoordinator = new();
@@ -71,6 +72,14 @@ public partial class DetalleViewModel : ObservableObject,
     [ObservableProperty] private bool _sinopsisExpandida = false;
     [ObservableProperty] private bool _esFavoritoAnime = false;
     [ObservableProperty] private bool _tieneCapituloEnProgreso = false;
+
+    // === BANNER DE EPISODIOS FALTANTES (huecos en la carpeta local) ===
+    [ObservableProperty] private bool _hayEpisodiosFaltantes;
+    [ObservableProperty] private string _episodiosFaltantesTexto = string.Empty;
+    private List<int> _numerosEpisodiosFaltantes = new();
+
+    // === DOCTOR DE INTEGRIDAD DE VIDEO ===
+    [ObservableProperty] private bool _verificandoIntegridad;
 
     public bool TieneEpisodios => EpisodiosDelAnime.Count > 0;
 
@@ -141,7 +150,8 @@ public partial class DetalleViewModel : ObservableObject,
         IDialogService dialogService,
         IDownloadService downloadService,
         PythonEpisodeEnricher? enricher = null,
-        IPluginService? pluginService = null)
+        IPluginService? pluginService = null,
+        IVideoIntegrityService? videoIntegrityService = null)
     {
         _animeTrackingService = animeTrackingService;
         _databaseService = databaseService;
@@ -151,6 +161,7 @@ public partial class DetalleViewModel : ObservableObject,
         _downloadService = downloadService;
         _enricher = enricher;
         _pluginService = pluginService;
+        _videoIntegrityService = videoIntegrityService;
         
         WeakReferenceMessenger.Default.Register<UsuarioLogeadoMensaje>(this);
         WeakReferenceMessenger.Default.Register<UsuarioDesconectadoMensaje>(this);
@@ -298,15 +309,15 @@ public partial class DetalleViewModel : ObservableObject,
                         }
                     });
 
-                    _dialogService.MostrarDialogoAsync("Descarga Completada",
-                        $"El episodio {episodio.NumeroEpisodio} se ha descargado exitosamente.",
+                    _dialogService.MostrarDialogoAsync(LocalizationService.T("Det_DescargaCompletadaTitulo"),
+                        string.Format(LocalizationService.T("Det_DescargaCompletadaMsj"), episodio.NumeroEpisodio),
                         false, "CheckCircleOutline", "#4CAF50");
                     AplicarFiltrosYOrdenamiento();
                 }
                 else if (!string.IsNullOrEmpty(message.Error))
                 {
-                    _dialogService.MostrarDialogoAsync("Error de descarga",
-                        $"Error al descargar el episodio {episodio.NumeroEpisodio}:\n{message.Error}",
+                    _dialogService.MostrarDialogoAsync(LocalizationService.T("Det_ErrorDescargaTitulo"),
+                        string.Format(LocalizationService.T("Det_ErrorDescargaMsj"), episodio.NumeroEpisodio, message.Error),
                         false, "AlertCircleOutline", "#E53935");
                 }
             }
@@ -485,18 +496,18 @@ public partial class DetalleViewModel : ObservableObject,
             var duplicados = await _enricher.EncontrarDuplicadosAsync(_todosLosEpisodios);
             if (duplicados.Count > 0)
             {
-                EstadoDuplicados = $"{duplicados.Count} duplicado(s)";
+                EstadoDuplicados = string.Format(LocalizationService.T("Det_DuplicadosContador"), duplicados.Count);
                 await _dialogService.MostrarDialogoAsync(
-                    "Duplicados encontrados",
-                    $"Se detectaron {duplicados.Count} archivos duplicados por hash perceptual:\n\n{string.Join("\n", duplicados.Select(d => System.IO.Path.GetFileName(d)).Take(10))}",
+                    LocalizationService.T("Det_DuplicadosEncontradosTitulo"),
+                    string.Format(LocalizationService.T("Det_DuplicadosEncontradosMsj"), duplicados.Count, string.Join("\n", duplicados.Select(d => System.IO.Path.GetFileName(d)).Take(10))),
                     false, "ContentDuplicate", "#F59E0B");
             }
             else
             {
                 EstadoDuplicados = string.Empty;
                 await _dialogService.MostrarDialogoAsync(
-                    "Análisis de duplicados",
-                    "¡Excelente! No se encontraron episodios duplicados en esta serie.",
+                    LocalizationService.T("Det_AnalisisDuplicadosTitulo"),
+                    LocalizationService.T("Det_SinDuplicadosMsj"),
                     false, "CheckCircleOutline", "#10B981");
             }
         }
@@ -505,8 +516,8 @@ public partial class DetalleViewModel : ObservableObject,
             AppLogger.Debug("DetalleViewModel", $"Error analizando duplicados: {ex.Message}");
             EstadoDuplicados = string.Empty;
             await _dialogService.MostrarDialogoAsync(
-                "Error en análisis",
-                $"No se pudo completar el análisis de duplicados: {ex.Message}",
+                LocalizationService.T("Det_ErrorAnalisisTitulo"),
+                string.Format(LocalizationService.T("Det_ErrorAnalisisMsj"), ex.Message),
                 false, "AlertCircleOutline", "#EF4444");
         }
         finally
@@ -529,7 +540,7 @@ public partial class DetalleViewModel : ObservableObject,
 
             if (faltantes > 0)
             {
-                ProximosEpisodiosTexto = $"Episodio {proximo} confirmado en AniList — faltan {faltantes} por localizar";
+                ProximosEpisodiosTexto = string.Format(LocalizationService.T("Det_ProximosEpisodiosFormato"), proximo, faltantes);
                 TieneProximosEpisodios = true;
             }
         }
@@ -573,6 +584,100 @@ public partial class DetalleViewModel : ObservableObject,
         }
 
         TieneCapituloEnProgreso = _todosLosEpisodios != null && _todosLosEpisodios.Any(e => e.TieneProgresoGuardado);
+
+        ActualizarEpisodiosFaltantes();
+    }
+
+    /// <summary>
+    /// Detecta huecos reales (episodios sin archivo local por debajo del episodio descargado
+    /// más alto) — no cuenta episodios "todavía no descargados" al final de la lista, que es
+    /// el estado normal de un anime en emisión, no un hueco silencioso que haga saltarte una
+    /// trama por accidente (el caso que describe este banner).
+    /// </summary>
+    private void ActualizarEpisodiosFaltantes()
+    {
+        int maxDescargado = _todosLosEpisodios.Where(e => e.Descargado).Select(e => e.NumeroEpisodio).DefaultIfEmpty(0).Max();
+
+        _numerosEpisodiosFaltantes = _todosLosEpisodios
+            .Where(e => !e.Descargado && e.NumeroEpisodio < maxDescargado)
+            .Select(e => e.NumeroEpisodio)
+            .OrderBy(n => n)
+            .ToList();
+
+        HayEpisodiosFaltantes = _numerosEpisodiosFaltantes.Count > 0;
+        EpisodiosFaltantesTexto = HayEpisodiosFaltantes
+            ? string.Format(LocalizationService.T("Det_FaltantesBannerFormato"), _numerosEpisodiosFaltantes.Count, FormatearListaEpisodios(_numerosEpisodiosFaltantes))
+            : string.Empty;
+    }
+
+    private static string FormatearListaEpisodios(List<int> numeros)
+    {
+        const int limiteVisible = 5;
+        var etiquetas = numeros.Take(limiteVisible)
+            .Select(n => string.Format(LocalizationService.T("Det_FaltanteEpisodioEtiqueta"), n))
+            .ToList();
+
+        string texto = etiquetas.Count == 1
+            ? etiquetas[0]
+            : string.Join(", ", etiquetas.Take(etiquetas.Count - 1)) + $" {LocalizationService.T("Det_Y")} " + etiquetas[^1];
+
+        int resto = numeros.Count - limiteVisible;
+        if (resto > 0) texto += $" {string.Format(LocalizationService.T("Det_FaltantesResto"), resto)}";
+        return texto;
+    }
+
+    [RelayCommand]
+    private async Task DescargarFaltantesAsync()
+    {
+        var faltantes = _todosLosEpisodios.Where(e => !e.Descargado && _numerosEpisodiosFaltantes.Contains(e.NumeroEpisodio)).ToList();
+        foreach (var episodio in faltantes)
+        {
+            await DescargarEpisodioAsync(episodio);
+        }
+    }
+
+    /// <summary>
+    /// "Doctor de integridad": verifica con ffprobe (sin decodificar el archivo entero) que
+    /// cada episodio descargado abra bien — detecta descargas que quedaron truncadas/corruptas
+    /// (el bug real que motivó esto: DownloadService trataba un corte de conexión a mitad de
+    /// descarga como éxito) antes de que el usuario se siente a verlas y se encuentre el error.
+    /// </summary>
+    [RelayCommand]
+    private async Task VerificarIntegridadAsync()
+    {
+        if (_videoIntegrityService == null || VerificandoIntegridad) return;
+
+        var descargados = _todosLosEpisodios.Where(e => e.Descargado && !string.IsNullOrWhiteSpace(e.RutaCompleta)).ToList();
+        if (descargados.Count == 0) return;
+
+        VerificandoIntegridad = true;
+        int corruptos = 0;
+        try
+        {
+            foreach (var episodio in descargados)
+            {
+                episodio.EstaCorrupto = false;
+                var resultado = await _videoIntegrityService.VerificarArchivoAsync(episodio.RutaCompleta);
+                if (resultado == ResultadoIntegridad.Corrupto)
+                {
+                    episodio.EstaCorrupto = true;
+                    corruptos++;
+                }
+            }
+
+            await _dialogService.MostrarDialogoAsync(
+                LocalizationService.T("Det_IntegridadTitulo"),
+                corruptos > 0
+                    ? string.Format(LocalizationService.T("Det_IntegridadConCorruptosFormato"), corruptos, descargados.Count)
+                    : string.Format(LocalizationService.T("Det_IntegridadSinCorruptosFormato"), descargados.Count),
+                false,
+                corruptos > 0 ? "AlertOctagonOutline" : "CheckCircleOutline",
+                corruptos > 0 ? "#F87171" : "#4CAF50");
+        }
+        finally
+        {
+            VerificandoIntegridad = false;
+        }
     }
 
     /// <summary>
@@ -584,12 +689,12 @@ public partial class DetalleViewModel : ObservableObject,
     {
         if (AnimeSeleccionado == null || string.IsNullOrWhiteSpace(AnimeSeleccionado.RutaCarpeta))
         {
-            _ = _dialogService.MostrarDialogoAsync("Carpeta no encontrada", "El anime no tiene una carpeta local asociada.", false, "AlertCircleOutline", "#F59E0B");
+            _ = _dialogService.MostrarDialogoAsync(LocalizationService.T("Det_CarpetaNoEncontradaTitulo"), LocalizationService.T("Det_SinCarpetaLocalMsj"), false, "AlertCircleOutline", "#F59E0B");
             return;
         }
         if (!Directory.Exists(AnimeSeleccionado.RutaCarpeta))
         {
-            _ = _dialogService.MostrarDialogoAsync("Carpeta no encontrada", "La carpeta del anime ya no existe en disco.", false, "AlertCircleOutline", "#F59E0B");
+            _ = _dialogService.MostrarDialogoAsync(LocalizationService.T("Det_CarpetaNoEncontradaTitulo"), LocalizationService.T("Det_CarpetaYaNoExisteMsj"), false, "AlertCircleOutline", "#F59E0B");
             return;
         }
 
@@ -614,8 +719,8 @@ public partial class DetalleViewModel : ObservableObject,
         if (episodio == null || !episodio.Descargado || string.IsNullOrWhiteSpace(episodio.RutaCompleta)) return;
 
         bool confirmar = await _dialogService.MostrarDialogoAsync(
-            "Eliminar episodio",
-            $"¿Eliminar el archivo del episodio {episodio.NumeroEpisodio}?\n\nSe borrará del disco y no podrá recuperarse.",
+            LocalizationService.T("Det_EliminarEpisodioTitulo"),
+            string.Format(LocalizationService.T("Det_EliminarEpisodioConfirmacionMsj"), episodio.NumeroEpisodio),
             true, "DeleteOutline", "#EF4444");
         if (!confirmar) return;
 
@@ -652,8 +757,8 @@ public partial class DetalleViewModel : ObservableObject,
 
         AplicarFiltrosYOrdenamiento();
 
-        await _dialogService.MostrarDialogoAsync("Episodio eliminado",
-            $"El episodio {episodio.NumeroEpisodio} fue eliminado del disco.",
+        await _dialogService.MostrarDialogoAsync(LocalizationService.T("Det_EpisodioEliminadoTitulo"),
+            string.Format(LocalizationService.T("Det_EpisodioEliminadoMsj"), episodio.NumeroEpisodio),
             false, "CheckCircleOutline", "#4CAF50");
     }
 
@@ -669,16 +774,16 @@ public partial class DetalleViewModel : ObservableObject,
         if (AnimeSeleccionado == null) return;
 
         bool confirmacion = await _dialogService.MostrarDialogoAsync(
-            "Eliminar de la biblioteca", 
-            $"¿Deseas eliminar '{AnimeSeleccionado.Titulo}' de tu biblioteca local?", 
+            LocalizationService.T("Bib_EliminarTitulo"),
+            string.Format(LocalizationService.T("Bib_EliminarMsj"), AnimeSeleccionado.Titulo),
             true, "HeartBrokenOutline", "#EF4444");
 
         if (confirmacion)
         {
             // Opción extra: borrar también los archivos del disco
             bool borrarArchivos = await _dialogService.MostrarDialogoAsync(
-                "¿Borrar también los archivos?",
-                $"¿Deseas eliminar también la carpeta con los episodios descargados del disco?\n\n'{(string.IsNullOrWhiteSpace(AnimeSeleccionado.RutaCarpeta) ? "sin carpeta local" : AnimeSeleccionado.RutaCarpeta)}'\n\nElige NO para conservar los archivos y solo quitar el anime de la biblioteca.",
+                LocalizationService.T("Bib_BorrarArchivosTitulo"),
+                string.Format(LocalizationService.T("Bib_BorrarArchivosMsj"), string.IsNullOrWhiteSpace(AnimeSeleccionado.RutaCarpeta) ? LocalizationService.T("Bib_SinCarpetaLocal") : AnimeSeleccionado.RutaCarpeta),
                 true, "FolderOutline", "#EF4444");
 
             string? carpeta = AnimeSeleccionado.RutaCarpeta;
@@ -708,11 +813,11 @@ public partial class DetalleViewModel : ObservableObject,
         var descargados = _todosLosEpisodios.Where(e => e.Descargado && File.Exists(e.RutaCompleta)).ToList();
         if (descargados.Count < 2)
         {
-            await _dialogService.MostrarDialogoAsync("Info", "Se necesitan al menos 2 episodios descargados para analizar el opening por audio.", false, "InformationOutline", "#60A5FA");
+            await _dialogService.MostrarDialogoAsync("Info", LocalizationService.T("Det_MinEpisodiosOPMsj"), false, "InformationOutline", "#60A5FA");
             return;
         }
 
-        await _dialogService.MostrarDialogoAsync("Analizando", "Esto tardará unos segundos. Iniciaremos un análisis cruzado del audio de los primeros 2 episodios para buscar el OP...", false, "InformationOutline", "#60A5FA");
+        await _dialogService.MostrarDialogoAsync(LocalizationService.T("Det_Analizando"), LocalizationService.T("Det_AnalizandoOpMsj"), false, "InformationOutline", "#60A5FA");
         
         var pluginRes = await _pluginService.EjecutarPluginAsync<object, AnimeLocalTracker.Services.SkipTimesCoordinator.AudioSkipResult>(
             "audio_skip_plugin.py", 
@@ -722,11 +827,11 @@ public partial class DetalleViewModel : ObservableObject,
         
         if (pluginRes != null && pluginRes.Found)
         {
-            await _dialogService.MostrarDialogoAsync("OP Encontrado", $"Opening detectado de {pluginRes.IntroEstimatedStart}s a {pluginRes.IntroEstimatedEnd}s.", false, "CheckCircle", "#10B981");
+            await _dialogService.MostrarDialogoAsync(LocalizationService.T("Det_OpEncontradoTitulo"), string.Format(LocalizationService.T("Det_OpEncontradoMsj"), pluginRes.IntroEstimatedStart, pluginRes.IntroEstimatedEnd), false, "CheckCircle", "#10B981");
         }
         else
         {
-            await _dialogService.MostrarDialogoAsync("No se encontró OP", "El plugin de audio no pudo encontrar un OP común entre estos episodios.", false, "CloseCircle", "#EF4444");
+            await _dialogService.MostrarDialogoAsync(LocalizationService.T("Det_OpNoEncontradoTitulo"), LocalizationService.T("Det_OpNoEncontradoMsj"), false, "CloseCircle", "#EF4444");
         }
     }
     
@@ -737,7 +842,7 @@ public partial class DetalleViewModel : ObservableObject,
         
         if (!episodio.Descargado || !File.Exists(episodio.RutaCompleta))
         {
-            await _dialogService.MostrarDialogoAsync("Episodio no encontrado", $"Archivo no encontrado para el episodio {episodio.NumeroEpisodio}.\nBuscando opciones de descarga en el navegador web...", false, "InformationOutline", "#FFC107");
+            await _dialogService.MostrarDialogoAsync(LocalizationService.T("Det_EpisodioNoEncontradoTitulo"), string.Format(LocalizationService.T("Det_EpisodioNoEncontradoMsj"), episodio.NumeroEpisodio), false, "InformationOutline", "#FFC107");
 
             string numeroEp = episodio.NumeroEpisodio.ToString("D2"); 
             string busqueda = $"{AnimeSeleccionado.Titulo} {numeroEp}";
@@ -762,7 +867,7 @@ public partial class DetalleViewModel : ObservableObject,
         }
         catch (System.Exception ex)
         {
-            await _dialogService.MostrarDialogoAsync("Error", $"Error al intentar iniciar el reproductor: {ex.Message}", false, "AlertCircleOutline", "#E53935");
+            await _dialogService.MostrarDialogoAsync(LocalizationService.T("Dlg_ErrorTitulo"), string.Format(LocalizationService.T("Det_ErrorIniciarReproductorMsj"), ex.Message), false, "AlertCircleOutline", "#E53935");
         }
     }
     
@@ -1058,11 +1163,11 @@ public partial class DetalleViewModel : ObservableObject,
             
             await InicializarAsync(AnimeSeleccionado);
             
-            await _dialogService.MostrarDialogoAsync("Actualizado", $"Anime actualizado. Total de episodios emitidos: {episodiosEmitidos}", false, "CheckCircleOutline", "#4CAF50");
+            await _dialogService.MostrarDialogoAsync(LocalizationService.T("Det_ActualizadoTitulo"), string.Format(LocalizationService.T("Det_ActualizadoMsj"), episodiosEmitidos), false, "CheckCircleOutline", "#4CAF50");
         }
         else
         {
-            await _dialogService.MostrarDialogoAsync("Error", "Error al conectar con AniList para actualizar.", false, "AlertCircleOutline", "#E53935");
+            await _dialogService.MostrarDialogoAsync(LocalizationService.T("Dlg_ErrorTitulo"), LocalizationService.T("Det_ErrorConectarAniListMsj"), false, "AlertCircleOutline", "#E53935");
         }
     }
     
@@ -1105,9 +1210,9 @@ public partial class DetalleViewModel : ObservableObject,
         if (AnimeSeleccionado == null) return;
         
         var token = _authService.ObtenerTokenGuardado();
-        if (string.IsNullOrEmpty(token)) 
+        if (string.IsNullOrEmpty(token))
         {
-            await _dialogService.MostrarDialogoAsync("Error de Autenticación", "Debes conectar tu cuenta de AniList primero.", false, "AlertCircleOutline", "#E53935");
+            await _dialogService.MostrarDialogoAsync(LocalizationService.T("Det_ErrorAutenticacionTitulo"), LocalizationService.T("Det_DebesConectarAniListMsj"), false, "AlertCircleOutline", "#E53935");
             return;
         }
 
@@ -1123,11 +1228,11 @@ public partial class DetalleViewModel : ObservableObject,
             AnimeSeleccionado.EstadoUsuario = estadoEnIngles;
             AnimeSeleccionado.EpisodiosVistos = progresoFinal;
             await _databaseService.ActualizarAnimeAsync(AnimeSeleccionado);
-            await _dialogService.MostrarDialogoAsync("Nube Sincronizada", "¡Seguimiento actualizado en AniList con éxito!", false, "CloudCheck", "#4CAF50");
+            await _dialogService.MostrarDialogoAsync(LocalizationService.T("Det_NubeSincronizadaTitulo"), LocalizationService.T("Det_NubeSincronizadaMsj"), false, "CloudCheck", "#4CAF50");
         }
         else
         {
-            await _dialogService.MostrarDialogoAsync("Error de Sincronización", "Hubo un error de comunicación al intentar guardar tus datos en AniList.", false, "AlertCircleOutline", "#E53935");
+            await _dialogService.MostrarDialogoAsync(LocalizationService.T("Det_ErrorSincronizacionTitulo"), LocalizationService.T("Det_ErrorSincronizacionMsj"), false, "AlertCircleOutline", "#E53935");
         }
     }
     
@@ -1137,24 +1242,24 @@ public partial class DetalleViewModel : ObservableObject,
         MostrandoEditorSeguimiento = false;
     }
     
-    private static string ConvertirEstadoAIngles(string estadoVisual) => estadoVisual switch
+    private static string ConvertirEstadoAIngles(string estadoVisual)
     {
-        "Viendo" => "CURRENT",
-        "Finalizado" => "COMPLETED",
-        "En Pausa" => "PAUSED",
-        "Abandonado" => "DROPPED",
-        "Planeando" => "PLANNING",
-        _ => "CURRENT"
-    };
+        if (estadoVisual == LocalizationService.T("Estado_Viendo")) return "CURRENT";
+        if (estadoVisual == LocalizationService.T("Estado_Finalizado")) return "COMPLETED";
+        if (estadoVisual == LocalizationService.T("Estado_EnPausa")) return "PAUSED";
+        if (estadoVisual == LocalizationService.T("Estado_Abandonado")) return "DROPPED";
+        if (estadoVisual == LocalizationService.T("Estado_Planeando")) return "PLANNING";
+        return "CURRENT";
+    }
 
     private static string ConvertirEstadoAEspanol(string estadoIngles) => estadoIngles switch
     {
-        "CURRENT" => "Viendo",
-        "COMPLETED" => "Finalizado",
-        "PAUSED" => "En Pausa",
-        "DROPPED" => "Abandonado",
-        "PLANNING" => "Planeando",
-        _ => "Viendo"
+        "CURRENT" => LocalizationService.T("Estado_Viendo"),
+        "COMPLETED" => LocalizationService.T("Estado_Finalizado"),
+        "PAUSED" => LocalizationService.T("Estado_EnPausa"),
+        "DROPPED" => LocalizationService.T("Estado_Abandonado"),
+        "PLANNING" => LocalizationService.T("Estado_Planeando"),
+        _ => LocalizationService.T("Estado_Viendo")
     };
 
     [RelayCommand]
