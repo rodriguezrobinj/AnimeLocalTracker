@@ -185,6 +185,22 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!-- ListBoxItem transparente para el cajón de episodios (ui-wpf-vistas.md #2): sin
+             plantilla de selección MaterialDesign, el resaltado del episodio actual lo pinta
+             el propio DataTemplate vía EpisodioActualBrush. -->
+        <Style x:Key="CajonEpisodioItemStyle" TargetType="ListBoxItem">
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <ContentPresenter/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </UserControl.Resources>
 
     <Grid>
@@ -329,6 +345,9 @@
                                 <ColumnDefinition Width="Auto"/> <!-- 8: Subtítulos -->
                                 <ColumnDefinition Width="Auto"/> <!-- 9: PiP -->
                                 <ColumnDefinition Width="Auto"/> <!-- 10: Fullscreen -->
+                                <ColumnDefinition Width="Auto"/> <!-- 11: Captura -->
+                                <ColumnDefinition Width="Auto"/> <!-- 12: Modo Noche -->
+                                <ColumnDefinition Width="Auto"/> <!-- 13: Cajón de episodios -->
                             </Grid.ColumnDefinitions>
 
                             <!-- Episodio Anterior -->
@@ -597,6 +616,44 @@
                                     Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,0,0">
                                 <materialDesign:PackIcon Kind="{Binding FullscreenIcon}" Width="26" Height="26" />
                             </Button>
+
+                            <!-- Captura de pantalla HD (Ctrl+S) -->
+                            <Button Grid.Column="11" Command="{Binding CapturarFrameCommand}" Focusable="True"
+                                    FocusVisualStyle="{StaticResource PlayerFocusVisual}"
+                                    ToolTip="{Binding [Player_Captura], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                    AutomationProperties.Name="{Binding [Player_Captura], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                    Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="8,0,0,0">
+                                <materialDesign:PackIcon Kind="CameraOutline" Width="26" Height="26" />
+                            </Button>
+
+                            <!-- Modo Noche: compresor de rango dinámico del audio -->
+                            <Button Grid.Column="12" Command="{Binding ToggleModoNocheCommand}" Focusable="True"
+                                    FocusVisualStyle="{StaticResource PlayerFocusVisual}"
+                                    ToolTip="{Binding [Player_ModoNoche], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                    AutomationProperties.Name="{Binding [Player_ModoNoche], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                    Style="{StaticResource MaterialDesignToolButton}" Width="40" Height="40" Margin="4,0,0,0">
+                                <materialDesign:PackIcon Kind="WeatherNight" Width="24" Height="24">
+                                    <materialDesign:PackIcon.Style>
+                                        <Style TargetType="materialDesign:PackIcon">
+                                            <Setter Property="Foreground" Value="White"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding ModoNocheActivo}" Value="True">
+                                                    <Setter Property="Foreground" Value="#818CF8"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </materialDesign:PackIcon.Style>
+                                </materialDesign:PackIcon>
+                            </Button>
+
+                            <!-- Cajón lateral de episodios (tecla L) -->
+                            <Button Grid.Column="13" Command="{Binding ToggleCajonEpisodiosCommand}" Focusable="True"
+                                    FocusVisualStyle="{StaticResource PlayerFocusVisual}"
+                                    ToolTip="{Binding [Player_CajonEpisodiosTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                    AutomationProperties.Name="{Binding [Player_CajonEpisodiosTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                    Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="4,0,0,0">
+                                <materialDesign:PackIcon Kind="PlaylistPlay" Width="26" Height="26" />
+                            </Button>
                         </Grid>
                     </Grid>
                 </Grid>
@@ -726,6 +783,96 @@
                         </Grid>
                     </Grid>
                 </Grid>
+
+                <!-- CAJÓN LATERAL DE EPISODIOS (tecla L) -->
+                <Border HorizontalAlignment="Right" Width="340"
+                        Background="#EE0B0F14" BorderBrush="#262D38" BorderThickness="1,0,0,0"
+                        Visibility="{Binding CajonEpisodiosAbierto, Converter={StaticResource BoolToVis}}">
+                    <Border.RenderTransform>
+                        <TranslateTransform X="340"/>
+                    </Border.RenderTransform>
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding CajonEpisodiosAbierto}" Value="True">
+                                    <DataTrigger.EnterActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetProperty="RenderTransform.X" To="0" Duration="0:0:0.22">
+                                                    <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
+                                                </DoubleAnimation>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </DataTrigger.EnterActions>
+                                    <DataTrigger.ExitActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetProperty="RenderTransform.X" To="340" Duration="0:0:0.18"/>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </DataTrigger.ExitActions>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <Grid Grid.Row="0" Margin="16,16,10,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="{Binding [Player_CajonEpisodios], Source={x:Static loc:LocalizationService.Instance}}" Foreground="White" FontSize="15" FontWeight="Bold" VerticalAlignment="Center"/>
+                            <Button Grid.Column="1" Command="{Binding ToggleCajonEpisodiosCommand}" Focusable="True"
+                                    Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="30" Height="30">
+                                <materialDesign:PackIcon Kind="Close" Width="18" Height="18"/>
+                            </Button>
+                        </Grid>
+
+                        <ListBox Grid.Row="1" ItemsSource="{Binding EpisodiosDelCajon}" Background="Transparent" BorderThickness="0"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                 VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
+                                 VirtualizingPanel.ScrollUnit="Pixel"
+                                 ScrollViewer.CanContentScroll="True" ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                 ItemContainerStyle="{StaticResource CajonEpisodioItemStyle}">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Padding="10,8" Margin="8,2" CornerRadius="8" Cursor="Hand">
+                                        <Border.Background>
+                                            <MultiBinding Converter="{StaticResource EpisodioActualBrush}">
+                                                <Binding Path="NumeroEpisodio"/>
+                                                <Binding Path="DataContext.Episodio" ElementName="RootWindow"/>
+                                            </MultiBinding>
+                                        </Border.Background>
+                                        <Border.InputBindings>
+                                            <MouseBinding MouseAction="LeftClick"
+                                                          Command="{Binding DataContext.SaltarAEpisodioCommand, ElementName=RootWindow}"
+                                                          CommandParameter="{Binding}"/>
+                                        </Border.InputBindings>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Border Width="72" Height="42" CornerRadius="6" ClipToBounds="True" Background="#1F242C">
+                                                <Image Source="{Binding RutaMiniatura, TargetNullValue={x:Null}}" Stretch="UniformToFill"/>
+                                            </Border>
+                                            <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding TituloVisual}" Foreground="White" FontSize="12.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Text="{Binding BadgeTecnico}" Foreground="#9CA3AF" FontSize="10" Margin="0,2,0,0"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </Grid>
+                </Border>
             </Grid>
             </Grid>
         </fl:FlyleafHost>
