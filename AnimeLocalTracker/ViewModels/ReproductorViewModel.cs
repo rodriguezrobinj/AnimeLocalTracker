@@ -11,6 +11,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using FlyleafLib;
+using FlyleafLib.MediaFramework.MediaDecoder;
 using FlyleafLib.MediaPlayer;
 using AnimeLocalTracker.Messages;
 using AnimeLocalTracker.Models;
@@ -144,6 +145,25 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
     private List<EpisodioItem> _episodiosDisponibles = new();
 
+    // === CAJÓN LATERAL DE EPISODIOS (tecla L) ===
+    // Reutiliza _episodiosDisponibles (ya filtrado a episodios con archivo local, ver
+    // CargarVideoAsync) — sin consulta nueva a la BD/disco, el dato ya estaba cargado para
+    // Siguiente/Anterior episodio.
+    public List<EpisodioItem> EpisodiosDelCajon => _episodiosDisponibles;
+
+    [ObservableProperty] private bool _cajonEpisodiosAbierto;
+
+    [RelayCommand]
+    private void ToggleCajonEpisodios() => CajonEpisodiosAbierto = !CajonEpisodiosAbierto;
+
+    [RelayCommand]
+    private void SaltarAEpisodio(EpisodioItem? episodio)
+    {
+        if (episodio == null || string.IsNullOrWhiteSpace(episodio.RutaCompleta)) return;
+        CajonEpisodiosAbierto = false;
+        CargarVideo(episodio.RutaCompleta, _animeId, TituloAnime, episodio.NumeroEpisodio, _episodiosDisponibles, _rutaPortada);
+    }
+
     private string _fullscreenIcon = "Fullscreen";
     public string FullscreenIcon
     {
@@ -164,6 +184,56 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         get => _subtitulosHabilitados;
         set => SetProperty(ref _subtitulosHabilitados, value);
     }
+
+    private bool _modoNocheActivo = false;
+    /// <summary>
+    /// "Modo noche": compresor de rango dinámico (FFmpeg acompressor) sobre el audio para que
+    /// el diálogo se escuche parejo sin que las escenas/openings fuertes suenen a todo volumen.
+    /// Se persiste como preferencia por defecto (AppSettings.ModoNocheActivo).
+    /// </summary>
+    public bool ModoNocheActivo
+    {
+        get => _modoNocheActivo;
+        set
+        {
+            if (SetProperty(ref _modoNocheActivo, value))
+            {
+                AplicarModoNocheAlPlayer(value);
+                GuardarModoNochePreferencia(value);
+            }
+        }
+    }
+
+    private static readonly List<Filter> FiltrosModoNoche = new()
+    {
+        new Filter { Id = "modonoche", Name = "acompressor", Args = "threshold=0.089:ratio=9:attack=200:release=1000:makeup=2" }
+    };
+
+    private void AplicarModoNocheAlPlayer(bool activo)
+    {
+        if (Player?.Config?.Audio == null) return;
+        try
+        {
+            Player.Config.Audio.Filters = activo ? FiltrosModoNoche : new List<Filter>();
+            Player.Config.Audio.ReloadFilters();
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("ReproductorViewModel", $"Error aplicando Modo Noche: {ex.Message}");
+        }
+    }
+
+    private void GuardarModoNochePreferencia(bool activo)
+    {
+        if (_settingsService == null) return;
+        var config = _settingsService.ObtenerConfiguracion();
+        if (config == null || config.ModoNocheActivo == activo) return;
+        config.ModoNocheActivo = activo;
+        _ = _settingsService.GuardarConfiguracionAsync(config);
+    }
+
+    [RelayCommand]
+    private void ToggleModoNoche() => ModoNocheActivo = !ModoNocheActivo;
 
     private int _animeId;
     public int AnimeId => _animeId;
@@ -226,6 +296,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                 _autoPlaySiguiente = config.AutoPlaySiguiente;
                 _subtitulosHabilitados = config.SubtitulosPorDefecto;
                 _subtitulosIcon = config.SubtitulosPorDefecto ? "Subtitles" : "SubtitlesOutline";
+                _modoNocheActivo = config.ModoNocheActivo;
             }
         }
     }
@@ -330,32 +401,42 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     {
         try
         {
-            var proc = Process.GetCurrentProcess().ProcessName;
-            if (proc.Contains("testhost", StringComparison.OrdinalIgnoreCase) ||
-                proc.Contains("vstest", StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-
-            if (Environment.CommandLine.Contains("test", StringComparison.OrdinalIgnoreCase) ||
-                Environment.CommandLine.Contains("vstest", StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-
-            return AppDomain.CurrentDomain.GetAssemblies().Any(a =>
-            {
-                var name = a.GetName().Name;
-                return name != null && (
-                    name.StartsWith("xunit", StringComparison.OrdinalIgnoreCase) ||
-                    name.EndsWith(".Tests", StringComparison.OrdinalIgnoreCase) ||
-                    name.Contains("test", StringComparison.OrdinalIgnoreCase));
-            });
+            return EsEntornoPruebas(
+                Process.GetCurrentProcess().ProcessName,
+                Environment.CommandLine,
+                AppDomain.CurrentDomain.GetAssemblies().Select(a => a.GetName().Name));
         }
         catch
         {
             return false;
         }
+    }
+
+    /// <summary>
+    /// Criterio deliberadamente ESTRECHO: solo los marcadores del ejecutor de pruebas (testhost /
+    /// vstest / xunit). Un simple "contiene 'test'" es peligroso — un plugin cargado en la app
+    /// (p. ej. un ensamblado "plugin_test") o una ruta de instalación como "C:\Users\test\..."
+    /// hacían creer a la app que corría bajo pruebas y dejaban los videos sin reproductor.
+    /// </summary>
+    internal static bool EsEntornoPruebas(string nombreProceso, string lineaComandos, IEnumerable<string?> nombresEnsamblados)
+    {
+        if (nombreProceso.Contains("testhost", StringComparison.OrdinalIgnoreCase) ||
+            nombreProceso.Contains("vstest", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (lineaComandos.Contains("vstest", StringComparison.OrdinalIgnoreCase) ||
+            lineaComandos.Contains("testhost", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return nombresEnsamblados.Any(nombre =>
+            nombre != null && (
+                nombre.StartsWith("xunit", StringComparison.OrdinalIgnoreCase) ||
+                nombre.Equals("testhost", StringComparison.OrdinalIgnoreCase) ||
+                nombre.StartsWith("Microsoft.TestPlatform", StringComparison.OrdinalIgnoreCase)));
     }
 
     public void AsegurarPlayerInicializado()
@@ -402,6 +483,10 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             {
                 config.Player.SeekAccurate = false;
                 config.Player.AutoPlay = true;
+
+                // El hilo de reproducción es el que alimenta el audio: con la ventana sin foco y
+                // otras apps compitiendo por CPU, en prioridad Normal el sonido se entrecorta.
+                config.Player.ThreadPriority = ThreadPriority.Highest;
             }
 
             // 2. Decoder multi-hilos para decodificación suave de AV1 y HEVC 10-bit
@@ -422,8 +507,22 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             {
                 config.Subtitles.Enabled = SubtitulosHabilitados;
             }
-            
+
+            // 5. Modo Noche (compresor de rango dinámico), si el usuario lo dejó activo la vez anterior
+            if (config.Audio != null && ModoNocheActivo)
+            {
+                config.Audio.Filters = FiltrosModoNoche;
+            }
+
             var player = new Player(config);
+
+            // Prioridad del proceso solo mientras hay un video abierto (se restaura en Dispose).
+            if (!_prioridadElevada)
+            {
+                PrioridadReproduccion.Elevar();
+                _prioridadElevada = true;
+            }
+
             player.OpenCompleted += (s, e) =>
             {
                 _haCompletadoOpen = true;
@@ -964,9 +1063,10 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         _rutaVideo = rutaVideo;
         _animeId = animeId;
         _episodio = episodio;
+        OnPropertyChanged(nameof(Episodio));
         _rutaPortada = rutaPortada;
         TituloAnime = tituloAnime;
-        TituloEpisodio = $"Episodio {episodio}";
+        TituloEpisodio = string.Format(LocalizationService.T("Act_EpisodioFormato"), episodio);
         _fueMarcadoComoVisto = false;
 
         // SMT-01: overlay nativo de Windows — título, episodio y portada del anime que arranca.
@@ -985,6 +1085,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                 .Where(e => !string.IsNullOrWhiteSpace(e.RutaCompleta))
                 .OrderBy(e => e.NumeroEpisodio)
                 .ToList();
+            OnPropertyChanged(nameof(EpisodiosDelCajon));
         }
 
         ActualizarEstadosNavegacionEpisodios();
@@ -1081,47 +1182,57 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
-    /// Captura el frame actual del episodio y lo guarda como PNG en la ubicación
-    /// elegida por el usuario. La invocación de ffmpeg vive en FrameCaptureService
-    /// (sin estado compartido con el reproductor, extraído para reducir el tamaño de este VM).
+    /// Captura el fotograma que Flyleaf tiene actualmente renderizado directo desde su buffer
+    /// Direct3D (Player.TakeSnapshotToBitmapSource) — sin relanzar ffmpeg ni re-decodificar, y en
+    /// la resolución nativa del video. Si los subtítulos están activos ya quedan incluidos porque
+    /// Flyleaf los compone dentro del propio frame renderizado (no son un overlay WPF aparte).
+    /// Se guarda automáticamente en Imágenes\AnimeLocalTracker y se copia al portapapeles.
     /// </summary>
     [RelayCommand]
     private async Task CapturarFrameAsync()
     {
-        if (Player == null || string.IsNullOrWhiteSpace(_rutaVideo) || !File.Exists(_rutaVideo)) return;
+        if (Player == null) return;
 
-        double posicion = TimeSpan.FromTicks(Player.CurTime).TotalSeconds;
-
-        var dialogo = new Microsoft.Win32.SaveFileDialog
+        try
         {
-            Title = "Capturar frame",
-            Filter = "PNG (*.png)|*.png|JPEG (*.jpg)|*.jpg",
-            FileName = $"frame_{DateTime.Now:yyyyMMdd_HHmmss}.png"
-        };
+            var bitmap = Player.TakeSnapshotToBitmapSource(0, 0);
+            if (bitmap == null)
+            {
+                _ = WeakReferenceMessenger.Default.Send(new Messages.MostrarDialogoRequestMessage(
+                    LocalizationService.T("Player_CapturaTitulo"), LocalizationService.T("Player_CapturaErrorMsj"), false, "AlertCircleOutline", "#EF4444"));
+                return;
+            }
+            bitmap.Freeze();
 
-        if (dialogo.ShowDialog() != true) return;
+            Clipboard.SetImage(bitmap);
 
-        var resultado = await FrameCaptureService.CapturarFrameAsync(_rutaVideo, posicion, dialogo.FileName);
+            string carpeta = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "AnimeLocalTracker");
+            string ruta = Path.Combine(carpeta, $"Captura_{DateTime.Now:yyyyMMdd_HHmmss}.png");
+            await Task.Run(() =>
+            {
+                Directory.CreateDirectory(carpeta);
+                var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+                encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
+                using var fs = File.Create(ruta);
+                encoder.Save(fs);
+            });
 
-        if (resultado.Exito)
-        {
             _ = WeakReferenceMessenger.Default.Send(new Messages.MostrarDialogoRequestMessage(
-                "Frame capturado", $"Imagen guardada en:\n{dialogo.FileName}", false, "CameraOutline", "#4CAF50"));
+                LocalizationService.T("Player_CapturaTitulo"), string.Format(LocalizationService.T("Player_CapturaListaFormato"), ruta), false, "CameraOutline", "#4CAF50"));
         }
-        else if (resultado.MensajeUsuario != null)
+        catch (Exception ex)
         {
+            AppLogger.Error("ReproductorViewModel", "Error capturando fotograma", ex);
             _ = WeakReferenceMessenger.Default.Send(new Messages.MostrarDialogoRequestMessage(
-                "Error", resultado.MensajeUsuario, false, "AlertCircleOutline", "#EF4444"));
+                LocalizationService.T("Player_CapturaTitulo"), LocalizationService.T("Player_CapturaErrorMsj"), false, "AlertCircleOutline", "#EF4444"));
         }
-        // Si MensajeUsuario es null (excepción no anticipada al lanzar ffmpeg): falla
-        // silenciosa igual que antes, ya queda registrada en el log por el servicio.
     }
 
     public async Task GuardarProgresoActualAsync(bool forzarProgresoCero = false)
     {
         if (_animeId <= 0 || _episodio <= 0) return;
 
-        // FUN-011: un solo guardado a la vez. Si el tick de 5 s llega con otro en curso,
+        // FUN-011: un solo guardado a la vez. Si el tick de 3 s llega con otro en curso,
         // se descarta (el siguiente tick guardará el estado más reciente).
         if (!_guardadoLock.Wait(0)) return;
 
@@ -1189,7 +1300,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             // Notificación flotante sutil (Toast)
             _ = WeakReferenceMessenger.Default.Send(new Messages.MostrarDialogoRequestMessage(
                 "Auto-Tracking",
-                $"Episodio {_episodio} marcado como visto.",
+                string.Format(LocalizationService.T("Player_EpisodioMarcadoVistoMsj"), _episodio),
                 false, "CheckCircle", "#4CAF50"));
 
             // Avisar a la vista de detalles para que actualice la lista automáticamente
@@ -1254,8 +1365,8 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                             string tiempoFormateado = tPos.ToString(tPos.Hours > 0 ? @"hh\:mm\:ss" : @"mm\:ss");
 
                             _ = WeakReferenceMessenger.Default.Send(new Messages.MostrarDialogoRequestMessage(
-                                "Reanudar Reproducción",
-                                $"Continuando desde {tiempoFormateado}",
+                                LocalizationService.T("Player_ReanudarReproduccionTitulo"),
+                                string.Format(LocalizationService.T("Player_ContinuandoDesdeFormato"), tiempoFormateado),
                                 false, "PlaySpeed", "#2196F3"));
                         }
                     }
@@ -1293,8 +1404,11 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
                     if (PlayPauseIcon != "Pause") PlayPauseIcon = "Pause";
 
-                    // Guardado continuo periódico cada 5 segundos
-                    if (Math.Abs(curSeconds - _lastSavedSeconds) >= 5.0)
+                    // Guardado continuo periódico cada 3 segundos: ya se persiste directo a SQLite
+                    // (WAL, durable en cuanto termina el await) — este intervalo solo acota cuánto
+                    // progreso se puede perder si la luz se va o Windows se reinicia a la fuerza
+                    // entre guardado y guardado.
+                    if (Math.Abs(curSeconds - _lastSavedSeconds) >= 3.0)
                     {
                         _lastSavedSeconds = curSeconds;
                         _ = GuardarProgresoActualAsync();
@@ -1329,7 +1443,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
                                 _ = WeakReferenceMessenger.Default.Send(new Messages.MostrarDialogoRequestMessage(
                                     "AniSkip",
-                                    $"{skip.TextoBoton} automáticamente.",
+                                    string.Format(LocalizationService.T("Player_SkipAutoFormato"), skip.TextoBoton),
                                     false, skip.IconoBoton, "#2196F3"));
                             }
                             else if (!AutoSkipIntroOutro)
@@ -1517,7 +1631,15 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             }
             Player = null!;
         }
+
+        if (_prioridadElevada)
+        {
+            _prioridadElevada = false;
+            PrioridadReproduccion.Restaurar();
+        }
     }
+
+    private bool _prioridadElevada;
 
     private void CancelarSeekPendiente()
     {

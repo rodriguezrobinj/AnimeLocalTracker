@@ -383,7 +383,12 @@ namespace AnimeLocalTracker.Views
             var k = e.Key;
             bool ejecutado = true;
 
-            if (k == vm.ObtenerTeclaPara("PlayPausa"))
+            // Ctrl+S siempre captura, además de la tecla configurable "CapturarFrame".
+            if (k == Key.S && Keyboard.Modifiers == ModifierKeys.Control)
+                vm.CapturarFrameCommand.Execute(null);
+            else if (k == Key.L && Keyboard.Modifiers == ModifierKeys.None)
+                vm.ToggleCajonEpisodiosCommand.Execute(null);
+            else if (k == vm.ObtenerTeclaPara("PlayPausa"))
                 vm.TogglePlayPauseCommand.Execute(null);
             else if (k == vm.ObtenerTeclaPara("PantallaCompleta"))
                 vm.ToggleFullscreenCommand.Execute(null);
