@@ -23,7 +23,13 @@ public class AuthService : IAuthService
     
     // Ruta donde guardaremos el token para que no inicies sesión cada vez que abras la app.
     // Ubicado en la carpeta de datos (fuera del directorio de instalación de Velopack).
-    private readonly string _rutaToken = AppDataPaths.TokenPath;
+    private readonly string _rutaToken;
+
+    public AuthService() : this(AppDataPaths.TokenPath) { }
+
+    /// <summary>Permite apuntar a otra ruta (pruebas): sin esto, las pruebas que llaman a
+    /// CerrarSesion() borraban el token REAL del usuario y obligaban a volver a iniciar sesión.</summary>
+    internal AuthService(string rutaToken) => _rutaToken = rutaToken;
 
     public bool EstaAutenticado() => File.Exists(_rutaToken) && ObtenerTokenGuardado() != string.Empty;
     
