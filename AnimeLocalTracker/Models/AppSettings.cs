@@ -23,6 +23,11 @@ public class AppSettings
     public string Idioma { get; set; } = "es";
     /// <summary>Velocidad de reproducción aplicada al abrir un video (0.5 a 2.0).</summary>
     public double VelocidadReproduccionDefecto { get; set; } = 1.0;
+    /// <summary>Compresor de rango dinámico de audio ("modo noche") activo por defecto al abrir un video.</summary>
+    public bool ModoNocheActivo { get; set; } = false;
+    /// <summary>Al cerrar/minimizar la ventana, se oculta a la bandeja del sistema en vez de salir.
+    /// Desactivado por defecto: no cambia el comportamiento del botón cerrar para quien no lo pida.</summary>
+    public bool MinimizarABandejaAlCerrar { get; set; } = false;
 
     /// <summary>
     /// Atajos de teclado configurables del reproductor: acción → tecla.

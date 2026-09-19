@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 
 namespace AnimeLocalTracker.Services;
@@ -228,6 +229,32 @@ public sealed class LocalizationService : INotifyPropertyChanged
         ["Player_RestaurarPip"] = "Restaurar reproductor",
         ["Pip_Banner_Reproduciendo"] = "Reproduciendo en ventana flotante:",
 
+        // === CAPTURA DE PANTALLA (Ctrl+S) ===
+        ["Player_Captura"] = "Capturar fotograma (Ctrl+S)",
+        ["Player_CapturaTitulo"] = "Captura de pantalla",
+        ["Player_CapturaListaFormato"] = "Guardada en {0} y copiada al portapapeles.",
+        ["Player_CapturaErrorMsj"] = "No se pudo capturar el fotograma actual.",
+
+        // === MODO NOCHE (compresor de audio) ===
+        ["Player_ModoNoche"] = "Modo noche (nivela el volumen del diálogo)",
+
+        // === CAJÓN LATERAL DE EPISODIOS (tecla L) ===
+        ["Player_CajonEpisodios"] = "Episodios",
+        ["Player_CajonEpisodiosTip"] = "Ver episodios (L)",
+
+        // === BANDEJA DEL SISTEMA ===
+        ["Tray_AbrirApp"] = "Abrir AnimeLocalTracker",
+        ["Tray_ReanudarUltimo"] = "Reanudar último anime",
+        ["Tray_BuscarNuevos"] = "Buscar nuevos episodios",
+        ["Tray_Salir"] = "Salir",
+        ["Tray_Titulo"] = "AnimeLocalTracker",
+        ["Tray_SinUltimoAnime"] = "Todavía no hay ningún episodio reciente para reanudar.",
+        ["Tray_ArchivoNoEncontrado"] = "El archivo del último episodio visto ya no está disponible.",
+        ["Tray_SinNuevos"] = "No se encontraron episodios nuevos.",
+        ["Tray_NuevosEncontradosFormato"] = "{0} episodio(s) nuevo(s) encontrado(s).",
+        ["Cfg_MinimizarBandeja"] = "Minimizar a la bandeja del sistema",
+        ["Cfg_MinimizarBandejaSub"] = "Al cerrar o minimizar, la app sigue en segundo plano (icono en el área de notificación) en vez de salir",
+
         // === GALERÍA ===
         ["Gal_Titulo"] = "Mi Colección",
         ["Gal_QueVerTip"] = "Elegir el siguiente episodio no visto de un anime al azar",
@@ -401,7 +428,7 @@ public sealed class LocalizationService : INotifyPropertyChanged
         ["Cfg_UltimaConfirmacionTitulo"] = "Última confirmación",
         ["Cfg_UltimaConfirmacionMsj"] = "¿Borrar TODOS tus datos locales ahora? La aplicación se cerrará y, al abrirla de nuevo, empezarás desde cero.",
         ["Cfg_Plugins"] = "Plugins y Extensiones",
-        ["Cfg_PluginsSub"] = "Scrapers y herramientas de la comunidad (Python)",
+        ["Cfg_PluginsSub"] = "Scrapers y herramientas de la comunidad (Python .py o C# .dll)",
         ["Cfg_SinPlugins"] = "No hay plugins instalados.",
         ["Cfg_AbrirCarpetaPlugins"] = "Abrir Carpeta",
 
@@ -428,7 +455,226 @@ public sealed class LocalizationService : INotifyPropertyChanged
         ["Det_SinEpisodios"] = "No hay episodios para mostrar",
         ["Det_SinEpisodiosSub"] = "No se encontraron episodios para este anime.",
         ["Det_SinEpisodiosFiltro"] = "No hay episodios con este filtro",
-        ["Det_SinEpisodiosFiltroSub"] = "No se encontraron episodios en la categoría '{0}'."
+        ["Det_SinEpisodiosFiltroSub"] = "No se encontraron episodios en la categoría '{0}'.",
+
+        // === LOC-08: TEXTOS DINÁMICOS QUE FALTABAN POR TRADUCIR ===
+        // --- Galería: filtros y ordenación ---
+        ["Gal_TodosLosGeneros"] = "Todos los géneros",
+        ["Gal_TodasLasTemporadas"] = "Todas las temporadas",
+        ["Gal_TodosLosAnios"] = "Todos los años",
+        ["Gal_OrdenTituloAZ"] = "Título (A - Z)",
+        ["Gal_OrdenTituloZA"] = "Título (Z - A)",
+        ["Gal_OrdenMayorProgreso"] = "Mayor Progreso",
+        ["Gal_OrdenMenorProgreso"] = "Menor Progreso",
+        ["Gal_OrdenMasEpisodios"] = "Más Episodios",
+        ["Gal_OrdenMenosEpisodios"] = "Menos Episodios",
+        ["Gal_OrdenMasRecientes"] = "Más Recientes",
+        ["Gal_ConteoCero"] = "0 animes",
+        ["Gal_ConteoUno"] = "1 anime",
+        ["Gal_ConteoVarios"] = "{0} animes",
+        ["Gal_ConteoFiltrado"] = "Mostrando {0} de {1} animes",
+        ["Gal_UsuarioDefault"] = "Usuario",
+        ["Gal_QueVeoHoyTitulo"] = "Qué veo hoy",
+        ["Gal_QueVeoHoySinCarpetaMsj"] = "No tienes animes con carpeta local en la biblioteca.\n\nAgrega un anime con su carpeta de episodios para usar esta función.",
+        ["Gal_QueVeoHoySinEpisodiosMsj"] = "No se encontraron episodios sin ver en tu biblioteca local. ¡Disfruta de tu maratón!",
+        ["Gal_QueVeoHoyErrorMsj"] = "Ocurrió un error al buscar episodios.",
+        ["Gal_ConectarAniListTitulo"] = "Conectar con AniList",
+        ["Gal_ConectarAniListMsj"] = "Al conectar, la app podrá:\n\n• LEER tu perfil y tu lista de AniList (títulos y progreso).\n• ESCRIBIR tu progreso (episodios vistos), estado y puntuación cuando los marques.\n\nTus archivos de video nunca se suben y la app no tiene telemetría.",
+        ["Gal_NubeActivadaTitulo"] = "Nube Activada",
+        ["Gal_NubeActivadaMsj"] = "¡Conectado a AniList exitosamente! Tu progreso ahora se sincronizará.",
+        ["Gal_AutenticacionCanceladaTitulo"] = "Autenticación Cancelada",
+        ["Gal_AutenticacionCanceladaMsj"] = "No se pudo iniciar sesión con AniList o el proceso fue cancelado.",
+        ["Gal_SesionCerradaTitulo"] = "Sesión Cerrada",
+        ["Gal_SesionCerradaMsj"] = "Te has desconectado de AniList correctamente.",
+        ["Gal_ConsultandoAniList"] = "Consultando AniList...",
+        ["Gal_SincronizandoFormato"] = "Sincronizando: {0} ({1}/{2})",
+        ["Gal_ActualizacionCompletada"] = "¡Actualización completada con éxito!",
+
+        // --- Biblioteca: diálogos compartidos entre Galería y Detalle ---
+        ["Bib_EliminarTitulo"] = "Eliminar de la biblioteca",
+        ["Bib_EliminarMsj"] = "¿Deseas eliminar '{0}' de tu biblioteca local?",
+        ["Bib_BorrarArchivosTitulo"] = "¿Borrar también los archivos?",
+        ["Bib_BorrarArchivosMsj"] = "¿Deseas eliminar también la carpeta con los episodios descargados del disco?\n\n'{0}'\n\nElige NO para conservar los archivos y solo quitar el anime de la biblioteca.",
+        ["Bib_SinCarpetaLocal"] = "sin carpeta local",
+
+        // --- Temporadas de estreno (compartido) ---
+        ["Temporada_Invierno"] = "Invierno",
+        ["Temporada_Primavera"] = "Primavera",
+        ["Temporada_Verano"] = "Verano",
+        ["Temporada_Otonio"] = "Otoño",
+
+        // --- Agregar Anime ---
+        ["Add_TendenciasTemporada"] = "Tendencias de la temporada",
+        ["Add_ResultadosParaFormato"] = "Resultados para \"{0}\"",
+        ["Add_ErrorAlAnadirTitulo"] = "Error al Añadir",
+        ["Add_ErrorAlAnadirMsj"] = "Ocurrió un error al añadir '{0}': {1}",
+        ["Add_AnimeAnadidoTitulo"] = "¡Anime Añadido!",
+        ["Add_AnimeAnadidoMsj"] = "'{0}' se ha añadido a tu biblioteca correctamente.",
+
+        // --- Datos de AniList formateados para tarjetas de búsqueda ---
+        ["Media_EstadoEnEmision"] = "En Emisión",
+        ["Media_EstadoFinalizado"] = "Finalizado",
+        ["Media_EstadoProximamente"] = "Próximamente",
+        ["Media_EstadoCancelado"] = "Cancelado",
+        ["Media_EstadoPausado"] = "Pausado",
+        ["Media_EstadoDesconocido"] = "Desconocido",
+        ["Media_EpisodiosDesconocido"] = "Episodios: ?",
+        ["Media_AnioDesconocido"] = "Año ?",
+        ["Media_SinGeneros"] = "Sin géneros",
+
+        // --- Configuración: diálogos y estados de texto ---
+        ["Cfg_EspacioCalculando"] = "Calculando...",
+        ["Cfg_RutaNoConfigurada"] = "Ruta no configurada",
+        ["Cfg_Desconocido"] = "Desconocido",
+        ["Cfg_EspacioFormato"] = "{0:F1} GB libres de {1:F1} GB{2}",
+        ["Cfg_UnidadNoDisponible"] = "Unidad no disponible",
+        ["Cfg_EspacioInfoNoDisponible"] = "Información no disponible",
+        ["Cfg_SeleccionarCarpetaTitulo"] = "Selecciona la carpeta donde guardarás tus colecciones de anime",
+        ["Cfg_AlmacenamientoActualizadoTitulo"] = "Almacenamiento Actualizado",
+        ["Cfg_AlmacenamientoActualizadoMsj"] = "La carpeta principal de animes se ha configurado a:\n{0}\n\nLos animes ya existentes conservan su carpeta actual: para que la app los encuentre, deberán estar (o copiarse) dentro de la nueva carpeta base.",
+        ["Cfg_CarpetaNoEncontradaTitulo"] = "Carpeta no encontrada",
+        ["Cfg_CarpetaNoEncontradaMsj"] = "La carpeta especificada no existe en disco:\n{0}",
+        ["Cfg_ErrorCambiarCarpetaMsj"] = "No se pudo cambiar la carpeta de almacenamiento: {0}",
+        ["Cfg_PreferenciasGuardadasTitulo"] = "Preferencias Guardadas",
+        ["Cfg_PreferenciasGuardadasMsj"] = "Tus preferencias han sido guardadas correctamente.",
+        ["Cfg_CerrarSesionConfirmacionMsj"] = "¿Deseas desconectar tu cuenta de AniList? La aplicación continuará funcionando en modo offline local.",
+        ["Cfg_ErrorBorrarDatosMsj"] = "No se pudieron borrar todos los datos: {0}",
+        ["Cfg_DatosBorradosTitulo"] = "Datos borrados",
+        ["Cfg_DatosBorradosMsj"] = "Todos tus datos locales se han eliminado correctamente. La aplicación se cerrará.",
+        ["Cfg_LimpiarCacheConfirmacionMsj"] = "¿Eliminar miniaturas y portadas de animes que ya no existen en tu biblioteca?\n\nEsto libera espacio en disco sin borrar ningún episodio.",
+        ["Cfg_LimpiezaCompletadaTitulo"] = "Limpieza completada",
+        ["Cfg_LimpiezaCompletadaMsj"] = "Se liberaron {0:F1} MB\n{1} miniaturas y {2} portadas eliminadas.",
+        ["Cfg_LimpiezaErrorMsj"] = "No se pudo completar la limpieza de caché.",
+        ["Cfg_NoConectado"] = "No conectado",
+        ["Cfg_ConectadoSincronizacionActiva"] = "Conectado con AniList (Sincronización activa)",
+        ["Cfg_SesionNoIniciadaOffline"] = "Sesión no iniciada (Modo Local Offline)",
+
+        // --- Detalle: diálogos de episodios/anime/AniList ---
+        ["Det_DescargaCompletadaTitulo"] = "Descarga Completada",
+        ["Det_DescargaCompletadaMsj"] = "El episodio {0} se ha descargado exitosamente.",
+        ["Det_ErrorDescargaTitulo"] = "Error de descarga",
+        ["Det_ErrorDescargaMsj"] = "Error al descargar el episodio {0}:\n{1}",
+        ["Det_DuplicadosEncontradosTitulo"] = "Duplicados encontrados",
+        ["Det_DuplicadosEncontradosMsj"] = "Se detectaron {0} archivos duplicados por hash perceptual:\n\n{1}",
+        ["Det_DuplicadosContador"] = "{0} duplicado(s)",
+        ["Det_AnalisisDuplicadosTitulo"] = "Análisis de duplicados",
+        ["Det_SinDuplicadosMsj"] = "¡Excelente! No se encontraron episodios duplicados en esta serie.",
+        ["Det_ErrorAnalisisTitulo"] = "Error en análisis",
+        ["Det_ErrorAnalisisMsj"] = "No se pudo completar el análisis de duplicados: {0}",
+        ["Det_CarpetaNoEncontradaTitulo"] = "Carpeta no encontrada",
+        ["Det_SinCarpetaLocalMsj"] = "El anime no tiene una carpeta local asociada.",
+        ["Det_CarpetaYaNoExisteMsj"] = "La carpeta del anime ya no existe en disco.",
+        ["Det_EliminarEpisodioTitulo"] = "Eliminar episodio",
+        ["Det_EliminarEpisodioConfirmacionMsj"] = "¿Eliminar el archivo del episodio {0}?\n\nSe borrará del disco y no podrá recuperarse.",
+        ["Det_EpisodioEliminadoTitulo"] = "Episodio eliminado",
+        ["Det_EpisodioEliminadoMsj"] = "El episodio {0} fue eliminado del disco.",
+        ["Det_MinEpisodiosOPMsj"] = "Se necesitan al menos 2 episodios descargados para analizar el opening por audio.",
+        ["Det_AnalizandoOpMsj"] = "Esto tardará unos segundos. Iniciaremos un análisis cruzado del audio de los primeros 2 episodios para buscar el OP...",
+        ["Det_OpEncontradoTitulo"] = "OP Encontrado",
+        ["Det_OpEncontradoMsj"] = "Opening detectado de {0}s a {1}s.",
+        ["Det_OpNoEncontradoTitulo"] = "No se encontró OP",
+        ["Det_OpNoEncontradoMsj"] = "El plugin de audio no pudo encontrar un OP común entre estos episodios.",
+        ["Det_EpisodioNoEncontradoTitulo"] = "Episodio no encontrado",
+        ["Det_EpisodioNoEncontradoMsj"] = "Archivo no encontrado para el episodio {0}.\nBuscando opciones de descarga en el navegador web...",
+        ["Det_ErrorIniciarReproductorMsj"] = "Error al intentar iniciar el reproductor: {0}",
+        ["Det_ActualizadoTitulo"] = "Actualizado",
+        ["Det_ActualizadoMsj"] = "Anime actualizado. Total de episodios emitidos: {0}",
+        ["Det_ErrorConectarAniListMsj"] = "Error al conectar con AniList para actualizar.",
+        ["Det_ErrorAutenticacionTitulo"] = "Error de Autenticación",
+        ["Det_DebesConectarAniListMsj"] = "Debes conectar tu cuenta de AniList primero.",
+        ["Det_NubeSincronizadaTitulo"] = "Nube Sincronizada",
+        ["Det_NubeSincronizadaMsj"] = "¡Seguimiento actualizado en AniList con éxito!",
+        ["Det_ErrorSincronizacionTitulo"] = "Error de Sincronización",
+        ["Det_ErrorSincronizacionMsj"] = "Hubo un error de comunicación al intentar guardar tus datos en AniList.",
+
+        // --- Ficha: episodios faltantes (huecos en la carpeta local) ---
+        ["Det_FaltantesBannerFormato"] = "Faltan {0} episodios en tu carpeta local ({1})",
+        ["Det_FaltanteEpisodioEtiqueta"] = "Ep. {0}",
+        ["Det_Y"] = "y",
+        ["Det_FaltantesResto"] = "y {0} más",
+        ["Det_DescargarFaltantes"] = "Descargar faltantes",
+
+        // --- Ficha: doctor de integridad de video ---
+        ["Det_VerificarIntegridad"] = "Verificar integridad",
+        ["Det_VerificandoIntegridad"] = "Verificando...",
+        ["Det_IntegridadTitulo"] = "Doctor de Integridad",
+        ["Det_IntegridadSinCorruptosFormato"] = "Los {0} episodios descargados están en buen estado.",
+        ["Det_IntegridadConCorruptosFormato"] = "{0} de {1} episodios descargados están corruptos (marcados en la lista).",
+        ["Det_ArchivoCorruptoTip"] = "Este archivo parece estar corrupto o incompleto",
+        ["Det_ArchivoCorruptoBadge"] = "Corrupto",
+
+        // --- Calendario ---
+        ["Cal_NoEnBibliotecaTitulo"] = "No está en tu biblioteca",
+        ["Cal_NoEnBibliotecaMsj"] = "'{0}' aún no está en tu biblioteca local.\n\nAñádelo desde la pestaña + para poder verlo o descargarlo.",
+
+        // --- Estadísticas: textos dinámicos ---
+        ["Stats_ErrorCargaMsj"] = "No se pudieron cargar las estadísticas. Inténtalo de nuevo más tarde.",
+        ["Stats_DiasFormato"] = "{0} días",
+        ["Stats_GeneroFavoritoDetalleFormato"] = "{0} animes · {1:F0}% de tu colección",
+        ["Stats_Otros"] = "Otros",
+        ["Stats_EpisodiosDeTotalFormato"] = "{0} de {1} episodios",
+        ["Stats_EpisodiosVistosFormato"] = "{0} episodios vistos",
+        ["Stats_EpisodiosEnAnioFormato"] = "{0} episodios en {1}",
+        ["Stats_FavoritoPorcentaje"] = "favorito · {0:F0}%",
+
+        // --- Estadísticas: logros ---
+        ["Stats_Logros"] = "Logros",
+        ["Stats_LogrosSub"] = "Insignias desbloqueadas según tus hábitos de visionado",
+        ["Stats_LogroMaratonero"] = "Maratonero",
+        ["Stats_LogroMaratoneroDesc"] = "Ver 6 episodios seguidos en un día",
+        ["Stats_LogroBuhoNocturno"] = "Búho Nocturno",
+        ["Stats_LogroBuhoNocturnoDesc"] = "Ver un episodio entre las 2 y las 5 de la madrugada",
+        ["Stats_LogroCompletista"] = "Completista Legendario",
+        ["Stats_LogroCompletistaDesc"] = "Terminar una serie de más de 50 capítulos",
+        ["Stats_LogroBiografo"] = "Biógrafo Otaku",
+        ["Stats_LogroBiografoDesc"] = "Alcanzar más de 100 horas registradas",
+        ["Stats_LogroDesbloqueado"] = "Desbloqueado",
+        ["Stats_LogroBloqueado"] = "Aún no",
+
+        // --- Estadísticas: tarjeta Wrapped ---
+        ["Stats_Wrapped"] = "Mi Año Anime",
+        ["Stats_WrappedSub"] = "Genera una tarjeta con tu resumen para compartir",
+        ["Stats_WrappedBoton"] = "Generar tarjeta",
+        ["Stats_WrappedGenerando"] = "Generando tarjeta...",
+        ["Stats_WrappedListoFormato"] = "Tarjeta guardada en {0} y copiada al portapapeles.",
+        ["Stats_WrappedErrorMsj"] = "No se pudo generar la tarjeta de resumen.",
+        ["Wrapped_Titulo"] = "MI AÑO EN ANIME",
+        ["Wrapped_Horas"] = "HORAS VISTAS",
+        ["Wrapped_Episodios"] = "EPISODIOS VISTOS",
+        ["Wrapped_TopAnimes"] = "TOP ANIMES",
+        ["Wrapped_GeneroFavorito"] = "GÉNERO FAVORITO",
+        ["Wrapped_RachaMaxima"] = "RACHA MÁXIMA",
+        ["Wrapped_Footer"] = "Generado con AnimeLocalTracker",
+
+        // --- Acerca de ---
+        ["Acerca_NovedadesTituloFormato"] = "Novedades: {0}",
+        ["Acerca_LicenciaTexto"] = "Licencia MIT - Software de Código Abierto",
+        ["Acerca_NovedadesDefault"] = "- Gestor y reproductor nativo multimedia para colecciones de anime locales.\n- Auto-tracking local e integración bidireccional con AniList.\n- Motor acelerado por hardware con Flyleaf y DirectX.\n- Actualizaciones automáticas con Velopack y GitHub Releases.",
+        ["Acerca_PublicadoFormato"] = "Publicado: {0:dd/MM/yyyy}",
+        ["Acerca_ActualizacionDisponibleTitulo"] = "¡Actualización Disponible!",
+        ["Acerca_ActualizacionDisponibleMsj"] = "Se encontró la versión {0}.\n\n¿Deseas descargarla e instalarla ahora automáticamente?",
+        ["Acerca_AplicacionActualizadaTitulo"] = "Aplicación Actualizada",
+        ["Acerca_AplicacionActualizadaMsj"] = "Ya tienes instalada la versión más reciente ({0}).",
+        ["Acerca_ErrorActualizacionTitulo"] = "Error de Actualización",
+        ["Acerca_ErrorActualizacionMsj"] = "No se pudo comprobar la actualización: {0}",
+
+        // --- Reproductor: diálogos flotantes ---
+        ["Player_ReanudarReproduccionTitulo"] = "Reanudar Reproducción",
+        ["Player_ContinuandoDesdeFormato"] = "Continuando desde {0}",
+        ["Player_SkipAutoFormato"] = "{0} automáticamente.",
+        ["Skip_SaltarIntro"] = "Saltar intro",
+        ["Skip_SaltarEnding"] = "Saltar ending",
+        ["Skip_SaltarResumen"] = "Saltar resumen",
+        ["Skip_SaltarSegmento"] = "Saltar segmento",
+
+        // --- Episodio: textos genéricos (título, accesibilidad, progreso) ---
+        ["Epi_ProgresoEpisodiosTexto"] = "{0} de {1} vistos",
+        ["Epi_ResumenAccesibleFormato"] = "Episodio {0}: {1}. {2}.",
+        ["Player_EpisodioMarcadoVistoMsj"] = "Episodio {0} marcado como visto.",
+        ["Det_ProximosEpisodiosFormato"] = "Episodio {0} confirmado en AniList — faltan {1} por localizar",
+        ["Epi_AccVisto"] = "Visto",
+        ["Epi_AccNoVisto"] = "No visto",
+        ["Epi_AccNoDescargado"] = "No descargado"
     };
 
 
@@ -630,6 +876,32 @@ public sealed class LocalizationService : INotifyPropertyChanged
         ["Player_RestaurarPip"] = "Restore player",
         ["Pip_Banner_Reproduciendo"] = "Playing in floating window:",
 
+        // === SCREENSHOT (Ctrl+S) ===
+        ["Player_Captura"] = "Capture frame (Ctrl+S)",
+        ["Player_CapturaTitulo"] = "Screenshot",
+        ["Player_CapturaListaFormato"] = "Saved to {0} and copied to the clipboard.",
+        ["Player_CapturaErrorMsj"] = "Could not capture the current frame.",
+
+        // === NIGHT MODE (audio compressor) ===
+        ["Player_ModoNoche"] = "Night mode (levels out dialogue volume)",
+
+        // === EPISODE DRAWER (key L) ===
+        ["Player_CajonEpisodios"] = "Episodes",
+        ["Player_CajonEpisodiosTip"] = "View episodes (L)",
+
+        // === SYSTEM TRAY ===
+        ["Tray_AbrirApp"] = "Open AnimeLocalTracker",
+        ["Tray_ReanudarUltimo"] = "Resume last anime",
+        ["Tray_BuscarNuevos"] = "Check for new episodes",
+        ["Tray_Salir"] = "Exit",
+        ["Tray_Titulo"] = "AnimeLocalTracker",
+        ["Tray_SinUltimoAnime"] = "There's no recent episode to resume yet.",
+        ["Tray_ArchivoNoEncontrado"] = "The file for the last watched episode is no longer available.",
+        ["Tray_SinNuevos"] = "No new episodes found.",
+        ["Tray_NuevosEncontradosFormato"] = "{0} new episode(s) found.",
+        ["Cfg_MinimizarBandeja"] = "Minimize to system tray",
+        ["Cfg_MinimizarBandejaSub"] = "When closing or minimizing, the app keeps running in the background (notification area icon) instead of exiting",
+
         // === LIBRARY ===
         ["Gal_Titulo"] = "My Library",
         ["Gal_QueVerTip"] = "Pick the next unwatched episode of a random anime",
@@ -803,7 +1075,7 @@ public sealed class LocalizationService : INotifyPropertyChanged
         ["Cfg_UltimaConfirmacionTitulo"] = "Final confirmation",
         ["Cfg_UltimaConfirmacionMsj"] = "Delete ALL your local data now? The application will close and, when you reopen it, you'll start from scratch.",
         ["Cfg_Plugins"] = "Plugins & Extensions",
-        ["Cfg_PluginsSub"] = "Community scrapers and tools (Python)",
+        ["Cfg_PluginsSub"] = "Community scrapers and tools (Python .py or C# .dll)",
         ["Cfg_SinPlugins"] = "No plugins installed.",
         ["Cfg_AbrirCarpetaPlugins"] = "Open Folder",
 
@@ -830,7 +1102,226 @@ public sealed class LocalizationService : INotifyPropertyChanged
         ["Det_SinEpisodios"] = "No episodes to show",
         ["Det_SinEpisodiosSub"] = "No episodes found for this anime.",
         ["Det_SinEpisodiosFiltro"] = "No episodes match this filter",
-        ["Det_SinEpisodiosFiltroSub"] = "No episodes found in the '{0}' category."
+        ["Det_SinEpisodiosFiltroSub"] = "No episodes found in the '{0}' category.",
+
+        // === LOC-08: DYNAMIC TEXT THAT WAS MISSING TRANSLATION ===
+        // --- Library: filters and sorting ---
+        ["Gal_TodosLosGeneros"] = "All genres",
+        ["Gal_TodasLasTemporadas"] = "All seasons",
+        ["Gal_TodosLosAnios"] = "All years",
+        ["Gal_OrdenTituloAZ"] = "Title (A - Z)",
+        ["Gal_OrdenTituloZA"] = "Title (Z - A)",
+        ["Gal_OrdenMayorProgreso"] = "Highest Progress",
+        ["Gal_OrdenMenorProgreso"] = "Lowest Progress",
+        ["Gal_OrdenMasEpisodios"] = "Most Episodes",
+        ["Gal_OrdenMenosEpisodios"] = "Fewest Episodes",
+        ["Gal_OrdenMasRecientes"] = "Most Recent",
+        ["Gal_ConteoCero"] = "0 anime",
+        ["Gal_ConteoUno"] = "1 anime",
+        ["Gal_ConteoVarios"] = "{0} anime",
+        ["Gal_ConteoFiltrado"] = "Showing {0} of {1} anime",
+        ["Gal_UsuarioDefault"] = "User",
+        ["Gal_QueVeoHoyTitulo"] = "What to watch today",
+        ["Gal_QueVeoHoySinCarpetaMsj"] = "You don't have any anime with a local folder in your library.\n\nAdd an anime with its episode folder to use this feature.",
+        ["Gal_QueVeoHoySinEpisodiosMsj"] = "No unwatched episodes were found in your local library. Enjoy your marathon!",
+        ["Gal_QueVeoHoyErrorMsj"] = "An error occurred while searching for episodes.",
+        ["Gal_ConectarAniListTitulo"] = "Connect to AniList",
+        ["Gal_ConectarAniListMsj"] = "By connecting, the app will be able to:\n\n• READ your AniList profile and list (titles and progress).\n• WRITE your progress (episodes watched), status and score when you mark them.\n\nYour video files are never uploaded and the app has no telemetry.",
+        ["Gal_NubeActivadaTitulo"] = "Cloud Sync Enabled",
+        ["Gal_NubeActivadaMsj"] = "Successfully connected to AniList! Your progress will now sync.",
+        ["Gal_AutenticacionCanceladaTitulo"] = "Authentication Cancelled",
+        ["Gal_AutenticacionCanceladaMsj"] = "Could not sign in with AniList, or the process was cancelled.",
+        ["Gal_SesionCerradaTitulo"] = "Signed Out",
+        ["Gal_SesionCerradaMsj"] = "You have successfully disconnected from AniList.",
+        ["Gal_ConsultandoAniList"] = "Querying AniList...",
+        ["Gal_SincronizandoFormato"] = "Syncing: {0} ({1}/{2})",
+        ["Gal_ActualizacionCompletada"] = "Update completed successfully!",
+
+        // --- Library: dialogs shared between Library and Detail ---
+        ["Bib_EliminarTitulo"] = "Remove from library",
+        ["Bib_EliminarMsj"] = "Do you want to remove '{0}' from your local library?",
+        ["Bib_BorrarArchivosTitulo"] = "Also delete the files?",
+        ["Bib_BorrarArchivosMsj"] = "Do you also want to delete the folder with the downloaded episodes from disk?\n\n'{0}'\n\nChoose NO to keep the files and only remove the anime from the library.",
+        ["Bib_SinCarpetaLocal"] = "no local folder",
+
+        // --- Release seasons (shared) ---
+        ["Temporada_Invierno"] = "Winter",
+        ["Temporada_Primavera"] = "Spring",
+        ["Temporada_Verano"] = "Summer",
+        ["Temporada_Otonio"] = "Fall",
+
+        // --- Add Anime ---
+        ["Add_TendenciasTemporada"] = "Trending this season",
+        ["Add_ResultadosParaFormato"] = "Results for \"{0}\"",
+        ["Add_ErrorAlAnadirTitulo"] = "Error Adding",
+        ["Add_ErrorAlAnadirMsj"] = "An error occurred while adding '{0}': {1}",
+        ["Add_AnimeAnadidoTitulo"] = "Anime Added!",
+        ["Add_AnimeAnadidoMsj"] = "'{0}' has been added to your library successfully.",
+
+        // --- Formatted AniList data for search cards ---
+        ["Media_EstadoEnEmision"] = "Airing",
+        ["Media_EstadoFinalizado"] = "Finished",
+        ["Media_EstadoProximamente"] = "Upcoming",
+        ["Media_EstadoCancelado"] = "Cancelled",
+        ["Media_EstadoPausado"] = "On Hiatus",
+        ["Media_EstadoDesconocido"] = "Unknown",
+        ["Media_EpisodiosDesconocido"] = "Episodes: ?",
+        ["Media_AnioDesconocido"] = "Year ?",
+        ["Media_SinGeneros"] = "No genres",
+
+        // --- Settings: dialogs and status text ---
+        ["Cfg_EspacioCalculando"] = "Calculating...",
+        ["Cfg_RutaNoConfigurada"] = "Path not configured",
+        ["Cfg_Desconocido"] = "Unknown",
+        ["Cfg_EspacioFormato"] = "{0:F1} GB free of {1:F1} GB{2}",
+        ["Cfg_UnidadNoDisponible"] = "Drive not available",
+        ["Cfg_EspacioInfoNoDisponible"] = "Information not available",
+        ["Cfg_SeleccionarCarpetaTitulo"] = "Select the folder where you'll store your anime collections",
+        ["Cfg_AlmacenamientoActualizadoTitulo"] = "Storage Updated",
+        ["Cfg_AlmacenamientoActualizadoMsj"] = "The main anime folder has been set to:\n{0}\n\nExisting anime keep their current folder: for the app to find them, they'll need to be (or be copied) inside the new base folder.",
+        ["Cfg_CarpetaNoEncontradaTitulo"] = "Folder not found",
+        ["Cfg_CarpetaNoEncontradaMsj"] = "The specified folder does not exist on disk:\n{0}",
+        ["Cfg_ErrorCambiarCarpetaMsj"] = "Could not change the storage folder: {0}",
+        ["Cfg_PreferenciasGuardadasTitulo"] = "Preferences Saved",
+        ["Cfg_PreferenciasGuardadasMsj"] = "Your preferences have been saved successfully.",
+        ["Cfg_CerrarSesionConfirmacionMsj"] = "Do you want to disconnect your AniList account? The app will continue working in local offline mode.",
+        ["Cfg_ErrorBorrarDatosMsj"] = "Could not delete all your data: {0}",
+        ["Cfg_DatosBorradosTitulo"] = "Data deleted",
+        ["Cfg_DatosBorradosMsj"] = "All your local data has been successfully deleted. The app will now close.",
+        ["Cfg_LimpiarCacheConfirmacionMsj"] = "Delete thumbnails and covers of anime that no longer exist in your library?\n\nThis frees up disk space without deleting any episode.",
+        ["Cfg_LimpiezaCompletadaTitulo"] = "Cleanup completed",
+        ["Cfg_LimpiezaCompletadaMsj"] = "Freed {0:F1} MB\n{1} thumbnails and {2} covers deleted.",
+        ["Cfg_LimpiezaErrorMsj"] = "Could not complete the cache cleanup.",
+        ["Cfg_NoConectado"] = "Not connected",
+        ["Cfg_ConectadoSincronizacionActiva"] = "Connected to AniList (Sync active)",
+        ["Cfg_SesionNoIniciadaOffline"] = "Not signed in (Local Offline Mode)",
+
+        // --- Detail: episode/anime/AniList dialogs ---
+        ["Det_DescargaCompletadaTitulo"] = "Download Complete",
+        ["Det_DescargaCompletadaMsj"] = "Episode {0} has been downloaded successfully.",
+        ["Det_ErrorDescargaTitulo"] = "Download Error",
+        ["Det_ErrorDescargaMsj"] = "Error downloading episode {0}:\n{1}",
+        ["Det_DuplicadosEncontradosTitulo"] = "Duplicates Found",
+        ["Det_DuplicadosEncontradosMsj"] = "{0} duplicate files were detected by perceptual hash:\n\n{1}",
+        ["Det_DuplicadosContador"] = "{0} duplicate(s)",
+        ["Det_AnalisisDuplicadosTitulo"] = "Duplicate Analysis",
+        ["Det_SinDuplicadosMsj"] = "Great! No duplicate episodes were found in this series.",
+        ["Det_ErrorAnalisisTitulo"] = "Analysis Error",
+        ["Det_ErrorAnalisisMsj"] = "Could not complete the duplicate analysis: {0}",
+        ["Det_CarpetaNoEncontradaTitulo"] = "Folder Not Found",
+        ["Det_SinCarpetaLocalMsj"] = "This anime has no associated local folder.",
+        ["Det_CarpetaYaNoExisteMsj"] = "The anime's folder no longer exists on disk.",
+        ["Det_EliminarEpisodioTitulo"] = "Delete Episode",
+        ["Det_EliminarEpisodioConfirmacionMsj"] = "Delete the file for episode {0}?\n\nIt will be removed from disk and cannot be recovered.",
+        ["Det_EpisodioEliminadoTitulo"] = "Episode Deleted",
+        ["Det_EpisodioEliminadoMsj"] = "Episode {0} was deleted from disk.",
+        ["Det_MinEpisodiosOPMsj"] = "You need at least 2 downloaded episodes to analyze the opening by audio.",
+        ["Det_AnalizandoOpMsj"] = "This will take a few seconds. We'll start a cross-audio analysis of the first 2 episodes to find the OP...",
+        ["Det_OpEncontradoTitulo"] = "OP Found",
+        ["Det_OpEncontradoMsj"] = "Opening detected from {0}s to {1}s.",
+        ["Det_OpNoEncontradoTitulo"] = "No OP Found",
+        ["Det_OpNoEncontradoMsj"] = "The audio plugin could not find a common OP between these episodes.",
+        ["Det_EpisodioNoEncontradoTitulo"] = "Episode Not Found",
+        ["Det_EpisodioNoEncontradoMsj"] = "File not found for episode {0}.\nLooking for download options in the web browser...",
+        ["Det_ErrorIniciarReproductorMsj"] = "Error trying to start the player: {0}",
+        ["Det_ActualizadoTitulo"] = "Updated",
+        ["Det_ActualizadoMsj"] = "Anime updated. Total aired episodes: {0}",
+        ["Det_ErrorConectarAniListMsj"] = "Error connecting to AniList to refresh.",
+        ["Det_ErrorAutenticacionTitulo"] = "Authentication Error",
+        ["Det_DebesConectarAniListMsj"] = "You must connect your AniList account first.",
+        ["Det_NubeSincronizadaTitulo"] = "Cloud Synced",
+        ["Det_NubeSincronizadaMsj"] = "Tracking successfully updated on AniList!",
+        ["Det_ErrorSincronizacionTitulo"] = "Sync Error",
+        ["Det_ErrorSincronizacionMsj"] = "There was a communication error trying to save your data to AniList.",
+
+        // --- Anime page: missing episodes (gaps in the local folder) ---
+        ["Det_FaltantesBannerFormato"] = "{0} episode(s) missing from your local folder ({1})",
+        ["Det_FaltanteEpisodioEtiqueta"] = "Ep. {0}",
+        ["Det_Y"] = "and",
+        ["Det_FaltantesResto"] = "and {0} more",
+        ["Det_DescargarFaltantes"] = "Download missing",
+
+        // --- Anime page: video integrity doctor ---
+        ["Det_VerificarIntegridad"] = "Check integrity",
+        ["Det_VerificandoIntegridad"] = "Checking...",
+        ["Det_IntegridadTitulo"] = "Integrity Doctor",
+        ["Det_IntegridadSinCorruptosFormato"] = "All {0} downloaded episodes are in good shape.",
+        ["Det_IntegridadConCorruptosFormato"] = "{0} of {1} downloaded episodes are corrupt (flagged in the list).",
+        ["Det_ArchivoCorruptoTip"] = "This file appears to be corrupt or incomplete",
+        ["Det_ArchivoCorruptoBadge"] = "Corrupt",
+
+        // --- Calendar ---
+        ["Cal_NoEnBibliotecaTitulo"] = "Not in your library",
+        ["Cal_NoEnBibliotecaMsj"] = "'{0}' is not in your local library yet.\n\nAdd it from the + tab to watch or download it.",
+
+        // --- Statistics: dynamic text ---
+        ["Stats_ErrorCargaMsj"] = "Could not load statistics. Please try again later.",
+        ["Stats_DiasFormato"] = "{0} days",
+        ["Stats_GeneroFavoritoDetalleFormato"] = "{0} anime · {1:F0}% of your collection",
+        ["Stats_Otros"] = "Other",
+        ["Stats_EpisodiosDeTotalFormato"] = "{0} of {1} episodes",
+        ["Stats_EpisodiosVistosFormato"] = "{0} episodes watched",
+        ["Stats_EpisodiosEnAnioFormato"] = "{0} episodes in {1}",
+        ["Stats_FavoritoPorcentaje"] = "favorite · {0:F0}%",
+
+        // --- Statistics: achievements ---
+        ["Stats_Logros"] = "Achievements",
+        ["Stats_LogrosSub"] = "Badges unlocked based on your viewing habits",
+        ["Stats_LogroMaratonero"] = "Binge Watcher",
+        ["Stats_LogroMaratoneroDesc"] = "Watch 6 episodes in a row in one day",
+        ["Stats_LogroBuhoNocturno"] = "Night Owl",
+        ["Stats_LogroBuhoNocturnoDesc"] = "Watch an episode between 2 and 5 AM",
+        ["Stats_LogroCompletista"] = "Legendary Completionist",
+        ["Stats_LogroCompletistaDesc"] = "Finish a series with more than 50 episodes",
+        ["Stats_LogroBiografo"] = "Otaku Biographer",
+        ["Stats_LogroBiografoDesc"] = "Reach more than 100 hours logged",
+        ["Stats_LogroDesbloqueado"] = "Unlocked",
+        ["Stats_LogroBloqueado"] = "Not yet",
+
+        // --- Statistics: Wrapped card ---
+        ["Stats_Wrapped"] = "My Anime Year",
+        ["Stats_WrappedSub"] = "Generate a shareable card with your summary",
+        ["Stats_WrappedBoton"] = "Generate card",
+        ["Stats_WrappedGenerando"] = "Generating card...",
+        ["Stats_WrappedListoFormato"] = "Card saved to {0} and copied to the clipboard.",
+        ["Stats_WrappedErrorMsj"] = "Could not generate the summary card.",
+        ["Wrapped_Titulo"] = "MY ANIME YEAR",
+        ["Wrapped_Horas"] = "HOURS WATCHED",
+        ["Wrapped_Episodios"] = "EPISODES WATCHED",
+        ["Wrapped_TopAnimes"] = "TOP ANIME",
+        ["Wrapped_GeneroFavorito"] = "FAVORITE GENRE",
+        ["Wrapped_RachaMaxima"] = "LONGEST STREAK",
+        ["Wrapped_Footer"] = "Generated with AnimeLocalTracker",
+
+        // --- About ---
+        ["Acerca_NovedadesTituloFormato"] = "What's new: {0}",
+        ["Acerca_LicenciaTexto"] = "MIT License - Open Source Software",
+        ["Acerca_NovedadesDefault"] = "- Native media manager and player for local anime collections.\n- Local auto-tracking with two-way AniList integration.\n- Hardware-accelerated engine with Flyleaf and DirectX.\n- Automatic updates via Velopack and GitHub Releases.",
+        ["Acerca_PublicadoFormato"] = "Published: {0:MM/dd/yyyy}",
+        ["Acerca_ActualizacionDisponibleTitulo"] = "Update Available!",
+        ["Acerca_ActualizacionDisponibleMsj"] = "Version {0} was found.\n\nDo you want to download and install it now automatically?",
+        ["Acerca_AplicacionActualizadaTitulo"] = "Application Up to Date",
+        ["Acerca_AplicacionActualizadaMsj"] = "You already have the latest version installed ({0}).",
+        ["Acerca_ErrorActualizacionTitulo"] = "Update Error",
+        ["Acerca_ErrorActualizacionMsj"] = "Could not check for updates: {0}",
+
+        // --- Player: floating dialogs ---
+        ["Player_ReanudarReproduccionTitulo"] = "Resume Playback",
+        ["Player_ContinuandoDesdeFormato"] = "Continuing from {0}",
+        ["Player_SkipAutoFormato"] = "{0} automatically.",
+        ["Skip_SaltarIntro"] = "Skip intro",
+        ["Skip_SaltarEnding"] = "Skip ending",
+        ["Skip_SaltarResumen"] = "Skip recap",
+        ["Skip_SaltarSegmento"] = "Skip segment",
+
+        // --- Episode: generic text (title, accessibility, progress) ---
+        ["Epi_ProgresoEpisodiosTexto"] = "{0} of {1} watched",
+        ["Epi_ResumenAccesibleFormato"] = "Episode {0}: {1}. {2}.",
+        ["Player_EpisodioMarcadoVistoMsj"] = "Episode {0} marked as watched.",
+        ["Det_ProximosEpisodiosFormato"] = "Episode {0} confirmed on AniList — {1} still missing",
+        ["Epi_AccVisto"] = "Watched",
+        ["Epi_AccNoVisto"] = "Not watched",
+        ["Epi_AccNoDescargado"] = "Not downloaded"
     };
 
 
@@ -841,6 +1332,52 @@ public sealed class LocalizationService : INotifyPropertyChanged
 
     /// <summary>Acceso desde código (C#): LocalizationService.T("Clave").</summary>
     public static string T(string key) => Instance[key];
+
+    /// <summary>
+    /// Cultura para formatear fechas (nombres de día/mes con "dddd"/"MMM", etc.) acorde al
+    /// Idioma de la app — nunca usar CultureInfo.CurrentCulture para esto: depende del
+    /// idioma del sistema operativo, no del selector Idioma/Language de la app, y quedaba
+    /// en español aunque el usuario cambiara a inglés (LOC-08).
+    /// </summary>
+    public static CultureInfo Cultura => Instance.Idioma == "en" ? CultureInfo.GetCultureInfo("en-US") : CultureInfo.GetCultureInfo("es-ES");
+
+    /// <summary>
+    /// Los géneros vienen de AniList siempre en inglés (es el catálogo fijo de su GraphQL,
+    /// no depende del idioma de la consulta) y se guardan tal cual en BD — nunca pasan por
+    /// las claves Es/En de arriba. Esta tabla es solo para MOSTRARLOS traducidos en español;
+    /// el valor guardado/usado para filtrar sigue siendo siempre el nombre en inglés.
+    /// </summary>
+    private static readonly Dictionary<string, string> GenerosEs = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Action"] = "Acción",
+        ["Adventure"] = "Aventura",
+        ["Comedy"] = "Comedia",
+        ["Drama"] = "Drama",
+        ["Ecchi"] = "Ecchi",
+        ["Fantasy"] = "Fantasía",
+        ["Hentai"] = "Hentai",
+        ["Horror"] = "Horror",
+        ["Mahou Shoujo"] = "Mahou Shoujo",
+        ["Mecha"] = "Mecha",
+        ["Music"] = "Música",
+        ["Mystery"] = "Misterio",
+        ["Psychological"] = "Psicológico",
+        ["Romance"] = "Romance",
+        ["Sci-Fi"] = "Ciencia Ficción",
+        ["Slice of Life"] = "Recuentos de la vida",
+        ["Sports"] = "Deportes",
+        ["Supernatural"] = "Sobrenatural",
+        ["Thriller"] = "Suspenso",
+    };
+
+    /// <summary>Traduce un género de AniList (siempre en inglés) para MOSTRARLO — nunca usar
+    /// el resultado para comparar/filtrar, solo para el texto visible.</summary>
+    public static string TraducirGenero(string? generoIngles)
+    {
+        if (string.IsNullOrWhiteSpace(generoIngles)) return generoIngles ?? string.Empty;
+        if (Instance.Idioma != "en" && GenerosEs.TryGetValue(generoIngles, out var traducido)) return traducido;
+        return generoIngles;
+    }
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
