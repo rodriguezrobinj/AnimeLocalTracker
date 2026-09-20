@@ -74,6 +74,34 @@ public partial class ConfiguracionViewModel : ObservableObject
     [ObservableProperty] private bool _estaAutenticadoAniList;
     [ObservableProperty] private string _estadoAutenticacionTexto = LocalizationService.T("Cfg_NoConectado");
 
+    // === NAVEGACIÓN POR CATEGORÍAS ===
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(EsSeccionBiblioteca))]
+    [NotifyPropertyChangedFor(nameof(EsSeccionReproduccion))]
+    [NotifyPropertyChangedFor(nameof(EsSeccionAtajos))]
+    [NotifyPropertyChangedFor(nameof(EsSeccionDescargas))]
+    [NotifyPropertyChangedFor(nameof(EsSeccionGeneral))]
+    [NotifyPropertyChangedFor(nameof(EsSeccionPlugins))]
+    [NotifyPropertyChangedFor(nameof(MostrarBarraGuardar))]
+    private SeccionConfiguracion _seccionActiva = SeccionConfiguracion.Biblioteca;
+
+    public bool EsSeccionBiblioteca => SeccionActiva == SeccionConfiguracion.Biblioteca;
+    public bool EsSeccionReproduccion => SeccionActiva == SeccionConfiguracion.Reproduccion;
+    public bool EsSeccionAtajos => SeccionActiva == SeccionConfiguracion.Atajos;
+    public bool EsSeccionDescargas => SeccionActiva == SeccionConfiguracion.Descargas;
+    public bool EsSeccionGeneral => SeccionActiva == SeccionConfiguracion.General;
+    public bool EsSeccionPlugins => SeccionActiva == SeccionConfiguracion.Plugins;
+
+    /// <summary>"Guardar preferencias" solo tiene sentido en las categorías con preferencias; las de
+    /// Biblioteca (carpeta, copias) y Plugins actúan al instante con sus propios botones.</summary>
+    public bool MostrarBarraGuardar => SeccionActiva is SeccionConfiguracion.Reproduccion
+        or SeccionConfiguracion.Atajos
+        or SeccionConfiguracion.Descargas
+        or SeccionConfiguracion.General;
+
+    [RelayCommand]
+    private void SeleccionarSeccion(SeccionConfiguracion seccion) => SeccionActiva = seccion;
+
     public ConfiguracionViewModel(
         ISettingsService settingsService,
         IAuthService authService,

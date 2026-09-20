@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
@@ -342,6 +343,128 @@ public class DownloadServiceTests
         finally
         {
             try { if (File.Exists(destino)) File.Delete(destino); } catch { }
+        }
+    }
+
+    /// <summary>Servidor falso de video con soporte de Range, con fallos configurables.</summary>
+    private sealed class ServidorRangosHandler : HttpMessageHandler
+    {
+        private readonly byte[] _datos;
+        private int _cortesPendientes;
+        public bool IgnorarRange { get; init; }
+
+        public ServidorRangosHandler(byte[] datos, int cortesPendientes = 0)
+        {
+            _datos = datos;
+            _cortesPendientes = cortesPendientes;
+        }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            if (request.Method == HttpMethod.Head)
+            {
+                var head = new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new ByteArrayContent(Array.Empty<byte>()) };
+                head.Content.Headers.ContentLength = _datos.Length;
+                head.Headers.AcceptRanges.Add("bytes");
+                return Task.FromResult(head);
+            }
+
+            var rango = request.Headers.Range?.Ranges.FirstOrDefault();
+            if (rango == null || IgnorarRange)
+            {
+                return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new ByteArrayContent(_datos) });
+            }
+
+            long desde = rango.From ?? 0;
+            long hasta = Math.Min(rango.To ?? _datos.Length - 1, _datos.Length - 1);
+            int longitud = (int)(hasta - desde + 1);
+
+            // Simula un servidor que cierra la conexión a mitad del trozo: entrega solo la mitad.
+            if (longitud > 2 && Interlocked.Decrement(ref _cortesPendientes) >= 0)
+            {
+                longitud /= 2;
+            }
+
+            var respuesta = new HttpResponseMessage(System.Net.HttpStatusCode.PartialContent)
+            {
+                Content = new ByteArrayContent(_datos, (int)desde, longitud)
+            };
+            respuesta.Content.Headers.ContentRange = new System.Net.Http.Headers.ContentRangeHeaderValue(desde, hasta, _datos.Length);
+            return Task.FromResult(respuesta);
+        }
+    }
+
+    private DownloadService CrearServicioConServidor(HttpMessageHandler handler)
+    {
+        var factoryMock = new Mock<IHttpClientFactory>();
+        factoryMock.Setup(f => f.CreateClient(It.IsAny<string>())).Returns(new HttpClient(handler));
+        return new DownloadService(factoryMock.Object, sourceResolver: _sourceResolverMock.Object, settingsService: _settingsServiceMock.Object);
+    }
+
+    private static byte[] GenerarVideoFalso(int bytes)
+    {
+        var datos = new byte[bytes];
+        new Random(42).NextBytes(datos);
+        return datos;
+    }
+
+    [Fact]
+    public async Task DownloadVideoAsync_ConServidorConRangos_DeberiaDescargarElArchivoIntacto()
+    {
+        var datos = GenerarVideoFalso(10 * 1024 * 1024 + 123);
+        var destino = Path.Combine(Path.GetTempPath(), $"rangos_{Guid.NewGuid():N}.mp4");
+        var sut = CrearServicioConServidor(new ServidorRangosHandler(datos));
+
+        try
+        {
+            await sut.DownloadVideoAsync("https://cdn.example.com/video.mp4", destino);
+
+            (await File.ReadAllBytesAsync(destino)).Should().Equal(datos);
+        }
+        finally
+        {
+            try { File.Delete(destino); File.Delete(destino + ".state"); } catch { }
+        }
+    }
+
+    [Fact]
+    public async Task DownloadVideoAsync_SiElServidorCortaLaConexionATrozoMedio_DeberiaReintentarSoloEseTrozoYNoCorromper()
+    {
+        // Antes: un corte a mitad de trozo dejaba un hueco de ceros en el archivo final.
+        var datos = GenerarVideoFalso(10 * 1024 * 1024);
+        var destino = Path.Combine(Path.GetTempPath(), $"cortes_{Guid.NewGuid():N}.mp4");
+        var sut = CrearServicioConServidor(new ServidorRangosHandler(datos, cortesPendientes: 3));
+
+        try
+        {
+            await sut.DownloadVideoAsync("https://cdn.example.com/video.mp4", destino);
+
+            (await File.ReadAllBytesAsync(destino)).Should().Equal(datos);
+        }
+        finally
+        {
+            try { File.Delete(destino); File.Delete(destino + ".state"); } catch { }
+        }
+    }
+
+    [Fact]
+    public async Task DownloadVideoAsync_SiElServidorAnunciaRangosPeroLosIgnora_DeberiaCaerASecuencialSinCorromper()
+    {
+        // Antes: cada segmento escribía el inicio del video en su propia posición.
+        var datos = GenerarVideoFalso(10 * 1024 * 1024);
+        var destino = Path.Combine(Path.GetTempPath(), $"ignora_{Guid.NewGuid():N}.mp4");
+        var sut = CrearServicioConServidor(new ServidorRangosHandler(datos) { IgnorarRange = true });
+
+        try
+        {
+            await sut.DownloadVideoAsync("https://cdn.example.com/video.mp4", destino);
+
+            (await File.ReadAllBytesAsync(destino)).Should().Equal(datos);
+            File.Exists(destino + ".state").Should().BeFalse();
+        }
+        finally
+        {
+            try { File.Delete(destino); File.Delete(destino + ".state"); } catch { }
         }
     }
 }

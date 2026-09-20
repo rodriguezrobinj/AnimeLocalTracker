@@ -485,11 +485,9 @@ public partial class GaleriaViewModel : ObservableObject,
                     }
                 }
 
-                // Precarga ultra-rápida desde caché en memoria (0ms en scroll).
-                // RND-01: los hits de disco/red se cargan en segundo plano por
-                // CargarPortadasFaltantesEnSegundoPlanoAsync para no bloquear la UI.
-                // a.PortadaImagen fue reemplazado por AnimeCoverMultiConverter.
-                a.ResolverPortadaLocal();
+                // La ruta local de la portada ya la resolvió DatabaseService.ObtenerTodosLosAnimesAsync en un hilo de
+                // fondo: repetir aquí el File.Exists de cada anime bloqueaba el hilo de UI (~190 accesos a disco).
+                // Las imágenes las carga CargarPortadasFaltantesEnSegundoPlanoAsync (RND-01).
             }
 
             BibliotecaLocales = new ObservableCollection<AnimeItem>(animes);
@@ -580,172 +578,55 @@ public partial class GaleriaViewModel : ObservableObject,
         }
     }
 
+    /// <summary>
+    /// Carga en segundo plano las portadas que aún no están en memoria. Dos claves de velocidad:
+    /// (1) se piden en el orden en que la galería las muestra, así las tarjetas visibles se llenan
+    /// primero (antes: orden de la BD, y las visibles quedaban casi al final); (2) se decodifican
+    /// varias a la vez (antes: una por una, esperando cada decode antes de empezar la siguiente).
+    /// </summary>
     private async Task CargarPortadasFaltantesEnSegundoPlanoAsync(IEnumerable<AnimeItem> animes)
     {
-        var faltantes = animes.Where(a => _imageCacheService.ObtenerPortadaEnMemoria(a.AniListId) == null && !string.IsNullOrWhiteSpace(a.UrlPortada)).ToList();
+        var todos = animes as IReadOnlyList<AnimeItem> ?? animes.ToList();
+
+        // Se calcula de forma síncrona (antes del primer await) porque enumerar la vista de la galería
+        // requiere el hilo de UI.
+        var enOrdenVisual = (BibliotecaFiltrada?.Cast<AnimeItem>().ToList()) ?? new List<AnimeItem>();
+        var faltantes = enOrdenVisual
+            .Concat(todos.Except(enOrdenVisual))
+            .Where(a => !string.IsNullOrWhiteSpace(a.UrlPortada) && _imageCacheService.ObtenerPortadaEnMemoria(a.AniListId) == null)
+            .ToList();
         if (faltantes.Count == 0) return;
 
-        foreach (var anime in faltantes)
+        var reloj = System.Diagnostics.Stopwatch.StartNew();
+        var listoEn = new System.Collections.Concurrent.ConcurrentDictionary<int, long>();
+        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+
+        // La decodificación es trabajo de CPU: se usan casi todos los núcleos, pero se deja uno libre para la UI.
+        int paralelismo = Math.Clamp(Environment.ProcessorCount - 1, 2, 6);
+
+        await Parallel.ForEachAsync(faltantes, new ParallelOptions { MaxDegreeOfParallelism = paralelismo }, async (anime, cancelacion) =>
         {
             var img = await _imageCacheService.ObtenerPortadaAsync(anime.AniListId, anime.UrlPortada);
-            if (img != null)
+            if (img == null) return;
+
+            listoEn[anime.AniListId] = reloj.ElapsedMilliseconds;
+            if (dispatcher != null && !dispatcher.CheckAccess())
             {
-                if (System.Windows.Application.Current?.Dispatcher != null && !System.Windows.Application.Current.Dispatcher.CheckAccess())
-                {
-                    // RND-03: InvokeAsync para no bloquear el hilo de pool contra la UI
-                    _ = System.Windows.Application.Current.Dispatcher.InvokeAsync(() => anime.NotificarPortadaActualizada());
-                }
-                else
-                {
-                    anime.NotificarPortadaActualizada();
-                }
+                // RND-03: InvokeAsync para no bloquear el hilo de pool contra la UI
+                _ = dispatcher.InvokeAsync(() => anime.NotificarPortadaActualizada());
             }
-        }
+            else
+            {
+                anime.NotificarPortadaActualizada();
+            }
+        });
+
+        // Telemetría ligera: cuándo estuvieron listas las 24 primeras tarjetas (las que se ven al abrir).
+        var visibles = enOrdenVisual.Count > 0 ? enOrdenVisual.Take(24) : todos.Take(24);
+        long visiblesMs = visibles.Where(v => listoEn.ContainsKey(v.AniListId)).Select(v => listoEn[v.AniListId]).DefaultIfEmpty(0).Max();
+        AppLogger.Info("GaleriaViewModel", $"[Perf] Portadas: {listoEn.Count}/{faltantes.Count} listas en {reloj.ElapsedMilliseconds} ms; primeras 24 tarjetas visibles completas a los {visiblesMs} ms.");
     }
 
-    // ── "QUÉ VEO HOY": episodio no visto aleatorio de la biblioteca ──
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(SePuedeAyudarAverQueVer))]
-    [NotifyCanExecuteChangedFor(nameof(ElegirQueVerHoyCommand))]
-    private bool _estaBuscandoQueVer;
-
-    public bool SePuedeAyudarAverQueVer => !EstaBuscandoQueVer && !BibliotecaVacia;
-    /// <summary>
-    /// "Qué veo hoy": elige un anime al azar entre los que tienen episodios locales pendientes
-    /// (priorizando animes en curso "CURRENT") y reproduce su SIGUIENTE episodio no visto
-    /// en orden cronológico para mantener la continuidad de la trama.
-    /// </summary>
-    [RelayCommand(CanExecute = nameof(SePuedeAyudarAverQueVer))]
-    private async Task ElegirQueVerHoyAsync()
-    {
-        if (EstaBuscandoQueVer) return;
-        EstaBuscandoQueVer = true;
-
-        try
-        {
-            var animes = BibliotecaLocales
-                .Where(a => !string.IsNullOrWhiteSpace(a.RutaCarpeta))
-                .ToList();
-
-            if (animes.Count == 0)
-            {
-                EstaBuscandoQueVer = false;
-                await _dialogService.MostrarDialogoAsync(
-                    LocalizationService.T("Gal_QueVeoHoyTitulo"),
-                    LocalizationService.T("Gal_QueVeoHoySinCarpetaMsj"),
-                    false, "Dice", "#60A5FA");
-                return;
-            }
-
-            // Escaneo en hilo de fondo para no bloquear la UI
-            var elegido = await Task.Run(async () =>
-            {
-                var enCurso = animes.Where(a =>
-                    !string.IsNullOrEmpty(a.EstadoUsuario) && a.EstadoUsuario == "CURRENT").ToList();
-                var candidatos = enCurso.Count > 0 ? enCurso : animes;
-
-                var animesConSiguienteEpisodio = new List<(AnimeItem Anime, EpisodioItem SiguienteEpisodio, List<EpisodioItem> TodosDisponibles)>();
-
-                foreach (var anime in candidatos)
-                {
-                    try
-                    {
-                        var episodios = (await _fileScannerService.EscanearEpisodiosAsync(anime.RutaCarpeta!))
-                            .Where(e => !string.IsNullOrWhiteSpace(e.RutaCompleta))
-                            .Where(e => e.NumeroEpisodio > 0) // FUN-004: sin número no es candidato
-                            .OrderBy(e => e.NumeroEpisodio)
-                            .ToList();
-
-                        if (episodios.Count == 0) continue;
-
-                        var registros = await _databaseService.ObtenerRegistrosPorAnimeAsync(anime.AniListId);
-                        var vistos = new HashSet<int>(registros.Where(r => r.VistoLocal).Select(r => r.NumeroEpisodio));
-
-                        var siguiente = episodios.FirstOrDefault(ep => !vistos.Contains(ep.NumeroEpisodio));
-                        if (siguiente != null)
-                        {
-                            animesConSiguienteEpisodio.Add((anime, siguiente, episodios));
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        AppLogger.Debug("GaleriaViewModel", $"Qué veo hoy: error escaneando {anime.Titulo}: {ex.Message}");
-                    }
-                }
-
-                // Fallback a toda la biblioteca si los de en curso ya fueron vistos por completo
-                if (animesConSiguienteEpisodio.Count == 0 && enCurso.Count > 0 && candidatos == enCurso)
-                {
-                    var otrosAnimes = animes.Where(a => a.EstadoUsuario != "CURRENT").ToList();
-                    foreach (var anime in otrosAnimes)
-                    {
-                        try
-                        {
-                            var episodios = (await _fileScannerService.EscanearEpisodiosAsync(anime.RutaCarpeta!))
-                                .Where(e => !string.IsNullOrWhiteSpace(e.RutaCompleta))
-                                .OrderBy(e => e.NumeroEpisodio)
-                                .ToList();
-
-                            if (episodios.Count == 0) continue;
-
-                            var registros = await _databaseService.ObtenerRegistrosPorAnimeAsync(anime.AniListId);
-                            var vistos = new HashSet<int>(registros.Where(r => r.VistoLocal).Select(r => r.NumeroEpisodio));
-
-                            var siguiente = episodios.FirstOrDefault(ep => !vistos.Contains(ep.NumeroEpisodio));
-                            if (siguiente != null)
-                            {
-                                animesConSiguienteEpisodio.Add((anime, siguiente, episodios));
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            AppLogger.Debug("GaleriaViewModel", $"Qué veo hoy: error escaneando {anime.Titulo}: {ex.Message}");
-                        }
-                    }
-                }
-
-                if (animesConSiguienteEpisodio.Count == 0)
-                    return ((AnimeItem Anime, EpisodioItem SiguienteEpisodio, List<EpisodioItem> TodosDisponibles)?)null;
-
-                var random = new Random();
-                return animesConSiguienteEpisodio[random.Next(animesConSiguienteEpisodio.Count)];
-            });
-
-            EstaBuscandoQueVer = false;
-
-            if (elegido == null)
-            {
-                await _dialogService.MostrarDialogoAsync(
-                    LocalizationService.T("Gal_QueVeoHoyTitulo"),
-                    LocalizationService.T("Gal_QueVeoHoySinEpisodiosMsj"),
-                    false, "EmoticonHappyOutline", "#4CAF50");
-                return;
-            }
-
-            var seleccion = elegido.Value;
-
-            // Navegar al reproductor en el hilo principal de la UI
-            WeakReferenceMessenger.Default.Send(new NavegarMensaje_Reproductor(
-                seleccion.SiguienteEpisodio.RutaCompleta,
-                seleccion.Anime.AniListId,
-                seleccion.Anime.Titulo,
-                seleccion.SiguienteEpisodio.NumeroEpisodio,
-                EpisodiosDisponibles: seleccion.TodosDisponibles,
-                RutaPortada: seleccion.Anime.PortadaVisible
-            ));
-        }
-        catch (Exception ex)
-        {
-            EstaBuscandoQueVer = false;
-            AppLogger.Error("GaleriaViewModel", "Error en Qué veo hoy", ex);
-            await _dialogService.MostrarDialogoAsync(
-                LocalizationService.T("Gal_QueVeoHoyTitulo"), LocalizationService.T("Gal_QueVeoHoyErrorMsj"), false, "AlertCircleOutline", "#E53935");
-        }
-        finally
-        {
-            EstaBuscandoQueVer = false;
-        }
-    }
     
     public void ActualizarGenerosDisponibles()
     {

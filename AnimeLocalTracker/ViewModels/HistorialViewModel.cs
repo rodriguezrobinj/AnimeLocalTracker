@@ -20,7 +20,7 @@ public enum FiltroHistorial
     Completados
 }
 
-public partial class HistorialViewModel : ObservableObject, IRecipient<EpisodioActualizadoMensaje>
+public partial class HistorialViewModel : ObservableObject, IRecipient<EpisodioActualizadoMensaje>, IRecipient<IdiomaCambiadoMensaje>
 {
     /// <summary>Feed simple: solo los N capítulos reproducidos más recientes.</summary>
     private const int LimiteHistorial = 60;
@@ -61,6 +61,14 @@ public partial class HistorialViewModel : ObservableObject, IRecipient<EpisodioA
     [NotifyPropertyChangedFor(nameof(SinResultadosBusqueda))]
     private string _textoBusqueda = string.Empty;
 
+    /// <summary>Chips de filtro con contador ("En progreso · 3").</summary>
+    [ObservableProperty]
+    private ObservableCollection<FiltroChip> _filtros = [];
+
+    /// <summary>Tiempo total visto (suma de lo reproducido) en formato "12 h 30 min".</summary>
+    [ObservableProperty]
+    private string _tiempoVistoTexto = "0 min";
+
     public bool EsFiltroTodos => FiltroActual == FiltroHistorial.Todos;
     public bool EsFiltroEnProgreso => FiltroActual == FiltroHistorial.EnProgreso;
     public bool EsFiltroCompletados => FiltroActual == FiltroHistorial.Completados;
@@ -99,6 +107,7 @@ public partial class HistorialViewModel : ObservableObject, IRecipient<EpisodioA
         OnPropertyChanged(nameof(EsFiltroTodos));
         OnPropertyChanged(nameof(EsFiltroEnProgreso));
         OnPropertyChanged(nameof(EsFiltroCompletados));
+        ActualizarFiltros();
         AplicarFiltro();
     }
 
@@ -243,98 +252,6 @@ public partial class HistorialViewModel : ObservableObject, IRecipient<EpisodioA
     }
 
     [RelayCommand]
-    public async Task AlternarVistoAsync(HistorialItemViewModel? item)
-    {
-        if (item == null) return;
-
-        try
-        {
-            bool nuevoVisto = !item.VistoLocal;
-            item.VistoLocal = nuevoVisto;
-
-            if (nuevoVisto)
-            {
-                item.ProgresoSegundos = 0;
-                // Marcar "visto" desde el historial NO registra fecha de reproducción:
-                // el historial solo muestra visionado real.
-                await _playbackStateService.MarcarComoVistoYSincronizarAsync(
-                    item.AniListId,
-                    item.NumeroEpisodio,
-                    item.RutaArchivo,
-                    item.TotalSegundos,
-                    registrarReproduccion: false);
-            }
-            else
-            {
-                var registros = await _databaseService.ObtenerRegistrosPorAnimeAsync(item.AniListId);
-                var reg = registros.FirstOrDefault(r => r.NumeroEpisodio == item.NumeroEpisodio);
-                if (reg != null)
-                {
-                    reg.VistoLocal = false;
-                    await _databaseService.GuardarRegistroEpisodioAsync(reg);
-                }
-            }
-
-            ActualizarContadores();
-            AplicarFiltro();
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Error("HistorialViewModel", $"Error al alternar estado visto para ep {item.NumeroEpisodio}", ex);
-        }
-    }
-
-    [RelayCommand]
-    public async Task EliminarItemAsync(HistorialItemViewModel? item)
-    {
-        if (item == null) return;
-
-        try
-        {
-            await _databaseService.LimpiarRegistroHistorialAsync(item.AniListId, item.NumeroEpisodio);
-            ItemsHistorial.Remove(item);
-            // ItemsFiltrados es descartado/reconstruido por AplicarFiltro() (igual que ItemsAgrupados,
-            // que es lo que el ListBox realmente enlaza) — quitarlo aquí a mano no bastaba: el item
-            // seguía visible porque ItemsAgrupados nunca se refrescaba.
-            AplicarFiltro();
-            ActualizarContadores();
-            NotificarEstados();
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Error("HistorialViewModel", $"Error al eliminar ep {item.NumeroEpisodio} del historial", ex);
-        }
-    }
-
-    [RelayCommand]
-    public async Task LimpiarHistorialAsync()
-    {
-        if (ItemsHistorial.Count == 0) return;
-
-        bool confirmar = await _dialogService.MostrarDialogoAsync(
-            LocalizationService.T("Hist_LimpiarTitulo"),
-            LocalizationService.T("Hist_LimpiarMensaje"),
-            esConfirmacion: true,
-            icono: "DeleteSweepOutline",
-            color: "#F44336");
-
-        if (!confirmar) return;
-
-        try
-        {
-            await _databaseService.LimpiarTodoElHistorialAsync();
-            ItemsHistorial.Clear();
-            ItemsFiltrados.Clear();
-            ActualizarContadores();
-            NotificarEstados();
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Error("HistorialViewModel", "Error al vaciar el historial", ex);
-        }
-    }
-
-    [RelayCommand]
     public void ExplorarGaleria()
     {
         WeakReferenceMessenger.Default.Send(new NavegarMensaje_Galeria());
@@ -464,6 +381,44 @@ public partial class HistorialViewModel : ObservableObject, IRecipient<EpisodioA
         TotalElementos = ItemsHistorial.Count;
         TotalEnProgreso = ItemsHistorial.Count(i => i.EnProgreso);
         TotalCompletados = ItemsHistorial.Count(i => i.VistoLocal);
+
+        // Tiempo visto: capítulo completo si está visto; si no, lo reproducido hasta ahora.
+        double segundos = ItemsHistorial.Sum(i => i.VistoLocal && i.TotalSegundos > 0 ? i.TotalSegundos : i.ProgresoSegundos);
+        var t = TimeSpan.FromSeconds(Math.Max(0, segundos));
+        TiempoVistoTexto = t.TotalHours >= 1 ? $"{(int)t.TotalHours} h {t.Minutes} min" : $"{(int)t.TotalMinutes} min";
+
+        ActualizarFiltros();
+    }
+
+    private void ActualizarFiltros()
+    {
+        string Etiqueta(string claveLoc, int n) =>
+            string.Format(LocalizationService.T("Act_FiltroFormato"), LocalizationService.T(claveLoc), n);
+
+        Filtros = new ObservableCollection<FiltroChip>
+        {
+            new(nameof(FiltroHistorial.Todos), Etiqueta("Hist_FiltroTodos", TotalElementos), FiltroActual == FiltroHistorial.Todos),
+            new(nameof(FiltroHistorial.EnProgreso), Etiqueta("Hist_FiltroEnProgreso", TotalEnProgreso), FiltroActual == FiltroHistorial.EnProgreso),
+            new(nameof(FiltroHistorial.Completados), Etiqueta("Hist_FiltroCompletados", TotalCompletados), FiltroActual == FiltroHistorial.Completados),
+        };
+    }
+
+    public void Receive(IdiomaCambiadoMensaje message)
+    {
+        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+        if (dispatcher != null && !dispatcher.CheckAccess())
+        {
+            dispatcher.Invoke(RefrescarTextos);
+            return;
+        }
+        RefrescarTextos();
+    }
+
+    private void RefrescarTextos()
+    {
+        foreach (var i in ItemsHistorial) i.RefrescarTextos();
+        ActualizarFiltros();
+        AplicarFiltro();
     }
 
     private void NotificarEstados()

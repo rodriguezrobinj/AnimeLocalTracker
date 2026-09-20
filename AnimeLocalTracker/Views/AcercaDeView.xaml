@@ -16,20 +16,44 @@
             <Setter Property="Padding" Value="0"/>
             <Setter Property="FontSize" Value="13"/>
         </Style>
+
+        <!-- ── Piezas compartidas de la vista: todas las tarjetas usan la misma cabecera
+                (icono en chip + título + subtítulo) para que la página se lea uniforme. ── -->
+        <Style x:Key="AcercaCard" TargetType="Border" BasedOn="{StaticResource AppCard}">
+            <Setter Property="CornerRadius" Value="16"/>
+            <Setter Property="Padding" Value="22"/>
+            <Setter Property="Margin" Value="0,0,0,16"/>
+        </Style>
+        <Style x:Key="AcercaChip" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource Brush.Surface3}"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Width" Value="34"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="Margin" Value="0,0,12,0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="AcercaChipIcon" TargetType="materialDesign:PackIcon">
+            <Setter Property="Width" Value="18"/>
+            <Setter Property="Height" Value="18"/>
+            <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="AcercaBody" TargetType="TextBlock" BasedOn="{StaticResource AppText.Secondary}">
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="LineHeight" Value="20"/>
+        </Style>
+        <Style x:Key="AcercaTechChip" TargetType="Border" BasedOn="{StaticResource AppBadge}">
+            <Setter Property="Margin" Value="0,0,8,8"/>
+            <Setter Property="Padding" Value="10,0"/>
+        </Style>
+        <Style x:Key="AcercaTechChipText" TargetType="TextBlock" BasedOn="{StaticResource AppText.Micro}">
+            <Setter Property="Foreground" Value="{DynamicResource Brush.AccentSoft}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
     </UserControl.Resources>
 
-    <Grid ClipToBounds="True" MaxWidth="1200">
-        <Grid.Style>
-            <Style TargetType="Grid">
-                <Setter Property="Margin" Value="95,65,30,25"/>
-                <Style.Triggers>
-                    <DataTrigger Binding="{Binding Topmost, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
-                        <Setter Property="Margin" Value="95,35,30,25"/>
-                    </DataTrigger>
-                </Style.Triggers>
-            </Style>
-        </Grid.Style>
-
+    <Grid MaxWidth="1200" ClipToBounds="True" Style="{StaticResource AppPageRoot}">
         <Grid.RowDefinitions>
             <!-- Fila 0: ENCABEZADO FIJO -->
             <RowDefinition Height="Auto"/>
@@ -38,25 +62,23 @@
         </Grid.RowDefinitions>
 
         <!-- ENCABEZADO FIJO DE LA VISTA -->
-        <Grid Grid.Row="0" Margin="0,0,0,24">
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <Border Background="#1E293B" CornerRadius="12" Width="48" Height="48" Margin="0,0,16,0">
-                    <materialDesign:PackIcon Kind="InformationOutline" Width="26" Height="26" Foreground="#60A5FA" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                </Border>
-                <StackPanel VerticalAlignment="Center">
-                    <TextBlock Text="{Binding [Acerca_Titulo], Source={x:Static loc:LocalizationService.Instance}}" Style="{StaticResource AppText.PageTitle}"/>
-                    <TextBlock Text="{Binding [Acerca_Subtitulo], Source={x:Static loc:LocalizationService.Instance}}"
-                               FontSize="12" Foreground="#9CA3AF" Margin="0,3,0,0"/>
-                </StackPanel>
+        <StackPanel Grid.Row="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,24">
+            <Border Background="{DynamicResource Brush.Surface3}" CornerRadius="12" Width="48" Height="48" Margin="0,0,16,0">
+                <materialDesign:PackIcon Kind="InformationOutline" Width="26" Height="26" Foreground="{DynamicResource Brush.Accent}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+            <StackPanel VerticalAlignment="Center">
+                <TextBlock Text="{Binding [Acerca_Titulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.PageTitle}"/>
+                <TextBlock Text="{Binding [Acerca_Subtitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                           Style="{StaticResource AppText.Caption}" Margin="0,3,0,0"/>
             </StackPanel>
-        </Grid>
+        </StackPanel>
 
         <!-- CONTENIDO DESPLAZABLE -->
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <ScrollViewer x:Name="PaginaScroll" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
             <StackPanel Margin="0,0,24,20" HorizontalAlignment="Stretch">
 
-                <!-- 1. TARJETA HERO DE IDENTIDAD DE LA APP -->
-                <materialDesign:Card Background="#121212" BorderBrush="#262D38" BorderThickness="1" UniformCornerRadius="16" Margin="0,0,0,20" Padding="24" materialDesign:ElevationAssist.Elevation="Dp0">
+                <!-- 1. IDENTIDAD DE LA APP + BUSCAR ACTUALIZACIONES -->
+                <Border Style="{StaticResource AcercaCard}" Margin="0,0,0,12" Padding="24">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
@@ -64,153 +86,242 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
 
-                        <Border Grid.Column="0" Background="#1E293B" BorderBrush="#3B82F6" BorderThickness="1" CornerRadius="16" Width="64" Height="64" Margin="0,0,18,0">
-                            <materialDesign:PackIcon Kind="PlayCircle" Width="36" Height="36" Foreground="#60A5FA" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <Border Grid.Column="0" Background="{DynamicResource Brush.Surface3}" BorderBrush="{DynamicResource Brush.AccentStrong}" BorderThickness="1"
+                                CornerRadius="16" Width="64" Height="64" Margin="0,0,18,0">
+                            <materialDesign:PackIcon Kind="PlayCircle" Width="36" Height="36" Foreground="{DynamicResource Brush.Accent}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
 
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Text="{Binding [Acerca_NombreApp], Source={x:Static loc:LocalizationService.Instance}}" FontSize="20" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
-                                <Border Background="#1E293B" BorderBrush="#3B82F6" BorderThickness="1" CornerRadius="8" Padding="8,3" Margin="12,0,0,0" VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding VersionAppTexto, StringFormat='v{0}'}" FontSize="11" FontWeight="Bold" Foreground="#93C5FD"/>
-                                </Border>
-                            </StackPanel>
-                            <TextBlock Text="{Binding [Acerca_Descripcion], Source={x:Static loc:LocalizationService.Instance}}"
-                                       FontSize="12" Foreground="#9CA3AF" Margin="0,5,0,0" TextWrapping="Wrap"/>
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                            <TextBlock Text="{Binding [Acerca_NombreApp], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                       FontSize="22" FontWeight="Bold" Foreground="{DynamicResource Brush.TextPrimary}"/>
+                            <TextBlock Text="{Binding [Acerca_Descripcion], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                       Style="{StaticResource AcercaBody}" Margin="0,4,0,0"/>
                         </StackPanel>
 
                         <Button Grid.Column="2" Command="{Binding BuscarActualizacionesCommand}"
-                                Style="{StaticResource MaterialDesignRaisedButton}"
-                                Background="#059669" BorderBrush="#047857" Foreground="White"
-                                Height="42" Padding="18,0" VerticalAlignment="Center"
+                                Style="{StaticResource AppPrimaryButton}"
+                                Height="42" Padding="18,0" VerticalAlignment="Center" Cursor="Hand"
                                 materialDesign:ButtonAssist.CornerRadius="8"
-                                ToolTip="{Binding [Acerca_ComprobarActualizacionesTip], Source={x:Static loc:LocalizationService.Instance}}">
+                                ToolTip="{Binding [Acerca_ComprobarActualizacionesTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                AutomationProperties.Name="{Binding [Acerca_BuscarActualizaciones], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="Update" Width="18" Height="18" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                <TextBlock Text="{Binding [Acerca_BuscarActualizaciones], Source={x:Static loc:LocalizationService.Instance}}" VerticalAlignment="Center" FontWeight="Bold" FontSize="12"/>
+                                <TextBlock Text="{Binding [Acerca_BuscarActualizaciones], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                           VerticalAlignment="Center" FontWeight="SemiBold" FontSize="12"/>
                             </StackPanel>
                         </Button>
                     </Grid>
-                </materialDesign:Card>
+                </Border>
 
-                <!-- 2. NOVEDADES DE LA VERSIÓN (DINÁMICAS DESDE GITHUB) -->
-                <materialDesign:Card Background="#121212" BorderBrush="#262D38" BorderThickness="1" UniformCornerRadius="16" Margin="0,0,0,20" Padding="24" materialDesign:ElevationAssist.Elevation="Dp0">
+                <!-- 2. DATOS RÁPIDOS: versión y licencia -->
+                <Grid Margin="0,0,0,16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="12"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Border Grid.Column="0" Style="{StaticResource AppCard}" CornerRadius="12" Padding="16,12">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Border Style="{StaticResource AcercaChip}">
+                                <materialDesign:PackIcon Kind="Update" Style="{StaticResource AcercaChipIcon}"/>
+                            </Border>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="{Binding [Acerca_Version], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.Micro}"/>
+                                <TextBlock Text="{Binding VersionAppTexto, Mode=OneWay}" Style="{StaticResource AppText.BodyStrong}" Margin="0,2,0,0"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Column="2" Style="{StaticResource AppCard}" CornerRadius="12" Padding="16,12">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Border Style="{StaticResource AcercaChip}">
+                                <materialDesign:PackIcon Kind="HeartOutline" Style="{StaticResource AcercaChipIcon}"/>
+                            </Border>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="{Binding [Acerca_Licencia], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.Micro}"/>
+                                <TextBlock Text="MIT" Style="{StaticResource AppText.BodyStrong}" Margin="0,2,0,0"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <!-- 3. NOVEDADES DE LA VERSIÓN (DINÁMICAS DESDE GITHUB) -->
+                <Border Style="{StaticResource AcercaCard}">
                     <StackPanel>
                         <Grid Margin="0,0,0,16">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            
+
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <Border Background="#1E293B" CornerRadius="8" Width="34" Height="34" Margin="0,0,10,0" VerticalAlignment="Center">
-                                    <materialDesign:PackIcon Kind="FileDocumentOutline" Foreground="#60A5FA" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                <Border Style="{StaticResource AcercaChip}">
+                                    <materialDesign:PackIcon Kind="FileDocumentOutline" Style="{StaticResource AcercaChipIcon}"/>
                                 </Border>
                                 <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding NovedadesTituloTexto}" FontSize="16" FontWeight="Bold" Foreground="White"/>
-                                    <TextBlock Text="{Binding [Acerca_RegistroCambios], Source={x:Static loc:LocalizationService.Instance}}" FontSize="11" Foreground="#9CA3AF"/>
+                                    <TextBlock Text="{Binding NovedadesTituloTexto, Mode=OneWay}" Style="{StaticResource AppText.Section}"/>
+                                    <TextBlock Text="{Binding [Acerca_RegistroCambios], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.Caption}"/>
                                 </StackPanel>
                             </StackPanel>
 
-                            <Border Grid.Column="1" Background="#14181E" BorderBrush="#2D3748" BorderThickness="1" CornerRadius="6" Padding="8,4" VerticalAlignment="Center">
-                                <TextBlock Text="{Binding FechaVersionTexto}" FontSize="11" Foreground="#9CA3AF" FontWeight="Medium"/>
+                            <Border Grid.Column="1" VerticalAlignment="Center">
+                                <Border.Style>
+                                    <Style TargetType="Border" BasedOn="{StaticResource AppBadge}">
+                                        <Setter Property="Padding" Value="10,0"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding FechaVersionTexto}" Value="">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <TextBlock Text="{Binding FechaVersionTexto, Mode=OneWay}" Style="{StaticResource AppText.Micro}" VerticalAlignment="Center"/>
                             </Border>
                         </Grid>
 
-                        <Border Background="#14181E" BorderBrush="#262D38" BorderThickness="1" CornerRadius="12" Padding="18,16">
+                        <Border Background="{DynamicResource Brush.Surface2}" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1" CornerRadius="12" Padding="18,16">
                             <StackPanel>
                                 <ProgressBar IsIndeterminate="True"
                                              Visibility="{Binding IsCargandoNovedades, Converter={StaticResource BoolToVis}}"
-                                             Height="3" VerticalAlignment="Top" Foreground="#60A5FA" Margin="0,0,0,12"
+                                             Height="3" VerticalAlignment="Top" Foreground="{DynamicResource Brush.Accent}" Margin="0,0,0,12"
                                              materialDesign:TransitionAssist.DisableTransitions="True"/>
                                 <mdxam:MarkdownScrollViewer Markdown="{Binding NovedadesTexto}"
                                                              MarkdownStyleName="Standard"
                                                              Background="Transparent"
-                                                             Foreground="#E2E8F0"
+                                                             Foreground="{DynamicResource Brush.TextPrimary}"
                                                              VerticalScrollBarVisibility="Disabled"
+                                                             PreviewMouseWheel="Novedades_PreviewMouseWheel"
                                                              Style="{StaticResource NovedadesMarkdownViewerStyle}"/>
                             </StackPanel>
                         </Border>
                     </StackPanel>
-                </materialDesign:Card>
+                </Border>
 
-                <!-- 3. REPOSITORIO GITHUB Y LICENCIAS -->
-                <materialDesign:Card Background="#121212" BorderBrush="#262D38" BorderThickness="1" UniformCornerRadius="16" Margin="0,0,0,20" Padding="24" materialDesign:ElevationAssist.Elevation="Dp0">
+                <!-- 4. PRIVACIDAD (PRI-03/04): tres garantías en columnas, a ancho completo -->
+                <Border Style="{StaticResource AcercaCard}">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                            <Border Style="{StaticResource AcercaChip}">
+                                <materialDesign:PackIcon Kind="ShieldAccount" Style="{StaticResource AcercaChipIcon}" Foreground="{DynamicResource Brush.Success}"/>
+                            </Border>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="{Binding [Acerca_PrivacidadTitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.Section}"/>
+                                <TextBlock Text="{Binding [Acerca_PrivacidadSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.Caption}"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="16"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="16"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <Border Grid.Column="0" Background="{DynamicResource Brush.Surface2}" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1" CornerRadius="12" Padding="16">
+                                <StackPanel>
+                                    <materialDesign:PackIcon Kind="Harddisk" Width="20" Height="20" Foreground="{DynamicResource Brush.Success}" HorizontalAlignment="Left" Margin="0,0,0,8"/>
+                                    <TextBlock Text="{Binding [Acerca_PrivacidadP1], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AcercaBody}"/>
+                                </StackPanel>
+                            </Border>
+                            <Border Grid.Column="2" Background="{DynamicResource Brush.Surface2}" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1" CornerRadius="12" Padding="16">
+                                <StackPanel>
+                                    <materialDesign:PackIcon Kind="AccountSync" Width="20" Height="20" Foreground="{DynamicResource Brush.Accent}" HorizontalAlignment="Left" Margin="0,0,0,8"/>
+                                    <TextBlock Text="{Binding [Acerca_PrivacidadP2], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AcercaBody}"/>
+                                </StackPanel>
+                            </Border>
+                            <Border Grid.Column="4" Background="{DynamicResource Brush.Surface2}" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1" CornerRadius="12" Padding="16">
+                                <StackPanel>
+                                    <materialDesign:PackIcon Kind="EyeOffOutline" Width="20" Height="20" Foreground="{DynamicResource Brush.Success}" HorizontalAlignment="Left" Margin="0,0,0,8"/>
+                                    <TextBlock Text="{Binding [Acerca_PrivacidadP3], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AcercaBody}"/>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- AVISO DE CONTENIDO (recomendación de buenas prácticas, no asesoría legal) -->
+                <Border Style="{StaticResource AcercaCard}">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                            <Border Style="{StaticResource AcercaChip}">
+                                <materialDesign:PackIcon Kind="AlertCircleOutline" Style="{StaticResource AcercaChipIcon}" Foreground="{DynamicResource Brush.Warning}"/>
+                            </Border>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="{Binding [Acerca_AvisoContenidoTitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.Section}"/>
+                                <TextBlock Text="{Binding [Acerca_AvisoContenidoSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.Caption}"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <TextBlock Text="{Binding [Acerca_AvisoContenidoTexto], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AcercaBody}"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- 5. PROYECTO OPEN SOURCE: todo el texto (título, licencia y tecnologías) en la columna
+                     izquierda; los botones en la derecha, centrados verticalmente respecto a ESE bloque completo. -->
+                <Border Style="{StaticResource AcercaCard}" Margin="0">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
 
-                        <StackPanel VerticalAlignment="Center">
-                            <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                                <materialDesign:PackIcon Kind="Github" Width="20" Height="20" Foreground="White" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                <TextBlock Text="{Binding [Acerca_ProyectoOpenSource], Source={x:Static loc:LocalizationService.Instance}}" FontWeight="Bold" Foreground="White" FontSize="15" VerticalAlignment="Center"/>
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                                <Border Style="{StaticResource AcercaChip}">
+                                    <materialDesign:PackIcon Kind="Github" Style="{StaticResource AcercaChipIcon}" Foreground="{DynamicResource Brush.TextPrimary}"/>
+                                </Border>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding [Acerca_ProyectoOpenSource], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.Section}"/>
+                                    <TextBlock Text="{Binding LicenciaTexto, Mode=OneWay}" Style="{StaticResource AppText.Caption}"/>
+                                </StackPanel>
                             </StackPanel>
 
-                            <TextBlock Text="{Binding [Acerca_Tecnologias], Source={x:Static loc:LocalizationService.Instance}}" FontSize="12" Foreground="#9CA3AF" Margin="0,2,0,0"/>
-                            <TextBlock Text="{Binding LicenciaTexto}" FontSize="11" Foreground="#6B7280" Margin="0,4,0,0"/>
+                            <!-- Tecnologías (nombres propios: no se traducen). El margen inferior de los chips
+                                 se compensa para que el bloque de texto no tenga más aire abajo que arriba,
+                                 así el centrado de los botones es exacto. -->
+                            <WrapPanel Margin="0,0,0,-8">
+                                <Border Style="{StaticResource AcercaTechChip}"><TextBlock Text=".NET 8" Style="{StaticResource AcercaTechChipText}"/></Border>
+                                <Border Style="{StaticResource AcercaTechChip}"><TextBlock Text="C#" Style="{StaticResource AcercaTechChipText}"/></Border>
+                                <Border Style="{StaticResource AcercaTechChip}"><TextBlock Text="WPF" Style="{StaticResource AcercaTechChipText}"/></Border>
+                                <Border Style="{StaticResource AcercaTechChip}"><TextBlock Text="Flyleaf" Style="{StaticResource AcercaTechChipText}"/></Border>
+                                <Border Style="{StaticResource AcercaTechChip}"><TextBlock Text="SQLite-net" Style="{StaticResource AcercaTechChipText}"/></Border>
+                                <Border Style="{StaticResource AcercaTechChip}"><TextBlock Text="MaterialDesign" Style="{StaticResource AcercaTechChipText}"/></Border>
+                                <Border Style="{StaticResource AcercaTechChip}"><TextBlock Text="Velopack" Style="{StaticResource AcercaTechChipText}"/></Border>
+                            </WrapPanel>
                         </StackPanel>
 
                         <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                             <Button Command="{Binding AbrirReportarProblemaCommand}"
                                     Style="{StaticResource MaterialDesignOutlinedButton}"
-                                    BorderBrush="#475569" Foreground="#CBD5E1"
-                                    Height="40" Padding="18,0" VerticalAlignment="Center" Margin="0,0,10,0"
+                                    BorderBrush="{DynamicResource Brush.TextTertiary}" Foreground="{DynamicResource Brush.TextPrimary}"
+                                    Height="38" Padding="16,0" Margin="0,0,10,0" VerticalAlignment="Center" Cursor="Hand"
                                     materialDesign:ButtonAssist.CornerRadius="8"
-                                    ToolTip="{Binding [Acerca_ReportarProblemaTip], Source={x:Static loc:LocalizationService.Instance}}"
-                                    AutomationProperties.Name="{Binding [Acerca_ReportarProblema], Source={x:Static loc:LocalizationService.Instance}}">
+                                    ToolTip="{Binding [Acerca_ReportarProblemaTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                    AutomationProperties.Name="{Binding [Acerca_ReportarProblema], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
                                 <StackPanel Orientation="Horizontal">
                                     <materialDesign:PackIcon Kind="BugOutline" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                    <TextBlock Text="{Binding [Acerca_ReportarProblema], Source={x:Static loc:LocalizationService.Instance}}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="12"/>
+                                    <TextBlock Text="{Binding [Acerca_ReportarProblema], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="12"/>
                                 </StackPanel>
                             </Button>
 
                             <Button Command="{Binding AbrirRepositorioGitHubCommand}"
-                                    Style="{StaticResource MaterialDesignOutlinedButton}"
-                                    BorderBrush="#3B82F6" Foreground="#93C5FD"
-                                    Height="40" Padding="18,0" VerticalAlignment="Center"
+                                    Style="{StaticResource AppOutlinedButton}"
+                                    BorderBrush="{DynamicResource Brush.AccentStrong}"
+                                    Height="38" Padding="16,0" VerticalAlignment="Center" Cursor="Hand"
                                     materialDesign:ButtonAssist.CornerRadius="8"
-                                    ToolTip="{Binding [Acerca_AbrirRepositorioTip], Source={x:Static loc:LocalizationService.Instance}}"
-                                    AutomationProperties.Name="{Binding [Acerca_VerGitHub], Source={x:Static loc:LocalizationService.Instance}}">
+                                    ToolTip="{Binding [Acerca_AbrirRepositorioTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                    AutomationProperties.Name="{Binding [Acerca_VerGitHub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
                                 <StackPanel Orientation="Horizontal">
                                     <materialDesign:PackIcon Kind="OpenInNew" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                    <TextBlock Text="{Binding [Acerca_VerGitHub], Source={x:Static loc:LocalizationService.Instance}}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="12"/>
+                                    <TextBlock Text="{Binding [Acerca_VerGitHub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="12"/>
                                 </StackPanel>
                             </Button>
                         </StackPanel>
                     </Grid>
-                </materialDesign:Card>
-
-                <!-- 4. PRIVACIDAD Y DATOS (PRI-03/04) -->
-                <materialDesign:Card Background="#121212" BorderBrush="#262D38" BorderThickness="1" UniformCornerRadius="16" Margin="0,0,0,20" Padding="24" materialDesign:ElevationAssist.Elevation="Dp0">
-                    <StackPanel>
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                            <materialDesign:PackIcon Kind="ShieldAccount" Width="20" Height="20" Foreground="#34D399" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                            <TextBlock Text="{Binding [Acerca_PrivacidadTitulo], Source={x:Static loc:LocalizationService.Instance}}" FontWeight="Bold" Foreground="White" FontSize="15" VerticalAlignment="Center"/>
-                        </StackPanel>
-
-                        <TextBlock Text="{Binding [Acerca_PrivacidadP1], Source={x:Static loc:LocalizationService.Instance}}"
-                                   FontSize="12" Foreground="#E2E8F0" TextWrapping="Wrap" LineHeight="20" Margin="0,0,0,6"/>
-                        <TextBlock Text="{Binding [Acerca_PrivacidadP2], Source={x:Static loc:LocalizationService.Instance}}"
-                                   FontSize="12" Foreground="#E2E8F0" TextWrapping="Wrap" LineHeight="20" Margin="0,0,0,6"/>
-                        <TextBlock Text="{Binding [Acerca_PrivacidadP3], Source={x:Static loc:LocalizationService.Instance}}"
-                                   FontSize="12" Foreground="#E2E8F0" TextWrapping="Wrap" LineHeight="20"/>
-                    </StackPanel>
-                </materialDesign:Card>
-
-                <!-- 5. AVISO DE CONTENIDO (recomendación de buenas prácticas, no asesoría legal) -->
-                <materialDesign:Card Background="#121212" BorderBrush="#262D38" BorderThickness="1" UniformCornerRadius="16" Margin="0,0,0,20" Padding="24" materialDesign:ElevationAssist.Elevation="Dp0">
-                    <StackPanel>
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                            <materialDesign:PackIcon Kind="AlertCircleOutline" Width="20" Height="20" Foreground="#F59E0B" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                            <TextBlock Text="{Binding [Acerca_AvisoContenidoTitulo], Source={x:Static loc:LocalizationService.Instance}}" FontWeight="Bold" Foreground="White" FontSize="15" VerticalAlignment="Center"/>
-                        </StackPanel>
-
-                        <TextBlock Text="{Binding [Acerca_AvisoContenidoTexto], Source={x:Static loc:LocalizationService.Instance}}"
-                                   FontSize="12" Foreground="#E2E8F0" TextWrapping="Wrap" LineHeight="20"/>
-                    </StackPanel>
-                </materialDesign:Card>
+                </Border>
 
             </StackPanel>
         </ScrollViewer>

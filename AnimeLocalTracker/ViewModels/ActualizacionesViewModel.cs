@@ -18,8 +18,15 @@ namespace AnimeLocalTracker.ViewModels;
 /// Actualizaciones: episodios recién emitidos (últimos 7 días) de los animes en emisión
 /// de tu biblioteca que aún no tienes descargados, con descarga directa desde la lista.
 /// </summary>
-public partial class ActualizacionesViewModel : ObservableObject, IDisposable, IRecipient<DescargaProgresoMensaje>
+public partial class ActualizacionesViewModel : ObservableObject, IDisposable,
+    IRecipient<DescargaProgresoMensaje>, IRecipient<EpisodioActualizadoMensaje>, IRecipient<IdiomaCambiadoMensaje>
 {
+    // Claves de los filtros (chips)
+    public const string FiltroTodos = "Todos";
+    public const string FiltroPorDescargar = "PorDescargar";
+    public const string FiltroSinVer = "SinVer";
+    public const string FiltroListos = "Listos";
+
     private const int LimiteActualizaciones = 40;
 
     private readonly IDatabaseService _databaseService;
@@ -27,6 +34,8 @@ public partial class ActualizacionesViewModel : ObservableObject, IDisposable, I
     private readonly IDownloadService _downloadService;
     private readonly IFileScannerService _fileScannerService;
     private readonly PythonEpisodeEnricher? _enricher;
+    private readonly IDialogService? _dialogService;
+    private string _filtroActual = FiltroTodos;
     private readonly SemaphoreSlim _cargaLock = new(1, 1);
 
     // CA1001: el semáforo se libera en el cierre de la app (singleton DI)
@@ -49,6 +58,50 @@ public partial class ActualizacionesViewModel : ObservableObject, IDisposable, I
     public bool TieneItems => Items.Count > 0;
     public bool EstaVacio => !EstaCargando && Items.Count == 0;
 
+    // === Resumen, filtros y acciones en bloque ===
+
+    /// <summary>Episodios nuevos de esta semana (todos los cargados).</summary>
+    [ObservableProperty]
+    private int _totalNuevos;
+
+    /// <summary>Todavía sin archivo local (incluye los que se están descargando).</summary>
+    [ObservableProperty]
+    private int _totalPorDescargar;
+
+    /// <summary>Con archivo y sin ver: se pueden ver ya.</summary>
+    [ObservableProperty]
+    private int _totalListos;
+
+    [ObservableProperty]
+    private int _totalSinVer;
+
+    /// <summary>Sin archivo y sin descarga en curso: lo que "Descargar pendientes" encolaría.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PuedeDescargarPendientes))]
+    private int _pendientesEncolables;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PuedeMarcarVistos))]
+    private int _sinVerParaMarcar;
+
+    [ObservableProperty]
+    private string _descargarPendientesTexto = string.Empty;
+
+    [ObservableProperty]
+    private string _marcarVistosTexto = string.Empty;
+
+    [ObservableProperty]
+    private ObservableCollection<FiltroChip> _filtros = [];
+
+    public bool PuedeDescargarPendientes => PendientesEncolables > 0;
+    public bool PuedeMarcarVistos => SinVerParaMarcar > 0;
+
+    /// <summary>Hay tarjetas que mostrar con el filtro actual.</summary>
+    public bool TieneResultados => ItemsAgrupados.Count > 0;
+
+    /// <summary>Hay episodios, pero ninguno cumple el filtro elegido.</summary>
+    public bool SinResultados => !EstaCargando && Items.Count > 0 && ItemsAgrupados.Count == 0;
+
     // NAV-01: evita recorrer toda la BD + volver a llamar a AniList en cada visita a la
     // pestaña — se recarga como mucho una vez cada 30 s (mismo cooldown que Historial).
     private static readonly TimeSpan CooldownRecarga = TimeSpan.FromSeconds(30);
@@ -61,13 +114,15 @@ public partial class ActualizacionesViewModel : ObservableObject, IDisposable, I
         IAnimeTrackingService animeTrackingService,
         IDownloadService downloadService,
         IFileScannerService fileScannerService,
-        PythonEpisodeEnricher? enricher = null)
+        PythonEpisodeEnricher? enricher = null,
+        IDialogService? dialogService = null)
     {
         _databaseService = databaseService;
         _animeTrackingService = animeTrackingService;
         _downloadService = downloadService;
         _fileScannerService = fileScannerService;
         _enricher = enricher;
+        _dialogService = dialogService;
 
         WeakReferenceMessenger.Default.RegisterAll(this);
     }
@@ -96,6 +151,7 @@ public partial class ActualizacionesViewModel : ObservableObject, IDisposable, I
             {
                 Items.Clear();
                 ItemsAgrupados.Clear();
+                ActualizarResumenYFiltro();
                 return;
             }
 
@@ -107,6 +163,7 @@ public partial class ActualizacionesViewModel : ObservableObject, IDisposable, I
             {
                 Items.Clear();
                 ItemsAgrupados.Clear();
+                ActualizarResumenYFiltro();
                 return;
             }
 
@@ -187,7 +244,7 @@ public partial class ActualizacionesViewModel : ObservableObject, IDisposable, I
             }
 
             Items = new ObservableCollection<ActualizacionItemViewModel>(lista);
-            ItemsAgrupados = AgruparPorFecha(lista);
+            ActualizarResumenYFiltro();
         }
         catch (Exception ex)
         {
@@ -327,11 +384,16 @@ public partial class ActualizacionesViewModel : ObservableObject, IDisposable, I
             // esto el episodio se quedaba sin miniatura hasta que el usuario entrara
             // manualmente a la ficha del anime.
             _ = Task.Run(() => GenerarMiniaturaTrasDescargaAsync(item));
+            ActualizarResumenYFiltro();
             return;
         }
 
+        bool cambioDeEstado = item.IsDownloading != message.IsDownloading;
         item.IsDownloading = message.IsDownloading;
         item.DownloadProgress = message.Progreso;
+
+        // Los contadores solo cambian al empezar/terminar una descarga, no en cada porcentaje.
+        if (cambioDeEstado) ActualizarResumenYFiltro();
     }
 
     private async Task GenerarMiniaturaTrasDescargaAsync(ActualizacionItemViewModel item)
@@ -373,5 +435,202 @@ public partial class ActualizacionesViewModel : ObservableObject, IDisposable, I
     {
         OnPropertyChanged(nameof(TieneItems));
         OnPropertyChanged(nameof(EstaVacio));
+        OnPropertyChanged(nameof(TieneResultados));
+        OnPropertyChanged(nameof(SinResultados));
+    }
+
+    /// <summary>
+    /// Recalcula los contadores, los chips, los textos de los botones y la lista visible según el filtro.
+    /// Se llama al cargar y cada vez que cambia el estado de un episodio (descarga, visto, progreso).
+    /// </summary>
+    private void ActualizarResumenYFiltro()
+    {
+        TotalNuevos = Items.Count;
+        TotalPorDescargar = Items.Count(i => i.PorDescargar);
+        TotalListos = Items.Count(i => i.ListoParaVer);
+        TotalSinVer = Items.Count(i => i.SinVer);
+        PendientesEncolables = Items.Count(i => i.PorDescargar && !i.IsDownloading);
+        SinVerParaMarcar = TotalSinVer;
+
+        DescargarPendientesTexto = string.Format(LocalizationService.T("Act_DescargarPendientesFormato"), PendientesEncolables);
+        MarcarVistosTexto = string.Format(LocalizationService.T("Act_MarcarVistosFormato"), SinVerParaMarcar);
+
+        string Chip(string claveTexto, int cantidad) =>
+            string.Format(LocalizationService.T("Act_FiltroFormato"), LocalizationService.T(claveTexto), cantidad);
+
+        Filtros = new ObservableCollection<FiltroChip>
+        {
+            new(FiltroTodos, Chip("Act_Filtro_Todos", TotalNuevos), _filtroActual == FiltroTodos),
+            new(FiltroPorDescargar, Chip("Act_Filtro_PorDescargar", TotalPorDescargar), _filtroActual == FiltroPorDescargar),
+            new(FiltroListos, Chip("Act_Filtro_Listos", TotalListos), _filtroActual == FiltroListos),
+            new(FiltroSinVer, Chip("Act_Filtro_SinVer", TotalSinVer), _filtroActual == FiltroSinVer),
+        };
+
+        IEnumerable<ActualizacionItemViewModel> visibles = _filtroActual switch
+        {
+            FiltroPorDescargar => Items.Where(i => i.PorDescargar),
+            FiltroListos => Items.Where(i => i.ListoParaVer),
+            FiltroSinVer => Items.Where(i => i.SinVer),
+            _ => Items
+        };
+
+        ItemsAgrupados = AgruparPorFecha(visibles);
+        NotificarEstados();
+    }
+
+    [RelayCommand]
+    private void SeleccionarFiltro(string? clave)
+    {
+        _filtroActual = clave ?? FiltroTodos;
+        ActualizarResumenYFiltro();
+    }
+
+    /// <summary>
+    /// El botón principal de la tarjeta: descarga si no hay archivo; si lo hay, reproduce (continúa si estaba a
+    /// medias, o lo vuelve a ver si ya estaba visto).
+    /// </summary>
+    [RelayCommand]
+    private async Task EjecutarAccionAsync(ActualizacionItemViewModel? item)
+    {
+        if (item == null) return;
+
+        if (item.Descargado) await ReproducirAsync(item);
+        else await DescargarAsync(item);
+    }
+
+    [RelayCommand]
+    private async Task DescargarPendientesAsync()
+    {
+        var pendientes = Items.Where(i => i.PorDescargar && !i.IsDownloading).ToList();
+        if (pendientes.Count == 0) return;
+
+        if (_dialogService != null)
+        {
+            bool confirmado = await _dialogService.MostrarDialogoAsync(
+                LocalizationService.T("Act_ConfirmDescargarTitulo"),
+                string.Format(LocalizationService.T("Act_ConfirmDescargarMsj"), pendientes.Count),
+                true, "DownloadMultiple", "#60A5FA");
+            if (!confirmado) return;
+        }
+
+        foreach (var item in pendientes) await DescargarAsync(item);
+
+        _dialogService?.MostrarToast(
+            LocalizationService.T("Act_Titulo"),
+            string.Format(LocalizationService.T("Act_DescargaEncoladaFormato"), pendientes.Count),
+            "DownloadMultiple", "#60A5FA");
+        ActualizarResumenYFiltro();
+    }
+
+    /// <summary>
+    /// Marca como vistos todos los episodios sin ver de la lista. Marcado MANUAL: no fabrica fecha de visionado
+    /// (persistence.md #5) y conserva favorito y duración de lo que ya hubiera guardado.
+    /// </summary>
+    [RelayCommand]
+    private async Task MarcarTodoVistoAsync()
+    {
+        var sinVer = Items.Where(i => i.SinVer).ToList();
+        if (sinVer.Count == 0) return;
+
+        if (_dialogService != null)
+        {
+            bool confirmado = await _dialogService.MostrarDialogoAsync(
+                LocalizationService.T("Act_ConfirmVistosTitulo"),
+                string.Format(LocalizationService.T("Act_ConfirmVistosMsj"), sinVer.Count),
+                true, "EyeCheckOutline", "#A78BFA");
+            if (!confirmado) return;
+        }
+
+        try
+        {
+            var existentes = (await _databaseService.ObtenerTodosLosRegistrosAsync() ?? new List<RegistroEpisodio>())
+                .GroupBy(r => (r.AniListId, r.NumeroEpisodio))
+                .ToDictionary(g => g.Key, g => g.First());
+
+            var registros = sinVer.Select(i =>
+            {
+                existentes.TryGetValue((i.AniListId, i.NumeroEpisodio), out var existente);
+                return new RegistroEpisodio
+                {
+                    AniListId = i.AniListId,
+                    NumeroEpisodio = i.NumeroEpisodio,
+                    RutaArchivo = string.IsNullOrWhiteSpace(i.RutaArchivo) ? existente?.RutaArchivo ?? string.Empty : i.RutaArchivo,
+                    VistoLocal = true,
+                    FavoritoLocal = existente?.FavoritoLocal ?? false,
+                    TotalSegundos = existente?.TotalSegundos ?? 0,
+                    ProgresoSegundos = 0
+                };
+            }).ToList();
+
+            await _databaseService.GuardarRegistrosEpisodioBulkAsync(registros);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("ActualizacionesViewModel", "Error al marcar los episodios como vistos", ex);
+            return;
+        }
+
+        foreach (var item in sinVer)
+        {
+            item.Visto = true;
+            item.ProgresoSegundos = 0;
+            WeakReferenceMessenger.Default.Send(new EpisodioActualizadoMensaje(item.AniListId, item.NumeroEpisodio, true, 0, 0));
+        }
+
+        _dialogService?.MostrarToast(
+            LocalizationService.T("Act_Titulo"),
+            string.Format(LocalizationService.T("Act_MarcadosVistosFormato"), sinVer.Count),
+            "EyeCheckOutline", "#A78BFA");
+        ActualizarResumenYFiltro();
+    }
+
+    /// <summary>Visto/progreso en vivo: lo que pasa en el reproductor o en la ficha se refleja aquí sin recargar.</summary>
+    public void Receive(EpisodioActualizadoMensaje message)
+    {
+        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+        if (dispatcher != null && !dispatcher.CheckAccess())
+        {
+            dispatcher.Invoke(() => RecibirEpisodioActualizado(message));
+            return;
+        }
+
+        RecibirEpisodioActualizado(message);
+    }
+
+    private void RecibirEpisodioActualizado(EpisodioActualizadoMensaje message)
+    {
+        // Episodio 0 = cambio en bloque (p. ej. "marcar vistos" desde la ficha): no se sabe cuáles, se recarga.
+        if (message.NumeroEpisodio <= 0)
+        {
+            _ultimaCargaUtc = DateTime.MinValue;
+            return;
+        }
+
+        var item = Items.FirstOrDefault(i => i.AniListId == message.AnimeId && i.NumeroEpisodio == message.NumeroEpisodio);
+        if (item == null) return;
+
+        item.Visto = message.VistoLocal;
+        item.ProgresoSegundos = message.ProgresoSegundos;
+        if (message.TotalSegundos > 0) item.TotalSegundos = message.TotalSegundos;
+        ActualizarResumenYFiltro();
+    }
+
+    /// <summary>Los textos de las tarjetas, chips y botones se construyen localizados: al cambiar de idioma se rehacen.</summary>
+    public void Receive(IdiomaCambiadoMensaje message)
+    {
+        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+        if (dispatcher != null && !dispatcher.CheckAccess())
+        {
+            dispatcher.Invoke(RefrescarTextos);
+            return;
+        }
+
+        RefrescarTextos();
+    }
+
+    private void RefrescarTextos()
+    {
+        foreach (var item in Items) item.RefrescarTextos();
+        ActualizarResumenYFiltro();
     }
 }

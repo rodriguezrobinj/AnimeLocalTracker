@@ -16,6 +16,7 @@ using FlyleafLib.MediaPlayer;
 using AnimeLocalTracker.Messages;
 using AnimeLocalTracker.Models;
 using AnimeLocalTracker.Services;
+using AnimeLocalTracker.Services.Logros;
 
 namespace AnimeLocalTracker.ViewModels;
 
@@ -264,9 +265,13 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         IPlaybackStateService? playbackStateService = null,
         ISkipTimesCoordinator? skipTimesCoordinator = null,
         IVentanaPrincipal? ventanaPrincipal = null,
-        ISystemMediaControlsService? systemMediaControlsService = null)
+        ISystemMediaControlsService? systemMediaControlsService = null,
+        ILogrosService? logrosService = null,
+        IDialogService? dialogService = null)
     {
         _settingsService = settingsService;
+        _logrosService = logrosService;
+        DialogService = dialogService;
         _ventanaPrincipal = ventanaPrincipal;
 
         _playbackState = playbackStateService ?? new PlaybackStateService(databaseService, animeTrackingService, authService);
@@ -1287,6 +1292,20 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         }
     }
 
+    private async Task EvaluarLogrosAsync()
+    {
+        if (_logrosService == null) return;
+
+        try
+        {
+            await _logrosService.EvaluarAsync();
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("ReproductorViewModel", $"No se pudieron evaluar los logros: {ex.Message}");
+        }
+    }
+
     public async Task RealizarAutoTrackingAsync()
     {
         if (_fueMarcadoComoVisto) return;
@@ -1305,6 +1324,10 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
             // Avisar a la vista de detalles para que actualice la lista automáticamente
             WeakReferenceMessenger.Default.Send(new Messages.EpisodioActualizadoMensaje(_animeId, _episodio, true, 0, TotalSeconds));
+
+            // Terminar un episodio puede desbloquear un logro: se evalúa aquí para avisar en el momento
+            // (y no solo la próxima vez que abras Estadísticas o Logros).
+            _ = EvaluarLogrosAsync();
         }
         catch (Exception ex)
         {
@@ -1640,6 +1663,14 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     }
 
     private bool _prioridadElevada;
+
+    private readonly ILogrosService? _logrosService;
+
+    /// <summary>
+    /// Los avisos (toast) de la ventana principal quedan TAPADOS por el video: Flyleaf dibuja en su propia
+    /// ventana nativa. La vista del reproductor los dibuja por su cuenta, encima del video, a partir de esto.
+    /// </summary>
+    public IDialogService? DialogService { get; }
 
     private void CancelarSeekPendiente()
     {

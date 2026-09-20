@@ -21,6 +21,7 @@ public interface INavigationService : System.ComponentModel.INotifyPropertyChang
     bool EsAcercaDeActivo { get; }
     bool EsEstadisticasActivo { get; }
     bool EsHistorialActivo { get; }
+    bool EsLogrosActivo { get; }
     bool EsActualizacionesActivo { get; }
 
     GaleriaViewModel ObtenerGaleria();
@@ -31,6 +32,7 @@ public interface INavigationService : System.ComponentModel.INotifyPropertyChang
     AcercaDeViewModel ObtenerAcercaDe();
     EstadisticasViewModel ObtenerEstadisticas();
     HistorialViewModel ObtenerHistorial();
+    LogrosViewModel ObtenerLogros();
     ActualizacionesViewModel ObtenerActualizaciones();
     DetalleViewModel CrearDetalle();
     ReproductorViewModel CrearReproductor();
@@ -46,6 +48,7 @@ public sealed partial class NavigationService : ObservableObject, INavigationSer
     IRecipient<NavegarMensaje_AcercaDe>,
     IRecipient<NavegarMensaje_Estadisticas>,
     IRecipient<NavegarMensaje_Historial>,
+    IRecipient<NavegarMensaje_Logros>,
     IRecipient<NavegarMensaje_Actualizaciones>,
     IRecipient<NavegarMensaje_Reproductor>,
     IRecipient<NavegarMensaje_VolverDelReproductor>
@@ -63,6 +66,7 @@ public sealed partial class NavigationService : ObservableObject, INavigationSer
     [NotifyPropertyChangedFor(nameof(EsAcercaDeActivo))]
     [NotifyPropertyChangedFor(nameof(EsEstadisticasActivo))]
     [NotifyPropertyChangedFor(nameof(EsHistorialActivo))]
+    [NotifyPropertyChangedFor(nameof(EsLogrosActivo))]
     [NotifyPropertyChangedFor(nameof(EsActualizacionesActivo))]
     private ObservableObject _vistaActual = null!;
 
@@ -77,6 +81,7 @@ public sealed partial class NavigationService : ObservableObject, INavigationSer
     public bool EsAcercaDeActivo => VistaActual is AcercaDeViewModel;
     public bool EsEstadisticasActivo => VistaActual is EstadisticasViewModel;
     public bool EsHistorialActivo => VistaActual is HistorialViewModel;
+    public bool EsLogrosActivo => VistaActual is LogrosViewModel;
     public bool EsActualizacionesActivo => VistaActual is ActualizacionesViewModel;
 
     public NavigationService(IServiceProvider serviceProvider)
@@ -93,6 +98,7 @@ public sealed partial class NavigationService : ObservableObject, INavigationSer
     public AcercaDeViewModel ObtenerAcercaDe() => _serviceProvider.GetRequiredService<AcercaDeViewModel>();
     public EstadisticasViewModel ObtenerEstadisticas() => _serviceProvider.GetRequiredService<EstadisticasViewModel>();
     public HistorialViewModel ObtenerHistorial() => _serviceProvider.GetRequiredService<HistorialViewModel>();
+    public LogrosViewModel ObtenerLogros() => _serviceProvider.GetRequiredService<LogrosViewModel>();
     public ActualizacionesViewModel ObtenerActualizaciones() => _serviceProvider.GetRequiredService<ActualizacionesViewModel>();
     public DetalleViewModel CrearDetalle() => _serviceProvider.GetRequiredService<DetalleViewModel>();
     public ReproductorViewModel CrearReproductor() => _serviceProvider.GetRequiredService<ReproductorViewModel>();
@@ -214,6 +220,28 @@ public sealed partial class NavigationService : ObservableObject, INavigationSer
         catch (Exception ex)
         {
             AppLogger.Error("NavigationService", "Error navegando a historial", ex);
+        }
+    }
+
+    public void Receive(NavegarMensaje_Logros message)
+    {
+        _ = NavegarLogros();
+    }
+
+    private async Task NavegarLogros()
+    {
+        try
+        {
+            var logrosVm = ObtenerLogros();
+            VistaActual = logrosVm;
+            if (logrosVm.NecesitaRecargar())
+            {
+                await logrosVm.CargarAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("NavigationService", "Error navegando a logros", ex);
         }
     }
 

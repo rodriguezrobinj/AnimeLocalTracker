@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.IO;
 using System.Net.Http;
 using System.Threading;
@@ -16,6 +17,9 @@ public class ImageCacheService : IImageCacheService, IDisposable
     private readonly LruCache<int, ImageSource> _memoryCache = new(MaxEntradasEnMemoria);
     private readonly SemaphoreSlim _downloadSemaphore = new(6, 6);
     private readonly string _coversDirectory;
+    // Cargas en curso por anime: si la galería, "Qué veo hoy" y el calendario piden la misma portada a la
+    // vez, se lee y decodifica UNA sola vez y todos comparten el resultado.
+    private readonly ConcurrentDictionary<int, Task<ImageSource?>> _cargasEnCurso = new();
 
     // CA1001: el semáforo de descargas se libera en el cierre de la app (singleton DI)
     public void Dispose()
@@ -28,11 +32,13 @@ public class ImageCacheService : IImageCacheService, IDisposable
     // recargar desde disco es barato (sin red) y evita crecimiento sin límite en bibliotecas grandes.
     private const int MaxEntradasEnMemoria = 500;
 
-    public ImageCacheService(IHttpClientFactory httpClientFactory)
+    /// <param name="coversDirectory">Solo para pruebas: carpeta alternativa a la de datos del usuario (las
+    /// pruebas nunca deben leer ni escribir en <see cref="AppDataPaths"/>).</param>
+    public ImageCacheService(IHttpClientFactory httpClientFactory, string? coversDirectory = null)
     {
         _httpClientFactory = httpClientFactory;
-        
-        _coversDirectory = AppDataPaths.CoversDir;
+
+        _coversDirectory = coversDirectory ?? AppDataPaths.CoversDir;
         
         try
         {
@@ -132,7 +138,33 @@ public class ImageCacheService : IImageCacheService, IDisposable
         _memoryCache.Set(animeId, bitmap);
     }
 
-    public async Task<ImageSource?> ObtenerPortadaAsync(int animeId, string? urlPortada, int decodeWidth = 220)
+    public Task<ImageSource?> ObtenerPortadaAsync(int animeId, string? urlPortada, int decodeWidth = 220)
+    {
+        if (_memoryCache.TryGetValue(animeId, out var cachedMem))
+        {
+            return Task.FromResult<ImageSource?>(cachedMem);
+        }
+
+        // TaskCompletionSource explícito: así solo la primera petición arranca la carga y el resto la espera.
+        var tcs = new TaskCompletionSource<ImageSource?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var enCurso = _cargasEnCurso.GetOrAdd(animeId, tcs.Task);
+        if (!ReferenceEquals(enCurso, tcs.Task))
+        {
+            return enCurso;
+        }
+
+        _ = CargarPortadaInternaAsync(animeId, urlPortada, decodeWidth).ContinueWith(t =>
+        {
+            _cargasEnCurso.TryRemove(animeId, out _);
+            if (t.IsFaulted) tcs.TrySetException(t.Exception!.InnerExceptions);
+            else if (t.IsCanceled) tcs.TrySetCanceled();
+            else tcs.TrySetResult(t.Result);
+        }, TaskScheduler.Default);
+
+        return tcs.Task;
+    }
+
+    private async Task<ImageSource?> CargarPortadaInternaAsync(int animeId, string? urlPortada, int decodeWidth)
     {
         if (_memoryCache.TryGetValue(animeId, out var cachedMem))
         {
@@ -277,7 +309,9 @@ public class ImageCacheService : IImageCacheService, IDisposable
             bitmap.CacheOption = BitmapCacheOption.OnLoad;
             // IMPORTANTE: Con StreamSource no se debe usar IgnoreImageCache porque WPF
             // intenta buscar un Uri nulo en ImagingCache y lanza ArgumentNullException.
-            bitmap.CreateOptions = BitmapCreateOptions.None;
+            // IgnoreColorProfile: las portadas de AniList son sRGB, así que procesar el perfil de color solo
+            // añade coste de decodificación sin cambiar cómo se ve la imagen.
+            bitmap.CreateOptions = BitmapCreateOptions.IgnoreColorProfile;
             if (decodeWidth > 0)
             {
                 bitmap.DecodePixelWidth = decodeWidth;

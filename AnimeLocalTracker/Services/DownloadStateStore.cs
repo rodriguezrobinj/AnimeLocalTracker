@@ -78,8 +78,11 @@ public class DownloadStateStore : IDownloadStateStore
 
     public async Task GuardarAsync(string statePath, DownloadStateInfo info)
     {
+        // Escritura atómica: un cierre brusco a mitad de guardado no deja un .state a medias.
         string json = JsonSerializer.Serialize(info, JsonOptions);
-        await File.WriteAllTextAsync(statePath, json);
+        string tmpPath = statePath + ".tmp";
+        await File.WriteAllTextAsync(tmpPath, json);
+        File.Move(tmpPath, statePath, overwrite: true);
     }
 
     public void EliminarArchivosTemporales(string? rutaTemporal)

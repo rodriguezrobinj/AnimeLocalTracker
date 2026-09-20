@@ -64,7 +64,7 @@ public class MainViewModelTests : IDisposable
         CommunityToolkit.Mvvm.Messaging.WeakReferenceMessenger.Default.UnregisterAll(_navigationService);
     }
 
-    private MainViewModel CreateSut()
+    private MainViewModel CreateSut(IDialogService? dialogService = null)
     {
         return new MainViewModel(
             _navigationService,
@@ -72,7 +72,7 @@ public class MainViewModelTests : IDisposable
             _libraryService,
             _downloadMock.Object,
             _updateMock.Object,
-            new Mock<IDialogService>().Object,
+            dialogService ?? new Mock<IDialogService>().Object,
             Mock.Of<IDatabaseService>(),
             Mock.Of<IFileScannerService>(),
             new NewEpisodeNotifier(Mock.Of<IDatabaseService>(), Mock.Of<IFileScannerService>(), Mock.Of<ISettingsService>()),
@@ -237,5 +237,67 @@ public class MainViewModelTests : IDisposable
 
         // Assert
         sut.VersionAppTexto.Should().Be("1.0.0-test");
+    }
+
+    // ───────────── Avisos pedidos por mensaje (reproductor / calendario) ─────────────
+
+    [Fact]
+    public void MainViewModel_QuedaRegistradoComoReceptorDeAvisos()
+    {
+        // Regresión: un refactor de IDialogService dejó a MainViewModel sin registrar y los avisos
+        // del reproductor y del calendario se enviaban al vacío (nadie los mostraba).
+        var sut = CreateSut();
+
+        CommunityToolkit.Mvvm.Messaging.IMessenger mensajero = CommunityToolkit.Mvvm.Messaging.WeakReferenceMessenger.Default;
+        CommunityToolkit.Mvvm.Messaging.IMessengerExtensions.IsRegistered<Messages.MostrarDialogoRequestMessage>(mensajero, sut)
+            .Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Receive_MostrarDialogoRequest_MuestraElAvisoPorIDialogService()
+    {
+        var dialogMock = new Mock<IDialogService>();
+        dialogMock.Setup(d => d.MostrarDialogoAsync("Auto-Tracking", "Episodio 5 marcado como visto.", false, "CheckCircle", "#4CAF50"))
+            .ReturnsAsync(true);
+        var sut = CreateSut(dialogMock.Object);
+        var mensaje = new Messages.MostrarDialogoRequestMessage("Auto-Tracking", "Episodio 5 marcado como visto.", false, "CheckCircle", "#4CAF50");
+
+        sut.Receive(mensaje);
+
+        mensaje.HasReceivedResponse.Should().BeTrue("quien envía el mensaje espera una respuesta");
+        (await mensaje.Response).Should().BeTrue();
+        dialogMock.Verify(d => d.MostrarDialogoAsync("Auto-Tracking", "Episodio 5 marcado como visto.", false, "CheckCircle", "#4CAF50"), Times.Once);
+    }
+
+    [Fact]
+    public async Task Receive_MostrarDialogoRequest_LaConfirmacionDevuelveLaRespuestaDelUsuario()
+    {
+        var dialogMock = new Mock<IDialogService>();
+        dialogMock.Setup(d => d.MostrarDialogoAsync(It.IsAny<string>(), It.IsAny<string>(), true, It.IsAny<string>(), It.IsAny<string>()))
+            .ReturnsAsync(false);
+        var sut = CreateSut(dialogMock.Object);
+        var mensaje = new Messages.MostrarDialogoRequestMessage("Borrar", "¿Seguro?", true, "Alert", "#EF4444");
+
+        sut.Receive(mensaje);
+
+        (await mensaje.Response).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Receive_MostrarDialogoRequest_SiYaFueRespondidoNoResponderDeNuevo()
+    {
+        // MainViewModel es transient: con varias instancias registradas, solo la primera responde.
+        var primero = new Mock<IDialogService>();
+        primero.Setup(d => d.MostrarDialogoAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<string>(), It.IsAny<string>())).ReturnsAsync(true);
+        var segundo = new Mock<IDialogService>();
+        var sutA = CreateSut(primero.Object);
+        var sutB = CreateSut(segundo.Object);
+        var mensaje = new Messages.MostrarDialogoRequestMessage("T", "M", false, "InformationOutline", "#3F51B5");
+
+        sutA.Receive(mensaje);
+        var act = () => sutB.Receive(mensaje);
+
+        act.Should().NotThrow();
+        segundo.Verify(d => d.MostrarDialogoAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
     }
 }

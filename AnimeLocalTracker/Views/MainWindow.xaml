@@ -249,11 +249,44 @@
                                 </Button>
                             </Grid>
 
+                            <!-- BOTÓN LOGROS -->
+                            <Grid Margin="0,8">
+                                <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"
+                                           Visibility="{Binding Navigation.EsLogrosActivo, Converter={StaticResource BoolToVis}}"/>
+                                <Button Command="{Binding NavegarLogrosCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{Binding [Nav_Logros], Source={x:Static loc:LocalizationService.Instance}}" AutomationProperties.Name="{Binding [Nav_Logros], Source={x:Static loc:LocalizationService.Instance}}" TabIndex="7">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
+                                            <Setter Property="Background" Value="Transparent"/>
+                                            <Style.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="Background" Value="#1B222C"/>
+                                                </Trigger>
+                                                <DataTrigger Binding="{Binding Navigation.EsLogrosActivo}" Value="True">
+                                                    <Setter Property="Background" Value="#1E293B"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                    <materialDesign:PackIcon Kind="TrophyOutline" Width="24" Height="24">
+                                        <materialDesign:PackIcon.Style>
+                                            <Style TargetType="materialDesign:PackIcon">
+                                                <Setter Property="Foreground" Value="#6B7280"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Navigation.EsLogrosActivo}" Value="True">
+                                                        <Setter Property="Foreground" Value="#60A5FA"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </materialDesign:PackIcon.Style>
+                                    </materialDesign:PackIcon>
+                                </Button>
+                            </Grid>
+
                             <!-- BOTÓN COLA DE DESCARGAS -->
                             <Grid Margin="0,8">
                                 <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"
                                            Visibility="{Binding Navigation.EsDescargasActivas, Converter={StaticResource BoolToVis}}"/>
-                                <Button Command="{Binding NavegarDescargasCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{Binding [Nav_Descargas], Source={x:Static loc:LocalizationService.Instance}}" AutomationProperties.Name="{Binding [Nav_Descargas], Source={x:Static loc:LocalizationService.Instance}}" TabIndex="7">
+                                <Button Command="{Binding NavegarDescargasCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{Binding [Nav_Descargas], Source={x:Static loc:LocalizationService.Instance}}" AutomationProperties.Name="{Binding [Nav_Descargas], Source={x:Static loc:LocalizationService.Instance}}" TabIndex="8">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
                                             <Setter Property="Background" Value="Transparent"/>
@@ -303,7 +336,7 @@
                             <Grid Margin="0,4">
                                 <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"
                                            Visibility="{Binding Navigation.EsConfiguracionActiva, Converter={StaticResource BoolToVis}}"/>
-                                <Button Command="{Binding NavegarConfiguracionCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{Binding [Nav_Configuracion], Source={x:Static loc:LocalizationService.Instance}}" AutomationProperties.Name="{Binding [Nav_Configuracion], Source={x:Static loc:LocalizationService.Instance}}" TabIndex="8">
+                                <Button Command="{Binding NavegarConfiguracionCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{Binding [Nav_Configuracion], Source={x:Static loc:LocalizationService.Instance}}" AutomationProperties.Name="{Binding [Nav_Configuracion], Source={x:Static loc:LocalizationService.Instance}}" TabIndex="9">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
                                             <Setter Property="Background" Value="Transparent"/>
@@ -336,7 +369,7 @@
                             <Grid Margin="0,4">
                                 <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"
                                            Visibility="{Binding Navigation.EsAcercaDeActivo, Converter={StaticResource BoolToVis}}"/>
-                                <Button Command="{Binding NavegarAcercaDeCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{Binding [Nav_AcercaDe], Source={x:Static loc:LocalizationService.Instance}}" AutomationProperties.Name="{Binding [Nav_AcercaDe], Source={x:Static loc:LocalizationService.Instance}}" TabIndex="9">
+                                <Button Command="{Binding NavegarAcercaDeCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{Binding [Nav_AcercaDe], Source={x:Static loc:LocalizationService.Instance}}" AutomationProperties.Name="{Binding [Nav_AcercaDe], Source={x:Static loc:LocalizationService.Instance}}" TabIndex="10">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
                                             <Setter Property="Background" Value="Transparent"/>

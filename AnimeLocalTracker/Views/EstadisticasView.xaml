@@ -318,6 +318,7 @@
                                             </Border>
                                             <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,12,0">
                                                 <TextBlock Text="{Binding Titulo}" Foreground="White" FontSize="12.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Text="{Binding DetalleTexto}" Foreground="#94A3B8" FontSize="10.5" TextTrimming="CharacterEllipsis" Margin="0,1,0,0"/>
                                                 <Border Background="#1E293B" CornerRadius="4" Height="8" Margin="0,5,0,0" HorizontalAlignment="Stretch">
                                                     <Border CornerRadius="4" Width="{Binding AnchoBarra}" HorizontalAlignment="Left">
                                                         <Border.Background>
@@ -329,7 +330,7 @@
                                                     </Border>
                                                 </Border>
                                             </StackPanel>
-                                            <TextBlock Grid.Column="2" Text="{Binding ProgresoTexto}" Foreground="#C4B5FD" FontSize="11" FontWeight="Bold" TextAlignment="Right" VerticalAlignment="Center"/>
+                                            <TextBlock Grid.Column="2" Text="{Binding TiempoTexto}" Foreground="#C4B5FD" FontSize="12" FontWeight="Bold" TextAlignment="Right" VerticalAlignment="Center"/>
                                         </Grid>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
@@ -371,30 +372,90 @@
                     </StackPanel>
                 </Border>
 
-                <!-- ══ FILA 6: LOGROS ══ -->
-                <Border Background="#121212" BorderBrush="#262D38" BorderThickness="1" CornerRadius="14" Padding="22,18" Margin="0,0,0,16">
+                <!-- ══ FILA 6: LOGROS (resumen compacto; el catálogo completo vive en la pestaña Logros) ══ -->
+                <Border Background="#121212" BorderBrush="#262D38" BorderThickness="1" CornerRadius="14" Padding="22,18" Margin="0,0,0,16"
+                        Visibility="{Binding HayLogros, Converter={StaticResource BoolToVis}}">
                     <StackPanel>
-                        <TextBlock Text="{Binding [Stats_Logros], Source={x:Static loc:LocalizationService.Instance}}" FontSize="14" FontWeight="Bold" Foreground="White" Margin="0,0,0,4"/>
-                        <TextBlock Text="{Binding [Stats_LogrosSub], Source={x:Static loc:LocalizationService.Instance}}" FontSize="11" Foreground="#9CA3AF" Margin="0,0,0,14"/>
-                        <ItemsControl ItemsSource="{Binding Logros}">
+                        <Grid Margin="0,0,0,14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="{Binding [Stats_Logros], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="14" FontWeight="Bold" Foreground="White" Margin="0,0,0,4"/>
+                                <TextBlock Text="{Binding [Stats_LogrosSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="11" Foreground="#9CA3AF"/>
+                            </StackPanel>
+                            <Button Grid.Column="1" Command="{Binding VerTodosLosLogrosCommand}" VerticalAlignment="Center" Cursor="Hand"
+                                    Style="{StaticResource MaterialDesignOutlinedButton}" BorderBrush="#60A5FA" Foreground="#93C5FD"
+                                    Height="34" Padding="14,0" materialDesign:ButtonAssist.CornerRadius="10"
+                                    AutomationProperties.Name="{Binding [Stats_LogrosVerTodos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{Binding [Stats_LogrosVerTodos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                    <materialDesign:PackIcon Kind="ArrowRight" Width="16" Height="16" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+
+                        <!-- Rango + niveles conseguidos por dificultad -->
+                        <Grid Margin="0,0,0,16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Margin="0,0,24,0" VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{Binding LogrosRangoNombre}" FontSize="18" FontWeight="Bold" Foreground="#FBBF24"/>
+                                    <TextBlock Text="{Binding LogrosPuntosTexto}" FontSize="12" Foreground="#9CA3AF" VerticalAlignment="Bottom" Margin="10,0,0,2"/>
+                                    <TextBlock Text="{Binding LogrosNivelesTexto}" FontSize="12" Foreground="#9CA3AF" VerticalAlignment="Bottom" Margin="10,0,0,2"/>
+                                </StackPanel>
+                                <ProgressBar Minimum="0" Maximum="100" Value="{Binding LogrosProgresoRango, Mode=OneWay}" Height="6" Margin="0,8,0,4"
+                                             Foreground="#FBBF24" Background="#262D38" BorderThickness="0"/>
+                                <TextBlock Text="{Binding LogrosSiguienteRangoTexto}" FontSize="11" Foreground="#9CA3AF"/>
+                            </StackPanel>
+                            <ItemsControl Grid.Column="1" ItemsSource="{Binding LogrosContadores}" VerticalAlignment="Center">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Margin="10,0,0,0" HorizontalAlignment="Center" MinWidth="52">
+                                            <TextBlock Text="{Binding Cantidad}" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center" Foreground="{Binding Color}"/>
+                                            <TextBlock Text="{Binding Nombre}" FontSize="10" HorizontalAlignment="Center" Foreground="#9CA3AF"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Grid>
+
+                        <!-- Los 3 logros más cercanos a desbloquearse -->
+                        <TextBlock Text="{Binding [Stats_LogrosProximos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="12" FontWeight="Bold" Foreground="#93C5FD" Margin="0,0,0,8"/>
+                        <ItemsControl ItemsSource="{Binding LogrosProximos}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
-                                    <UniformGrid Columns="4"/>
+                                    <UniformGrid Columns="3"/>
                                 </ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <Border Background="#14181E" BorderBrush="#262D38" BorderThickness="1" CornerRadius="12" Padding="14,14" Margin="0,0,10,0"
-                                            Opacity="{Binding Desbloqueado, Converter={StaticResource BoolToOpacity}}">
+                                    <Border Background="#14181E" BorderBrush="#262D38" BorderThickness="1" CornerRadius="12" Padding="14,12" Margin="0,0,10,0">
                                         <StackPanel>
-                                            <Border Background="#1E293B" CornerRadius="10" Width="40" Height="40" HorizontalAlignment="Left">
-                                                <materialDesign:PackIcon Kind="{Binding Icono}" Foreground="{Binding Color}" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                            </Border>
-                                            <TextBlock Text="{Binding Titulo}" Foreground="White" FontSize="13" FontWeight="Bold" Margin="0,10,0,3" TextWrapping="Wrap"/>
-                                            <TextBlock Text="{Binding Descripcion}" Foreground="#9CA3AF" FontSize="10.5" TextWrapping="Wrap"/>
-                                            <Border Background="#1E293B" CornerRadius="8" Padding="8,3" Margin="0,10,0,0" HorizontalAlignment="Left">
-                                                <TextBlock Text="{Binding EstadoTexto}" FontSize="9" FontWeight="Bold" Foreground="#93C5FD"/>
-                                            </Border>
+                                            <StackPanel Orientation="Horizontal">
+                                                <Border Background="#1E293B" CornerRadius="10" Width="36" Height="36">
+                                                    <materialDesign:PackIcon Kind="{Binding Icono}" Foreground="{Binding Color}" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </Border>
+                                                <TextBlock Text="{Binding Titulo}" Foreground="White" FontSize="13" FontWeight="Bold" Margin="10,0,0,0"
+                                                           VerticalAlignment="Center" TextWrapping="Wrap"/>
+                                            </StackPanel>
+                                            <TextBlock Text="{Binding Descripcion}" Foreground="#9CA3AF" FontSize="10.5" TextWrapping="Wrap" Margin="0,8,0,8"/>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <ProgressBar Minimum="0" Maximum="100" Value="{Binding ProgresoPorcentaje, Mode=OneWay}" Height="6"
+                                                             VerticalAlignment="Center" Foreground="{Binding Color}" Background="#262D38" BorderThickness="0"/>
+                                                <TextBlock Grid.Column="1" Text="{Binding ProgresoTexto}" FontSize="10.5" FontWeight="SemiBold" Foreground="#E2E8F0" Margin="8,0,0,0"/>
+                                            </Grid>
                                         </StackPanel>
                                     </Border>
                                 </DataTemplate>

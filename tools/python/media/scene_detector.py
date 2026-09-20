@@ -4,7 +4,7 @@ import shutil
 import subprocess
 from typing import Dict, Any, List, Optional, Tuple
 
-from media.ffmpeg_guard import es_ruta_media_segura, MAX_ALLOC
+from media.ffmpeg_guard import es_ruta_media_segura, argumentos_ffprobe, filtro_scdet, MAX_ALLOC
 
 
 class SceneDetector:
@@ -218,10 +218,15 @@ class SceneDetector:
                 ffmpeg, "-hide_banner", "-nostats", "-nostdin", "-max_alloc", MAX_ALLOC,
                 "-i", video_path,
                 "-t", str(search_sec),
-                "-vf", f"scdet=s=0.30:sc=1,metadata=print:file=-",
+                "-vf", filtro_scdet(),
                 "-f", "null", "-"
             ]
             proc = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+            if proc.returncode != 0:
+                # Antes no se miraba el código de salida: si ffmpeg rechazaba el comando el resultado era
+                # "éxito" con cero escenas, y el filtro inválido pasó desapercibido.
+                detalle = (proc.stderr or "").strip().splitlines()
+                return {"success": False, "error": f"scdet fallo: {detalle[-1] if detalle else proc.returncode}"}
             output = proc.stdout + proc.stderr
             scenes = SceneDetector._parse_scdet(output)
 
@@ -254,7 +259,7 @@ class SceneDetector:
             return None
         try:
             result = subprocess.run(
-                [ffprobe, "-nostdin", "-max_alloc", MAX_ALLOC, "-v", "error",
+                [ffprobe, *argumentos_ffprobe(),
                  "-show_entries", "format=duration",
                  "-of", "json", video_path],
                 capture_output=True, text=True, timeout=30

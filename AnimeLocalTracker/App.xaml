@@ -19,6 +19,9 @@
 
                 <!-- Estilo Global de ComboBox Moderno y Glassmorphic -->
                 <ResourceDictionary Source="/Themes/CustomComboBox.xaml" />
+
+                <!-- Barra de progreso "quedó a medio ver" (Actualizaciones, Historial, Detalle) -->
+                <ResourceDictionary Source="/Themes/WatchProgressBar.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
             <!-- Estilo Shimmer Global para imágenes cargando -->
@@ -68,7 +71,6 @@
             <conv:AnimeCoverLoadingConverter x:Key="AnimeCoverLoading" />
             <conv:LocalizedFormatConverter x:Key="LocalizedFormat" />
             <conv:GeneroTraducidoConverter x:Key="GeneroTraducido" />
-            <conv:BoolToOpacityConverter x:Key="BoolToOpacity" />
             <conv:InverseBoolConverter x:Key="InverseBool" />
             <conv:EpisodioActualBrushConverter x:Key="EpisodioActualBrush" />
 
@@ -228,6 +230,9 @@
             </DataTemplate>
             <DataTemplate DataType="{x:Type vm:HistorialViewModel}">
                 <views:HistorialView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:LogrosViewModel}">
+                <views:LogrosView />
             </DataTemplate>
             <DataTemplate DataType="{x:Type vm:ActualizacionesViewModel}">
                 <views:ActualizacionesView />

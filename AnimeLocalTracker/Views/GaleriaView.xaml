@@ -7,7 +7,65 @@
              TextElement.Foreground="{DynamicResource MaterialDesignBody}"
              Background="Transparent">
 
-    <Grid MaxWidth="1248" Style="{StaticResource AppPageRoot}">
+    <UserControl.InputBindings>
+        <!-- Escape cierra el panel "Qué veo hoy" (sin efecto cuando está cerrado) -->
+        <KeyBinding Key="Escape" Command="{Binding CerrarQueVerHoyCommand}"/>
+    </UserControl.InputBindings>
+
+    <UserControl.Resources>
+        <!-- ══ Botón "QUÉ VEO HOY": mismo recipe que "Filtros" y el resto de botones outlined de la app
+                 (superficie plana + borde sutil, acento azul; al pasar el ratón resalta con el azul). ══ -->
+        <Style x:Key="QueVeoHoyButton" TargetType="Button" BasedOn="{StaticResource MaterialDesignOutlinedButton}">
+            <Setter Property="Height" Value="40"/>
+            <Setter Property="Padding" Value="14,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Background" Value="{DynamicResource Brush.Surface1}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Brush.BorderStrong}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource Brush.Surface3}"/>
+                    <Setter Property="BorderBrush" Value="{DynamicResource Brush.AccentStrong}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Botón del panel "Qué veo hoy" con aviso cuando no hay más opciones -->
+        <Style x:Key="QueVerOtroButton" TargetType="Button" BasedOn="{StaticResource AppOutlinedButton}">
+            <Setter Property="BorderBrush" Value="{DynamicResource Brush.BorderStrong}"/>
+            <Setter Property="ToolTipService.ShowOnDisabled" Value="True"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="BorderBrush" Value="{DynamicResource Brush.AccentStrong}"/>
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="ToolTip" Value="{Binding [Gal_QueVerOtroSinOpcionTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
+    <!-- Raíz sin márgenes: el panel "Qué veo hoy" la cubre por completo (antes quedaba dentro de la
+         página con márgenes y dejaba a la vista un marco y la barra de scroll de la galería). -->
+    <Grid>
+    <Grid MaxWidth="1248">
+        <Grid.Style>
+            <Style TargetType="Grid" BasedOn="{StaticResource AppPageRoot}">
+                <Style.Triggers>
+                    <!-- Con la ruleta abierta la galería se difumina y no recibe NADA: ni rueda, ni barra de
+                         scroll, ni clics, ni teclado (IsEnabled=False). -->
+                    <DataTrigger Binding="{Binding QueVerHoyAbierto}" Value="True">
+                        <Setter Property="Effect">
+                            <Setter.Value>
+                                <BlurEffect Radius="16" KernelType="Gaussian"/>
+                            </Setter.Value>
+                        </Setter>
+                        <Setter Property="IsHitTestVisible" Value="False"/>
+                        <Setter Property="IsEnabled" Value="False"/>
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+        </Grid.Style>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -37,27 +95,37 @@
             </StackPanel>
             
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                <!-- Botón Qué Veo Hoy -->
+                <!-- Botón Qué Veo Hoy (abre el panel con la ruleta) -->
                 <Button Command="{Binding ElegirQueVerHoyCommand}"
-                        Style="{StaticResource AppOutlinedButton}" Margin="0,0,10,0" Height="40" Padding="14,0"
+                        Style="{StaticResource QueVeoHoyButton}" Margin="0,0,10,0"
                         ToolTip="{Binding [Gal_QueVerTip], Source={x:Static loc:LocalizationService.Instance}}"
                         AutomationProperties.Name="{Binding [Gal_QueVeoHoy], Source={x:Static loc:LocalizationService.Instance}}">
-                    <Grid>
-                        <!-- Estado Normal -->
-                        <StackPanel Orientation="Horizontal" Visibility="{Binding EstaBuscandoQueVer, Converter={StaticResource InverseBoolToVis}}">
-                            <materialDesign:PackIcon Kind="DiceMultiple" Margin="0,0,8,0" VerticalAlignment="Center" Width="18" Height="18"/>
-                            <TextBlock Text="{Binding [Gal_QueVeoHoy], Source={x:Static loc:LocalizationService.Instance}}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="12.5"/>
-                        </StackPanel>
-
-                        <!-- Estado Buscando / Cargando -->
-                        <StackPanel Orientation="Horizontal" Visibility="{Binding EstaBuscandoQueVer, Converter={StaticResource BoolToVis}}">
-                            <ProgressBar Style="{StaticResource MaterialDesignCircularProgressBar}"
-                                         Width="16" Height="16" Margin="0,0,8,0" IsIndeterminate="True" Value="0"
-                                         Foreground="{DynamicResource Brush.Accent}"/>
-                            <TextBlock Text="{Binding [Gal_Buscando], Source={x:Static loc:LocalizationService.Instance}}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="12.5"
-                                       Foreground="{DynamicResource Brush.Accent}"/>
-                        </StackPanel>
-                    </Grid>
+                    <Button.Triggers>
+                        <!-- Detalle sutil: el dado da una vuelta al pasar el ratón (solo con el ratón, sin bucles) -->
+                        <EventTrigger RoutedEvent="Mouse.MouseEnter">
+                            <BeginStoryboard>
+                                <Storyboard>
+                                    <DoubleAnimation Storyboard.TargetName="DadoQueVeoHoy"
+                                                     Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
+                                                     From="0" To="360" Duration="0:0:0.5" FillBehavior="Stop">
+                                        <DoubleAnimation.EasingFunction>
+                                            <CubicEase EasingMode="EaseOut"/>
+                                        </DoubleAnimation.EasingFunction>
+                                    </DoubleAnimation>
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </EventTrigger>
+                    </Button.Triggers>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <materialDesign:PackIcon x:Name="DadoQueVeoHoy" Kind="DiceMultiple" Width="18" Height="18" Margin="0,0,8,0"
+                                                 VerticalAlignment="Center" RenderTransformOrigin="0.5,0.5">
+                            <materialDesign:PackIcon.RenderTransform>
+                                <RotateTransform Angle="0"/>
+                            </materialDesign:PackIcon.RenderTransform>
+                        </materialDesign:PackIcon>
+                        <TextBlock Text="{Binding [Gal_QueVeoHoy], Source={x:Static loc:LocalizationService.Instance}}"
+                                   FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    </StackPanel>
                 </Button>
 
                 <!-- Botón Selección Múltiple -->
@@ -860,6 +928,213 @@
                 </DataTemplate>
             </ListBox.ItemTemplate>
         </ListBox>
+    </Grid>
+
+    <!-- ═══ QUÉ VEO HOY: panel modal con ruleta de portadas ═══ -->
+    <Grid x:Name="OverlayQueVeoHoy" Visibility="{Binding QueVerHoyAbierto, Converter={StaticResource BoolToVis}}"
+          KeyboardNavigation.TabNavigation="Cycle" KeyboardNavigation.ControlTabNavigation="Cycle"
+          PreviewMouseWheel="Overlay_PreviewMouseWheel">
+        <!-- Fondo oscurecido sobre TODA la vista: un clic fuera del panel lo cierra -->
+        <Border Background="{DynamicResource Brush.Scrim}">
+            <Border.InputBindings>
+                <MouseBinding MouseAction="LeftClick" Command="{Binding CerrarQueVerHoyCommand}"/>
+            </Border.InputBindings>
+        </Border>
+
+        <Border x:Name="PanelQueVeoHoy" Style="{StaticResource AppCard}" CornerRadius="20" Padding="26,22" Width="700"
+                Focusable="True" FocusVisualStyle="{x:Null}"
+                HorizontalAlignment="Center" VerticalAlignment="Center">
+            <StackPanel>
+                <!-- Cabecera -->
+                <Grid Margin="0,0,0,16">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Border Background="{DynamicResource Brush.Surface3}" CornerRadius="10" Width="36" Height="36" Margin="0,0,12,0">
+                            <materialDesign:PackIcon Kind="DiceMultiple" Width="20" Height="20" Foreground="{DynamicResource Brush.Accent}"
+                                                     HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <TextBlock Text="{Binding [Gal_QueVeoHoyTitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                   Style="{StaticResource AppText.Section}" FontSize="20" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <Button Command="{Binding CerrarQueVerHoyCommand}" HorizontalAlignment="Right" VerticalAlignment="Center"
+                            Style="{StaticResource MaterialDesignFlatButton}" Width="36" Height="36" Padding="0" Cursor="Hand"
+                            Foreground="{DynamicResource Brush.TextSecondary}"
+                            ToolTip="{Binding [Gal_QueVerCerrar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                            AutomationProperties.Name="{Binding [Gal_QueVerCerrar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                        <materialDesign:PackIcon Kind="Close" Width="18" Height="18"/>
+                    </Button>
+                </Grid>
+
+                <!-- Cuerpo de altura fija (ruleta 158 + zona inferior 84 + aire): todas las fases ocupan lo mismo
+                     y el panel no cambia de tamaño ni "salta" al pasar de una fase a otra. -->
+                <Grid Height="254">
+
+                    <!-- Escaneando la biblioteca -->
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center"
+                                Visibility="{Binding EsFaseBuscandoQueVer, Converter={StaticResource BoolToVis}}">
+                        <ProgressBar Style="{StaticResource MaterialDesignCircularProgressBar}" Width="40" Height="40" Margin="0,0,0,14"
+                                     IsIndeterminate="True" Value="0" Foreground="{DynamicResource Brush.Accent}"/>
+                        <TextBlock Text="{Binding [Gal_QueVerBuscandoTitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                   Style="{StaticResource AppText.Secondary}" HorizontalAlignment="Center"/>
+                    </StackPanel>
+
+                    <!-- Ruleta: la tira de portadas se desplaza y se detiene en el anime elegido -->
+                    <Grid Height="158" VerticalAlignment="Top" Visibility="{Binding MostrarTiraQueVer, Converter={StaticResource BoolToVis}}">
+                        <Canvas x:Name="RuletaCanvas" ClipToBounds="True">
+                            <Canvas.OpacityMask>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                    <GradientStop Color="Transparent" Offset="0"/>
+                                    <GradientStop Color="Black" Offset="0.1"/>
+                                    <GradientStop Color="Black" Offset="0.9"/>
+                                    <GradientStop Color="Transparent" Offset="1"/>
+                                </LinearGradientBrush>
+                            </Canvas.OpacityMask>
+                            <!-- Tarjeta 100x142 + separación 10: deben coincidir con las constantes de GaleriaView.xaml.cs -->
+                            <ItemsControl x:Name="RuletaItems" ItemsSource="{Binding RuletaPortadasQueVer}" Canvas.Left="0" Canvas.Top="8">
+                                <ItemsControl.RenderTransform>
+                                    <TranslateTransform X="0"/>
+                                </ItemsControl.RenderTransform>
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Horizontal"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Width="100" Height="142" Margin="0,0,10,0" CornerRadius="10"
+                                                Background="{DynamicResource Brush.Surface3}">
+                                            <!-- ClipToBounds solo recorta a un rectángulo: la portada (esquinas rectas) se recorta con una
+                                                 geometría redondeada del mismo radio que el interior del marco de selección (13 - 3 = 10). -->
+                                            <Border.Clip>
+                                                <RectangleGeometry Rect="0,0,100,142" RadiusX="10" RadiusY="10"/>
+                                            </Border.Clip>
+                                            <Image Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality">
+                                                <Image.Source>
+                                                    <MultiBinding Converter="{StaticResource AnimeCoverMulti}">
+                                                        <Binding Path="."/>
+                                                        <Binding Path="PortadaVisible"/>
+                                                    </MultiBinding>
+                                                </Image.Source>
+                                            </Image>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Canvas>
+
+                        <!-- Marco fijo en el centro. El borde (3 px) queda por FUERA de la tarjeta de 100x142:
+                             106x148 = tarjeta + 3 px por lado, y radio 13 = 10 de la tarjeta + 3. Así abraza la portada
+                             elegida sin huecos. -->
+                        <Border Width="106" Height="148" CornerRadius="13" BorderThickness="3" IsHitTestVisible="False"
+                                BorderBrush="{DynamicResource Brush.Accent}"
+                                HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Grid>
+
+                    <!-- Zona inferior (84 px): "Eligiendo…" mientras gira y el resultado después, en UNA fila -->
+                    <Grid Height="84" VerticalAlignment="Bottom" Visibility="{Binding MostrarTiraQueVer, Converter={StaticResource BoolToVis}}">
+                        <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Style="{StaticResource AppText.Secondary}"
+                                   Text="{Binding [Gal_QueVerEligiendo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                   Visibility="{Binding EsFaseGirandoQueVer, Converter={StaticResource BoolToVis}}"/>
+
+                        <Grid VerticalAlignment="Center" RenderTransformOrigin="0.5,0.5"
+                              Visibility="{Binding EsFaseResultadoQueVer, Converter={StaticResource BoolToVis}}">
+                            <Grid.RenderTransform>
+                                <TranslateTransform Y="0"/>
+                            </Grid.RenderTransform>
+                            <Grid.Style>
+                                <Style TargetType="Grid">
+                                    <Style.Triggers>
+                                        <Trigger Property="Visibility" Value="Visible">
+                                            <Trigger.EnterActions>
+                                                <BeginStoryboard>
+                                                    <Storyboard>
+                                                        <DoubleAnimation Storyboard.TargetProperty="Opacity" From="0" To="1" Duration="0:0:0.35"/>
+                                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)" From="12" To="0" Duration="0:0:0.35">
+                                                            <DoubleAnimation.EasingFunction>
+                                                                <QuarticEase EasingMode="EaseOut"/>
+                                                            </DoubleAnimation.EasingFunction>
+                                                        </DoubleAnimation>
+                                                    </Storyboard>
+                                                </BeginStoryboard>
+                                            </Trigger.EnterActions>
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Grid.Style>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,20,0">
+                                <TextBlock Text="{Binding [Gal_QueVerTuEleccion], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                           Style="{StaticResource AppText.Micro}" Foreground="{DynamicResource Brush.Accent}"/>
+                                <TextBlock Text="{Binding QueVerElegido.Titulo}" Style="{StaticResource AppText.Section}" FontSize="18"
+                                           TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="48" Margin="0,2,0,0"
+                                           ToolTip="{Binding QueVerElegido.Titulo}"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                                    <TextBlock Text="{Binding QueVerEpisodioTexto}" Style="{StaticResource AppText.BodyStrong}"
+                                               Foreground="{DynamicResource Brush.AccentSoft}"/>
+                                    <TextBlock Text="  ·  " Style="{StaticResource AppText.Caption}"/>
+                                    <TextBlock Text="{Binding QueVerProgresoTexto}" Style="{StaticResource AppText.Caption}" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                <Button Command="{Binding VerElegidoQueVerCommand}" Style="{StaticResource AppPrimaryButton}"
+                                        Height="40" Padding="18,0" Margin="0,0,10,0" Cursor="Hand"
+                                        materialDesign:ButtonAssist.CornerRadius="8"
+                                        AutomationProperties.Name="{Binding [Gal_QueVerVerAhora], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <materialDesign:PackIcon Kind="PlayCircleOutline" Width="20" Height="20" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <TextBlock Text="{Binding [Gal_QueVerVerAhora], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                   VerticalAlignment="Center" FontWeight="Bold" FontSize="12.5"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button Command="{Binding OtroQueVerHoyCommand}" Style="{StaticResource QueVerOtroButton}"
+                                        Height="40" Padding="16,0" Cursor="Hand"
+                                        materialDesign:ButtonAssist.CornerRadius="8"
+                                        AutomationProperties.Name="{Binding [Gal_QueVerOtro], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <materialDesign:PackIcon Kind="DiceMultiple" Width="18" Height="18" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <TextBlock Text="{Binding [Gal_QueVerOtro], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                   VerticalAlignment="Center" FontWeight="SemiBold" FontSize="12.5"/>
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+                    </Grid>
+
+                    <!-- Sin carpeta / sin pendientes / error -->
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center"
+                                Visibility="{Binding EsFaseVaciaQueVer, Converter={StaticResource BoolToVis}}">
+                        <materialDesign:PackIcon Width="44" Height="44" HorizontalAlignment="Center" Margin="0,0,0,12"
+                                                 Kind="AlertCircleOutline" Foreground="{DynamicResource Brush.Warning}">
+                            <materialDesign:PackIcon.Style>
+                                <Style TargetType="materialDesign:PackIcon">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding FaseActualQueVer}" Value="SinCarpeta">
+                                            <Setter Property="Kind" Value="FolderMultiple"/>
+                                            <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding FaseActualQueVer}" Value="SinPendientes">
+                                            <Setter Property="Kind" Value="EmoticonHappyOutline"/>
+                                            <Setter Property="Foreground" Value="{DynamicResource Brush.Success}"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </materialDesign:PackIcon.Style>
+                        </materialDesign:PackIcon>
+                        <TextBlock Text="{Binding QueVerMensaje}" Style="{StaticResource AppText.Secondary}" TextAlignment="Center"
+                                   TextWrapping="Wrap" MaxWidth="480" HorizontalAlignment="Center"/>
+                        <Button Command="{Binding CerrarQueVerHoyCommand}" Style="{StaticResource QueVerOtroButton}" Margin="0,16,0,0"
+                                Height="38" Padding="22,0" Cursor="Hand" HorizontalAlignment="Center"
+                                materialDesign:ButtonAssist.CornerRadius="8"
+                                Content="{Binding [Gal_QueVerCerrar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+        </Border>
+    </Grid>
     </Grid>
 
 </UserControl>

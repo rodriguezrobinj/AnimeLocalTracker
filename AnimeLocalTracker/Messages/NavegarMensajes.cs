@@ -12,6 +12,7 @@ public record NavegarMensaje_Configuracion();
 public record NavegarMensaje_AcercaDe();
 public record NavegarMensaje_Estadisticas();
 public record NavegarMensaje_Historial();
+public record NavegarMensaje_Logros();
 public record NavegarMensaje_Actualizaciones();
 public record NavegarMensaje_Reproductor(string RutaVideo, int AnimeId, string TituloAnime, int Episodio, System.Collections.Generic.List<EpisodioItem>? EpisodiosDisponibles = null, string? RutaPortada = null);
 public record NavegarMensaje_VolverDelReproductor();

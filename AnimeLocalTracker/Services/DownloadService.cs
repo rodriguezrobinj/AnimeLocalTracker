@@ -18,7 +18,12 @@ namespace AnimeLocalTracker.Services;
 public class DownloadService : IDownloadService
 {
     private const string UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
-    private const int SegmentosParalelos = 6;
+    // Tamaño de cada trozo de la cola de descarga: lo bastante pequeño para repartir la carga
+    // entre conexiones y hacer barato un reintento, lo bastante grande para no saturar de peticiones.
+    private const long TamanoTrozoBytes = 4L * 1024 * 1024;
+    private const int MinimoTrozos = 6;
+    private const int MaxReintentosPorTrozo = 4;
+    private const int ConexionesTotalesObjetivo = 12;
     private const int LimiteDescargasPorDefecto = 3;
     // FUN-017: máximo de reintentos automáticos ante cortes de red transitorios antes de abandonar.
     private const int MaxReintentosDescargaTransitoria = 5;
@@ -378,6 +383,14 @@ public class DownloadService : IDownloadService
                     try
                     {
                         await DownloadVideoAsync(state.VideoUrl, state.RutaTemporal, progress, state.Cts.Token);
+
+                        // Un enlace caducado a veces devuelve una página de error con código 200:
+                        // si lo descargado no es un video se descarta y se repite limpio.
+                        if (!Core.UrlSeguridad.EsUrlManifiestoStreaming(state.VideoUrl) && !ArchivoPareceVideo(state.RutaTemporal))
+                        {
+                            _stateStore.EliminarArchivosTemporales(state.RutaTemporal);
+                            throw new IOException("El archivo descargado no es un video válido (el servidor devolvió una página de error).");
+                        }
                         descargaCompletada = true;
                     }
                     catch (Exception ex) when (EsRechazoDeEnlace(ex) && reintentosResolucion == 0 && !state.IsPaused && !state.Cts.IsCancellationRequested)
@@ -572,7 +585,18 @@ public class DownloadService : IDownloadService
         // Descarga segmentada en paralelo si el servidor soporta Range y conocemos el tamaño (> 3MB)
         if (supportsRanges && totalBytes > 3 * 1024 * 1024)
         {
-            await DownloadSegmentedParallelAsync(videoUrl, destinationPath, totalBytes, progress, cancellationToken);
+            try
+            {
+                await DownloadSegmentedParallelAsync(videoUrl, destinationPath, totalBytes, progress, cancellationToken);
+            }
+            catch (RangoInvalidoException ex)
+            {
+                // El servidor prometió rangos pero no los cumple (o el archivo cambió): seguir
+                // por rangos corrompería el video, así que se descarga completo en una sola conexión.
+                AppLogger.Warn("DownloadService", $"{ex.Message} Se reinicia la descarga en modo secuencial.");
+                _stateStore.EliminarArchivosTemporales(destinationPath);
+                await DownloadSequentialAsync(videoUrl, destinationPath, -1, progress, cancellationToken);
+            }
         }
         else
         {
@@ -580,16 +604,24 @@ public class DownloadService : IDownloadService
         }
     }
 
+    /// <summary>
+    /// Descarga por cola de trozos: el archivo se divide en trozos de ~4 MB y N conexiones toman
+    /// el siguiente trozo pendiente. Así ninguna conexión lenta retrasa el final (velocidad más
+    /// estable), un corte solo repite unos MB (reintento por trozo) y el progreso se guarda cada
+    /// pocos segundos para reanudar aunque la app se cierre de golpe.
+    /// </summary>
     private async Task DownloadSegmentedParallelAsync(string videoUrl, string destinationPath, long totalBytes, IProgress<(double Progress, double Speed)>? progress, CancellationToken cancellationToken)
     {
-        string statePath = destinationPath + ".state";
-        DownloadStateInfo stateInfo = await _stateStore.CargarOInicializarAsync(statePath, totalBytes, SegmentosParalelos);
-
         const long MaxPreallocLimitBytes = 35L * 1024 * 1024 * 1024; // 35 GB por archivo de episodio
         if (totalBytes > MaxPreallocLimitBytes)
         {
             throw new InvalidOperationException($"El tamaño declarado del video ({totalBytes / (1024 * 1024)} MB) supera el límite de seguridad de 35 GB.");
         }
+
+        string statePath = destinationPath + ".state";
+        int totalTrozos = (int)Math.Max(MinimoTrozos, (totalBytes + TamanoTrozoBytes - 1) / TamanoTrozoBytes);
+        DownloadStateInfo stateInfo = await _stateStore.CargarOInicializarAsync(statePath, totalBytes, totalTrozos);
+        var trozos = stateInfo.Segments;
 
         // Verificar espacio libre en la unidad de destino
         try
@@ -614,126 +646,249 @@ public class DownloadService : IDownloadService
             {
                 // SEC-06: el tamaño declarado proviene del servidor remoto (Content-Length/Content-Range).
                 // Acotarlo evita que un servidor malicioso fuerce la reserva de todo el disco.
-                const long MaxPreallocBytes = 50L * 1024 * 1024 * 1024; // 50 GB por archivo (4K remux)
-                long preallocSize = totalBytes > MaxPreallocBytes ? 0 : totalBytes;
-                if (totalBytes > MaxPreallocBytes)
-                {
-                    AppLogger.Warn("DownloadService", $"Tamaño declarado excesivo ({totalBytes} bytes): descarga incremental sin pre-asignación.");
-                }
-                preAlloc.SetLength(preallocSize);
+                preAlloc.SetLength(totalBytes);
             }
         }
 
         using SafeFileHandle fileHandle = File.OpenHandle(destinationPath, FileMode.Open, FileAccess.Write, FileShare.ReadWrite, FileOptions.Asynchronous);
 
-        long totalDownloaded = stateInfo.Segments.Sum(s => s.CurrentOffset - s.Start);
-        double lastReportedPercentage = -1.0;
-        var lastReportTime = DateTime.UtcNow;
-        long lastReportedTotalBytes = totalDownloaded;
-        object progressLock = new object();
+        var acumulador = new ProgresoAgregado(progress, totalBytes, trozos.Sum(s => s.CurrentOffset - s.Start));
+        int siguienteTrozo = -1;
+        int conexiones = Math.Min(ConexionesPorDescarga(), trozos.Count);
 
-        var tasks = new Task[SegmentosParalelos];
+        using var trabajoCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        using var guardadorCts = CancellationTokenSource.CreateLinkedTokenSource(trabajoCts.Token);
 
-        try
+        // Guardado periódico: si la app se cierra o se cae, la próxima vez se retoma desde aquí.
+        var guardador = Task.Run(async () =>
         {
-            for (int i = 0; i < SegmentosParalelos; i++)
+            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(5));
+            try
             {
-                var segment = stateInfo.Segments[i];
-                tasks[i] = Task.Run(async () =>
+                while (await timer.WaitForNextTickAsync(guardadorCts.Token))
                 {
-                    if (segment.CurrentOffset > segment.End) return; // Ya terminó este segmento
+                    try { await _stateStore.GuardarAsync(statePath, stateInfo); }
+                    catch (Exception ex) { AppLogger.Debug("DownloadService", $"Guardado periódico del estado omitido: {ex.Message}"); }
+                }
+            }
+            catch (OperationCanceledException) { }
+        }, CancellationToken.None);
 
-                    using var req = new HttpRequestMessage(HttpMethod.Get, videoUrl);
-                    req.Headers.Add("User-Agent", UserAgent);
-                    req.Headers.Add("Referer", "https://www.mp4upload.com/");
-                    req.Headers.Range = new RangeHeaderValue(segment.CurrentOffset, segment.End);
-
-                    using var response = await _httpClient.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-                    response.EnsureSuccessStatusCode();
-
-                    using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-                    byte[] buffer = new byte[131072];
-
-                    while (segment.CurrentOffset <= segment.End)
+        var trabajadores = new Task[conexiones];
+        for (int i = 0; i < conexiones; i++)
+        {
+            trabajadores[i] = Task.Run(async () =>
+            {
+                try
+                {
+                    while (!trabajoCts.IsCancellationRequested)
                     {
-                        int bytesToRead = (int)Math.Min(buffer.Length, segment.End - segment.CurrentOffset + 1);
-
-                        int read;
-                        try
-                        {
-                            // FUN-015: watchdog de inactividad — 60 s sin recibir datos abortan el segmento.
-                            using var idleCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                            idleCts.CancelAfter(TimeSpan.FromSeconds(60));
-                            read = await stream.ReadAsync(buffer.AsMemory(0, bytesToRead), idleCts.Token);
-                        }
-                        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-                        {
-                            throw new IOException("La descarga se detuvo por inactividad (60 s sin recibir datos del servidor).");
-                        }
-                        if (read == 0) break;
-
-                        await RandomAccess.WriteAsync(fileHandle, buffer.AsMemory(0, read), segment.CurrentOffset, cancellationToken);
-                        segment.CurrentOffset += read;
-
-                        long currentTotal = Interlocked.Add(ref totalDownloaded, read);
-
-                        if (progress != null)
-                        {
-                            double percent = Math.Clamp((double)currentTotal / totalBytes * 100.0, 0.0, 100.0);
-                            var now = DateTime.UtcNow;
-                            bool shouldReport = false;
-                            double speed = 0;
-
-                            lock(progressLock)
-                            {
-                                var timeElapsed = (now - lastReportTime).TotalSeconds;
-                                if (percent - lastReportedPercentage >= 0.5 || timeElapsed >= 0.15 || currentTotal == totalBytes)
-                                {
-                                    speed = timeElapsed > 0 ? (currentTotal - lastReportedTotalBytes) / timeElapsed : 0;
-                                    lastReportedPercentage = percent;
-                                    lastReportTime = now;
-                                    lastReportedTotalBytes = currentTotal;
-                                    shouldReport = true;
-                                }
-                            }
-
-                            if (shouldReport) progress.Report((percent, speed));
-                        }
+                        int idx = Interlocked.Increment(ref siguienteTrozo);
+                        if (idx >= trozos.Count) return;
+                        await DescargarTrozoConReintentosAsync(videoUrl, fileHandle, trozos[idx], totalBytes, acumulador, trabajoCts.Token);
                     }
+                }
+                catch
+                {
+                    // Un trozo agotó sus reintentos: se detiene al resto para no dejar tareas
+                    // escribiendo en el archivo mientras se cierra o se reintenta la descarga.
+                    trabajoCts.Cancel();
+                    throw;
+                }
+            }, CancellationToken.None);
+        }
 
-                    // FUN-018: si el servidor cierra la conexión antes de entregar todo el rango
-                    // pedido (frecuente en hosts gratuitos saturados), el stream devuelve 0 bytes
-                    // y el bucle de arriba salía en silencio dando el segmento por terminado — el
-                    // archivo final quedaba con un hueco de ceros (de la pre-asignación) sin que
-                    // ninguna excepción avisara. Tratarlo como corte transitorio de red reutiliza
-                    // el mismo reintento con backoff que ya existe para timeouts/5xx (ver FUN-017).
-                    if (segment.CurrentOffset <= segment.End)
+        try { await Task.WhenAll(trabajadores); }
+        catch { /* se analiza abajo, cuando TODOS los trabajadores ya terminaron */ }
+
+        guardadorCts.Cancel();
+        await guardador;
+
+        var falloReal = trabajadores
+            .Where(t => t.IsFaulted)
+            .Select(t => t.Exception!.InnerExceptions[0])
+            .FirstOrDefault(e => e is not OperationCanceledException);
+
+        if (falloReal != null || cancellationToken.IsCancellationRequested)
+        {
+            // Pausa, cancelación o corte: se conserva el progreso para poder reanudar.
+            await _stateStore.GuardarAsync(statePath, stateInfo);
+            if (falloReal != null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(falloReal).Throw();
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+
+        // Verificación final: nunca dar por buena una descarga con huecos o de tamaño distinto.
+        if (trozos.Any(t => t.CurrentOffset <= t.End))
+        {
+            throw new IOException("La descarga terminó con trozos pendientes.");
+        }
+
+        RandomAccess.FlushToDisk(fileHandle);
+        long tamanoReal = RandomAccess.GetLength(fileHandle);
+        if (tamanoReal != totalBytes)
+        {
+            _stateStore.EliminarArchivosTemporales(destinationPath);
+            throw new IOException($"El archivo descargado mide {tamanoReal} bytes y se esperaban {totalBytes}: se reinicia la descarga.");
+        }
+
+        progress?.Report((100.0, 0));
+    }
+
+    private async Task DescargarTrozoConReintentosAsync(string videoUrl, SafeFileHandle fileHandle, SegmentState trozo, long totalBytes, ProgresoAgregado acumulador, CancellationToken ct)
+    {
+        int intentosFallidos = 0;
+        while (trozo.CurrentOffset <= trozo.End)
+        {
+            long offsetAntes = trozo.CurrentOffset;
+            try
+            {
+                await DescargarTramoAsync(videoUrl, fileHandle, trozo, totalBytes, acumulador, ct);
+            }
+            catch (Exception ex) when (!ct.IsCancellationRequested
+                                       && EsErrorTransitorioDeRed(ex)
+                                       && !EsRechazoDeEnlace(ex))
+            {
+                // Si el trozo avanzó antes de cortarse, el fallo no cuenta como intento agotado.
+                if (trozo.CurrentOffset > offsetAntes) intentosFallidos = 0;
+                if (++intentosFallidos > MaxReintentosPorTrozo) throw;
+
+                var espera = TimeSpan.FromSeconds(Math.Min(1 << (intentosFallidos - 1), 8));
+                AppLogger.Debug("DownloadService", $"Corte en un trozo (intento {intentosFallidos}/{MaxReintentosPorTrozo}): {ex.Message}. Reintentando en {espera.TotalSeconds:F0}s.");
+                await Task.Delay(espera, ct);
+            }
+        }
+    }
+
+    private async Task DescargarTramoAsync(string videoUrl, SafeFileHandle fileHandle, SegmentState trozo, long totalBytes, ProgresoAgregado acumulador, CancellationToken ct)
+    {
+        using var req = new HttpRequestMessage(HttpMethod.Get, videoUrl);
+        req.Headers.Add("User-Agent", UserAgent);
+        req.Headers.Add("Referer", "https://www.mp4upload.com/");
+        req.Headers.Range = new RangeHeaderValue(trozo.CurrentOffset, trozo.End);
+
+        using var response = await _httpClient.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
+
+        if (response.StatusCode == System.Net.HttpStatusCode.RequestedRangeNotSatisfiable)
+        {
+            throw new RangoInvalidoException("El servidor rechazó el rango pedido (416): el archivo cambió o no admite rangos.");
+        }
+        response.EnsureSuccessStatusCode();
+
+        // Un 200 a una petición con Range significa que el cuerpo empieza en el byte 0: escribirlo
+        // en la posición del trozo dejaría el video corrupto sin ningún error visible.
+        if (response.StatusCode != System.Net.HttpStatusCode.PartialContent)
+        {
+            throw new RangoInvalidoException($"El servidor ignoró el rango pedido (respondió {(int)response.StatusCode} en vez de 206).");
+        }
+
+        var contentRange = response.Content.Headers.ContentRange;
+        if (contentRange?.Length is long longitudReal && longitudReal != totalBytes)
+        {
+            throw new RangoInvalidoException($"El tamaño del archivo cambió en el servidor ({totalBytes} → {longitudReal} bytes).");
+        }
+        if (contentRange?.From is long desde && desde != trozo.CurrentOffset)
+        {
+            throw new IOException($"El servidor devolvió el rango desde el byte {desde} en vez de {trozo.CurrentOffset}.");
+        }
+
+        using var stream = await response.Content.ReadAsStreamAsync(ct);
+        byte[] buffer = new byte[131072];
+
+        while (trozo.CurrentOffset <= trozo.End)
+        {
+            int bytesToRead = (int)Math.Min(buffer.Length, trozo.End - trozo.CurrentOffset + 1);
+
+            int read;
+            try
+            {
+                // FUN-015: watchdog de inactividad — 60 s sin recibir datos abortan el tramo.
+                using var idleCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                idleCts.CancelAfter(TimeSpan.FromSeconds(60));
+                read = await stream.ReadAsync(buffer.AsMemory(0, bytesToRead), idleCts.Token);
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+            {
+                throw new IOException("La descarga se detuvo por inactividad (60 s sin recibir datos del servidor).");
+            }
+            if (read == 0) break;
+
+            await RandomAccess.WriteAsync(fileHandle, buffer.AsMemory(0, read), trozo.CurrentOffset, ct);
+            trozo.CurrentOffset += read;
+            acumulador.Sumar(read);
+        }
+
+        // FUN-018: un cierre prematuro de la conexión (host gratuito saturado) deja el stream en
+        // EOF antes de entregar todo el rango. Se trata como corte transitorio: se reintenta
+        // desde el último byte recibido en vez de dar el trozo por terminado.
+        if (trozo.CurrentOffset <= trozo.End)
+        {
+            throw new IOException($"El servidor cerró la conexión antes de completar el trozo (recibidos hasta el byte {trozo.CurrentOffset} de {trozo.End}).");
+        }
+    }
+
+    /// <summary>
+    /// Conexiones simultáneas por descarga: se reparte un presupuesto total (~12) entre las
+    /// descargas en paralelo para no saturar al servidor (que respondería con cortes o más lento).
+    /// </summary>
+    private int ConexionesPorDescarga()
+    {
+        int limite;
+        lock (_slotLock) limite = _limiteDescargas;
+        return Math.Clamp(ConexionesTotalesObjetivo / Math.Max(1, limite), 3, 8);
+    }
+
+    /// <summary>
+    /// Agrega los bytes de todas las conexiones y publica progreso con una velocidad suavizada
+    /// (media móvil), para que el indicador no salte entre valores extremos.
+    /// </summary>
+    private sealed class ProgresoAgregado
+    {
+        private readonly IProgress<(double Progress, double Speed)>? _progress;
+        private readonly long _total;
+        private readonly object _lock = new();
+        private long _descargado;
+        private long _ultimoTotal;
+        private DateTime _ultimoInstante = DateTime.UtcNow;
+        private double _ultimoPorcentaje = -1.0;
+        private double _velocidadSuavizada;
+
+        public ProgresoAgregado(IProgress<(double Progress, double Speed)>? progress, long total, long yaDescargado)
+        {
+            _progress = progress;
+            _total = total;
+            _descargado = yaDescargado;
+            _ultimoTotal = yaDescargado;
+        }
+
+        public void Sumar(int bytes)
+        {
+            long actual = Interlocked.Add(ref _descargado, bytes);
+            if (_progress == null) return;
+
+            double porcentaje = Math.Clamp((double)actual / _total * 100.0, 0.0, 100.0);
+            double velocidad = 0;
+            bool reportar = false;
+
+            lock (_lock)
+            {
+                var ahora = DateTime.UtcNow;
+                double transcurrido = (ahora - _ultimoInstante).TotalSeconds;
+                if (porcentaje - _ultimoPorcentaje >= 0.5 || transcurrido >= 0.25 || actual == _total)
+                {
+                    if (transcurrido >= 0.1)
                     {
-                        throw new IOException($"El servidor cerró la conexión antes de completar el segmento (recibidos hasta el byte {segment.CurrentOffset} de {segment.End}).");
+                        double instantanea = (actual - _ultimoTotal) / transcurrido;
+                        _velocidadSuavizada = _velocidadSuavizada <= 0 ? instantanea : 0.7 * _velocidadSuavizada + 0.3 * instantanea;
+                        _ultimoTotal = actual;
+                        _ultimoInstante = ahora;
                     }
-                }, cancellationToken);
+                    _ultimoPorcentaje = porcentaje;
+                    velocidad = _velocidadSuavizada;
+                    reportar = true;
+                }
             }
 
-            await Task.WhenAll(tasks);
-            progress?.Report((100.0, 0));
-        }
-        catch (OperationCanceledException)
-        {
-            await _stateStore.GuardarAsync(statePath, stateInfo);
-            throw;
-        }
-        catch (IOException)
-        {
-            // FUN-015: ante inactividad se conserva el estado para poder reanudar después.
-            await _stateStore.GuardarAsync(statePath, stateInfo);
-            throw;
-        }
-        catch (HttpRequestException)
-        {
-            // FUN-017: cortes de conexión o errores del servidor (reset, 5xx) a media descarga
-            // también deben conservar el progreso de los segmentos para poder reanudar.
-            await _stateStore.GuardarAsync(statePath, stateInfo);
-            throw;
+            if (reportar) _progress.Report((porcentaje, velocidad));
         }
     }
 
@@ -907,6 +1062,39 @@ public class DownloadService : IDownloadService
     {
         if (ex is DownloadAbortDefinitivoException) return false;
         return ex is IOException or HttpRequestException or TaskCanceledException;
+    }
+
+    /// <summary>El servidor no respeta el rango pedido (200 en vez de 206, 416, tamaño distinto): no reintentable por rangos.</summary>
+    private sealed class RangoInvalidoException : Exception
+    {
+        public RangoInvalidoException(string message) : base(message) { }
+    }
+
+    /// <summary>
+    /// Comprobación barata de que el archivo descargado es un video y no una página de error
+    /// (HTML/JSON) que el servidor entregó con código 200 al caducar el enlace.
+    /// </summary>
+    private static bool ArchivoPareceVideo(string ruta)
+    {
+        try
+        {
+            using var fs = new FileStream(ruta, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            if (fs.Length < 12) return false;
+            var cabecera = new byte[512];
+            int leidos = fs.Read(cabecera, 0, cabecera.Length);
+            for (int i = 0; i < leidos; i++)
+            {
+                byte b = cabecera[i];
+                if (b is (byte)' ' or (byte)'\t' or (byte)'\r' or (byte)'\n') continue;
+                return b is not ((byte)'<' or (byte)'{');
+            }
+            return false; // todo espacios/ceros de pre-asignación no es un video
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("DownloadService", $"No se pudo comprobar la cabecera del video: {ex.Message}");
+            return true; // ante la duda no se bloquea una descarga posiblemente buena
+        }
     }
 
     /// <summary>Corte de seguridad definitivo (límite de tamaño, espacio en disco insuficiente): no se reintenta.</summary>

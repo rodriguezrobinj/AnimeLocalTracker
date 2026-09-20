@@ -5,8 +5,28 @@ param(
     [Parameter(Mandatory=$false)]
     [string]$Channel = "win",
 
+    # Firma con signtool (certificado en archivo .pfx, p. ej. un OV o el de Azure Artifact Signing vía signtool):
+    # parámetros de signtool SIN el archivo (vpk lo añade al final). Si se define SIGN_CERT_PATH (lo prepara el CI) se
+    # genera solo. Para firmadores en la nube que no usan signtool, usar -SignTemplate con el marcador {{file}}.
     [Parameter(Mandatory=$false)]
-    [string]$SignTemplate = ""
+    [string]$SignParams = "",
+
+    [Parameter(Mandatory=$false)]
+    [string]$SignTemplate = "",
+
+    # Carpeta de salida de los paquetes (por defecto Releases\ del repo). Útil para pruebas sin tocar Releases\.
+    [Parameter(Mandatory=$false)]
+    [string]$ReleasesDir = "",
+
+    # Requisitos que el instalador (Setup.exe) descarga e instala si faltan en el PC del usuario:
+    #  - net8-x64-desktop     -> .NET 8 Desktop Runtime (la app se publica --self-contained false; sin
+    #                            él, un Windows recién instalado no puede ni abrir la app).
+    #  - vcredist143-x64      -> Visual C++ Redistributable 2015-2022: animetracker_core.dll (núcleo Rust)
+    #                            importa vcruntime140.dll; sin él el núcleo nativo no carga (parseo de
+    #                            nombres, huellas, miniaturas). Ninguna otra DLL nativa de la app lo usa.
+    # Velopack también los instala al ACTUALIZAR si una versión nueva sube el requisito. Cadena vacía = no declarar.
+    [Parameter(Mandatory=$false)]
+    [string]$Framework = "net8-x64-desktop,vcredist143-x64"
 )
 
 # DEV-09: sin -Version ya no existe un default silencioso ("1.0.0") que pueda pisar
@@ -99,18 +119,22 @@ if ($LASTEXITCODE -ne 0) {
 
 # SEC-05: firma de código. El CI prepara el certificado en el runner y lo expone como
 # SIGN_CERT_PATH/SIGN_CERT_PASSWORD; si no hay certificado, el paquete sale sin firmar.
-if (-not $SignTemplate -and $env:SIGN_CERT_PATH) {
-    $SignTemplate = "signtool sign /fd SHA256 /f `"$env:SIGN_CERT_PATH`" /p `"$env:SIGN_CERT_PASSWORD`" `$file"
+# OJO con la sintaxis (errores que tenía la versión anterior y que impedían firmar de verdad):
+#  * vpk sustituye el marcador {{file}} en --signTemplate (NO "$file"); con --signParams añade el archivo solo.
+#  * /tr + /td = sello de tiempo RFC 3161: sin él, las firmas dejan de ser válidas cuando caduca el certificado.
+$timestampUrl = if ($env:SIGN_TIMESTAMP_URL) { $env:SIGN_TIMESTAMP_URL } else { "http://timestamp.digicert.com" }
+if (-not $SignTemplate -and -not $SignParams -and $env:SIGN_CERT_PATH) {
+    $SignParams = "/f `"$env:SIGN_CERT_PATH`" /p `"$env:SIGN_CERT_PASSWORD`" /fd SHA256 /tr $timestampUrl /td SHA256"
 }
-if ($SignTemplate) {
-    Write-Host "Firma de código ACTIVADA (template con signtool)" -ForegroundColor Green
+if ($SignTemplate -or $SignParams) {
+    Write-Host "Firma de código ACTIVADA ($(if ($SignTemplate) { 'plantilla personalizada' } else { 'signtool con sello de tiempo' }))" -ForegroundColor Green
 } else {
     Write-Host "Sin certificado: la release se genera SIN firma (SEC-05 pendiente)." -ForegroundColor Yellow
 }
 
 # 3. Empaquetar con Velopack (vpk)
 Write-Host "`n[3/5] Creando instalador y paquetes delta con vpk..." -ForegroundColor Green
-$releasesDir = "$PSScriptRoot\Releases"
+$releasesDir = if ($ReleasesDir) { $ReleasesDir } else { "$PSScriptRoot\Releases" }
 if (-not (Test-Path $releasesDir)) {
     New-Item -ItemType Directory -Path $releasesDir | Out-Null
 }
@@ -128,6 +152,12 @@ $vpkArgs = @(
 )
 if ($SignTemplate) {
     $vpkArgs += @("--signTemplate", $SignTemplate)
+} elseif ($SignParams) {
+    $vpkArgs += @("--signParams", $SignParams)
+}
+if ($Framework) {
+    $vpkArgs += @("--framework", $Framework)
+    Write-Host "Requisitos del instalador: $Framework" -ForegroundColor Gray
 }
 
 vpk @vpkArgs
