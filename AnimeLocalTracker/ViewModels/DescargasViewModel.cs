@@ -174,18 +174,28 @@ public partial class DescargasViewModel : ObservableObject, IRecipient<DescargaP
         string Etiqueta(string clave, int n) =>
             string.Format(LocalizationService.T("Act_FiltroFormato"), LocalizationService.T(clave), n);
 
-        Pestanas =
-        [
-            new FiltroChip("Activas", Etiqueta("Desc_TabActivas", ColaDescargas.Count), EsPestanaActivas),
-            new FiltroChip("Historial", Etiqueta("Desc_TabHistorial", TotalHistorial), EsPestanaHistorial)
-        ];
-        Filtros =
-        [
-            new FiltroChip(FiltroTodas, Etiqueta("Desc_FiltroTodas", TotalHistorial), FiltroHistorial == FiltroTodas),
-            new FiltroChip(FiltroCompletadas, Etiqueta("Desc_FiltroCompletadas", TotalCompletadas), FiltroHistorial == FiltroCompletadas),
-            new FiltroChip(FiltroFallidas, Etiqueta("Desc_FiltroFallidas", TotalFallidas), FiltroHistorial == FiltroFallidas)
-        ];
+        // Solo se recrean los chips si algo cambió: ActualizarConteo se llama en cada tick de progreso y, si se
+        // regeneraran los botones varias veces por segundo, el clic (bajada + subida) caía sobre un botón ya
+        // sustituido y "no hacía nada" hasta insistir.
+        var pestanas = new (string Clave, string Texto, bool Activo)[]
+        {
+            ("Activas", Etiqueta("Desc_TabActivas", ColaDescargas.Count), EsPestanaActivas),
+            ("Historial", Etiqueta("Desc_TabHistorial", TotalHistorial), EsPestanaHistorial)
+        };
+        var filtros = new (string Clave, string Texto, bool Activo)[]
+        {
+            (FiltroTodas, Etiqueta("Desc_FiltroTodas", TotalHistorial), FiltroHistorial == FiltroTodas),
+            (FiltroCompletadas, Etiqueta("Desc_FiltroCompletadas", TotalCompletadas), FiltroHistorial == FiltroCompletadas),
+            (FiltroFallidas, Etiqueta("Desc_FiltroFallidas", TotalFallidas), FiltroHistorial == FiltroFallidas)
+        };
+
+        if (!MismosChips(Pestanas, pestanas)) Pestanas = new ObservableCollection<FiltroChip>(pestanas.Select(c => new FiltroChip(c.Clave, c.Texto, c.Activo)));
+        if (!MismosChips(Filtros, filtros)) Filtros = new ObservableCollection<FiltroChip>(filtros.Select(c => new FiltroChip(c.Clave, c.Texto, c.Activo)));
     }
+
+    private static bool MismosChips(ObservableCollection<FiltroChip> actuales, (string Clave, string Texto, bool Activo)[] nuevos) =>
+        actuales.Count == nuevos.Length &&
+        actuales.Zip(nuevos).All(p => p.First.Clave == p.Second.Clave && p.First.Etiqueta == p.Second.Texto && p.First.EsActivo == p.Second.Activo);
 
     partial void OnPestanaActualChanged(string value) => ActualizarChips();
 

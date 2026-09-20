@@ -199,4 +199,20 @@ public class DescargasViewModelHistorialTests
         item.EstadoTexto.Should().Be(LocalizationService.T("Desc_EnPausa"));
         item.DetalleTexto.Should().BeEmpty();
     }
+
+    [Fact]
+    public void AplicarMensaje_ConProgresoRepetido_NoRecreaLosChips()
+    {
+        // Regresión: los botones Activas/Historial/filtros se regeneraban en cada tick de progreso y los clics se perdían.
+        _descargas.Setup(d => d.ObtenerDescargasActivas()).Returns(new List<DescargaItem> { new() { AniListId = 1, NumeroEpisodio = 1 } });
+        var sut = new DescargasViewModel(_descargas.Object);
+        var pestanas = sut.Pestanas;
+        var filtros = sut.Filtros;
+
+        for (int p = 1; p <= 20; p++)
+            sut.AplicarMensaje(new DescargaProgresoMensaje(1, 1, p, true, false, false, "", null, "A", "1,0 MB/s", velocidadBps: 1048576));
+
+        sut.Pestanas.Should().BeSameAs(pestanas);
+        sut.Filtros.Should().BeSameAs(filtros);
+    }
 }
