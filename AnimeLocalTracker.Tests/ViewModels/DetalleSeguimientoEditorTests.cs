@@ -113,40 +113,27 @@ public class DetalleSeguimientoEditorTests
     }
 
     [Fact]
-    public void ProgresoPorcentaje_ReflejaElAvanceSobreElTotal()
+    public void TotalDeEpisodios_SeMuestraSoloSiSeConoce()
     {
-        var sut = CrearSut(10);
+        var conTotal = CrearSut(10);
+        conTotal.EditTotalEpisodiosTexto.Should().Be("/ 10");
+        conTotal.TieneTotalEpisodios.Should().BeTrue();
 
-        sut.EditProgresoTexto = "5";
-
-        sut.EditProgresoPorcentaje.Should().BeApproximately(50, 0.001);
-        sut.EditTotalEpisodiosTexto.Should().Be("/ 10");
+        var sinTotal = CrearSut(0);
+        sinTotal.TieneTotalEpisodios.Should().BeFalse();
+        sinTotal.EditTotalEpisodiosTexto.Should().BeEmpty();
     }
 
     [Fact]
-    public void SinTotalConocido_NoMuestraTotalNiPorcentaje()
-    {
-        var sut = CrearSut(0);
-        sut.EditProgresoTexto = "4";
-
-        sut.TieneTotalEpisodios.Should().BeFalse();
-        sut.EditTotalEpisodiosTexto.Should().BeEmpty();
-        sut.EditProgresoPorcentaje.Should().Be(0);
-    }
-
-    [Fact]
-    public void Puntuacion_MuestraGuionSiEsCeroYSePuedeQuitar()
+    public void Puntuacion_MuestraGuionSiEsCero()
     {
         var sut = CrearSut(10);
         sut.EditPuntajeTexto.Should().Be("—");
-        sut.TienePuntaje.Should().BeFalse();
 
         sut.EditPuntaje = 85;
         sut.EditPuntajeTexto.Should().Be("85");
-        sut.TienePuntaje.Should().BeTrue();
 
-        sut.LimpiarPuntajeCommand.Execute(null);
-        sut.EditPuntaje.Should().Be(0);
+        sut.EditPuntaje = 0;
         sut.EditPuntajeTexto.Should().Be("—");
     }
 

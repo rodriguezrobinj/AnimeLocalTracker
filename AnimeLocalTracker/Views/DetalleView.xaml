@@ -797,7 +797,7 @@
         <Grid Visibility="{Binding MostrandoEditorSeguimiento, Converter={StaticResource BoolToVis}}" 
               Background="#CC000000" Panel.ZIndex="100">
 
-            <materialDesign:Card Width="520" VerticalAlignment="Center" HorizontalAlignment="Center" 
+            <materialDesign:Card x:Name="EditorSeguimientoCard" Width="520" VerticalAlignment="Center" HorizontalAlignment="Center" 
                                  UniformCornerRadius="16" Background="#1A1F26" BorderBrush="#2D3748" BorderThickness="1"
                                  materialDesign:ElevationAssist.Elevation="Dp16" Padding="22,20">
                 <materialDesign:Card.Resources>
@@ -915,6 +915,35 @@
                         </Setter>
                     </Style>
 
+                    <!-- Calendario del selector de fecha: mismos colores que la app (acento azul sobre superficie slate) -->
+                    <Style x:Key="SegCalendar" TargetType="Calendar" BasedOn="{StaticResource MaterialDesignDatePickerCalendarPortrait}">
+                        <Style.Resources>
+                            <SolidColorBrush x:Key="MaterialDesign.Brush.Primary" Color="#2563EB"/>
+                            <SolidColorBrush x:Key="MaterialDesign.Brush.Primary.Light" Color="#60A5FA"/>
+                            <SolidColorBrush x:Key="MaterialDesign.Brush.Primary.Dark" Color="#1D4ED8"/>
+                            <SolidColorBrush x:Key="MaterialDesign.Brush.Primary.Foreground" Color="White"/>
+                            <SolidColorBrush x:Key="PrimaryHueMidBrush" Color="#2563EB"/>
+                            <SolidColorBrush x:Key="PrimaryHueLightBrush" Color="#60A5FA"/>
+                            <SolidColorBrush x:Key="PrimaryHueDarkBrush" Color="#1D4ED8"/>
+                            <SolidColorBrush x:Key="PrimaryHueMidForegroundBrush" Color="White"/>
+                            <SolidColorBrush x:Key="MaterialDesign.Brush.Background" Color="#1A1F26"/>
+                            <SolidColorBrush x:Key="MaterialDesignPaper" Color="#1A1F26"/>
+                            <SolidColorBrush x:Key="MaterialDesign.Brush.Card.Background" Color="#1A1F26"/>
+                            <SolidColorBrush x:Key="MaterialDesignCardBackground" Color="#1A1F26"/>
+                            <SolidColorBrush x:Key="MaterialDesign.Brush.Paper" Color="#1A1F26"/>
+                            <SolidColorBrush x:Key="MaterialDesignToolBarBackground" Color="#1A1F26"/>
+                            <SolidColorBrush x:Key="MaterialDesign.Brush.ToolBar.Background" Color="#1A1F26"/>
+                            <SolidColorBrush x:Key="MaterialDesignBackground" Color="#1A1F26"/>
+                            <SolidColorBrush x:Key="MaterialDesign.Brush.Surface" Color="#1A1F26"/>
+                            <SolidColorBrush x:Key="MaterialDesignChipBackground" Color="#1A1F26"/>
+                        </Style.Resources>
+                        <Setter Property="Background" Value="#1A1F26"/>
+                        <Setter Property="BorderBrush" Value="#2D3748"/>
+                        <Setter Property="BorderThickness" Value="1"/>
+                        <Setter Property="Foreground" Value="#E2E8F0"/>
+                        <Setter Property="materialDesign:CalendarAssist.IsHeaderVisible" Value="False"/>
+                    </Style>
+
                     <Style x:Key="SegDatePicker" TargetType="DatePicker" BasedOn="{StaticResource MaterialDesignOutlinedDatePicker}">
                         <Setter Property="Height" Value="40"/>
                         <Setter Property="Padding" Value="8,0"/>
@@ -924,6 +953,7 @@
                         <Setter Property="Background" Value="#14181E"/>
                         <Setter Property="BorderBrush" Value="#2D3748"/>
                         <Setter Property="materialDesign:TextFieldAssist.UnderlineBrush" Value="#3B82F6"/>
+                        <Setter Property="CalendarStyle" Value="{StaticResource SegCalendar}"/>
                     </Style>
                 </materialDesign:Card.Resources>
 
@@ -1005,24 +1035,11 @@
                                     </Button>
                                 </Grid>
                             </Border>
-                            <ProgressBar Value="{Binding EditProgresoPorcentaje, Mode=OneWay}" Minimum="0" Maximum="100" Height="4" Margin="2,8,2,0"
-                                         Foreground="#3B82F6" Background="#1E293B" BorderThickness="0"
-                                         materialDesign:TransitionAssist.DisableTransitions="True"
-                                         Visibility="{Binding TieneTotalEpisodios, Converter={StaticResource BoolToVis}}"/>
                         </StackPanel>
 
                         <!-- Puntuación -->
                         <StackPanel Grid.Column="2">
-                            <Grid>
-                                <TextBlock Text="{Binding [Det_Puntuacion], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource SegLabel}" VerticalAlignment="Center"/>
-                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                    <Button Command="{Binding LimpiarPuntajeCommand}" Style="{StaticResource MaterialDesignIconButton}" Width="22" Height="22" Padding="0" Margin="0,0,4,0" Cursor="Hand"
-                                            ToolTip="{Binding [Det_SegQuitarPuntajeTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" AutomationProperties.Name="{Binding [Det_SegQuitarPuntajeTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                            Visibility="{Binding TienePuntaje, Converter={StaticResource BoolToVis}}">
-                                        <materialDesign:PackIcon Kind="CloseCircleOutline" Width="15" Height="15" Foreground="#94A3B8"/>
-                                    </Button>
-                                </StackPanel>
-                            </Grid>
+                            <TextBlock Text="{Binding [Det_Puntuacion], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource SegLabel}"/>
                             <Border Background="#14181E" BorderBrush="#2D3748" BorderThickness="1" CornerRadius="10" Height="40" Margin="0,6,0,0" Padding="12,0">
                                 <Grid>
                                     <Grid.ColumnDefinitions>

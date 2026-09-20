@@ -92,7 +92,6 @@ public partial class DetalleViewModel : ObservableObject,
     partial void OnEditProgresoTextoChanged(string value)
     {
         ProcesarProgresoTexto(value);
-        OnPropertyChanged(nameof(EditProgresoPorcentaje));
     }
 
     private void ProcesarProgresoTexto(string value)

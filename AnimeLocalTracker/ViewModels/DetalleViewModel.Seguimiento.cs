@@ -34,18 +34,13 @@ public partial class DetalleViewModel
     public bool TieneTotalEpisodios => EditTotalEpisodios > 0;
     public string EditTotalEpisodiosTexto => TieneTotalEpisodios ? $"/ {EditTotalEpisodios}" : string.Empty;
 
-    /// <summary>Progreso 0-100 sobre el total conocido, para la barra del editor.</summary>
-    public double EditProgresoPorcentaje => TieneTotalEpisodios ? Math.Clamp(EditProgreso * 100.0 / EditTotalEpisodios, 0, 100) : 0;
 
     /// <summary>"85" o "—" cuando no hay puntuación (0 en AniList = sin puntuar).</summary>
     public string EditPuntajeTexto => EditPuntaje > 0 ? $"{EditPuntaje:F0}" : "—";
 
-    public bool TienePuntaje => EditPuntaje > 0;
-
     partial void OnEditPuntajeChanged(float value)
     {
         OnPropertyChanged(nameof(EditPuntajeTexto));
-        OnPropertyChanged(nameof(TienePuntaje));
     }
 
     /// <summary>Se llama al abrir el editor y cuando cambia el anime/total, para refrescar los textos derivados.</summary>
@@ -54,7 +49,6 @@ public partial class DetalleViewModel
         OnPropertyChanged(nameof(EditTotalEpisodios));
         OnPropertyChanged(nameof(TieneTotalEpisodios));
         OnPropertyChanged(nameof(EditTotalEpisodiosTexto));
-        OnPropertyChanged(nameof(EditProgresoPorcentaje));
         OnPropertyChanged(nameof(EditPuntajeTexto));
     }
 
@@ -90,7 +84,4 @@ public partial class DetalleViewModel
 
     [RelayCommand]
     private void PonerFechaFinHoy() => EditFechaFin = DateTime.Today;
-
-    [RelayCommand]
-    private void LimpiarPuntaje() => EditPuntaje = 0;
 }
