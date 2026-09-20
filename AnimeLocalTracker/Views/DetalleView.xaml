@@ -1208,8 +1208,8 @@
                                     </Button>
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
                                         <TextBox Text="{Binding EditProgresoTexto, UpdateSourceTrigger=PropertyChanged}"
-                                                 MinWidth="34" MaxWidth="60" BorderThickness="0" Background="Transparent"
-                                                 Foreground="White" FontSize="15" FontWeight="Bold" TextAlignment="Right"
+                                                 MaxWidth="60" Padding="0" BorderThickness="0" Background="Transparent"
+                                                 Foreground="White" FontSize="15" FontWeight="Bold" TextAlignment="Center"
                                                  CaretBrush="#60A5FA" VerticalContentAlignment="Center"
                                                  materialDesign:TextFieldAssist.DecorationVisibility="Hidden"
                                                  AutomationProperties.Name="{Binding [Det_EpisodiosVistos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
@@ -1253,34 +1253,14 @@
 
                         <StackPanel Grid.Column="0">
                             <TextBlock Text="{Binding [Det_FechaInicio], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource SegLabel}"/>
-                            <Grid Margin="0,6,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <DatePicker Grid.Column="0" SelectedDate="{Binding EditFechaInicio}" Style="{StaticResource SegDatePicker}"
+                            <DatePicker Margin="0,6,0,0" SelectedDate="{Binding EditFechaInicio}" Style="{StaticResource SegDatePicker}"
                                             AutomationProperties.Name="{Binding [Det_FechaInicio], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
-                                <Button Grid.Column="1" Command="{Binding PonerFechaInicioHoyCommand}" Style="{StaticResource SegStepBtn}" Margin="4,0,0,0"
-                                        ToolTip="{Binding [Det_SegHoyTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" AutomationProperties.Name="{Binding [Det_SegHoyTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
-                                    <TextBlock Text="{Binding [Det_SegHoyCorto], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="12" FontWeight="SemiBold"/>
-                                </Button>
-                            </Grid>
                         </StackPanel>
 
                         <StackPanel Grid.Column="2">
                             <TextBlock Text="{Binding [Det_FechaFin], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource SegLabel}"/>
-                            <Grid Margin="0,6,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <DatePicker Grid.Column="0" SelectedDate="{Binding EditFechaFin}" Style="{StaticResource SegDatePicker}"
+                            <DatePicker Margin="0,6,0,0" SelectedDate="{Binding EditFechaFin}" Style="{StaticResource SegDatePicker}"
                                             AutomationProperties.Name="{Binding [Det_FechaFin], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
-                                <Button Grid.Column="1" Command="{Binding PonerFechaFinHoyCommand}" Style="{StaticResource SegStepBtn}" Margin="4,0,0,0"
-                                        ToolTip="{Binding [Det_SegHoyTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" AutomationProperties.Name="{Binding [Det_SegHoyTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
-                                    <TextBlock Text="{Binding [Det_SegHoyCorto], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="12" FontWeight="SemiBold"/>
-                                </Button>
-                            </Grid>
                         </StackPanel>
                     </Grid>
 

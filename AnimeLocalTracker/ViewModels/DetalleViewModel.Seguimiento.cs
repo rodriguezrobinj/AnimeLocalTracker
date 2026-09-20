@@ -78,10 +78,4 @@ public partial class DetalleViewModel
 
     [RelayCommand]
     private void DecrementarProgreso() => EditProgresoTexto = Math.Max(0, EditProgreso - 1).ToString();
-
-    [RelayCommand]
-    private void PonerFechaInicioHoy() => EditFechaInicio = DateTime.Today;
-
-    [RelayCommand]
-    private void PonerFechaFinHoy() => EditFechaFin = DateTime.Today;
 }

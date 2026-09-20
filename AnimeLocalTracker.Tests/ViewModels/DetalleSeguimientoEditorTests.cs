@@ -136,16 +136,4 @@ public class DetalleSeguimientoEditorTests
         sut.EditPuntaje = 0;
         sut.EditPuntajeTexto.Should().Be("—");
     }
-
-    [Fact]
-    public void FechasHoy_PonenLaFechaActual()
-    {
-        var sut = CrearSut(10);
-
-        sut.PonerFechaInicioHoyCommand.Execute(null);
-        sut.PonerFechaFinHoyCommand.Execute(null);
-
-        sut.EditFechaInicio.Should().Be(DateTime.Today);
-        sut.EditFechaFin.Should().Be(DateTime.Today);
-    }
 }
