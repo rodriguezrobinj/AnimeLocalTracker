@@ -7,6 +7,20 @@ Actions + Velopack); las notas curadas de cada release se mantienen aquí.
 
 ## [No publicado]
 
+### Cambiado
+- El instalador ahora declara sus requisitos (`--framework net8-x64-desktop,vcredist143-x64`): si el PC no
+  tiene el runtime de .NET 8 Desktop o el Visual C++ Redistributable 2015-2022, `Setup.exe` los descarga e
+  instala solo (y Velopack también los instala al actualizar si una versión nueva sube el requisito). Antes,
+  en un Windows recién instalado la app no abría (falta .NET) y el núcleo nativo Rust no cargaba
+  (`animetracker_core.dll` importa `vcruntime140.dll`). Se puede cambiar o desactivar con `-Framework` en
+  `build_velopack_release.ps1`.
+- El instalador y los paquetes completos pesan unos 70 MB menos (~30 %): `ffmpeg.exe` y `ffprobe.exe`
+  pasaron de builds estáticos de ~98 MB cada uno a builds "shared" de menos de 1 MB que reutilizan las
+  DLLs de FFmpeg que ya se distribuyen para el reproductor (Flyleaf.FFmpeg). Miniaturas, análisis con
+  ffprobe, audio y detección de escenas dan resultados idénticos. La versión de FFmpeg y su SHA256 quedan
+  fijados en `tools/Get-FFmpegBinaries.ps1` (antes se descargaba "la última release" sin control) y una
+  prueba avisa en el CI si una actualización de Flyleaf.FFmpeg cambia la versión de las bibliotecas.
+
 ### Accesibilidad
 - Nombres accesibles (`AutomationProperties.Name`) en las tarjetas de anime de la galería y en
   los botones "Qué veo hoy", "Conectar", menú de usuario, "Cerrar sesión", "Filtros" y el badge
@@ -14,6 +28,21 @@ Actions + Velopack); las notas curadas de cada release se mantienen aquí.
   pantalla (Narrator).
 
 ### Corregido
+- El flujo de firma de código de las releases tenía cuatro errores que habrían impedido firmar aunque hubiera
+  certificado: la plantilla de `signtool` usaba `$file` en vez del marcador `{{file}}` que sustituye `vpk`, no
+  había sello de tiempo (las firmas dejarían de ser válidas al caducar el certificado), el paso de verificación
+  del CI buscaba `Releases\Setup.exe` (el archivo real es `AnimeLocalTracker-win-Setup.exe`) y solo se
+  comprobaba el instalador. Ahora se usa `--signParams` con `/tr`+`/td`, y `tools/Test-ReleaseSignature.ps1`
+  verifica el instalador y los binarios propios de dentro (exe, núcleo Rust, motor Python). Se probó de punta a
+  punta con un certificado de prueba autofirmado. `build_velopack_release.ps1` admite además `-SignParams` y
+  `-ReleasesDir`.
+- La resolución, el códec de video, los fps y el indicador de 10 bits de cada episodio ya se
+  obtienen: el motor Python le pasaba a `ffprobe` la opción `-nostdin` (solo válida en `ffmpeg`), así
+  que `ffprobe` rechazaba el comando siempre y el fallo se descartaba en silencio. Lo mismo impedía
+  conocer la duración del video en el plan B de detección de intro/ending.
+- El plan B de detección de intro/ending (cuando OpenCV falla) usaba un filtro `scdet` inválido
+  (`s=0.30` es un booleano, no un umbral) y respondía "éxito" sin ninguna escena porque no se
+  comprobaba el código de salida de `ffmpeg`. Ahora usa `t=30:s=1` y un fallo de `ffmpeg` se informa.
 - La barra de pestañas de filtro ("Todos/Viendo/Completados/Planeando") ya no se solapa con el
   buscador ni recorta contenido al reducir el ancho de la ventana por debajo de ~800px — ahora
   se reordena a una segunda línea.
