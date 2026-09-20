@@ -32,8 +32,6 @@ public interface IDatabaseService
     Task<List<RegistroEpisodio>> ObtenerRegistrosPorAnimeAsync(int aniListId);
     Task<List<RegistroEpisodio>> ObtenerTodosLosRegistrosAsync();
     Task<List<RegistroEpisodio>> ObtenerHistorialEpisodiosAsync(int limite = 300);
-    Task LimpiarRegistroHistorialAsync(int aniListId, int numeroEpisodio);
-    Task LimpiarTodoElHistorialAsync();
     Task<List<RegistroEpisodio>> ObtenerEpisodiosNoSincronizadosAsync();
     Task MarcarEpisodiosSincronizadosAsync(IEnumerable<int> ids);
     Task ActualizarAnimeAsync(AnimeItem anime);
@@ -43,4 +41,15 @@ public interface IDatabaseService
 
     // PRI-01: borrado total de la biblioteca local (tablas) para "Borrar todos mis datos".
     Task VaciarBibliotecaAsync();
+
+    // === LOGROS: niveles ya conseguidos (para avisar una sola vez y no perderlos) ===
+    Task<List<LogroDesbloqueado>> ObtenerLogrosDesbloqueadosAsync();
+    Task GuardarLogrosDesbloqueadosAsync(IEnumerable<LogroDesbloqueado> logros);
+
+    // === FRANQUICIAS: relaciones de AniList (precuela/secuela/spin-off…) para agrupar en Estadísticas ===
+    Task<List<RelacionAnime>> ObtenerRelacionesAnimeAsync();
+    Task<List<RelacionAnimeSync>> ObtenerRelacionesSincronizadasAsync();
+
+    /// <summary>Reemplaza las aristas de cada anime consultado y lo marca como sincronizado (aunque no tenga ninguna).</summary>
+    Task GuardarRelacionesAnimeAsync(IReadOnlyDictionary<int, List<RelacionAnime>> relacionesPorAnime);
 }

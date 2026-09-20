@@ -874,6 +874,25 @@
                     </Grid>
                 </Border>
             </Grid>
+
+                <!-- AVISO (toast) DEL REPRODUCTOR. Va en la raíz del contenido del host y NO dentro de
+                     OverlayControls: esos controles se desvanecen tras unos segundos sin actividad, y avisos
+                     como "Continuando desde 09:36" salen justo cuando ya están ocultos. Sus textos los
+                     actualiza el code-behind (ReproductorView.xaml.cs), no un Binding: en la raíz del
+                     contenido del FlyleafHost los bindings se quedan congelados (ver memoria del proyecto). -->
+                <Border x:Name="ToastReproductor" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,70,0,0"
+                        Opacity="0" IsHitTestVisible="False" AutomationProperties.LiveSetting="Assertive">
+                    <materialDesign:Card UniformCornerRadius="10" Background="#161B22" Padding="20,15" materialDesign:ElevationAssist.Elevation="Dp8">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon x:Name="ToastRepIcono" Kind="InformationOutline" Foreground="White" Width="28" Height="28"
+                                                     VerticalAlignment="Center" Margin="0,0,15,0"/>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock x:Name="ToastRepTitulo" FontWeight="Bold" FontSize="15" Foreground="White"/>
+                                <TextBlock x:Name="ToastRepMensaje" TextWrapping="Wrap" MaxWidth="450" Foreground="#CCCCCC" FontSize="13" Margin="0,4,0,0"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </materialDesign:Card>
+                </Border>
             </Grid>
         </fl:FlyleafHost>
     </Grid>

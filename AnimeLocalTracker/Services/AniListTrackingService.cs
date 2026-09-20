@@ -228,6 +228,88 @@ public class AniListTrackingService : IAnimeTrackingService
     }
 
     /// <summary>
+    /// Relaciones (precuela, secuela, spin-off…) de cada anime, en lotes de 50 — solo relaciones con otros
+    /// animes. La clave está presente si el lote se consultó bien (aunque no haya relaciones) y ausente si falló.
+    /// Sin caché en memoria: el resultado se persiste en la BD (RelacionAnime).
+    /// </summary>
+    public async Task<Dictionary<int, List<RelacionAnime>>> ObtenerRelacionesLoteAsync(IEnumerable<int> ids)
+    {
+        var resultado = new Dictionary<int, List<RelacionAnime>>();
+        var idsUnicos = ids.Where(id => id > 0).Distinct().ToList();
+        if (idsUnicos.Count == 0) return resultado;
+
+        const string consulta = @"
+        query ($ids: [Int]) {
+            Page(page: 1, perPage: 50) {
+                media(id_in: $ids, type: ANIME) {
+                    id
+                    relations {
+                        edges {
+                            relationType(version: 2)
+                            node { id type }
+                        }
+                    }
+                }
+            }
+        }";
+
+        foreach (var chunk in idsUnicos.Chunk(50))
+        {
+            try
+            {
+                var jsonContent = JsonSerializer.Serialize(new { query = consulta, variables = new { ids = chunk } }, JsonOptions);
+                var response = await EnviarYDetectarSesionAsync(CrearRequest(jsonContent, null));
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    AppLogger.Warn("AniListTrackingService", $"Lote de relaciones ({chunk.Length} ids) falló con HTTP {(int)response.StatusCode}.");
+                    continue;
+                }
+
+                var content = await response.Content.ReadAsStringAsync();
+                if (content.Contains("\"errors\""))
+                {
+                    AppLogger.Warn("AniListTrackingService", $"AniList devolvió error en lote de relaciones: {Truncar(content)}");
+                    continue;
+                }
+
+                var medias = JsonSerializer.Deserialize<AniListRelacionesRespuesta>(content, JsonOptions)?.Data?.Page?.Media;
+                if (medias == null) continue;
+
+                foreach (var media in medias)
+                {
+                    var aristas = new List<RelacionAnime>();
+                    foreach (var arista in media.Relations?.Edges ?? new List<AniListRelacionesArista>())
+                    {
+                        // Solo relaciones con otros animes; ignora la obra original (manga/novela).
+                        if (arista.Node == null || arista.Node.Id <= 0 || arista.Node.Id == media.Id) continue;
+                        if (!string.Equals(arista.Node.Type, "ANIME", StringComparison.OrdinalIgnoreCase)) continue;
+                        if (string.IsNullOrWhiteSpace(arista.RelationType)) continue;
+
+                        aristas.Add(new RelacionAnime { AnimeId = media.Id, RelacionadoId = arista.Node.Id, Tipo = arista.RelationType });
+                    }
+
+                    resultado[media.Id] = aristas;
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                AppLogger.Warn("AniListTrackingService", "Timeout al obtener el lote de relaciones de AniList.");
+            }
+            catch (HttpRequestException ex)
+            {
+                AppLogger.Warn("AniListTrackingService", $"Fallo de red al obtener relaciones (lote): {ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Error("AniListTrackingService", "Error al obtener el lote de relaciones", ex);
+            }
+        }
+
+        return resultado;
+    }
+
+    /// <summary>
     /// RND-02: consulta muchos animes de una vez (Page.media con id_in + mediaListEntry
     /// del usuario autenticado). Reemplaza N× ObtenerAnimePorIdAsync + N×
     /// ObtenerSeguimientoUsuarioAsync por ~1 request cada 50 animes: la actualización

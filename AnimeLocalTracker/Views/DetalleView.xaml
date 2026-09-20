@@ -626,10 +626,7 @@
                                             
                                             <StackPanel x:Name="PanelProgreso" Orientation="Horizontal" Margin="0,3,0,0"
                                                         Visibility="Visible">
-                                                <ProgressBar Value="{Binding PorcentajeProgreso, Mode=OneWay}" Maximum="1.0" 
-                                                             Height="3" Width="85" Background="#33FFFFFF" Foreground="#60A5FA" 
-                                                             VerticalAlignment="Center" Margin="0,0,6,0"
-                                                             materialDesign:TransitionAssist.DisableTransitions="True"/>
+                                                <ProgressBar Value="{Binding PorcentajeProgreso, Mode=OneWay}" Style="{StaticResource AppWatchProgressBar}" Width="90" VerticalAlignment="Center" Margin="0,0,8,0"/>
                                                 <TextBlock Text="{Binding ProgresoFormateado}" Foreground="#93C5FD" FontSize="11" FontWeight="Medium" VerticalAlignment="Center"/>
                                             </StackPanel>
 

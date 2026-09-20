@@ -2,7 +2,7 @@ import json
 import subprocess
 from typing import Dict, Any, List
 
-from media.ffmpeg_guard import es_ruta_media_segura, MAX_ALLOC
+from media.ffmpeg_guard import es_ruta_media_segura, argumentos_ffprobe, MAX_ALLOC
 
 
 class EpisodeMetadata:
@@ -16,7 +16,7 @@ class EpisodeMetadata:
                 return {"success": False, "error": "ruta de video no permitida"}
 
             ffprobe = subprocess.run(
-                ["ffprobe", "-nostdin", "-max_alloc", MAX_ALLOC, "-v", "error",
+                ["ffprobe", *argumentos_ffprobe(),
                  "-print_format", "json", "-show_format", "-show_streams", video_path],
                 capture_output=True, text=True, timeout=30
             )

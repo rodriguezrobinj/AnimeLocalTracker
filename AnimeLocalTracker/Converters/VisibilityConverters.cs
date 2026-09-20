@@ -78,16 +78,6 @@ public class GeneroTraducidoConverter : IValueConverter
         => Binding.DoNothing;
 }
 
-/// <summary>Atenúa (no oculta) tarjetas de logros aún no desbloqueados.</summary>
-public class BoolToOpacityConverter : IValueConverter
-{
-    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
-        => value is true ? 1.0 : 0.4;
-
-    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
-        => Binding.DoNothing;
-}
-
 /// <summary>Niega un bool — usado para IsEnabled ligado a un flag "ocupado/cargando".</summary>
 public class InverseBoolConverter : IValueConverter
 {

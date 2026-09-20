@@ -11,6 +11,13 @@ public interface IAnimeTrackingService
     Task<bool> ActualizarProgresoAsync(int mediaId, int episodio, string token);
     Task<AniListMedia?> ObtenerAnimePorIdAsync(int id);
     Task<Dictionary<int, AniListMedia>> ObtenerAnimesPorIdsLoteAsync(IEnumerable<int> ids, string? token = null);
+
+    /// <summary>
+    /// Relaciones (precuela, secuela, spin-off…) de cada anime, en lotes de 50. La clave está presente para
+    /// todo anime cuyo lote se consultó bien — aunque no tenga relaciones —, y ausente si el lote falló.
+    /// Solo devuelve relaciones con otros ANIME (no con el manga/novela original).
+    /// </summary>
+    Task<Dictionary<int, List<RelacionAnime>>> ObtenerRelacionesLoteAsync(IEnumerable<int> ids);
     // Obtener los datos actuales de tu cuenta
     Task<AniListMediaList?> ObtenerSeguimientoUsuarioAsync(int mediaId, string token);
     // Guardar el panel completo de datos
