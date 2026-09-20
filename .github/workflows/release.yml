@@ -162,13 +162,10 @@ jobs:
     - name: Verify Code Signing
       if: steps.cert.outputs.cert_ready == 'true'
       shell: powershell
-      run: |
-        $sig = Get-AuthenticodeSignature "Releases\Setup.exe"
-        if ($sig.Status -ne 'Valid') {
-          Write-Host "::error::Setup.exe no está firmado correctamente ($($sig.Status))"
-          exit 1
-        }
-        Write-Host "Setup.exe firmado correctamente: $($sig.SignerCertificate.Subject)"
+      # Antes se comprobaba "Releases\Setup.exe", pero vpk lo genera como AnimeLocalTracker-win-Setup.exe (el paso
+      # fallaba siempre) y solo miraba el instalador. Ahora se verifica el instalador Y los binarios propios de
+      # dentro (exe, núcleo Rust, motor Python), exigiendo firma válida y sello de tiempo.
+      run: powershell -ExecutionPolicy Bypass -File .\tools\Test-ReleaseSignature.ps1 -ReleasesDir Releases
 
     - name: Upload to GitHub Release (Pre-release)
       shell: powershell

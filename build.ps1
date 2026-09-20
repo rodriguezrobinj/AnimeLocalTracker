@@ -22,30 +22,15 @@ $root = $PSScriptRoot
 #  `ffmpeg`/`ffprobe` por nombre. Si no se distribuyen junto a la
 #  app, miniaturas, sprite sheets y enriquecimiento fallan en
 #  silencio en máquinas sin FFmpeg instalado.
+#  Se usa el build "shared" (~0,8 MB los dos): cargan las DLLs de
+#  Flyleaf.FFmpeg que la app ya distribuye, en vez de llevar una segunda
+#  copia de todos los códecs (los estáticos pesaban ~98 MB cada uno).
+#  Versión y SHA256 fijados en tools\Get-FFmpegBinaries.ps1.
 #  (La carpeta AnimeLocalTracker\FFmpeg\ está en .gitignore: cada
 #  clon/build descarga los binarios si no existen.)
 # ────────────────────────────────────────────────────────────
 $ffmpegDir = "$root\AnimeLocalTracker\FFmpeg"
-if (-not (Test-Path "$ffmpegDir\ffmpeg.exe") -or -not (Test-Path "$ffmpegDir\ffprobe.exe")) {
-    Write-Host "[build] ffmpeg/ffprobe embebidos no encontrados; descargando essentials de gyan.dev..." -ForegroundColor Yellow
-    $ffmpegZip = Join-Path $env:TEMP "ffmpeg-release-essentials.zip"
-    if (-not (Test-Path $ffmpegZip)) {
-        Invoke-WebRequest "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" -OutFile $ffmpegZip -UseBasicParsing
-    }
-    $ffmpegExtract = Join-Path $env:TEMP ("ffmpeg_" + [guid]::NewGuid().ToString("N"))
-    Expand-Archive $ffmpegZip $ffmpegExtract
-    try {
-        $ffmpegBin = Get-ChildItem $ffmpegExtract -Recurse -Filter "ffmpeg.exe" | Select-Object -First 1 -ExpandProperty DirectoryName
-        if (-not $ffmpegBin) { throw "No se pudo localizar ffmpeg.exe en el zip descargado." }
-        New-Item -ItemType Directory -Path $ffmpegDir -Force | Out-Null
-        Copy-Item "$ffmpegBin\ffmpeg.exe" "$ffmpegDir\" -Force
-        Copy-Item "$ffmpegBin\ffprobe.exe" "$ffmpegDir\" -Force
-        Write-Host "[build] ffmpeg/ffprobe embebidos listos en $ffmpegDir" -ForegroundColor Green
-    }
-    finally {
-        Remove-Item $ffmpegExtract -Recurse -Force -ErrorAction SilentlyContinue
-    }
-}
+& "$root\tools\Get-FFmpegBinaries.ps1" -Destino $ffmpegDir
 
 function Invoke-Build {
     param([string]$Label)
