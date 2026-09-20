@@ -915,33 +915,217 @@
                         </Setter>
                     </Style>
 
-                    <!-- Calendario del selector de fecha: mismos colores que la app (acento azul sobre superficie slate) -->
-                    <Style x:Key="SegCalendar" TargetType="Calendar" BasedOn="{StaticResource MaterialDesignDatePickerCalendarPortrait}">
-                        <Style.Resources>
-                            <SolidColorBrush x:Key="MaterialDesign.Brush.Primary" Color="#2563EB"/>
-                            <SolidColorBrush x:Key="MaterialDesign.Brush.Primary.Light" Color="#60A5FA"/>
-                            <SolidColorBrush x:Key="MaterialDesign.Brush.Primary.Dark" Color="#1D4ED8"/>
-                            <SolidColorBrush x:Key="MaterialDesign.Brush.Primary.Foreground" Color="White"/>
-                            <SolidColorBrush x:Key="PrimaryHueMidBrush" Color="#2563EB"/>
-                            <SolidColorBrush x:Key="PrimaryHueLightBrush" Color="#60A5FA"/>
-                            <SolidColorBrush x:Key="PrimaryHueDarkBrush" Color="#1D4ED8"/>
-                            <SolidColorBrush x:Key="PrimaryHueMidForegroundBrush" Color="White"/>
-                            <SolidColorBrush x:Key="MaterialDesign.Brush.Background" Color="#1A1F26"/>
-                            <SolidColorBrush x:Key="MaterialDesignPaper" Color="#1A1F26"/>
-                            <SolidColorBrush x:Key="MaterialDesign.Brush.Card.Background" Color="#1A1F26"/>
-                            <SolidColorBrush x:Key="MaterialDesignCardBackground" Color="#1A1F26"/>
-                            <SolidColorBrush x:Key="MaterialDesign.Brush.Paper" Color="#1A1F26"/>
-                            <SolidColorBrush x:Key="MaterialDesignToolBarBackground" Color="#1A1F26"/>
-                            <SolidColorBrush x:Key="MaterialDesign.Brush.ToolBar.Background" Color="#1A1F26"/>
-                            <SolidColorBrush x:Key="MaterialDesignBackground" Color="#1A1F26"/>
-                            <SolidColorBrush x:Key="MaterialDesign.Brush.Surface" Color="#1A1F26"/>
-                            <SolidColorBrush x:Key="MaterialDesignChipBackground" Color="#1A1F26"/>
-                        </Style.Resources>
-                        <Setter Property="Background" Value="#1A1F26"/>
-                        <Setter Property="BorderBrush" Value="#2D3748"/>
-                        <Setter Property="BorderThickness" Value="1"/>
+                    <!-- ══ Calendario del selector de fecha, con la plantilla estándar de WPF (su cabecera navega
+                         mes → año → década con un clic) y los colores de la app ══ -->
+                    <Style x:Key="SegCalNavBtn" TargetType="Button">
+                        <Setter Property="Width" Value="30"/>
+                        <Setter Property="Height" Value="30"/>
+                        <Setter Property="Cursor" Value="Hand"/>
+                        <Setter Property="Focusable" Value="False"/>
+                        <Setter Property="Foreground" Value="#9CA3AF"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="Raiz" Background="Transparent" CornerRadius="8">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Raiz" Property="Background" Value="#1E293B"/>
+                                            <Setter Property="Foreground" Value="#93C5FD"/>
+                                        </Trigger>
+                                        <Trigger Property="IsEnabled" Value="False">
+                                            <Setter Property="Opacity" Value="0.3"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+
+                    <Style x:Key="SegCalHeaderBtn" TargetType="Button">
+                        <Setter Property="Cursor" Value="Hand"/>
+                        <Setter Property="Focusable" Value="False"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="Raiz" Background="Transparent" CornerRadius="8" Padding="10,5" HorizontalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal">
+                                            <ContentPresenter x:Name="Texto" VerticalAlignment="Center" TextElement.FontSize="13.5" TextElement.FontWeight="Bold"
+                                                              TextElement.Foreground="#E2E8F0"/>
+                                            <Path Data="M 0,0 L 4,4 L 8,0" Stroke="#94A3B8" StrokeThickness="1.6" Margin="7,2,0,0" VerticalAlignment="Center"
+                                                  StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Raiz" Property="Background" Value="#1E293B"/>
+                                            <Setter TargetName="Texto" Property="TextElement.Foreground" Value="#93C5FD"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+
+                    <!-- Día del mes -->
+                    <Style x:Key="SegCalDayBtn" TargetType="CalendarDayButton">
+                        <Setter Property="MinWidth" Value="34"/>
+                        <Setter Property="MinHeight" Value="34"/>
+                        <Setter Property="Cursor" Value="Hand"/>
                         <Setter Property="Foreground" Value="#E2E8F0"/>
-                        <Setter Property="materialDesign:CalendarAssist.IsHeaderVisible" Value="False"/>
+                        <Setter Property="FontSize" Value="12.5"/>
+                        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                        <Setter Property="VerticalContentAlignment" Value="Center"/>
+                        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="CalendarDayButton">
+                                    <Grid>
+                                        <Border x:Name="Fondo" Background="Transparent" BorderBrush="Transparent" BorderThickness="1" CornerRadius="17" Margin="1"/>
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Grid>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Fondo" Property="Background" Value="#1E293B"/>
+                                        </Trigger>
+                                        <Trigger Property="IsToday" Value="True">
+                                            <Setter TargetName="Fondo" Property="BorderBrush" Value="#60A5FA"/>
+                                        </Trigger>
+                                        <Trigger Property="IsInactive" Value="True">
+                                            <Setter Property="Foreground" Value="#4B5563"/>
+                                        </Trigger>
+                                        <Trigger Property="IsBlackedOut" Value="True">
+                                            <Setter Property="Opacity" Value="0.35"/>
+                                        </Trigger>
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Setter TargetName="Fondo" Property="Background" Value="#2563EB"/>
+                                            <Setter Property="Foreground" Value="White"/>
+                                        </Trigger>
+                                        <Trigger Property="IsEnabled" Value="False">
+                                            <Setter Property="Opacity" Value="0.35"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+
+                    <!-- Mes / año (vistas de año y década) -->
+                    <Style x:Key="SegCalMonthBtn" TargetType="CalendarButton">
+                        <Setter Property="MinWidth" Value="56"/>
+                        <Setter Property="MinHeight" Value="38"/>
+                        <Setter Property="Cursor" Value="Hand"/>
+                        <Setter Property="Foreground" Value="#E2E8F0"/>
+                        <Setter Property="FontSize" Value="12.5"/>
+                        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="CalendarButton">
+                                    <Grid>
+                                        <Border x:Name="Fondo" Background="Transparent" BorderBrush="Transparent" BorderThickness="1" CornerRadius="10" Margin="3" Height="38" VerticalAlignment="Center"/>
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Grid>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Fondo" Property="Background" Value="#1E293B"/>
+                                        </Trigger>
+                                        <Trigger Property="HasSelectedDays" Value="True">
+                                            <Setter TargetName="Fondo" Property="Background" Value="#2563EB"/>
+                                            <Setter Property="Foreground" Value="White"/>
+                                        </Trigger>
+                                        <Trigger Property="IsInactive" Value="True">
+                                            <Setter Property="Foreground" Value="#4B5563"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+
+                    <Style x:Key="SegCalItem" TargetType="CalendarItem">
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="CalendarItem">
+                                    <ControlTemplate.Resources>
+                                        <DataTemplate x:Key="{x:Static CalendarItem.DayTitleTemplateResourceKey}">
+                                            <TextBlock Text="{Binding}" FontSize="11" FontWeight="SemiBold" Foreground="#94A3B8"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,6,0,4"/>
+                                        </DataTemplate>
+                                    </ControlTemplate.Resources>
+                                    <Grid x:Name="PART_Root" MinWidth="268">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="*"/>
+                                        </Grid.RowDefinitions>
+
+                                        <Grid Grid.Row="0" Margin="0,0,0,4">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Button x:Name="PART_PreviousButton" Grid.Column="0" Style="{StaticResource SegCalNavBtn}">
+                                                <Path Data="M 5,0 L 0,5 L 5,10" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="2"
+                                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                                            </Button>
+                                            <Button x:Name="PART_HeaderButton" Grid.Column="1" Style="{StaticResource SegCalHeaderBtn}" HorizontalAlignment="Center"/>
+                                            <Button x:Name="PART_NextButton" Grid.Column="2" Style="{StaticResource SegCalNavBtn}">
+                                                <Path Data="M 0,0 L 5,5 L 0,10" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="2"
+                                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                                            </Button>
+                                        </Grid>
+
+                                        <Grid x:Name="PART_MonthView" Grid.Row="1" Visibility="Visible" HorizontalAlignment="Center">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
+                                        </Grid>
+
+                                        <Grid x:Name="PART_YearView" Grid.Row="1" Visibility="Hidden" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="*"/><RowDefinition Height="*"/><RowDefinition Height="*"/>
+                                            </Grid.RowDefinitions>
+                                        </Grid>
+                                    </Grid>
+                                    <ControlTemplate.Triggers>
+                                        <!-- La vista visible depende del modo del calendario: mes (por defecto), año (12 meses) o década (años) -->
+                                        <DataTrigger Binding="{Binding DisplayMode, RelativeSource={RelativeSource AncestorType=Calendar}}" Value="Year">
+                                            <Setter TargetName="PART_MonthView" Property="Visibility" Value="Hidden"/>
+                                            <Setter TargetName="PART_YearView" Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding DisplayMode, RelativeSource={RelativeSource AncestorType=Calendar}}" Value="Decade">
+                                            <Setter TargetName="PART_MonthView" Property="Visibility" Value="Hidden"/>
+                                            <Setter TargetName="PART_YearView" Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+
+                    <Style x:Key="SegCalendar" TargetType="Calendar">
+                        <Setter Property="Foreground" Value="#E2E8F0"/>
+                        <Setter Property="CalendarItemStyle" Value="{StaticResource SegCalItem}"/>
+                        <Setter Property="CalendarDayButtonStyle" Value="{StaticResource SegCalDayBtn}"/>
+                        <Setter Property="CalendarButtonStyle" Value="{StaticResource SegCalMonthBtn}"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="Calendar">
+                                    <Border Background="#1A1F26" BorderBrush="#2D3748" BorderThickness="1" CornerRadius="12" Padding="10,8,10,10">
+                                        <CalendarItem x:Name="PART_CalendarItem" Style="{TemplateBinding CalendarItemStyle}"/>
+                                    </Border>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
                     </Style>
 
                     <Style x:Key="SegDatePicker" TargetType="DatePicker" BasedOn="{StaticResource MaterialDesignOutlinedDatePicker}">

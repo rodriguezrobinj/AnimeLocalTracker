@@ -11,8 +11,9 @@ Actions + Velopack); las notas curadas de cada release se mantienen aquí.
 - Editor de seguimiento de AniList rediseñado (botón «Seguimiento» de un anime): el estado se elige con chips de
   un clic en vez de un desplegable; los episodios vistos tienen botones − / + con el total; la puntuación
   muestra su valor junto al deslizador; las fechas de inicio y fin van en una fila con atajo «Hoy» y un
-  calendario con los colores de la app (acento azul, en el idioma elegido y con la semana desde el lunes en
-  español). Al elegir «Finalizado» se completa el progreso y la fecha de fin, y al
+  calendario con los colores de la app (acento azul y en el idioma elegido). Pulsando el título del calendario
+  («octubre de 2024») se pasa a la vista de meses y, pulsándolo otra vez, a la de años por décadas, para saltar
+  a 2014 en tres clics en vez de retroceder mes a mes. Al elegir «Finalizado» se completa el progreso y la fecha de fin, y al
   elegir «Viendo» se pone la fecha de inicio (sin pisar lo que ya hubiera escrito). El editor ya no arrastra
   el estado del anime anterior al abrirse.
 - Pestaña **Descargas** rediseñada: dos pestañas, *Activas* e *Historial*. En Activas ves un resumen
