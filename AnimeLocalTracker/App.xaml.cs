@@ -153,6 +153,12 @@ public partial class App : Application
 
         services.AddSingleton<IVideoIntegrityService, VideoIntegrityService>();
 
+        // Logros por niveles: evaluación, persistencia de desbloqueos y avisos
+        services.AddSingleton<AnimeLocalTracker.Services.Logros.ILogrosService, AnimeLocalTracker.Services.Logros.LogrosService>();
+
+        // Franquicias (temporadas, películas, spin-offs) para el top de Estadísticas por tiempo visto
+        services.AddSingleton<AnimeLocalTracker.Services.Franquicias.IFranquiciaService, AnimeLocalTracker.Services.Franquicias.FranquiciaService>();
+
         // Orquestación de skip-times (resolución MAL ID + reglas de evaluación)
         services.AddSingleton<ISkipTimesCoordinator, SkipTimesCoordinator>();
         services.AddSingleton<IMediaEnrichmentService, MediaEnrichmentService>();
@@ -245,6 +251,7 @@ public partial class App : Application
 
         // Estadísticas personales
         services.AddSingleton<EstadisticasViewModel>();
+        services.AddSingleton<LogrosViewModel>();
 
         // Historial de reproducción
         services.AddSingleton<HistorialViewModel>();

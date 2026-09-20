@@ -38,6 +38,38 @@ public partial class HistorialItemViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(GrupoTemporal))]
     private DateTime? _ultimaReproduccion;
 
+    /// <summary>Pastilla corta "EP 11".</summary>
+    public string EpisodioCorto => string.Format(LocalizationService.T("Act_EpisodioCortoFormato"), NumeroEpisodio);
+
+    /// <summary>Se abrió el capítulo pero el reloj quedó en 00:00 (o casi): todavía no se ha empezado a ver.</summary>
+    public bool PorEmpezar => !VistoLocal && ProgresoSegundos <= 5;
+
+    /// <summary>El "00:00" solo estorba cuando aún no se empezó.</summary>
+    public bool MostrarProgreso => !PorEmpezar;
+
+    /// <summary>Texto del estado: Visto / En progreso / Por empezar.</summary>
+    public string EstadoTexto =>
+        VistoLocal ? LocalizationService.T("Act_Estado_Visto")
+        : EnProgreso ? LocalizationService.T("Act_Estado_EnProgreso")
+        : PorEmpezar ? LocalizationService.T("Hist_Estado_PorEmpezar")
+        : string.Empty;
+
+    public bool TieneEstado => VistoLocal || EnProgreso || PorEmpezar;
+
+    /// <summary>Color del estado: violeta visto, ámbar en progreso, gris azulado por empezar.</summary>
+    public string EstadoColor => VistoLocal ? "#A78BFA" : EnProgreso ? "#FBBF24" : "#94A3B8";
+
+    /// <summary>Acción principal de la fila: Continuar / Ver de nuevo / Ver ahora.</summary>
+    public string AccionTexto =>
+        EnProgreso ? LocalizationService.T("Act_Accion_Continuar")
+        : VistoLocal ? LocalizationService.T("Act_Accion_VerDeNuevo")
+        : LocalizationService.T("Act_Accion_VerAhora");
+
+    public bool AccionEsPrimaria => !VistoLocal;
+
+    /// <summary>Vuelve a leer todos los textos localizados (cambio de idioma en caliente).</summary>
+    public void RefrescarTextos() => OnPropertyChanged(string.Empty);
+
     public bool ExisteArchivoLocal => !string.IsNullOrWhiteSpace(RutaArchivo) && File.Exists(RutaArchivo);
 
     /// <summary>

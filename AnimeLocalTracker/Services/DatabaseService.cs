@@ -83,8 +83,31 @@ public class DatabaseService : IDatabaseService, IDisposable
         (1, "esquema base (tablas AnimeItem/RegistroEpisodio + índice compuesto)", CrearEsquemaBaseAsync),
         (2, "índice de la cola de sincronización (VistoLocal, SincronizadoEnNube)", CrearIndiceColaSincronizacionAsync),
         (3, "índice de UltimaReproduccion para el historial", CrearIndiceUltimaReproduccionAsync),
-        (4, "columnas Temporada/AnioLanzamiento/EsFavorito en AnimeItem", AgregarColumnasTemporadaFavoritoAsync)
+        (4, "columnas Temporada/AnioLanzamiento/EsFavorito en AnimeItem", AgregarColumnasTemporadaFavoritoAsync),
+        (5, "tabla de logros desbloqueados + índice único (LogroId, Nivel)", CrearTablaLogrosAsync),
+        (6, "relaciones entre animes (franquicias) + marca de sincronización", CrearTablasRelacionesAsync)
     };
+
+    /// <summary>
+    /// v6: relaciones de AniList (precuela/secuela/spin-off…) para agrupar franquicias en Estadísticas.
+    /// El índice único evita duplicar una arista aunque se vuelva a sincronizar.
+    /// </summary>
+    private static async Task CrearTablasRelacionesAsync(SQLiteAsyncConnection conexion)
+    {
+        await conexion.CreateTableAsync<RelacionAnime>();
+        await conexion.CreateTableAsync<RelacionAnimeSync>();
+        await conexion.ExecuteAsync("CREATE UNIQUE INDEX IF NOT EXISTS IX_RelacionAnime_Unica ON RelacionAnime(AnimeId, RelacionadoId);");
+    }
+
+    /// <summary>
+    /// v5: niveles de logros ya conseguidos. El índice único evita duplicar un nivel aunque dos
+    /// evaluaciones coincidan (se inserta con INSERT OR IGNORE).
+    /// </summary>
+    private static async Task CrearTablaLogrosAsync(SQLiteAsyncConnection conexion)
+    {
+        await conexion.CreateTableAsync<LogroDesbloqueado>();
+        await conexion.ExecuteAsync("CREATE UNIQUE INDEX IF NOT EXISTS IX_LogroDesbloqueado_Unico ON LogroDesbloqueado(LogroId, Nivel);");
+    }
 
     private static async Task EjecutarMigracionesPendientesAsync(SQLiteAsyncConnection conexion)
     {
@@ -628,19 +651,6 @@ public class DatabaseService : IDatabaseService, IDisposable
             limite);
     }
 
-    public async Task LimpiarRegistroHistorialAsync(int aniListId, int numeroEpisodio)
-    {
-        await _conexion.ExecuteAsync(
-            "UPDATE RegistroEpisodio SET UltimaReproduccion = NULL, ProgresoSegundos = 0 WHERE AniListId = ? AND NumeroEpisodio = ?;",
-            aniListId, numeroEpisodio);
-    }
-
-    public async Task LimpiarTodoElHistorialAsync()
-    {
-        await _conexion.ExecuteAsync(
-            "UPDATE RegistroEpisodio SET UltimaReproduccion = NULL, ProgresoSegundos = 0 WHERE UltimaReproduccion IS NOT NULL OR ProgresoSegundos > 0;");
-    }
-
     public async Task<List<RegistroEpisodio>> ObtenerEpisodiosNoSincronizadosAsync()
     {
         return await _conexion.Table<RegistroEpisodio>()
@@ -696,6 +706,66 @@ public class DatabaseService : IDatabaseService, IDisposable
         {
             db.Execute("DELETE FROM RegistroEpisodio;");
             db.Execute("DELETE FROM AnimeItem;");
+            db.Execute("DELETE FROM LogroDesbloqueado;");
+            db.Execute("DELETE FROM RelacionAnime;");
+            db.Execute("DELETE FROM RelacionAnimeSync;");
+        });
+    }
+
+    public async Task<List<RelacionAnime>> ObtenerRelacionesAnimeAsync()
+    {
+        return await _conexion.Table<RelacionAnime>().ToListAsync();
+    }
+
+    public async Task<List<RelacionAnimeSync>> ObtenerRelacionesSincronizadasAsync()
+    {
+        return await _conexion.Table<RelacionAnimeSync>().ToListAsync();
+    }
+
+    public async Task GuardarRelacionesAnimeAsync(IReadOnlyDictionary<int, List<RelacionAnime>> relacionesPorAnime)
+    {
+        if (relacionesPorAnime == null || relacionesPorAnime.Count == 0) return;
+
+        var ahora = DateTime.UtcNow;
+        await _conexion.RunInTransactionAsync(db =>
+        {
+            foreach (var (animeId, aristas) in relacionesPorAnime)
+            {
+                // Se reemplazan las aristas del anime consultado: AniList es la fuente de verdad.
+                db.Execute("DELETE FROM RelacionAnime WHERE AnimeId = ?;", animeId);
+                foreach (var arista in aristas)
+                {
+                    db.Execute(
+                        "INSERT OR IGNORE INTO RelacionAnime (AnimeId, RelacionadoId, Tipo) VALUES (?, ?, ?);",
+                        animeId, arista.RelacionadoId, arista.Tipo);
+                }
+
+                db.Execute("INSERT OR REPLACE INTO RelacionAnimeSync (AnimeId, FechaUtc) VALUES (?, ?);", animeId, ahora);
+            }
+        });
+    }
+
+    public async Task<List<LogroDesbloqueado>> ObtenerLogrosDesbloqueadosAsync()
+    {
+        return await _conexion.Table<LogroDesbloqueado>().ToListAsync();
+    }
+
+    public async Task GuardarLogrosDesbloqueadosAsync(IEnumerable<LogroDesbloqueado> logros)
+    {
+        if (logros == null) return;
+
+        var lista = logros.ToList();
+        if (lista.Count == 0) return;
+
+        // INSERT OR IGNORE: el índice único (LogroId, Nivel) descarta duplicados sin lanzar.
+        await _conexion.RunInTransactionAsync(db =>
+        {
+            foreach (var logro in lista)
+            {
+                db.Execute(
+                    "INSERT OR IGNORE INTO LogroDesbloqueado (LogroId, Nivel, FechaUtc) VALUES (?, ?, ?);",
+                    logro.LogroId, logro.Nivel, logro.FechaUtc);
+            }
         });
     }
 }

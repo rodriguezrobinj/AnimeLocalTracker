@@ -13,7 +13,8 @@ namespace AnimeLocalTracker.ViewModels;
 public partial class MainViewModel : ObservableObject, 
     IRecipient<AbrirBuscadorMensaje>,
     IRecipient<DescargaProgresoMensaje>,
-    IRecipient<NuevosEpisodiosMensaje>
+    IRecipient<NuevosEpisodiosMensaje>,
+    IRecipient<MostrarDialogoRequestMessage>
 {
     private readonly INavigationService _navigationService;
     private readonly IAnimeTrackingService _animeTrackingService;
@@ -214,6 +215,33 @@ public partial class MainViewModel : ObservableObject,
 
     [RelayCommand]
     private void NavegarEstadisticas() => WeakReferenceMessenger.Default.Send(new NavegarMensaje_Estadisticas());
+
+    [RelayCommand]
+    private void NavegarLogros() => WeakReferenceMessenger.Default.Send(new NavegarMensaje_Logros());
+
+    /// <summary>
+    /// Avisos y diálogos que otros ViewModels piden por mensaje (reproductor: "Episodio marcado como visto",
+    /// AniSkip, reanudar…; calendario). El receptor se perdió en el refactor de IDialogService y esos avisos
+    /// dejaron de mostrarse; ahora se delega en IDialogService, que ya sabe mostrar toasts y confirmaciones.
+    /// </summary>
+    public void Receive(MostrarDialogoRequestMessage message)
+    {
+        // MainViewModel es transient: puede haber varias instancias registradas y solo una debe responder.
+        if (message.HasReceivedResponse) return;
+
+        try
+        {
+            message.Reply(DialogService.MostrarDialogoAsync(message.Titulo, message.Mensaje, message.EsConfirmacion, message.Icono, message.Color));
+        }
+        catch (InvalidOperationException)
+        {
+            // Otra instancia respondió entre la comprobación y el Reply: no es un error.
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("MainViewModel", $"Error respondiendo a MostrarDialogoRequestMessage: {ex.Message}");
+        }
+    }
 
     [RelayCommand]
     private void NavegarHistorial() => WeakReferenceMessenger.Default.Send(new NavegarMensaje_Historial());

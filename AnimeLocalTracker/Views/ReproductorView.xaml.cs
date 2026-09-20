@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -8,6 +9,7 @@ using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using AnimeLocalTracker.Services;
 using AnimeLocalTracker.ViewModels;
+using MaterialDesignThemes.Wpf;
 
 namespace AnimeLocalTracker.Views
 {
@@ -17,6 +19,10 @@ namespace AnimeLocalTracker.Views
         private DispatcherTimer _fadeTimer;
         private bool _controlsVisible = true;
         private Point _lastMousePosition;
+
+        // Aviso propio del reproductor (ver ToastReproductor en el XAML)
+        private IDialogService? _dialogoToast;
+        private bool _toastMostrado;
 
         public ReproductorView()
         {
@@ -40,6 +46,57 @@ namespace AnimeLocalTracker.Views
             {
                 OverlayControls.DataContext = this.DataContext;
             }
+
+            EnlazarToast((e.NewValue as ReproductorViewModel)?.DialogService);
+        }
+
+        /// <summary>Se suscribe a los cambios del toast de IDialogService (y se desuscribe del anterior).</summary>
+        private void EnlazarToast(IDialogService? dialogo)
+        {
+            if (ReferenceEquals(_dialogoToast, dialogo)) return;
+
+            if (_dialogoToast != null) _dialogoToast.PropertyChanged -= DialogoToast_PropertyChanged;
+            _dialogoToast = dialogo;
+            if (_dialogoToast != null)
+            {
+                _dialogoToast.PropertyChanged += DialogoToast_PropertyChanged;
+                ActualizarToast();
+            }
+        }
+
+        private void DialogoToast_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName is not (nameof(IDialogService.ToastVisible) or nameof(IDialogService.ToastTitulo)
+                or nameof(IDialogService.ToastMensaje) or nameof(IDialogService.ToastIcono) or nameof(IDialogService.ToastColor)))
+            {
+                return;
+            }
+
+            if (Dispatcher.CheckAccess()) ActualizarToast();
+            else Dispatcher.InvokeAsync(ActualizarToast);
+        }
+
+        private void ActualizarToast()
+        {
+            var dialogo = _dialogoToast;
+            if (dialogo == null) return;
+
+            ToastRepTitulo.Text = dialogo.ToastTitulo;
+            ToastRepMensaje.Text = dialogo.ToastMensaje;
+            ToastRepIcono.Kind = Enum.TryParse<PackIconKind>(dialogo.ToastIcono, out var icono) ? icono : PackIconKind.InformationOutline;
+            try
+            {
+                ToastRepIcono.Foreground = (Brush)new BrushConverter().ConvertFromString(dialogo.ToastColor)!;
+            }
+            catch (Exception)
+            {
+                ToastRepIcono.Foreground = Brushes.White;
+            }
+
+            // Solo se anima al cambiar de visible a oculto (o al revés), no en cada cambio de texto.
+            if (dialogo.ToastVisible == _toastMostrado) return;
+            _toastMostrado = dialogo.ToastVisible;
+            ToastReproductor.BeginAnimation(OpacityProperty, new DoubleAnimation(_toastMostrado ? 1 : 0, TimeSpan.FromMilliseconds(300)));
         }
 
         private void ReproductorView_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
@@ -52,6 +109,7 @@ namespace AnimeLocalTracker.Views
 
         private void ReproductorView_Loaded(object sender, RoutedEventArgs e)
         {
+            EnlazarToast((DataContext as ReproductorViewModel)?.DialogService);
             DesactivarInteraccionNativaDelHost();
 
             // Suscribir al pipeline global de input DESPUÉS de que FlyleafHost
@@ -129,6 +187,10 @@ namespace AnimeLocalTracker.Views
 
         private void ReproductorView_Unloaded(object sender, RoutedEventArgs e)
         {
+            EnlazarToast(null);
+            _toastMostrado = false;
+            ToastReproductor.BeginAnimation(OpacityProperty, null);
+            ToastReproductor.Opacity = 0;
             InputManager.Current.PreProcessInput -= InputManager_PreProcessInput;
             _fadeTimer.Stop();
             Mouse.OverrideCursor = null;

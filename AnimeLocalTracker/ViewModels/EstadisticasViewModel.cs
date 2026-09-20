@@ -7,9 +7,13 @@ using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using AnimeLocalTracker.Controls;
+using AnimeLocalTracker.Messages;
 using AnimeLocalTracker.Services;
+using AnimeLocalTracker.Services.Franquicias;
+using AnimeLocalTracker.Services.Logros;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using CommunityToolkit.Mvvm.Messaging;
 
 namespace AnimeLocalTracker.ViewModels;
 
@@ -17,21 +21,36 @@ namespace AnimeLocalTracker.ViewModels;
 /// Estadísticas personales estilo MAL: resumen general, actividad de los últimos 7 días,
 /// estado de la lista, top de animes más vistos, episodios por año y por género.
 /// </summary>
-public partial class EstadisticasViewModel : ObservableObject
+public partial class EstadisticasViewModel : ObservableObject, IRecipient<IdiomaCambiadoMensaje>
 {
     private readonly IDatabaseService _databaseService;
     private readonly IAnimeTrackingService _animeTrackingService;
     private readonly IAuthService _authService;
     private readonly IDialogService _dialogService;
+    private readonly ILogrosService? _logrosService;
+    private readonly IFranquiciaService? _franquiciaService;
+
+    private static readonly IReadOnlyDictionary<int, int> SinFranquicias = new Dictionary<int, int>();
 
     public EstadisticasViewModel(IDatabaseService databaseService, IAnimeTrackingService animeTrackingService,
-        IAuthService authService, IDialogService dialogService)
+        IAuthService authService, IDialogService dialogService, ILogrosService? logrosService = null,
+        IFranquiciaService? franquiciaService = null)
     {
         _databaseService = databaseService;
         _animeTrackingService = animeTrackingService;
         _authService = authService;
         _dialogService = dialogService;
+        _logrosService = logrosService;
+        _franquiciaService = franquiciaService;
+
+        WeakReferenceMessenger.Default.RegisterAll(this);
     }
+
+    /// <summary>
+    /// Los géneros, rangos y textos se traducen al CALCULAR las estadísticas: al cambiar de idioma hay que
+    /// recalcularlas la próxima vez que se abra la pestaña (si no, quedan en el idioma anterior hasta 30 s).
+    /// </summary>
+    public void Receive(IdiomaCambiadoMensaje message) => _ultimaCargaUtc = DateTime.MinValue;
 
     // === RESUMEN ===
     [ObservableProperty] private int _totalAnimes;
@@ -75,8 +94,18 @@ public partial class EstadisticasViewModel : ObservableObject
     // === TOP ANIMES ===
     [ObservableProperty] private List<TopAnime> _topAnimes = new();
 
-    // === LOGROS ===
-    [ObservableProperty] private List<Logro> _logros = new();
+    // === LOGROS: solo un resumen compacto; el catálogo completo vive en la pestaña Logros ===
+    [ObservableProperty] private bool _hayLogros;
+    [ObservableProperty] private string _logrosNivelesTexto = string.Empty;
+    [ObservableProperty] private string _logrosRangoNombre = string.Empty;
+    [ObservableProperty] private string _logrosPuntosTexto = string.Empty;
+    [ObservableProperty] private double _logrosProgresoRango;
+    [ObservableProperty] private string _logrosSiguienteRangoTexto = string.Empty;
+    [ObservableProperty] private List<ContadorNivel> _logrosContadores = new();
+    [ObservableProperty] private List<LogroItemViewModel> _logrosProximos = new();
+
+    [RelayCommand]
+    private void VerTodosLosLogros() => WeakReferenceMessenger.Default.Send(new NavegarMensaje_Logros());
 
     // === TARJETA WRAPPED ===
     [ObservableProperty] private bool _generandoWrapped;
@@ -109,9 +138,15 @@ public partial class EstadisticasViewModel : ObservableObject
             {
                 var animes = await _databaseService.ObtenerTodosLosAnimesAsync() ?? new List<Models.AnimeItem>();
                 var registros = await _databaseService.ObtenerTodosLosRegistrosAsync() ?? new List<Models.RegistroEpisodio>();
-                return (animes, registros);
+                // Franquicias YA conocidas (sin red): el top se pinta de inmediato; lo que falte se sincroniza aparte.
+                var franquicias = _franquiciaService != null
+                    ? await _franquiciaService.ObtenerMapaAsync(animes.Select(a => a.AniListId))
+                    : SinFranquicias;
+                return (animes, registros, franquicias);
             });
-            await Task.Run(() => CalcularEstadisticas(datos.animes, datos.registros));
+            await Task.Run(() => CalcularEstadisticas(datos.animes, datos.registros, datos.franquicias));
+            await ActualizarResumenLogrosAsync(datos.animes, datos.registros);
+            _sincronizacionFranquicias = SincronizarFranquiciasAsync(datos.animes, datos.registros);
         }
         catch (Exception ex)
         {
@@ -123,16 +158,104 @@ public partial class EstadisticasViewModel : ObservableObject
         }
     }
 
+    private Task _sincronizacionFranquicias = Task.CompletedTask;
+
+    /// <summary>Solo para pruebas: espera a que termine la sincronización de franquicias en segundo plano.</summary>
+    internal Task SincronizacionFranquicias => _sincronizacionFranquicias;
+
+    /// <summary>
+    /// Top de lo más visto por TIEMPO, sumando la franquicia completa (temporadas, películas, spin-offs).
+    /// También fija la tarjeta "Anime más visto", que ahora habla de la misma franquicia.
+    /// </summary>
+    private void ActualizarTop(IReadOnlyList<Models.AnimeItem> animes, IReadOnlyCollection<Models.RegistroEpisodio> vistos,
+        IReadOnlyDictionary<int, int> franquicias)
+    {
+        var top = CalculadorTop.Calcular(animes, vistos, franquicias);
+        double maximo = Math.Max(1, top.Count > 0 ? top[0].Segundos : 1);
+
+        TopAnimes = top
+            .Select((f, i) => new TopAnime(i + 1, f.Titulo, f.Segundos, f.Episodios, f.Titulos)
+            {
+                AnchoBarra = f.Segundos / maximo * 420.0
+            })
+            .ToList();
+
+        if (top.Count > 0)
+        {
+            var lider = top[0];
+            AnimeMasVisto = lider.Titulo;
+            AnimeMasVistoDetalle = $"{TopAnime.FormatoTiempo(lider.Segundos)} · {TopAnime.DetalleDe(lider.Episodios, lider.Titulos)}";
+        }
+    }
+
+    /// <summary>
+    /// Trae de AniList las relaciones que falten (primera vez, series nuevas, o caducadas) y, si hubo datos nuevos,
+    /// recalcula el top con las franquicias completas. Corre aparte: la pestaña ya se pintó con lo que había.
+    /// </summary>
+    private async Task SincronizarFranquiciasAsync(List<Models.AnimeItem> animes, List<Models.RegistroEpisodio> registros)
+    {
+        if (_franquiciaService == null) return;
+
+        try
+        {
+            var ids = animes.Select(a => a.AniListId).ToList();
+            if (!await _franquiciaService.SincronizarAsync(ids)) return;
+
+            var franquicias = await _franquiciaService.ObtenerMapaAsync(ids);
+            var vistos = registros.Where(r => r.VistoLocal).ToList();
+            await Task.Run(() => ActualizarTop(animes, vistos, franquicias));
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn("EstadisticasViewModel", $"No se pudo actualizar el top con las franquicias: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Evalúa los logros con los datos ya cargados (avisa de los nuevos) y publica el resumen. Un fallo
+    /// aquí no debe marcar como fallida toda la pestaña de estadísticas: solo se registra.
+    /// </summary>
+    private async Task ActualizarResumenLogrosAsync(List<Models.AnimeItem> animes, List<Models.RegistroEpisodio> registros)
+    {
+        if (_logrosService == null) return;
+
+        try
+        {
+            var resumen = await _logrosService.EvaluarAsync(animes, registros);
+
+            LogrosNivelesTexto = string.Format(LocalizationService.T("Logro_NivelesFormato"), resumen.NivelesDesbloqueados, resumen.NivelesTotales);
+            LogrosRangoNombre = LocalizationService.T(resumen.Rango.ClaveNombre);
+            LogrosPuntosTexto = string.Format(LocalizationService.T("Logro_PuntosTotalFormato"), resumen.Puntos);
+            LogrosProgresoRango = resumen.Rango.ProgresoHaciaSiguiente(resumen.Puntos) * 100.0;
+            LogrosSiguienteRangoTexto = resumen.Rango.PuntosSiguiente is int siguiente
+                ? string.Format(LocalizationService.T("Logro_SiguienteRangoFormato"), siguiente - resumen.Puntos,
+                    LocalizationService.T($"Logro_Rango_{resumen.Rango.Indice + 1}"))
+                : LocalizationService.T("Logro_RangoMaximo");
+            LogrosContadores = Enum.GetValues<NivelLogro>()
+                .Select(n => new ContadorNivel(
+                    LocalizationService.T($"Logro_Nivel_{(int)n}"),
+                    LogroItemViewModel.ColorDeNivel((int)n),
+                    resumen.PorNivel.GetValueOrDefault(n)))
+                .ToList();
+            LogrosProximos = resumen.Proximos.Select(l => new LogroItemViewModel(l)).ToList();
+            HayLogros = true;
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("EstadisticasViewModel", "Error evaluando los logros", ex);
+        }
+    }
+
     /// <summary>
     /// Agregación pura de las estadísticas. PER-01: los registros se indexan UNA sola vez
     /// (lookup por AniListId y por fecha) — los barridos O(A×R) originales son O(A+R).
     /// WPF enlaza cambios de propiedad desde cualquier hilo, así que puede correr en un
     /// hilo de fondo y solo se publica el resultado final.
     /// </summary>
-    private void CalcularEstadisticas(List<Models.AnimeItem> animes, List<Models.RegistroEpisodio> registros)
+    private void CalcularEstadisticas(List<Models.AnimeItem> animes, List<Models.RegistroEpisodio> registros,
+        IReadOnlyDictionary<int, int> franquicias)
     {
         var registrosPorAnime = registros.ToLookup(r => r.AniListId);
-        var animesPorId = animes.ToDictionary(a => a.AniListId);
 
         var vistos = registros.Where(r => r.VistoLocal).ToList();
         var porDia = vistos.ToLookup(r => r.UltimaReproduccion?.Date);
@@ -143,7 +266,8 @@ public partial class EstadisticasViewModel : ObservableObject
         TotalFavoritos = registros.Count(r => r.FavoritoLocal);
         TotalDescargados = registros.Count(r => !string.IsNullOrWhiteSpace(r.RutaArchivo));
 
-        double segundosVistos = vistos.Sum(r => Math.Max(r.TotalSegundos, r.ProgresoSegundos));
+        // Los episodios marcados/importados sin duración se estiman (ver EstimadorDuracion): igual que Logros.
+        double segundosVistos = EstimadorDuracion.SegundosVistos(vistos);
         double horas = segundosVistos / 3600.0;
         HorasVistasTexto = horas >= 10 ? $"{horas:F0} h" : $"{horas:F1} h";
 
@@ -204,24 +328,8 @@ public partial class EstadisticasViewModel : ObservableObject
             .ToList();
         DonutEstadoCentro = TotalAnimes.ToString();
 
-        // === TOP 5 ANIMES MÁS VISTOS ===
-        TopAnimes = vistos
-            .GroupBy(r => r.AniListId)
-            .Select(g => (Id: g.Key, N: g.Count()))
-            .OrderByDescending(x => x.N)
-            .Take(5)
-            .Select((x, idx) =>
-            {
-                animesPorId.TryGetValue(x.Id, out var anime);
-                return new TopAnime(
-                    anime?.Titulo ?? $"Anime {x.Id}",
-                    x.N,
-                    anime?.TotalEpisodios ?? 0,
-                    idx + 1);
-            })
-            .ToList();
-        int maxTop = Math.Max(1, TopAnimes.Count > 0 ? TopAnimes.Max(t => t.EpisodiosVistos) : 1);
-        foreach (var t in TopAnimes) t.AnchoBarra = (t.EpisodiosVistos / (double)maxTop) * 420.0;
+        // === TOP 5 MÁS VISTOS: por TIEMPO y sumando toda la franquicia (también fija "Anime más visto") ===
+        ActualizarTop(animes, vistos, franquicias);
 
         // === POR AÑO ===
         var porAnio = vistos
@@ -251,7 +359,7 @@ public partial class EstadisticasViewModel : ObservableObject
         var generosTop = porGenero.OrderByDescending(kv => kv.Value).Take(6).ToList();
         int maxGenero = generosTop.Count > 0 ? generosTop[0].Value : 1;
         VistosPorGenero = generosTop
-            .Select(kv => new BarraDato(kv.Key, kv.Value, (kv.Value / (double)maxGenero) * 420.0))
+            .Select(kv => new BarraDato(LocalizationService.TraducirGenero(kv.Key), kv.Value, (kv.Value / (double)maxGenero) * 420.0))
             .ToList();
 
         // === DONUT DE GÉNEROS (top 6 + "Otros") ===
@@ -259,7 +367,7 @@ public partial class EstadisticasViewModel : ObservableObject
         var generosParaDonut = porGenero.OrderByDescending(kv => kv.Value).Take(6).ToList();
         int resto = porGenero.Where(kv => !generosParaDonut.Any(g => g.Key == kv.Key)).Sum(kv => kv.Value);
         var donutGeneros = generosParaDonut
-            .Select((kv, i) => new DonutDato(kv.Key, kv.Value, paletaGeneros[i % paletaGeneros.Length]))
+            .Select((kv, i) => new DonutDato(LocalizationService.TraducirGenero(kv.Key), kv.Value, paletaGeneros[i % paletaGeneros.Length]))
             .ToList();
         if (resto > 0) donutGeneros.Add(new DonutDato(LocalizationService.T("Stats_Otros"), resto, "#4B5563"));
         DonutGeneros = donutGeneros;
@@ -269,23 +377,11 @@ public partial class EstadisticasViewModel : ObservableObject
         var generoFav = porGenero.OrderByDescending(kv => kv.Value).FirstOrDefault();
         if (generoFav.Key != null)
         {
-            GeneroFavorito = generoFav.Key;
+            GeneroFavorito = LocalizationService.TraducirGenero(generoFav.Key);
             double pct = TotalAnimes > 0 ? generoFav.Value * 100.0 / TotalAnimes : 0;
             GeneroFavoritoDetalle = string.Format(LocalizationService.T("Stats_GeneroFavoritoDetalleFormato"), generoFav.Value, pct);
-            DonutGenerosCentro = generoFav.Key;
+            DonutGenerosCentro = LocalizationService.TraducirGenero(generoFav.Key);
             DonutGenerosSubcentro = string.Format(LocalizationService.T("Stats_FavoritoPorcentaje"), pct);
-        }
-
-        // Anime más visto
-        var top1 = vistos.GroupBy(r => r.AniListId).OrderByDescending(g => g.Count()).FirstOrDefault();
-        if (top1 != null)
-        {
-            animesPorId.TryGetValue(top1.Key, out var animeTop);
-            AnimeMasVisto = animeTop?.Titulo ?? $"Anime {top1.Key}";
-            int totalDelAnime = animeTop?.TotalEpisodios ?? 0;
-            AnimeMasVistoDetalle = totalDelAnime > 0
-                ? string.Format(LocalizationService.T("Stats_EpisodiosDeTotalFormato"), top1.Count(), totalDelAnime)
-                : string.Format(LocalizationService.T("Stats_EpisodiosVistosFormato"), top1.Count());
         }
 
         // Mejor año
@@ -341,33 +437,6 @@ public partial class EstadisticasViewModel : ObservableObject
         }
         RachaMaxima = string.Format(LocalizationService.T("Stats_DiasFormato"), rachaMax);
         RachaActual = string.Format(LocalizationService.T("Stats_DiasFormato"), rachaActual);
-
-        // === LOGROS ===
-        // Búho Nocturno compara contra la hora local del reloj de pared. UltimaReproduccion
-        // llega de sqlite-net con Kind=Unspecified pero representa UTC (regla persistence.md #4):
-        // DateTime.ToLocalTime() ya asume UTC cuando Kind es Unspecified, así que no hace falta
-        // SpecifyKind explícito.
-        bool buhoNocturno = vistos.Any(r =>
-        {
-            if (!r.UltimaReproduccion.HasValue) return false;
-            int horaLocal = r.UltimaReproduccion.Value.ToLocalTime().Hour;
-            return horaLocal is >= 2 and < 5;
-        });
-
-        bool maratonero = porDia.Any(g => g.Key.HasValue && g.Count() >= 6);
-
-        bool completistaLegendario = animes.Any(a =>
-            a.TotalEpisodios > 50 && registrosPorAnime[a.AniListId].Count(r => r.VistoLocal) >= a.TotalEpisodios);
-
-        bool biografoOtaku = horas >= 100;
-
-        Logros = new List<Logro>
-        {
-            new("Run", "#FB923C", LocalizationService.T("Stats_LogroMaratonero"), LocalizationService.T("Stats_LogroMaratoneroDesc"), maratonero),
-            new("Owl", "#818CF8", LocalizationService.T("Stats_LogroBuhoNocturno"), LocalizationService.T("Stats_LogroBuhoNocturnoDesc"), buhoNocturno),
-            new("TrophyAward", "#FBBF24", LocalizationService.T("Stats_LogroCompletista"), LocalizationService.T("Stats_LogroCompletistaDesc"), completistaLegendario),
-            new("BookOpenPageVariant", "#34D399", LocalizationService.T("Stats_LogroBiografo"), LocalizationService.T("Stats_LogroBiografoDesc"), biografoOtaku),
-        };
     }
 
     /// <summary>
@@ -516,44 +585,42 @@ public class BarraDato
     }
 }
 
-/// <summary>Entrada del top de animes más vistos.</summary>
+/// <summary>
+/// Entrada del top de lo más visto: una franquicia completa (o un anime suelto) ordenada por el TIEMPO que le has
+/// dedicado — no por el número de episodios, que favorecía siempre a las series larguísimas.
+/// </summary>
 public class TopAnime
 {
     public int Posicion { get; }
     public string Titulo { get; }
+    public double Segundos { get; }
     public int EpisodiosVistos { get; }
-    public int TotalEpisodios { get; }
+
+    /// <summary>Cuántos títulos (temporadas, películas, especiales…) de la franquicia has visto.</summary>
+    public int Titulos { get; }
+
     public double AnchoBarra { get; set; }
 
-    public string ProgresoTexto => TotalEpisodios > 0
-        ? string.Format(LocalizationService.T("Stats_EpisodiosDeTotalFormato"), EpisodiosVistos, TotalEpisodios)
-        : string.Format(LocalizationService.T("Stats_EpisodiosVistosFormato"), EpisodiosVistos);
+    public string TiempoTexto => FormatoTiempo(Segundos);
+    public string DetalleTexto => DetalleDe(EpisodiosVistos, Titulos);
 
-    public TopAnime(string titulo, int episodiosVistos, int totalEpisodios, int posicion)
+    public TopAnime(int posicion, string titulo, double segundos, int episodiosVistos, int titulos)
     {
-        Titulo = titulo;
-        EpisodiosVistos = episodiosVistos;
-        TotalEpisodios = totalEpisodios;
         Posicion = posicion;
-    }
-}
-
-/// <summary>Insignia calculada dinámicamente a partir del historial (sin tabla/migración propia).</summary>
-public class Logro
-{
-    public string Icono { get; }
-    public string Color { get; }
-    public string Titulo { get; }
-    public string Descripcion { get; }
-    public bool Desbloqueado { get; }
-    public string EstadoTexto => LocalizationService.T(Desbloqueado ? "Stats_LogroDesbloqueado" : "Stats_LogroBloqueado");
-
-    public Logro(string icono, string color, string titulo, string descripcion, bool desbloqueado)
-    {
-        Icono = icono;
-        Color = color;
         Titulo = titulo;
-        Descripcion = descripcion;
-        Desbloqueado = desbloqueado;
+        Segundos = segundos;
+        EpisodiosVistos = episodiosVistos;
+        Titulos = titulos;
     }
+
+    internal static string FormatoTiempo(double segundos)
+    {
+        double horas = segundos / 3600.0;
+        return horas >= 10 ? $"{horas:F0} h" : $"{horas:F1} h";
+    }
+
+    internal static string DetalleDe(int episodios, int titulos) => titulos > 1
+        ? string.Format(LocalizationService.T("Stats_TopDetalleFranquiciaFormato"), episodios, titulos)
+        : string.Format(LocalizationService.T("Stats_EpisodiosVistosFormato"), episodios);
 }
+

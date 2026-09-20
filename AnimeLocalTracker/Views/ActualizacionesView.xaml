@@ -8,6 +8,36 @@
              TextElement.Foreground="{DynamicResource MaterialDesignBody}"
              Background="Transparent">
 
+    <UserControl.Resources>
+        <!-- Chip de filtro: activo = borde y texto azules de la paleta (igual que en Logros) -->
+        <Style x:Key="ActChipStyle" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Focusable" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Raiz" Background="#14181E" BorderBrush="#262D38" BorderThickness="1"
+                                CornerRadius="16" Padding="14,6" Margin="0,0,8,0">
+                            <ContentPresenter x:Name="Texto" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                              TextElement.FontSize="12" TextElement.FontWeight="SemiBold"
+                                              TextElement.Foreground="#9CA3AF"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Raiz" Property="Background" Value="#1B222C"/>
+                            </Trigger>
+                            <DataTrigger Binding="{Binding EsActivo}" Value="True">
+                                <Setter TargetName="Raiz" Property="Background" Value="#1E293B"/>
+                                <Setter TargetName="Raiz" Property="BorderBrush" Value="#60A5FA"/>
+                                <Setter TargetName="Texto" Property="TextElement.Foreground" Value="#93C5FD"/>
+                            </DataTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
     <Grid MaxWidth="1280">
         <Grid.Style>
             <Style TargetType="Grid">
@@ -21,12 +51,14 @@
         </Grid.Style>
 
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>  <!-- 0: encabezado + acciones -->
+            <RowDefinition Height="Auto"/>  <!-- 1: resumen -->
+            <RowDefinition Height="Auto"/>  <!-- 2: filtros -->
+            <RowDefinition Height="*"/>     <!-- 3: lista / estados -->
         </Grid.RowDefinitions>
 
-        <!-- ENCABEZADO -->
-        <Grid Grid.Row="0" Margin="0,0,0,20">
+        <!-- ═══ FILA 0: ENCABEZADO Y ACCIONES EN BLOQUE ═══ -->
+        <Grid Grid.Row="0" Margin="0,0,0,18">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
@@ -37,22 +69,106 @@
                     <materialDesign:PackIcon Kind="NewReleases" Foreground="#60A5FA" Width="26" Height="26" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
                 <StackPanel VerticalAlignment="Center">
-                    <TextBlock Text="{Binding [Act_Titulo], Source={x:Static loc:LocalizationService.Instance}}" Style="{StaticResource AppText.PageTitle}"/>
-                    <TextBlock Text="{Binding [Act_Subtitulo], Source={x:Static loc:LocalizationService.Instance}}" FontSize="12" Foreground="#9CA3AF" Margin="0,3,0,0"/>
+                    <TextBlock Text="{Binding [Act_Titulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.PageTitle}"/>
+                    <TextBlock Text="{Binding [Act_Subtitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="12" Foreground="#9CA3AF" Margin="0,3,0,0"/>
                 </StackPanel>
             </StackPanel>
 
-            <Button Grid.Column="1" Command="{Binding CargarActualizacionesCommand}"
-                    Style="{StaticResource MaterialDesignOutlinedButton}" Height="36" Padding="12,0"
-                    VerticalAlignment="Center">
-                <StackPanel Orientation="Horizontal">
-                    <materialDesign:PackIcon Kind="Refresh" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                    <TextBlock Text="{Binding [Act_BotonActualizar], Source={x:Static loc:LocalizationService.Instance}}" VerticalAlignment="Center" FontSize="12"/>
-                </StackPanel>
-            </Button>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                <!-- Descargar todo lo pendiente (pide confirmación) -->
+                <Button Command="{Binding DescargarPendientesCommand}" IsEnabled="{Binding PuedeDescargarPendientes}"
+                        Style="{StaticResource AppPrimaryButton}" Height="38" Padding="16,0" Cursor="Hand"
+                        materialDesign:ButtonAssist.CornerRadius="10" Margin="0,0,10,0"
+                        AutomationProperties.Name="{Binding DescargarPendientesTexto}">
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon Kind="DownloadMultiple" Width="18" Height="18" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <TextBlock Text="{Binding DescargarPendientesTexto}" FontWeight="SemiBold" FontSize="12.5" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+
+                <!-- Marcar todo como visto -->
+                <Button Command="{Binding MarcarTodoVistoCommand}" IsEnabled="{Binding PuedeMarcarVistos}"
+                        Style="{StaticResource MaterialDesignOutlinedButton}" Height="38" Padding="14,0" Cursor="Hand"
+                        Foreground="{DynamicResource Brush.TextPrimary}" BorderBrush="{DynamicResource Brush.BorderStrong}"
+                        materialDesign:ButtonAssist.CornerRadius="10" Margin="0,0,10,0"
+                        AutomationProperties.Name="{Binding MarcarVistosTexto}">
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon Kind="EyeCheckOutline" Width="18" Height="18" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <TextBlock Text="{Binding MarcarVistosTexto}" FontSize="12.5" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+
+                <!-- Volver a consultar AniList -->
+                <Button Command="{Binding CargarActualizacionesCommand}" Width="38" Height="38" Cursor="Hand"
+                        Style="{StaticResource MaterialDesignOutlinedButton}" Padding="0"
+                        Foreground="{DynamicResource Brush.TextPrimary}" BorderBrush="{DynamicResource Brush.BorderStrong}"
+                        materialDesign:ButtonAssist.CornerRadius="10"
+                        ToolTip="{Binding [Act_BotonActualizar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                        AutomationProperties.Name="{Binding [Act_BotonActualizar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                    <materialDesign:PackIcon Kind="Refresh" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Button>
+            </StackPanel>
         </Grid>
 
-        <Grid Grid.Row="1">
+        <!-- ═══ FILA 1: RESUMEN (nuevos · por descargar · listos) ═══ -->
+        <UniformGrid Grid.Row="1" Columns="3" Margin="0,0,0,16">
+            <Border Background="{DynamicResource Brush.Surface1}" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1"
+                    CornerRadius="14" Padding="18,14" Margin="0,0,10,0">
+                <StackPanel Orientation="Horizontal">
+                    <Border Background="#2E2547" CornerRadius="10" Width="42" Height="42" Margin="0,0,14,0">
+                        <materialDesign:PackIcon Kind="NewReleases" Foreground="#A78BFA" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="{Binding TotalNuevos}" FontSize="24" FontWeight="Bold" Foreground="White"/>
+                        <TextBlock Text="{Binding [Act_Resumen_Nuevos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="11.5" Foreground="#94A3B8"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <Border Background="{DynamicResource Brush.Surface1}" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1"
+                    CornerRadius="14" Padding="18,14" Margin="0,0,10,0">
+                <StackPanel Orientation="Horizontal">
+                    <Border Background="#1E293B" CornerRadius="10" Width="42" Height="42" Margin="0,0,14,0">
+                        <materialDesign:PackIcon Kind="CloudDownloadOutline" Foreground="#60A5FA" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="{Binding TotalPorDescargar}" FontSize="24" FontWeight="Bold" Foreground="White"/>
+                        <TextBlock Text="{Binding [Act_Resumen_PorDescargar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="11.5" Foreground="#94A3B8"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <Border Background="{DynamicResource Brush.Surface1}" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1"
+                    CornerRadius="14" Padding="18,14">
+                <StackPanel Orientation="Horizontal">
+                    <Border Background="#123A2E" CornerRadius="10" Width="42" Height="42" Margin="0,0,14,0">
+                        <materialDesign:PackIcon Kind="PlayCircleOutline" Foreground="#34D399" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="{Binding TotalListos}" FontSize="24" FontWeight="Bold" Foreground="White"/>
+                        <TextBlock Text="{Binding [Act_Resumen_Listos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="11.5" Foreground="#94A3B8"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </UniformGrid>
+
+        <!-- ═══ FILA 2: FILTROS (chips con contador) ═══ -->
+        <ItemsControl Grid.Row="2" ItemsSource="{Binding Filtros}" Margin="0,0,0,4">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Button Content="{Binding Etiqueta}" Style="{StaticResource ActChipStyle}"
+                            Command="{Binding DataContext.SeleccionarFiltroCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                            CommandParameter="{Binding Clave}"
+                            AutomationProperties.Name="{Binding Etiqueta}"/>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <!-- ═══ FILA 3: CONTENIDO ═══ -->
+        <Grid Grid.Row="3">
             <!-- CARGANDO -->
             <ProgressBar Style="{StaticResource MaterialDesignCircularProgressBar}" IsIndeterminate="True"
                          Width="44" Height="44" Value="0" Foreground="#60A5FA"
@@ -65,27 +181,35 @@
                 <Border Background="#1E293B" CornerRadius="36" Width="72" Height="72" Margin="0,0,0,16" HorizontalAlignment="Center">
                     <materialDesign:PackIcon Kind="NewReleases" Foreground="#64748B" Width="36" Height="36" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
-                <TextBlock Text="{Binding [Act_VacioTitulo], Source={x:Static loc:LocalizationService.Instance}}" Style="{StaticResource AppEmptyTitle}"/>
-                <TextBlock Text="{Binding [Act_VacioSub], Source={x:Static loc:LocalizationService.Instance}}" Style="{StaticResource AppEmptyText}" Margin="0,6,0,0"/>
+                <TextBlock Text="{Binding [Act_VacioTitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppEmptyTitle}"/>
+                <TextBlock Text="{Binding [Act_VacioSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppEmptyText}" Margin="0,6,0,0"/>
+            </StackPanel>
+
+            <!-- SIN RESULTADOS CON EL FILTRO ACTUAL -->
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,40,0,40"
+                        Visibility="{Binding SinResultados, Converter={StaticResource BoolToVis}}">
+                <materialDesign:PackIcon Kind="FilterVariant" Foreground="#64748B" Width="48" Height="48" HorizontalAlignment="Center" Margin="0,0,0,12"/>
+                <TextBlock Text="{Binding [Act_SinResultados], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppEmptyText}" FontSize="15" HorizontalAlignment="Center"/>
             </StackPanel>
 
             <!-- LISTA VIRTUALIZADA CON CABECERAS DE FECHA -->
             <ListBox ItemsSource="{Binding ItemsAgrupados}"
                      Background="Transparent" BorderThickness="0" Padding="0,0,16,0"
                      ScrollViewer.VerticalScrollBarVisibility="Auto"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                      VirtualizingPanel.IsVirtualizing="True"
                      VirtualizingPanel.VirtualizationMode="Recycling"
                      VirtualizingPanel.ScrollUnit="Pixel"
                      ScrollViewer.CanContentScroll="True"
                      SelectionMode="Single"
-                     Visibility="{Binding TieneItems, Converter={StaticResource BoolToVis}}">
+                     Visibility="{Binding TieneResultados, Converter={StaticResource BoolToVis}}">
                 <ListBox.ItemContainerStyle>
                     <Style TargetType="ListBoxItem">
                         <Setter Property="Background" Value="Transparent"/>
                         <Setter Property="BorderThickness" Value="0"/>
                         <Setter Property="Padding" Value="0"/>
+                        <Setter Property="Focusable" Value="False"/>
                         <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
                         <Setter Property="Template">
                             <Setter.Value>
                                 <ControlTemplate TargetType="ListBoxItem">
@@ -95,6 +219,7 @@
                         </Setter>
                     </Style>
                 </ListBox.ItemContainerStyle>
+
                 <ListBox.Resources>
                     <!-- CABECERA DE FECHA (Hoy / Ayer / Hace N días) -->
                     <DataTemplate DataType="{x:Type sys:String}">
@@ -102,156 +227,135 @@
                                    Focusable="False" IsHitTestVisible="False"/>
                     </DataTemplate>
 
+                    <!-- TARJETA DE EPISODIO -->
                     <DataTemplate DataType="{x:Type vm:ActualizacionItemViewModel}">
                         <Border Background="{DynamicResource Brush.Surface1}"
                                 BorderBrush="{DynamicResource Brush.Border}"
-                                BorderThickness="1" CornerRadius="12"
-                                Padding="12,10" Margin="0,0,10,10" ClipToBounds="True">
+                                BorderThickness="1" CornerRadius="14"
+                                Padding="14,12" Margin="0,0,10,10" ClipToBounds="True">
                             <Grid>
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="90"/>
+                                    <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
 
-                                <!-- PORTADA (Clic para abrir ficha) -->
+                                <!-- PORTADA (clic: abre la ficha). Con progreso guardado muestra una barra abajo. -->
                                 <Button Grid.Column="0"
                                         Command="{Binding DataContext.NavegarDetalleCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                         CommandParameter="{Binding}"
+                                        Width="66" Height="94" MinHeight="94"
                                         Background="Transparent" BorderThickness="0" Padding="0" Margin="0"
-                                        Cursor="Hand" ToolTip="{Binding [Act_VerAnime], Source={x:Static loc:LocalizationService.Instance}}"
-                                        HorizontalAlignment="Left" VerticalAlignment="Center">
-                                    <Border Width="80" Height="45" CornerRadius="6" ClipToBounds="True"
-                                            Background="#1E293B" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                        Cursor="Hand" ToolTip="{Binding [Act_VerAnime], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                        AutomationProperties.Name="{Binding [Act_VerAnime], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                        VerticalAlignment="Center">
+                                    <Border x:Name="Portada" Width="66" Height="94" CornerRadius="10" ClipToBounds="True" Background="#1E293B">
                                         <Grid>
-                                            <!-- Efecto "bones" mientras carga la portada -->
+                                            <!-- Placeholder DEBAJO de la imagen: se ve si la portada falla o aún carga -->
                                             <Border Style="{StaticResource ShimmerEffectStyle}">
-                                                <materialDesign:PackIcon Kind="MoviePlayOutline" Foreground="#475569" Width="22" Height="22"
+                                                <materialDesign:PackIcon Kind="MoviePlayOutline" Foreground="#475569" Width="24" Height="24"
                                                                          HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                             </Border>
                                             <Image Source="{Binding RutaPortada, TargetNullValue={x:Null}}" Stretch="UniformToFill"/>
+                                            <ProgressBar Value="{Binding PorcentajeProgreso, Mode=OneWay}" Style="{StaticResource AppWatchProgressBar.Overlay}"
+                                                         Visibility="{Binding TieneProgresoGuardado, Converter={StaticResource BoolToVis}}"/>
                                         </Grid>
                                     </Border>
                                 </Button>
 
-                                <!-- INFO -->
-                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="10,0,12,0">
-                                    <!-- TÍTULO (Clic para abrir ficha) -->
+                                <!-- INFO: título, episodio + fecha + tamaño, y estado -->
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="16,0,14,0">
                                     <Button Command="{Binding DataContext.NavegarDetalleCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                             CommandParameter="{Binding}"
                                             Background="Transparent" BorderThickness="0" Padding="0" Margin="0"
                                             Cursor="Hand" HorizontalAlignment="Left" HorizontalContentAlignment="Left"
-                                            ToolTip="{Binding [Act_VerAnime], Source={x:Static loc:LocalizationService.Instance}}">
-                                        <TextBlock Text="{Binding TituloAnime}" FontWeight="Bold" FontSize="14.5" Foreground="#E2E8F0"
-                                                   TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" MaxHeight="20"/>
+                                            ToolTip="{Binding [Act_VerAnime], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                        <TextBlock Text="{Binding TituloAnime}" FontWeight="Bold" FontSize="15" Foreground="#E2E8F0"
+                                                   TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"/>
                                     </Button>
-                                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0" VerticalAlignment="Center">
-                                        <!-- PUNTO NO VISTO (igual que en la Ficha) -->
-                                        <Ellipse x:Name="PuntoNoVisto" Width="6" Height="6" Fill="#60A5FA" VerticalAlignment="Center" Margin="0,0,6,0"
-                                                 Visibility="Visible"/>
-                                        <TextBlock x:Name="TextoEpisodio" Text="{Binding EpisodioTexto}" FontWeight="SemiBold" FontSize="12.5" Foreground="#93C5FD" VerticalAlignment="Center"/>
-                                        <TextBlock Text=" · " Foreground="#6B7280" FontSize="12.5" VerticalAlignment="Center"/>
-                                        <TextBlock Text="{Binding FechaTexto}" FontSize="12" Foreground="#94A3B8" VerticalAlignment="Center"/>
 
-                                        <!-- TAMAÑO DE ARCHIVO DESCARGADO -->
-                                        <TextBlock Text=" · " Foreground="#6B7280" FontSize="12" VerticalAlignment="Center"
+                                    <StackPanel Orientation="Horizontal" Margin="0,7,0,0">
+                                        <Border Background="#1E293B" CornerRadius="6" Padding="7,2" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding EpisodioCorto}" Foreground="#93C5FD" FontSize="11" FontWeight="Bold"/>
+                                        </Border>
+                                        <TextBlock Text="{Binding FechaTexto}" FontSize="12" Foreground="#94A3B8" VerticalAlignment="Center" Margin="9,0,0,0"/>
+                                        <TextBlock Text=" · " Foreground="#94A3B8" FontSize="12" VerticalAlignment="Center"
                                                    Visibility="{Binding Descargado, Converter={StaticResource BoolToVis}}"/>
                                         <TextBlock Text="{Binding TamanoArchivoFormateado}" FontSize="12" Foreground="#94A3B8" VerticalAlignment="Center"
                                                    Visibility="{Binding Descargado, Converter={StaticResource BoolToVis}}"/>
+                                    </StackPanel>
 
-                                        <!-- BADGE DESCARGADO -->
-                                        <Border Background="#1E3A8A" CornerRadius="4" Padding="5,1.5" Margin="8,0,0,0" VerticalAlignment="Center"
-                                                Visibility="{Binding Descargado, Converter={StaticResource BoolToVis}}">
-                                            <StackPanel Orientation="Horizontal">
-                                                <materialDesign:PackIcon Kind="Check" Foreground="#60A5FA" Width="11" Height="11" VerticalAlignment="Center" Margin="0,0,3,0"/>
-                                                <TextBlock Text="{Binding [Act_Descargado], Source={x:Static loc:LocalizationService.Instance}}"
-                                                           FontSize="10.5" Foreground="#93C5FD" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                    <!-- ESTADO: chip de color + tiempo guardado si está a medias -->
+                                    <StackPanel Orientation="Horizontal" Margin="0,9,0,0">
+                                        <Grid>
+                                            <Border Background="{Binding EstadoColor}" Opacity="0.16" CornerRadius="11"/>
+                                            <StackPanel Orientation="Horizontal" Margin="10,4">
+                                                <materialDesign:PackIcon Kind="{Binding EstadoIcono}" Foreground="{Binding EstadoColor}"
+                                                                         Width="14" Height="14" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                                <TextBlock Text="{Binding EstadoTexto}" Foreground="{Binding EstadoColor}"
+                                                           FontSize="11.5" FontWeight="SemiBold" VerticalAlignment="Center"/>
                                             </StackPanel>
-                                        </Border>
-
-                                        <!-- PROGRESO GUARDADO: capítulo a medio ver (misma línea que los demás
-                                             estados, para que la tarjeta no cambie de alto entre capítulos). -->
-                                        <StackPanel x:Name="PanelProgreso" Orientation="Horizontal" Margin="8,0,0,0"
-                                                    VerticalAlignment="Center" Visibility="Visible">
-                                            <ProgressBar Value="{Binding PorcentajeProgreso, Mode=OneWay}" Maximum="1.0"
-                                                         Height="3" Width="40" Background="#33FFFFFF" Foreground="#60A5FA"
-                                                         VerticalAlignment="Center" Margin="0,0,6,0"
-                                                         materialDesign:TransitionAssist.DisableTransitions="True"/>
-                                            <TextBlock Text="{Binding ProgresoFormateado}" Foreground="#93C5FD" FontSize="11" FontWeight="Medium" VerticalAlignment="Center"/>
-                                        </StackPanel>
+                                        </Grid>
+                                        <TextBlock Text="{Binding ProgresoFormateado}" Foreground="#94A3B8" FontSize="11.5"
+                                                   VerticalAlignment="Center" Margin="10,0,0,0"
+                                                   Visibility="{Binding TieneProgresoGuardado, Converter={StaticResource BoolToVis}}"/>
                                     </StackPanel>
                                 </StackPanel>
 
-                                <!-- ACCIÓN: REPRODUCIR / PROGRESO / DESCARGAR -->
-                                <Grid Grid.Column="2" Width="34" Height="34" VerticalAlignment="Center">
-                                    <!-- 1. DESCARGADO: botón de reproducir directamente -->
-                                    <Button Command="{Binding DataContext.ReproducirCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                <!-- ACCIÓN PRINCIPAL (con texto) + ficha -->
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <!-- Principal: Descargar / Ver ahora / Continuar -->
+                                    <Button Command="{Binding DataContext.EjecutarAccionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                             CommandParameter="{Binding}"
-                                            Width="34" Height="34" Cursor="Hand"
-                                            ToolTip="{Binding [Act_Reproducir], Source={x:Static loc:LocalizationService.Instance}}"
-                                            AutomationProperties.Name="{Binding [Act_Reproducir], Source={x:Static loc:LocalizationService.Instance}}"
-                                            Visibility="{Binding Descargado, Converter={StaticResource BoolToVis}}">
-                                        <Button.Style>
-                                            <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
-                                                <Setter Property="Background" Value="Transparent"/>
-                                            </Style>
-                                        </Button.Style>
-                                        <materialDesign:PackIcon Kind="PlayCircleOutline" Foreground="#60A5FA" Width="26" Height="26"/>
+                                            Style="{StaticResource AppPrimaryButton}" Height="38" MinWidth="130" Padding="16,0" Cursor="Hand"
+                                            materialDesign:ButtonAssist.CornerRadius="10"
+                                            AutomationProperties.Name="{Binding AccionTexto}"
+                                            Visibility="{Binding MostrarAccionPrimaria, Converter={StaticResource BoolToVis}}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <materialDesign:PackIcon Kind="{Binding AccionIcono}" Width="18" Height="18" VerticalAlignment="Center" Margin="0,0,7,0"/>
+                                            <TextBlock Text="{Binding AccionTexto}" FontWeight="SemiBold" FontSize="12.5" VerticalAlignment="Center"/>
+                                        </StackPanel>
                                     </Button>
 
-                                    <!-- 2. DESCARGANDO: círculo de progreso -->
-                                    <Grid Visibility="{Binding IsDownloading, Converter={StaticResource BoolToVis}}">
-                                        <Ellipse Width="24" Height="24" Stroke="#33FFFFFF" StrokeThickness="3"
-                                                 VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                                        <ProgressBar Width="24" Height="24" Foreground="#60A5FA"
-                                                     Style="{StaticResource MaterialDesignCircularProgressBar}"
-                                                     IsIndeterminate="True"
-                                                     Visibility="{Binding EstaEnEspera, Converter={StaticResource BoolToVis}}"
-                                                     VerticalAlignment="Center" HorizontalAlignment="Center"
-                                                     materialDesign:TransitionAssist.DisableTransitions="True"/>
-                                        <ProgressBar Value="{Binding DownloadProgress}" Minimum="0" Maximum="100"
-                                                     Style="{StaticResource MaterialDesignCircularProgressBar}"
-                                                     Width="24" Height="24" Foreground="#60A5FA"
-                                                     IsIndeterminate="False"
-                                                     Visibility="{Binding ProgresoDescargaActivo, Converter={StaticResource BoolToVis}}"
-                                                     VerticalAlignment="Center" HorizontalAlignment="Center"
-                                                     materialDesign:TransitionAssist.DisableTransitions="True"/>
+                                    <!-- Secundaria (episodio ya visto): Ver de nuevo / Descargar -->
+                                    <Button Command="{Binding DataContext.EjecutarAccionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding}"
+                                            Style="{StaticResource MaterialDesignOutlinedButton}" Height="38" MinWidth="130" Padding="14,0" Cursor="Hand"
+                                            Foreground="{DynamicResource Brush.TextPrimary}" BorderBrush="{DynamicResource Brush.BorderStrong}"
+                                            materialDesign:ButtonAssist.CornerRadius="10"
+                                            AutomationProperties.Name="{Binding AccionTexto}"
+                                            Visibility="{Binding MostrarAccionSecundaria, Converter={StaticResource BoolToVis}}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <materialDesign:PackIcon Kind="{Binding AccionIcono}" Width="18" Height="18" VerticalAlignment="Center" Margin="0,0,7,0"/>
+                                            <TextBlock Text="{Binding AccionTexto}" FontSize="12.5" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
+
+                                    <!-- Descargando: círculo de progreso en lugar del botón -->
+                                    <Grid Width="130" Height="38" Visibility="{Binding IsDownloading, Converter={StaticResource BoolToVis}}">
+                                        <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
+                                            <Ellipse Width="26" Height="26" Stroke="#33FFFFFF" StrokeThickness="3"/>
+                                            <ProgressBar Width="26" Height="26" Foreground="#60A5FA"
+                                                         Style="{StaticResource MaterialDesignCircularProgressBar}" IsIndeterminate="True"
+                                                         Visibility="{Binding EstaEnEspera, Converter={StaticResource BoolToVis}}"
+                                                         materialDesign:TransitionAssist.DisableTransitions="True"/>
+                                            <ProgressBar Value="{Binding DownloadProgress, Mode=OneWay}" Minimum="0" Maximum="100"
+                                                         Style="{StaticResource MaterialDesignCircularProgressBar}"
+                                                         Width="26" Height="26" Foreground="#60A5FA" IsIndeterminate="False"
+                                                         Visibility="{Binding ProgresoDescargaActivo, Converter={StaticResource BoolToVis}}"
+                                                         materialDesign:TransitionAssist.DisableTransitions="True"/>
+                                        </Grid>
                                     </Grid>
 
-                                    <!-- 3. PENDIENTE DE DESCARGAR (no descargado ni descargando) -->
-                                    <Button Command="{Binding DataContext.DescargarCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                            CommandParameter="{Binding}"
-                                            Width="34" Height="34" Cursor="Hand"
-                                            ToolTip="{Binding [Act_Descargar], Source={x:Static loc:LocalizationService.Instance}}"
-                                            AutomationProperties.Name="{Binding [Act_Descargar], Source={x:Static loc:LocalizationService.Instance}}">
-                                        <Button.Style>
-                                            <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
-                                                <Setter Property="Visibility" Value="Visible"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding Descargado}" Value="True">
-                                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                                    </DataTrigger>
-                                                    <DataTrigger Binding="{Binding IsDownloading}" Value="True">
-                                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Button.Style>
-                                        <materialDesign:PackIcon Kind="DownloadCircleOutline" Foreground="#60A5FA" Width="24" Height="24"/>
-                                    </Button>
-                                </Grid>
+                                    
+                                </StackPanel>
                             </Grid>
                         </Border>
 
                         <DataTemplate.Triggers>
-                            <!-- ESTADO VISTO: ocultar el punto azul y atenuar el número de episodio -->
-                            <DataTrigger Binding="{Binding Visto}" Value="True">
-                                <Setter TargetName="PuntoNoVisto" Property="Visibility" Value="Collapsed"/>
-                                <Setter TargetName="TextoEpisodio" Property="Opacity" Value="0.6"/>
-                            </DataTrigger>
-
-                            <DataTrigger Binding="{Binding TieneProgresoGuardado}" Value="False">
-                                <Setter TargetName="PanelProgreso" Property="Visibility" Value="Collapsed"/>
+                            <!-- Episodio ya visto: portada atenuada para que destaque lo pendiente -->
+                            <DataTrigger Binding="{Binding Estado}" Value="Visto">
+                                <Setter TargetName="Portada" Property="Opacity" Value="0.55"/>
                             </DataTrigger>
                         </DataTemplate.Triggers>
                     </DataTemplate>
