@@ -362,6 +362,14 @@ public sealed class LocalizationService : INotifyPropertyChanged
         ["Det_FechaInicio"] = "Fecha de Inicio",
         ["Det_FechaFin"] = "Fecha de Fin",
         ["Det_GuardarAniList"] = "Guardar en AniList",
+        ["Det_SegMenosTip"] = "Quitar un episodio",
+        ["Det_SegMasTip"] = "Sumar un episodio",
+        ["Det_SegHoyTip"] = "Poner la fecha de hoy",
+        ["Det_SegHoyCorto"] = "Hoy",
+        ["Det_SegSinPuntuar"] = "Sin puntuar",
+        ["Det_SegQuitarPuntajeTip"] = "Quitar la puntuación",
+        ["Det_SegInicioCorto"] = "Inicio",
+        ["Det_SegFinCorto"] = "Fin",
 
         // === AGREGAR ANIME ===
         ["Add_Titulo"] = "Añadir Anime",
@@ -1169,6 +1177,14 @@ public sealed class LocalizationService : INotifyPropertyChanged
         ["Det_FechaInicio"] = "Start Date",
         ["Det_FechaFin"] = "End Date",
         ["Det_GuardarAniList"] = "Save to AniList",
+        ["Det_SegMenosTip"] = "Remove one episode",
+        ["Det_SegMasTip"] = "Add one episode",
+        ["Det_SegHoyTip"] = "Set today's date",
+        ["Det_SegHoyCorto"] = "Today",
+        ["Det_SegSinPuntuar"] = "Not scored",
+        ["Det_SegQuitarPuntajeTip"] = "Clear the score",
+        ["Det_SegInicioCorto"] = "Start",
+        ["Det_SegFinCorto"] = "End",
 
         // === ADD ANIME ===
         ["Add_Titulo"] = "Add Anime",

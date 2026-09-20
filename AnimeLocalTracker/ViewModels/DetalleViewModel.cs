@@ -91,16 +91,22 @@ public partial class DetalleViewModel : ObservableObject,
 
     partial void OnEditProgresoTextoChanged(string value)
     {
+        ProcesarProgresoTexto(value);
+        OnPropertyChanged(nameof(EditProgresoPorcentaje));
+    }
+
+    private void ProcesarProgresoTexto(string value)
+    {
         if (string.IsNullOrWhiteSpace(value))
         {
-            _editProgreso = 0;
+            EditProgreso = 0;
             return;
         }
 
         string soloDigitos = new string(value.Where(char.IsDigit).ToArray());
         if (string.IsNullOrEmpty(soloDigitos))
         {
-            _editProgreso = 0;
+            EditProgreso = 0;
             EditProgresoTexto = "0";
             return;
         }
@@ -111,7 +117,7 @@ public partial class DetalleViewModel : ObservableObject,
             if (num < 0) num = 0;
             if (max > 0 && num > max) num = max;
 
-            _editProgreso = num;
+            EditProgreso = num;
             if (num.ToString() != value)
             {
                 EditProgresoTexto = num.ToString();
@@ -1182,6 +1188,8 @@ public partial class DetalleViewModel : ObservableObject,
         EditPuntaje = 0;
         EditFechaInicio = null;
         EditFechaFin = null;
+        EditEstadoVisual = LocalizationService.T("Estado_Viendo");
+        NotificarDerivadosEditor();
         MostrandoEditorSeguimiento = true;
 
         var token = _authService.ObtenerTokenGuardado();
@@ -1201,6 +1209,8 @@ public partial class DetalleViewModel : ObservableObject,
             
             if (datos.CompletedAt != null && datos.CompletedAt.Year.HasValue)
                 EditFechaFin = new DateTime(datos.CompletedAt.Year.Value, datos.CompletedAt.Month ?? 1, datos.CompletedAt.Day ?? 1);
+
+            NotificarDerivadosEditor();
         }
     }
 
