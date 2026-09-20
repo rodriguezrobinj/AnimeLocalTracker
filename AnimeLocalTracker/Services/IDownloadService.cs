@@ -20,6 +20,9 @@ public interface IDownloadService
     void ReanudarTodas();
     IReadOnlyList<DescargaItem> ObtenerDescargasActivas();
 
+    /// <summary>Adelanta una descarga en cola al primer puesto. False si no estaba esperando un slot.</summary>
+    bool PriorizarDescarga(int aniListId, int numeroEpisodio);
+
     /// <summary>
     /// Ajusta en caliente el número máximo de descargas simultáneas.
     /// </summary>

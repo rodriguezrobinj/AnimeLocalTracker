@@ -141,6 +141,15 @@ public Task ActualizarAnimesAsync(IEnumerable<AnimeItem> animes) => Task.Complet
         public Task MarcarEpisodiosSincronizadosAsync(IEnumerable<int> ids) => Task.CompletedTask;
         public Task ActualizarAnimeAsync(AnimeItem anime) => Task.CompletedTask;
         public Task VaciarBibliotecaAsync() => Task.CompletedTask;
+        public Task<List<LogroDesbloqueado>> ObtenerLogrosDesbloqueadosAsync() => Task.FromResult(new List<LogroDesbloqueado>());
+        public Task GuardarLogrosDesbloqueadosAsync(IEnumerable<LogroDesbloqueado> logros) => Task.CompletedTask;
+        public Task<List<RelacionAnime>> ObtenerRelacionesAnimeAsync() => Task.FromResult(new List<RelacionAnime>());
+        public Task<List<RelacionAnimeSync>> ObtenerRelacionesSincronizadasAsync() => Task.FromResult(new List<RelacionAnimeSync>());
+        public Task GuardarRelacionesAnimeAsync(IReadOnlyDictionary<int, List<RelacionAnime>> relacionesPorAnime) => Task.CompletedTask;
+        public Task<List<DescargaHistorial>> ObtenerDescargasHistorialAsync(int limite = 300) => Task.FromResult(new List<DescargaHistorial>());
+        public Task GuardarDescargaHistorialAsync(DescargaHistorial descarga) => Task.CompletedTask;
+        public Task EliminarDescargaHistorialAsync(int id) => Task.CompletedTask;
+        public Task LimpiarDescargasHistorialAsync(bool soloFallidas = false) => Task.CompletedTask;
     }
 
     private class DummyTrackingService : IAnimeTrackingService
@@ -155,6 +164,7 @@ public Task ActualizarAnimesAsync(IEnumerable<AnimeItem> animes) => Task.Complet
         public Task<List<AniListMedia>> BuscarAnimesEnVivoAsync(string busqueda, System.Threading.CancellationToken cancellationToken = default) => Task.FromResult(new List<AniListMedia>());
         public Task<List<AniListMedia>> ObtenerAnimesTendenciaAsync(System.Threading.CancellationToken cancellationToken = default) => Task.FromResult(new List<AniListMedia>());
         public Task<List<AiringEpisode>> ObtenerCalendarioEmisionAsync(List<int> mediaIds, long inicioSemana, long finSemana) => Task.FromResult(new List<AiringEpisode>());
+        public Task<Dictionary<int, List<RelacionAnime>>> ObtenerRelacionesLoteAsync(IEnumerable<int> ids) => Task.FromResult(new Dictionary<int, List<RelacionAnime>>());
     }
 
     private class DummyAuthService : IAuthService

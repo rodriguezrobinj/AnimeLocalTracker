@@ -7,6 +7,16 @@ Actions + Velopack); las notas curadas de cada release se mantienen aquí.
 
 ## [No publicado]
 
+### Añadido
+- Pestaña **Descargas** rediseñada: dos pestañas, *Activas* e *Historial*. En Activas ves un resumen
+  (descargando, en cola, velocidad total, completadas hoy) y cada tarjeta muestra su estado (descargando,
+  en cola, en pausa, reintento), velocidad, tiempo restante estimado y un botón para **saltar la cola**
+  ("descargar ahora") en las que esperan turno. El historial conserva entre sesiones las descargas
+  completadas y las fallidas (hasta 500, migración v7 de la base de datos), agrupadas por día, con búsqueda,
+  filtros (todas/completadas/fallidas) y acciones: reproducir, mostrar en la carpeta, reintentar (también
+  cuando el archivo ya no está en disco), quitar del historial, reintentar todas las fallidas y vaciar.
+  "Borrar todos mis datos" también vacía este historial.
+
 ### Cambiado
 - El instalador ahora declara sus requisitos (`--framework net8-x64-desktop,vcredist143-x64`): si el PC no
   tiene el runtime de .NET 8 Desktop o el Visual C++ Redistributable 2015-2022, `Setup.exe` los descarga e

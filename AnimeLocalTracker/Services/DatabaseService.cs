@@ -85,8 +85,19 @@ public class DatabaseService : IDatabaseService, IDisposable
         (3, "índice de UltimaReproduccion para el historial", CrearIndiceUltimaReproduccionAsync),
         (4, "columnas Temporada/AnioLanzamiento/EsFavorito en AnimeItem", AgregarColumnasTemporadaFavoritoAsync),
         (5, "tabla de logros desbloqueados + índice único (LogroId, Nivel)", CrearTablaLogrosAsync),
-        (6, "relaciones entre animes (franquicias) + marca de sincronización", CrearTablasRelacionesAsync)
+        (6, "relaciones entre animes (franquicias) + marca de sincronización", CrearTablasRelacionesAsync),
+        (7, "historial de descargas (completadas y fallidas)", CrearTablaHistorialDescargasAsync)
     };
+
+    /// <summary>
+    /// v7: historial de descargas. Para bases existentes hace falta esta migración (los [Indexed] del modelo solo
+    /// aplican a bases nuevas), así que el índice por fecha se crea explícitamente.
+    /// </summary>
+    private static async Task CrearTablaHistorialDescargasAsync(SQLiteAsyncConnection conexion)
+    {
+        await conexion.CreateTableAsync<DescargaHistorial>();
+        await conexion.ExecuteAsync("CREATE INDEX IF NOT EXISTS IX_DescargaHistorial_FechaUtc ON DescargaHistorial(FechaUtc);");
+    }
 
     /// <summary>
     /// v6: relaciones de AniList (precuela/secuela/spin-off…) para agrupar franquicias en Estadísticas.
@@ -709,6 +720,7 @@ public class DatabaseService : IDatabaseService, IDisposable
             db.Execute("DELETE FROM LogroDesbloqueado;");
             db.Execute("DELETE FROM RelacionAnime;");
             db.Execute("DELETE FROM RelacionAnimeSync;");
+            db.Execute("DELETE FROM DescargaHistorial;");
         });
     }
 
@@ -767,5 +779,42 @@ public class DatabaseService : IDatabaseService, IDisposable
                     logro.LogroId, logro.Nivel, logro.FechaUtc);
             }
         });
+    }
+
+    // Tope de filas del historial de descargas: lo más antiguo se descarta para que la tabla no crezca sin límite.
+    private const int MaxHistorialDescargas = 500;
+
+    public async Task<List<DescargaHistorial>> ObtenerDescargasHistorialAsync(int limite = 300)
+    {
+        return await _conexion.Table<DescargaHistorial>()
+            .OrderByDescending(d => d.FechaUtc)
+            .Take(Math.Max(1, limite))
+            .ToListAsync();
+    }
+
+    public async Task GuardarDescargaHistorialAsync(DescargaHistorial descarga)
+    {
+        if (descarga == null) return;
+
+        await _conexion.RunInTransactionAsync(db =>
+        {
+            db.Insert(descarga);
+            // Retención: se conservan solo las MaxHistorialDescargas más recientes.
+            db.Execute(
+                "DELETE FROM DescargaHistorial WHERE Id NOT IN (SELECT Id FROM DescargaHistorial ORDER BY FechaUtc DESC, Id DESC LIMIT ?);",
+                MaxHistorialDescargas);
+        });
+    }
+
+    public async Task EliminarDescargaHistorialAsync(int id)
+    {
+        await _conexion.ExecuteAsync("DELETE FROM DescargaHistorial WHERE Id = ?;", id);
+    }
+
+    public async Task LimpiarDescargasHistorialAsync(bool soloFallidas = false)
+    {
+        await _conexion.ExecuteAsync(soloFallidas
+            ? "DELETE FROM DescargaHistorial WHERE Completada = 0;"
+            : "DELETE FROM DescargaHistorial;");
     }
 }
