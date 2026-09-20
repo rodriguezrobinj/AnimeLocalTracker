@@ -149,7 +149,6 @@
                 <Grid>
                     <Button x:Name="MenuOpcionesBtn" Width="40" Height="40"
                             Click="MenuOpcionesBtn_Click"
-                            PreviewMouseLeftButtonDown="MenuOpcionesBtn_PreviewMouseLeftButtonDown"
                             Cursor="Hand"
                             ToolTip="{Binding [Desc_MasOpcionesTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
                             AutomationProperties.Name="{Binding [Desc_MasOpcionesTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
@@ -172,7 +171,7 @@
 
                     <Popup x:Name="MenuOpcionesPopup" PlacementTarget="{Binding ElementName=MenuOpcionesBtn}"
                            Placement="Bottom" VerticalOffset="6" HorizontalOffset="-190"
-                           StaysOpen="False" AllowsTransparency="True" PopupAnimation="Fade">
+                           StaysOpen="True" AllowsTransparency="True" PopupAnimation="Fade">
                         <Border Background="{DynamicResource Brush.Surface3}" BorderBrush="{DynamicResource Brush.BorderStrong}" BorderThickness="1"
                                 CornerRadius="10" Padding="4" MinWidth="230">
                             <Border.Effect>
