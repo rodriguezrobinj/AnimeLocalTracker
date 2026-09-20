@@ -22,9 +22,11 @@ $root = $PSScriptRoot
 #  `ffmpeg`/`ffprobe` por nombre. Si no se distribuyen junto a la
 #  app, miniaturas, sprite sheets y enriquecimiento fallan en
 #  silencio en máquinas sin FFmpeg instalado.
-#  Se usa el build "shared" (~0,8 MB los dos): cargan las DLLs de
-#  Flyleaf.FFmpeg que la app ya distribuye, en vez de llevar una segunda
-#  copia de todos los códecs (los estáticos pesaban ~98 MB cada uno).
+#  Se usa el build "shared" (~0,8 MB los dos): cargan las DLLs de FFmpeg
+#  de la misma carpeta (las del reproductor), en vez de llevar una segunda
+#  copia de todos los códecs (los estáticos pesaban ~98 MB cada uno). Si
+#  esas DLLs faltan (checkout limpio, CI) el script también las instala; las
+#  que ya existan (equipo de desarrollo) no se tocan.
 #  Versión y SHA256 fijados en tools\Get-FFmpegBinaries.ps1.
 #  (La carpeta AnimeLocalTracker\FFmpeg\ está en .gitignore: cada
 #  clon/build descarga los binarios si no existen.)

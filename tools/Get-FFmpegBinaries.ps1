@@ -1,28 +1,32 @@
 ﻿<#
 .SYNOPSIS
-    Obtiene ffmpeg.exe y ffprobe.exe (build "shared" de gyan.dev) para embeberlos en la app.
+    Deja en la carpeta FFmpeg de la app un conjunto COMPLETO y coherente de FFmpeg (build "shared" de gyan.dev):
+    ffmpeg.exe, ffprobe.exe y las DLLs de las que dependen.
 
 .DESCRIPTION
-    La app ya distribuye las DLLs de FFmpeg (paquete NuGet Flyleaf.FFmpeg, usadas por el reproductor).
-    Los ejecutables ffmpeg.exe/ffprobe.exe (núcleo Rust: miniaturas; daemon Python: yt-dlp, escenas,
-    metadatos; VideoIntegrityService) antes eran builds ESTÁTICOS de ~98 MB cada uno, que llevan
-    dentro una segunda copia completa de todos los códecs. Con el build "shared" pesan ~0,6 MB y
-    ~0,2 MB porque cargan las DLLs que ya viajan en la misma carpeta -> el instalador baja unos
-    72 MB comprimidos (~195 MB en disco), sin cambiar cómo se ven miniaturas ni cómo se analizan
-    los videos (verificado: ffprobe, audio y detección de escenas idénticos bit a bit; JPEG idénticos
-    píxel a píxel).
+    Las DLLs de FFmpeg (avcodec-63.dll, avformat-63.dll...) las usa el reproductor (Flyleaf, FFmpegPath=":FFmpeg") y,
+    desde que los ejecutables son "shared", también ffmpeg.exe/ffprobe.exe (núcleo Rust: miniaturas; daemon Python:
+    yt-dlp, escenas, metadatos; VideoIntegrityService). OJO: el paquete NuGet Flyleaf.FFmpeg NO trae esas DLLs (solo
+    un ensamblado .NET de 0,5 MB); la carpeta AnimeLocalTracker\FFmpeg\ está en .gitignore y, en un equipo de
+    desarrollo, las DLLs las coloca el desarrollador a mano. Este script cubre el resto de casos (checkout limpio,
+    CI de GitHub) para que ffmpeg.exe/ffprobe.exe nunca queden sin sus DLLs.
 
-    REGLA DE COMPATIBILIDAD: el exe "shared" y las DLLs deben compartir la versión MAYOR de cada
-    biblioteca (avcodec-63, avformat-63, avutil-61...). Por eso la versión de FFmpeg está FIJADA
-    aquí (antes se bajaba "la última release" sin control). Si se actualiza Flyleaf.FFmpeg a una
-    versión con otras bibliotecas (p. ej. avcodec-64), hay que subir $Version/$Sha256 a la release
-    de gyan.dev cuyo `ffmpeg -version` reporte las mismas versiones mayores.
+    Comportamiento:
+      * ffmpeg.exe y ffprobe.exe: se instalan siempre que no sean ya los "shared" (~0,6 MB y ~0,2 MB; los estáticos
+        antiguos pesaban ~98 MB cada uno con otra copia completa de los códecs -> ~70 MB menos de instalador).
+      * DLLs: se instalan SOLO si faltan. Nunca se sobrescriben las que ya haya (p. ej. las del reproductor en un PC
+        de desarrollo); con -Forzar sí se reemplazan.
+
+    REGLA DE COMPATIBILIDAD: los exe y las DLLs deben compartir la versión MAYOR de cada biblioteca (avcodec-63,
+    avformat-63, avutil-61...). La versión de FFmpeg está FIJADA aquí (antes se bajaba "la última release" sin control)
+    y se comprueba que las DLLs ya presentes en el destino sean de la misma versión mayor. Si se cambia de FFmpeg,
+    subir $Version/$Sha256/$Dlls a la release de gyan.dev cuyo `ffmpeg -version` reporte las mismas versiones mayores.
 
 .PARAMETER Destino
-    Carpeta donde dejar ffmpeg.exe y ffprobe.exe (AnimeLocalTracker\FFmpeg).
+    Carpeta de destino (AnimeLocalTracker\FFmpeg).
 
 .PARAMETER Forzar
-    Vuelve a descargar/copiar aunque ya existan los exe "shared".
+    Vuelve a descargar/copiar todo, incluidas las DLLs, aunque ya existan.
 #>
 param(
     [Parameter(Mandatory)] [string]$Destino,
@@ -33,30 +37,29 @@ $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'   # Invoke-WebRequest es mucho más rápido sin la barra de progreso
 
 # ── Versión fijada (ver REGLA DE COMPATIBILIDAD arriba) ──
-$Version            = '9.0.1'
-$Sha256             = 'cb4d5e8db6a3353bffdb2100d3eb4b76733457fa443215e236f57c99f9ffdca4'   # publicado en https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-9.0.1-full_build-shared.7z.sha256
-$AvcodecEsperada    = 'avcodec-63.dll'
-$Url                = "https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-$Version-full_build-shared.7z"
+$Version = '9.0.1'
+$Sha256  = 'cb4d5e8db6a3353bffdb2100d3eb4b76733457fa443215e236f57c99f9ffdca4'   # publicado en https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-9.0.1-full_build-shared.7z.sha256
+$Url     = "https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-$Version-full_build-shared.7z"
+$Exes    = @('ffmpeg.exe', 'ffprobe.exe')
+$Dlls    = @('avcodec-63.dll', 'avdevice-63.dll', 'avfilter-12.dll', 'avformat-63.dll', 'avutil-61.dll', 'swresample-7.dll', 'swscale-10.dll')
 
 # Los exe estáticos antiguos pesan ~98 MB; los "shared", menos de 1 MB.
 function Test-EsShared([string]$ruta) {
     return (Test-Path $ruta) -and ((Get-Item $ruta).Length -lt 5MB)
 }
 
-if (-not $Forzar -and (Test-EsShared "$Destino\ffmpeg.exe") -and (Test-EsShared "$Destino\ffprobe.exe")) {
-    return
+# ── Comprobación de compatibilidad con las DLLs que YA haya en el destino ──
+$avcodecExistentes = @(Get-ChildItem $Destino -Filter 'avcodec-*.dll' -ErrorAction SilentlyContinue)
+if ($avcodecExistentes.Count -gt 0 -and ($avcodecExistentes.Name -notcontains 'avcodec-63.dll')) {
+    throw ("En '$Destino' hay '$($avcodecExistentes[0].Name)', pero los ffmpeg.exe/ffprobe.exe fijados en este script " +
+           "(FFmpeg $Version) esperan 'avcodec-63.dll'. Sube `$Version/`$Sha256/`$Dlls a una release de gyan.dev " +
+           "(build full_build-shared) cuyo `ffmpeg -version` reporte las mismas versiones mayores que tus DLLs.")
 }
 
-# ── Comprobación previa: las DLLs del paquete de Flyleaf deben ser de la misma versión mayor ──
-$nugetRoot = if ($env:NUGET_PACKAGES) { $env:NUGET_PACKAGES } else { Join-Path $HOME '.nuget\packages' }
-$flyleaf = Join-Path $nugetRoot 'flyleaf.ffmpeg'
-if (Test-Path $flyleaf) {
-    $dllFlyleaf = Get-ChildItem $flyleaf -Recurse -Filter 'avcodec-*.dll' -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($dllFlyleaf -and $dllFlyleaf.Name -ne $AvcodecEsperada) {
-        throw ("Flyleaf.FFmpeg trae '$($dllFlyleaf.Name)' pero los ffmpeg.exe/ffprobe.exe fijados en tools\Get-FFmpegBinaries.ps1 " +
-               "(FFmpeg $Version) esperan '$AvcodecEsperada'. Sube `$Version/`$Sha256/`$AvcodecEsperada a una release de gyan.dev " +
-               "(build full_build-shared) cuyo `ffmpeg -version` reporte las mismas versiones mayores que esas DLLs.")
-    }
+$exesOk = -not $Forzar -and (($Exes | Where-Object { -not (Test-EsShared "$Destino\$_") }).Count -eq 0)
+$dllsFaltan = @($Dlls | Where-Object { $Forzar -or -not (Test-Path "$Destino\$_") })
+if ($exesOk -and $dllsFaltan.Count -eq 0) {
+    return
 }
 
 # ── 7-Zip (los builds shared de gyan.dev solo se publican en .7z) ──
@@ -83,24 +86,32 @@ if (-not (Test-HashOk $archivo)) {
     }
 }
 
-# ── Extraer solo ffmpeg.exe y ffprobe.exe ──
+# ── Extraer solo los archivos necesarios (los exe y las DLLs) ──
 $tmp = Join-Path $env:TEMP ('ffmpeg_shared_' + [guid]::NewGuid().ToString('N'))
 try {
-    & $sevenZip e $archivo "-o$tmp" -r ffmpeg.exe ffprobe.exe -y -bso0 -bsp0
+    & $sevenZip e $archivo "-o$tmp" -r @($Exes + $Dlls) -y -bso0 -bsp0
     if ($LASTEXITCODE -ne 0) { throw "7-Zip falló al extraer FFmpeg (código $LASTEXITCODE)." }
 
-    foreach ($nombre in 'ffmpeg.exe', 'ffprobe.exe') {
+    foreach ($nombre in ($Exes + $Dlls)) {
         if (-not (Test-Path "$tmp\$nombre")) { throw "No se encontró $nombre en el paquete descargado." }
     }
 
     New-Item -ItemType Directory -Path $Destino -Force | Out-Null
-    foreach ($nombre in 'ffmpeg.exe', 'ffprobe.exe') {
+
+    foreach ($nombre in $Exes) {
         Copy-Item "$tmp\$nombre" "$Destino\$nombre" -Force
         # MSBuild copia a bin\ solo si el origen es MÁS NUEVO: los exe de gyan son más antiguos que los
         # estáticos que ya pueda haber en bin\, así que se sella la fecha para que los sustituyan.
         (Get-Item "$Destino\$nombre").LastWriteTime = Get-Date
     }
-    Write-Host "[ffmpeg] ffmpeg.exe/ffprobe.exe (shared $Version) listos en $Destino" -ForegroundColor Green
+
+    foreach ($nombre in $dllsFaltan) {
+        Copy-Item "$tmp\$nombre" "$Destino\$nombre" -Force
+        (Get-Item "$Destino\$nombre").LastWriteTime = Get-Date
+    }
+
+    $tag = if ($dllsFaltan.Count -gt 0) { "y $($dllsFaltan.Count) DLL(s) que faltaban" } else { "(las DLLs existentes se respetan)" }
+    Write-Host "[ffmpeg] ffmpeg.exe/ffprobe.exe (shared $Version) $tag listos en $Destino" -ForegroundColor Green
 }
 finally {
     Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue

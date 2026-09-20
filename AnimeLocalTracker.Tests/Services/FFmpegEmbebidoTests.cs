@@ -9,9 +9,9 @@ using Xunit;
 namespace AnimeLocalTracker.Tests.Services;
 
 /// <summary>
-/// ffmpeg.exe/ffprobe.exe embebidos: son builds "shared" (~0,8 MB) que cargan las DLLs de Flyleaf.FFmpeg de la
-/// misma carpeta (ver tools\Get-FFmpegBinaries.ps1). Si una actualización de Flyleaf.FFmpeg cambia la versión
-/// mayor de esas DLLs, los exe dejarían de arrancar: estas pruebas lo detectan en el CI antes de publicar.
+/// ffmpeg.exe/ffprobe.exe embebidos: son builds "shared" (~0,8 MB) que cargan las DLLs de FFmpeg de la misma
+/// carpeta (ver tools\Get-FFmpegBinaries.ps1, que las instala si faltan). Si las DLLs de la carpeta son de otra
+/// versión mayor, o faltan, los exe no arrancan: estas pruebas lo detectan en el CI antes de publicar.
 /// Sin los binarios descargados (clon sin ejecutar build.ps1) las pruebas se omiten, como RustNativeTests.
 /// </summary>
 public class FFmpegEmbebidoTests

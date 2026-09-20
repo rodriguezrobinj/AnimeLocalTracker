@@ -16,10 +16,11 @@ Actions + Velopack); las notas curadas de cada release se mantienen aquí.
   `build_velopack_release.ps1`.
 - El instalador y los paquetes completos pesan unos 70 MB menos (~30 %): `ffmpeg.exe` y `ffprobe.exe`
   pasaron de builds estáticos de ~98 MB cada uno a builds "shared" de menos de 1 MB que reutilizan las
-  DLLs de FFmpeg que ya se distribuyen para el reproductor (Flyleaf.FFmpeg). Miniaturas, análisis con
-  ffprobe, audio y detección de escenas dan resultados idénticos. La versión de FFmpeg y su SHA256 quedan
-  fijados en `tools/Get-FFmpegBinaries.ps1` (antes se descargaba "la última release" sin control) y una
-  prueba avisa en el CI si una actualización de Flyleaf.FFmpeg cambia la versión de las bibliotecas.
+  DLLs de FFmpeg de su misma carpeta (las del reproductor). Miniaturas, análisis con ffprobe, audio y
+  detección de escenas dan resultados idénticos. La versión de FFmpeg y su SHA256 quedan fijados en
+  `tools/Get-FFmpegBinaries.ps1` (antes se descargaba "la última release" sin control). Ese script instala
+  también las DLLs cuando faltan (checkout limpio, CI; las DLLs que ya haya en un equipo de desarrollo no se
+  tocan) y comprueba que sean de la misma versión mayor; unas pruebas lo verifican en el CI.
 
 ### Accesibilidad
 - Nombres accesibles (`AutomationProperties.Name`) en las tarjetas de anime de la galería y en
