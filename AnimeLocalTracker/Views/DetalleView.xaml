@@ -871,7 +871,7 @@
                         <Setter Property="Template">
                             <Setter.Value>
                                 <ControlTemplate TargetType="Button">
-                                    <Border x:Name="Raiz" Background="#14181E" BorderBrush="#2D3748" BorderThickness="1" CornerRadius="16" Padding="13,6" Margin="0,0,8,8">
+                                    <Border x:Name="Raiz" Background="#14181E" BorderBrush="#2D3748" BorderThickness="1" CornerRadius="16" Padding="13,6" Margin="4,0,4,8">
                                         <ContentPresenter x:Name="Texto" HorizontalAlignment="Center" VerticalAlignment="Center"
                                                           TextElement.FontSize="12.5" TextElement.FontWeight="SemiBold" TextElement.Foreground="#9CA3AF"/>
                                     </Border>
@@ -1171,7 +1171,7 @@
 
                     <!-- ESTADO: chips de un clic -->
                     <TextBlock Text="{Binding [Det_Estado], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource SegLabel}"/>
-                    <ItemsControl ItemsSource="{Binding EstadosChips}" Margin="0,6,0,14">
+                    <ItemsControl ItemsSource="{Binding EstadosChips}" HorizontalAlignment="Center" Margin="0,6,0,6">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate><WrapPanel Orientation="Horizontal"/></ItemsPanelTemplate>
                         </ItemsControl.ItemsPanel>
