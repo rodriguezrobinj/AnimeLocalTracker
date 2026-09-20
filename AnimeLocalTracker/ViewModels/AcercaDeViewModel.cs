@@ -15,9 +15,17 @@ public partial class AcercaDeViewModel : ObservableObject, IRecipient<IdiomaCamb
     private readonly IDialogService _dialogService;
 
     // === INFORMACIÓN DE LA APLICACIÓN ===
-    public string VersionAppTexto => _updateService?.ObtenerVersionActual() ?? "1.0.0";
+    /// <summary>Siempre con prefijo "v": el servicio devuelve "1.0.5" instalado por Velopack pero
+    /// "v1.0.5" en modo desarrollo, y la vista mostraba "vv1.0.5" en este último caso.</summary>
+    public string VersionAppTexto
+    {
+        get
+        {
+            var version = _updateService?.ObtenerVersionActual() ?? "1.0.0";
+            return version.StartsWith('v') || version.StartsWith('V') ? version : "v" + version;
+        }
+    }
     public string RepositorioUrl => "https://github.com/rodriguezrobinj/AnimeLocalTracker";
-    public string AutorTexto => "Robin Rodriguez";
     public string LicenciaTexto => LocalizationService.T("Acerca_LicenciaTexto");
 
     [ObservableProperty]
@@ -104,13 +112,10 @@ public partial class AcercaDeViewModel : ObservableObject, IRecipient<IdiomaCamb
             }
             else
             {
+                // null NO significa siempre "estás al día": con esManual el servicio ya avisó él
+                // mismo del resultado real (modo desarrollo, al día o error de conexión). Mostrar
+                // aquí otro "Aplicación actualizada" pisaba el aviso de modo desarrollo.
                 await CargarNovedadesAsync(forzar: true);
-                await _dialogService.MostrarDialogoAsync(
-                    LocalizationService.T("Acerca_AplicacionActualizadaTitulo"),
-                    string.Format(LocalizationService.T("Acerca_AplicacionActualizadaMsj"), VersionAppTexto),
-                    false,
-                    "CheckCircleOutline",
-                    "#4CAF50");
             }
         }
         catch (Exception ex)
