@@ -1134,6 +1134,7 @@
                         <Setter Property="Height" Value="40"/>
                         <Setter Property="Padding" Value="8,0"/>
                         <Setter Property="VerticalContentAlignment" Value="Center"/>
+                        <Setter Property="HorizontalContentAlignment" Value="Center"/>
                         <Setter Property="FontSize" Value="12.5"/>
                         <Setter Property="Foreground" Value="White"/>
                         <Setter Property="Background" Value="#14181E"/>
