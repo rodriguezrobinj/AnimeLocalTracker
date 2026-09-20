@@ -1,3 +1,4 @@
+using System;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
@@ -39,6 +40,15 @@ public partial class DetalleView : UserControl
         {
             EditorSeguimientoCard.Language = XmlLanguage.GetLanguage(LocalizationService.Cultura.IetfLanguageTag);
         }
+        else if (e.PropertyName == nameof(DetalleViewModel.MostrandoCalendarioFecha) && _vmObservado?.MostrandoCalendarioFecha == true)
+        {
+            // Cada vez que se abre: idioma de la app, vista de días y el mes de la fecha ya elegida (o de hoy).
+            CalendarioFechaCard.Language = XmlLanguage.GetLanguage(LocalizationService.Cultura.IetfLanguageTag);
+            var fecha = _vmObservado.CalendarioFechaInicial;
+            CalendarioFecha.DisplayMode = CalendarMode.Month;
+            CalendarioFecha.SelectedDate = _vmObservado.CalendarioTieneFecha ? fecha : null;
+            CalendarioFecha.DisplayDate = fecha;
+        }
     }
 
     /// <summary>
@@ -76,6 +86,24 @@ public partial class DetalleView : UserControl
         {
             calendario.DisplayMode = CalendarMode.Month;
             e.Handled = true;
+        }
+    }
+
+    /// <summary>
+    /// Un clic en un día aplica la fecha y cierra la tarjeta. Se resuelve aquí (y no con SelectedDate) para que
+    /// también funcione al pulsar el día que ya estaba seleccionado, que no genera cambio de selección.
+    /// </summary>
+    private void CalendarioFecha_PreviewMouseLeftButtonUp(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        for (DependencyObject? actual = e.OriginalSource as DependencyObject; actual != null && !ReferenceEquals(actual, CalendarioFecha); actual = VisualTreeHelper.GetParent(actual))
+        {
+            if (actual is System.Windows.Controls.Primitives.CalendarDayButton { DataContext: DateTime dia })
+            {
+                if (_vmObservado?.ElegirFechaCalendarioCommand.CanExecute(dia) == true)
+                    _vmObservado.ElegirFechaCalendarioCommand.Execute(dia);
+                e.Handled = true;
+                return;
+            }
         }
     }
 

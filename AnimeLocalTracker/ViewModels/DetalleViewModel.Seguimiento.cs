@@ -73,6 +73,60 @@ public partial class DetalleViewModel
         }
     }
 
+    // ── Selector de fecha como tarjeta superpuesta (igual que el editor), en vez de un popup ──
+
+    [ObservableProperty] private bool _mostrandoCalendarioFecha;
+    [ObservableProperty] private string _calendarioTitulo = string.Empty;
+    [ObservableProperty] private bool _calendarioTieneFecha;
+    private bool _calendarioEsInicio;
+
+    /// <summary>Fecha con la que se abre el calendario (la ya elegida o, si no hay, hoy).</summary>
+    public DateTime CalendarioFechaInicial { get; private set; } = DateTime.Today;
+
+    public string EditFechaInicioTexto => FormatearFecha(EditFechaInicio);
+    public string EditFechaFinTexto => FormatearFecha(EditFechaFin);
+
+    private static string FormatearFecha(DateTime? fecha) => fecha.HasValue ? fecha.Value.ToString("d", LocalizationService.Cultura) : "—";
+
+    partial void OnEditFechaInicioChanged(DateTime? value) => OnPropertyChanged(nameof(EditFechaInicioTexto));
+    partial void OnEditFechaFinChanged(DateTime? value) => OnPropertyChanged(nameof(EditFechaFinTexto));
+
+    [RelayCommand]
+    private void AbrirCalendarioInicio() => AbrirCalendario(esInicio: true);
+
+    [RelayCommand]
+    private void AbrirCalendarioFin() => AbrirCalendario(esInicio: false);
+
+    private void AbrirCalendario(bool esInicio)
+    {
+        _calendarioEsInicio = esInicio;
+        var actual = esInicio ? EditFechaInicio : EditFechaFin;
+        CalendarioTitulo = LocalizationService.T(esInicio ? "Det_FechaInicio" : "Det_FechaFin");
+        CalendarioTieneFecha = actual.HasValue;
+        CalendarioFechaInicial = actual ?? DateTime.Today;
+        MostrandoCalendarioFecha = true;
+    }
+
+    /// <summary>Un clic en un día lo aplica al campo y cierra el calendario.</summary>
+    [RelayCommand]
+    private void ElegirFechaCalendario(DateTime fecha)
+    {
+        if (_calendarioEsInicio) EditFechaInicio = fecha.Date;
+        else EditFechaFin = fecha.Date;
+        MostrandoCalendarioFecha = false;
+    }
+
+    [RelayCommand]
+    private void QuitarFechaCalendario()
+    {
+        if (_calendarioEsInicio) EditFechaInicio = null;
+        else EditFechaFin = null;
+        MostrandoCalendarioFecha = false;
+    }
+
+    [RelayCommand]
+    private void CerrarCalendarioFecha() => MostrandoCalendarioFecha = false;
+
     [RelayCommand]
     private void IncrementarProgreso() => EditProgresoTexto = (EditProgreso + 1).ToString();
 

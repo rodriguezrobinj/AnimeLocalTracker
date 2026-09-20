@@ -136,4 +136,75 @@ public class DetalleSeguimientoEditorTests
         sut.EditPuntaje = 0;
         sut.EditPuntajeTexto.Should().Be("—");
     }
+
+    [Fact]
+    public void CalendarioFecha_AbreConLaFechaYaElegidaYUnDiaLaAplicaYCierra()
+    {
+        var sut = CrearSut(10);
+        sut.EditFechaInicio = new DateTime(2024, 10, 5);
+
+        sut.AbrirCalendarioInicioCommand.Execute(null);
+
+        sut.MostrandoCalendarioFecha.Should().BeTrue();
+        sut.CalendarioTieneFecha.Should().BeTrue();
+        sut.CalendarioFechaInicial.Should().Be(new DateTime(2024, 10, 5));
+
+        sut.ElegirFechaCalendarioCommand.Execute(new DateTime(2014, 3, 9, 15, 30, 0));
+
+        sut.EditFechaInicio.Should().Be(new DateTime(2014, 3, 9), "se guarda solo la fecha, sin hora");
+        sut.MostrandoCalendarioFecha.Should().BeFalse();
+        sut.EditFechaFin.Should().BeNull("el calendario de inicio no toca la fecha de fin");
+    }
+
+    [Fact]
+    public void CalendarioFecha_SinFechaAbreEnHoyYNoOfreceQuitar()
+    {
+        var sut = CrearSut(10);
+
+        sut.AbrirCalendarioFinCommand.Execute(null);
+
+        sut.CalendarioTieneFecha.Should().BeFalse();
+        sut.CalendarioFechaInicial.Should().Be(DateTime.Today);
+    }
+
+    [Fact]
+    public void CalendarioFecha_QuitarVaciaSoloEseCampo()
+    {
+        var sut = CrearSut(10);
+        sut.EditFechaInicio = new DateTime(2024, 10, 5);
+        sut.EditFechaFin = new DateTime(2024, 10, 12);
+        sut.AbrirCalendarioFinCommand.Execute(null);
+
+        sut.QuitarFechaCalendarioCommand.Execute(null);
+
+        sut.EditFechaFin.Should().BeNull();
+        sut.EditFechaInicio.Should().Be(new DateTime(2024, 10, 5));
+        sut.MostrandoCalendarioFecha.Should().BeFalse();
+    }
+
+    [Fact]
+    public void CalendarioFecha_CancelarNoCambiaNada()
+    {
+        var sut = CrearSut(10);
+        sut.EditFechaInicio = new DateTime(2024, 10, 5);
+        sut.AbrirCalendarioInicioCommand.Execute(null);
+
+        sut.CerrarCalendarioFechaCommand.Execute(null);
+
+        sut.EditFechaInicio.Should().Be(new DateTime(2024, 10, 5));
+        sut.MostrandoCalendarioFecha.Should().BeFalse();
+    }
+
+    [Fact]
+    public void TextoDeLosCamposDeFecha_MuestraGuionSiNoHayFecha()
+    {
+        var sut = CrearSut(10);
+        sut.EditFechaInicioTexto.Should().Be("—");
+
+        sut.EditFechaInicio = new DateTime(2024, 10, 5);
+        sut.EditFechaInicioTexto.Should().Contain("2024");
+
+        sut.EditFechaInicio = null;
+        sut.EditFechaInicioTexto.Should().Be("—");
+    }
 }
