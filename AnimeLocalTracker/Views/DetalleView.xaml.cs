@@ -1,15 +1,54 @@
+using System;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Markup;
 using System.Windows.Media;
+using AnimeLocalTracker.Services;
+using AnimeLocalTracker.ViewModels;
 
 namespace AnimeLocalTracker.Views;
 
 public partial class DetalleView : UserControl
 {
+    private DetalleViewModel? _vmObservado;
+
     public DetalleView()
     {
         InitializeComponent();
+        DataContextChanged += (_, _) =>
+        {
+            if (_vmObservado != null) _vmObservado.PropertyChanged -= Vm_PropertyChanged;
+            _vmObservado = DataContext as DetalleViewModel;
+            if (_vmObservado != null) _vmObservado.PropertyChanged += Vm_PropertyChanged;
+        };
+        Unloaded += (_, _) =>
+        {
+            if (_vmObservado != null) _vmObservado.PropertyChanged -= Vm_PropertyChanged;
+            _vmObservado = null;
+        };
+    }
+
+    /// <summary>
+    /// El calendario del selector de fechas usa el idioma del elemento (por defecto en-US: "October 2024").
+    /// Se ajusta al idioma de la app cada vez que se abre el editor de seguimiento.
+    /// </summary>
+    private void Vm_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(DetalleViewModel.MostrandoEditorSeguimiento) && _vmObservado?.MostrandoEditorSeguimiento == true)
+        {
+            EditorSeguimientoCard.Language = XmlLanguage.GetLanguage(LocalizationService.Cultura.IetfLanguageTag);
+        }
+        else if (e.PropertyName == nameof(DetalleViewModel.MostrandoCalendarioFecha) && _vmObservado?.MostrandoCalendarioFecha == true)
+        {
+            // Cada vez que se abre: idioma de la app, vista de días y el mes de la fecha ya elegida (o de hoy).
+            CalendarioFechaCard.Language = XmlLanguage.GetLanguage(LocalizationService.Cultura.IetfLanguageTag);
+            var fecha = _vmObservado.CalendarioFechaInicial;
+            CalendarioFecha.DisplayMode = CalendarMode.Month;
+            CalendarioFecha.SelectedDate = _vmObservado.CalendarioTieneFecha ? fecha : null;
+            CalendarioFecha.DisplayDate = fecha;
+        }
     }
 
     /// <summary>
@@ -26,6 +65,45 @@ public partial class DetalleView : UserControl
             menu.VerticalOffset = 6;
             menu.IsOpen = true;
             e.Handled = true;
+        }
+    }
+
+    /// <summary>
+    /// El título del calendario avanza mes → año → década (comportamiento nativo). En la década su botón queda
+    /// deshabilitado y no había forma de volver: ahora pulsar el título en esa vista regresa a los días del mes.
+    /// </summary>
+    private void CalendarioTitulo_PreviewMouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (sender is not Calendar calendario || calendario.DisplayMode != CalendarMode.Decade) return;
+
+        // Se comprueba por posición: con el botón deshabilitado, el origen del clic no es fiable (llega la rejilla de fondo).
+        var item = calendario.Template?.FindName("PART_CalendarItem", calendario) as Control;
+        var cabecera = item?.Template?.FindName("PART_HeaderButton", item) as FrameworkElement;
+        if (cabecera == null || !cabecera.IsVisible) return;
+
+        var zona = cabecera.TransformToAncestor(calendario).TransformBounds(new Rect(0, 0, cabecera.ActualWidth, cabecera.ActualHeight));
+        if (zona.Contains(e.GetPosition(calendario)))
+        {
+            calendario.DisplayMode = CalendarMode.Month;
+            e.Handled = true;
+        }
+    }
+
+    /// <summary>
+    /// Un clic en un día aplica la fecha y cierra la tarjeta. Se resuelve aquí (y no con SelectedDate) para que
+    /// también funcione al pulsar el día que ya estaba seleccionado, que no genera cambio de selección.
+    /// </summary>
+    private void CalendarioFecha_PreviewMouseLeftButtonUp(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        for (DependencyObject? actual = e.OriginalSource as DependencyObject; actual != null && !ReferenceEquals(actual, CalendarioFecha); actual = VisualTreeHelper.GetParent(actual))
+        {
+            if (actual is System.Windows.Controls.Primitives.CalendarDayButton { DataContext: DateTime dia })
+            {
+                if (_vmObservado?.ElegirFechaCalendarioCommand.CanExecute(dia) == true)
+                    _vmObservado.ElegirFechaCalendarioCommand.Execute(dia);
+                e.Handled = true;
+                return;
+            }
         }
     }
 

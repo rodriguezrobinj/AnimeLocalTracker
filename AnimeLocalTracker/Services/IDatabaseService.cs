@@ -46,6 +46,13 @@ public interface IDatabaseService
     Task<List<LogroDesbloqueado>> ObtenerLogrosDesbloqueadosAsync();
     Task GuardarLogrosDesbloqueadosAsync(IEnumerable<LogroDesbloqueado> logros);
 
+    // === DESCARGAS: historial de resultados finales (completadas y fallidas), más recientes primero ===
+    Task<List<DescargaHistorial>> ObtenerDescargasHistorialAsync(int limite = 300);
+    Task GuardarDescargaHistorialAsync(DescargaHistorial descarga);
+    Task EliminarDescargaHistorialAsync(int id);
+    /// <summary>Borra el historial: todo, o solo las fallidas si <paramref name="soloFallidas"/> es true.</summary>
+    Task LimpiarDescargasHistorialAsync(bool soloFallidas = false);
+
     // === FRANQUICIAS: relaciones de AniList (precuela/secuela/spin-off…) para agrupar en Estadísticas ===
     Task<List<RelacionAnime>> ObtenerRelacionesAnimeAsync();
     Task<List<RelacionAnimeSync>> ObtenerRelacionesSincronizadasAsync();

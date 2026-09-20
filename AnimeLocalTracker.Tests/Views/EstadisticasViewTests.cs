@@ -40,6 +40,7 @@ public class EstadisticasViewTests
             _ = new LogrosView();
             _ = new ActualizacionesView();
             _ = new HistorialView();
+            _ = new DescargasView();
             _ = new ReproductorView();
         });
     }
