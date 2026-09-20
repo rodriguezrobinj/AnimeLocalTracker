@@ -628,6 +628,19 @@ public class DownloadService : IDownloadService
         long totalBytes = -1;
         bool supportsRanges = false;
 
+        // Reanudación: si hay un archivo parcial con su .state, el tamaño y el soporte de rangos ya se conocen de la
+        // primera vez. Los sondeos HEAD/GET (6 s) fallan a menudo con mp4upload; si fallaban al reanudar, se caía al
+        // modo secuencial, el servidor devolvía 200 al Range y la descarga volvía a empezar desde cero.
+        long totalGuardado = LeerTotalDeEstadoGuardado(destinationPath);
+        bool reanudandoSegmentada = totalGuardado > 3 * 1024 * 1024;
+        if (reanudandoSegmentada)
+        {
+            totalBytes = totalGuardado;
+            supportsRanges = true;
+            AppLogger.Info("DownloadService", $"Reanudando descarga segmentada ({totalGuardado / (1024 * 1024)} MB) sin volver a sondear el servidor.");
+        }
+
+        if (!reanudandoSegmentada)
         using (var headReq = new HttpRequestMessage(HttpMethod.Head, videoUrl))
         {
             headReq.Headers.Add("User-Agent", UserAgent);
@@ -652,7 +665,7 @@ public class DownloadService : IDownloadService
         }
 
         // Si HEAD no devolvió tamaño o soporte de rangos, probar con GET range 0-0
-        if (totalBytes <= 0 || !supportsRanges)
+        if (!reanudandoSegmentada && (totalBytes <= 0 || !supportsRanges))
         {
             using var testReq = new HttpRequestMessage(HttpMethod.Get, videoUrl);
             testReq.Headers.Add("User-Agent", UserAgent);
@@ -703,6 +716,25 @@ public class DownloadService : IDownloadService
         else
         {
             await DownloadSequentialAsync(videoUrl, destinationPath, totalBytes, progress, cancellationToken);
+        }
+    }
+
+    /// <summary>Tamaño total guardado en el .state de una descarga segmentada previa (0 si no hay o no es válido).</summary>
+    private static long LeerTotalDeEstadoGuardado(string destinationPath)
+    {
+        try
+        {
+            string statePath = destinationPath + ".state";
+            if (!File.Exists(statePath) || !File.Exists(destinationPath)) return 0;
+            var info = System.Text.Json.JsonSerializer.Deserialize<DownloadStateInfo>(File.ReadAllText(statePath));
+            if (info == null || info.TotalBytes <= 0 || info.Segments.Count == 0) return 0;
+            // El archivo preasignado tiene ya el tamaño total; si no coincide, el estado no es fiable.
+            return new FileInfo(destinationPath).Length == info.TotalBytes ? info.TotalBytes : 0;
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("DownloadService", $"No se pudo leer el estado de reanudación: {ex.Message}");
+            return 0;
         }
     }
 
