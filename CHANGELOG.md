@@ -7,6 +7,32 @@ Actions + Velopack); las notas curadas de cada release se mantienen aquí.
 
 ## [No publicado]
 
+### Añadido
+- Fechas de seguimiento automáticas en AniList: al ver (de verdad, reproduciendo) el primer episodio de un anime
+  que aún no tenías empezado en AniList se guarda la fecha de inicio, y al ver el último episodio OFICIAL de un
+  anime ya finalizado (el total que indica AniList, no simplemente el último de la lista) se guarda la de fin y el
+  estado pasa a Completado.
+  Nunca pisa una fecha que ya tengas, no toca los re-visionados (estado Completado o Repitiendo), no las inventa
+  al marcar episodios como vistos a mano, y también se envían al recuperar la conexión si viste episodios sin
+  internet.
+- Editor de seguimiento de AniList rediseñado (botón «Seguimiento» de un anime): el estado se elige con chips de
+  un clic en vez de un desplegable; los episodios vistos tienen botones − / + con el total; la puntuación
+  muestra su valor junto al deslizador; las fechas de inicio y fin van en una fila y, al pulsarlas, el calendario
+  se abre como tarjeta superpuesta (igual que el editor) en vez de un popup, con los colores de la app y en el idioma elegido; un clic en un día lo
+  aplica y cierra, y hay «Quitar fecha». Pulsando el título del calendario («octubre de 2024») se pasa a la vista de meses y, pulsándolo otra vez, a la de años por décadas, para saltar
+  a 2014 en pocos clics en vez de retroceder mes a mes; en la vista de décadas, pulsar el título de nuevo
+  vuelve a los días. Al elegir «Finalizado» se completa el progreso y la fecha de fin, y al
+  elegir «Viendo» se pone la fecha de inicio (sin pisar lo que ya hubiera escrito). El editor ya no arrastra
+  el estado del anime anterior al abrirse.
+- Pestaña **Descargas** rediseñada: dos pestañas, *Activas* e *Historial*. En Activas ves un resumen
+  (descargando, en cola, velocidad total, completadas hoy) y cada tarjeta muestra su estado (descargando,
+  en cola, en pausa, reintento), velocidad, tiempo restante estimado y un botón para **saltar la cola**
+  ("descargar ahora") en las que esperan turno. El historial conserva entre sesiones las descargas
+  completadas y las fallidas (hasta 500, migración v7 de la base de datos), agrupadas por día, con búsqueda,
+  filtros (todas/completadas/fallidas) y acciones: reproducir, mostrar en la carpeta, reintentar (también
+  cuando el archivo ya no está en disco), quitar del historial, reintentar todas las fallidas y vaciar.
+  "Borrar todos mis datos" también vacía este historial.
+
 ### Cambiado
 - El instalador ahora declara sus requisitos (`--framework net8-x64-desktop,vcredist143-x64`): si el PC no
   tiene el runtime de .NET 8 Desktop o el Visual C++ Redistributable 2015-2022, `Setup.exe` los descarga e

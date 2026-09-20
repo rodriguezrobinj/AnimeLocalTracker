@@ -91,6 +91,10 @@ public class SyncService : ISyncService
                     bool ok = await _trackingService.ActualizarProgresoAsync(aniListId, progresoFinal, token);
                     if (ok)
                     {
+                        // Episodios vistos sin conexión: también sus fechas (inicio del primer visionado real y, si
+                        // era el último oficial de un anime finalizado, la de fin). Nunca pisa fechas de la nube.
+                        await SeguimientoFechas.AplicarAsync(_databaseService, _trackingService, aniListId, seguimientoRemoto, maxEpisodio, token);
+
                         await _databaseService.MarcarEpisodiosSincronizadosAsync(idsSincronizar);
                         totalExitosos += idsSincronizar.Count;
                         AppLogger.Info($"[SyncService] Sincronizado AniListId={aniListId} hasta episodio {progresoFinal} (Local: {maxEpisodio}, Remoto: {progresoRemoto}).", "SyncService");

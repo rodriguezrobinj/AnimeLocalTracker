@@ -1,6 +1,6 @@
 ﻿<#
 .SYNOPSIS
-    Deja en la carpeta FFmpeg de la app un conjunto COMPLETO y coherente de FFmpeg (build "shared" de gyan.dev):
+    Deja en la carpeta FFmpeg de la app un conjunto COMPLETO y coherente de FFmpeg (build "shared" de gyan.dev, archivado en GitHub Releases):
     ffmpeg.exe, ffprobe.exe y las DLLs de las que dependen.
 
 .DESCRIPTION
@@ -38,8 +38,10 @@ $ProgressPreference = 'SilentlyContinue'   # Invoke-WebRequest es mucho más rá
 
 # ── Versión fijada (ver REGLA DE COMPATIBILIDAD arriba) ──
 $Version = '9.0.1'
-$Sha256  = 'cb4d5e8db6a3353bffdb2100d3eb4b76733457fa443215e236f57c99f9ffdca4'   # publicado en https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-9.0.1-full_build-shared.7z.sha256
-$Url     = "https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-$Version-full_build-shared.7z"
+$Sha256  = 'cb4d5e8db6a3353bffdb2100d3eb4b76733457fa443215e236f57c99f9ffdca4'   # SHA256 del .7z de esta versión (es el mismo archivo que publica gyan.dev)
+# gyan.dev SOLO conserva la última release (9.0.1 dio 404 al salir la 9.0.2 y rompió el CI); el mismo autor archiva
+# TODAS las versiones como assets de GitHub Releases, que sí son estables para una versión fijada.
+$Url     = "https://github.com/GyanD/codexffmpeg/releases/download/$Version/ffmpeg-$Version-full_build-shared.7z"
 $Exes    = @('ffmpeg.exe', 'ffprobe.exe')
 $Dlls    = @('avcodec-63.dll', 'avdevice-63.dll', 'avfilter-12.dll', 'avformat-63.dll', 'avutil-61.dll', 'swresample-7.dll', 'swscale-10.dll')
 
@@ -78,7 +80,7 @@ function Test-HashOk([string]$ruta) {
     return (Test-Path $ruta) -and ((Get-FileHash $ruta -Algorithm SHA256).Hash -ieq $Sha256)
 }
 if (-not (Test-HashOk $archivo)) {
-    Write-Host "[ffmpeg] Descargando FFmpeg $Version (shared) de gyan.dev..." -ForegroundColor Yellow
+    Write-Host "[ffmpeg] Descargando FFmpeg $Version (shared) de GitHub Releases (GyanD/codexffmpeg)..." -ForegroundColor Yellow
     Invoke-WebRequest $Url -OutFile $archivo -UseBasicParsing
     if (-not (Test-HashOk $archivo)) {
         Remove-Item $archivo -Force -ErrorAction SilentlyContinue

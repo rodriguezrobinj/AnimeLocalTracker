@@ -34,11 +34,12 @@ public class DownloadService : IDownloadService
     private readonly IDownloadStateStore _stateStore;
     private readonly IVideoSourceResolver _sourceResolver;
     private readonly IPythonBridgeService? _pythonBridge;
+    private readonly IDatabaseService? _database;
     private readonly ConcurrentDictionary<string, DownloadState> _activeDownloads = new();
 
     // Gestor de slots de concurrencia (redimensionable en caliente según DescargasSimultaneas)
     private readonly object _slotLock = new();
-    private Queue<TaskCompletionSource<bool>> _slotWaiters = new();
+    private readonly List<(string Key, TaskCompletionSource<bool> Tcs)> _slotWaiters = new();
     private int _slotsActivos;
     private int _limiteDescargas = LimiteDescargasPorDefecto;
 
@@ -58,6 +59,12 @@ public class DownloadService : IDownloadService
         public bool IsPaused { get; set; }
         public CancellationTokenSource Cts { get; set; } = new();
         public DateTime FechaCreacion { get; set; } = DateTime.UtcNow;
+        public string CarpetaDestino { get; set; } = string.Empty;
+        /// <summary>True hasta que la descarga obtiene un slot (o mientras espera uno tras reanudar).</summary>
+        public volatile bool EnCola = true;
+        public int Reintentos { get; set; }
+        /// <summary>El usuario pidió saltar la cola antes de que la descarga llegara a registrarse como waiter.</summary>
+        public volatile bool Priorizada;
     }
 
     public DownloadService(
@@ -65,8 +72,10 @@ public class DownloadService : IDownloadService
         IDownloadStateStore? stateStore = null,
         IVideoSourceResolver? sourceResolver = null,
         ISettingsService? settingsService = null,
-        IPythonBridgeService? pythonBridge = null)
+        IPythonBridgeService? pythonBridge = null,
+        IDatabaseService? database = null)
     {
+        _database = database;
         _httpClient = httpClientFactory.CreateClient("Downloader");
         _stateStore = stateStore ?? new DownloadStateStore();
         _sourceResolver = sourceResolver ?? new AnimeAv1VideoSourceResolver(_httpClient);
@@ -122,9 +131,10 @@ public class DownloadService : IDownloadService
         var concedidos = new List<TaskCompletionSource<bool>>();
         while (_slotWaiters.Count > 0 && _slotsActivos < _limiteDescargas)
         {
-            var waiter = _slotWaiters.Dequeue();
+            var waiter = _slotWaiters[0];
+            _slotWaiters.RemoveAt(0);
             _slotsActivos++;
-            concedidos.Add(waiter);
+            concedidos.Add(waiter.Tcs);
         }
         return concedidos.ToArray();
     }
@@ -134,7 +144,7 @@ public class DownloadService : IDownloadService
     /// Respetuoso con la cancelación: si el token se cancela mientras espera,
     /// el slot no se consume y el waiter se descarta de la cola.
     /// </summary>
-    private async Task<bool> AdquirirSlotAsync(CancellationToken ct)
+    private async Task<bool> AdquirirSlotAsync(string key, DownloadState state, CancellationToken ct)
     {
         TaskCompletionSource<bool>? tcs = null;
         lock (_slotLock)
@@ -146,7 +156,9 @@ public class DownloadService : IDownloadService
             }
 
             tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-            _slotWaiters.Enqueue(tcs);
+            // La bandera se lee DENTRO del lock: PriorizarDescarga puede activarla justo antes de que esta descarga se encole.
+            if (state.Priorizada) _slotWaiters.Insert(0, (key, tcs));
+            else _slotWaiters.Add((key, tcs));
         }
 
         using var reg = ct.Register(() => tcs.TrySetCanceled());
@@ -160,10 +172,44 @@ public class DownloadService : IDownloadService
             // Si se canceló mientras esperaba, retirar de la cola para no perder un slot futuro
             lock (_slotLock)
             {
-                _slotWaiters = new Queue<TaskCompletionSource<bool>>(_slotWaiters.Where(w => !ReferenceEquals(w, tcs)));
+                _slotWaiters.RemoveAll(w => ReferenceEquals(w.Tcs, tcs));
             }
             throw;
         }
+    }
+
+    /// <summary>Adelanta una descarga en espera al primer puesto de la cola. False si no está esperando un slot.</summary>
+    public bool PriorizarDescarga(int aniListId, int numeroEpisodio)
+    {
+        string key = $"{aniListId}_{numeroEpisodio}";
+        lock (_slotLock)
+        {
+            int idx = _slotWaiters.FindIndex(w => w.Key == key);
+            if (idx < 0)
+            {
+                // Aún no llegó a la cola (se acaba de iniciar): se recuerda para que entre por delante.
+                if (_activeDownloads.TryGetValue(key, out var pendiente) && pendiente.EnCola && !pendiente.IsPaused)
+                {
+                    pendiente.Priorizada = true;
+                    pendiente.Orden = _activeDownloads.Values.Min(d => d.Orden) - 1;
+                    return true;
+                }
+                return false;
+            }
+            if (idx > 0)
+            {
+                var w = _slotWaiters[idx];
+                _slotWaiters.RemoveAt(idx);
+                _slotWaiters.Insert(0, w);
+            }
+        }
+
+        if (_activeDownloads.TryGetValue(key, out var state))
+        {
+            var minOrden = _activeDownloads.Values.Min(d => d.Orden);
+            state.Orden = minOrden - 1;
+        }
+        return true;
     }
 
     private void LiberarSlot()
@@ -251,6 +297,7 @@ public class DownloadService : IDownloadService
         {
             state.IsPaused = false;
             state.Cts = new CancellationTokenSource();
+            state.EnCola = true;
             WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(aniListId, numeroEpisodio, state.Progreso, isDownloading: true, isCompleted: false, isPaused: false, state.RutaDestino, null, state.AnimeTitulo));
             EjecutarBucleDescargaAsync(state);
         }
@@ -265,6 +312,7 @@ public class DownloadService : IDownloadService
             {
                 state.IsPaused = false;
                 state.Cts = new CancellationTokenSource();
+                state.EnCola = true;
                 WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, state.Progreso, isDownloading: true, isCompleted: false, isPaused: false, state.RutaDestino, null, state.AnimeTitulo));
                 EjecutarBucleDescargaAsync(state);
             }
@@ -284,7 +332,10 @@ public class DownloadService : IDownloadService
                 IsDownloading = true,
                 IsCompleted = false,
                 IsPaused = s.IsPaused,
-                RutaArchivo = s.RutaDestino
+                RutaArchivo = s.RutaDestino,
+                EnCola = s.EnCola && !s.IsPaused,
+                Orden = s.Orden,
+                Reintentos = s.Reintentos
             })
             .ToList();
     }
@@ -317,6 +368,7 @@ public class DownloadService : IDownloadService
             RutaDestino = Path.Combine(carpetaDestino, $"Episodio {numeroEpisodio:D2}.mp4"),
         };
         state.RutaTemporal = state.RutaDestino + ".downloading";
+        state.CarpetaDestino = carpetaDestino;
 
         if (!_activeDownloads.TryAdd(key, state)) return Task.CompletedTask;
 
@@ -325,7 +377,7 @@ public class DownloadService : IDownloadService
             Directory.CreateDirectory(carpetaDestino);
         }
 
-        WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(aniListId, numeroEpisodio, 0, isDownloading: true, isCompleted: false, isPaused: false, "", null, animeTitulo));
+        WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(aniListId, numeroEpisodio, 0, isDownloading: true, isCompleted: false, isPaused: false, "", null, animeTitulo, enCola: true));
 
         EjecutarBucleDescargaAsync(state);
         return Task.CompletedTask;
@@ -342,10 +394,13 @@ public class DownloadService : IDownloadService
             int reintentosDescarga = 0;
             try
             {
-                await AdquirirSlotAsync(state.Cts.Token);
+                await AdquirirSlotAsync(key, state, state.Cts.Token);
                 slotAdquirido = true;
+                state.EnCola = false;
 
                 if (state.Cts.IsCancellationRequested || state.IsPaused) return;
+
+                WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, state.Progreso, isDownloading: true, isCompleted: false, isPaused: false, state.RutaDestino, null, state.AnimeTitulo, enCola: false, reintentos: state.Reintentos));
 
                 IProgress<(double Progress, double Speed)>? progress = null;
                 bool descargaCompletada = false;
@@ -366,7 +421,9 @@ public class DownloadService : IDownloadService
                             // FUN-016: trazabilidad del ciclo de descarga en app.log (antes solo Debug)
                             AppLogger.Warn("DownloadService", $"No se encontró enlace para '{state.AnimeTitulo}' Ep {state.NumeroEpisodio}.");
                             _activeDownloads.TryRemove(key, out _);
-                            WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, 0, isDownloading: false, isCompleted: false, isPaused: false, "", $"No se encontró el episodio {state.NumeroEpisodio} en el servidor.", state.AnimeTitulo));
+                            string errorNoEncontrado = $"No se encontró el episodio {state.NumeroEpisodio} en el servidor.";
+                            WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, 0, isDownloading: false, isCompleted: false, isPaused: false, "", errorNoEncontrado, state.AnimeTitulo));
+                            RegistrarEnHistorial(state, completada: false, errorNoEncontrado);
                             return;
                         }
                     }
@@ -377,7 +434,7 @@ public class DownloadService : IDownloadService
                     {
                         state.Progreso = p.Progress;
                         string speedText = FormatearVelocidad(p.Speed);
-                        WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, p.Progress, isDownloading: true, isCompleted: false, isPaused: false, state.RutaDestino, null, state.AnimeTitulo, speedText));
+                        WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, p.Progress, isDownloading: true, isCompleted: false, isPaused: false, state.RutaDestino, null, state.AnimeTitulo, speedText, velocidadBps: p.Speed, reintentos: state.Reintentos));
                     });
 
                     try
@@ -407,8 +464,10 @@ public class DownloadService : IDownloadService
                     catch (Exception ex) when (EsErrorTransitorioDeRed(ex) && reintentosDescarga < MaxReintentosDescargaTransitoria && !state.IsPaused && !state.Cts.IsCancellationRequested)
                     {
                         reintentosDescarga++;
+                        state.Reintentos = reintentosDescarga;
                         var espera = TimeSpan.FromSeconds(Math.Min(2 * reintentosDescarga, 15));
                         AppLogger.Warn("DownloadService", $"Fallo transitorio de red descargando '{state.AnimeTitulo}' Ep {state.NumeroEpisodio} (intento {reintentosDescarga}/{MaxReintentosDescargaTransitoria}): {ex.Message}. Reintentando en {espera.TotalSeconds:F0}s sin perder el progreso.");
+                        WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, state.Progreso, isDownloading: true, isCompleted: false, isPaused: false, state.RutaDestino, null, state.AnimeTitulo, reintentos: reintentosDescarga));
                         await Task.Delay(espera, state.Cts.Token);
                     }
                 }
@@ -419,6 +478,7 @@ public class DownloadService : IDownloadService
 
                 _activeDownloads.TryRemove(key, out _);
                 WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, 100, isDownloading: false, isCompleted: true, isPaused: false, state.RutaDestino, null, state.AnimeTitulo));
+                RegistrarEnHistorial(state, completada: true, null);
             }
             catch (OperationCanceledException)
             {
@@ -443,6 +503,7 @@ public class DownloadService : IDownloadService
                 // del usuario retome la descarga en vez de empezar desde cero.
                 _activeDownloads.TryRemove(key, out _);
                 WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, 0, isDownloading: false, isCompleted: false, isPaused: false, "", ex.Message, state.AnimeTitulo));
+                RegistrarEnHistorial(state, completada: false, ex.Message);
             }
             finally
             {
@@ -450,6 +511,47 @@ public class DownloadService : IDownloadService
                 {
                     LiberarSlot();
                 }
+            }
+        });
+    }
+
+    /// <summary>
+    /// Guarda el resultado FINAL (éxito o fallo definitivo) para el historial de la pestaña Descargas.
+    /// Fire-and-forget: un fallo de BD nunca debe afectar a la descarga. Cancelar/pausar no se registra.
+    /// </summary>
+    private void RegistrarEnHistorial(DownloadState state, bool completada, string? error)
+    {
+        if (_database == null) return;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                long tamano = 0;
+                if (completada)
+                {
+                    try { tamano = new FileInfo(state.RutaDestino).Length; } catch (IOException) { } catch (UnauthorizedAccessException) { }
+                }
+
+                await _database.GuardarDescargaHistorialAsync(new AnimeLocalTracker.Models.DescargaHistorial
+                {
+                    AniListId = state.AniListId,
+                    AnimeTitulo = state.AnimeTitulo,
+                    NumeroEpisodio = state.NumeroEpisodio,
+                    CarpetaDestino = string.IsNullOrEmpty(state.CarpetaDestino) ? (Path.GetDirectoryName(state.RutaDestino) ?? string.Empty) : state.CarpetaDestino,
+                    RutaArchivo = completada ? state.RutaDestino : string.Empty,
+                    TamanoBytes = tamano,
+                    FechaUtc = DateTime.UtcNow,
+                    Completada = completada,
+                    Error = completada ? null : error,
+                    TitulosAlternativos = string.Join(" | ", state.Titulos.Skip(1))
+                });
+
+                WeakReferenceMessenger.Default.Send(new DescargaHistorialActualizadoMensaje());
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("DownloadService", $"No se pudo guardar el historial de descargas: {ex.Message}");
             }
         });
     }
@@ -526,6 +628,19 @@ public class DownloadService : IDownloadService
         long totalBytes = -1;
         bool supportsRanges = false;
 
+        // Reanudación: si hay un archivo parcial con su .state, el tamaño y el soporte de rangos ya se conocen de la
+        // primera vez. Los sondeos HEAD/GET (6 s) fallan a menudo con mp4upload; si fallaban al reanudar, se caía al
+        // modo secuencial, el servidor devolvía 200 al Range y la descarga volvía a empezar desde cero.
+        long totalGuardado = LeerTotalDeEstadoGuardado(destinationPath);
+        bool reanudandoSegmentada = totalGuardado > 3 * 1024 * 1024;
+        if (reanudandoSegmentada)
+        {
+            totalBytes = totalGuardado;
+            supportsRanges = true;
+            AppLogger.Info("DownloadService", $"Reanudando descarga segmentada ({totalGuardado / (1024 * 1024)} MB) sin volver a sondear el servidor.");
+        }
+
+        if (!reanudandoSegmentada)
         using (var headReq = new HttpRequestMessage(HttpMethod.Head, videoUrl))
         {
             headReq.Headers.Add("User-Agent", UserAgent);
@@ -550,7 +665,7 @@ public class DownloadService : IDownloadService
         }
 
         // Si HEAD no devolvió tamaño o soporte de rangos, probar con GET range 0-0
-        if (totalBytes <= 0 || !supportsRanges)
+        if (!reanudandoSegmentada && (totalBytes <= 0 || !supportsRanges))
         {
             using var testReq = new HttpRequestMessage(HttpMethod.Get, videoUrl);
             testReq.Headers.Add("User-Agent", UserAgent);
@@ -601,6 +716,25 @@ public class DownloadService : IDownloadService
         else
         {
             await DownloadSequentialAsync(videoUrl, destinationPath, totalBytes, progress, cancellationToken);
+        }
+    }
+
+    /// <summary>Tamaño total guardado en el .state de una descarga segmentada previa (0 si no hay o no es válido).</summary>
+    private static long LeerTotalDeEstadoGuardado(string destinationPath)
+    {
+        try
+        {
+            string statePath = destinationPath + ".state";
+            if (!File.Exists(statePath) || !File.Exists(destinationPath)) return 0;
+            var info = System.Text.Json.JsonSerializer.Deserialize<DownloadStateInfo>(File.ReadAllText(statePath));
+            if (info == null || info.TotalBytes <= 0 || info.Segments.Count == 0) return 0;
+            // El archivo preasignado tiene ya el tamaño total; si no coincide, el estado no es fiable.
+            return new FileInfo(destinationPath).Length == info.TotalBytes ? info.TotalBytes : 0;
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("DownloadService", $"No se pudo leer el estado de reanudación: {ex.Message}");
+            return 0;
         }
     }
 

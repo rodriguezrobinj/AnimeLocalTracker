@@ -467,4 +467,78 @@ public class DownloadServiceTests
             try { File.Delete(destino); File.Delete(destino + ".state"); } catch { }
         }
     }
+
+    /// <summary>Servidor cuyos sondeos (HEAD) fallan —como mp4upload— y que solo sirve rangos; cuenta los bytes servidos.</summary>
+    private sealed class ServidorSinSondeoHandler : HttpMessageHandler
+    {
+        private readonly byte[] _datos;
+        public long BytesServidos;
+        public int PeticionesSinRango;
+
+        public ServidorSinSondeoHandler(byte[] datos) => _datos = datos;
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            if (request.Method == HttpMethod.Head) throw new HttpRequestException("sondeo fallido");
+
+            var rango = request.Headers.Range?.Ranges.FirstOrDefault();
+            if (rango == null)
+            {
+                Interlocked.Increment(ref PeticionesSinRango);
+                return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new ByteArrayContent(_datos) });
+            }
+
+            if (rango.From == 0 && rango.To == 0) throw new HttpRequestException("sondeo GET Range(0,0) fallido");
+
+            long desde = rango.From ?? 0;
+            long hasta = Math.Min(rango.To ?? _datos.Length - 1, _datos.Length - 1);
+            Interlocked.Add(ref BytesServidos, hasta - desde + 1);
+            var respuesta = new HttpResponseMessage(System.Net.HttpStatusCode.PartialContent)
+            {
+                Content = new ByteArrayContent(_datos, (int)desde, (int)(hasta - desde + 1))
+            };
+            respuesta.Content.Headers.ContentRange = new System.Net.Http.Headers.ContentRangeHeaderValue(desde, hasta, _datos.Length);
+            return Task.FromResult(respuesta);
+        }
+    }
+
+    [Fact]
+    public async Task DownloadVideoAsync_AlReanudarConEstadoGuardado_NoSondeaYSoloPideLosTrozosPendientes()
+    {
+        // Regresión: al pausar y reanudar una descarga al 65 %, los sondeos HEAD/GET fallaban, se caía al modo
+        // secuencial y el servidor respondía 200 a la petición con Range: la descarga volvía a empezar desde cero.
+        const int totalTrozos = 6; // max(6, ceil(12 MB / 4 MB))
+        var datos = GenerarVideoFalso(12 * 1024 * 1024);
+        var destino = Path.Combine(Path.GetTempPath(), $"reanuda_{Guid.NewGuid():N}.mp4");
+        var store = new DownloadStateStore();
+        var estado = await store.CargarOInicializarAsync(destino + ".state", datos.Length, totalTrozos);
+
+        // Los primeros 4 trozos (~2/3) ya estaban descargados cuando se pausó.
+        var parcial = new byte[datos.Length];
+        for (int i = 0; i < 4; i++)
+        {
+            var t = estado.Segments[i];
+            Array.Copy(datos, t.Start, parcial, t.Start, t.End - t.Start + 1);
+            t.CurrentOffset = t.End + 1;
+        }
+        await File.WriteAllBytesAsync(destino, parcial);
+        await store.GuardarAsync(destino + ".state", estado);
+        long pendientes = estado.Segments.Where(t => t.CurrentOffset <= t.End).Sum(t => t.End - t.CurrentOffset + 1);
+
+        var servidor = new ServidorSinSondeoHandler(datos);
+        var sut = CrearServicioConServidor(servidor);
+
+        try
+        {
+            await sut.DownloadVideoAsync("https://cdn.example.com/video.mp4", destino);
+
+            (await File.ReadAllBytesAsync(destino)).Should().Equal(datos);
+            servidor.PeticionesSinRango.Should().Be(0, "reanudar no debe pedir el archivo completo");
+            servidor.BytesServidos.Should().Be(pendientes, "solo se descargan los trozos que faltaban");
+        }
+        finally
+        {
+            try { File.Delete(destino); File.Delete(destino + ".state"); } catch { }
+        }
+    }
 }

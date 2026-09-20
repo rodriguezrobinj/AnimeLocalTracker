@@ -5,6 +5,257 @@
              xmlns:loc="clr-namespace:AnimeLocalTracker.Services"
              TextElement.Foreground="{DynamicResource MaterialDesignBody}"
              Background="#121212">
+    <UserControl.Resources>
+                    <!-- ══ Calendario del selector de fecha, con la plantilla estándar de WPF (su cabecera navega
+                         mes → año → década con un clic) y los colores de la app ══ -->
+                    <Style x:Key="SegCalNavBtn" TargetType="Button">
+                        <Setter Property="Width" Value="30"/>
+                        <Setter Property="Height" Value="30"/>
+                        <Setter Property="Cursor" Value="Hand"/>
+                        <Setter Property="Focusable" Value="False"/>
+                        <Setter Property="Foreground" Value="#9CA3AF"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="Raiz" Background="Transparent" CornerRadius="8">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Raiz" Property="Background" Value="#1E293B"/>
+                                            <Setter Property="Foreground" Value="#93C5FD"/>
+                                        </Trigger>
+                                        <Trigger Property="IsEnabled" Value="False">
+                                            <Setter Property="Opacity" Value="0.3"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+
+                    <Style x:Key="SegCalHeaderBtn" TargetType="Button">
+                        <Setter Property="Cursor" Value="Hand"/>
+                        <Setter Property="Focusable" Value="False"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="Raiz" Background="Transparent" CornerRadius="8" Padding="10,5" HorizontalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal">
+                                            <ContentPresenter x:Name="Texto" VerticalAlignment="Center" TextElement.FontSize="13.5" TextElement.FontWeight="Bold"
+                                                              TextElement.Foreground="#E2E8F0"/>
+                                            <Path Data="M 0,0 L 4,4 L 8,0" Stroke="#94A3B8" StrokeThickness="1.6" Margin="7,2,0,0" VerticalAlignment="Center"
+                                                  StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Raiz" Property="Background" Value="#1E293B"/>
+                                            <Setter TargetName="Texto" Property="TextElement.Foreground" Value="#93C5FD"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+
+                    <!-- Día del mes -->
+                    <Style x:Key="SegCalDayBtn" TargetType="CalendarDayButton">
+                        <Setter Property="MinWidth" Value="34"/>
+                        <Setter Property="MinHeight" Value="34"/>
+                        <Setter Property="Cursor" Value="Hand"/>
+                        <Setter Property="Foreground" Value="#E2E8F0"/>
+                        <Setter Property="FontSize" Value="12.5"/>
+                        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                        <Setter Property="VerticalContentAlignment" Value="Center"/>
+                        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="CalendarDayButton">
+                                    <Grid>
+                                        <Border x:Name="Fondo" Background="Transparent" BorderBrush="Transparent" BorderThickness="1" CornerRadius="17" Margin="1"/>
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Grid>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Fondo" Property="Background" Value="#1E293B"/>
+                                        </Trigger>
+                                        <Trigger Property="IsToday" Value="True">
+                                            <Setter TargetName="Fondo" Property="BorderBrush" Value="#60A5FA"/>
+                                        </Trigger>
+                                        <Trigger Property="IsInactive" Value="True">
+                                            <Setter Property="Foreground" Value="#4B5563"/>
+                                        </Trigger>
+                                        <Trigger Property="IsBlackedOut" Value="True">
+                                            <Setter Property="Opacity" Value="0.35"/>
+                                        </Trigger>
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Setter TargetName="Fondo" Property="Background" Value="#2563EB"/>
+                                            <Setter Property="Foreground" Value="White"/>
+                                        </Trigger>
+                                        <Trigger Property="IsEnabled" Value="False">
+                                            <Setter Property="Opacity" Value="0.35"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+
+                    <!-- Mes / año (vistas de año y década) -->
+                    <Style x:Key="SegCalMonthBtn" TargetType="CalendarButton">
+                        <Setter Property="MinWidth" Value="56"/>
+                        <Setter Property="MinHeight" Value="38"/>
+                        <Setter Property="Cursor" Value="Hand"/>
+                        <Setter Property="Foreground" Value="#E2E8F0"/>
+                        <Setter Property="FontSize" Value="12.5"/>
+                        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="CalendarButton">
+                                    <Grid>
+                                        <Border x:Name="Fondo" Background="Transparent" BorderBrush="Transparent" BorderThickness="1" CornerRadius="10" Margin="3" Height="38" VerticalAlignment="Center"/>
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Grid>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Fondo" Property="Background" Value="#1E293B"/>
+                                        </Trigger>
+                                        <Trigger Property="HasSelectedDays" Value="True">
+                                            <Setter TargetName="Fondo" Property="Background" Value="#2563EB"/>
+                                            <Setter Property="Foreground" Value="White"/>
+                                        </Trigger>
+                                        <Trigger Property="IsInactive" Value="True">
+                                            <Setter Property="Foreground" Value="#4B5563"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+
+                    <Style x:Key="SegCalItem" TargetType="CalendarItem">
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="CalendarItem">
+                                    <ControlTemplate.Resources>
+                                        <DataTemplate x:Key="{x:Static CalendarItem.DayTitleTemplateResourceKey}">
+                                            <TextBlock Text="{Binding}" FontSize="11" FontWeight="SemiBold" Foreground="#94A3B8"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,6,0,4"/>
+                                        </DataTemplate>
+                                    </ControlTemplate.Resources>
+                                    <Grid x:Name="PART_Root" MinWidth="268">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="*"/>
+                                        </Grid.RowDefinitions>
+
+                                        <Grid Grid.Row="0" Margin="0,0,0,4">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Button x:Name="PART_PreviousButton" Grid.Column="0" Style="{StaticResource SegCalNavBtn}">
+                                                <Path Data="M 5,0 L 0,5 L 5,10" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="2"
+                                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                                            </Button>
+                                            <Button x:Name="PART_HeaderButton" Grid.Column="1" Style="{StaticResource SegCalHeaderBtn}" HorizontalAlignment="Center"/>
+                                            <Button x:Name="PART_NextButton" Grid.Column="2" Style="{StaticResource SegCalNavBtn}">
+                                                <Path Data="M 0,0 L 5,5 L 0,10" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="2"
+                                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                                            </Button>
+                                        </Grid>
+
+                                        <Grid x:Name="PART_MonthView" Grid.Row="1" Visibility="Visible" HorizontalAlignment="Center">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
+                                        </Grid>
+
+                                        <Grid x:Name="PART_YearView" Grid.Row="1" Visibility="Hidden" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="*"/><RowDefinition Height="*"/><RowDefinition Height="*"/>
+                                            </Grid.RowDefinitions>
+                                        </Grid>
+                                    </Grid>
+                                    <ControlTemplate.Triggers>
+                                        <!-- La vista visible depende del modo del calendario: mes (por defecto), año (12 meses) o década (años) -->
+                                        <DataTrigger Binding="{Binding DisplayMode, RelativeSource={RelativeSource AncestorType=Calendar}}" Value="Year">
+                                            <Setter TargetName="PART_MonthView" Property="Visibility" Value="Hidden"/>
+                                            <Setter TargetName="PART_YearView" Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding DisplayMode, RelativeSource={RelativeSource AncestorType=Calendar}}" Value="Decade">
+                                            <Setter TargetName="PART_MonthView" Property="Visibility" Value="Hidden"/>
+                                            <Setter TargetName="PART_YearView" Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+
+                    <Style x:Key="SegCalendar" TargetType="Calendar">
+                        <!-- En la vista de décadas el botón del título está deshabilitado (no hay nivel superior): se atiende el clic aquí para volver a los días -->
+                        <EventSetter Event="PreviewMouseLeftButtonDown" Handler="CalendarioTitulo_PreviewMouseLeftButtonDown"/>
+                        <Setter Property="Foreground" Value="#E2E8F0"/>
+                        <Setter Property="CalendarItemStyle" Value="{StaticResource SegCalItem}"/>
+                        <Setter Property="CalendarDayButtonStyle" Value="{StaticResource SegCalDayBtn}"/>
+                        <Setter Property="CalendarButtonStyle" Value="{StaticResource SegCalMonthBtn}"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="Calendar">
+                                    <Border Background="#1A1F26" BorderBrush="#2D3748" BorderThickness="1" CornerRadius="12" Padding="10,8,10,10">
+                                        <CalendarItem x:Name="PART_CalendarItem" Style="{TemplateBinding CalendarItemStyle}"/>
+                                    </Border>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+
+                    <!-- Campo de fecha: abre la tarjeta de calendario -->
+                    <Style x:Key="SegDateField" TargetType="Button">
+                        <Setter Property="Height" Value="40"/>
+                        <Setter Property="Cursor" Value="Hand"/>
+                        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="Raiz" Background="#14181E" BorderBrush="#2D3748" BorderThickness="1" CornerRadius="10">
+                                        <ContentPresenter VerticalAlignment="Center" HorizontalAlignment="Stretch"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Raiz" Property="BorderBrush" Value="#60A5FA"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+
+                    <!-- Calendario dentro de la tarjeta (sin marco propio: ya lo da la tarjeta) -->
+                    <Style x:Key="SegCalendarInline" TargetType="Calendar" BasedOn="{StaticResource SegCalendar}">
+                        <Setter Property="HorizontalAlignment" Value="Center"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="Calendar">
+                                    <CalendarItem x:Name="PART_CalendarItem" Style="{TemplateBinding CalendarItemStyle}"/>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+    </UserControl.Resources>
+
 
     <Grid>
         <!-- 1. FONDO DIFUMINADO HERO CON DEGRADADO SUAVE -->
@@ -797,9 +1048,9 @@
         <Grid Visibility="{Binding MostrandoEditorSeguimiento, Converter={StaticResource BoolToVis}}" 
               Background="#CC000000" Panel.ZIndex="100">
 
-            <materialDesign:Card Width="430" VerticalAlignment="Center" HorizontalAlignment="Center" 
+            <materialDesign:Card x:Name="EditorSeguimientoCard" Width="520" VerticalAlignment="Center" HorizontalAlignment="Center" 
                                  UniformCornerRadius="16" Background="#1A1F26" BorderBrush="#2D3748" BorderThickness="1"
-                                 materialDesign:ElevationAssist.Elevation="Dp16" Padding="22">
+                                 materialDesign:ElevationAssist.Elevation="Dp16" Padding="22,20">
                 <materialDesign:Card.Resources>
                     <Style x:Key="CleanScoreSlider" TargetType="Slider">
                         <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
@@ -857,128 +1108,265 @@
                             </Setter.Value>
                         </Setter>
                     </Style>
+
+                    <Style x:Key="SegLabel" TargetType="TextBlock">
+                        <Setter Property="FontSize" Value="11"/>
+                        <Setter Property="FontWeight" Value="SemiBold"/>
+                        <Setter Property="Foreground" Value="#94A3B8"/>
+                    </Style>
+
+                    <!-- Chip de estado: activo = borde y texto azules -->
+                    <Style x:Key="SegChip" TargetType="Button">
+                        <Setter Property="Cursor" Value="Hand"/>
+                        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="Raiz" Background="#14181E" BorderBrush="#2D3748" BorderThickness="1" CornerRadius="16" Padding="13,6" Margin="4,0,4,8">
+                                        <ContentPresenter x:Name="Texto" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                          TextElement.FontSize="12.5" TextElement.FontWeight="SemiBold" TextElement.Foreground="#9CA3AF"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Raiz" Property="Background" Value="#1B222C"/>
+                                        </Trigger>
+                                        <DataTrigger Binding="{Binding EsActivo}" Value="True">
+                                            <Setter TargetName="Raiz" Property="Background" Value="#1E293B"/>
+                                            <Setter TargetName="Raiz" Property="BorderBrush" Value="#60A5FA"/>
+                                            <Setter TargetName="Texto" Property="TextElement.Foreground" Value="#93C5FD"/>
+                                        </DataTrigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+
+                    <!-- Botón cuadrado pequeño (−, +, hoy) -->
+                    <Style x:Key="SegStepBtn" TargetType="Button">
+                        <Setter Property="MinWidth" Value="40"/>
+                        <Setter Property="Padding" Value="8,0"/>
+                        <Setter Property="Height" Value="40"/>
+                        <Setter Property="Cursor" Value="Hand"/>
+                        <Setter Property="Foreground" Value="#9CA3AF"/>
+                        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="Raiz" Background="Transparent" CornerRadius="10">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" TextElement.Foreground="{TemplateBinding Foreground}"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Raiz" Property="Background" Value="#1E293B"/>
+                                            <Setter Property="Foreground" Value="#93C5FD"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+
                 </materialDesign:Card.Resources>
 
                 <StackPanel>
-                    <!-- CABECERA MODERNA CON BOTÓN CERRAR -->
-                    <Grid Margin="0,0,0,18">
+                    <!-- CABECERA: icono + título + anime + cerrar -->
+                    <Grid Margin="0,0,0,16">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
 
-                        <Border Grid.Column="0" Background="#14181E" BorderBrush="#2D3748" BorderThickness="1" CornerRadius="10" Width="38" Height="38" Margin="0,0,12,0" VerticalAlignment="Center">
-                            <materialDesign:PackIcon Kind="Sync" Width="20" Height="20" Foreground="#60A5FA" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <Border Grid.Column="0" Background="#14181E" BorderBrush="#2D3748" BorderThickness="1" CornerRadius="10" Width="36" Height="36" Margin="0,0,12,0" VerticalAlignment="Center">
+                            <materialDesign:PackIcon Kind="Sync" Width="19" Height="19" Foreground="#60A5FA" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
 
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                            <TextBlock Text="{Binding [Det_ActualizarAniListTitulo], Source={x:Static loc:LocalizationService.Instance}}" FontSize="16" FontWeight="Bold" Foreground="White"/>
-                            <TextBlock Text="{Binding [Det_ActualizarAniListSub], Source={x:Static loc:LocalizationService.Instance}}" FontSize="11" Foreground="#9CA3AF" Margin="0,2,0,0"/>
+                            <TextBlock Text="{Binding [Det_ActualizarAniListTitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="15.5" FontWeight="Bold" Foreground="White"/>
+                            <TextBlock Text="{Binding AnimeSeleccionado.Titulo}" FontSize="11.5" Foreground="#94A3B8" Margin="0,1,0,0" TextTrimming="CharacterEllipsis"/>
                         </StackPanel>
 
                         <Button Grid.Column="2" Command="{Binding CerrarEditorSeguimientoCommand}"
-                                Style="{StaticResource MaterialDesignIconButton}" Width="32" Height="32" Padding="0"
-                                ToolTip="{Binding [Det_CerrarVentanaTip], Source={x:Static loc:LocalizationService.Instance}}">
+                                Style="{StaticResource MaterialDesignIconButton}" Width="32" Height="32" Padding="0" Cursor="Hand"
+                                ToolTip="{Binding [Det_CerrarVentanaTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" AutomationProperties.Name="{Binding [Det_CerrarVentanaTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
                             <materialDesign:PackIcon Kind="Close" Width="18" Height="18" Foreground="#9CA3AF"/>
                         </Button>
                     </Grid>
 
-                    <!-- FILA 1: ESTADO Y EPISODIOS VISTOS (2 COLUMNAS) -->
+                    <!-- ESTADO: chips de un clic -->
+                    <TextBlock Text="{Binding [Det_Estado], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource SegLabel}"/>
+                    <ItemsControl ItemsSource="{Binding EstadosChips}" HorizontalAlignment="Center" Margin="0,6,0,6">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><WrapPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Button Content="{Binding Etiqueta}" Style="{StaticResource SegChip}"
+                                        Command="{Binding DataContext.SeleccionarEstadoCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding Clave}"
+                                        AutomationProperties.Name="{Binding Etiqueta}"/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <!-- PROGRESO (stepper) + PUNTUACIÓN, en dos columnas -->
                     <Grid Margin="0,0,0,14">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="1.3*"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="16"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
 
-                        <!-- ESTADO -->
-                        <StackPanel Grid.Column="0" Margin="0,0,8,0">
-                            <TextBlock Text="{Binding [Det_Estado], Source={x:Static loc:LocalizationService.Instance}}" FontSize="11" FontWeight="SemiBold" Foreground="#9CA3AF" Margin="0,0,0,5"/>
-                            <ComboBox ItemsSource="{Binding OpcionesEstadoVisual}"
-                                      SelectedItem="{Binding EditEstadoVisual}"
-                                      Height="38"/>
+                        <!-- Episodios vistos -->
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="{Binding [Det_EpisodiosVistos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource SegLabel}"/>
+                            <Border Background="#14181E" BorderBrush="#2D3748" BorderThickness="1" CornerRadius="10" Height="40" Margin="0,6,0,0">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Button Grid.Column="0" Command="{Binding DecrementarProgresoCommand}" Style="{StaticResource SegStepBtn}"
+                                            ToolTip="{Binding [Det_SegMenosTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" AutomationProperties.Name="{Binding [Det_SegMenosTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                        <materialDesign:PackIcon Kind="Minus" Width="16" Height="16"/>
+                                    </Button>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <TextBox Text="{Binding EditProgresoTexto, UpdateSourceTrigger=PropertyChanged}"
+                                                 MaxWidth="60" Padding="0" BorderThickness="0" Background="Transparent"
+                                                 Foreground="White" FontSize="15" FontWeight="Bold" TextAlignment="Center"
+                                                 CaretBrush="#60A5FA" VerticalContentAlignment="Center"
+                                                 materialDesign:TextFieldAssist.DecorationVisibility="Hidden"
+                                                 AutomationProperties.Name="{Binding [Det_EpisodiosVistos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                        <TextBlock Text="{Binding EditTotalEpisodiosTexto}" FontSize="13" Foreground="#94A3B8" Margin="5,0,0,0" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                    <Button Grid.Column="2" Command="{Binding IncrementarProgresoCommand}" Style="{StaticResource SegStepBtn}"
+                                            ToolTip="{Binding [Det_SegMasTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" AutomationProperties.Name="{Binding [Det_SegMasTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                        <materialDesign:PackIcon Kind="Plus" Width="16" Height="16"/>
+                                    </Button>
+                                </Grid>
+                            </Border>
                         </StackPanel>
 
-                        <!-- EPISODIOS VISTOS (VALIDADO) -->
-                        <StackPanel Grid.Column="1" Margin="8,0,0,0">
-                            <TextBlock Text="{Binding [Det_EpisodiosVistos], Source={x:Static loc:LocalizationService.Instance}}" FontSize="11" FontWeight="SemiBold" Foreground="#9CA3AF" Margin="0,0,0,5"/>
-                            <TextBox Text="{Binding EditProgresoTexto, UpdateSourceTrigger=PropertyChanged}" 
-                                     Style="{StaticResource MaterialDesignOutlinedTextBox}"
-                                     materialDesign:TextFieldAssist.UnderlineBrush="#3B82F6"
-                                     VerticalContentAlignment="Center"
-                                     FontSize="14" FontWeight="SemiBold"
-                                     Foreground="White" Background="#14181E" BorderBrush="#2D3748"
-                                     TextAlignment="Center"/>
+                        <!-- Puntuación -->
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="{Binding [Det_Puntuacion], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource SegLabel}"/>
+                            <Border Background="#14181E" BorderBrush="#2D3748" BorderThickness="1" CornerRadius="10" Height="40" Margin="0,6,0,0" Padding="12,0">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Slider Grid.Column="0" Minimum="0" Maximum="100" Value="{Binding EditPuntaje, UpdateSourceTrigger=PropertyChanged}"
+                                            Style="{StaticResource CleanScoreSlider}" IsSnapToTickEnabled="True" TickFrequency="1"
+                                            VerticalAlignment="Center" Margin="0,0,10,0"
+                                            AutomationProperties.Name="{Binding [Det_Puntuacion], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                    <TextBlock Grid.Column="1" Text="{Binding EditPuntajeTexto}" FontWeight="Bold" FontSize="15" Foreground="#93C5FD"
+                                               MinWidth="26" TextAlignment="Right" VerticalAlignment="Center"/>
+                                </Grid>
+                            </Border>
                         </StackPanel>
                     </Grid>
 
-                    <!-- FILA 2: PUNTUACIÓN (0-100) SIN ESTRELLA Y CON SLIDER CENTRADO -->
-                    <StackPanel Margin="0,0,0,14">
-                        <Grid Margin="0,0,0,6">
-                            <TextBlock Text="{Binding [Det_Puntuacion], Source={x:Static loc:LocalizationService.Instance}}" FontSize="11" FontWeight="SemiBold" Foreground="#9CA3AF" VerticalAlignment="Center"/>
-
-                            <Border HorizontalAlignment="Right" Background="#14181E" BorderBrush="#2D3748" BorderThickness="1" CornerRadius="6" Padding="8,2">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="{Binding EditPuntaje, StringFormat={}{0:F0}}" FontWeight="Bold" FontSize="12" Foreground="#93C5FD" VerticalAlignment="Center"/>
-                                    <TextBlock Text=" / 100" FontSize="11" Foreground="#60A5FA" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </Border>
-                        </Grid>
-
-                        <Slider Minimum="0" Maximum="100" Value="{Binding EditPuntaje, UpdateSourceTrigger=PropertyChanged}" 
-                                Style="{StaticResource CleanScoreSlider}"
-                                IsSnapToTickEnabled="True" TickFrequency="1" Margin="0,2,0,0"/>
-                    </StackPanel>
-
-                    <!-- FILA 3: FECHAS (INICIO Y FIN) SIN RECORTES DE TEXTO -->
-                    <Grid Margin="0,0,0,20">
+                    <!-- FECHAS: inicio y fin en una fila, con atajo "hoy" -->
+                    <Grid Margin="0,0,0,18">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="16"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        
-                        <StackPanel Grid.Column="0" Margin="0,0,8,0">
-                            <TextBlock Text="{Binding [Det_FechaInicio], Source={x:Static loc:LocalizationService.Instance}}" FontSize="11" FontWeight="SemiBold" Foreground="#9CA3AF" Margin="0,0,0,5"/>
-                            <DatePicker SelectedDate="{Binding EditFechaInicio}" 
-                                        Style="{StaticResource MaterialDesignOutlinedDatePicker}"
-                                        materialDesign:TextFieldAssist.UnderlineBrush="#3B82F6"
-                                        VerticalContentAlignment="Center"
-                                        Foreground="White" Background="#14181E" BorderBrush="#2D3748"/>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="{Binding [Det_FechaInicio], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource SegLabel}"/>
+                            <Button Margin="0,6,0,0" Command="{Binding AbrirCalendarioInicioCommand}" Style="{StaticResource SegDateField}"
+                                    AutomationProperties.Name="{Binding [Det_FechaInicio], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                <Grid>
+                                    <TextBlock Text="{Binding EditFechaInicioTexto}" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12.5" Foreground="White"/>
+                                    <materialDesign:PackIcon Kind="CalendarMonthOutline" Width="17" Height="17" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="#94A3B8"/>
+                                </Grid>
+                            </Button>
                         </StackPanel>
-                        
-                        <StackPanel Grid.Column="1" Margin="8,0,0,0">
-                            <TextBlock Text="{Binding [Det_FechaFin], Source={x:Static loc:LocalizationService.Instance}}" FontSize="11" FontWeight="SemiBold" Foreground="#9CA3AF" Margin="0,0,0,5"/>
-                            <DatePicker SelectedDate="{Binding EditFechaFin}" 
-                                        Style="{StaticResource MaterialDesignOutlinedDatePicker}"
-                                        materialDesign:TextFieldAssist.UnderlineBrush="#3B82F6"
-                                        VerticalContentAlignment="Center"
-                                        Foreground="White" Background="#14181E" BorderBrush="#2D3748"/>
+
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="{Binding [Det_FechaFin], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource SegLabel}"/>
+                            <Button Margin="0,6,0,0" Command="{Binding AbrirCalendarioFinCommand}" Style="{StaticResource SegDateField}"
+                                    AutomationProperties.Name="{Binding [Det_FechaFin], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                <Grid>
+                                    <TextBlock Text="{Binding EditFechaFinTexto}" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12.5" Foreground="White"/>
+                                    <materialDesign:PackIcon Kind="CalendarMonthOutline" Width="17" Height="17" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="#94A3B8"/>
+                                </Grid>
+                            </Button>
                         </StackPanel>
                     </Grid>
 
-                    <!-- BOTONES DE ACCIÓN ESPACIOSOS -->
+                    <!-- ACCIONES -->
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
 
-                        <Button Grid.Column="0" Content="{Binding [Gal_Cancelar], Source={x:Static loc:LocalizationService.Instance}}" Command="{Binding CerrarEditorSeguimientoCommand}"
-                                Style="{StaticResource MaterialDesignOutlinedButton}" 
-                                BorderBrush="#374151" Foreground="#9CA3AF" Height="44" Padding="18,0"
-                                FontSize="13"
-                                materialDesign:ButtonAssist.CornerRadius="8"/>
+                        <Button Grid.Column="0" Content="{Binding [Gal_Cancelar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Command="{Binding CerrarEditorSeguimientoCommand}"
+                                Style="{StaticResource MaterialDesignOutlinedButton}"
+                                BorderBrush="#374151" Foreground="#9CA3AF" Height="42" Padding="18,0" FontSize="13"
+                                materialDesign:ButtonAssist.CornerRadius="10" Cursor="Hand"/>
 
-                        <Button Grid.Column="1" Command="{Binding GuardarEditorSeguimientoCommand}" 
-                                Style="{StaticResource MaterialDesignRaisedButton}" 
-                                Background="#2563EB" BorderBrush="#1D4ED8" Foreground="White"
-                                Height="44" Padding="18,0" Margin="10,0,0,0"
-                                materialDesign:ButtonAssist.CornerRadius="8">
+                        <Button Grid.Column="1" Command="{Binding GuardarEditorSeguimientoCommand}"
+                                Style="{StaticResource AppPrimaryButton}"
+                                Height="42" Padding="18,0" Margin="10,0,0,0"
+                                materialDesign:ButtonAssist.CornerRadius="10" Cursor="Hand">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Center">
                                 <materialDesign:PackIcon Kind="CloudUpload" Width="18" Height="18" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                <TextBlock Text="{Binding [Det_GuardarAniList], Source={x:Static loc:LocalizationService.Instance}}" FontWeight="Bold" FontSize="13" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding [Det_GuardarAniList], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontWeight="Bold" FontSize="13" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
+                    </Grid>
+                </StackPanel>
+            </materialDesign:Card>
+        </Grid>
+
+        <!-- PARTE 4: TARJETA DEL CALENDARIO (fecha de inicio / fin), sobre el editor de seguimiento -->
+        <Grid Visibility="{Binding MostrandoCalendarioFecha, Converter={StaticResource BoolToVis}}"
+              Background="#99000000" Panel.ZIndex="110">
+            <materialDesign:Card x:Name="CalendarioFechaCard" Width="340" VerticalAlignment="Center" HorizontalAlignment="Center"
+                                 UniformCornerRadius="16" Background="#1A1F26" BorderBrush="#2D3748" BorderThickness="1"
+                                 materialDesign:ElevationAssist.Elevation="Dp16" Padding="20,18">
+                <StackPanel>
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Border Grid.Column="0" Background="#14181E" BorderBrush="#2D3748" BorderThickness="1" CornerRadius="10" Width="34" Height="34" Margin="0,0,12,0" VerticalAlignment="Center">
+                            <materialDesign:PackIcon Kind="CalendarMonthOutline" Width="18" Height="18" Foreground="#60A5FA" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <TextBlock Grid.Column="1" Text="{Binding CalendarioTitulo}" FontSize="15" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
+                        <Button Grid.Column="2" Command="{Binding CerrarCalendarioFechaCommand}"
+                                Style="{StaticResource MaterialDesignIconButton}" Width="30" Height="30" Padding="0" Cursor="Hand"
+                                ToolTip="{Binding [Det_CerrarVentanaTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" AutomationProperties.Name="{Binding [Det_CerrarVentanaTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                            <materialDesign:PackIcon Kind="Close" Width="17" Height="17" Foreground="#9CA3AF"/>
+                        </Button>
+                    </Grid>
+
+                    <Calendar x:Name="CalendarioFecha" Style="{StaticResource SegCalendarInline}"
+                              PreviewMouseLeftButtonUp="CalendarioFecha_PreviewMouseLeftButtonUp"/>
+
+                    <Grid Margin="0,14,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Command="{Binding QuitarFechaCalendarioCommand}" HorizontalAlignment="Left"
+                                Style="{StaticResource MaterialDesignFlatButton}" Foreground="#F87171" Height="38" Padding="12,0" Cursor="Hand"
+                                materialDesign:ButtonAssist.CornerRadius="10"
+                                Visibility="{Binding CalendarioTieneFecha, Converter={StaticResource BoolToVis}}">
+                            <TextBlock Text="{Binding [Det_SegQuitarFecha], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="12.5" FontWeight="SemiBold"/>
+                        </Button>
+                        <Button Grid.Column="1" Content="{Binding [Gal_Cancelar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Command="{Binding CerrarCalendarioFechaCommand}"
+                                Style="{StaticResource MaterialDesignOutlinedButton}"
+                                BorderBrush="#374151" Foreground="#9CA3AF" Height="38" Padding="16,0" FontSize="12.5"
+                                materialDesign:ButtonAssist.CornerRadius="10" Cursor="Hand"/>
                     </Grid>
                 </StackPanel>
             </materialDesign:Card>

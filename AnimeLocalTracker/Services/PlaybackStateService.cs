@@ -169,7 +169,21 @@ public class PlaybackStateService : IPlaybackStateService
             var token = _authService.ObtenerTokenGuardado();
             if (!string.IsNullOrEmpty(token))
             {
-                await _animeTrackingService.ActualizarProgresoAsync(animeId, episodio, token);
+                // Solo el visionado REAL fija fechas. La entrada de AniList se lee ANTES de subir el progreso:
+                // después ya no se sabría si el usuario venía de cero (inicio) o de un re-visionado.
+                AniListMediaList? remotoPrevio = null;
+                if (registrarReproduccion)
+                {
+                    try { remotoPrevio = await _animeTrackingService.ObtenerSeguimientoUsuarioAsync(animeId, token); }
+                    catch (Exception ex) { AppLogger.Debug("PlaybackStateService", $"No se pudo leer el seguimiento previo de {animeId}: {ex.Message}"); }
+                }
+
+                bool progresoSubido = await _animeTrackingService.ActualizarProgresoAsync(animeId, episodio, token);
+
+                if (progresoSubido && registrarReproduccion)
+                {
+                    await SeguimientoFechas.AplicarAsync(_databaseService, _animeTrackingService, animeId, remotoPrevio, episodio, token);
+                }
             }
 
             return true;

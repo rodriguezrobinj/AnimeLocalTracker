@@ -3,296 +3,646 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
              xmlns:loc="clr-namespace:AnimeLocalTracker.Services"
+             xmlns:vm="clr-namespace:AnimeLocalTracker.ViewModels"
+             xmlns:models="clr-namespace:AnimeLocalTracker.Models"
+             xmlns:sys="clr-namespace:System;assembly=System.Runtime"
              TextElement.Foreground="{DynamicResource MaterialDesignBody}"
              Background="Transparent">
 
-    <Grid MaxWidth="1248">
-        <Grid.Style>
-            <Style TargetType="Grid">
-                <Setter Property="Margin" Value="95,60,30,30"/>
-                <Style.Triggers>
-                    <DataTrigger Binding="{Binding Topmost, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
-                        <Setter Property="Margin" Value="95,30,30,30"/>
-                    </DataTrigger>
-                </Style.Triggers>
-            </Style>
-        </Grid.Style>
+    <UserControl.Resources>
+        <!-- Chip de pestaña/filtro: activo = borde y texto azules (igual que Historial/Logros) -->
+        <Style x:Key="DescChipStyle" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Raiz" Background="{DynamicResource Brush.Surface1}" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1"
+                                CornerRadius="16" Padding="14,6" Margin="0,0,8,0">
+                            <ContentPresenter x:Name="Texto" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                              TextElement.FontSize="12.5" TextElement.FontWeight="SemiBold"
+                                              TextElement.Foreground="{DynamicResource Brush.TextSecondary}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Raiz" Property="Background" Value="{DynamicResource Brush.Surface2}"/>
+                            </Trigger>
+                            <DataTrigger Binding="{Binding EsActivo}" Value="True">
+                                <Setter TargetName="Raiz" Property="Background" Value="{DynamicResource Brush.Surface3}"/>
+                                <Setter TargetName="Raiz" Property="BorderBrush" Value="{DynamicResource Brush.Accent}"/>
+                                <Setter TargetName="Texto" Property="TextElement.Foreground" Value="{DynamicResource Brush.AccentSoft}"/>
+                            </DataTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Botón solo-icono de las tarjetas -->
+        <Style x:Key="DescIconBtn" TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
+            <Setter Property="Width" Value="36"/>
+            <Setter Property="Height" Value="36"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Margin" Value="4,0,0,0"/>
+        </Style>
+
+        <!-- Ítem del menú de opciones -->
+        <Style x:Key="DescMenuBtn" TargetType="Button">
+            <Setter Property="Height" Value="38"/>
+            <Setter Property="Padding" Value="14,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="b" Background="Transparent" CornerRadius="7" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter VerticalAlignment="Center" HorizontalAlignment="Left"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="b" Property="Background" Value="{DynamicResource Brush.Surface3}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Tarjeta de resumen -->
+        <Style x:Key="DescStatCard" TargetType="Border" BasedOn="{StaticResource AppCard}">
+            <Setter Property="Margin" Value="0,0,12,0"/>
+            <Setter Property="Padding" Value="16,12"/>
+        </Style>
+
+        <Style x:Key="DescRowContainer" TargetType="ListBoxItem">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <ContentPresenter/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid MaxWidth="1248" Style="{StaticResource AppPageRoot}">
         <Grid.RowDefinitions>
-            <!-- Fila 0: Header / Título -->
             <RowDefinition Height="Auto"/>
-            <!-- Fila 1: Lista de descargas -->
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <!-- HEADER SUPERIOR -->
-        <Grid Grid.Row="0" Margin="0,0,0,20">
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <TextBlock Text="{Binding [Desc_Titulo], Source={x:Static loc:LocalizationService.Instance}}" Style="{StaticResource AppText.PageTitle}" VerticalAlignment="Center"/>
-
-                <!-- BADGE CONTEO -->
+        <!-- ═══ FILA 0: título + acciones ═══ -->
+        <DockPanel Grid.Row="0" Margin="0,0,0,16" LastChildFill="False">
+            <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="{Binding [Desc_Titulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.PageTitle}" VerticalAlignment="Center"/>
                 <Border Style="{StaticResource AppBadge}" Margin="14,0,0,0" VerticalAlignment="Center"
                         Visibility="{Binding TieneDescargas, Converter={StaticResource BoolToVis}}">
-                    <TextBlock Text="{Binding ConteoActivas}" Style="{StaticResource AppText.Caption}" FontWeight="Bold" Foreground="#60A5FA"
+                    <TextBlock Text="{Binding ConteoActivas}" Style="{StaticResource AppText.Caption}" FontWeight="Bold" Foreground="{DynamicResource Brush.Accent}"
                                VerticalAlignment="Center" HorizontalAlignment="Center" TextAlignment="Center"/>
                 </Border>
             </StackPanel>
-        </Grid>
 
-            <!-- LISTA DE DESCARGAS ACTIVAS -->
-            <Grid Grid.Row="1">
-                <!-- VISTA CON DESCARGAS -->
-                <ScrollViewer VerticalScrollBarVisibility="Auto" 
-                              Padding="0,0,20,0"
-                              Visibility="{Binding TieneDescargas, Converter={StaticResource BoolToVis}}">
-                    <StackPanel>
-                        <!-- ENCABEZADO DE GRUPO (placeholder fijo, no viene de datos reales) -->
-                        <TextBlock Text="{Binding [Desc_GrupoEjemplo], Source={x:Static loc:LocalizationService.Instance}}" FontSize="15" FontWeight="SemiBold" Foreground="#6B7280" Margin="10,0,0,15"/>
+            <!-- Acciones (a la derecha) -->
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                <Button Command="{Binding AlternarPausaTodasCommand}" Height="40" Padding="18,0" Margin="0,0,10,0"
+                        Style="{StaticResource AppPrimaryButton}"
+                        materialDesign:ButtonAssist.CornerRadius="10" Cursor="Hand"
+                        Visibility="{Binding MostrarPausarTodas, Converter={StaticResource BoolToVis}}">
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon Width="18" Height="18" VerticalAlignment="Center" Margin="0,0,8,0">
+                            <materialDesign:PackIcon.Style>
+                                <Style TargetType="materialDesign:PackIcon">
+                                    <Setter Property="Kind" Value="Pause"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding TodasPausadas}" Value="True">
+                                            <Setter Property="Kind" Value="Play"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </materialDesign:PackIcon.Style>
+                        </materialDesign:PackIcon>
+                        <TextBlock FontWeight="SemiBold" FontSize="13.5" VerticalAlignment="Center">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Text" Value="{Binding [Desc_PausarTodas], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding TodasPausadas}" Value="True">
+                                            <Setter Property="Text" Value="{Binding [Desc_ReanudarTodas], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </StackPanel>
+                </Button>
 
-                        <ItemsControl ItemsSource="{Binding ColaDescargas}"
-                                      VirtualizingPanel.IsVirtualizing="True"
-                                      VirtualizingPanel.VirtualizationMode="Recycling">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <VirtualizingStackPanel/>
-                                </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <!-- Tarjeta de descarga con barra de estado lateral -->
-                                    <Border Background="#14181E" BorderBrush="#262D38" BorderThickness="1"
-                                            CornerRadius="12" Padding="0" Margin="0,0,15,10" ClipToBounds="True">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="3"/>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
+                <!-- Menú de tres puntos: las acciones destructivas quedan a dos clics -->
+                <Grid>
+                    <Button x:Name="MenuOpcionesBtn" Width="40" Height="40"
+                            Click="MenuOpcionesBtn_Click"
+                            Cursor="Hand"
+                            ToolTip="{Binding [Desc_MasOpcionesTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                            AutomationProperties.Name="{Binding [Desc_MasOpcionesTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="btnBorder" Background="{DynamicResource Brush.Surface3}" BorderBrush="{DynamicResource Brush.BorderStrong}"
+                                        BorderThickness="1" CornerRadius="10">
+                                    <materialDesign:PackIcon x:Name="icon" Kind="DotsVertical" Width="22" Height="22"
+                                                             Foreground="{DynamicResource Brush.TextSecondary}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="btnBorder" Property="BorderBrush" Value="{DynamicResource Brush.Accent}"/>
+                                        <Setter TargetName="icon" Property="Foreground" Value="White"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
 
-                                            <!-- BARRA DE ESTADO LATERAL: azul descargando / ámbar en pausa -->
-                                            <Border Grid.Column="0" Background="#60A5FA">
-                                                <Border.Style>
-                                                    <Style TargetType="Border">
-                                                        <Setter Property="Background" Value="#60A5FA"/>
+                    <Popup x:Name="MenuOpcionesPopup" PlacementTarget="{Binding ElementName=MenuOpcionesBtn}"
+                           Placement="Bottom" VerticalOffset="6" HorizontalOffset="-190"
+                           StaysOpen="True" AllowsTransparency="True" PopupAnimation="Fade">
+                        <Border Background="{DynamicResource Brush.Surface3}" BorderBrush="{DynamicResource Brush.BorderStrong}" BorderThickness="1"
+                                CornerRadius="10" Padding="4" MinWidth="230">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="16" ShadowDepth="4" Direction="270" Opacity="0.45" Color="Black"/>
+                            </Border.Effect>
+                            <StackPanel>
+                                <!-- Menú de la pestaña Activas -->
+                                <StackPanel Visibility="{Binding EsPestanaActivas, Converter={StaticResource BoolToVis}}">
+                                    <Button Command="{Binding CancelarTodasCommand}" Click="CerrarMenuOpciones_Click" Style="{StaticResource DescMenuBtn}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <materialDesign:PackIcon Kind="TrashCanOutline" Width="18" Height="18" Foreground="{DynamicResource Brush.Danger}" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding [Desc_CancelarTodas], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Foreground="{DynamicResource Brush.Danger}" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+                                <!-- Menú de la pestaña Historial -->
+                                <StackPanel Visibility="{Binding EsPestanaHistorial, Converter={StaticResource BoolToVis}}">
+                                    <Button Command="{Binding ReintentarFallidasCommand}" Click="CerrarMenuOpciones_Click" Style="{StaticResource DescMenuBtn}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <materialDesign:PackIcon Kind="Reload" Width="18" Height="18" Foreground="{DynamicResource Brush.Accent}" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding [Desc_ReintentarFallidas], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Foreground="{DynamicResource Brush.TextPrimary}" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
+                                    <Button Command="{Binding LimpiarFallidasCommand}" Click="CerrarMenuOpciones_Click" Style="{StaticResource DescMenuBtn}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <materialDesign:PackIcon Kind="AlertCircleOutline" Width="18" Height="18" Foreground="{DynamicResource Brush.Warning}" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding [Desc_LimpiarFallidas], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Foreground="{DynamicResource Brush.TextPrimary}" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
+                                    <Button Command="{Binding LimpiarHistorialCommand}" Click="CerrarMenuOpciones_Click" Style="{StaticResource DescMenuBtn}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <materialDesign:PackIcon Kind="TrashCanOutline" Width="18" Height="18" Foreground="{DynamicResource Brush.Danger}" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding [Desc_LimpiarHistorial], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Foreground="{DynamicResource Brush.Danger}" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </Popup>
+                </Grid>
+            </StackPanel>
+        </DockPanel>
+
+        <!-- ═══ FILA 1: pestañas + (historial) filtros y búsqueda ═══ -->
+        <DockPanel Grid.Row="1" Margin="0,0,0,14" LastChildFill="True">
+            <!-- Búsqueda: solo en Historial -->
+            <Border DockPanel.Dock="Right" Width="260" Height="36" Margin="12,0,0,0" VerticalAlignment="Center"
+                    Background="{DynamicResource Brush.Surface1}" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1"
+                    CornerRadius="18" Padding="12,0"
+                    Visibility="{Binding EsPestanaHistorial, Converter={StaticResource BoolToVis}}">
+                <Grid VerticalAlignment="Center">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <materialDesign:PackIcon Grid.Column="0" Kind="Magnify" Foreground="{DynamicResource Brush.TextTertiary}" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <TextBox Grid.Column="1" Text="{Binding TextoBusqueda, UpdateSourceTrigger=PropertyChanged}"
+                             Background="Transparent" BorderThickness="0" Foreground="{DynamicResource Brush.TextPrimary}" FontSize="12.5"
+                             VerticalAlignment="Center" CaretBrush="{DynamicResource Brush.Accent}"
+                             AutomationProperties.Name="{Binding [Desc_Buscar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                             materialDesign:HintAssist.Hint="{Binding [Desc_Buscar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                             materialDesign:TextFieldAssist.DecorationVisibility="Hidden"/>
+                    <Button Grid.Column="2" Command="{Binding LimpiarBusquedaCommand}"
+                            Style="{StaticResource MaterialDesignIconButton}" Width="20" Height="20" Padding="0" Cursor="Hand"
+                            ToolTip="{Binding [Desc_LimpiarBusquedaTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                            AutomationProperties.Name="{Binding [Desc_LimpiarBusquedaTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                            Visibility="{Binding HayBusqueda, Converter={StaticResource BoolToVis}}">
+                        <materialDesign:PackIcon Kind="CloseCircle" Foreground="{DynamicResource Brush.TextSecondary}" Width="14" Height="14"/>
+                    </Button>
+                </Grid>
+            </Border>
+
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <!-- Pestañas -->
+                <ItemsControl ItemsSource="{Binding Pestanas}" Margin="0,0,14,0">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Button Content="{Binding Etiqueta}" Style="{StaticResource DescChipStyle}"
+                                    Command="{Binding DataContext.CambiarPestanaCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                    CommandParameter="{Binding Clave}"
+                                    AutomationProperties.Name="{Binding Etiqueta}"/>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <!-- Filtros del historial -->
+                <ItemsControl ItemsSource="{Binding Filtros}"
+                              Visibility="{Binding EsPestanaHistorial, Converter={StaticResource BoolToVis}}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Button Content="{Binding Etiqueta}" Style="{StaticResource DescChipStyle}"
+                                    Command="{Binding DataContext.CambiarFiltroCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                    CommandParameter="{Binding Clave}"
+                                    AutomationProperties.Name="{Binding Etiqueta}"/>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </DockPanel>
+
+        <!-- ═══ FILA 2: resumen (solo en Activas y con descargas) ═══ -->
+        <UniformGrid Grid.Row="2" Rows="1" Columns="4" Margin="0,0,-12,14">
+            <UniformGrid.Style>
+                <Style TargetType="UniformGrid">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Style.Triggers>
+                        <MultiDataTrigger>
+                            <MultiDataTrigger.Conditions>
+                                <Condition Binding="{Binding EsPestanaActivas}" Value="True"/>
+                                <Condition Binding="{Binding TieneDescargas}" Value="True"/>
+                            </MultiDataTrigger.Conditions>
+                            <Setter Property="Visibility" Value="Visible"/>
+                        </MultiDataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </UniformGrid.Style>
+            <Border Style="{StaticResource DescStatCard}">
+                <StackPanel>
+                    <TextBlock Text="{Binding ConteoActivas}" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource Brush.Accent}"/>
+                    <TextBlock Text="{Binding [Desc_ResActivas], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.Caption}"/>
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource DescStatCard}">
+                <StackPanel>
+                    <TextBlock Text="{Binding ConteoEnCola}" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource Brush.TextPrimary}"/>
+                    <TextBlock Text="{Binding [Desc_ResEnCola], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.Caption}"/>
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource DescStatCard}">
+                <StackPanel>
+                    <TextBlock Text="{Binding VelocidadTotalTexto}" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource Brush.TextPrimary}"/>
+                    <TextBlock Text="{Binding [Desc_ResVelocidad], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.Caption}"/>
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource DescStatCard}">
+                <StackPanel>
+                    <TextBlock Text="{Binding CompletadasHoy}" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource Brush.Success}"/>
+                    <TextBlock Text="{Binding [Desc_ResHoy], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.Caption}"/>
+                </StackPanel>
+            </Border>
+        </UniformGrid>
+
+        <!-- ═══ FILA 3: contenido ═══ -->
+        <Grid Grid.Row="3">
+
+            <!-- ── PESTAÑA ACTIVAS ── -->
+            <Grid Visibility="{Binding EsPestanaActivas, Converter={StaticResource BoolToVis}}">
+                <ListBox ItemsSource="{Binding ColaDescargas}"
+                         Background="Transparent" BorderThickness="0"
+                         HorizontalContentAlignment="Stretch"
+                         VirtualizingPanel.IsVirtualizing="True"
+                         VirtualizingPanel.VirtualizationMode="Recycling"
+                         VirtualizingPanel.ScrollUnit="Pixel"
+                         ScrollViewer.CanContentScroll="True"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                         ItemContainerStyle="{StaticResource DescRowContainer}"
+                         Visibility="{Binding TieneDescargas, Converter={StaticResource BoolToVis}}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate DataType="{x:Type models:DescargaItem}">
+                            <Border Style="{StaticResource AppCard}" Padding="0" Margin="0,0,15,10" ClipToBounds="True">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="3"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- Barra lateral de estado: azul descargando / ámbar pausa / gris en cola -->
+                                    <Border Grid.Column="0">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Background" Value="{DynamicResource Brush.Accent}"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding EnCola}" Value="True">
+                                                        <Setter Property="Background" Value="{DynamicResource Brush.TextTertiary}"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsPaused}" Value="True">
+                                                        <Setter Property="Background" Value="{DynamicResource Brush.Warning}"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                    </Border>
+
+                                    <Grid Grid.Column="1" Margin="16,14">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <!-- Icono de estado -->
+                                        <Border Grid.Column="0" Width="44" Height="44" CornerRadius="12" Background="{DynamicResource Brush.Surface3}" Margin="0,0,14,0" VerticalAlignment="Center">
+                                            <materialDesign:PackIcon Width="24" Height="24" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                <materialDesign:PackIcon.Style>
+                                                    <Style TargetType="materialDesign:PackIcon">
+                                                        <Setter Property="Kind" Value="CloudDownloadOutline"/>
+                                                        <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}"/>
                                                         <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding EnCola}" Value="True">
+                                                                <Setter Property="Kind" Value="ClockOutline"/>
+                                                                <Setter Property="Foreground" Value="{DynamicResource Brush.TextTertiary}"/>
+                                                            </DataTrigger>
                                                             <DataTrigger Binding="{Binding IsPaused}" Value="True">
-                                                                <Setter Property="Background" Value="#F59E0B"/>
+                                                                <Setter Property="Kind" Value="PauseCircleOutline"/>
+                                                                <Setter Property="Foreground" Value="{DynamicResource Brush.Warning}"/>
                                                             </DataTrigger>
                                                         </Style.Triggers>
                                                     </Style>
-                                                </Border.Style>
-                                            </Border>
+                                                </materialDesign:PackIcon.Style>
+                                            </materialDesign:PackIcon>
+                                        </Border>
 
-                                            <!-- CUERPO CENTRAL -->
-                                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="16,14">
-                                                <Grid Margin="0,0,0,4">
-                                                    <StackPanel Orientation="Horizontal">
-                                                        <TextBlock Text="{Binding AnimeTitulo}" FontWeight="Bold" FontSize="14.5" Foreground="#E2E8F0"
-                                                                   TextTrimming="CharacterEllipsis" MaxWidth="620" HorizontalAlignment="Left"/>
-                                                        <!-- CHIP EN PAUSA -->
-                                                        <Border Background="#33F59E0B" BorderBrush="#66F59E0B" BorderThickness="1" CornerRadius="6"
-                                                                Padding="7,2" Margin="8,0,0,0" VerticalAlignment="Center"
-                                                                Visibility="{Binding IsPaused, Converter={StaticResource BoolToVis}}">
-                                                            <TextBlock Text="{Binding [Desc_EnPausa], Source={x:Static loc:LocalizationService.Instance}}" FontSize="10" FontWeight="Bold" Foreground="#F59E0B"/>
-                                                        </Border>
-                                                    </StackPanel>
-                                                    <TextBlock Text="{Binding ProgresoTexto}" FontWeight="Bold" FontSize="14" Foreground="#60A5FA"
-                                                               HorizontalAlignment="Right" Margin="0,0,0,0"/>
-                                                </Grid>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                                    <TextBlock Text="{Binding AnimeTitulo}" Style="{StaticResource AppText.BodyStrong}" FontWeight="Bold" FontSize="14.5"
+                                                               TextTrimming="CharacterEllipsis" MaxWidth="480" VerticalAlignment="Center"/>
+                                                    <Border Background="{DynamicResource Brush.Surface3}" BorderBrush="{DynamicResource Brush.BorderStrong}" BorderThickness="1"
+                                                            CornerRadius="6" Padding="7,2" Margin="10,0,0,0" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding EstadoTexto}" FontSize="10.5" FontWeight="Bold" Foreground="{DynamicResource Brush.AccentSoft}"/>
+                                                    </Border>
+                                                </StackPanel>
+                                                <TextBlock Grid.Column="1" Text="{Binding ProgresoTexto}" FontWeight="Bold" FontSize="14" Foreground="{DynamicResource Brush.Accent}" VerticalAlignment="Center"/>
+                                            </Grid>
 
-                                                <TextBlock Text="{Binding TituloEpisodio}" FontSize="12.5" Foreground="#9CA3AF" Margin="0,0,0,10"/>
+                                            <TextBlock Text="{Binding TituloEpisodio}" Style="{StaticResource AppText.Secondary}" Margin="0,2,0,8"/>
 
-                                                <!-- BARRA DE PROGRESO (Sin transiciones para 0 lag durante descargas activas) -->
-                                                <ProgressBar Value="{Binding Progreso}" Minimum="0" Maximum="100"
-                                                             Height="6" Foreground="#60A5FA" Background="#1B222C"
-                                                             IsIndeterminate="{Binding EstaEnEspera}"
-                                                             BorderThickness="0"
-                                                             materialDesign:TransitionAssist.DisableTransitions="True"/>
-                                            </StackPanel>
+                                            <ProgressBar Value="{Binding Progreso}" Minimum="0" Maximum="100" Height="6"
+                                                         Foreground="{DynamicResource Brush.Accent}" Background="{DynamicResource Brush.Surface3}"
+                                                         IsIndeterminate="{Binding EstaEnEspera}" BorderThickness="0"
+                                                         materialDesign:TransitionAssist.DisableTransitions="True"/>
 
-                                            <!-- BOTONES DE ACCIÓN -->
-                                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
+                                            <!-- Velocidad · tiempo restante · reintentos -->
+                                            <TextBlock Text="{Binding DetalleTexto}" Style="{StaticResource AppText.Caption}" Margin="0,7,0,0" Foreground="{DynamicResource Brush.TextTertiary}"/>
+                                        </StackPanel>
+                                    </Grid>
 
-                                                <!-- BOTÓN PAUSA / REANUDAR -->
-                                                <Button Command="{Binding DataContext.AlternarPausaDescargaCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                        CommandParameter="{Binding}"
-                                                        Style="{StaticResource MaterialDesignIconButton}" Width="36" Height="36"
-                                                        AutomationProperties.Name="{Binding [Desc_PausarReanudarTip], Source={x:Static loc:LocalizationService.Instance}}">
-                                                    <materialDesign:PackIcon Foreground="#60A5FA" Width="22" Height="22">
-                                                        <materialDesign:PackIcon.Style>
-                                                            <Style TargetType="materialDesign:PackIcon">
-                                                                <Setter Property="Kind" Value="Pause" />
-                                                                <Style.Triggers>
-                                                                    <DataTrigger Binding="{Binding IsPaused}" Value="True">
-                                                                        <Setter Property="Kind" Value="Play" />
-                                                                    </DataTrigger>
-                                                                </Style.Triggers>
-                                                            </Style>
-                                                        </materialDesign:PackIcon.Style>
-                                                    </materialDesign:PackIcon>
-                                                </Button>
+                                    <!-- Acciones -->
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
+                                        <!-- Saltar la cola: solo si está esperando un slot -->
+                                        <Button Command="{Binding DataContext.PriorizarCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}" Style="{StaticResource DescIconBtn}"
+                                                ToolTip="{Binding [Desc_Priorizar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                AutomationProperties.Name="{Binding [Desc_Priorizar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                Visibility="{Binding EnCola, Converter={StaticResource BoolToVis}}">
+                                            <materialDesign:PackIcon Kind="ArrowCollapseUp" Foreground="{DynamicResource Brush.AccentSoft}" Width="20" Height="20"/>
+                                        </Button>
 
-                                                <!-- BOTÓN CANCELAR -->
-                                                <Button Command="{Binding DataContext.CancelarDescargaCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                        CommandParameter="{Binding}"
-                                                        Style="{StaticResource MaterialDesignIconButton}" Width="36" Height="36"
-                                                        ToolTip="{Binding [Desc_CancelarTip], Source={x:Static loc:LocalizationService.Instance}}" Margin="4,0,0,0"
-                                                        AutomationProperties.Name="{Binding [Desc_CancelarTip], Source={x:Static loc:LocalizationService.Instance}}">
-                                                    <materialDesign:PackIcon Kind="TrashCanOutline" Foreground="#F87171" Width="20" Height="20"/>
-                                                </Button>
-                                            </StackPanel>
-                                        </Grid>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </StackPanel>
-                </ScrollViewer>
+                                        <Button Command="{Binding DataContext.AlternarPausaDescargaCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}" Style="{StaticResource DescIconBtn}"
+                                                ToolTip="{Binding [Desc_PausarReanudarTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                AutomationProperties.Name="{Binding [Desc_PausarReanudarTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                            <materialDesign:PackIcon Foreground="{DynamicResource Brush.Accent}" Width="22" Height="22">
+                                                <materialDesign:PackIcon.Style>
+                                                    <Style TargetType="materialDesign:PackIcon">
+                                                        <Setter Property="Kind" Value="Pause"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsPaused}" Value="True">
+                                                                <Setter Property="Kind" Value="Play"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </materialDesign:PackIcon.Style>
+                                            </materialDesign:PackIcon>
+                                        </Button>
 
-                <!-- ESTADO VACÍO (Sin descargas) -->
+                                        <Button Command="{Binding DataContext.CancelarDescargaCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}" Style="{StaticResource DescIconBtn}"
+                                                ToolTip="{Binding [Desc_CancelarTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                AutomationProperties.Name="{Binding [Desc_CancelarTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                            <materialDesign:PackIcon Kind="TrashCanOutline" Foreground="{DynamicResource Brush.Danger}" Width="20" Height="20"/>
+                                        </Button>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+
+                <!-- Estado vacío de Activas -->
                 <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center"
                             Visibility="{Binding TieneDescargas, Converter={StaticResource InverseBoolToVis}}">
-                    <Border Background="#1E293B" CornerRadius="40" Width="80" Height="80" HorizontalAlignment="Center" Margin="0,0,0,16">
-                        <materialDesign:PackIcon Kind="CloudDownloadOutline" Width="40" Height="40" Foreground="#6B7280" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    <Border Background="{DynamicResource Brush.Surface3}" CornerRadius="40" Width="80" Height="80" HorizontalAlignment="Center" Margin="0,0,0,16">
+                        <materialDesign:PackIcon Kind="CloudDownloadOutline" Width="40" Height="40" Foreground="{DynamicResource Brush.TextTertiary}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
-                    <TextBlock Text="{Binding [Desc_VacioTitulo], Source={x:Static loc:LocalizationService.Instance}}" Style="{StaticResource AppEmptyTitle}" Margin="0,0,0,6"/>
-                    <TextBlock Text="{Binding [Desc_VacioSub], Source={x:Static loc:LocalizationService.Instance}}" Style="{StaticResource AppEmptyText}"/>
+                    <TextBlock Text="{Binding [Desc_VacioTitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppEmptyTitle}" Margin="0,0,0,6"/>
+                    <TextBlock Text="{Binding [Desc_VacioSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppEmptyText}"/>
+                </StackPanel>
+            </Grid>
+
+            <!-- ── PESTAÑA HISTORIAL ── -->
+            <Grid Visibility="{Binding EsPestanaHistorial, Converter={StaticResource BoolToVis}}">
+                <ListBox ItemsSource="{Binding ItemsAgrupados}"
+                         Background="Transparent" BorderThickness="0"
+                         HorizontalContentAlignment="Stretch"
+                         VirtualizingPanel.IsVirtualizing="True"
+                         VirtualizingPanel.VirtualizationMode="Recycling"
+                         VirtualizingPanel.ScrollUnit="Pixel"
+                         ScrollViewer.CanContentScroll="True"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                         ItemContainerStyle="{StaticResource DescRowContainer}">
+                    <ListBox.Resources>
+                        <!-- Cabecera de día -->
+                        <DataTemplate DataType="{x:Type sys:String}">
+                            <TextBlock Text="{Binding}" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource Brush.AccentSoft}" Margin="1,12,0,8"/>
+                        </DataTemplate>
+
+                        <!-- Fila de historial -->
+                        <DataTemplate DataType="{x:Type vm:DescargaHistorialItemViewModel}">
+                            <Border Style="{StaticResource AppCard}" Padding="14,12" Margin="0,0,15,8">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <Border Grid.Column="0" Width="40" Height="40" CornerRadius="20" Background="{DynamicResource Brush.Surface3}" Margin="0,0,14,0" VerticalAlignment="Center">
+                                        <materialDesign:PackIcon Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                            <materialDesign:PackIcon.Style>
+                                                <Style TargetType="materialDesign:PackIcon">
+                                                    <Setter Property="Kind" Value="CheckCircleOutline"/>
+                                                    <Setter Property="Foreground" Value="{DynamicResource Brush.Success}"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding EsFallida}" Value="True">
+                                                            <Setter Property="Kind" Value="AlertCircleOutline"/>
+                                                            <Setter Property="Foreground" Value="{DynamicResource Brush.Danger}"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </materialDesign:PackIcon.Style>
+                                        </materialDesign:PackIcon>
+                                    </Border>
+
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding AnimeTitulo}" Style="{StaticResource AppText.BodyStrong}" FontWeight="Bold" TextTrimming="CharacterEllipsis"/>
+                                        <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                                            <TextBlock Text="{Binding DetalleTexto}" Style="{StaticResource AppText.Secondary}"/>
+                                        </StackPanel>
+                                        <!-- Motivo del fallo -->
+                                        <TextBlock Text="{Binding Error}" Style="{StaticResource AppText.Caption}" Foreground="{DynamicResource Brush.Danger}"
+                                                   TextTrimming="CharacterEllipsis" Margin="0,4,0,0"
+                                                   Visibility="{Binding EsFallida, Converter={StaticResource BoolToVis}}"/>
+                                        <!-- Archivo perdido -->
+                                        <TextBlock Text="{Binding [Desc_ArchivoNoExiste], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                   Foreground="{DynamicResource Brush.Warning}" Margin="0,4,0,0">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock" BasedOn="{StaticResource AppText.Caption}">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <MultiDataTrigger>
+                                                            <MultiDataTrigger.Conditions>
+                                                                <Condition Binding="{Binding ArchivoExiste}" Value="False"/>
+                                                                <Condition Binding="{Binding Completada}" Value="True"/>
+                                                            </MultiDataTrigger.Conditions>
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </MultiDataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                        <!-- Reproducir: completada y con el archivo en disco -->
+                                        <Button Command="{Binding DataContext.ReproducirCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}"
+                                                ToolTip="{Binding [Desc_Reproducir], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" AutomationProperties.Name="{Binding [Desc_Reproducir], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                            <Button.Style>
+                                                <Style TargetType="Button" BasedOn="{StaticResource DescIconBtn}">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <MultiDataTrigger>
+                                                            <MultiDataTrigger.Conditions>
+                                                                <Condition Binding="{Binding Completada}" Value="True"/>
+                                                                <Condition Binding="{Binding ArchivoExiste}" Value="True"/>
+                                                            </MultiDataTrigger.Conditions>
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </MultiDataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                            <materialDesign:PackIcon Kind="PlayCircleOutline" Foreground="{DynamicResource Brush.Accent}" Width="24" Height="24"/>
+                                        </Button>
+
+                                        <!-- Reintentar: fallidas o con el archivo perdido -->
+                                        <Button Command="{Binding DataContext.ReintentarCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}"
+                                                ToolTip="{Binding [Desc_Reintentar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" AutomationProperties.Name="{Binding [Desc_Reintentar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                            <Button.Style>
+                                                <Style TargetType="Button" BasedOn="{StaticResource DescIconBtn}">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding EsFallida}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding ArchivoExiste}" Value="False">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                            <materialDesign:PackIcon Kind="Reload" Foreground="{DynamicResource Brush.Warning}" Width="22" Height="22"/>
+                                        </Button>
+
+                                        <Button Command="{Binding DataContext.AbrirCarpetaCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}" Style="{StaticResource DescIconBtn}"
+                                                ToolTip="{Binding [Desc_AbrirCarpeta], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" AutomationProperties.Name="{Binding [Desc_AbrirCarpeta], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                            <materialDesign:PackIcon Kind="FolderOpenOutline" Foreground="{DynamicResource Brush.TextSecondary}" Width="21" Height="21"/>
+                                        </Button>
+
+                                        <Button Command="{Binding DataContext.QuitarDelHistorialCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}" Style="{StaticResource DescIconBtn}"
+                                                ToolTip="{Binding [Desc_QuitarHistorial], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" AutomationProperties.Name="{Binding [Desc_QuitarHistorial], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                            <materialDesign:PackIcon Kind="CloseCircleOutline" Foreground="{DynamicResource Brush.TextTertiary}" Width="20" Height="20"/>
+                                        </Button>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ListBox.Resources>
+                </ListBox>
+
+                <!-- Cargando -->
+                <ProgressBar Style="{StaticResource MaterialDesignCircularProgressBar}" IsIndeterminate="True" Width="44" Height="44"
+                             Value="0" Foreground="{DynamicResource Brush.Accent}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                             Visibility="{Binding EstaCargando, Converter={StaticResource BoolToVis}}"/>
+
+                <!-- Historial vacío -->
+                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                    <StackPanel.Style>
+                        <Style TargetType="StackPanel">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding TieneHistorial}" Value="False"/>
+                                        <Condition Binding="{Binding EstaCargando}" Value="False"/>
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </MultiDataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Style>
+                    <Border Background="{DynamicResource Brush.Surface3}" CornerRadius="40" Width="80" Height="80" HorizontalAlignment="Center" Margin="0,0,0,16">
+                        <materialDesign:PackIcon Kind="History" Width="40" Height="40" Foreground="{DynamicResource Brush.TextTertiary}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <TextBlock Text="{Binding [Desc_VacioHistorialTitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppEmptyTitle}" Margin="0,0,0,6"/>
+                    <TextBlock Text="{Binding [Desc_VacioHistorialSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppEmptyText}" MaxWidth="420" TextWrapping="Wrap"/>
                 </StackPanel>
 
-                <!-- BOTONES FLOTANTES DE ACCIONES (SEPARADOS) -->
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Bottom" 
-                            Margin="0,0,10,10"
-                            Visibility="{Binding TieneDescargas, Converter={StaticResource BoolToVis}}">
-
-                    <!-- BOTÓN 1: PAUSAR / REANUDAR TODAS -->
-                    <Button Command="{Binding AlternarPausaTodasCommand}"
-                            Height="44" Padding="20,0" Margin="0,0,10,0"
-                            materialDesign:ButtonAssist.CornerRadius="10"
-                            materialDesign:ElevationAssist.Elevation="Dp3"
-                            Cursor="Hand">
-                        <Button.Style>
-                            <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignRaisedButton}">
-                                <Setter Property="Background" Value="#3B82F6" />
-                                <Setter Property="BorderBrush" Value="#3B82F6" />
-                                <Setter Property="Foreground" Value="White" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding TodasPausadas}" Value="True">
-                                        <Setter Property="Background" Value="#1D4ED8" />
-                                        <Setter Property="BorderBrush" Value="#3B82F6" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Button.Style>
-                        <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Width="20" Height="20" VerticalAlignment="Center" Margin="0,0,8,0">
-                                <materialDesign:PackIcon.Style>
-                                    <Style TargetType="materialDesign:PackIcon">
-                                        <Setter Property="Kind" Value="Pause" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding TodasPausadas}" Value="True">
-                                                <Setter Property="Kind" Value="Play" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </materialDesign:PackIcon.Style>
-                            </materialDesign:PackIcon>
-                            <TextBlock FontWeight="Bold" FontSize="14" VerticalAlignment="Center">
-                                <TextBlock.Style>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="Text" Value="{Binding [Desc_PausarTodas], Source={x:Static loc:LocalizationService.Instance}}" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding TodasPausadas}" Value="True">
-                                                <Setter Property="Text" Value="{Binding [Desc_ReanudarTodas], Source={x:Static loc:LocalizationService.Instance}}" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
-                        </StackPanel>
-                    </Button>
-
-                    <!-- BOTÓN 2: MENÚ DE 3 PUNTOS (SEPARADO) -->
-                    <Grid>
-                        <Button x:Name="MenuOpcionesBtn"
-                                Width="44" Height="44"
-                                Background="#1E293B" BorderBrush="#2D3748" BorderThickness="1"
-                                Click="MenuOpcionesBtn_Click"
-                                PreviewMouseLeftButtonDown="MenuOpcionesBtn_PreviewMouseLeftButtonDown"
-                                Cursor="Hand" ToolTip="{Binding [Desc_MasOpcionesTip], Source={x:Static loc:LocalizationService.Instance}}">
-                            <Button.Template>
-                                <ControlTemplate TargetType="Button">
-                                    <Border x:Name="btnBorder"
-                                            Background="{TemplateBinding Background}"
-                                            BorderBrush="{TemplateBinding BorderBrush}"
-                                            BorderThickness="{TemplateBinding BorderThickness}"
-                                            CornerRadius="10">
-                                        <Border.Effect>
-                                            <DropShadowEffect BlurRadius="10" ShadowDepth="2" Direction="270" Opacity="0.3" Color="Black" />
-                                        </Border.Effect>
-                                        <materialDesign:PackIcon x:Name="icon" Kind="DotsVertical" Width="22" Height="22" 
-                                                                 Foreground="#9CA3AF" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    </Border>
-                                    <ControlTemplate.Triggers>
-                                        <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter TargetName="btnBorder" Property="Background" Value="#2D3748"/>
-                                            <Setter TargetName="btnBorder" Property="BorderBrush" Value="#6B7280"/>
-                                            <Setter TargetName="icon" Property="Foreground" Value="#FFFFFF"/>
-                                        </Trigger>
-                                        <Trigger Property="IsPressed" Value="True">
-                                            <Setter TargetName="btnBorder" Property="Background" Value="#1E293B"/>
-                                            <Setter TargetName="btnBorder" Property="BorderBrush" Value="#6B7280"/>
-                                            <Setter TargetName="icon" Property="Foreground" Value="#FFFFFF"/>
-                                        </Trigger>
-                                    </ControlTemplate.Triggers>
-                                </ControlTemplate>
-                            </Button.Template>
-                        </Button>
-
-                        <!-- POPUP DEL MENÚ -->
-                        <Popup x:Name="MenuOpcionesPopup"
-                               PlacementTarget="{Binding ElementName=MenuOpcionesBtn}"
-                               Placement="Top"
-                               VerticalOffset="-8"
-                               HorizontalOffset="-180"
-                               StaysOpen="False"
-                               AllowsTransparency="True"
-                               PopupAnimation="Fade">
-                            <Border Background="#1E293B" BorderBrush="#2D3748" BorderThickness="1" 
-                                    CornerRadius="10" Padding="4">
-                                <Border.Effect>
-                                    <DropShadowEffect BlurRadius="16" ShadowDepth="4" Direction="270" Opacity="0.45" Color="Black" />
-                                </Border.Effect>
-                                <Button Command="{Binding CancelarTodasCommand}"
-                                        Click="CerrarMenuOpciones_Click"
-                                        Height="38" Padding="14,0"
-                                        Background="Transparent" BorderThickness="0"
-                                        Cursor="Hand">
-                                    <Button.Style>
-                                        <Style TargetType="Button">
-                                            <Setter Property="Template">
-                                                <Setter.Value>
-                                                    <ControlTemplate TargetType="Button">
-                                                        <Border x:Name="b" Background="Transparent" CornerRadius="7" Padding="{TemplateBinding Padding}">
-                                                            <ContentPresenter VerticalAlignment="Center" HorizontalAlignment="Left"/>
-                                                        </Border>
-                                                        <ControlTemplate.Triggers>
-                                                            <Trigger Property="IsMouseOver" Value="True">
-                                                                <Setter TargetName="b" Property="Background" Value="#2D1518"/>
-                                                            </Trigger>
-                                                        </ControlTemplate.Triggers>
-                                                    </ControlTemplate>
-                                                </Setter.Value>
-                                            </Setter>
-                                        </Style>
-                                    </Button.Style>
-                                    <StackPanel Orientation="Horizontal">
-                                        <materialDesign:PackIcon Kind="TrashCanOutline" Width="18" Height="18" Foreground="#EF4444" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                                        <TextBlock Text="{Binding [Desc_CancelarTodas], Source={x:Static loc:LocalizationService.Instance}}" Foreground="#EF4444" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                </Button>
-                            </Border>
-                        </Popup>
-                    </Grid>
+                <!-- Sin resultados para el filtro/búsqueda -->
+                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center"
+                            Visibility="{Binding SinResultados, Converter={StaticResource BoolToVis}}">
+                    <materialDesign:PackIcon Kind="FileSearchOutline" Width="40" Height="40" Foreground="{DynamicResource Brush.TextTertiary}" HorizontalAlignment="Center" Margin="0,0,0,10"/>
+                    <TextBlock Text="{Binding [Desc_SinResultados], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppEmptyText}"/>
                 </StackPanel>
             </Grid>
         </Grid>
+    </Grid>
 </UserControl>

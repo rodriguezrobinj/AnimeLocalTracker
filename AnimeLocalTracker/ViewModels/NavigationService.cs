@@ -152,7 +152,9 @@ public sealed partial class NavigationService : ObservableObject, INavigationSer
 
     public void Receive(NavegarMensaje_Descargas message)
     {
-        VistaActual = ObtenerDescargas();
+        var descargas = ObtenerDescargas();
+        descargas.Refrescar();
+        VistaActual = descargas;
     }
 
     public void Receive(NavegarMensaje_Configuracion message)
