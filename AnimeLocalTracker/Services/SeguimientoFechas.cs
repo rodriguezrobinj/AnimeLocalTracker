@@ -7,8 +7,8 @@ using AnimeLocalTracker.Models;
 namespace AnimeLocalTracker.Services;
 
 /// <summary>
-/// Fechas de seguimiento automáticas para AniList: la de inicio (primer visionado real) y la de fin (último episodio
-/// oficial de un anime ya finalizado). Solo cuenta el VISIONADO REAL (episodios con fecha de reproducción): el
+/// Seguimiento automático para AniList: la fecha de inicio (primer visionado real) y, al terminar el último episodio
+/// oficial de un anime ya finalizado, la fecha de fin y el estado Completado. Solo cuenta el VISIONADO REAL (episodios con fecha de reproducción): el
 /// marcado manual como visto no inventa fechas. Nunca pisa una fecha que AniList ya tenga.
 /// </summary>
 public static class SeguimientoFechas
@@ -80,10 +80,18 @@ public static class SeguimientoFechas
             var (inicio, fin) = Calcular(anime, registros, remotoPrevio, episodioMaximo);
             if (!inicio.HasValue && !fin.HasValue) return false;
 
-            bool ok = await tracking.GuardarFechasSeguimientoAsync(aniListId, inicio, fin, token);
+            // Terminar el último episodio oficial de un anime finalizado = Completado (la fecha de fin solo se calcula en ese caso).
+            bool ok = await tracking.GuardarFechasSeguimientoAsync(aniListId, inicio, fin, token, marcarCompletado: fin.HasValue);
             if (ok)
             {
-                AppLogger.Info("SeguimientoFechas", $"Fechas guardadas en AniList para {aniListId}: inicio={inicio:yyyy-MM-dd}, fin={fin:yyyy-MM-dd}.");
+                // La copia local (galería, filtros por estado) refleja el nuevo estado sin esperar a otra sincronización.
+                if (fin.HasValue && anime != null)
+                {
+                    anime.EstadoUsuario = "COMPLETED";
+                    await database.ActualizarAnimeAsync(anime);
+                }
+
+                AppLogger.Info("SeguimientoFechas", $"Fechas guardadas en AniList para {aniListId}: inicio={inicio:yyyy-MM-dd}, fin={fin:yyyy-MM-dd}{(fin.HasValue ? ", estado=COMPLETED" : string.Empty)}.");
             }
             return ok;
         }

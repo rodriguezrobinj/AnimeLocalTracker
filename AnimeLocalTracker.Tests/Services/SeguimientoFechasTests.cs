@@ -160,12 +160,12 @@ public class SeguimientoFechasTests
     {
         _db.Setup(d => d.ObtenerRegistrosPorAnimeAsync(7)).ReturnsAsync(new List<RegistroEpisodio> { Visto(1, Dia1) });
         _db.Setup(d => d.ObtenerAnimePorIdAsync(7)).ReturnsAsync(Anime("RELEASING", 28));
-        _tracking.Setup(t => t.GuardarFechasSeguimientoAsync(7, It.IsAny<DateTime?>(), It.IsAny<DateTime?>(), "tok")).ReturnsAsync(true);
+        _tracking.Setup(t => t.GuardarFechasSeguimientoAsync(7, It.IsAny<DateTime?>(), It.IsAny<DateTime?>(), "tok", It.IsAny<bool>())).ReturnsAsync(true);
 
         bool ok = await SeguimientoFechas.AplicarAsync(_db.Object, _tracking.Object, 7, null, 1, "tok");
 
         ok.Should().BeTrue();
-        _tracking.Verify(t => t.GuardarFechasSeguimientoAsync(7, Dia1.Date, null, "tok"), Times.Once);
+        _tracking.Verify(t => t.GuardarFechasSeguimientoAsync(7, Dia1.Date, null, "tok", false), Times.Once);
     }
 
     [Fact]
@@ -177,7 +177,7 @@ public class SeguimientoFechasTests
         bool ok = await SeguimientoFechas.AplicarAsync(_db.Object, _tracking.Object, 7, null, 1, "tok");
 
         ok.Should().BeFalse();
-        _tracking.Verify(t => t.GuardarFechasSeguimientoAsync(It.IsAny<int>(), It.IsAny<DateTime?>(), It.IsAny<DateTime?>(), It.IsAny<string>()), Times.Never);
+        _tracking.Verify(t => t.GuardarFechasSeguimientoAsync(It.IsAny<int>(), It.IsAny<DateTime?>(), It.IsAny<DateTime?>(), It.IsAny<string>(), It.IsAny<bool>()), Times.Never);
     }
 
     [Fact]
@@ -191,14 +191,14 @@ public class SeguimientoFechasTests
     }
 
     [Fact]
-    public async Task Reproduccion_DelUltimoEpisodioOficial_SubeProgresoYLuegoLaFechaDeFin()
+    public async Task Reproduccion_DelUltimoEpisodioOficial_SubeProgresoYLuegoFechaDeFinYCompletado()
     {
         var auth = new Mock<IAuthService>();
         auth.Setup(a => a.ObtenerTokenGuardado()).Returns("tok");
         var previo = Remoto(progreso: 11, inicio: new AniListFuzzyDate { Year = 2026, Month = 9, Day = 1 });
         _tracking.Setup(t => t.ObtenerSeguimientoUsuarioAsync(7, "tok")).ReturnsAsync(previo);
         _tracking.Setup(t => t.ActualizarProgresoAsync(7, 12, "tok")).ReturnsAsync(true);
-        _tracking.Setup(t => t.GuardarFechasSeguimientoAsync(7, It.IsAny<DateTime?>(), It.IsAny<DateTime?>(), "tok")).ReturnsAsync(true);
+        _tracking.Setup(t => t.GuardarFechasSeguimientoAsync(7, It.IsAny<DateTime?>(), It.IsAny<DateTime?>(), "tok", It.IsAny<bool>())).ReturnsAsync(true);
         _db.Setup(d => d.ObtenerRegistrosPorAnimeAsync(7)).ReturnsAsync(new List<RegistroEpisodio> { Visto(1, Dia1), Visto(12, DateTime.UtcNow) });
         _db.Setup(d => d.ObtenerAnimePorIdAsync(7)).ReturnsAsync(Anime("FINISHED", 12));
         var settings = new Mock<ISettingsService>();
@@ -207,7 +207,7 @@ public class SeguimientoFechasTests
 
         await sut.MarcarComoVistoYSincronizarAsync(7, 12, @"C:\v\12.mkv", 1400);
 
-        _tracking.Verify(t => t.GuardarFechasSeguimientoAsync(7, null, DateTime.Today, "tok"), Times.Once);
+        _tracking.Verify(t => t.GuardarFechasSeguimientoAsync(7, null, DateTime.Today, "tok", true), Times.Once);
     }
 
     [Fact]
@@ -221,7 +221,7 @@ public class SeguimientoFechasTests
 
         await sut.MarcarComoVistoYSincronizarAsync(7, 5, @"C:\v\5.mkv", 1400, registrarReproduccion: false);
 
-        _tracking.Verify(t => t.GuardarFechasSeguimientoAsync(It.IsAny<int>(), It.IsAny<DateTime?>(), It.IsAny<DateTime?>(), It.IsAny<string>()), Times.Never);
+        _tracking.Verify(t => t.GuardarFechasSeguimientoAsync(It.IsAny<int>(), It.IsAny<DateTime?>(), It.IsAny<DateTime?>(), It.IsAny<string>(), It.IsAny<bool>()), Times.Never);
         _tracking.Verify(t => t.ObtenerSeguimientoUsuarioAsync(It.IsAny<int>(), It.IsAny<string>()), Times.Never);
     }
 
@@ -236,7 +236,7 @@ public class SeguimientoFechasTests
 
         await sut.MarcarComoVistoYSincronizarAsync(7, 1, @"C:\v\1.mkv", 1400);
 
-        _tracking.Verify(t => t.GuardarFechasSeguimientoAsync(It.IsAny<int>(), It.IsAny<DateTime?>(), It.IsAny<DateTime?>(), It.IsAny<string>()), Times.Never);
+        _tracking.Verify(t => t.GuardarFechasSeguimientoAsync(It.IsAny<int>(), It.IsAny<DateTime?>(), It.IsAny<DateTime?>(), It.IsAny<string>(), It.IsAny<bool>()), Times.Never);
     }
 
     [Fact]
@@ -252,12 +252,43 @@ public class SeguimientoFechasTests
         _db.Setup(d => d.ObtenerAnimePorIdAsync(7)).ReturnsAsync(Anime("FINISHED", 3));
         _tracking.Setup(t => t.ObtenerSeguimientoUsuarioAsync(7, "tok")).ReturnsAsync((AniListMediaList?)null);
         _tracking.Setup(t => t.ActualizarProgresoAsync(7, 3, "tok")).ReturnsAsync(true);
-        _tracking.Setup(t => t.GuardarFechasSeguimientoAsync(7, It.IsAny<DateTime?>(), It.IsAny<DateTime?>(), "tok")).ReturnsAsync(true);
+        _tracking.Setup(t => t.GuardarFechasSeguimientoAsync(7, It.IsAny<DateTime?>(), It.IsAny<DateTime?>(), "tok", It.IsAny<bool>())).ReturnsAsync(true);
         using var sync = new SyncService(_db.Object, _tracking.Object, auth.Object);
 
         var (exitosos, _) = await sync.SincronizarPendientesAsync();
 
         exitosos.Should().Be(3);
-        _tracking.Verify(t => t.GuardarFechasSeguimientoAsync(7, Dia1.Date, Dia1.AddDays(2).Date, "tok"), Times.Once);
+        _tracking.Verify(t => t.GuardarFechasSeguimientoAsync(7, Dia1.Date, Dia1.AddDays(2).Date, "tok", true), Times.Once);
+    }
+
+    [Fact]
+    public async Task Aplicar_AlCompletarLaSerie_ActualizaTambienElEstadoDeLaCopiaLocal()
+    {
+        var anime = Anime("FINISHED", 12);
+        anime.EstadoUsuario = "CURRENT";
+        _db.Setup(d => d.ObtenerRegistrosPorAnimeAsync(7)).ReturnsAsync(new List<RegistroEpisodio> { Visto(1, Dia1), Visto(12, Dia12) });
+        _db.Setup(d => d.ObtenerAnimePorIdAsync(7)).ReturnsAsync(anime);
+        _tracking.Setup(t => t.GuardarFechasSeguimientoAsync(7, It.IsAny<DateTime?>(), It.IsAny<DateTime?>(), "tok", It.IsAny<bool>())).ReturnsAsync(true);
+
+        await SeguimientoFechas.AplicarAsync(_db.Object, _tracking.Object, 7, Remoto(progreso: 11, inicio: new AniListFuzzyDate { Year = 2026, Month = 9, Day = 1 }), 12, "tok");
+
+        anime.EstadoUsuario.Should().Be("COMPLETED");
+        _db.Verify(d => d.ActualizarAnimeAsync(anime), Times.Once);
+    }
+
+    [Fact]
+    public async Task Aplicar_SoloInicio_NoMarcaCompletadoNiToca_ElEstadoLocal()
+    {
+        var anime = Anime("RELEASING", 28);
+        anime.EstadoUsuario = "PLANNING";
+        _db.Setup(d => d.ObtenerRegistrosPorAnimeAsync(7)).ReturnsAsync(new List<RegistroEpisodio> { Visto(1, Dia1) });
+        _db.Setup(d => d.ObtenerAnimePorIdAsync(7)).ReturnsAsync(anime);
+        _tracking.Setup(t => t.GuardarFechasSeguimientoAsync(7, It.IsAny<DateTime?>(), It.IsAny<DateTime?>(), "tok", It.IsAny<bool>())).ReturnsAsync(true);
+
+        await SeguimientoFechas.AplicarAsync(_db.Object, _tracking.Object, 7, null, 1, "tok");
+
+        anime.EstadoUsuario.Should().Be("PLANNING");
+        _tracking.Verify(t => t.GuardarFechasSeguimientoAsync(7, Dia1.Date, null, "tok", false), Times.Once);
+        _db.Verify(d => d.ActualizarAnimeAsync(It.IsAny<AnimeItem>()), Times.Never);
     }
 }

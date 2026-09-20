@@ -632,9 +632,9 @@ public class AniListTrackingService : IAnimeTrackingService
         }
     }
     
-    public async Task<bool> GuardarFechasSeguimientoAsync(int mediaId, DateTime? fechaInicio, DateTime? fechaFin, string token)
+    public async Task<bool> GuardarFechasSeguimientoAsync(int mediaId, DateTime? fechaInicio, DateTime? fechaFin, string token, bool marcarCompletado)
     {
-        if (!fechaInicio.HasValue && !fechaFin.HasValue) return true;
+        if (!fechaInicio.HasValue && !fechaFin.HasValue && !marcarCompletado) return true;
 
         try
         {
@@ -649,6 +649,12 @@ public class AniListTrackingService : IAnimeTrackingService
                 declaraciones.Add("$startedAt: FuzzyDateInput");
                 argumentos.Add("startedAt: $startedAt");
                 variables["startedAt"] = new { year = fechaInicio.Value.Year, month = fechaInicio.Value.Month, day = fechaInicio.Value.Day };
+            }
+            if (marcarCompletado)
+            {
+                declaraciones.Add("$status: MediaListStatus");
+                argumentos.Add("status: $status");
+                variables["status"] = "COMPLETED";
             }
             if (fechaFin.HasValue)
             {
