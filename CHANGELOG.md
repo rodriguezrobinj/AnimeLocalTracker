@@ -13,7 +13,8 @@ Actions + Velopack); las notas curadas de cada release se mantienen aquí.
   muestra su valor junto al deslizador; las fechas de inicio y fin van en una fila con atajo «Hoy» y un
   calendario con los colores de la app (acento azul y en el idioma elegido). Pulsando el título del calendario
   («octubre de 2024») se pasa a la vista de meses y, pulsándolo otra vez, a la de años por décadas, para saltar
-  a 2014 en tres clics en vez de retroceder mes a mes. Al elegir «Finalizado» se completa el progreso y la fecha de fin, y al
+  a 2014 en pocos clics en vez de retroceder mes a mes; en la vista de décadas, pulsar el título de nuevo
+  vuelve a los días. Al elegir «Finalizado» se completa el progreso y la fecha de fin, y al
   elegir «Viendo» se pone la fecha de inicio (sin pisar lo que ya hubiera escrito). El editor ya no arrastra
   el estado del anime anterior al abrirse.
 - Pestaña **Descargas** rediseñada: dos pestañas, *Activas* e *Historial*. En Activas ves un resumen

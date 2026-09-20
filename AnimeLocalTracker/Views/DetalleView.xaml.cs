@@ -58,6 +58,27 @@ public partial class DetalleView : UserControl
         }
     }
 
+    /// <summary>
+    /// El título del calendario avanza mes → año → década (comportamiento nativo). En la década su botón queda
+    /// deshabilitado y no había forma de volver: ahora pulsar el título en esa vista regresa a los días del mes.
+    /// </summary>
+    private void CalendarioTitulo_PreviewMouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (sender is not Calendar calendario || calendario.DisplayMode != CalendarMode.Decade) return;
+
+        // Se comprueba por posición: con el botón deshabilitado, el origen del clic no es fiable (llega la rejilla de fondo).
+        var item = calendario.Template?.FindName("PART_CalendarItem", calendario) as Control;
+        var cabecera = item?.Template?.FindName("PART_HeaderButton", item) as FrameworkElement;
+        if (cabecera == null || !cabecera.IsVisible) return;
+
+        var zona = cabecera.TransformToAncestor(calendario).TransformBounds(new Rect(0, 0, cabecera.ActualWidth, cabecera.ActualHeight));
+        if (zona.Contains(e.GetPosition(calendario)))
+        {
+            calendario.DisplayMode = CalendarMode.Month;
+            e.Handled = true;
+        }
+    }
+
     private static Border? BuscarFila(DependencyObject origen)
     {
         for (DependencyObject? actual = origen; actual != null; actual = VisualTreeHelper.GetParent(actual))

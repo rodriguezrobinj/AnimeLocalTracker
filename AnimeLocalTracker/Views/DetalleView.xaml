@@ -1113,6 +1113,8 @@
                     </Style>
 
                     <Style x:Key="SegCalendar" TargetType="Calendar">
+                        <!-- En la vista de décadas el botón del título está deshabilitado (no hay nivel superior): se atiende el clic aquí para volver a los días -->
+                        <EventSetter Event="PreviewMouseLeftButtonDown" Handler="CalendarioTitulo_PreviewMouseLeftButtonDown"/>
                         <Setter Property="Foreground" Value="#E2E8F0"/>
                         <Setter Property="CalendarItemStyle" Value="{StaticResource SegCalItem}"/>
                         <Setter Property="CalendarDayButtonStyle" Value="{StaticResource SegCalDayBtn}"/>
