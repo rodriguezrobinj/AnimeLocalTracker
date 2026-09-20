@@ -8,6 +8,12 @@ Actions + Velopack); las notas curadas de cada release se mantienen aquí.
 ## [No publicado]
 
 ### Añadido
+- Fechas de seguimiento automáticas en AniList: al ver (de verdad, reproduciendo) el primer episodio de un anime
+  que aún no tenías empezado en AniList se guarda la fecha de inicio, y al ver el último episodio OFICIAL de un
+  anime ya finalizado (el total que indica AniList, no simplemente el último de la lista) se guarda la de fin.
+  Nunca pisa una fecha que ya tengas, no toca los re-visionados (estado Completado o Repitiendo), no las inventa
+  al marcar episodios como vistos a mano, y también se envían al recuperar la conexión si viste episodios sin
+  internet.
 - Editor de seguimiento de AniList rediseñado (botón «Seguimiento» de un anime): el estado se elige con chips de
   un clic en vez de un desplegable; los episodios vistos tienen botones − / + con el total; la puntuación
   muestra su valor junto al deslizador; las fechas de inicio y fin van en una fila y, al pulsarlas, el calendario

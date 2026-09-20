@@ -632,6 +632,56 @@ public class AniListTrackingService : IAnimeTrackingService
         }
     }
     
+    public async Task<bool> GuardarFechasSeguimientoAsync(int mediaId, DateTime? fechaInicio, DateTime? fechaFin, string token)
+    {
+        if (!fechaInicio.HasValue && !fechaFin.HasValue) return true;
+
+        try
+        {
+            // Solo se declaran y envían las variables con valor: un argumento ausente no se modifica en AniList,
+            // mientras que uno enviado como null BORRARÍA la fecha existente.
+            var declaraciones = new List<string> { "$mediaId: Int" };
+            var argumentos = new List<string> { "mediaId: $mediaId" };
+            var variables = new Dictionary<string, object> { ["mediaId"] = mediaId };
+
+            if (fechaInicio.HasValue)
+            {
+                declaraciones.Add("$startedAt: FuzzyDateInput");
+                argumentos.Add("startedAt: $startedAt");
+                variables["startedAt"] = new { year = fechaInicio.Value.Year, month = fechaInicio.Value.Month, day = fechaInicio.Value.Day };
+            }
+            if (fechaFin.HasValue)
+            {
+                declaraciones.Add("$completedAt: FuzzyDateInput");
+                argumentos.Add("completedAt: $completedAt");
+                variables["completedAt"] = new { year = fechaFin.Value.Year, month = fechaFin.Value.Month, day = fechaFin.Value.Day };
+            }
+
+            var query = $"mutation ({string.Join(", ", declaraciones)}) {{ SaveMediaListEntry({string.Join(", ", argumentos)}) {{ id }} }}";
+            var jsonContent = JsonSerializer.Serialize(new { query, variables }, JsonOptions);
+
+            var request = CrearRequest(jsonContent, token);
+            var response = await EnviarYDetectarSesionAsync(request);
+            var content = await response.Content.ReadAsStringAsync();
+
+            if (content.Contains("\"errors\""))
+            {
+                AppLogger.Warn("AniListTrackingService", $"AniList rechazó las fechas de seguimiento de MediaId {mediaId}: {Truncar(content)}");
+                return false;
+            }
+
+            if (!response.IsSuccessStatusCode) return false;
+
+            InvalidateCacheForMedia(mediaId);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("AniListTrackingService", $"Error al guardar las fechas de seguimiento de MediaId {mediaId}", ex);
+            return false;
+        }
+    }
+
     public async Task<AniListUser?> ObtenerPerfilUsuarioAsync(string token)
     {
         try

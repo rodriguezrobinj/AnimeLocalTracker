@@ -160,6 +160,7 @@ public Task ActualizarAnimesAsync(IEnumerable<AnimeItem> animes) => Task.Complet
         public Task<Dictionary<int, AniListMedia>> ObtenerAnimesPorIdsLoteAsync(IEnumerable<int> ids, string? token = null) => Task.FromResult(new Dictionary<int, AniListMedia>());
         public Task<AniListMediaList?> ObtenerSeguimientoUsuarioAsync(int mediaId, string token) => Task.FromResult<AniListMediaList?>(null);
         public Task<bool> GuardarSeguimientoUsuarioAsync(int mediaId, string estado, int progreso, float puntaje, DateTime? fechaInicio, DateTime? fechaFin, string token) => Task.FromResult(true);
+        public Task<bool> GuardarFechasSeguimientoAsync(int mediaId, DateTime? fechaInicio, DateTime? fechaFin, string token) => Task.FromResult(true);
         public Task<AniListUser?> ObtenerPerfilUsuarioAsync(string token) => Task.FromResult<AniListUser?>(null);
         public Task<List<AniListMedia>> BuscarAnimesEnVivoAsync(string busqueda, System.Threading.CancellationToken cancellationToken = default) => Task.FromResult(new List<AniListMedia>());
         public Task<List<AniListMedia>> ObtenerAnimesTendenciaAsync(System.Threading.CancellationToken cancellationToken = default) => Task.FromResult(new List<AniListMedia>());

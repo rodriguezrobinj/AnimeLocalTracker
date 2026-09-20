@@ -22,6 +22,11 @@ public interface IAnimeTrackingService
     Task<AniListMediaList?> ObtenerSeguimientoUsuarioAsync(int mediaId, string token);
     // Guardar el panel completo de datos
     Task<bool> GuardarSeguimientoUsuarioAsync(int mediaId, string estado, int progreso, float puntaje, System.DateTime? fechaInicio, System.DateTime? fechaFin, string token);
+    /// <summary>
+    /// Guarda SOLO las fechas indicadas (inicio y/o fin) sin tocar estado, progreso ni puntuación. Un valor null
+    /// significa "no modificar" (nunca borra la fecha que AniList ya tenga).
+    /// </summary>
+    Task<bool> GuardarFechasSeguimientoAsync(int mediaId, System.DateTime? fechaInicio, System.DateTime? fechaFin, string token);
     Task<AniListUser?> ObtenerPerfilUsuarioAsync(string token);
     Task<List<AniListMedia>> BuscarAnimesEnVivoAsync(string busqueda, System.Threading.CancellationToken cancellationToken = default);
     Task<List<AniListMedia>> ObtenerAnimesTendenciaAsync(System.Threading.CancellationToken cancellationToken = default);
