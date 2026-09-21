@@ -6,6 +6,110 @@
              TextElement.Foreground="{DynamicResource MaterialDesignBody}"
              Background="#121212">
     <UserControl.Resources>
+
+    <!-- ══ Barra de acciones de la cabecera de episodios: botones neutros y menús desplegables ══ -->
+    <Style x:Key="DetToolBtn" TargetType="ButtonBase">
+        <Setter Property="Height" Value="34"/>
+        <Setter Property="MinWidth" Value="34"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Foreground" Value="#CBD5E1"/>
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ButtonBase">
+                    <Border x:Name="Raiz" Background="#1F242C" BorderBrush="#2D333B" BorderThickness="1" CornerRadius="10" Padding="9,0">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                                          TextElement.Foreground="{TemplateBinding Foreground}"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Raiz" Property="BorderBrush" Value="#60A5FA"/>
+                            <Setter TargetName="Raiz" Property="Background" Value="#1E293B"/>
+                            <Setter Property="Foreground" Value="#93C5FD"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.45"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Chips pulsables de la fila de etiquetas (mismo tamaño que las etiquetas informativas) -->
+    <ControlTemplate x:Key="DetChipTemplate" TargetType="ButtonBase">
+        <Border x:Name="Raiz" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10,4">
+            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        </Border>
+        <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Raiz" Property="BorderBrush" Value="#60A5FA"/>
+            </Trigger>
+        </ControlTemplate.Triggers>
+    </ControlTemplate>
+
+    <Style x:Key="DetChipToggle" TargetType="ToggleButton">
+        <Setter Property="Background" Value="#1AF59E0B"/>
+        <Setter Property="BorderBrush" Value="#33F59E0B"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        <Setter Property="Template" Value="{StaticResource DetChipTemplate}"/>
+    </Style>
+
+    <Style x:Key="DetChipButton" TargetType="Button">
+        <Setter Property="Background" Value="#1A3B82F6"/>
+        <Setter Property="BorderBrush" Value="#333B82F6"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        <Setter Property="Template" Value="{StaticResource DetChipTemplate}"/>
+    </Style>
+
+    <Style x:Key="DetToolToggle" TargetType="ToggleButton" BasedOn="{StaticResource DetToolBtn}">
+        <Style.Triggers>
+            <Trigger Property="IsChecked" Value="True">
+                <Setter Property="Foreground" Value="#93C5FD"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- Ítem de menú: icono + título + descripción -->
+    <Style x:Key="DetMenuItem" TargetType="Button">
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <EventSetter Event="Click" Handler="MenuAcciones_ItemClick"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Raiz" Background="Transparent" CornerRadius="8" Padding="10,8">
+                        <ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Raiz" Property="Background" Value="#1E293B"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.45"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="DetMenuCard" TargetType="Border">
+        <Setter Property="Background" Value="#1A1F26"/>
+        <Setter Property="BorderBrush" Value="#2D3748"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="12"/>
+        <Setter Property="Padding" Value="5"/>
+        <Setter Property="Width" Value="270"/>
+        <Setter Property="Effect">
+            <Setter.Value>
+                <DropShadowEffect BlurRadius="16" ShadowDepth="4" Direction="270" Opacity="0.45" Color="Black"/>
+            </Setter.Value>
+        </Setter>
+    </Style>
                     <!-- ══ Calendario del selector de fecha, con la plantilla estándar de WPF (su cabecera navega
                          mes → año → década con un clic) y los colores de la app ══ -->
                     <Style x:Key="SegCalNavBtn" TargetType="Button">
@@ -413,6 +517,94 @@
                             </StackPanel>
                         </Border>
 
+                        <!-- Badge Próximo episodio: cuenta atrás en vivo (dato local). Al pulsarlo: avisos y descarga automática -->
+                        <Grid Margin="0,0,8,6" VerticalAlignment="Center"
+                              Visibility="{Binding TieneContadorProximo, Converter={StaticResource BoolToVis}}">
+                            <ToggleButton x:Name="AvisosToggle" Style="{StaticResource DetChipToggle}"
+                                          IsChecked="{Binding IsOpen, ElementName=AvisosPopup, Mode=TwoWay}"
+                                          IsHitTestVisible="{Binding IsOpen, ElementName=AvisosPopup, Converter={StaticResource InverseBool}}"
+                                          ToolTip="{Binding ContadorProximoTooltip}"
+                                          AutomationProperties.Name="{Binding [Det_AvisosTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <materialDesign:PackIcon Kind="TimerOutline" Width="13" Height="13" Foreground="#FBBF24" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                    <TextBlock Text="{Binding ContadorProximoTexto}" FontSize="11" Foreground="#FCD34D" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                    <materialDesign:PackIcon Kind="BellRing" Width="12" Height="12" Foreground="#FBBF24" VerticalAlignment="Center" Margin="6,0,0,0"
+                                                             Visibility="{Binding TieneAvisosActivos, Converter={StaticResource BoolToVis}}"/>
+                                    <materialDesign:PackIcon Kind="ChevronDown" Width="13" Height="13" Foreground="#FBBF24" VerticalAlignment="Center" Margin="3,1,0,0"/>
+                                </StackPanel>
+                            </ToggleButton>
+                            <Popup x:Name="AvisosPopup" PlacementTarget="{Binding ElementName=AvisosToggle}" Placement="Bottom" VerticalOffset="6"
+                                   StaysOpen="False" AllowsTransparency="True" PopupAnimation="Fade">
+                                <Border Style="{StaticResource DetMenuCard}" Width="320" Padding="14">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding [Det_AvisosTitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="13.5" FontWeight="Bold" Foreground="White" Margin="0,0,0,10"/>
+
+                                        <Grid Margin="0,0,0,12">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                                                <TextBlock Text="{Binding [Det_AvisosAvisarTitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="12.5" FontWeight="SemiBold" Foreground="#E2E8F0"/>
+                                                <TextBlock Text="{Binding [Det_AvisosAvisarDesc], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="11" Foreground="#94A3B8" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                            </StackPanel>
+                                            <ToggleButton Grid.Column="1" Style="{StaticResource MaterialDesignSwitchToggleButton}" VerticalAlignment="Center"
+                                                          IsChecked="{Binding AvisarEpisodioNuevo, Mode=TwoWay}" Cursor="Hand"
+                                                          AutomationProperties.Name="{Binding [Det_AvisosAvisarTitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                        </Grid>
+
+                                        <Grid>
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                                                <TextBlock Text="{Binding [Det_AvisosDescargarTitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="12.5" FontWeight="SemiBold" Foreground="#E2E8F0"/>
+                                                <TextBlock Text="{Binding [Det_AvisosDescargarDesc], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="11" Foreground="#94A3B8" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                            </StackPanel>
+                                            <ToggleButton Grid.Column="1" Style="{StaticResource MaterialDesignSwitchToggleButton}" VerticalAlignment="Center"
+                                                          IsChecked="{Binding DescargarAutomaticamente, Mode=TwoWay}" Cursor="Hand"
+                                                          AutomationProperties.Name="{Binding [Det_AvisosDescargarTitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                        </Grid>
+
+                                        <TextBlock Text="{Binding [Det_AvisosNota], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="10.5" Foreground="#64748B" TextWrapping="Wrap" Margin="0,12,0,0"/>
+                                    </StackPanel>
+                                </Border>
+                            </Popup>
+                        </Grid>
+
+                        <!-- Badge Espacio en disco -->
+                        <Border Background="#1A64748B" BorderBrush="#3364748B" BorderThickness="1" CornerRadius="8" Padding="10,4" Margin="0,0,8,6" VerticalAlignment="Center"
+                                Visibility="{Binding TieneEspacioEnDisco, Converter={StaticResource BoolToVis}}"
+                                ToolTip="{Binding EspacioEnDiscoTooltip}">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <materialDesign:PackIcon Kind="HarddiskPlus" Width="13" Height="13" Foreground="#94A3B8" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                <TextBlock Text="{Binding EspacioEnDiscoTexto}" FontSize="11" Foreground="#CBD5E1" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Etiquetas con datos de AniList (nota, formato y duración, estudio, fuente) -->
+                        <ItemsControl ItemsSource="{Binding EtiquetasAniList}" VerticalAlignment="Center">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><WrapPanel Orientation="Horizontal" VerticalAlignment="Center"/></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="#1F242C" BorderBrush="#2D333B" BorderThickness="1" CornerRadius="8" Padding="10,4" Margin="0,0,8,6" VerticalAlignment="Center"
+                                            ToolTip="{Binding Tooltip}">
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <materialDesign:PackIcon Kind="{Binding Icono}" Width="13" Height="13" Foreground="#94A3B8" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                            <TextBlock Text="{Binding Texto}" FontSize="11" Foreground="#CBD5E1" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <!-- Tráiler -->
+                        <Button Command="{Binding AbrirTrailerCommand}" Style="{StaticResource DetChipButton}" Margin="0,0,8,6" VerticalAlignment="Center"
+                                Visibility="{Binding TieneTrailer, Converter={StaticResource BoolToVis}}"
+                                ToolTip="{Binding [Det_TrailerTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" AutomationProperties.Name="{Binding [Det_Trailer], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <materialDesign:PackIcon Kind="PlayCircleOutline" Width="13" Height="13" Foreground="#60A5FA" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                <TextBlock Text="{Binding [Det_Trailer], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="11" Foreground="#93C5FD" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+
                         <!-- Chips de Géneros -->
                         <ItemsControl ItemsSource="{Binding AnimeSeleccionado.GenerosLista}" VerticalAlignment="Center">
                             <ItemsControl.ItemsPanel>
@@ -540,135 +732,177 @@
                             </TextBlock.Text>
                         </TextBlock>
 
-                        <!-- FILTROS Y ORDENACIÓN -->
+                        <!-- FILTRO Y ORDENACIÓN (lo que cambia QUÉ episodios se ven) -->
                         <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                            <ComboBox ItemsSource="{Binding OpcionesFiltro}" SelectedItem="{Binding FiltroEpisodios}" 
+                            <ComboBox ItemsSource="{Binding OpcionesFiltro}" SelectedItem="{Binding FiltroEpisodios}"
                                       Height="34" Margin="0,0,8,0"
                                       VerticalAlignment="Center"/>
-                                      
+
                             <ToggleButton IsChecked="{Binding OrdenAscendente}" Style="{StaticResource MaterialDesignActionToggleButton}"
                                           Content="{materialDesign:PackIcon Kind=SortDescending, Size=18}"
                                           materialDesign:ToggleButtonAssist.OnContent="{materialDesign:PackIcon Kind=SortAscending, Size=18}"
                                           ToolTip="{Binding [Det_OrdenTip], Source={x:Static loc:LocalizationService.Instance}}" Width="34" Height="34" Background="#1F242C" BorderBrush="#2D333B" BorderThickness="1" Foreground="White" />
-
-                            <!-- CARPETA DEL ANIME (acción única, no por episodio) -->
-                            <Button Command="{Binding AbrirCarpetaAnimeCommand}"
-                                    Style="{StaticResource MaterialDesignOutlinedButton}"
-                                    BorderBrush="#34D399" Foreground="#34D399"
-                                    Height="34" Padding="10,0" Margin="8,0,0,0"
-                                    ToolTip="{Binding [Det_CarpetaTip], Source={x:Static loc:LocalizationService.Instance}}">
-                                <StackPanel Orientation="Horizontal">
-                                    <materialDesign:PackIcon Kind="FolderOpen" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                                    <TextBlock Text="{Binding [Det_Carpeta], Source={x:Static loc:LocalizationService.Instance}}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="11"/>
-                                </StackPanel>
-                            </Button>
-
-                            <!-- DETECTAR OP (Plugin de Audio) -->
-                            <Button Command="{Binding AnalizarOpeningsCommand}"
-                                    Style="{StaticResource MaterialDesignOutlinedButton}"
-                                    BorderBrush="#60A5FA" Foreground="#60A5FA"
-                                    Height="34" Padding="10,0" Margin="8,0,0,0"
-                                    ToolTip="{Binding [Det_DetectarOpTip], Source={x:Static loc:LocalizationService.Instance}}">
-                                <StackPanel Orientation="Horizontal">
-                                    <materialDesign:PackIcon Kind="Magnify" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                                    <TextBlock Text="{Binding [Det_DetectarOp], Source={x:Static loc:LocalizationService.Instance}}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="11"/>
-                                </StackPanel>
-                            </Button>
-
-                            <!-- DOCTOR DE INTEGRIDAD DE VIDEO -->
-                            <Button Command="{Binding VerificarIntegridadCommand}"
-                                    Style="{StaticResource MaterialDesignOutlinedButton}"
-                                    BorderBrush="#FBBF24" Foreground="#FBBF24"
-                                    Height="34" Padding="10,0" Margin="8,0,0,0"
-                                    IsEnabled="{Binding VerificandoIntegridad, Converter={StaticResource InverseBool}}"
-                                    ToolTip="{Binding [Det_VerificarIntegridad], Source={x:Static loc:LocalizationService.Instance}}">
-                                <StackPanel Orientation="Horizontal">
-                                    <materialDesign:PackIcon Kind="ShieldSearch" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                                    <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" FontSize="11">
-                                        <TextBlock.Style>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="Text" Value="{Binding [Det_VerificarIntegridad], Source={x:Static loc:LocalizationService.Instance}}"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding VerificandoIntegridad}" Value="True">
-                                                        <Setter Property="Text" Value="{Binding [Det_VerificandoIntegridad], Source={x:Static loc:LocalizationService.Instance}}"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </TextBlock.Style>
-                                    </TextBlock>
-                                </StackPanel>
-                            </Button>
                         </StackPanel>
 
-                        <!-- BOTONES DE ACCIÓN MASIVA (Cápsulas modernas) -->
+                        <!-- ACCIONES: 2 menús + 2 botones de icono, todos con el mismo estilo (antes 7 botones de colores) -->
                         <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                            
-                            <!-- BOTÓN MARCAR VISTOS -->
-                            <Button Command="{Binding MarcarVistosCommand}" 
-                                    CommandParameter="{Binding SelectedItems, ElementName=ListaEpisodios}" 
-                                    Style="{StaticResource MaterialDesignOutlinedButton}"
-                                    BorderBrush="#10B981" Foreground="#34D399"
-                                    Height="34" Padding="10,0" Margin="0,0,6,0"
-                                    ToolTip="{Binding [Det_MarcarVistosTip], Source={x:Static loc:LocalizationService.Instance}}">
-                                <StackPanel Orientation="Horizontal">
-                                    <materialDesign:PackIcon Kind="CheckAll" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                                    <TextBlock Text="{Binding [Det_Vistos], Source={x:Static loc:LocalizationService.Instance}}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="11"/>
-                                </StackPanel>
+
+                            <!-- MARCAR ▾ : vistos / no vistos de los episodios seleccionados (o todos) -->
+                            <Grid Margin="0,0,6,0">
+                                <ToggleButton x:Name="MarcarToggle" Style="{StaticResource DetToolToggle}" Width="104"
+                                              IsChecked="{Binding IsOpen, ElementName=MarcarPopup, Mode=TwoWay}"
+                                              IsHitTestVisible="{Binding IsOpen, ElementName=MarcarPopup, Converter={StaticResource InverseBool}}"
+                                              ToolTip="{Binding [Det_MarcarVistosTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                              AutomationProperties.Name="{Binding [Det_Marcar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <materialDesign:PackIcon Kind="CheckAll" Width="17" Height="17" VerticalAlignment="Center" Foreground="#34D399" Margin="0,0,6,0"/>
+                                        <TextBlock Text="{Binding [Det_Marcar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                        <materialDesign:PackIcon Kind="ChevronDown" Width="15" Height="15" VerticalAlignment="Center" Margin="4,1,0,0"/>
+                                    </StackPanel>
+                                </ToggleButton>
+                                <Popup x:Name="MarcarPopup" PlacementTarget="{Binding ElementName=MarcarToggle}" Placement="Bottom"
+                                       HorizontalOffset="-166" VerticalOffset="6" StaysOpen="False" AllowsTransparency="True" PopupAnimation="Fade">
+                                    <Border Style="{StaticResource DetMenuCard}">
+                                        <StackPanel>
+                                    <Button Command="{Binding MarcarVistosCommand}" Style="{StaticResource DetMenuItem}"
+                                            CommandParameter="{Binding SelectedItems, ElementName=ListaEpisodios}">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <materialDesign:PackIcon Grid.Column="0" Kind="CheckAll" Width="20" Height="20" Foreground="#34D399" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding [Det_MarcarComoVistos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="13" FontWeight="SemiBold" Foreground="#E2E8F0"/>
+                                                <TextBlock Text="{Binding [Det_MarcarVistosTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="11" Foreground="#94A3B8" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Button>
+                                    <Button Command="{Binding MarcarNoVistosCommand}" Style="{StaticResource DetMenuItem}"
+                                            CommandParameter="{Binding SelectedItems, ElementName=ListaEpisodios}">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <materialDesign:PackIcon Grid.Column="0" Kind="EyeOffOutline" Width="20" Height="20" Foreground="#F87171" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding [Det_MarcarComoNoVistos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="13" FontWeight="SemiBold" Foreground="#E2E8F0"/>
+                                                <TextBlock Text="{Binding [Det_MarcarNoVistosTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="11" Foreground="#94A3B8" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Button>
+                                        </StackPanel>
+                                    </Border>
+                                </Popup>
+                            </Grid>
+
+                            <!-- ACTUALIZAR desde AniList -->
+                            <Button Command="{Binding ActualizarAnimeActualCommand}" Style="{StaticResource DetToolBtn}" Margin="0,0,6,0"
+                                    ToolTip="{Binding [Det_ActualizarTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" AutomationProperties.Name="{Binding [Det_Actualizar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                <materialDesign:PackIcon Kind="Refresh" Width="18" Height="18" Foreground="#60A5FA"/>
                             </Button>
 
-                            <!-- BOTÓN MARCAR NO VISTOS -->
-                            <Button Command="{Binding MarcarNoVistosCommand}" 
-                                    CommandParameter="{Binding SelectedItems, ElementName=ListaEpisodios}" 
-                                    Style="{StaticResource MaterialDesignOutlinedButton}"
-                                    BorderBrush="#EF4444" Foreground="#F87171"
-                                    Height="34" Padding="10,0" Margin="0,0,6,0"
-                                    ToolTip="{Binding [Det_MarcarNoVistosTip], Source={x:Static loc:LocalizationService.Instance}}">
-                                <StackPanel Orientation="Horizontal">
-                                    <materialDesign:PackIcon Kind="EyeOffOutline" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                                    <TextBlock Text="{Binding [Det_NoVistos], Source={x:Static loc:LocalizationService.Instance}}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="11"/>
-                                </StackPanel>
+                            <!-- CARPETA del anime -->
+                            <Button Command="{Binding AbrirCarpetaAnimeCommand}" Style="{StaticResource DetToolBtn}" Margin="0,0,6,0"
+                                    ToolTip="{Binding [Det_CarpetaTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" AutomationProperties.Name="{Binding [Det_Carpeta], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                <materialDesign:PackIcon Kind="FolderOpenOutline" Width="18" Height="18" Foreground="#34D399"/>
                             </Button>
 
-                            <!-- BOTÓN ACTUALIZAR -->
-                            <Button Command="{Binding ActualizarAnimeActualCommand}" 
-                                    Style="{StaticResource MaterialDesignOutlinedButton}"
-                                    BorderBrush="#60A5FA" Foreground="#93C5FD"
-                                    Height="34" Padding="10,0"
-                                    ToolTip="{Binding [Det_ActualizarTip], Source={x:Static loc:LocalizationService.Instance}}">
-                                <StackPanel Orientation="Horizontal">
-                                    <materialDesign:PackIcon Kind="Refresh" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                                    <TextBlock Text="{Binding [Det_Actualizar], Source={x:Static loc:LocalizationService.Instance}}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="11"/>
-                                </StackPanel>
-                            </Button>
-
-                            <!-- BOTÓN ANALIZAR DUPLICADOS (hash perceptual vía Python) -->
-                            <Button Command="{Binding AnalizarDuplicadosCommand}" 
-                                    Style="{StaticResource MaterialDesignOutlinedButton}"
-                                    BorderBrush="#F59E0B" Foreground="#FBBF24"
-                                    Height="34" Padding="10,0" Margin="6,0,0,0"
-                                    ToolTip="{Binding [Det_DuplicadosTip], Source={x:Static loc:LocalizationService.Instance}}">
-                                <StackPanel Orientation="Horizontal">
-                                    <materialDesign:PackIcon Kind="ContentDuplicate" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,5,0"
-                                                             Visibility="{Binding EstaAnalizandoDuplicados, Converter={StaticResource InverseBoolToVis}}"/>
-                                    <ProgressBar Style="{StaticResource MaterialDesignCircularProgressBar}"
-                                                 Width="13" Height="13" IsIndeterminate="True"
-                                                 Foreground="#FBBF24"
-                                                 VerticalAlignment="Center" Margin="0,0,6,0"
-                                                 Visibility="{Binding EstaAnalizandoDuplicados, Converter={StaticResource BoolToVis}}"/>
-                                    <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" FontSize="11">
-                                        <TextBlock.Style>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="Text" Value="{Binding [Det_Duplicados], Source={x:Static loc:LocalizationService.Instance}}"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding EstaAnalizandoDuplicados}" Value="True">
-                                                        <Setter Property="Text" Value="{Binding [Det_Analizando], Source={x:Static loc:LocalizationService.Instance}}"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </TextBlock.Style>
-                                    </TextBlock>
-                                </StackPanel>
-                            </Button>
+                            <!-- HERRAMIENTAS ⋯ : detectar OP, verificar integridad, duplicados -->
+                            <Grid>
+                                <ToggleButton x:Name="HerramientasToggle" Style="{StaticResource DetToolToggle}"
+                                              IsChecked="{Binding IsOpen, ElementName=HerramientasPopup, Mode=TwoWay}"
+                                              IsHitTestVisible="{Binding IsOpen, ElementName=HerramientasPopup, Converter={StaticResource InverseBool}}"
+                                              ToolTip="{Binding [Det_Herramientas], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" AutomationProperties.Name="{Binding [Det_Herramientas], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                    <Grid>
+                                        <materialDesign:PackIcon Kind="DotsHorizontal" Width="20" Height="20">
+                                            <materialDesign:PackIcon.Style>
+                                                <Style TargetType="materialDesign:PackIcon">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding VerificandoIntegridad}" Value="True"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger>
+                                                        <DataTrigger Binding="{Binding EstaAnalizandoDuplicados}" Value="True"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </materialDesign:PackIcon.Style>
+                                        </materialDesign:PackIcon>
+                                        <!-- Herramienta en curso: spinner en el propio botón -->
+                                        <ProgressBar Width="16" Height="16" IsIndeterminate="True" Foreground="#FBBF24">
+                                            <ProgressBar.Style>
+                                                <Style TargetType="ProgressBar" BasedOn="{StaticResource MaterialDesignCircularProgressBar}">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding VerificandoIntegridad}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger>
+                                                        <DataTrigger Binding="{Binding EstaAnalizandoDuplicados}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </ProgressBar.Style>
+                                        </ProgressBar>
+                                    </Grid>
+                                </ToggleButton>
+                                <Popup x:Name="HerramientasPopup" PlacementTarget="{Binding ElementName=HerramientasToggle}" Placement="Bottom"
+                                       HorizontalOffset="-236" VerticalOffset="6" StaysOpen="False" AllowsTransparency="True" PopupAnimation="Fade">
+                                    <Border Style="{StaticResource DetMenuCard}">
+                                        <StackPanel>
+                                    <Button Command="{Binding AnalizarOpeningsCommand}" Style="{StaticResource DetMenuItem}">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <materialDesign:PackIcon Grid.Column="0" Kind="Magnify" Width="20" Height="20" Foreground="#60A5FA" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding [Det_DetectarOp], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="13" FontWeight="SemiBold" Foreground="#E2E8F0"/>
+                                                <TextBlock Text="{Binding [Det_DetectarOpTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="11" Foreground="#94A3B8" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Button>
+                                    <Button Command="{Binding VerificarIntegridadCommand}" Style="{StaticResource DetMenuItem}"
+                                            IsEnabled="{Binding VerificandoIntegridad, Converter={StaticResource InverseBool}}">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <materialDesign:PackIcon Grid.Column="0" Kind="ShieldSearch" Width="20" Height="20" Foreground="#FBBF24" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding [Det_VerificarIntegridad], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="13" FontWeight="SemiBold" Foreground="#E2E8F0"/>
+                                                <TextBlock Text="{Binding [Det_VerificarIntegridadDesc], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="11" Foreground="#94A3B8" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Button>
+                                    <Button Command="{Binding AnalizarDuplicadosCommand}" Style="{StaticResource DetMenuItem}">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <materialDesign:PackIcon Grid.Column="0" Kind="ContentDuplicate" Width="20" Height="20" Foreground="#FBBF24" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding [Det_Duplicados], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="13" FontWeight="SemiBold" Foreground="#E2E8F0"/>
+                                                <TextBlock Text="{Binding [Det_DuplicadosTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="11" Foreground="#94A3B8" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Button>
+                                    <Button Command="{Binding LiberarEspacioCommand}" Style="{StaticResource DetMenuItem}"
+                                            IsEnabled="{Binding HayEspacioLiberable}">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <materialDesign:PackIcon Grid.Column="0" Kind="DeleteSweepOutline" Width="20" Height="20" Foreground="#F87171" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding [Det_LiberarEspacio], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="13" FontWeight="SemiBold" Foreground="#E2E8F0"/>
+                                                <TextBlock Text="{Binding LiberarEspacioDescripcion}" FontSize="11" Foreground="#94A3B8" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Button>
+                                        </StackPanel>
+                                    </Border>
+                                </Popup>
+                            </Grid>
                         </StackPanel>
                     </Grid>
 

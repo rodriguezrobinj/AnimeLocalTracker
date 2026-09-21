@@ -23,8 +23,11 @@ public partial class DetalleView : UserControl
             _vmObservado = DataContext as DetalleViewModel;
             if (_vmObservado != null) _vmObservado.PropertyChanged += Vm_PropertyChanged;
         };
+        Loaded += (_, _) => (DataContext as DetalleViewModel)?.ReanudarContador();
         Unloaded += (_, _) =>
         {
+            // El contador de próximo episodio no debe seguir corriendo con la ficha oculta.
+            _vmObservado?.DetenerContador();
             if (_vmObservado != null) _vmObservado.PropertyChanged -= Vm_PropertyChanged;
             _vmObservado = null;
         };
@@ -102,6 +105,19 @@ public partial class DetalleView : UserControl
                 if (_vmObservado?.ElegirFechaCalendarioCommand.CanExecute(dia) == true)
                     _vmObservado.ElegirFechaCalendarioCommand.Execute(dia);
                 e.Handled = true;
+                return;
+            }
+        }
+    }
+
+    /// <summary>Al elegir una opción de un menú de acciones (Marcar / Herramientas) se cierra su popup; el comando se ejecuta después.</summary>
+    private void MenuAcciones_ItemClick(object sender, RoutedEventArgs e)
+    {
+        for (DependencyObject? actual = sender as DependencyObject; actual != null; actual = LogicalTreeHelper.GetParent(actual) ?? (actual is FrameworkElement fe ? fe.Parent : null))
+        {
+            if (actual is Popup popup)
+            {
+                popup.IsOpen = false;
                 return;
             }
         }

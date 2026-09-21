@@ -135,6 +135,9 @@ public partial class App : Application
         
         // Lo registramos como Singleton porque queremos que haya una sola conexión a la BD en toda la app
         services.AddSingleton<IDatabaseService, DatabaseService>();
+        services.AddSingleton<IProximaEmisionService, ProximaEmisionService>();
+        services.AddSingleton<IDatosExtraService, DatosExtraService>();
+        services.AddSingleton<IEmisionMonitorService, EmisionMonitorService>();
 
         // Servicio de sincronización offline-online en segundo plano
         services.AddSingleton<ISyncService, SyncService>();
@@ -388,6 +391,9 @@ public partial class App : Application
                     }
                 };
             }
+
+            // Avisos y descarga automática de episodios nuevos (animes con la opción activada en su ficha).
+            ServiceProvider.GetRequiredService<IEmisionMonitorService>().Iniciar();
 
             // Verificación de actualizaciones automáticas en segundo plano (4 h), salvo que
             // el usuario la desactive con "Buscar actualizaciones al iniciar".

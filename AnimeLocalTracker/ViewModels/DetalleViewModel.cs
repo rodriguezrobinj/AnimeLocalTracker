@@ -156,8 +156,14 @@ public partial class DetalleViewModel : ObservableObject,
         IDownloadService downloadService,
         PythonEpisodeEnricher? enricher = null,
         IPluginService? pluginService = null,
-        IVideoIntegrityService? videoIntegrityService = null)
+        IVideoIntegrityService? videoIntegrityService = null,
+        IProximaEmisionService? proximaEmision = null,
+        IDatosExtraService? datosExtra = null,
+        IEmisionMonitorService? monitorEmision = null)
     {
+        _proximaEmision = proximaEmision;
+        _datosExtra = datosExtra;
+        _monitorEmision = monitorEmision;
         _animeTrackingService = animeTrackingService;
         _databaseService = databaseService;
         _authService = authService;
@@ -235,6 +241,7 @@ public partial class DetalleViewModel : ObservableObject,
                     episodio.Descargado = true;
                     episodio.RutaCompleta = message.RutaArchivo;
                     episodio.CalcularTamanoArchivo();
+                    _ = CalcularEspacioEnDiscoAsync();
 
                     // Generar miniatura nativa y metadata técnica automáticamente sin salir de la pestaña
                     _ = Task.Run(async () =>
@@ -331,6 +338,8 @@ public partial class DetalleViewModel : ObservableObject,
 
     public async Task InicializarAsync(AnimeItem anime)
     {
+        ReiniciarContadorProximo();
+        ReiniciarExtras();
         EstaConectado = _authService.EstaAutenticado();
         AnimeSeleccionado = anime;
         EsFavoritoAnime = anime.EsFavorito;
@@ -436,6 +445,10 @@ public partial class DetalleViewModel : ObservableObject,
         // Enriquecimiento Python (metadata ffprobe + miniaturas) en segundo plano solo para los que falten
         _ = EnriquecerEpisodiosEnSegundoPlanoAsync(anime.AniListId);
         _ = CargarProximosEpisodiosDeAniListAsync();
+        _ = CargarProximaEmisionAsync();
+        _ = CalcularEspacioEnDiscoAsync();
+        _ = CargarDatosExtraAsync();
+        _ = CargarPreferenciasEmisionAsync();
     }
 
     /// <summary>
@@ -761,6 +774,7 @@ public partial class DetalleViewModel : ObservableObject,
         episodio.Es10Bit = false;
 
         AplicarFiltrosYOrdenamiento();
+        _ = CalcularEspacioEnDiscoAsync();
 
         await _dialogService.MostrarDialogoAsync(LocalizationService.T("Det_EpisodioEliminadoTitulo"),
             string.Format(LocalizationService.T("Det_EpisodioEliminadoMsj"), episodio.NumeroEpisodio),
@@ -1166,6 +1180,7 @@ public partial class DetalleViewModel : ObservableObject,
             
             await _databaseService.ActualizarAnimeAsync(AnimeSeleccionado);
             
+            _forzarProximaEmision = true; // el botón "Actualizar" también revalida la hora del próximo episodio
             await InicializarAsync(AnimeSeleccionado);
             
             await _dialogService.MostrarDialogoAsync(LocalizationService.T("Det_ActualizadoTitulo"), string.Format(LocalizationService.T("Det_ActualizadoMsj"), episodiosEmitidos), false, "CheckCircleOutline", "#4CAF50");

@@ -993,6 +993,7 @@ public partial class GaleriaViewModel : ObservableObject,
 
         int procesados = 0;
         var modificados = new List<Models.AnimeItem>();
+        var proximasEmisiones = new List<Models.ProximaEmisionLocal>();
         foreach (var anime in listaAnimes)
         {
             procesados++;
@@ -1037,7 +1038,18 @@ public partial class GaleriaViewModel : ObservableObject,
                 }
             }
 
+            // Cuenta atrás del próximo episodio: la misma respuesta ya trae la hora de emisión, así que
+            // "Actualizar biblioteca" refresca todos los contadores sin peticiones extra.
+            var copiaEmision = ProximaEmisionService.CopiaDesdeConsulta(anime.AniListId, datosFrescos.Status, datosFrescos.NextAiringEpisode, DateTime.UtcNow);
+            if (copiaEmision != null) proximasEmisiones.Add(copiaEmision);
+
             if (cambio) modificados.Add(anime);
+        }
+
+        foreach (var copia in proximasEmisiones)
+        {
+            try { await _databaseService.GuardarProximaEmisionAsync(copia); }
+            catch (Exception ex) { AppLogger.Debug("GaleriaViewModel", $"No se pudo guardar la próxima emisión de {copia.AniListId}: {ex.Message}"); }
         }
 
         if (modificados.Count > 0)

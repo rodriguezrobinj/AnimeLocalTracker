@@ -8,6 +8,22 @@ Actions + Velopack); las notas curadas de cada release se mantienen aquí.
 ## [No publicado]
 
 ### Añadido
+- Ficha del anime, tres mejoras:
+  - **Espacio en disco:** una etiqueta con lo que ocupa el anime en tu equipo y, en el menú ⋯, «Liberar espacio», que
+    borra (con confirmación) los archivos de los episodios que ya viste. Siguen marcados como vistos en el historial.
+  - **Avisos y descarga automática:** pulsando la cuenta atrás del próximo episodio se activa «Avisarme cuando salga»
+    y/o «Descargar automáticamente». Solo cuentan los episodios posteriores a activarlo. La descarga espera unos
+    minutos tras la emisión y reintenta con espera creciente (10 min hasta 16 h) si el episodio aún no está en el
+    servidor, sin llenar el historial de descargas con fallos. Funciona con la app abierta; si estuvo cerrada, se pone
+    al día al abrirla (hasta 5 episodios atrasados por anime).
+  - **Más datos de AniList en etiquetas:** nota media, formato y duración, estudio, obra original y botón de tráiler.
+    Se guardan en local y se refrescan como mucho una vez por semana.
+- Cuenta atrás del próximo episodio en la ficha de un anime en emisión («Ep. 12 en 3 d 5 h», y en horas:minutos:
+  segundos el último día). La hora de emisión se guarda en local (migración v8), así que el contador corre sin
+  conexión y sin consultar AniList en cada visita. Solo se vuelve a preguntar a AniList cuando puede haber cambiado
+  la programación, y con más frecuencia cuanto más cerca está la emisión: cada 24 h si faltan más de 3 días, cada
+  6 h entre 6 h y 3 días, cada hora en las últimas 6 h; al pasar la hora de emisión se busca el episodio siguiente. El
+  botón «Actualizar» de la ficha también revalida la hora. Si falla la red se sigue mostrando la cuenta guardada.
 - Fechas de seguimiento automáticas en AniList: al ver (de verdad, reproduciendo) el primer episodio de un anime
   que aún no tenías empezado en AniList se guarda la fecha de inicio, y al ver el último episodio OFICIAL de un
   anime ya finalizado (el total que indica AniList, no simplemente el último de la lista) se guarda la de fin y el

@@ -27,6 +27,16 @@ public interface IAnimeTrackingService
     /// puntuación. Un valor null significa "no modificar" (nunca borra la fecha que AniList ya tenga).
     /// </summary>
     Task<bool> GuardarFechasSeguimientoAsync(int mediaId, System.DateTime? fechaInicio, System.DateTime? fechaFin, string token, bool marcarCompletado);
+    /// <summary>
+    /// Próximo episodio programado de un anime (consulta mínima y SIN caché en memoria: la usa la caché local de la
+    /// cuenta atrás). Exito=false si la consulta falló; con Exito=true y Proximo=null, AniList no tiene ninguno programado.
+    /// </summary>
+    Task<(bool Exito, AniListNextAiringEpisode? Proximo)> ObtenerProximaEmisionAsync(int mediaId);
+    /// <summary>
+    /// Datos para las etiquetas de la ficha (nota media, formato, duración, estudio, fuente, tráiler). Exito=false si la
+    /// consulta falló. Sin caché en memoria: la usa la caché local semanal.
+    /// </summary>
+    Task<(bool Exito, AniListMedia? Media)> ObtenerDatosExtraAsync(int mediaId);
     Task<AniListUser?> ObtenerPerfilUsuarioAsync(string token);
     Task<List<AniListMedia>> BuscarAnimesEnVivoAsync(string busqueda, System.Threading.CancellationToken cancellationToken = default);
     Task<List<AniListMedia>> ObtenerAnimesTendenciaAsync(System.Threading.CancellationToken cancellationToken = default);

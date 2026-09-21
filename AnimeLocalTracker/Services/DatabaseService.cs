@@ -86,8 +86,20 @@ public class DatabaseService : IDatabaseService, IDisposable
         (4, "columnas Temporada/AnioLanzamiento/EsFavorito en AnimeItem", AgregarColumnasTemporadaFavoritoAsync),
         (5, "tabla de logros desbloqueados + índice único (LogroId, Nivel)", CrearTablaLogrosAsync),
         (6, "relaciones entre animes (franquicias) + marca de sincronización", CrearTablasRelacionesAsync),
-        (7, "historial de descargas (completadas y fallidas)", CrearTablaHistorialDescargasAsync)
+        (7, "historial de descargas (completadas y fallidas)", CrearTablaHistorialDescargasAsync),
+        (8, "copia local de la próxima emisión (cuenta atrás)", CrearTablaProximaEmisionAsync),
+        (9, "preferencias de emisión (avisos/descarga automática) y datos extra de AniList", CrearTablasPreferenciasYDatosExtraAsync)
     };
+
+    /// <summary>v9: avisos/descarga automática por anime y caché semanal de los datos extra de AniList.</summary>
+    private static async Task CrearTablasPreferenciasYDatosExtraAsync(SQLiteAsyncConnection conexion)
+    {
+        await conexion.CreateTableAsync<PreferenciaEmision>();
+        await conexion.CreateTableAsync<DatosExtraAnime>();
+    }
+
+    /// <summary>v8: próximo episodio de cada anime en emisión, para no consultar AniList en cada visita.</summary>
+    private static Task CrearTablaProximaEmisionAsync(SQLiteAsyncConnection conexion) => conexion.CreateTableAsync<ProximaEmisionLocal>();
 
     /// <summary>
     /// v7: historial de descargas. Para bases existentes hace falta esta migración (los [Indexed] del modelo solo
@@ -721,6 +733,9 @@ public class DatabaseService : IDatabaseService, IDisposable
             db.Execute("DELETE FROM RelacionAnime;");
             db.Execute("DELETE FROM RelacionAnimeSync;");
             db.Execute("DELETE FROM DescargaHistorial;");
+            db.Execute("DELETE FROM ProximaEmisionLocal;");
+            db.Execute("DELETE FROM PreferenciaEmision;");
+            db.Execute("DELETE FROM DatosExtraAnime;");
         });
     }
 
@@ -779,6 +794,44 @@ public class DatabaseService : IDatabaseService, IDisposable
                     logro.LogroId, logro.Nivel, logro.FechaUtc);
             }
         });
+    }
+
+    public async Task<PreferenciaEmision?> ObtenerPreferenciaEmisionAsync(int aniListId)
+    {
+        return await _conexion.FindAsync<PreferenciaEmision>(aniListId);
+    }
+
+    public async Task GuardarPreferenciaEmisionAsync(PreferenciaEmision preferencia)
+    {
+        if (preferencia == null || preferencia.AniListId <= 0) return;
+        await _conexion.InsertOrReplaceAsync(preferencia);
+    }
+
+    public async Task<List<PreferenciaEmision>> ObtenerPreferenciasEmisionActivasAsync()
+    {
+        return await _conexion.Table<PreferenciaEmision>().Where(p => p.Avisar || p.AutoDescargar).ToListAsync();
+    }
+
+    public async Task<DatosExtraAnime?> ObtenerDatosExtraAsync(int aniListId)
+    {
+        return await _conexion.FindAsync<DatosExtraAnime>(aniListId);
+    }
+
+    public async Task GuardarDatosExtraAsync(DatosExtraAnime datos)
+    {
+        if (datos == null || datos.AniListId <= 0) return;
+        await _conexion.InsertOrReplaceAsync(datos);
+    }
+
+    public async Task<ProximaEmisionLocal?> ObtenerProximaEmisionAsync(int aniListId)
+    {
+        return await _conexion.FindAsync<ProximaEmisionLocal>(aniListId);
+    }
+
+    public async Task GuardarProximaEmisionAsync(ProximaEmisionLocal proxima)
+    {
+        if (proxima == null || proxima.AniListId <= 0) return;
+        await _conexion.InsertOrReplaceAsync(proxima);
     }
 
     // Tope de filas del historial de descargas: lo más antiguo se descarta para que la tabla no crezca sin límite.
