@@ -146,6 +146,13 @@ public Task ActualizarAnimesAsync(IEnumerable<AnimeItem> animes) => Task.Complet
         public Task<List<RelacionAnime>> ObtenerRelacionesAnimeAsync() => Task.FromResult(new List<RelacionAnime>());
         public Task<List<RelacionAnimeSync>> ObtenerRelacionesSincronizadasAsync() => Task.FromResult(new List<RelacionAnimeSync>());
         public Task GuardarRelacionesAnimeAsync(IReadOnlyDictionary<int, List<RelacionAnime>> relacionesPorAnime) => Task.CompletedTask;
+        public Task<PreferenciaEmision?> ObtenerPreferenciaEmisionAsync(int aniListId) => Task.FromResult<PreferenciaEmision?>(null);
+        public Task GuardarPreferenciaEmisionAsync(PreferenciaEmision preferencia) => Task.CompletedTask;
+        public Task<List<PreferenciaEmision>> ObtenerPreferenciasEmisionActivasAsync() => Task.FromResult(new List<PreferenciaEmision>());
+        public Task<DatosExtraAnime?> ObtenerDatosExtraAsync(int aniListId) => Task.FromResult<DatosExtraAnime?>(null);
+        public Task GuardarDatosExtraAsync(DatosExtraAnime datos) => Task.CompletedTask;
+        public Task<ProximaEmisionLocal?> ObtenerProximaEmisionAsync(int aniListId) => Task.FromResult<ProximaEmisionLocal?>(null);
+        public Task GuardarProximaEmisionAsync(ProximaEmisionLocal proxima) => Task.CompletedTask;
         public Task<List<DescargaHistorial>> ObtenerDescargasHistorialAsync(int limite = 300) => Task.FromResult(new List<DescargaHistorial>());
         public Task GuardarDescargaHistorialAsync(DescargaHistorial descarga) => Task.CompletedTask;
         public Task EliminarDescargaHistorialAsync(int id) => Task.CompletedTask;
@@ -161,6 +168,8 @@ public Task ActualizarAnimesAsync(IEnumerable<AnimeItem> animes) => Task.Complet
         public Task<AniListMediaList?> ObtenerSeguimientoUsuarioAsync(int mediaId, string token) => Task.FromResult<AniListMediaList?>(null);
         public Task<bool> GuardarSeguimientoUsuarioAsync(int mediaId, string estado, int progreso, float puntaje, DateTime? fechaInicio, DateTime? fechaFin, string token) => Task.FromResult(true);
         public Task<bool> GuardarFechasSeguimientoAsync(int mediaId, DateTime? fechaInicio, DateTime? fechaFin, string token, bool marcarCompletado) => Task.FromResult(true);
+        public Task<(bool Exito, AniListNextAiringEpisode? Proximo)> ObtenerProximaEmisionAsync(int mediaId) => Task.FromResult((false, (AniListNextAiringEpisode?)null));
+        public Task<(bool Exito, AniListMedia? Media)> ObtenerDatosExtraAsync(int mediaId) => Task.FromResult((false, (AniListMedia?)null));
         public Task<AniListUser?> ObtenerPerfilUsuarioAsync(string token) => Task.FromResult<AniListUser?>(null);
         public Task<List<AniListMedia>> BuscarAnimesEnVivoAsync(string busqueda, System.Threading.CancellationToken cancellationToken = default) => Task.FromResult(new List<AniListMedia>());
         public Task<List<AniListMedia>> ObtenerAnimesTendenciaAsync(System.Threading.CancellationToken cancellationToken = default) => Task.FromResult(new List<AniListMedia>());

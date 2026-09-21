@@ -171,7 +171,7 @@ public class AniListTrackingService : IAnimeTrackingService
                     genres
                     episodes
                     status
-                    nextAiringEpisode { episode } 
+                    nextAiringEpisode { episode airingAt } 
                 }
             }";
 
@@ -359,7 +359,7 @@ public class AniListTrackingService : IAnimeTrackingService
                             status
                             startDate { year month day }
                             season
-                            nextAiringEpisode { episode }
+                            nextAiringEpisode { episode airingAt }
                             mediaListEntry {
                                 id
                                 status
@@ -457,7 +457,7 @@ public class AniListTrackingService : IAnimeTrackingService
                         description(asHtml: false) 
                         genres
                         episodes
-                        nextAiringEpisode { episode } 
+                        nextAiringEpisode { episode airingAt } 
                     }
                 }
             }";
@@ -688,6 +688,77 @@ public class AniListTrackingService : IAnimeTrackingService
         }
     }
 
+    public async Task<(bool Exito, AniListNextAiringEpisode? Proximo)> ObtenerProximaEmisionAsync(int mediaId)
+    {
+        try
+        {
+            var query = @"
+            query ($id: Int) {
+                Media(id: $id, type: ANIME) {
+                    nextAiringEpisode { episode airingAt }
+                }
+            }";
+
+            var jsonContent = JsonSerializer.Serialize(new { query, variables = new { id = mediaId } }, JsonOptions);
+            var request = CrearRequest(jsonContent);
+            var response = await EnviarYDetectarSesionAsync(request);
+            if (!response.IsSuccessStatusCode) return (false, null);
+
+            var content = await response.Content.ReadAsStringAsync();
+            if (content.Contains("\"errors\""))
+            {
+                AppLogger.Warn("AniListTrackingService", $"AniList devolvió error al pedir la próxima emisión de MediaId {mediaId}: {Truncar(content)}");
+                return (false, null);
+            }
+
+            var result = JsonSerializer.Deserialize<AniListResponse>(content, JsonOptions);
+            return (true, result?.Data?.Media?.NextAiringEpisode);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("AniListTrackingService", $"No se pudo consultar la próxima emisión de MediaId {mediaId}: {ex.Message}");
+            return (false, null);
+        }
+    }
+
+    public async Task<(bool Exito, AniListMedia? Media)> ObtenerDatosExtraAsync(int mediaId)
+    {
+        try
+        {
+            var query = @"
+            query ($id: Int) {
+                Media(id: $id, type: ANIME) {
+                    averageScore
+                    format
+                    duration
+                    source
+                    studios(isMain: true) { nodes { name } }
+                    trailer { id site }
+                }
+            }";
+
+            var jsonContent = JsonSerializer.Serialize(new { query, variables = new { id = mediaId } }, JsonOptions);
+            var request = CrearRequest(jsonContent);
+            var response = await EnviarYDetectarSesionAsync(request);
+            if (!response.IsSuccessStatusCode) return (false, null);
+
+            var content = await response.Content.ReadAsStringAsync();
+            if (content.Contains("\"errors\""))
+            {
+                AppLogger.Warn("AniListTrackingService", $"AniList devolvió error al pedir los datos extra de MediaId {mediaId}: {Truncar(content)}");
+                return (false, null);
+            }
+
+            var result = JsonSerializer.Deserialize<AniListResponse>(content, JsonOptions);
+            return (result?.Data?.Media != null, result?.Data?.Media);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("AniListTrackingService", $"No se pudieron consultar los datos extra de MediaId {mediaId}: {ex.Message}");
+            return (false, null);
+        }
+    }
+
     public async Task<AniListUser?> ObtenerPerfilUsuarioAsync(string token)
     {
         try
@@ -748,7 +819,7 @@ public class AniListTrackingService : IAnimeTrackingService
                         episodes
                         startDate { year month day }
                         season
-                        nextAiringEpisode { episode }
+                        nextAiringEpisode { episode airingAt }
                     }
                 }
             }";
@@ -815,7 +886,7 @@ public class AniListTrackingService : IAnimeTrackingService
                         episodes
                         startDate { year month day }
                         season
-                        nextAiringEpisode { episode }
+                        nextAiringEpisode { episode airingAt }
                     }
                 }
             }";

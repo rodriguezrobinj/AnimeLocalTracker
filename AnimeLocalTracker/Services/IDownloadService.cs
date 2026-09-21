@@ -12,6 +12,11 @@ public interface IDownloadService
     Task DownloadVideoAsync(string videoUrl, string destinationPath, IProgress<(double Progress, double Speed)>? progress = null, CancellationToken cancellationToken = default);
     bool EstaDescargando(int aniListId, int numeroEpisodio, out double progreso);
     Task IniciarDescargaEpisodioAsync(int aniListId, string animeTitulo, string carpetaDestino, int numeroEpisodio, IEnumerable<string>? titulosAlternativos = null);
+    /// <summary>
+    /// Como <see cref="IniciarDescargaEpisodioAsync"/>, pero para la descarga automática de episodios nuevos: si el
+    /// episodio aún no está en el servidor, el fallo NO se apunta en el historial de descargas (se reintenta más tarde).
+    /// </summary>
+    Task IniciarDescargaAutomaticaAsync(int aniListId, string animeTitulo, string carpetaDestino, int numeroEpisodio, IEnumerable<string>? titulosAlternativos = null);
     void CancelarDescarga(int aniListId, int numeroEpisodio);
     void CancelarTodas();
     void PausarDescarga(int aniListId, int numeroEpisodio);

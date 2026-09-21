@@ -63,6 +63,8 @@ public class DownloadService : IDownloadService
         /// <summary>True hasta que la descarga obtiene un slot (o mientras espera uno tras reanudar).</summary>
         public volatile bool EnCola = true;
         public int Reintentos { get; set; }
+        /// <summary>Iniciada por la descarga automática de episodios nuevos (sus fallos "no encontrado" no van al historial).</summary>
+        public bool Automatica { get; set; }
         /// <summary>El usuario pidió saltar la cola antes de que la descarga llegara a registrarse como waiter.</summary>
         public volatile bool Priorizada;
     }
@@ -341,6 +343,12 @@ public class DownloadService : IDownloadService
     }
 
     public Task IniciarDescargaEpisodioAsync(int aniListId, string animeTitulo, string carpetaDestino, int numeroEpisodio, IEnumerable<string>? titulosAlternativos = null)
+        => IniciarInterno(aniListId, animeTitulo, carpetaDestino, numeroEpisodio, titulosAlternativos, automatica: false);
+
+    public Task IniciarDescargaAutomaticaAsync(int aniListId, string animeTitulo, string carpetaDestino, int numeroEpisodio, IEnumerable<string>? titulosAlternativos = null)
+        => IniciarInterno(aniListId, animeTitulo, carpetaDestino, numeroEpisodio, titulosAlternativos, automatica: true);
+
+    private Task IniciarInterno(int aniListId, string animeTitulo, string carpetaDestino, int numeroEpisodio, IEnumerable<string>? titulosAlternativos, bool automatica)
     {
         string key = $"{aniListId}_{numeroEpisodio}";
         if (_activeDownloads.ContainsKey(key)) return Task.CompletedTask;
@@ -366,6 +374,7 @@ public class DownloadService : IDownloadService
             NumeroEpisodio = numeroEpisodio,
             Progreso = 0,
             RutaDestino = Path.Combine(carpetaDestino, $"Episodio {numeroEpisodio:D2}.mp4"),
+            Automatica = automatica
         };
         state.RutaTemporal = state.RutaDestino + ".downloading";
         state.CarpetaDestino = carpetaDestino;
@@ -423,7 +432,9 @@ public class DownloadService : IDownloadService
                             _activeDownloads.TryRemove(key, out _);
                             string errorNoEncontrado = $"No se encontró el episodio {state.NumeroEpisodio} en el servidor.";
                             WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, 0, isDownloading: false, isCompleted: false, isPaused: false, "", errorNoEncontrado, state.AnimeTitulo));
-                            RegistrarEnHistorial(state, completada: false, errorNoEncontrado);
+                            // Descarga automática: el episodio puede tardar horas en aparecer en el servidor; cada intento
+                            // fallido no debe llenar el historial (el monitor reintenta con espera creciente).
+                            if (!state.Automatica) RegistrarEnHistorial(state, completada: false, errorNoEncontrado);
                             return;
                         }
                     }

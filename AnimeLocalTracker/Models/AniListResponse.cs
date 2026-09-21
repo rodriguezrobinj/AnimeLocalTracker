@@ -107,6 +107,25 @@ public class AniListMedia
     [JsonPropertyName("status")]
     public string? Status { get; set; }
     
+    // Datos para las etiquetas de la ficha (solo se piden en la consulta de datos extra)
+    [JsonPropertyName("averageScore")]
+    public int? AverageScore { get; set; }
+
+    [JsonPropertyName("format")]
+    public string? Format { get; set; }
+
+    [JsonPropertyName("duration")]
+    public int? Duration { get; set; }
+
+    [JsonPropertyName("source")]
+    public string? Source { get; set; }
+
+    [JsonPropertyName("studios")]
+    public AniListStudios? Studios { get; set; }
+
+    [JsonPropertyName("trailer")]
+    public AniListTrailer? Trailer { get; set; }
+
     // NUEVO: La entrada personal del usuario autenticado
     [JsonPropertyName("mediaListEntry")]
     public AniListMediaList? MediaListEntry { get; set; }
@@ -183,10 +202,35 @@ public class AniListCoverImage
     public string? ExtraLarge { get; set; }
 }
 
+public class AniListStudios
+{
+    [JsonPropertyName("nodes")]
+    public List<AniListStudio>? Nodes { get; set; }
+}
+
+public class AniListStudio
+{
+    [JsonPropertyName("name")]
+    public string? Name { get; set; }
+}
+
+public class AniListTrailer
+{
+    [JsonPropertyName("id")]
+    public string? Id { get; set; }
+
+    [JsonPropertyName("site")]
+    public string? Site { get; set; }
+}
+
 public class AniListNextAiringEpisode
 {
     [JsonPropertyName("episode")]
     public int Episode { get; set; }
+
+    /// <summary>Momento de emisión (segundos Unix UTC). 0 si la consulta no lo pidió.</summary>
+    [JsonPropertyName("airingAt")]
+    public long AiringAt { get; set; }
 }
 
 public class AniListFuzzyDate

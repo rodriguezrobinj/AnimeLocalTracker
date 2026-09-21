@@ -46,6 +46,17 @@ public interface IDatabaseService
     Task<List<LogroDesbloqueado>> ObtenerLogrosDesbloqueadosAsync();
     Task GuardarLogrosDesbloqueadosAsync(IEnumerable<LogroDesbloqueado> logros);
 
+    // === PRÓXIMA EMISIÓN: copia local del próximo episodio de animes en emisión (cuenta atrás sin red) ===
+    Task<ProximaEmisionLocal?> ObtenerProximaEmisionAsync(int aniListId);
+    Task GuardarProximaEmisionAsync(ProximaEmisionLocal proxima);
+
+    // === PREFERENCIAS DE EMISIÓN (avisar / descargar automáticamente) y DATOS EXTRA de AniList (etiquetas de la ficha) ===
+    Task<PreferenciaEmision?> ObtenerPreferenciaEmisionAsync(int aniListId);
+    Task GuardarPreferenciaEmisionAsync(PreferenciaEmision preferencia);
+    Task<List<PreferenciaEmision>> ObtenerPreferenciasEmisionActivasAsync();
+    Task<DatosExtraAnime?> ObtenerDatosExtraAsync(int aniListId);
+    Task GuardarDatosExtraAsync(DatosExtraAnime datos);
+
     // === DESCARGAS: historial de resultados finales (completadas y fallidas), más recientes primero ===
     Task<List<DescargaHistorial>> ObtenerDescargasHistorialAsync(int limite = 300);
     Task GuardarDescargaHistorialAsync(DescargaHistorial descarga);
