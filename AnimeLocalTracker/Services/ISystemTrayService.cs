@@ -20,6 +20,12 @@ public interface ISystemTrayService
     /// <summary>Debe llamarse una única vez, con la ventana principal, tan pronto esté disponible.</summary>
     void Habilitar(Window ventanaPrincipal);
 
+    /// <summary>
+    /// True si la ventana principal no es visible o no está activa (minimizada, oculta en la bandeja, o el usuario
+    /// está en otra aplicación): en ese caso un toast interno de WPF pasaría inadvertido.
+    /// </summary>
+    bool VentanaEnSegundoPlano { get; }
+
     /// <summary>Muestra una notificación nativa de Windows (útil cuando la ventana está oculta).</summary>
     void MostrarNotificacion(string titulo, string mensaje);
 }

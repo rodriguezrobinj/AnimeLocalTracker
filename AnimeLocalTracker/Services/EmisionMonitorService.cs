@@ -52,18 +52,36 @@ public sealed class EmisionMonitorService : IEmisionMonitorService, IRecipient<D
     private readonly IDownloadService _descargas;
     private readonly IFileScannerService _escaner;
     private readonly IDialogService _dialogos;
+    private readonly ISystemTrayService _bandeja;
     private readonly SemaphoreSlim _ciclo = new(1, 1);
     private readonly ConcurrentDictionary<string, (int Intentos, DateTime ProximoIntentoUtc)> _intentos = new();
     private readonly ConcurrentDictionary<string, byte> _automaticasEnCurso = new();
     private Timer? _timer;
 
-    public EmisionMonitorService(IDatabaseService database, IProximaEmisionService proxima, IDownloadService descargas, IFileScannerService escaner, IDialogService dialogos)
+    public EmisionMonitorService(IDatabaseService database, IProximaEmisionService proxima, IDownloadService descargas, IFileScannerService escaner, IDialogService dialogos, ISystemTrayService bandeja)
     {
         _database = database;
         _proxima = proxima;
         _descargas = descargas;
         _escaner = escaner;
         _dialogos = dialogos;
+        _bandeja = bandeja;
+    }
+
+    /// <summary>
+    /// Avisa al usuario: si la ventana está minimizada/oculta o en segundo plano, un toast interno de WPF pasaría
+    /// inadvertido, así que se usa el globo nativo de la bandeja de Windows en su lugar.
+    /// </summary>
+    private void Avisar(string titulo, string mensaje, string icono, string color)
+    {
+        if (_bandeja.VentanaEnSegundoPlano)
+        {
+            _bandeja.MostrarNotificacion(titulo, mensaje);
+        }
+        else
+        {
+            _dialogos.MostrarToast(titulo, mensaje, icono, color);
+        }
     }
 
     public void Iniciar()
@@ -88,7 +106,7 @@ public sealed class EmisionMonitorService : IEmisionMonitorService, IRecipient<D
         if (!message.IsCompleted) return;
         if (!_automaticasEnCurso.TryRemove(Clave(message.AniListId, message.NumeroEpisodio), out _)) return;
 
-        _dialogos.MostrarToast(
+        Avisar(
             LocalizationService.T("Emision_DescargadoTitulo"),
             string.Format(LocalizationService.T("Emision_DescargadoMsj"), message.AnimeTitulo, message.NumeroEpisodio),
             "CloudDownloadOutline", "#10B981");
@@ -160,7 +178,7 @@ public sealed class EmisionMonitorService : IEmisionMonitorService, IRecipient<D
         string mensaje = desde == hasta
             ? string.Format(LocalizationService.T("Emision_AvisoUno"), anime.Titulo, hasta)
             : string.Format(LocalizationService.T("Emision_AvisoVarios"), anime.Titulo, hasta - desde + 1, desde, hasta);
-        _dialogos.MostrarToast(LocalizationService.T("Emision_AvisoTitulo"), mensaje, "BellRing", "#F59E0B");
+        Avisar(LocalizationService.T("Emision_AvisoTitulo"), mensaje, "BellRing", "#F59E0B");
     }
 
     /// <summary>
@@ -207,7 +225,7 @@ public sealed class EmisionMonitorService : IEmisionMonitorService, IRecipient<D
             if (estado.Intentos >= EsperasEntreIntentos.Length)
             {
                 // Agotados los intentos: se avisa una vez y se sigue con el siguiente para no bloquear la cola.
-                _dialogos.MostrarToast(
+                Avisar(
                     LocalizationService.T("Emision_FalloTitulo"),
                     string.Format(LocalizationService.T("Emision_FalloMsj"), anime.Titulo, ep),
                     "AlertCircleOutline", "#EF4444");
