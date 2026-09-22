@@ -169,9 +169,10 @@ public class AniListBusquedaYCalendarioTests
         var sut = CreateService(HttpStatusCode.OK, json);
 
         // Act
-        var emisiones = await sut.ObtenerCalendarioEmisionAsync(new List<int> { 21 }, 0, long.MaxValue);
+        var (exito, emisiones) = await sut.ObtenerCalendarioEmisionAsync(new List<int> { 21 }, 0, long.MaxValue);
 
         // Assert
+        exito.Should().BeTrue();
         emisiones.Should().HaveCount(1);
         var ep = emisiones[0];
         ep.AniListId.Should().Be(21);
@@ -183,16 +184,52 @@ public class AniListBusquedaYCalendarioTests
     }
 
     [Fact]
-    public async Task ObtenerCalendarioEmisionAsync_ConErrorGraphQL_DeberiaDevolverVacio()
+    public async Task ObtenerCalendarioEmisionAsync_ConErrorGraphQL_DeberiaDevolverVacioPeroExitoso()
     {
-        // Arrange
+        // Arrange: la petición SÍ llegó a AniList (200 OK); es la consulta la que fue rechazada,
+        // no un problema de conectividad, así que no debe tratarse como "sin conexión".
         string json = """{"errors":[{"message":"Invalid variable"}]}""";
         var sut = CreateService(HttpStatusCode.OK, json);
 
         // Act
-        var emisiones = await sut.ObtenerCalendarioEmisionAsync(new List<int> { 21 }, 0, 100);
+        var (exito, emisiones) = await sut.ObtenerCalendarioEmisionAsync(new List<int> { 21 }, 0, 100);
 
         // Assert
+        exito.Should().BeTrue();
+        emisiones.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ObtenerCalendarioEmisionAsync_Con403Cloudflare_DeberiaDevolverExitoFalso()
+    {
+        // Arrange: fallo del lado del servidor/red (rate-limit, bloqueo de Cloudflare, etc.) — el
+        // llamador (Calendario/Actualizaciones) debe distinguirlo de "no hay episodios" para no
+        // vaciar la pantalla cuando en realidad solo falló la consulta.
+        var sut = CreateService(HttpStatusCode.Forbidden, "<html>Forbidden</html>");
+
+        // Act
+        var (exito, emisiones) = await sut.ObtenerCalendarioEmisionAsync(new List<int> { 21 }, 0, 100);
+
+        // Assert
+        exito.Should().BeFalse();
+        emisiones.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ObtenerCalendarioEmisionAsync_ConFalloDeRed_DeberiaDevolverExitoFalso()
+    {
+        // Arrange: sin conexión — la petición ni siquiera llega a completarse.
+        _handlerMock
+            .Protected()
+            .Setup<Task<HttpResponseMessage>>("SendAsync", ItExpr.IsAny<HttpRequestMessage>(), ItExpr.IsAny<CancellationToken>())
+            .ThrowsAsync(new HttpRequestException("No hay conexión a internet."));
+        var sut = new AniListTrackingService(new HttpClient(_handlerMock.Object));
+
+        // Act
+        var (exito, emisiones) = await sut.ObtenerCalendarioEmisionAsync(new List<int> { 21 }, 0, 100);
+
+        // Assert
+        exito.Should().BeFalse();
         emisiones.Should().BeEmpty();
     }
 

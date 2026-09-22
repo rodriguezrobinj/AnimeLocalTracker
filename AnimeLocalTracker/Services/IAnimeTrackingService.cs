@@ -40,5 +40,10 @@ public interface IAnimeTrackingService
     Task<AniListUser?> ObtenerPerfilUsuarioAsync(string token);
     Task<List<AniListMedia>> BuscarAnimesEnVivoAsync(string busqueda, System.Threading.CancellationToken cancellationToken = default);
     Task<List<AniListMedia>> ObtenerAnimesTendenciaAsync(System.Threading.CancellationToken cancellationToken = default);
-    Task<List<AiringEpisode>> ObtenerCalendarioEmisionAsync(List<int> mediaIds, long inicioSemana, long finSemana);
+    /// <summary>
+    /// Episodios emitidos/por emitir en el rango de fechas dado (calendario semanal). Exito=false si la consulta
+    /// falló (sin conexión, límite de peticiones, error del servidor): en ese caso Episodios viene vacío y el
+    /// llamador debe conservar los datos que ya tuviera en pantalla en vez de vaciarla.
+    /// </summary>
+    Task<(bool Exito, List<AiringEpisode> Episodios)> ObtenerCalendarioEmisionAsync(List<int> mediaIds, long inicioSemana, long finSemana);
 }

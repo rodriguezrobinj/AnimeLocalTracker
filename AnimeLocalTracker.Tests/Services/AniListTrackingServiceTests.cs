@@ -235,10 +235,11 @@ public class AniListTrackingServiceTests
         var invalidIds = new List<int> { 0, -1, -5 };
 
         // Act
-        var result = await _sut.ObtenerCalendarioEmisionAsync(invalidIds, 1700000000, 1700604800);
+        var (exito, episodios) = await _sut.ObtenerCalendarioEmisionAsync(invalidIds, 1700000000, 1700604800);
 
         // Assert
-        result.Should().BeEmpty();
+        exito.Should().BeTrue();
+        episodios.Should().BeEmpty();
         _httpMessageHandlerMock.Protected().Verify("SendAsync", Times.Never(), ItExpr.IsAny<HttpRequestMessage>(), ItExpr.IsAny<CancellationToken>());
     }
 

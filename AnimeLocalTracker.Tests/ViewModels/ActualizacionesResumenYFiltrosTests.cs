@@ -37,9 +37,9 @@ public class ActualizacionesResumenYFiltrosTests
             .ToList());
 
         _trackingMock.Setup(t => t.ObtenerCalendarioEmisionAsync(It.IsAny<List<int>>(), It.IsAny<long>(), It.IsAny<long>()))
-            .ReturnsAsync(Enumerable.Range(1, 4)
+            .ReturnsAsync((true, Enumerable.Range(1, 4)
                 .Select(i => new AiringEpisode { AniListId = i, NumeroEpisodio = 10 + i, FechaEmision = DateTime.UtcNow.AddHours(-i) })
-                .ToList());
+                .ToList()));
 
         // El anime 1 no tiene archivo; los demás sí
         _fileScannerMock.Setup(f => f.EscanearEpisodiosAsync(It.IsAny<string>())).ReturnsAsync(new List<EpisodioItem>());

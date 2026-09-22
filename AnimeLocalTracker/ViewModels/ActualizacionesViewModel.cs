@@ -158,8 +158,16 @@ public partial class ActualizacionesViewModel : ObservableObject, IDisposable,
             // 2) Episodios ya emitidos en los últimos 7 días (hasta ahora)
             long ahora = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
             long inicio = ahora - 7L * 24 * 60 * 60;
-            var schedule = await _animeTrackingService.ObtenerCalendarioEmisionAsync(ids, inicio, ahora);
-            if (schedule == null || schedule.Count == 0)
+            var (exito, schedule) = await _animeTrackingService.ObtenerCalendarioEmisionAsync(ids, inicio, ahora);
+            if (!exito)
+            {
+                // Sin conexión (o AniList caído/limitando): se conserva el feed ya cargado —
+                // no tiene sentido vaciar los episodios recién descargados/vistos por no poder refrescar.
+                AppLogger.Debug("ActualizacionesViewModel", "No se pudieron consultar las actualizaciones; se conserva el feed anterior.");
+                return;
+            }
+
+            if (schedule.Count == 0)
             {
                 Items.Clear();
                 ItemsAgrupados.Clear();
