@@ -46,9 +46,12 @@ public sealed class EpisodeEnrichmentCoordinator : IDisposable
         IReadOnlyList<EpisodioItem> todosLosEpisodios,
         PythonEpisodeEnricher? enricher,
         IDatabaseService databaseService,
-        Action solicitarRefrescoEpisodios)
+        Action solicitarRefrescoEpisodios,
+        CancellationToken cancellationToken = default)
     {
-        if (!_gate.Wait(0)) return;
+        // Wait(0) es solo el coalescing (no bloquea, no se cancela): CancellationToken.None explícito
+        // para dejar claro que cancellationToken no aplica aquí, solo al trabajo de fondo en sí.
+        if (!_gate.Wait(0, CancellationToken.None)) return;
 
         try
         {
@@ -78,6 +81,9 @@ public sealed class EpisodeEnrichmentCoordinator : IDisposable
                 var sinMiniatura = pendientes.Where(e => string.IsNullOrEmpty(e.RutaMiniatura)).ToList();
                 foreach (var ep in sinMiniatura)
                 {
+                    // Navegación rápida entre fichas: no seguir extrayendo miniaturas de un anime
+                    // que ya no está en pantalla.
+                    cancellationToken.ThrowIfCancellationRequested();
                     string outPath = PythonEpisodeEnricher.ObtenerRutaMiniaturaEsperada(ep.RutaCompleta);
                     bool ok;
                     if (enricher != null)
@@ -110,6 +116,7 @@ public sealed class EpisodeEnrichmentCoordinator : IDisposable
                     {
                         foreach (var ep in sinMetadata)
                         {
+                            cancellationToken.ThrowIfCancellationRequested();
                             await enricher!.EnriquecerEpisodioAsync(ep).ConfigureAwait(false);
 
                             if (!string.IsNullOrEmpty(ep.Resolucion))
@@ -119,14 +126,18 @@ public sealed class EpisodeEnrichmentCoordinator : IDisposable
                             }
 
                             // Pausa de cortesía para no saturar CPU en segundo plano
-                            await Task.Delay(20).ConfigureAwait(false);
+                            await Task.Delay(20, cancellationToken).ConfigureAwait(false);
                         }
                     }
                 }
 
                 // PERF-05: vaciar el lote de persistencia acumulado del enriquecimiento
                 await VaciarPersistenciaPendienteAsync(databaseService).ConfigureAwait(false);
-            }).ConfigureAwait(false);
+            }, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // Ficha cerrada/cambiada mientras enriquecía: no es un error, nada que registrar.
         }
         catch (Exception ex)
         {
@@ -134,7 +145,9 @@ public sealed class EpisodeEnrichmentCoordinator : IDisposable
         }
         finally
         {
-            _gate.Release();
+            // El ViewModel puede haberse descartado (Dispose) mientras esta pasada seguía en curso:
+            // el gate ya estaría liberado/destruido, así que liberarlo de nuevo no debe explotar.
+            try { _gate.Release(); } catch (ObjectDisposedException) { }
         }
     }
 

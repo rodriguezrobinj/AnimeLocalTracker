@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -36,10 +37,22 @@ public partial class DetalleViewModel : ObservableObject,
     // Enriquecimiento de metadata/miniaturas de episodios (extraído a EpisodeEnrichmentCoordinator).
     private readonly EpisodeEnrichmentCoordinator _enrichmentCoordinator = new();
 
-    // CA1001: el coordinador de enriquecimiento (posee un SemaphoreSlim) se libera al
-    // descartar el ViewModel (los transients no los dispone el contenedor).
+    /// <summary>
+    /// Cancela las cargas de fondo de ESTA ficha (espacio en disco, próximos episodios, próxima
+    /// emisión, datos extra, preferencias de emisión, enriquecimiento de episodios): si el usuario
+    /// navega a otro anime antes de que terminen, no tiene sentido seguir golpeando disco/red por
+    /// uno que ya no está en pantalla. Se crea uno nuevo en cada InicializarAsync (también en el
+    /// refresco desde AniList) y el anterior se cancela.
+    /// </summary>
+    private CancellationTokenSource? _ctsCargaFicha;
+
+    // CA1001: el coordinador de enriquecimiento (posee un SemaphoreSlim) y el CTS de las cargas de
+    // fondo se liberan al descartar el ViewModel (los transients no los dispone el contenedor).
     public void Dispose()
     {
+        DetenerContador();
+        _ctsCargaFicha?.Cancel();
+        _ctsCargaFicha?.Dispose();
         _enrichmentCoordinator.Dispose();
         GC.SuppressFinalize(this);
     }
@@ -442,13 +455,20 @@ public partial class DetalleViewModel : ObservableObject,
         _todosLosEpisodios.AddRange(episodiosGenerados);
         AplicarFiltrosYOrdenamiento();
 
+        // Navegación rápida entre fichas (flechas, clics seguidos): se cancelan las cargas de
+        // fondo de la ficha anterior en vez de dejarlas terminar para un anime que ya no se ve.
+        _ctsCargaFicha?.Cancel();
+        _ctsCargaFicha?.Dispose();
+        _ctsCargaFicha = new CancellationTokenSource();
+        var ctFicha = _ctsCargaFicha.Token;
+
         // Enriquecimiento Python (metadata ffprobe + miniaturas) en segundo plano solo para los que falten
-        _ = EnriquecerEpisodiosEnSegundoPlanoAsync(anime.AniListId);
-        _ = CargarProximosEpisodiosDeAniListAsync();
-        _ = CargarProximaEmisionAsync();
-        _ = CalcularEspacioEnDiscoAsync();
-        _ = CargarDatosExtraAsync();
-        _ = CargarPreferenciasEmisionAsync();
+        _ = EnriquecerEpisodiosEnSegundoPlanoAsync(anime.AniListId, ctFicha);
+        _ = CargarProximosEpisodiosDeAniListAsync(ctFicha);
+        _ = CargarProximaEmisionAsync(ctFicha);
+        _ = CalcularEspacioEnDiscoAsync(ctFicha);
+        _ = CargarDatosExtraAsync(ctFicha);
+        _ = CargarPreferenciasEmisionAsync(ctFicha);
     }
 
     /// <summary>
@@ -457,9 +477,9 @@ public partial class DetalleViewModel : ObservableObject,
     /// La implementación vive en EpisodeEnrichmentCoordinator (extraída para reducir el
     /// tamaño de este ViewModel); aquí solo se le pasan las dependencias necesarias.
     /// </summary>
-    private Task EnriquecerEpisodiosEnSegundoPlanoAsync(int aniListId) =>
+    private Task EnriquecerEpisodiosEnSegundoPlanoAsync(int aniListId, CancellationToken cancellationToken = default) =>
         _enrichmentCoordinator.EnriquecerEnSegundoPlanoAsync(
-            aniListId, _todosLosEpisodios, _enricher, _databaseService, SolicitarRefrescoEpisodios);
+            aniListId, _todosLosEpisodios, _enricher, _databaseService, SolicitarRefrescoEpisodios, cancellationToken);
 
     // PERF-01: refrescos coalescidos de la lista de episodios — varios episodios pueden
     // completar su miniatura casi a la vez; repintar la lista completa por cada uno era
@@ -544,12 +564,14 @@ public partial class DetalleViewModel : ObservableObject,
         }
     }
 
-    private async Task CargarProximosEpisodiosDeAniListAsync()
+    private async Task CargarProximosEpisodiosDeAniListAsync(CancellationToken cancellationToken = default)
     {
         try
         {
-            if (AnimeSeleccionado == null) return;
-            var datos = await _animeTrackingService.ObtenerAnimePorIdAsync(AnimeSeleccionado.AniListId);
+            if (AnimeSeleccionado == null || cancellationToken.IsCancellationRequested) return;
+            var anime = AnimeSeleccionado;
+            var datos = await _animeTrackingService.ObtenerAnimePorIdAsync(anime.AniListId);
+            if (cancellationToken.IsCancellationRequested || !ReferenceEquals(anime, AnimeSeleccionado)) return; // se cambió de ficha mientras se consultaba
             if (datos?.NextAiringEpisode == null) return;
 
             int proximo = datos.NextAiringEpisode.Episode;

@@ -3,6 +3,7 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using AnimeLocalTracker.Models;
 using AnimeLocalTracker.Services;
@@ -38,7 +39,7 @@ public partial class DetalleViewModel
     private int _episodiosLiberables;
 
     /// <summary>Suma el tamaño de los archivos del anime (fuera del hilo de UI: son accesos a disco).</summary>
-    internal async Task CalcularEspacioEnDiscoAsync()
+    internal async Task CalcularEspacioEnDiscoAsync(CancellationToken cancellationToken = default)
     {
         var anime = AnimeSeleccionado;
         var archivos = _todosLosEpisodios
@@ -46,26 +47,38 @@ public partial class DetalleViewModel
             .Select(e => (e.RutaCompleta, e.Visto))
             .ToList();
 
-        var (total, vistos, nVistos, nTotal) = await Task.Run(() =>
+        long total, vistos;
+        int nVistos, nTotal;
+        try
         {
-            long t = 0, v = 0;
-            int nv = 0, nt = 0;
-            foreach (var (ruta, visto) in archivos)
+            (total, vistos, nVistos, nTotal) = await Task.Run(() =>
             {
-                try
+                long t = 0, v = 0;
+                int nv = 0, nt = 0;
+                foreach (var (ruta, visto) in archivos)
                 {
-                    var info = new FileInfo(ruta);
-                    if (!info.Exists) continue;
-                    t += info.Length;
-                    nt++;
-                    if (visto) { v += info.Length; nv++; }
+                    // Navegación rápida entre fichas: no tiene sentido seguir recorriendo el disco
+                    // de un anime que ya no está en pantalla.
+                    cancellationToken.ThrowIfCancellationRequested();
+                    try
+                    {
+                        var info = new FileInfo(ruta);
+                        if (!info.Exists) continue;
+                        t += info.Length;
+                        nt++;
+                        if (visto) { v += info.Length; nv++; }
+                    }
+                    catch (IOException) { /* archivo en uso o desaparecido: no cuenta */ }
                 }
-                catch (IOException) { /* archivo en uso o desaparecido: no cuenta */ }
-            }
-            return (t, v, nv, nt);
-        });
+                return (t, v, nv, nt);
+            }, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
 
-        if (!ReferenceEquals(anime, AnimeSeleccionado)) return; // se cambió de ficha mientras se calculaba
+        if (cancellationToken.IsCancellationRequested || !ReferenceEquals(anime, AnimeSeleccionado)) return; // se cambió de ficha mientras se calculaba
 
         TieneEspacioEnDisco = nTotal > 0;
         EspacioEnDiscoTexto = nTotal > 0 ? EpisodioItem.FormatearTamano(total) : string.Empty;
@@ -167,16 +180,16 @@ public partial class DetalleViewModel
 
     [ObservableProperty] private bool _tieneTrailer;
 
-    internal async Task CargarDatosExtraAsync()
+    internal async Task CargarDatosExtraAsync(CancellationToken cancellationToken = default)
     {
         var servicio = _datosExtra;
         var anime = AnimeSeleccionado;
-        if (servicio == null || anime == null) return;
+        if (servicio == null || anime == null || cancellationToken.IsCancellationRequested) return;
 
         try
         {
             var datos = await servicio.ObtenerAsync(anime.AniListId);
-            if (!ReferenceEquals(anime, AnimeSeleccionado)) return;
+            if (cancellationToken.IsCancellationRequested || !ReferenceEquals(anime, AnimeSeleccionado)) return;
             AplicarDatosExtra(datos);
         }
         catch (Exception ex)
@@ -256,15 +269,15 @@ public partial class DetalleViewModel
         if (!_cargandoPreferencias) _ = GuardarPreferenciasEmisionAsync();
     }
 
-    internal async Task CargarPreferenciasEmisionAsync()
+    internal async Task CargarPreferenciasEmisionAsync(CancellationToken cancellationToken = default)
     {
         var anime = AnimeSeleccionado;
-        if (anime == null) return;
+        if (anime == null || cancellationToken.IsCancellationRequested) return;
 
         try
         {
             var pref = await _databaseService.ObtenerPreferenciaEmisionAsync(anime.AniListId);
-            if (!ReferenceEquals(anime, AnimeSeleccionado)) return;
+            if (cancellationToken.IsCancellationRequested || !ReferenceEquals(anime, AnimeSeleccionado)) return;
 
             _cargandoPreferencias = true;
             AvisarEpisodioNuevo = pref?.Avisar ?? false;

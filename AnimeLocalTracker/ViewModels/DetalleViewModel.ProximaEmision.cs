@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
@@ -35,11 +36,11 @@ public partial class DetalleViewModel
         DetenerContador();
     }
 
-    private async Task CargarProximaEmisionAsync()
+    private async Task CargarProximaEmisionAsync(CancellationToken cancellationToken = default)
     {
         var servicio = _proximaEmision;
         var anime = AnimeSeleccionado;
-        if (servicio == null || anime == null || _refrescandoProximaEmision) return;
+        if (servicio == null || anime == null || _refrescandoProximaEmision || cancellationToken.IsCancellationRequested) return;
 
         bool forzar = _forzarProximaEmision;
         _forzarProximaEmision = false;
@@ -47,7 +48,7 @@ public partial class DetalleViewModel
         try
         {
             var proxima = await servicio.ObtenerAsync(anime.AniListId, anime.Estado, forzar);
-            if (!ReferenceEquals(anime, AnimeSeleccionado)) return; // el usuario ya cambió de anime
+            if (cancellationToken.IsCancellationRequested || !ReferenceEquals(anime, AnimeSeleccionado)) return; // el usuario ya cambió de anime
 
             _proximaEmisionActual = proxima;
             ActualizarContadorProximo();
