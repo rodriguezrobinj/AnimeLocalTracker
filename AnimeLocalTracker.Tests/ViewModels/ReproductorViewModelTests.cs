@@ -117,6 +117,23 @@ public class ReproductorViewModelTests
         sut.Dispose();
     }
 
+    // ── Pre-carga del siguiente episodio (ARQ-01: decisión pura, sin Player/FlyleafLib) ──
+
+    [Theory]
+    [InlineData(0.94, "C:\\Anime\\Ep02.mkv", null, false)] // aún no llega al umbral del 95%
+    [InlineData(0.95, "C:\\Anime\\Ep02.mkv", null, true)] // umbral inclusive
+    [InlineData(1.0, "C:\\Anime\\Ep02.mkv", null, true)]
+    [InlineData(0.99, null, null, false)] // no hay episodio siguiente con archivo
+    [InlineData(0.99, "", null, false)]
+    [InlineData(0.99, "C:\\Anime\\Ep02.mkv", "C:\\Anime\\Ep02.mkv", false)] // ya se precargó este mismo archivo
+    [InlineData(0.99, "C:\\Anime\\Ep02.mkv", "C:\\Anime\\Ep01.mkv", true)] // precargado era de OTRO episodio (recién cambiado)
+    public void DebePrecargarSiguienteEpisodio_DecideSegunPorcentajeYArchivoYaPrecargado(
+        double porcentaje, string? rutaSiguiente, string? rutaYaPrecargada, bool esperado)
+    {
+        ReproductorViewModel.DebePrecargarSiguienteEpisodio(porcentaje, rutaSiguiente, rutaYaPrecargada)
+            .Should().Be(esperado);
+    }
+
     [Fact]
     public void SiguienteEpisodio_DeberiaCargarNuevoCapituloYActualizarEstados()
     {
