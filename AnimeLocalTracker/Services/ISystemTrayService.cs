@@ -26,6 +26,10 @@ public interface ISystemTrayService
     /// </summary>
     bool VentanaEnSegundoPlano { get; }
 
+    /// <summary>El usuario pidió (Configuración → General) que los avisos usen siempre la notificación nativa de
+    /// Windows, aunque la ventana esté visible y activa.</summary>
+    bool NotificarSiempreConBandeja { get; }
+
     /// <summary>Muestra una notificación nativa de Windows (útil cuando la ventana está oculta).</summary>
     void MostrarNotificacion(string titulo, string mensaje);
 }

@@ -44,6 +44,7 @@ public partial class ConfiguracionViewModel : ObservableObject
     [ObservableProperty] private int _umbralMarcadoVisto = 95;
     [ObservableProperty] private bool _notificarNuevosEpisodios = true;
     [ObservableProperty] private bool _minimizarABandejaAlCerrar = false;
+    [ObservableProperty] private bool _notificarConBandejaSiempre = false;
     [ObservableProperty] private string _idioma = "es";
     [ObservableProperty] private double _velocidadReproduccionDefecto = 1.0;
 
@@ -132,6 +133,7 @@ public partial class ConfiguracionViewModel : ObservableObject
         UmbralMarcadoVisto = config.UmbralMarcadoVisto is >= 1 and <= 100 ? config.UmbralMarcadoVisto : 90;
         NotificarNuevosEpisodios = config.NotificarNuevosEpisodios;
         MinimizarABandejaAlCerrar = config.MinimizarABandejaAlCerrar;
+        NotificarConBandejaSiempre = config.NotificarConBandejaSiempre;
         Idioma = config.Idioma == "en" ? "en" : "es";
         VelocidadReproduccionDefecto = config.VelocidadReproduccionDefecto is >= 0.5 and <= 2.0 ? config.VelocidadReproduccionDefecto : 1.0;
         Atajos = config.Atajos ?? new Dictionary<string, string>();
@@ -325,6 +327,7 @@ public partial class ConfiguracionViewModel : ObservableObject
             config.UmbralMarcadoVisto = Math.Clamp(UmbralMarcadoVisto, 1, 100);
             config.NotificarNuevosEpisodios = NotificarNuevosEpisodios;
             config.MinimizarABandejaAlCerrar = MinimizarABandejaAlCerrar;
+            config.NotificarConBandejaSiempre = NotificarConBandejaSiempre;
             config.Idioma = Idioma == "en" ? "en" : "es";
             config.VelocidadReproduccionDefecto = VelocidadReproduccionDefecto is >= 0.5 and <= 2.0 ? VelocidadReproduccionDefecto : 1.0;
             config.Atajos = new Dictionary<string, string>(Atajos);

@@ -28,6 +28,7 @@ public class EmisionMonitorServiceTests
         double p = 0;
         _descargas.Setup(d => d.EstaDescargando(It.IsAny<int>(), It.IsAny<int>(), out p)).Returns(false);
         _bandeja.Setup(b => b.VentanaEnSegundoPlano).Returns(false); // ventana visible/activa por defecto: usa el toast interno
+        _bandeja.Setup(b => b.NotificarSiempreConBandeja).Returns(false); // opción desactivada por defecto
     }
 
     private EmisionMonitorService CrearSut() => new(_db.Object, _proxima.Object, _descargas.Object, _escaner.Object, _dialogos.Object, _bandeja.Object);
@@ -240,6 +241,22 @@ public class EmisionMonitorServiceTests
     public async Task Aviso_ConLaVentanaEnSegundoPlano_UsaNotificacionNativaEnVezDeToast()
     {
         _bandeja.Setup(b => b.VentanaEnSegundoPlano).Returns(true);
+        Preferencias(new PreferenciaEmision { AniListId = 7, Avisar = true, UltimoAvisado = 11 });
+        ProximaEmision(12, TimeSpan.FromMinutes(-3));
+
+        await CrearSut().EjecutarCicloAsync();
+
+        _bandeja.Verify(b => b.MostrarNotificacion(It.IsAny<string>(), It.Is<string>(m => m.Contains("Frieren") && m.Contains("12", StringComparison.Ordinal))), Times.Once);
+        _dialogos.Verify(d => d.MostrarToast(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Aviso_ConNotificarSiempreConBandejaActivado_UsaNotificacionNativaAunqueLaVentanaEsteVisible()
+    {
+        // Configuración → General → "Avisar siempre con notificación de Windows": la ventana está
+        // visible y activa (VentanaEnSegundoPlano=false, el valor por defecto de los mocks), pero el
+        // usuario pidió explícitamente que los avisos usen siempre el globo nativo.
+        _bandeja.Setup(b => b.NotificarSiempreConBandeja).Returns(true);
         Preferencias(new PreferenciaEmision { AniListId = 7, Avisar = true, UltimoAvisado = 11 });
         ProximaEmision(12, TimeSpan.FromMinutes(-3));
 

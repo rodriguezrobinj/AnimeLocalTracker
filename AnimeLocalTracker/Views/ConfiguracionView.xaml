@@ -655,6 +655,13 @@
                                         <ToggleButton IsChecked="{Binding MinimizarABandejaAlCerrar}" Style="{StaticResource CfgSwitch}"
                                                       AutomationProperties.Name="{Binding [Cfg_MinimizarBandeja], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
                                     </ctl:SettingRow>
+                                    <Border Style="{StaticResource CfgDivider}"/>
+
+                                    <ctl:SettingRow Title="{Binding [Cfg_NotificarConBandeja], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                    Description="{Binding [Cfg_NotificarConBandejaSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                        <ToggleButton IsChecked="{Binding NotificarConBandejaSiempre}" Style="{StaticResource CfgSwitch}"
+                                                      AutomationProperties.Name="{Binding [Cfg_NotificarConBandeja], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                    </ctl:SettingRow>
                                 </StackPanel>
                             </Border>
                         </StackPanel>
