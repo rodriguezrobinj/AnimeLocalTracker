@@ -124,10 +124,17 @@ public sealed partial class NavigationService : ObservableObject, INavigationSer
         _ = InicializarDetalleAsync(message);
     }
 
-    private async Task InicializarDetalleAsync(NavegarMensaje_Detalle message)
+    // internal: permite a las pruebas esperar la navegación directamente en vez de depender del
+    // fire-and-forget de Receive() (evita timing flaky).
+    internal async Task InicializarDetalleAsync(NavegarMensaje_Detalle message)
     {
         try
         {
+            // Navegación rápida entre fichas (ej. varios clics seguidos en la galería): la ficha
+            // anterior se descarta sin haber terminado de cargar; se cancelan sus tareas de fondo
+            // en vez de dejarlas seguir golpeando disco/red por un anime que ya no está en pantalla.
+            if (VistaActual is DetalleViewModel anterior) anterior.Dispose();
+
             var detalleVm = CrearDetalle();
             _vistaAnteriorADetalleCalendario = VistaActual is CalendarioViewModel ? VistaActual : null;
             VistaActual = detalleVm;

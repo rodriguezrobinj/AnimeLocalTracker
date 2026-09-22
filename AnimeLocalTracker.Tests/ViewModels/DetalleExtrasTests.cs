@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 using AnimeLocalTracker.Models;
 using AnimeLocalTracker.Services;
@@ -71,6 +73,62 @@ public class DetalleExtrasTests : IDisposable
         sut.EspacioEnDiscoTexto.Should().Contain("7"); // 2 + 1 + 4 MB
         sut.HayEspacioLiberable.Should().BeTrue();
         sut.LiberarEspacioDescripcion.Should().Contain("2").And.Contain("3", "2 episodios vistos que suman 3 MB");
+    }
+
+    [Fact]
+    public async Task Espacio_ConTokenYaCancelado_NoEscaneaNiActualizaLaFicha()
+    {
+        // Navegación rápida entre fichas: si para cuando le toca correr ya se sabe que esta ficha
+        // se abandonó, ni siquiera debe empezar a recorrer el disco.
+        var anime = new AnimeItem { AniListId = 7, Titulo = "Frieren", RutaCarpeta = _carpeta, Estado = "FINISHED", TotalEpisodios = 1 };
+        string ruta = Path.Combine(_carpeta, "Episodio 01.mp4");
+        await File.WriteAllBytesAsync(ruta, new byte[2048]);
+        _escaner.Setup(e => e.EscanearEpisodiosAsync(_carpeta)).ReturnsAsync(new List<EpisodioItem>
+        {
+            new() { NumeroEpisodio = 1, RutaCompleta = ruta, Descargado = true }
+        });
+        _db.Setup(d => d.ObtenerRegistrosPorAnimeAsync(7)).ReturnsAsync(new List<RegistroEpisodio>());
+        double p = 0;
+        _descargas.Setup(d => d.EstaDescargando(It.IsAny<int>(), It.IsAny<int>(), out p)).Returns(false);
+
+        var sut = CrearSut();
+        await sut.InicializarAsync(anime);
+
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        await sut.CalcularEspacioEnDiscoAsync(cts.Token);
+
+        sut.TieneEspacioEnDisco.Should().BeFalse("el token ya estaba cancelado antes de recorrer el disco");
+        sut.EspacioEnDiscoTexto.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task InicializarAsync_LlamadoDeNuevoSobreLaMismaInstancia_CancelaLasCargasDeFondoAnteriores()
+    {
+        // DetalleViewModel.ActualizarAnimeActualAsync (refresco desde AniList) vuelve a llamar a
+        // InicializarAsync sobre la MISMA instancia; una segunda carga no debe dejar corriendo las
+        // tareas de fondo (espacio en disco, próximos episodios…) de la primera.
+        var sut = await FichaConEpisodiosAsync((1, 1024, false));
+
+        var campo = typeof(DetalleViewModel).GetField("_ctsCargaFicha", BindingFlags.NonPublic | BindingFlags.Instance);
+        var ctsPrimeraCarga = (CancellationTokenSource)campo!.GetValue(sut)!;
+        ctsPrimeraCarga.IsCancellationRequested.Should().BeFalse();
+
+        await sut.InicializarAsync(sut.AnimeSeleccionado!);
+
+        ctsPrimeraCarga.IsCancellationRequested.Should().BeTrue("la carga anterior debe cancelarse al empezar una nueva sobre la misma ficha");
+    }
+
+    [Fact]
+    public async Task Dispose_CancelaLasCargasDeFondoEnCurso()
+    {
+        var sut = await FichaConEpisodiosAsync((1, 1024, false));
+        var campo = typeof(DetalleViewModel).GetField("_ctsCargaFicha", BindingFlags.NonPublic | BindingFlags.Instance);
+        var cts = (CancellationTokenSource)campo!.GetValue(sut)!;
+
+        sut.Dispose();
+
+        cts.IsCancellationRequested.Should().BeTrue("al descartar la ficha no debe seguir cargando datos para ella");
     }
 
     [Fact]
