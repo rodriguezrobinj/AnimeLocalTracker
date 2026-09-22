@@ -108,6 +108,20 @@ public class SystemTrayService : ISystemTrayService, IDisposable
         _ventana.Activate();
     }
 
+    public bool VentanaEnSegundoPlano
+    {
+        get
+        {
+            if (_ventana == null) return true;
+            return _ventana.Dispatcher.CheckAccess()
+                ? EvaluarSegundoPlano()
+                : _ventana.Dispatcher.Invoke(EvaluarSegundoPlano);
+        }
+    }
+
+    private bool EvaluarSegundoPlano() =>
+        _ventana == null || !_ventana.IsVisible || _ventana.WindowState == WindowState.Minimized || !_ventana.IsActive;
+
     public void MostrarNotificacion(string titulo, string mensaje)
     {
         _notifyIcon?.ShowBalloonTip(4000, titulo, mensaje, System.Windows.Forms.ToolTipIcon.Info);

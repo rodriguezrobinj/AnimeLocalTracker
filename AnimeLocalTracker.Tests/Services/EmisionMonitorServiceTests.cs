@@ -18,6 +18,7 @@ public class EmisionMonitorServiceTests
     private readonly Mock<IDownloadService> _descargas = new();
     private readonly Mock<IFileScannerService> _escaner = new();
     private readonly Mock<IDialogService> _dialogos = new();
+    private readonly Mock<ISystemTrayService> _bandeja = new();
     private readonly AnimeItem _anime = new() { AniListId = 7, Titulo = "Frieren", Estado = "RELEASING", RutaCarpeta = @"C:\Anime\Frieren", TotalEpisodios = 11 };
 
     public EmisionMonitorServiceTests()
@@ -26,9 +27,10 @@ public class EmisionMonitorServiceTests
         _escaner.Setup(e => e.EscanearEpisodiosAsync(It.IsAny<string>())).ReturnsAsync(new List<EpisodioItem>());
         double p = 0;
         _descargas.Setup(d => d.EstaDescargando(It.IsAny<int>(), It.IsAny<int>(), out p)).Returns(false);
+        _bandeja.Setup(b => b.VentanaEnSegundoPlano).Returns(false); // ventana visible/activa por defecto: usa el toast interno
     }
 
-    private EmisionMonitorService CrearSut() => new(_db.Object, _proxima.Object, _descargas.Object, _escaner.Object, _dialogos.Object);
+    private EmisionMonitorService CrearSut() => new(_db.Object, _proxima.Object, _descargas.Object, _escaner.Object, _dialogos.Object, _bandeja.Object);
 
     private void Preferencias(params PreferenciaEmision[] prefs) =>
         _db.Setup(d => d.ObtenerPreferenciasEmisionActivasAsync()).ReturnsAsync(new List<PreferenciaEmision>(prefs));
@@ -230,5 +232,35 @@ public class EmisionMonitorServiceTests
 
         _dialogos.Verify(d => d.MostrarToast(It.IsAny<string>(), It.Is<string>(m => m.Contains("Frieren") && m.Contains("12")), "CloudDownloadOutline", It.IsAny<string>()), Times.Once);
         _dialogos.Verify(d => d.MostrarToast(It.IsAny<string>(), It.Is<string>(m => m.Contains("Otro")), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+    }
+
+    // ── Ventana en segundo plano: notificación nativa en vez de toast interno ──
+
+    [Fact]
+    public async Task Aviso_ConLaVentanaEnSegundoPlano_UsaNotificacionNativaEnVezDeToast()
+    {
+        _bandeja.Setup(b => b.VentanaEnSegundoPlano).Returns(true);
+        Preferencias(new PreferenciaEmision { AniListId = 7, Avisar = true, UltimoAvisado = 11 });
+        ProximaEmision(12, TimeSpan.FromMinutes(-3));
+
+        await CrearSut().EjecutarCicloAsync();
+
+        _bandeja.Verify(b => b.MostrarNotificacion(It.IsAny<string>(), It.Is<string>(m => m.Contains("Frieren") && m.Contains("12", StringComparison.Ordinal))), Times.Once);
+        _dialogos.Verify(d => d.MostrarToast(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task AlTerminarUnaDescargaAutomatica_ConLaVentanaEnSegundoPlano_UsaNotificacionNativa()
+    {
+        _bandeja.Setup(b => b.VentanaEnSegundoPlano).Returns(true);
+        Preferencias(new PreferenciaEmision { AniListId = 7, AutoDescargar = true, UltimoDescargado = 11 });
+        ProximaEmision(12, TimeSpan.FromMinutes(-30));
+        var sut = CrearSut();
+        await sut.EjecutarCicloAsync();
+
+        sut.Receive(new DescargaProgresoMensaje(7, 12, 100, false, true, false, @"C:\x.mp4", null, "Frieren"));
+
+        _bandeja.Verify(b => b.MostrarNotificacion(It.IsAny<string>(), It.Is<string>(m => m.Contains("Frieren") && m.Contains("12"))), Times.Once);
+        _dialogos.Verify(d => d.MostrarToast(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
     }
 }
