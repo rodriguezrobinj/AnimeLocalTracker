@@ -58,7 +58,8 @@
         </Grid.RowDefinitions>
 
         <!-- ═══ FILA 0: ENCABEZADO Y ACCIONES EN BLOQUE ═══ -->
-        <Grid Grid.Row="0" Margin="0,0,0,18">
+        <StackPanel Grid.Row="0">
+        <Grid Margin="0,0,0,18">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
@@ -109,6 +110,18 @@
                 </Button>
             </StackPanel>
         </Grid>
+
+        <!-- Sin conexión: se conservó el último feed cargado en vez de vaciarlo -->
+        <Border CornerRadius="8" Background="#111827" BorderBrush="#1D4ED8" BorderThickness="1"
+                Padding="12,8" Margin="0,0,0,18"
+                Visibility="{Binding SinConexion, Converter={StaticResource BoolToVis}}">
+            <StackPanel Orientation="Horizontal">
+                <materialDesign:PackIcon Kind="WifiOff" Width="16" Height="16" Foreground="#60A5FA" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                <TextBlock Text="{Binding [Act_SinConexion], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                           Foreground="#93C5FD" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
+            </StackPanel>
+        </Border>
+        </StackPanel>
 
         <!-- ═══ FILA 1: RESUMEN (nuevos · por descargar · listos) ═══ -->
         <UniformGrid Grid.Row="1" Columns="3" Margin="0,0,0,16">

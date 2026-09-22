@@ -76,16 +76,29 @@ public class ActualizacionesViewModelTests
         var sut = CrearSut();
         await sut.CargarActualizacionesAsync();
         sut.Items.Should().ContainSingle();
+        sut.SinConexion.Should().BeFalse("la primera carga fue exitosa");
 
         // Act: se pierde la conexión y se recarga (p. ej. al revisitar la pestaña)
         _trackingMock.Setup(t => t.ObtenerCalendarioEmisionAsync(It.IsAny<List<int>>(), It.IsAny<long>(), It.IsAny<long>()))
             .ReturnsAsync((false, new List<AiringEpisode>()));
         await sut.CargarActualizacionesAsync();
 
-        // Assert: el feed NO se vacía; se conserva el episodio ya cargado
+        // Assert: el feed NO se vacía; se conserva el episodio ya cargado, y se marca el aviso de "sin conexión"
         sut.Items.Should().ContainSingle();
         sut.Items[0].NumeroEpisodio.Should().Be(1120);
         sut.TieneItems.Should().BeTrue();
+        sut.SinConexion.Should().BeTrue("la UI debe avisar que se está mostrando el feed guardado, no uno recién consultado");
+
+        // Act: vuelve la conexión y se recarga de nuevo
+        _trackingMock.Setup(t => t.ObtenerCalendarioEmisionAsync(It.IsAny<List<int>>(), It.IsAny<long>(), It.IsAny<long>()))
+            .ReturnsAsync((true, new List<AiringEpisode>
+            {
+                new() { AniListId = 1, NumeroEpisodio = 1121, FechaEmision = DateTime.UtcNow.AddHours(-1) }
+            }));
+        await sut.CargarActualizacionesAsync();
+
+        // Assert: el aviso desaparece una vez que la consulta vuelve a tener éxito
+        sut.SinConexion.Should().BeFalse("una recarga exitosa quita el aviso de sin conexión");
     }
 
     [Fact]

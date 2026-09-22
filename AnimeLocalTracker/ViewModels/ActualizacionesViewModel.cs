@@ -55,6 +55,11 @@ public partial class ActualizacionesViewModel : ObservableObject, IDisposable,
     [ObservableProperty]
     private bool _estaCargando;
 
+    /// <summary>La última consulta a AniList falló (sin conexión, límite de peticiones, servidor caído) y se
+    /// conservó el feed anterior en vez de vaciarlo: la UI muestra un aviso no intrusivo al respecto.</summary>
+    [ObservableProperty]
+    private bool _sinConexion;
+
     public bool TieneItems => Items.Count > 0;
     public bool EstaVacio => !EstaCargando && Items.Count == 0;
 
@@ -149,6 +154,7 @@ public partial class ActualizacionesViewModel : ObservableObject, IDisposable,
             var ids = animes.Select(a => a.AniListId).Distinct().ToList();
             if (ids.Count == 0)
             {
+                SinConexion = false;
                 Items.Clear();
                 ItemsAgrupados.Clear();
                 ActualizarResumenYFiltro();
@@ -164,9 +170,11 @@ public partial class ActualizacionesViewModel : ObservableObject, IDisposable,
                 // Sin conexión (o AniList caído/limitando): se conserva el feed ya cargado —
                 // no tiene sentido vaciar los episodios recién descargados/vistos por no poder refrescar.
                 AppLogger.Debug("ActualizacionesViewModel", "No se pudieron consultar las actualizaciones; se conserva el feed anterior.");
+                SinConexion = true;
                 return;
             }
 
+            SinConexion = false;
             if (schedule.Count == 0)
             {
                 Items.Clear();

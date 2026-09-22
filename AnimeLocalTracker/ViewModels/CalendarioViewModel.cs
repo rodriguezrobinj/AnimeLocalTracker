@@ -28,6 +28,10 @@ public partial class CalendarioViewModel : ObservableObject, IDisposable
     [ObservableProperty] private bool _estaCargando;
     [ObservableProperty] private int _totalAnimesEnEmision;
 
+    /// <summary>La última consulta a AniList falló (sin conexión, límite de peticiones, servidor caído) y se
+    /// conservó el calendario anterior en vez de vaciarlo: la UI muestra un aviso no intrusivo al respecto.</summary>
+    [ObservableProperty] private bool _sinConexion;
+
     // Día actual para el badge "HOY" del calendario (formato invariante: LUNES, MARTES, ...)
     private static readonly string[] NombresDias = { "DOMINGO", "LUNES", "MARTES", "MIÉRCOLES", "JUEVES", "VIERNES", "SÁBADO" };
     public string DiaActual => NombresDias[(int)DateTime.Now.DayOfWeek];
@@ -112,6 +116,7 @@ public partial class CalendarioViewModel : ObservableObject, IDisposable
 
             if (ids.Count == 0)
             {
+                SinConexion = false;
                 LimpiarListas();
                 return;
             }
@@ -131,9 +136,11 @@ public partial class CalendarioViewModel : ObservableObject, IDisposable
                 // Sin conexión (o AniList caído/limitando): se conserva el último calendario cargado
                 // en vez de dejar la pestaña vacía — las listas de días NO se tocan.
                 AppLogger.Debug("CalendarioViewModel", "No se pudo actualizar el calendario de emisión; se conserva el último conocido.");
+                SinConexion = true;
                 return;
             }
 
+            SinConexion = false;
             LimpiarListas();
 
             int animesConEmisionSemanal = schedule.Select(e => e.AniListId).Distinct().Count();

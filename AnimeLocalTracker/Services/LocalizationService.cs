@@ -207,6 +207,7 @@ public sealed class LocalizationService : INotifyPropertyChanged
         // === ACTUALIZACIONES ===
         ["Act_Titulo"] = "Actualizaciones",
         ["Act_Subtitulo"] = "Capítulos recién emitidos de tus animes en emisión",
+        ["Act_SinConexion"] = "Sin conexión — mostrando la última programación guardada",
         ["Act_Descargar"] = "Descargar",
         ["Act_Reproducir"] = "Reproducir episodio",
         ["Act_Descargado"] = "Descargado",
@@ -466,6 +467,7 @@ public sealed class LocalizationService : INotifyPropertyChanged
 
         // === CALENDARIO ===
         ["Cal_Titulo"] = "Calendario de Emisión",
+        ["Cal_SinConexion"] = "Sin conexión — mostrando la última programación guardada",
         ["Cal_SinEpisodios"] = "Sin episodios",
         ["Cal_YaEmitidoTip"] = "Ya emitido",
         ["Cal_ProximoTip"] = "Próximo",
@@ -1081,6 +1083,7 @@ public sealed class LocalizationService : INotifyPropertyChanged
         // === ACTUALIZACIONES ===
         ["Act_Titulo"] = "Updates",
         ["Act_Subtitulo"] = "Recently aired episodes of your ongoing anime",
+        ["Act_SinConexion"] = "Offline — showing the last saved schedule",
         ["Act_Descargar"] = "Download",
         ["Act_Reproducir"] = "Play episode",
         ["Act_Descargado"] = "Downloaded",
@@ -1340,6 +1343,7 @@ public sealed class LocalizationService : INotifyPropertyChanged
 
         // === CALENDAR ===
         ["Cal_Titulo"] = "Airing Calendar",
+        ["Cal_SinConexion"] = "Offline — showing the last saved schedule",
         ["Cal_SinEpisodios"] = "No episodes",
         ["Cal_YaEmitidoTip"] = "Already aired",
         ["Cal_ProximoTip"] = "Upcoming",
