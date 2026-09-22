@@ -82,6 +82,9 @@ public class SystemTrayService : ISystemTrayService, IDisposable
             ContextMenuStrip = menu
         };
         _notifyIcon.DoubleClick += (_, _) => RestaurarVentana();
+        // Clic sobre el globo de una notificación nativa (p. ej. "Episodio 12 de Frieren listo"):
+        // lleva directo a la app en vez de dejar que el usuario tenga que buscarla en la bandeja.
+        _notifyIcon.BalloonTipClicked += (_, _) => RestaurarVentana();
     }
 
     private void OnClosing(object? sender, CancelEventArgs e)

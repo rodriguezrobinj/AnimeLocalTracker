@@ -123,6 +123,7 @@ public class CalendarioViewModelTests
         var vm = new CalendarioViewModel(dbMock.Object, trackingMock.Object);
         await EsperarCargaInicialAsync(vm);
         vm.Miercoles.Should().ContainSingle();
+        vm.SinConexion.Should().BeFalse("la primera carga fue exitosa");
 
         // Act: se pierde la conexión y se vuelve a cargar (p. ej. al revisitar la pestaña)
         trackingMock
@@ -130,10 +131,23 @@ public class CalendarioViewModelTests
             .ReturnsAsync((false, new List<AiringEpisode>()));
         await vm.CargarCalendarioCommand.ExecuteAsync(null);
 
-        // Assert: el calendario NO se vacía; se conserva lo que ya se había cargado
+        // Assert: el calendario NO se vacía; se conserva lo que ya se había cargado, y se marca el aviso
         vm.Miercoles.Should().ContainSingle();
         vm.Miercoles[0].Titulo.Should().Be("One Piece");
         vm.EstaVacio.Should().BeFalse();
+        vm.SinConexion.Should().BeTrue("la UI debe avisar que se está mostrando la programación guardada, no una recién consultada");
+
+        // Act: vuelve la conexión y se recarga de nuevo
+        trackingMock
+            .Setup(t => t.ObtenerCalendarioEmisionAsync(It.IsAny<List<int>>(), It.IsAny<long>(), It.IsAny<long>()))
+            .ReturnsAsync((true, new List<AiringEpisode>
+            {
+                new() { AniListId = 21, Titulo = "One Piece", NumeroEpisodio = 1173, FechaEmision = fechaMiercoles.AddDays(7) }
+            }));
+        await vm.CargarCalendarioCommand.ExecuteAsync(null);
+
+        // Assert: el aviso desaparece una vez que la consulta vuelve a tener éxito
+        vm.SinConexion.Should().BeFalse("una recarga exitosa quita el aviso de sin conexión");
     }
 
     [Fact]
