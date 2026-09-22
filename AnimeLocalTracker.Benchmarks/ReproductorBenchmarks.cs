@@ -173,7 +173,7 @@ public Task ActualizarAnimesAsync(IEnumerable<AnimeItem> animes) => Task.Complet
         public Task<AniListUser?> ObtenerPerfilUsuarioAsync(string token) => Task.FromResult<AniListUser?>(null);
         public Task<List<AniListMedia>> BuscarAnimesEnVivoAsync(string busqueda, System.Threading.CancellationToken cancellationToken = default) => Task.FromResult(new List<AniListMedia>());
         public Task<List<AniListMedia>> ObtenerAnimesTendenciaAsync(System.Threading.CancellationToken cancellationToken = default) => Task.FromResult(new List<AniListMedia>());
-        public Task<List<AiringEpisode>> ObtenerCalendarioEmisionAsync(List<int> mediaIds, long inicioSemana, long finSemana) => Task.FromResult(new List<AiringEpisode>());
+        public Task<(bool Exito, List<AiringEpisode> Episodios)> ObtenerCalendarioEmisionAsync(List<int> mediaIds, long inicioSemana, long finSemana) => Task.FromResult((true, new List<AiringEpisode>()));
         public Task<Dictionary<int, List<RelacionAnime>>> ObtenerRelacionesLoteAsync(IEnumerable<int> ids) => Task.FromResult(new Dictionary<int, List<RelacionAnime>>());
     }
 

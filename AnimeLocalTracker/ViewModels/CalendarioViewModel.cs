@@ -87,7 +87,6 @@ public partial class CalendarioViewModel : ObservableObject, IDisposable
         try
         {
             EstaCargando = true;
-            LimpiarListas();
 
             // PERF-02: proyección ligera (sin Sinopsis) para la lista del calendario.
             var animes = await _databaseService.ObtenerAnimesLigerosAsync();
@@ -113,6 +112,7 @@ public partial class CalendarioViewModel : ObservableObject, IDisposable
 
             if (ids.Count == 0)
             {
+                LimpiarListas();
                 return;
             }
 
@@ -125,7 +125,16 @@ public partial class CalendarioViewModel : ObservableObject, IDisposable
             long timestampInicio = ((DateTimeOffset)inicioSemana).ToUnixTimeSeconds();
             long timestampFin = ((DateTimeOffset)finSemana).ToUnixTimeSeconds();
 
-            var schedule = await _animeTrackingService.ObtenerCalendarioEmisionAsync(ids, timestampInicio, timestampFin);
+            var (exito, schedule) = await _animeTrackingService.ObtenerCalendarioEmisionAsync(ids, timestampInicio, timestampFin);
+            if (!exito)
+            {
+                // Sin conexión (o AniList caído/limitando): se conserva el último calendario cargado
+                // en vez de dejar la pestaña vacía — las listas de días NO se tocan.
+                AppLogger.Debug("CalendarioViewModel", "No se pudo actualizar el calendario de emisión; se conserva el último conocido.");
+                return;
+            }
+
+            LimpiarListas();
 
             int animesConEmisionSemanal = schedule.Select(e => e.AniListId).Distinct().Count();
             if (animesConEmisionSemanal > TotalAnimesEnEmision)

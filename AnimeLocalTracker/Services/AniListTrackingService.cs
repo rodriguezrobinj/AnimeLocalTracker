@@ -928,18 +928,18 @@ public class AniListTrackingService : IAnimeTrackingService
         }
     }
 
-    public async Task<List<AiringEpisode>> ObtenerCalendarioEmisionAsync(List<int> mediaIds, long inicioSemana, long finSemana)
+    public async Task<(bool Exito, List<AiringEpisode> Episodios)> ObtenerCalendarioEmisionAsync(List<int> mediaIds, long inicioSemana, long finSemana)
     {
-        if (mediaIds == null || mediaIds.Count == 0) return [];
+        if (mediaIds == null || mediaIds.Count == 0) return (true, []);
 
         var validIds = mediaIds.Where(id => id > 0).Distinct().ToList();
-        if (validIds.Count == 0) return [];
+        if (validIds.Count == 0) return (true, []);
 
         // Caché corta: evita golpear la API en cada navegación al calendario (rate-limit de AniList)
         string cacheKey = $"calendario_{inicioSemana}_{finSemana}_{string.Join(',', validIds.OrderBy(i => i))}";
         if (TryGetFromCache<List<AiringEpisode>>(cacheKey, out var cached))
         {
-            return cached!;
+            return (true, cached!);
         }
 
         var query = @"
@@ -959,6 +959,9 @@ public class AniListTrackingService : IAnimeTrackingService
         }";
 
         var airingList = new List<AiringEpisode>();
+        // true = no se pudo consultar a AniList (sin conexión, límite de peticiones, error del servidor o excepción):
+        // distinto de "se consultó bien y no hay episodios", que si se cachea y se toma como definitivo.
+        bool falloDeRed = false;
 
         try
         {
@@ -986,12 +989,14 @@ public class AniListTrackingService : IAnimeTrackingService
                 if (!response.IsSuccessStatusCode)
                 {
                     AppLogger.Warn("AniListTrackingService", $"Calendario de emisión (página {page}) falló con HTTP {(int)response.StatusCode}.");
+                    falloDeRed = true;
                     break;
                 }
 
                 var jsonResponse = await response.Content.ReadAsStringAsync();
                 if (jsonResponse.Contains("\"errors\""))
                 {
+                    // Respuesta de AniList (no es un problema de conectividad): la consulta en sí fue rechazada.
                     AppLogger.Error("AniListTrackingService", $"AniList devolvió errores GraphQL en el calendario (página {page}): {Truncar(jsonResponse)}", null);
                     break;
                 }
@@ -1017,27 +1022,40 @@ public class AniListTrackingService : IAnimeTrackingService
                         });
                     }
                 }
-                
+
                 page++;
             }
-
-            if (airingList.Count > 0)
-            {
-                SetInCache(cacheKey, airingList, TimeSpan.FromMinutes(5));
-            }
-            else
-            {
-                // Respuesta válida pero sin emisiones esta semana: caché corta para no
-                // martillar la API en cada navegación (las fallas NO se cachean)
-                SetInCache(cacheKey, airingList, TimeSpan.FromSeconds(60));
-            }
-            return airingList;
+        }
+        catch (OperationCanceledException)
+        {
+            AppLogger.Warn("AniListTrackingService", "Timeout al obtener el calendario de emisión de AniList (la API tardó más de 60s o la conexión fue lenta).");
+            falloDeRed = true;
+        }
+        catch (HttpRequestException ex)
+        {
+            AppLogger.Warn("AniListTrackingService", $"Fallo de red al obtener el calendario de emisión: {ex.Message}");
+            falloDeRed = true;
         }
         catch (Exception ex)
         {
             AppLogger.Error("AniListTrackingService", "Error al obtener calendario de emisión", ex);
-            return [];
+            falloDeRed = true;
         }
+
+        // Éxito parcial (algunas páginas se obtuvieron antes de que fallara una posterior): se aprovecha lo
+        // conseguido en vez de descartarlo, igual que si hubiera sido una respuesta completa.
+        if (airingList.Count > 0)
+        {
+            SetInCache(cacheKey, airingList, TimeSpan.FromMinutes(5));
+            return (true, airingList);
+        }
+
+        if (falloDeRed) return (false, airingList);
+
+        // Respuesta válida pero sin emisiones esta semana: caché corta para no
+        // martillar la API en cada navegación (las fallas NO se cachean)
+        SetInCache(cacheKey, airingList, TimeSpan.FromSeconds(60));
+        return (true, airingList);
     }
 
     private static string Truncar(string texto)

@@ -285,7 +285,11 @@ public class DatabaseService : IDatabaseService, IDisposable
     /// <summary>Devuelve la fila completa de un anime (incluida la Sinopsis) por su id.</summary>
     public async Task<AnimeItem?> ObtenerAnimePorIdAsync(int aniListId)
     {
-        return await _conexion.Table<AnimeItem>().FirstOrDefaultAsync(a => a.AniListId == aniListId);
+        var anime = await _conexion.Table<AnimeItem>().FirstOrDefaultAsync(a => a.AniListId == aniListId);
+        // Sin esto, PortadaVisible cae a la URL remota de AniList y la portada no se ve sin conexión
+        // (Historial/Actualizaciones navegan a la Ficha con el anime que devuelve este método).
+        anime?.ResolverPortadaLocal();
+        return anime;
     }
 
     /// <summary>PERF-03: comprueba la existencia sin cargar la biblioteca completa.</summary>

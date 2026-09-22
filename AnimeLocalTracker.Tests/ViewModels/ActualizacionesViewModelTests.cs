@@ -43,10 +43,10 @@ public class ActualizacionesViewModelTests
         });
         _dbMock.Setup(d => d.ObtenerTodosLosRegistrosAsync()).ReturnsAsync(new List<RegistroEpisodio>());
         _trackingMock.Setup(t => t.ObtenerCalendarioEmisionAsync(It.IsAny<List<int>>(), It.IsAny<long>(), It.IsAny<long>()))
-            .ReturnsAsync(new List<AiringEpisode>
+            .ReturnsAsync((true, new List<AiringEpisode>
             {
                 new() { AniListId = 1, NumeroEpisodio = 1120, FechaEmision = DateTime.UtcNow.AddHours(-3) }
-            });
+            }));
         var sut = CrearSut();
 
         // Act
@@ -56,6 +56,35 @@ public class ActualizacionesViewModelTests
         sut.Items.Should().ContainSingle();
         sut.Items[0].NumeroEpisodio.Should().Be(1120);
         sut.Items[0].RutaCarpeta.Should().Be(@"C:\Anime\OnePiece");
+        sut.TieneItems.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Recarga_SinConexion_DeberiaConservarElFeedYaCargado()
+    {
+        // Arrange: primera carga con éxito.
+        _dbMock.Setup(d => d.ObtenerAnimesLigerosAsync()).ReturnsAsync(new List<AnimeItem>
+        {
+            new() { AniListId = 1, Titulo = "One Piece", Estado = "RELEASING", RutaCarpeta = @"C:\Anime\OnePiece", UrlPortada = "cover.png" }
+        });
+        _dbMock.Setup(d => d.ObtenerTodosLosRegistrosAsync()).ReturnsAsync(new List<RegistroEpisodio>());
+        _trackingMock.Setup(t => t.ObtenerCalendarioEmisionAsync(It.IsAny<List<int>>(), It.IsAny<long>(), It.IsAny<long>()))
+            .ReturnsAsync((true, new List<AiringEpisode>
+            {
+                new() { AniListId = 1, NumeroEpisodio = 1120, FechaEmision = DateTime.UtcNow.AddHours(-3) }
+            }));
+        var sut = CrearSut();
+        await sut.CargarActualizacionesAsync();
+        sut.Items.Should().ContainSingle();
+
+        // Act: se pierde la conexión y se recarga (p. ej. al revisitar la pestaña)
+        _trackingMock.Setup(t => t.ObtenerCalendarioEmisionAsync(It.IsAny<List<int>>(), It.IsAny<long>(), It.IsAny<long>()))
+            .ReturnsAsync((false, new List<AiringEpisode>()));
+        await sut.CargarActualizacionesAsync();
+
+        // Assert: el feed NO se vacía; se conserva el episodio ya cargado
+        sut.Items.Should().ContainSingle();
+        sut.Items[0].NumeroEpisodio.Should().Be(1120);
         sut.TieneItems.Should().BeTrue();
     }
 
@@ -73,10 +102,10 @@ public class ActualizacionesViewModelTests
         _dbMock.Setup(d => d.ObtenerTodosLosRegistrosAsync()).ReturnsAsync(new List<RegistroEpisodio>());
         _trackingMock.Setup(t => t.ObtenerCalendarioEmisionAsync(It.IsAny<List<int>>(), It.IsAny<long>(), It.IsAny<long>()))
             .Callback<List<int>, long, long>((ids, _, _) => idsConsultados = ids)
-            .ReturnsAsync(new List<AiringEpisode>
+            .ReturnsAsync((true, new List<AiringEpisode>
             {
                 new() { AniListId = 1, NumeroEpisodio = 12, FechaEmision = DateTime.UtcNow.AddHours(-5) }
-            });
+            }));
         var sut = CrearSut();
 
         // Act
@@ -104,10 +133,10 @@ public class ActualizacionesViewModelTests
                 new() { NumeroEpisodio = 1120, RutaCompleta = @"C:\Anime\OnePiece\Ep1120.mkv" }
             });
         _trackingMock.Setup(t => t.ObtenerCalendarioEmisionAsync(It.IsAny<List<int>>(), It.IsAny<long>(), It.IsAny<long>()))
-            .ReturnsAsync(new List<AiringEpisode>
+            .ReturnsAsync((true, new List<AiringEpisode>
             {
                 new() { AniListId = 1, NumeroEpisodio = 1120, FechaEmision = DateTime.UtcNow.AddHours(-3) }
-            });
+            }));
         var sut = CrearSut();
 
         // Act
@@ -141,10 +170,10 @@ public class ActualizacionesViewModelTests
                 new() { NumeroEpisodio = 1120, RutaCompleta = @"C:\Anime\OnePiece\Ep1120.mkv", TamanoArchivoFormateado = "350 MB" }
             });
         _trackingMock.Setup(t => t.ObtenerCalendarioEmisionAsync(It.IsAny<List<int>>(), It.IsAny<long>(), It.IsAny<long>()))
-            .ReturnsAsync(new List<AiringEpisode>
+            .ReturnsAsync((true, new List<AiringEpisode>
             {
                 new() { AniListId = 1, NumeroEpisodio = 1120, FechaEmision = DateTime.UtcNow.AddHours(-3) }
-            });
+            }));
         var sut = CrearSut();
 
         // Act
@@ -180,10 +209,10 @@ public class ActualizacionesViewModelTests
                 new() { NumeroEpisodio = 1120, RutaCompleta = @"C:\Anime\OnePiece\Ep1120.mkv" }
             });
         _trackingMock.Setup(t => t.ObtenerCalendarioEmisionAsync(It.IsAny<List<int>>(), It.IsAny<long>(), It.IsAny<long>()))
-            .ReturnsAsync(new List<AiringEpisode>
+            .ReturnsAsync((true, new List<AiringEpisode>
             {
                 new() { AniListId = 1, NumeroEpisodio = 1120, FechaEmision = DateTime.UtcNow.AddHours(-3) }
-            });
+            }));
         var sut = CrearSut();
 
         // Act
@@ -209,7 +238,7 @@ public class ActualizacionesViewModelTests
         });
         _dbMock.Setup(d => d.ObtenerTodosLosRegistrosAsync()).ReturnsAsync(new List<RegistroEpisodio>());
         _trackingMock.Setup(t => t.ObtenerCalendarioEmisionAsync(It.IsAny<List<int>>(), It.IsAny<long>(), It.IsAny<long>()))
-            .ReturnsAsync(new List<AiringEpisode>
+            .ReturnsAsync((true, new List<AiringEpisode>
             {
                 new()
                 {
@@ -217,7 +246,7 @@ public class ActualizacionesViewModelTests
                     NumeroEpisodio = 1121,
                     FechaEmision = DateTime.SpecifyKind(DateTime.UtcNow.AddMinutes(-1), DateTimeKind.Unspecified)
                 }
-            });
+            }));
         var sut = CrearSut();
 
         // Act

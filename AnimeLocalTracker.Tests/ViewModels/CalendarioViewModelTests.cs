@@ -46,7 +46,7 @@ public class CalendarioViewModelTests
         var trackingMock = new Mock<IAnimeTrackingService>();
         trackingMock
             .Setup(t => t.ObtenerCalendarioEmisionAsync(It.IsAny<List<int>>(), It.IsAny<long>(), It.IsAny<long>()))
-            .ReturnsAsync(new List<AiringEpisode>());
+            .ReturnsAsync((true, new List<AiringEpisode>()));
 
         // Act
         var vm = new CalendarioViewModel(dbMock.Object, trackingMock.Object);
@@ -78,7 +78,7 @@ public class CalendarioViewModelTests
         var trackingMock = new Mock<IAnimeTrackingService>();
         trackingMock
             .Setup(t => t.ObtenerCalendarioEmisionAsync(It.IsAny<List<int>>(), It.IsAny<long>(), It.IsAny<long>()))
-            .ReturnsAsync(new List<AiringEpisode>
+            .ReturnsAsync((true, new List<AiringEpisode>
             {
                 new()
                 {
@@ -87,7 +87,7 @@ public class CalendarioViewModelTests
                     NumeroEpisodio = 1172,
                     FechaEmision = fechaMiercoles
                 }
-            });
+            }));
 
         // Act
         var vm = new CalendarioViewModel(dbMock.Object, trackingMock.Object);
@@ -100,6 +100,40 @@ public class CalendarioViewModelTests
         vm.Miercoles[0].Titulo.Should().Be("One Piece");
         vm.Miercoles[0].UrlPortada.Should().Be(animeLocal.PortadaVisible,
             "el calendario debe usar la portada visible local del anime");
+    }
+
+    [Fact]
+    public async Task Recarga_SinConexion_DeberiaConservarElUltimoCalendarioCargado()
+    {
+        // Arrange: primera carga con éxito, con una emisión el miércoles.
+        var fechaMiercoles = DateTimeOffset.Parse("2026-08-19T21:00:00Z").DateTime;
+        var animeLocal = new AnimeItem { AniListId = 21, Estado = "RELEASING", UrlPortada = "onepiece.png" };
+
+        var dbMock = new Mock<IDatabaseService>();
+        dbMock.Setup(d => d.ObtenerAnimesLigerosAsync()).ReturnsAsync(new List<AnimeItem> { animeLocal });
+
+        var trackingMock = new Mock<IAnimeTrackingService>();
+        trackingMock
+            .Setup(t => t.ObtenerCalendarioEmisionAsync(It.IsAny<List<int>>(), It.IsAny<long>(), It.IsAny<long>()))
+            .ReturnsAsync((true, new List<AiringEpisode>
+            {
+                new() { AniListId = 21, Titulo = "One Piece", NumeroEpisodio = 1172, FechaEmision = fechaMiercoles }
+            }));
+
+        var vm = new CalendarioViewModel(dbMock.Object, trackingMock.Object);
+        await EsperarCargaInicialAsync(vm);
+        vm.Miercoles.Should().ContainSingle();
+
+        // Act: se pierde la conexión y se vuelve a cargar (p. ej. al revisitar la pestaña)
+        trackingMock
+            .Setup(t => t.ObtenerCalendarioEmisionAsync(It.IsAny<List<int>>(), It.IsAny<long>(), It.IsAny<long>()))
+            .ReturnsAsync((false, new List<AiringEpisode>()));
+        await vm.CargarCalendarioCommand.ExecuteAsync(null);
+
+        // Assert: el calendario NO se vacía; se conserva lo que ya se había cargado
+        vm.Miercoles.Should().ContainSingle();
+        vm.Miercoles[0].Titulo.Should().Be("One Piece");
+        vm.EstaVacio.Should().BeFalse();
     }
 
     [Fact]

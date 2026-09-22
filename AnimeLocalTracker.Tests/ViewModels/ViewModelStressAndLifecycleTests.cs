@@ -123,7 +123,7 @@ public class ViewModelStressAndLifecycleTests
 
         _trackingMock
             .Setup(t => t.ObtenerCalendarioEmisionAsync(It.IsAny<List<int>>(), It.IsAny<long>(), It.IsAny<long>()))
-            .ReturnsAsync(schedules);
+            .ReturnsAsync((true, schedules));
 
         // Act
         var sut = new CalendarioViewModel(_dbMock.Object, _trackingMock.Object);
