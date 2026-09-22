@@ -281,6 +281,8 @@ public sealed class LocalizationService : INotifyPropertyChanged
         ["Tray_NuevosEncontradosFormato"] = "{0} episodio(s) nuevo(s) encontrado(s).",
         ["Cfg_MinimizarBandeja"] = "Minimizar a la bandeja del sistema",
         ["Cfg_MinimizarBandejaSub"] = "Al cerrar o minimizar, la app sigue en segundo plano (icono en el área de notificación) en vez de salir",
+        ["Cfg_NotificarConBandeja"] = "Avisar siempre con notificación de Windows",
+        ["Cfg_NotificarConBandejaSub"] = "Los avisos de episodios nuevos y descargas aparecen como notificación nativa de Windows aunque la ventana esté visible (mantiene un icono en el área de notificación)",
 
         // === GALERÍA ===
         ["Gal_Titulo"] = "Mi Colección",
@@ -1153,6 +1155,8 @@ public sealed class LocalizationService : INotifyPropertyChanged
         ["Tray_NuevosEncontradosFormato"] = "{0} new episode(s) found.",
         ["Cfg_MinimizarBandeja"] = "Minimize to system tray",
         ["Cfg_MinimizarBandejaSub"] = "When closing or minimizing, the app keeps running in the background (notification area icon) instead of exiting",
+        ["Cfg_NotificarConBandeja"] = "Always notify with a Windows notification",
+        ["Cfg_NotificarConBandejaSub"] = "New episode and download alerts appear as a native Windows notification even while the window is visible (keeps an icon in the notification area)",
 
         // === LIBRARY ===
         ["Gal_Titulo"] = "My Library",

@@ -33,7 +33,10 @@ public class SystemTrayService : ISystemTrayService, IDisposable
 
     private void ActualizarVisibilidadIcono()
     {
-        bool activo = _settingsService.ObtenerConfiguracion()?.MinimizarABandejaAlCerrar ?? false;
+        var config = _settingsService.ObtenerConfiguracion();
+        // El icono debe existir si se pidió minimizar a bandeja O si se pidió notificar siempre por bandeja:
+        // ShowBalloonTip necesita un NotifyIcon visible aunque el usuario no quiera ocultar la ventana al cerrar.
+        bool activo = (config?.MinimizarABandejaAlCerrar ?? false) || (config?.NotificarConBandejaSiempre ?? false);
         if (activo && _notifyIcon == null)
         {
             CrearIcono();
@@ -121,6 +124,8 @@ public class SystemTrayService : ISystemTrayService, IDisposable
 
     private bool EvaluarSegundoPlano() =>
         _ventana == null || !_ventana.IsVisible || _ventana.WindowState == WindowState.Minimized || !_ventana.IsActive;
+
+    public bool NotificarSiempreConBandeja => _settingsService.ObtenerConfiguracion()?.NotificarConBandejaSiempre ?? false;
 
     public void MostrarNotificacion(string titulo, string mensaje)
     {

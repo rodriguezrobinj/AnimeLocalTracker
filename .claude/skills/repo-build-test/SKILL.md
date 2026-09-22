@@ -37,6 +37,14 @@ El SDK de WPF compila cada proyecto en dos fases: primero genera los `.g.cs` des
    Get-Process dotnet,MSBuild,VBCSCompiler,AnimeLocalTracker,testhost -ErrorAction SilentlyContinue | Stop-Process -Force
    ```
    y volver a intentar desde el paso 1.
+7. **Variante con mensaje explícito de archivo bloqueado** (distinta del flake silencioso de arriba): si el build SÍ produce output pero falla repetidamente (3+ veces seguidas, sin converger) con
+   `error MC1000: ... 'The process cannot access the file '...View.g.cs' because it is being used by another process'`,
+   no es el flake normal — son **nodos de MSBuild reciclados** (`dotnet.exe` de *node reuse*, `-nodeReuse` está activo por defecto) que quedan vivos entre invocaciones separadas de `dotnet build`/`dotnet test` y retienen el lock del `.g.cs` de una build anterior. Reintentar sin más no lo arregla (a diferencia del flake del paso 2). Solución:
+   ```
+   Get-Process dotnet,MSBuild,VBCSCompiler -ErrorAction SilentlyContinue | Stop-Process -Force
+   dotnet build AnimeLocalTracker/AnimeLocalTracker.csproj -c Debug -nodeReuse:false
+   ```
+   `-nodeReuse:false` evita que esa build deje nodos vivos para la siguiente invocación; conviene pasarlo en toda la sesión si vas a encadenar varios `dotnet build`/`dotnet test` seguidos.
 
 ## Exe de prueba (para lanzar la app manualmente)
 

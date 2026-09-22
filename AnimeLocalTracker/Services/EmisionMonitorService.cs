@@ -74,7 +74,7 @@ public sealed class EmisionMonitorService : IEmisionMonitorService, IRecipient<D
     /// </summary>
     private void Avisar(string titulo, string mensaje, string icono, string color)
     {
-        if (_bandeja.VentanaEnSegundoPlano)
+        if (_bandeja.VentanaEnSegundoPlano || _bandeja.NotificarSiempreConBandeja)
         {
             _bandeja.MostrarNotificacion(titulo, mensaje);
         }

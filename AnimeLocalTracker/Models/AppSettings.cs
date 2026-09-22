@@ -28,6 +28,11 @@ public class AppSettings
     /// <summary>Al cerrar/minimizar la ventana, se oculta a la bandeja del sistema en vez de salir.
     /// Desactivado por defecto: no cambia el comportamiento del botón cerrar para quien no lo pida.</summary>
     public bool MinimizarABandejaAlCerrar { get; set; } = false;
+    /// <summary>Los avisos de episodios nuevos/descargas usan siempre el globo nativo de Windows,
+    /// aunque la ventana esté visible y activa (por defecto solo se usa si está oculta/minimizada).
+    /// Independiente de <see cref="MinimizarABandejaAlCerrar"/>: activarlo mantiene un icono en la
+    /// bandeja mientras la app está abierta aunque esa otra opción esté desactivada.</summary>
+    public bool NotificarConBandejaSiempre { get; set; } = false;
 
     /// <summary>
     /// Atajos de teclado configurables del reproductor: acción → tecla.

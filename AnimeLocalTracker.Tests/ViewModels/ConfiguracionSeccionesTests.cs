@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using AnimeLocalTracker.Models;
 using AnimeLocalTracker.Services;
 using AnimeLocalTracker.ViewModels;
@@ -10,10 +11,10 @@ namespace AnimeLocalTracker.Tests.ViewModels;
 
 public class ConfiguracionSeccionesTests
 {
-    private static ConfiguracionViewModel CrearSut()
+    private static ConfiguracionViewModel CrearSut(AppSettings? config = null)
     {
         var settings = new Mock<ISettingsService>();
-        settings.Setup(s => s.ObtenerConfiguracion()).Returns(new AppSettings());
+        settings.Setup(s => s.ObtenerConfiguracion()).Returns(config ?? new AppSettings());
         var db = Mock.Of<IDatabaseService>();
 
         return new ConfiguracionViewModel(
@@ -71,5 +72,33 @@ public class ConfiguracionSeccionesTests
             nameof(ConfiguracionViewModel.EsSeccionAtajos),
             nameof(ConfiguracionViewModel.MostrarBarraGuardar)
         });
+    }
+
+    [Fact]
+    public void AlAbrir_DeberiaCargarNotificarConBandejaSiempreDesdeLaConfiguracion()
+    {
+        var sut = CrearSut(new AppSettings { NotificarConBandejaSiempre = true });
+
+        sut.NotificarConBandejaSiempre.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task GuardarPreferenciasAsync_DeberiaPersistirNotificarConBandejaSiempre()
+    {
+        var settings = new Mock<ISettingsService>();
+        var config = new AppSettings();
+        settings.Setup(s => s.ObtenerConfiguracion()).Returns(config);
+        var db = Mock.Of<IDatabaseService>();
+        var sut = new ConfiguracionViewModel(
+            settings.Object, Mock.Of<IAuthService>(), db, Mock.Of<IDialogService>(),
+            new CacheMaintenanceService(db), Mock.Of<IPluginService>())
+        {
+            NotificarConBandejaSiempre = true
+        };
+
+        await sut.GuardarPreferenciasAsync();
+
+        config.NotificarConBandejaSiempre.Should().BeTrue();
+        settings.Verify(s => s.GuardarConfiguracionAsync(config), Times.Once);
     }
 }
