@@ -12,6 +12,7 @@ using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using FlyleafLib;
 using FlyleafLib.MediaFramework.MediaDecoder;
+using FlyleafLib.MediaFramework.MediaDemuxer;
 using FlyleafLib.MediaPlayer;
 using AnimeLocalTracker.Messages;
 using AnimeLocalTracker.Models;
@@ -980,7 +981,64 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         }
     }
 
+    /// <summary>
+    /// ARQ-01: decisión pura (sin Player) de si toca disparar la pre-carga del siguiente episodio en
+    /// este instante del sondeo de progreso — al menos 95% visto, hay un siguiente episodio con
+    /// archivo, y no es el mismo que ya se precargó (como máximo una vez por episodio).
+    /// </summary>
+    internal static bool DebePrecargarSiguienteEpisodio(double porcentaje, string? rutaSiguiente, string? rutaYaPrecargada) =>
+        porcentaje >= 0.95 && !string.IsNullOrWhiteSpace(rutaSiguiente) && rutaSiguiente != rutaYaPrecargada;
+
+    /// <summary>
+    /// Pre-buffering del siguiente episodio: abre un <see cref="Demuxer"/> de FlyleafLib APARTE del
+    /// Player en reproducción contra el archivo del siguiente episodio, y lo descarta enseguida. No
+    /// sustituye la apertura real del Player al cambiar de episodio — la API pública de FlyleafLib no
+    /// permite entregarle a un Player un demuxer ya abierto — pero adelanta el sondeo de
+    /// contenedor/streams (avformat_find_stream_info) y calienta la caché de E/S de Windows para ese
+    /// archivo, así que cuando SiguienteEpisodio() abra el Player real, esa parte del trabajo ya no
+    /// parte de cero. Estrictamente best-effort: nunca toca el Player en reproducción, y cualquier
+    /// fallo (archivo movido, formato no soportado) se descarta sin avisar al usuario.
+    /// </summary>
+    private async Task PrecargarSiguienteEpisodioAsync(string rutaSiguiente, CancellationToken ct)
+    {
+        try
+        {
+            await Task.Run(() =>
+            {
+                if (ct.IsCancellationRequested) return;
+
+                var config = new Config();
+                var demuxer = new Demuxer(config.Demuxer, MediaType.Video);
+                try
+                {
+                    string error = demuxer.Open(rutaSiguiente);
+                    if (!string.IsNullOrEmpty(error))
+                    {
+                        AppLogger.Debug("ReproductorViewModel", $"Precarga del siguiente episodio no pudo abrir '{rutaSiguiente}': {error}");
+                    }
+                }
+                finally
+                {
+                    demuxer.Dispose();
+                }
+            }, ct).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // Se cambió de episodio/se cerró el reproductor antes de que terminara: no hay nada que hacer.
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("ReproductorViewModel", $"Precarga del siguiente episodio falló (no afecta la reproducción actual): {ex.Message}");
+        }
+    }
+
     private CancellationTokenSource? _trackingCts;
+
+    /// <summary>Pre-buffering del siguiente episodio (ver <see cref="PrecargarSiguienteEpisodioAsync"/>):
+    /// evita relanzarlo más de una vez por episodio y se cancela si se cambia de video antes de terminar.</summary>
+    private CancellationTokenSource? _precargaCts;
+    private string? _rutaPrecargada;
 
     public async Task VerificarProgresoPrevioAsync(int animeId, int episodio)
     {
@@ -1052,6 +1110,12 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         MostrarSkipButton = false;
         MostrarSkipIntro = false;
         _autoPlayEjecutado = false;
+
+        // Cancelar la pre-carga del siguiente episodio del video anterior (si seguía en curso)
+        _precargaCts?.Cancel();
+        _precargaCts?.Dispose();
+        _precargaCts = new CancellationTokenSource();
+        _rutaPrecargada = null;
 
         if (_settingsService != null)
         {
@@ -1439,6 +1503,20 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
                     double porcentaje = durSeconds > 0 ? curSeconds / durSeconds : 0;
 
+                    // PERF: cerca del final, pre-abrir (y descartar) el demuxer del siguiente episodio
+                    // en un Demuxer aparte del Player en reproducción — adelanta el sondeo de
+                    // contenedor/streams y calienta la caché de E/S de Windows para ese archivo, sin
+                    // tocar en absoluto la reproducción actual. Como máximo una vez por episodio.
+                    if (TieneEpisodioSiguiente && !EsEntornoPruebas())
+                    {
+                        var siguienteParaPrecarga = ObtenerSiguienteEpisodio();
+                        if (DebePrecargarSiguienteEpisodio(porcentaje, siguienteParaPrecarga?.RutaCompleta, _rutaPrecargada))
+                        {
+                            _rutaPrecargada = siguienteParaPrecarga!.RutaCompleta;
+                            _ = PrecargarSiguienteEpisodioAsync(siguienteParaPrecarga.RutaCompleta, _precargaCts!.Token);
+                        }
+                    }
+
                     // Auto-Tracking al umbral configurado (FUN-003: antes fijo en 90%)
                     if (porcentaje >= UmbralMarcadoVistoActual && !_fueMarcadoComoVisto)
                     {
@@ -1637,6 +1715,14 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         }
         catch { }
         _trackingCts = null;
+
+        try
+        {
+            _precargaCts?.Cancel();
+            _precargaCts?.Dispose();
+        }
+        catch { }
+        _precargaCts = null;
 
         if (Player != null)
         {
