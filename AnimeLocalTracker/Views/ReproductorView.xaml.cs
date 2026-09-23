@@ -200,6 +200,10 @@ namespace AnimeLocalTracker.Views
             {
                 SubtitlesPopup.IsOpen = false;
             }
+            if (MoreOptionsPopup != null)
+            {
+                MoreOptionsPopup.IsOpen = false;
+            }
         }
 
         private void InputManager_PreProcessInput(object sender, PreProcessInputEventArgs e)
@@ -259,8 +263,11 @@ namespace AnimeLocalTracker.Views
             if (!_controlsVisible)
                 return;
 
-            // No ocultar mientras el menú de subtítulos esté abierto...
+            // No ocultar mientras el menú de subtítulos o el de "más opciones" estén abiertos...
             if (SubtitlesPopup != null && SubtitlesPopup.IsOpen)
+                return;
+
+            if (MoreOptionsPopup != null && MoreOptionsPopup.IsOpen)
                 return;
 
             // ...ni mientras el usuario esté arrastrando la barra de progreso...
@@ -404,12 +411,37 @@ namespace AnimeLocalTracker.Views
             SubtitlesPopup.IsOpen = false;
         }
 
+        // === Menú "Más opciones" (Captura + Modo Noche) — mismo patrón de toggle que Subtítulos ===
+        private void MoreOptionsButton_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            MoreOptionsPopup.IsOpen = !MoreOptionsPopup.IsOpen;
+            e.Handled = true;
+            RegistrarActividad();
+        }
+
+        private void MoreOptionsButton_Click(object sender, RoutedEventArgs e)
+        {
+            MoreOptionsPopup.IsOpen = !MoreOptionsPopup.IsOpen;
+            RegistrarActividad();
+        }
+
+        private void MoreOptionsMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            // Modo Noche se queda encendido/apagado (es un toggle); cerramos el menú igual en ambos casos.
+            MoreOptionsPopup.IsOpen = false;
+        }
+
         private void ReproductorView_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             // Clic fuera del popup y del botón: cerrar el menú
             if (SubtitlesPopup.IsOpen && !SubtitlesPopup.IsMouseOver && !SubtitlesButton.IsMouseOver)
             {
                 SubtitlesPopup.IsOpen = false;
+            }
+
+            if (MoreOptionsPopup.IsOpen && !MoreOptionsPopup.IsMouseOver && !MoreOptionsButton.IsMouseOver)
+            {
+                MoreOptionsPopup.IsOpen = false;
             }
         }
 

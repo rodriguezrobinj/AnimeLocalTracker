@@ -201,6 +201,34 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!-- Estilo premium compartido por los menús flotantes del reproductor (Subtítulos y
+             Más opciones): antes vivía duplicado dentro de los Resources de cada Popup. -->
+        <Style TargetType="Button" x:Key="MenuItemButton">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#E5E5E5"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="15,10"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="4">
+                            <ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#33FFFFFF"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </UserControl.Resources>
 
     <Grid>
@@ -331,23 +359,27 @@
                             </Grid>
                         </Grid>
 
-                        <!-- Controles -->
+                        <!-- Controles: agrupados por función (navegación de episodio → scrub/play → volumen/tiempo
+                             → [espacio] → acciones secundarias) en vez de la fila plana anterior, donde
+                             Retroceder/Adelantar 10s quedaban separados del Play/Prev/Next por el bloque de
+                             Volumen+Tiempo — el usuario tenía que recorrer casi toda la barra para encontrarlos.
+                             Captura y Modo Noche (las dos acciones menos usadas) se agrupan en "Más opciones"
+                             para no sumar dos íconos más a una barra ya larga. -->
                         <Grid Grid.Row="2" Margin="0,0,0,0">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/> <!-- 0: Anterior -->
-                                <ColumnDefinition Width="Auto"/> <!-- 1: Play -->
-                                <ColumnDefinition Width="Auto"/> <!-- 2: Siguiente -->
-                                <ColumnDefinition Width="Auto"/> <!-- 3: Volumen -->
-                                <ColumnDefinition Width="Auto"/> <!-- 4: Tiempo -->
-                                <ColumnDefinition Width="*"/>    <!-- 5: Espacio -->
-                                <ColumnDefinition Width="Auto"/> <!-- 6: Retroceder -->
-                                <ColumnDefinition Width="Auto"/> <!-- 7: Adelantar -->
+                                <ColumnDefinition Width="Auto"/> <!-- 0: Episodio anterior -->
+                                <ColumnDefinition Width="Auto"/> <!-- 1: Retroceder 10s -->
+                                <ColumnDefinition Width="Auto"/> <!-- 2: Play/Pausa -->
+                                <ColumnDefinition Width="Auto"/> <!-- 3: Adelantar 10s -->
+                                <ColumnDefinition Width="Auto"/> <!-- 4: Episodio siguiente -->
+                                <ColumnDefinition Width="Auto"/> <!-- 5: Volumen -->
+                                <ColumnDefinition Width="Auto"/> <!-- 6: Tiempo -->
+                                <ColumnDefinition Width="*"/>    <!-- 7: Espacio -->
                                 <ColumnDefinition Width="Auto"/> <!-- 8: Subtítulos -->
-                                <ColumnDefinition Width="Auto"/> <!-- 9: PiP -->
-                                <ColumnDefinition Width="Auto"/> <!-- 10: Fullscreen -->
-                                <ColumnDefinition Width="Auto"/> <!-- 11: Captura -->
-                                <ColumnDefinition Width="Auto"/> <!-- 12: Modo Noche -->
-                                <ColumnDefinition Width="Auto"/> <!-- 13: Cajón de episodios -->
+                                <ColumnDefinition Width="Auto"/> <!-- 9: Más opciones (Captura + Modo Noche) -->
+                                <ColumnDefinition Width="Auto"/> <!-- 10: PiP -->
+                                <ColumnDefinition Width="Auto"/> <!-- 11: Fullscreen -->
+                                <ColumnDefinition Width="Auto"/> <!-- 12: Cajón de episodios -->
                             </Grid.ColumnDefinitions>
 
                             <!-- Episodio Anterior -->
@@ -356,12 +388,21 @@
                                     IsEnabled="{Binding TieneEpisodioAnterior}"
                                     ToolTip="{Binding EpisodioAnteriorTooltip}"
                                     AutomationProperties.Name="{Binding EpisodioAnteriorTooltip}"
-                                    Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="36" Height="36" Margin="0,0,2,0">
+                                    Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="36" Height="36" Margin="0,0,8,0">
                                 <materialDesign:PackIcon Kind="SkipPrevious" Width="24" Height="24" />
                             </Button>
 
+                            <!-- Retroceder 10s -->
+                            <Button Grid.Column="1" Command="{Binding Rewind10Command}" Focusable="True"
+                                    FocusVisualStyle="{StaticResource PlayerFocusVisual}"
+                                    ToolTip="{Binding [Player_Retroceder10Tooltip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                    AutomationProperties.Name="{Binding [Atajo_Retroceder10], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                    Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="36" Height="36" Margin="0,0,2,0">
+                                <materialDesign:PackIcon Kind="Rewind" Width="24" Height="24" />
+                            </Button>
+
                             <!-- Play/Pause -->
-                            <Button Grid.Column="1" Command="{Binding TogglePlayPauseCommand}" Focusable="True"
+                            <Button Grid.Column="2" Command="{Binding TogglePlayPauseCommand}" Focusable="True"
                                     FocusVisualStyle="{StaticResource PlayerFocusVisual}"
                                     ToolTip="{Binding [Player_PlayPausaTooltip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
                                     AutomationProperties.Name="{Binding [Atajo_PlayPausa], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
@@ -369,18 +410,27 @@
                                 <materialDesign:PackIcon Kind="{Binding PlayPauseIcon}" Width="28" Height="28" />
                             </Button>
 
+                            <!-- Adelantar 10s -->
+                            <Button Grid.Column="3" Command="{Binding Forward10Command}" Focusable="True"
+                                    FocusVisualStyle="{StaticResource PlayerFocusVisual}"
+                                    ToolTip="{Binding [Player_Adelantar10Tooltip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                    AutomationProperties.Name="{Binding [Atajo_Adelantar10], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                    Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="36" Height="36" Margin="0,0,8,0">
+                                <materialDesign:PackIcon Kind="FastForward" Width="24" Height="24" />
+                            </Button>
+
                             <!-- Episodio Siguiente -->
-                            <Button Grid.Column="2" Command="{Binding SiguienteEpisodioCommand}" Focusable="True"
+                            <Button Grid.Column="4" Command="{Binding SiguienteEpisodioCommand}" Focusable="True"
                                     FocusVisualStyle="{StaticResource PlayerFocusVisual}"
                                     IsEnabled="{Binding TieneEpisodioSiguiente}"
                                     ToolTip="{Binding EpisodioSiguienteTooltip}"
                                     AutomationProperties.Name="{Binding EpisodioSiguienteTooltip}"
-                                    Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="36" Height="36" Margin="0,0,8,0">
+                                    Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="36" Height="36" Margin="0,0,14,0">
                                 <materialDesign:PackIcon Kind="SkipNext" Width="24" Height="24" />
                             </Button>
 
                             <!-- Contenedor Volumen Animado -->
-                            <StackPanel Grid.Column="3" Orientation="Horizontal" x:Name="VolumePanel" Background="Transparent" Margin="0,0,10,0">
+                            <StackPanel Grid.Column="5" Orientation="Horizontal" x:Name="VolumePanel" Background="Transparent" Margin="0,0,10,0">
                                 <Button Command="{Binding ToggleMuteCommand}" Focusable="True" FocusVisualStyle="{StaticResource PlayerFocusVisual}" Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" AutomationProperties.Name="{Binding [Player_SilenciarToggle], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
                                     <materialDesign:PackIcon Kind="{Binding VolumenIcon}" Width="24" Height="24" />
                                 </Button>
@@ -503,26 +553,8 @@
                             </StackPanel>
 
                             <!-- Tiempo -->
-                            <TextBlock Grid.Column="4" Text="{Binding TiempoCombinadoTexto}" 
+                            <TextBlock Grid.Column="6" Text="{Binding TiempoCombinadoTexto}"
                                        Foreground="White" VerticalAlignment="Center" FontSize="13" FontWeight="Bold" Margin="5,0,0,0" Opacity="0.9"/>
-                                       
-                            <!-- Retroceder 10s -->
-                            <Button Grid.Column="6" Command="{Binding Rewind10Command}" Focusable="True"
-                                    FocusVisualStyle="{StaticResource PlayerFocusVisual}"
-                                    ToolTip="{Binding [Player_Retroceder10Tooltip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                    AutomationProperties.Name="{Binding [Atajo_Retroceder10], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                    Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,5,0">
-                                <materialDesign:PackIcon Kind="Rewind" Width="26" Height="26" />
-                            </Button>
-
-                            <!-- Adelantar 10s -->
-                            <Button Grid.Column="7" Command="{Binding Forward10Command}" Focusable="True"
-                                    FocusVisualStyle="{StaticResource PlayerFocusVisual}"
-                                    ToolTip="{Binding [Player_Adelantar10Tooltip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                    AutomationProperties.Name="{Binding [Atajo_Adelantar10], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                    Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,10,0">
-                                <materialDesign:PackIcon Kind="FastForward" Width="26" Height="26" />
-                            </Button>
 
                             <!-- Subtítulos (Menú Manual) -->
                             <Button x:Name="SubtitlesButton" Grid.Column="8" Focusable="True"
@@ -545,35 +577,6 @@
                                         <DropShadowEffect Color="Black" BlurRadius="15" ShadowDepth="5" Opacity="0.5"/>
                                     </Border.Effect>
                                     
-                                    <Border.Resources>
-                                        <!-- Estilo premium para los botones del menú -->
-                                        <Style TargetType="Button" x:Key="MenuItemButton">
-                                            <Setter Property="Background" Value="Transparent"/>
-                                            <Setter Property="Foreground" Value="#E5E5E5"/>
-                                            <Setter Property="BorderThickness" Value="0"/>
-                                            <Setter Property="Padding" Value="15,10"/>
-                                            <Setter Property="HorizontalContentAlignment" Value="Left"/>
-                                            <Setter Property="FontSize" Value="14"/>
-                                            <Setter Property="FontWeight" Value="SemiBold"/>
-                                            <Setter Property="Cursor" Value="Hand"/>
-                                            <Setter Property="Template">
-                                                <Setter.Value>
-                                                    <ControlTemplate TargetType="Button">
-                                                        <Border Background="{TemplateBinding Background}" CornerRadius="4">
-                                                            <ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"/>
-                                                        </Border>
-                                                        <ControlTemplate.Triggers>
-                                                            <Trigger Property="IsMouseOver" Value="True">
-                                                                <Setter Property="Background" Value="#33FFFFFF"/>
-                                                                <Setter Property="Foreground" Value="White"/>
-                                                            </Trigger>
-                                                        </ControlTemplate.Triggers>
-                                                    </ControlTemplate>
-                                                </Setter.Value>
-                                            </Setter>
-                                        </Style>
-                                    </Border.Resources>
-
                                     <StackPanel>
                                         <TextBlock Text="{Binding [Player_Subtitulos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Foreground="Gray" FontSize="12" FontWeight="Bold" Margin="15,0,0,10" />
 
@@ -598,9 +601,63 @@
                                     </StackPanel>
                                 </Border>
                             </Popup>
-                            
+
+                            <!-- Más opciones: agrupa Captura y Modo Noche (las dos acciones que menos se
+                                 tocan durante la reproducción normal) para no sumar dos íconos permanentes
+                                 más a la barra. Mismo patrón de Popup manual que Subtítulos. -->
+                            <Button x:Name="MoreOptionsButton" Grid.Column="9" Focusable="True"
+                                    FocusVisualStyle="{StaticResource PlayerFocusVisual}"
+                                    ToolTip="{Binding [Player_MasOpciones], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                    AutomationProperties.Name="{Binding [Player_MasOpciones], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                    PreviewMouseLeftButtonDown="MoreOptionsButton_PreviewMouseLeftButtonDown"
+                                    Click="MoreOptionsButton_Click"
+                                    Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,4,0">
+                                <materialDesign:PackIcon Kind="DotsVertical" Width="24" Height="24" />
+                            </Button>
+
+                            <Popup x:Name="MoreOptionsPopup" IsOpen="False" StaysOpen="True"
+                                   PlacementTarget="{Binding Source={x:Reference MoreOptionsButton}}" Placement="Top"
+                                   VerticalOffset="-35" HorizontalOffset="10" PopupAnimation="Fade" AllowsTransparency="True">
+                                <Border Background="#F2141414" BorderThickness="0" CornerRadius="8" Padding="10" MinWidth="200">
+                                    <Border.Effect>
+                                        <DropShadowEffect Color="Black" BlurRadius="15" ShadowDepth="5" Opacity="0.5"/>
+                                    </Border.Effect>
+
+                                    <StackPanel>
+                                        <!-- Captura de pantalla HD (Ctrl+S) -->
+                                        <Button Command="{Binding CapturarFrameCommand}" Click="MoreOptionsMenuItem_Click" Style="{StaticResource MenuItemButton}">
+                                            <StackPanel Orientation="Horizontal">
+                                                <materialDesign:PackIcon Kind="CameraOutline" Width="18" Height="18" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                                <TextBlock Text="{Binding [Player_Captura], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
+
+                                        <!-- Modo Noche: compresor de rango dinámico del audio (toggle, con check cuando está activo) -->
+                                        <Button Command="{Binding ToggleModoNocheCommand}" Click="MoreOptionsMenuItem_Click" Style="{StaticResource MenuItemButton}">
+                                            <StackPanel Orientation="Horizontal">
+                                                <materialDesign:PackIcon Kind="WeatherNight" Width="18" Height="18" VerticalAlignment="Center" Margin="0,0,10,0">
+                                                    <materialDesign:PackIcon.Style>
+                                                        <Style TargetType="materialDesign:PackIcon">
+                                                            <Setter Property="Foreground" Value="#E5E5E5"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding ModoNocheActivo}" Value="True">
+                                                                    <Setter Property="Foreground" Value="#818CF8"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </materialDesign:PackIcon.Style>
+                                                </materialDesign:PackIcon>
+                                                <TextBlock Text="{Binding [Player_ModoNoche], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" VerticalAlignment="Center"/>
+                                                <materialDesign:PackIcon Kind="Check" Width="16" Height="16" Margin="10,0,0,0" VerticalAlignment="Center" Foreground="#818CF8"
+                                                                          Visibility="{Binding ModoNocheActivo, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                                            </StackPanel>
+                                        </Button>
+                                    </StackPanel>
+                                </Border>
+                            </Popup>
+
                             <!-- Modo Mini Reproductor -->
-                            <Button Grid.Column="9" Command="{Binding MinimizarAMiniCommand}" Focusable="True"
+                            <Button Grid.Column="10" Command="{Binding MinimizarAMiniCommand}" Focusable="True"
                                     FocusVisualStyle="{StaticResource PlayerFocusVisual}"
                                     ToolTip="{Binding [Player_Mini], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
                                     AutomationProperties.Name="{Binding [Player_ModoFlotante], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
@@ -609,49 +666,20 @@
                             </Button>
 
                             <!-- Fullscreen con ícono dinámico -->
-                            <Button Grid.Column="10" Command="{Binding ToggleFullscreenCommand}" Focusable="True"
+                            <Button Grid.Column="11" Command="{Binding ToggleFullscreenCommand}" Focusable="True"
                                     FocusVisualStyle="{StaticResource PlayerFocusVisual}"
                                     ToolTip="{Binding [Player_PantallaCompletaTooltip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
                                     AutomationProperties.Name="{Binding [Atajo_PantallaCompleta], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                    Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,0,0">
+                                    Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,4,0">
                                 <materialDesign:PackIcon Kind="{Binding FullscreenIcon}" Width="26" Height="26" />
                             </Button>
 
-                            <!-- Captura de pantalla HD (Ctrl+S) -->
-                            <Button Grid.Column="11" Command="{Binding CapturarFrameCommand}" Focusable="True"
-                                    FocusVisualStyle="{StaticResource PlayerFocusVisual}"
-                                    ToolTip="{Binding [Player_Captura], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                    AutomationProperties.Name="{Binding [Player_Captura], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                    Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="8,0,0,0">
-                                <materialDesign:PackIcon Kind="CameraOutline" Width="26" Height="26" />
-                            </Button>
-
-                            <!-- Modo Noche: compresor de rango dinámico del audio -->
-                            <Button Grid.Column="12" Command="{Binding ToggleModoNocheCommand}" Focusable="True"
-                                    FocusVisualStyle="{StaticResource PlayerFocusVisual}"
-                                    ToolTip="{Binding [Player_ModoNoche], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                    AutomationProperties.Name="{Binding [Player_ModoNoche], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                    Style="{StaticResource MaterialDesignToolButton}" Width="40" Height="40" Margin="4,0,0,0">
-                                <materialDesign:PackIcon Kind="WeatherNight" Width="24" Height="24">
-                                    <materialDesign:PackIcon.Style>
-                                        <Style TargetType="materialDesign:PackIcon">
-                                            <Setter Property="Foreground" Value="White"/>
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding ModoNocheActivo}" Value="True">
-                                                    <Setter Property="Foreground" Value="#818CF8"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </materialDesign:PackIcon.Style>
-                                </materialDesign:PackIcon>
-                            </Button>
-
                             <!-- Cajón lateral de episodios (tecla L) -->
-                            <Button Grid.Column="13" Command="{Binding ToggleCajonEpisodiosCommand}" Focusable="True"
+                            <Button Grid.Column="12" Command="{Binding ToggleCajonEpisodiosCommand}" Focusable="True"
                                     FocusVisualStyle="{StaticResource PlayerFocusVisual}"
                                     ToolTip="{Binding [Player_CajonEpisodiosTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
                                     AutomationProperties.Name="{Binding [Player_CajonEpisodiosTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                    Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="4,0,0,0">
+                                    Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,0,0">
                                 <materialDesign:PackIcon Kind="PlaylistPlay" Width="26" Height="26" />
                             </Button>
                         </Grid>
