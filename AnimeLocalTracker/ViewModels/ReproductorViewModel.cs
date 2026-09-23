@@ -501,6 +501,16 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                 config.Decoder.VideoThreads = Math.Max(2, Environment.ProcessorCount / 2);
             }
 
+            // 2b. Decodificación por GPU (Direct3D) explícita: es el valor por defecto de FlyleafLib,
+            // pero se deja explícito para que no dependa de un default que la librería podría cambiar
+            // en una actualización futura. El soporte real de AV1/HEVC 10-bit por hardware varía mucho
+            // entre GPUs, así que si falla, FlyleafLib cae solo a decodificación por software (más lenta
+            // pero funcional) — se registra cuál de las dos se usó en OpenCompleted, más abajo.
+            if (config.Video != null)
+            {
+                config.Video.VideoAcceleration = true;
+            }
+
             // 3. Buffer de Demuxer en RAM (30 segundos precargados en memoria para reproducción sin tirones)
             if (config.Demuxer != null)
             {
@@ -533,6 +543,17 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             {
                 _haCompletadoOpen = true;
                 EvaluarSubtitulosPorDefecto();
+
+                // Diagnóstico: qué decodificador se negoció de verdad para este archivo. El soporte de
+                // AV1/HEVC 10-bit por GPU varía mucho entre tarjetas — sin este log, una caída
+                // silenciosa a software (más lenta, más CPU) se confundiría con "el reproductor va lento"
+                // sin pista de la causa real.
+                try
+                {
+                    bool porHardware = player.VideoDecoder?.VideoAccelerated ?? false;
+                    AppLogger.Debug("ReproductorViewModel", $"Decodificación de video: {(porHardware ? "hardware (GPU)" : "software (CPU)")}");
+                }
+                catch { }
 
                 try
                 {
@@ -947,6 +968,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     public void ActualizarEstadosNavegacionEpisodios()
     {
         var siguiente = ObtenerSiguienteEpisodio();
+        _siguienteEpisodioCache = siguiente;
         TieneEpisodioSiguiente = siguiente != null && !string.IsNullOrWhiteSpace(siguiente.RutaCompleta);
         EpisodioSiguienteTooltip = TieneEpisodioSiguiente
             ? $"Siguiente: Episodio {siguiente!.NumeroEpisodio} (N)"
@@ -1039,6 +1061,15 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     /// evita relanzarlo más de una vez por episodio y se cancela si se cambia de video antes de terminar.</summary>
     private CancellationTokenSource? _precargaCts;
     private string? _rutaPrecargada;
+
+    /// <summary>
+    /// PERF: <see cref="ObtenerSiguienteEpisodio"/> recorre y ordena _episodiosDisponibles (puede tener
+    /// cientos/miles de elementos en animes largos, p. ej. One Piece). La lista no cambia durante la
+    /// reproducción del episodio actual, así que el resultado se calcula una vez en
+    /// ActualizarEstadosNavegacionEpisodios() y el loop de progreso (250ms) lee este caché en vez de
+    /// recalcularlo en cada tick.
+    /// </summary>
+    private EpisodioItem? _siguienteEpisodioCache;
 
     public async Task VerificarProgresoPrevioAsync(int animeId, int episodio)
     {
@@ -1509,7 +1540,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                     // tocar en absoluto la reproducción actual. Como máximo una vez por episodio.
                     if (TieneEpisodioSiguiente && !EsEntornoPruebas())
                     {
-                        var siguienteParaPrecarga = ObtenerSiguienteEpisodio();
+                        var siguienteParaPrecarga = _siguienteEpisodioCache;
                         if (DebePrecargarSiguienteEpisodio(porcentaje, siguienteParaPrecarga?.RutaCompleta, _rutaPrecargada))
                         {
                             _rutaPrecargada = siguienteParaPrecarga!.RutaCompleta;
