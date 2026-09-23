@@ -392,11 +392,11 @@
                                 <materialDesign:PackIcon Kind="SkipPrevious" Width="24" Height="24" />
                             </Button>
 
-                            <!-- Retroceder 10s -->
+                            <!-- Retroceder (segundos configurables en Ajustes) -->
                             <Button Grid.Column="1" Command="{Binding Rewind10Command}" Focusable="True"
                                     FocusVisualStyle="{StaticResource PlayerFocusVisual}"
-                                    ToolTip="{Binding [Player_Retroceder10Tooltip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                    AutomationProperties.Name="{Binding [Atajo_Retroceder10], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                    ToolTip="{Binding RetrocederTooltip}"
+                                    AutomationProperties.Name="{Binding RetrocederTooltip}"
                                     Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="36" Height="36" Margin="0,0,2,0">
                                 <materialDesign:PackIcon Kind="Rewind" Width="24" Height="24" />
                             </Button>
@@ -410,11 +410,11 @@
                                 <materialDesign:PackIcon Kind="{Binding PlayPauseIcon}" Width="28" Height="28" />
                             </Button>
 
-                            <!-- Adelantar 10s -->
+                            <!-- Adelantar (segundos configurables en Ajustes) -->
                             <Button Grid.Column="3" Command="{Binding Forward10Command}" Focusable="True"
                                     FocusVisualStyle="{StaticResource PlayerFocusVisual}"
-                                    ToolTip="{Binding [Player_Adelantar10Tooltip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                    AutomationProperties.Name="{Binding [Atajo_Adelantar10], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                    ToolTip="{Binding AdelantarTooltip}"
+                                    AutomationProperties.Name="{Binding AdelantarTooltip}"
                                     Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="36" Height="36" Margin="0,0,8,0">
                                 <materialDesign:PackIcon Kind="FastForward" Width="24" Height="24" />
                             </Button>
@@ -777,20 +777,20 @@
                                     <materialDesign:PackIcon Kind="{Binding PlayPauseIcon}" Width="20" Height="20" />
                                 </Button>
 
-                                <!-- Retroceder 10s -->
+                                <!-- Retroceder (segundos configurables en Ajustes) -->
                                 <Button Grid.Column="1" Command="{Binding Rewind10Command}" Focusable="True"
                                         FocusVisualStyle="{StaticResource PlayerFocusVisual}"
-                                        ToolTip="{Binding [Player_Retroceder10Tooltip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                        AutomationProperties.Name="{Binding [Atajo_Retroceder10], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                        ToolTip="{Binding RetrocederTooltip}"
+                                        AutomationProperties.Name="{Binding RetrocederTooltip}"
                                         Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="26" Height="26" Margin="0,0,2,0">
                                     <materialDesign:PackIcon Kind="Rewind" Width="18" Height="18" />
                                 </Button>
 
-                                <!-- Adelantar 10s -->
+                                <!-- Adelantar (segundos configurables en Ajustes) -->
                                 <Button Grid.Column="2" Command="{Binding Forward10Command}" Focusable="True"
                                         FocusVisualStyle="{StaticResource PlayerFocusVisual}"
-                                        ToolTip="{Binding [Player_Adelantar10Tooltip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                        AutomationProperties.Name="{Binding [Atajo_Adelantar10], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                        ToolTip="{Binding AdelantarTooltip}"
+                                        AutomationProperties.Name="{Binding AdelantarTooltip}"
                                         Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="26" Height="26" Margin="0,0,6,0">
                                     <materialDesign:PackIcon Kind="FastForward" Width="18" Height="18" />
                                 </Button>
@@ -920,6 +920,39 @@
                             </StackPanel>
                         </StackPanel>
                     </materialDesign:Card>
+                </Border>
+
+                <!-- CUENTA ATRÁS DE AUTO-PLAY (Configuración → Reproducción → "Al terminar un episodio").
+                     Igual que ToastReproductor: fuera de OverlayControls (no se desvanece por inactividad,
+                     justo cuando el episodio termina y el mouse lleva rato quieto) y con texto empujado
+                     desde el code-behind, no por Binding (bindings congelados en la raíz del FlyleafHost). -->
+                <Border x:Name="CuentaAtrasSiguiente" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,20,90"
+                        Background="#F2141414" BorderBrush="#33FFFFFF" BorderThickness="1" CornerRadius="10" Padding="16"
+                        Opacity="0" IsHitTestVisible="False">
+                    <Border.Effect>
+                        <DropShadowEffect Color="Black" BlurRadius="16" ShadowDepth="4" Opacity="0.7"/>
+                    </Border.Effect>
+                    <StackPanel Width="260">
+                        <TextBlock Text="{Binding [Player_SiguienteEpisodioEn], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                   Foreground="#9CA3AF" FontSize="11" FontWeight="SemiBold"/>
+                        <TextBlock x:Name="CuentaAtrasTitulo" Foreground="White" FontSize="14" FontWeight="Bold" Margin="0,2,0,10" TextTrimming="CharacterEllipsis"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Button Grid.Column="0" Click="BtnCancelarAutoPlay_Click" HorizontalAlignment="Left"
+                                    Style="{StaticResource MenuItemButton}" Padding="10,6"
+                                    Content="{Binding [Player_Cancelar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                            <Button x:Name="BtnReproducirAhoraCuentaAtras" Grid.Column="1" Click="BtnReproducirAhoraCuentaAtras_Click"
+                                    Style="{StaticResource AppPrimaryButton}" Padding="14,6" materialDesign:ButtonAssist.CornerRadius="6">
+                                <StackPanel Orientation="Horizontal">
+                                    <materialDesign:PackIcon Kind="Play" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <TextBlock x:Name="CuentaAtrasSegundosTexto" VerticalAlignment="Center" FontSize="12" FontWeight="Bold"/>
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+                    </StackPanel>
                 </Border>
             </Grid>
         </fl:FlyleafHost>

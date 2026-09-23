@@ -442,10 +442,34 @@
 
                             <Border Style="{StaticResource CfgGroup}" Margin="0">
                                 <StackPanel>
-                                    <ctl:SettingRow Title="{Binding [Cfg_AutoPlay], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                                    Description="{Binding [Cfg_AutoPlaySub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
-                                        <ToggleButton IsChecked="{Binding AutoPlaySiguiente}" Style="{StaticResource CfgSwitch}"
-                                                      AutomationProperties.Name="{Binding [Cfg_AutoPlay], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                    <ctl:SettingRow Title="{Binding [Cfg_AccionFinEpisodio], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                    Description="{Binding [Cfg_AccionFinEpisodioSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                        <ComboBox SelectedValue="{Binding AccionFinEpisodio}" SelectedValuePath="Tag" Height="36" MinWidth="230"
+                                                  AutomationProperties.Name="{Binding [Cfg_AccionFinEpisodio], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                            <ComboBoxItem Content="{Binding [Cfg_AccionFinEpisodio_CuentaAtras], Source={x:Static loc:LocalizationService.Instance}}" Tag="AutoPlayCuentaAtras"/>
+                                            <ComboBoxItem Content="{Binding [Cfg_AccionFinEpisodio_Inmediato], Source={x:Static loc:LocalizationService.Instance}}" Tag="AutoPlayInmediato"/>
+                                            <ComboBoxItem Content="{Binding [Cfg_AccionFinEpisodio_SalirFicha], Source={x:Static loc:LocalizationService.Instance}}" Tag="PausarYSalirFicha"/>
+                                            <ComboBoxItem Content="{Binding [Cfg_AccionFinEpisodio_Permanecer], Source={x:Static loc:LocalizationService.Instance}}" Tag="PermanecerPausado"/>
+                                        </ComboBox>
+                                    </ctl:SettingRow>
+                                    <Border Style="{StaticResource CfgDivider}"/>
+
+                                    <ctl:SettingRow Title="{Binding [Cfg_PasosSalto], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                    Description="{Binding [Cfg_PasosSaltoSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                        <ComboBox SelectedValue="{Binding PasosSaltoSegundos}" SelectedValuePath="Tag" Height="36" MinWidth="90"
+                                                  AutomationProperties.Name="{Binding [Cfg_PasosSalto], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                            <ComboBoxItem Content="5s" Tag="5"/>
+                                            <ComboBoxItem Content="10s" Tag="10"/>
+                                            <ComboBoxItem Content="30s" Tag="30"/>
+                                            <ComboBoxItem Content="60s" Tag="60"/>
+                                        </ComboBox>
+                                    </ctl:SettingRow>
+                                    <Border Style="{StaticResource CfgDivider}"/>
+
+                                    <ctl:SettingRow Title="{Binding [Cfg_EvitarSuspension], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                    Description="{Binding [Cfg_EvitarSuspensionSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                        <ToggleButton IsChecked="{Binding EvitarSuspensionPantalla}" Style="{StaticResource CfgSwitch}"
+                                                      AutomationProperties.Name="{Binding [Cfg_EvitarSuspension], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
                                     </ctl:SettingRow>
                                     <Border Style="{StaticResource CfgDivider}"/>
 
@@ -661,6 +685,35 @@
                                                     Description="{Binding [Cfg_NotificarConBandejaSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
                                         <ToggleButton IsChecked="{Binding NotificarConBandejaSiempre}" Style="{StaticResource CfgSwitch}"
                                                       AutomationProperties.Name="{Binding [Cfg_NotificarConBandeja], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                    </ctl:SettingRow>
+                                    <Border Style="{StaticResource CfgDivider}"/>
+
+                                    <ctl:SettingRow Title="{Binding [Cfg_IniciarConWindows], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                    Description="{Binding [Cfg_IniciarConWindowsSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                        <ToggleButton IsChecked="{Binding IniciarConWindows}" Style="{StaticResource CfgSwitch}"
+                                                      AutomationProperties.Name="{Binding [Cfg_IniciarConWindows], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                    </ctl:SettingRow>
+                                </StackPanel>
+                            </Border>
+
+                            <TextBlock Text="{Binding [Cfg_GrupoTeclaPanico], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource CfgGroupCaption}"/>
+                            <Border Style="{StaticResource CfgGroup}" Margin="0">
+                                <StackPanel>
+                                    <ctl:SettingRow Title="{Binding [Cfg_TeclaPanico], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                    Description="{Binding [Cfg_TeclaPanicoSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                        <ToggleButton IsChecked="{Binding TeclaPanicoActiva}" Style="{StaticResource CfgSwitch}"
+                                                      AutomationProperties.Name="{Binding [Cfg_TeclaPanico], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                    </ctl:SettingRow>
+                                    <Border Style="{StaticResource CfgDivider}"/>
+
+                                    <ctl:SettingRow Title="{Binding [Cfg_TeclaPanicoAtajo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                    Description="{Binding [Cfg_TeclaPanicoAtajoSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                        <ComboBox SelectedValue="{Binding TeclaPanico}" SelectedValuePath="Tag" Height="36" MinWidth="120"
+                                                  IsEnabled="{Binding TeclaPanicoActiva}"
+                                                  AutomationProperties.Name="{Binding [Cfg_TeclaPanicoAtajo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                            <ComboBoxItem Content="F12" Tag="F12"/>
+                                            <ComboBoxItem Content="Escape" Tag="Escape"/>
+                                        </ComboBox>
                                     </ctl:SettingRow>
                                 </StackPanel>
                             </Border>

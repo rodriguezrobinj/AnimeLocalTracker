@@ -48,6 +48,7 @@ namespace AnimeLocalTracker.Views
             }
 
             EnlazarToast((e.NewValue as ReproductorViewModel)?.DialogService);
+            EnlazarCuentaAtras(e.NewValue as ReproductorViewModel);
         }
 
         /// <summary>Se suscribe a los cambios del toast de IDialogService (y se desuscribe del anterior).</summary>
@@ -97,6 +98,63 @@ namespace AnimeLocalTracker.Views
             if (dialogo.ToastVisible == _toastMostrado) return;
             _toastMostrado = dialogo.ToastVisible;
             ToastReproductor.BeginAnimation(OpacityProperty, new DoubleAnimation(_toastMostrado ? 1 : 0, TimeSpan.FromMilliseconds(300)));
+        }
+
+        // === Cuenta atrás de auto-play al siguiente episodio: mismo patrón que EnlazarToast/ActualizarToast
+        // (ver comentario en el XAML sobre por qué no se usa Binding en la raíz del FlyleafHost) ===
+        private ReproductorViewModel? _vmCuentaAtras;
+        private bool _cuentaAtrasMostrada;
+
+        private void EnlazarCuentaAtras(ReproductorViewModel? vm)
+        {
+            if (ReferenceEquals(_vmCuentaAtras, vm)) return;
+
+            if (_vmCuentaAtras != null) _vmCuentaAtras.PropertyChanged -= VmCuentaAtras_PropertyChanged;
+            _vmCuentaAtras = vm;
+            if (_vmCuentaAtras != null)
+            {
+                _vmCuentaAtras.PropertyChanged += VmCuentaAtras_PropertyChanged;
+                ActualizarCuentaAtras();
+            }
+        }
+
+        private void VmCuentaAtras_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName is not (nameof(ReproductorViewModel.MostrarCuentaAtrasSiguiente)
+                or nameof(ReproductorViewModel.SegundosCuentaAtrasSiguiente)
+                or nameof(ReproductorViewModel.TituloSiguienteEnCuentaAtras)))
+            {
+                return;
+            }
+
+            if (Dispatcher.CheckAccess()) ActualizarCuentaAtras();
+            else Dispatcher.InvokeAsync(ActualizarCuentaAtras);
+        }
+
+        private void ActualizarCuentaAtras()
+        {
+            var vm = _vmCuentaAtras;
+            if (vm == null) return;
+
+            CuentaAtrasTitulo.Text = vm.TituloSiguienteEnCuentaAtras;
+            CuentaAtrasSegundosTexto.Text = $"{vm.SegundosCuentaAtrasSiguiente}s";
+
+            if (vm.MostrarCuentaAtrasSiguiente == _cuentaAtrasMostrada) return;
+            _cuentaAtrasMostrada = vm.MostrarCuentaAtrasSiguiente;
+            CuentaAtrasSiguiente.IsHitTestVisible = _cuentaAtrasMostrada;
+            CuentaAtrasSiguiente.BeginAnimation(OpacityProperty, new DoubleAnimation(_cuentaAtrasMostrada ? 1 : 0, TimeSpan.FromMilliseconds(250)));
+        }
+
+        private void BtnCancelarAutoPlay_Click(object sender, RoutedEventArgs e)
+        {
+            (DataContext as ReproductorViewModel)?.CancelarAutoPlayCommand.Execute(null);
+        }
+
+        private void BtnReproducirAhoraCuentaAtras_Click(object sender, RoutedEventArgs e)
+        {
+            if (DataContext is not ReproductorViewModel vm) return;
+            vm.CancelarAutoPlayCommand.Execute(null);
+            vm.SiguienteEpisodioCommand.Execute(null);
         }
 
         private void ReproductorView_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
@@ -191,6 +249,11 @@ namespace AnimeLocalTracker.Views
             _toastMostrado = false;
             ToastReproductor.BeginAnimation(OpacityProperty, null);
             ToastReproductor.Opacity = 0;
+
+            EnlazarCuentaAtras(null);
+            _cuentaAtrasMostrada = false;
+            CuentaAtrasSiguiente.BeginAnimation(OpacityProperty, null);
+            CuentaAtrasSiguiente.Opacity = 0;
             InputManager.Current.PreProcessInput -= InputManager_PreProcessInput;
             _fadeTimer.Stop();
             Mouse.OverrideCursor = null;
@@ -493,9 +556,9 @@ namespace AnimeLocalTracker.Views
             else if (k == vm.ObtenerTeclaPara("BajarVolumen"))
                 vm.Volumen = Math.Max(0, vm.Volumen - 5);
             else if (k == vm.ObtenerTeclaPara("Adelantar10"))
-                vm.SeekCommand.Execute(vm.CurrentSeconds + 10);
+                vm.Forward10Command.Execute(null);
             else if (k == vm.ObtenerTeclaPara("Retroceder10"))
-                vm.SeekCommand.Execute(vm.CurrentSeconds - 10);
+                vm.Rewind10Command.Execute(null);
             else if (k == vm.ObtenerTeclaPara("SaltarIntro"))
             {
                 if (vm.MostrarSkipButton || vm.MostrarSkipIntro)

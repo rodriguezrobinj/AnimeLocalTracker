@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
 using System.Windows;
@@ -153,6 +154,15 @@ public partial class App : Application
         services.AddSingleton<ISystemMediaControlsService, SystemMediaControlsService>();
 
         services.AddSingleton<ISystemTrayService, SystemTrayService>();
+
+        // Evita que Windows apague/proteja la pantalla mientras hay un video reproduciéndose.
+        services.AddSingleton<IScreenSaverPreventionService, ScreenSaverPreventionService>();
+
+        // Arranque automático con Windows (registro HKCU\...\Run).
+        services.AddSingleton<IStartupService, StartupService>();
+
+        // Tecla de pánico / modo discreto: hotkey global (RegisterHotKey) atado al HWND de MainWindow.
+        services.AddSingleton<IPanicKeyService, PanicKeyService>();
 
         services.AddSingleton<IVideoIntegrityService, VideoIntegrityService>();
 
@@ -426,6 +436,13 @@ public partial class App : Application
             // con todas sus dependencias ya inyectadas.
             var mainWindow = ServiceProvider.GetRequiredService<MainWindow>();
             mainWindow.Show();
+
+            // Arranque con Windows (StartupService añade "--bandeja" al comando del registro):
+            // ocultar directo a la bandeja para no interrumpir el inicio de sesión con una ventana.
+            if (e.Args.Any(a => string.Equals(a, "--bandeja", StringComparison.OrdinalIgnoreCase)))
+            {
+                ServiceProvider.GetRequiredService<ISystemTrayService>().IniciarEnBandeja();
+            }
 
             // Iniciar servicio de gamepad
             var gamepad = ServiceProvider.GetService<IGamepadService>();

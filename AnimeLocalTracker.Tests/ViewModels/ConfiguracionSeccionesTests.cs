@@ -101,4 +101,83 @@ public class ConfiguracionSeccionesTests
         config.NotificarConBandejaSiempre.Should().BeTrue();
         settings.Verify(s => s.GuardarConfiguracionAsync(config), Times.Once);
     }
+
+    [Fact]
+    public void AlAbrir_ConSettingsJsonAntiguoSinAccionFinEpisodio_DeberiaCaerEnCuentaAtrasPorDefecto()
+    {
+        // AppSettings.AccionFinEpisodio ya trae ese default de fábrica, pero esto cubre el caso real:
+        // un settings.json existente que un usuario ya tenía antes de que este ajuste existiera.
+        var sut = CrearSut(new AppSettings { AccionFinEpisodio = null! });
+
+        sut.AccionFinEpisodio.Should().Be(AccionFinEpisodioValores.AutoPlayCuentaAtras);
+    }
+
+    [Theory]
+    [InlineData(5)]
+    [InlineData(30)]
+    [InlineData(60)]
+    public void AlAbrir_DeberiaCargarPasosSaltoSegundosDesdeLaConfiguracion(int pasos)
+    {
+        var sut = CrearSut(new AppSettings { PasosSaltoSegundos = pasos });
+
+        sut.PasosSaltoSegundos.Should().Be(pasos);
+    }
+
+    [Fact]
+    public void AlAbrir_ConPasosSaltoSegundosInvalido_DeberiaCaerEnDiezPorDefecto()
+    {
+        // Un settings.json corrupto/editado a mano no debe dejar un valor sin sentido en el ComboBox
+        var sut = CrearSut(new AppSettings { PasosSaltoSegundos = 7 });
+
+        sut.PasosSaltoSegundos.Should().Be(10);
+    }
+
+    [Fact]
+    public async Task GuardarPreferenciasAsync_DeberiaPersistirLosNuevosAjustesDeReproduccionYGeneral()
+    {
+        var settings = new Mock<ISettingsService>();
+        var config = new AppSettings();
+        settings.Setup(s => s.ObtenerConfiguracion()).Returns(config);
+        var db = Mock.Of<IDatabaseService>();
+        var startupService = new Mock<IStartupService>();
+        var sut = new ConfiguracionViewModel(
+            settings.Object, Mock.Of<IAuthService>(), db, Mock.Of<IDialogService>(),
+            new CacheMaintenanceService(db), Mock.Of<IPluginService>(), startupService.Object)
+        {
+            PasosSaltoSegundos = 30,
+            EvitarSuspensionPantalla = false,
+            AccionFinEpisodio = AccionFinEpisodioValores.PausarYSalirFicha,
+            TeclaPanicoActiva = true,
+            TeclaPanico = "Escape",
+            IniciarConWindows = true
+        };
+
+        await sut.GuardarPreferenciasAsync();
+
+        config.PasosSaltoSegundos.Should().Be(30);
+        config.EvitarSuspensionPantalla.Should().BeFalse();
+        config.AccionFinEpisodio.Should().Be(AccionFinEpisodioValores.PausarYSalirFicha);
+        config.TeclaPanicoActiva.Should().BeTrue();
+        config.TeclaPanico.Should().Be("Escape");
+        // El registro de Windows es la fuente de verdad, no un campo de AppSettings.
+        startupService.Verify(s => s.Sincronizar(true), Times.Once);
+    }
+
+    [Fact]
+    public void AlAbrir_DeberiaLeerIniciarConWindowsDesdeElStartupServiceNoDesdeAppSettings()
+    {
+        // El registro de Windows puede haber sido desactivado desde fuera de la app (p. ej. el
+        // Administrador de tareas de Windows): la fuente de verdad debe ser el propio registro.
+        var settings = new Mock<ISettingsService>();
+        settings.Setup(s => s.ObtenerConfiguracion()).Returns(new AppSettings());
+        var db = Mock.Of<IDatabaseService>();
+        var startupService = new Mock<IStartupService>();
+        startupService.Setup(s => s.EstaHabilitado()).Returns(true);
+
+        var sut = new ConfiguracionViewModel(
+            settings.Object, Mock.Of<IAuthService>(), db, Mock.Of<IDialogService>(),
+            new CacheMaintenanceService(db), Mock.Of<IPluginService>(), startupService.Object);
+
+        sut.IniciarConWindows.Should().BeTrue();
+    }
 }

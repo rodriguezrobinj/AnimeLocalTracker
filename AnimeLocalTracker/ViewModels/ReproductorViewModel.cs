@@ -29,6 +29,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     private readonly IPlaybackStateService _playbackState;
     private readonly ISkipTimesCoordinator _skipCoordinator;
     private readonly ISystemMediaControlsService? _smtc;
+    private readonly IScreenSaverPreventionService? _screenSaverPrevention;
     private CancellationTokenSource? _skipCts;
 
     // FUN-011: serializa los guardados periódicos de progreso (un guardado a la vez).
@@ -63,7 +64,28 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     private bool _autoSkipIntroOutro = false;
 
     [ObservableProperty]
-    private bool _autoPlaySiguiente = true;
+    private string _accionFinEpisodio = AccionFinEpisodioValores.AutoPlayCuentaAtras;
+
+    // === Pasos de salto configurables (Configuración → Reproducción) ===
+    [ObservableProperty]
+    private int _pasosSaltoSegundos = 10;
+
+    public string RetrocederTooltip => string.Format(LocalizationService.T("Player_RetrocederTooltipFormato"), PasosSaltoSegundos);
+    public string AdelantarTooltip => string.Format(LocalizationService.T("Player_AdelantarTooltipFormato"), PasosSaltoSegundos);
+
+    partial void OnPasosSaltoSegundosChanged(int value)
+    {
+        OnPropertyChanged(nameof(RetrocederTooltip));
+        OnPropertyChanged(nameof(AdelantarTooltip));
+    }
+
+    // === Cuenta atrás de auto-play al siguiente episodio (AccionFinEpisodioValores.AutoPlayCuentaAtras) ===
+    [ObservableProperty] private bool _mostrarCuentaAtrasSiguiente;
+    [ObservableProperty] private int _segundosCuentaAtrasSiguiente;
+    [ObservableProperty] private string _tituloSiguienteEnCuentaAtras = string.Empty;
+
+    [RelayCommand]
+    private void CancelarAutoPlay() => MostrarCuentaAtrasSiguiente = false;
 
     // Control de volumen y mute
     private int _volumen = 100;
@@ -268,12 +290,14 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         IVentanaPrincipal? ventanaPrincipal = null,
         ISystemMediaControlsService? systemMediaControlsService = null,
         ILogrosService? logrosService = null,
-        IDialogService? dialogService = null)
+        IDialogService? dialogService = null,
+        IScreenSaverPreventionService? screenSaverPreventionService = null)
     {
         _settingsService = settingsService;
         _logrosService = logrosService;
         DialogService = dialogService;
         _ventanaPrincipal = ventanaPrincipal;
+        _screenSaverPrevention = screenSaverPreventionService;
 
         _playbackState = playbackStateService ?? new PlaybackStateService(databaseService, animeTrackingService, authService);
 
@@ -299,7 +323,8 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             if (config != null)
             {
                 _autoSkipIntroOutro = config.AutoSkipIntroOutro;
-                _autoPlaySiguiente = config.AutoPlaySiguiente;
+                _accionFinEpisodio = string.IsNullOrWhiteSpace(config.AccionFinEpisodio) ? AccionFinEpisodioValores.AutoPlayCuentaAtras : config.AccionFinEpisodio;
+                _pasosSaltoSegundos = config.PasosSaltoSegundos is 5 or 10 or 30 or 60 ? config.PasosSaltoSegundos : 10;
                 _subtitulosHabilitados = config.SubtitulosPorDefecto;
                 _subtitulosIcon = config.SubtitulosPorDefecto ? "Subtitles" : "SubtitlesOutline";
                 _modoNocheActivo = config.ModoNocheActivo;
@@ -563,6 +588,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                     }
                     PlayPauseIcon = "Pause";
                     _smtc?.ActualizarEstadoReproduccion(true);
+                    IniciarProteccionPantallaSiCorresponde();
                 }
                 catch { }
 
@@ -614,6 +640,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         Player.Pause();
         PlayPauseIcon = "Play";
         _smtc?.ActualizarEstadoReproduccion(false);
+        DetenerProteccionPantalla();
         _ = GuardarProgresoActualAsync();
     }
 
@@ -630,7 +657,21 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         Player.Play();
         PlayPauseIcon = "Pause";
         _smtc?.ActualizarEstadoReproduccion(true);
+        IniciarProteccionPantallaSiCorresponde();
     }
+
+    /// <summary>Activa SetThreadExecutionState (evitar suspensión) solo si el usuario lo pidió en
+    /// Configuración; se llama en cada Play (manual, SMTC o autoplay al abrir un episodio).</summary>
+    private void IniciarProteccionPantallaSiCorresponde()
+    {
+        bool evitarSuspension = _settingsService?.ObtenerConfiguracion()?.EvitarSuspensionPantalla ?? true;
+        if (evitarSuspension)
+        {
+            _screenSaverPrevention?.Activar();
+        }
+    }
+
+    private void DetenerProteccionPantalla() => _screenSaverPrevention?.Desactivar();
 
     /// <summary>
     /// SMT-01: el evento ButtonPressed de SMTC llega en un hilo COM/MTA ajeno al Dispatcher
@@ -651,15 +692,15 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     [RelayCommand]
     public void Rewind10()
     {
-        double newSeconds = Math.Max(0, CurrentSeconds - 10);
+        double newSeconds = Math.Max(0, CurrentSeconds - PasosSaltoSegundos);
         Seek(newSeconds);
     }
-    
+
     [RelayCommand]
     public void Forward10()
     {
         double max = TotalSeconds > 0 ? TotalSeconds : double.MaxValue;
-        double newSeconds = Math.Min(max, CurrentSeconds + 10);
+        double newSeconds = Math.Min(max, CurrentSeconds + PasosSaltoSegundos);
         Seek(newSeconds);
     }
 
@@ -1141,6 +1182,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         MostrarSkipButton = false;
         MostrarSkipIntro = false;
         _autoPlayEjecutado = false;
+        MostrarCuentaAtrasSiguiente = false;
 
         // Cancelar la pre-carga del siguiente episodio del video anterior (si seguía en curso)
         _precargaCts?.Cancel();
@@ -1154,7 +1196,8 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             if (config != null)
             {
                 AutoSkipIntroOutro = config.AutoSkipIntroOutro;
-                AutoPlaySiguiente = config.AutoPlaySiguiente;
+                AccionFinEpisodio = string.IsNullOrWhiteSpace(config.AccionFinEpisodio) ? AccionFinEpisodioValores.AutoPlayCuentaAtras : config.AccionFinEpisodio;
+                PasosSaltoSegundos = config.PasosSaltoSegundos is 5 or 10 or 30 or 60 ? config.PasosSaltoSegundos : 10;
                 SubtitulosHabilitados = config.SubtitulosPorDefecto;
                 SubtitulosIcon = config.SubtitulosPorDefecto ? "Subtitles" : "SubtitlesOutline";
             }
@@ -1430,6 +1473,71 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         }
     }
 
+    /// <summary>
+    /// Qué hacer al llegar al final de un episodio, según Configuración → Reproducción → "Al terminar
+    /// un episodio". Se llama UNA vez por episodio (guardado por <c>_autoPlayEjecutado</c> en el
+    /// llamador). "Permanecer pausado" y "sin siguiente episodio" no hacen nada: el video se queda
+    /// en el último fotograma, que es exactamente el comportamiento por defecto de Flyleaf al terminar.
+    /// </summary>
+    private async Task EjecutarAccionFinEpisodioAsync(CancellationToken ct)
+    {
+        if (!TieneEpisodioSiguiente || AccionFinEpisodio == AccionFinEpisodioValores.PermanecerPausado)
+        {
+            return;
+        }
+
+        if (AccionFinEpisodio == AccionFinEpisodioValores.PausarYSalirFicha)
+        {
+            _ = GuardarProgresoActualAsync();
+            Dispose();
+            WeakReferenceMessenger.Default.Send(new NavegarMensaje_VolverDelReproductor());
+            return;
+        }
+
+        if (AccionFinEpisodio == AccionFinEpisodioValores.AutoPlayInmediato)
+        {
+            var siguienteInmediato = ObtenerSiguienteEpisodio();
+            string msg = siguienteInmediato != null
+                ? string.Format(LocalizationService.T("Player_SiguienteEpisodioFormato"), siguienteInmediato.NumeroEpisodio)
+                : LocalizationService.T("Player_SiguienteEpisodioGenerico");
+
+            _ = WeakReferenceMessenger.Default.Send(new Messages.MostrarDialogoRequestMessage(
+                "Auto-Play", msg, false, "FastForward", "#4CAF50"));
+
+            await Task.Delay(1500, ct);
+            if (!ct.IsCancellationRequested)
+            {
+                SiguienteEpisodio();
+            }
+            return;
+        }
+
+        // AccionFinEpisodioValores.AutoPlayCuentaAtras (default): cuenta atrás de 5s, cancelable.
+        var siguiente = ObtenerSiguienteEpisodio();
+        TituloSiguienteEnCuentaAtras = siguiente != null
+            ? string.Format(LocalizationService.T("Player_SiguienteEpisodioFormato"), siguiente.NumeroEpisodio)
+            : LocalizationService.T("Player_SiguienteEpisodioGenerico");
+        SegundosCuentaAtrasSiguiente = 5;
+        MostrarCuentaAtrasSiguiente = true;
+
+        try
+        {
+            for (int i = 5; i > 0; i--)
+            {
+                await Task.Delay(1000, ct);
+                if (!MostrarCuentaAtrasSiguiente) return; // el usuario canceló (CancelarAutoPlayCommand)
+                SegundosCuentaAtrasSiguiente = i - 1;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        MostrarCuentaAtrasSiguiente = false;
+        SiguienteEpisodio();
+    }
+
     private async Task RastrearProgresoAsync(CancellationToken ct)
     {
         while (Player != null && !Player.IsDisposed && !ct.IsCancellationRequested)
@@ -1622,26 +1730,11 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                         await RealizarAutoTrackingAsync();
                     }
 
-                    // Auto-Play al siguiente episodio
-                    if (AutoPlaySiguiente && TieneEpisodioSiguiente && !_autoPlayEjecutado)
+                    // Acción configurable al terminar el episodio (Configuración → Reproducción)
+                    if (!_autoPlayEjecutado)
                     {
                         _autoPlayEjecutado = true;
-
-                        var siguiente = ObtenerSiguienteEpisodio();
-                        string msg = siguiente != null 
-                            ? $"Reproduciendo Episodio {siguiente.NumeroEpisodio}..." 
-                            : "Reproduciendo siguiente episodio...";
-
-                        _ = WeakReferenceMessenger.Default.Send(new Messages.MostrarDialogoRequestMessage(
-                            "Auto-Play",
-                            msg,
-                            false, "FastForward", "#4CAF50"));
-
-                        await Task.Delay(1500, ct);
-                        if (!ct.IsCancellationRequested)
-                        {
-                            System.Windows.Application.Current?.Dispatcher?.Invoke(() => SiguienteEpisodio());
-                        }
+                        await EjecutarAccionFinEpisodioAsync(ct);
                     }
                 }
 
@@ -1777,6 +1870,8 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             _prioridadElevada = false;
             PrioridadReproduccion.Restaurar();
         }
+
+        DetenerProteccionPantalla();
     }
 
     private bool _prioridadElevada;

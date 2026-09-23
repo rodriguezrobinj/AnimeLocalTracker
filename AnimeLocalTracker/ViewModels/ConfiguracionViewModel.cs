@@ -19,6 +19,7 @@ public partial class ConfiguracionViewModel : ObservableObject
     private readonly IDialogService _dialogService;
     private readonly CacheMaintenanceService _cacheMaintenanceService;
     private readonly IPluginService _pluginService;
+    private readonly IStartupService? _startupService;
 
     // === PLUGINS ===
     [ObservableProperty] private System.Collections.ObjectModel.ObservableCollection<string> _pluginsInstalados = new();
@@ -34,11 +35,13 @@ public partial class ConfiguracionViewModel : ObservableObject
     partial void OnTotalAnimesBibliotecaChanged(int value) => OnPropertyChanged(nameof(TotalAnimesTexto));
 
     // === REPRODUCCIÓN Y DESCARGAS ===
-    [ObservableProperty] private bool _autoPlaySiguiente = true;
     [ObservableProperty] private bool _autoSkipIntroOutro = false;
     [ObservableProperty] private bool _subtitulosPorDefecto = true;
     [ObservableProperty] private int _descargasSimultaneas = 3;
     [ObservableProperty] private int _intervaloSincronizacionMinutos = 5;
+    [ObservableProperty] private int _pasosSaltoSegundos = 10;
+    [ObservableProperty] private bool _evitarSuspensionPantalla = true;
+    [ObservableProperty] private string _accionFinEpisodio = AccionFinEpisodioValores.AutoPlayCuentaAtras;
 
     // === PREFERENCIAS DE USUARIO ===
     [ObservableProperty] private int _umbralMarcadoVisto = 95;
@@ -47,6 +50,9 @@ public partial class ConfiguracionViewModel : ObservableObject
     [ObservableProperty] private bool _notificarConBandejaSiempre = false;
     [ObservableProperty] private string _idioma = "es";
     [ObservableProperty] private double _velocidadReproduccionDefecto = 1.0;
+    [ObservableProperty] private bool _iniciarConWindows = false;
+    [ObservableProperty] private bool _teclaPanicoActiva = false;
+    [ObservableProperty] private string _teclaPanico = "F12";
 
     /// <summary>Atajos de teclado configurables (acción → tecla). Se enlaza por índice desde XAML.</summary>
     public Dictionary<string, string> Atajos { get; set; } = new();
@@ -109,7 +115,8 @@ public partial class ConfiguracionViewModel : ObservableObject
         IDatabaseService databaseService,
         IDialogService dialogService,
         CacheMaintenanceService cacheMaintenanceService,
-        IPluginService pluginService)
+        IPluginService pluginService,
+        IStartupService? startupService = null)
     {
         _settingsService = settingsService;
         _authService = authService;
@@ -117,6 +124,7 @@ public partial class ConfiguracionViewModel : ObservableObject
         _dialogService = dialogService;
         _cacheMaintenanceService = cacheMaintenanceService;
         _pluginService = pluginService;
+        _startupService = startupService;
 
         CargarDatosConfiguracion();
     }
@@ -125,17 +133,24 @@ public partial class ConfiguracionViewModel : ObservableObject
     {
         var config = _settingsService?.ObtenerConfiguracion() ?? new AppSettings();
         RutaBaseAnimes = config.RutaBaseAnimes ?? string.Empty;
-        AutoPlaySiguiente = config.AutoPlaySiguiente;
         AutoSkipIntroOutro = config.AutoSkipIntroOutro;
         SubtitulosPorDefecto = config.SubtitulosPorDefecto;
         DescargasSimultaneas = config.DescargasSimultaneas;
         IntervaloSincronizacionMinutos = config.IntervaloSincronizacionMinutos;
+        PasosSaltoSegundos = config.PasosSaltoSegundos is 5 or 10 or 30 or 60 ? config.PasosSaltoSegundos : 10;
+        EvitarSuspensionPantalla = config.EvitarSuspensionPantalla;
+        AccionFinEpisodio = string.IsNullOrWhiteSpace(config.AccionFinEpisodio) ? AccionFinEpisodioValores.AutoPlayCuentaAtras : config.AccionFinEpisodio;
         UmbralMarcadoVisto = config.UmbralMarcadoVisto is >= 1 and <= 100 ? config.UmbralMarcadoVisto : 90;
         NotificarNuevosEpisodios = config.NotificarNuevosEpisodios;
         MinimizarABandejaAlCerrar = config.MinimizarABandejaAlCerrar;
         NotificarConBandejaSiempre = config.NotificarConBandejaSiempre;
         Idioma = config.Idioma == "en" ? "en" : "es";
         VelocidadReproduccionDefecto = config.VelocidadReproduccionDefecto is >= 0.5 and <= 2.0 ? config.VelocidadReproduccionDefecto : 1.0;
+        // El registro de Windows es la fuente de verdad (no AppSettings): así se refleja si el
+        // usuario lo desactivó desde el Administrador de tareas en vez de desde esta pantalla.
+        IniciarConWindows = _startupService?.EstaHabilitado() ?? false;
+        TeclaPanicoActiva = config.TeclaPanicoActiva;
+        TeclaPanico = config.TeclaPanico == "Escape" ? "Escape" : "F12";
         Atajos = config.Atajos ?? new Dictionary<string, string>();
         OnPropertyChanged(nameof(Atajos));
 
@@ -319,20 +334,25 @@ public partial class ConfiguracionViewModel : ObservableObject
         try
         {
             var config = _settingsService.ObtenerConfiguracion();
-            config.AutoPlaySiguiente = AutoPlaySiguiente;
             config.AutoSkipIntroOutro = AutoSkipIntroOutro;
             config.SubtitulosPorDefecto = SubtitulosPorDefecto;
             config.DescargasSimultaneas = DescargasSimultaneas;
             config.IntervaloSincronizacionMinutos = IntervaloSincronizacionMinutos;
+            config.PasosSaltoSegundos = PasosSaltoSegundos;
+            config.EvitarSuspensionPantalla = EvitarSuspensionPantalla;
+            config.AccionFinEpisodio = AccionFinEpisodio;
             config.UmbralMarcadoVisto = Math.Clamp(UmbralMarcadoVisto, 1, 100);
             config.NotificarNuevosEpisodios = NotificarNuevosEpisodios;
             config.MinimizarABandejaAlCerrar = MinimizarABandejaAlCerrar;
             config.NotificarConBandejaSiempre = NotificarConBandejaSiempre;
             config.Idioma = Idioma == "en" ? "en" : "es";
             config.VelocidadReproduccionDefecto = VelocidadReproduccionDefecto is >= 0.5 and <= 2.0 ? VelocidadReproduccionDefecto : 1.0;
+            config.TeclaPanicoActiva = TeclaPanicoActiva;
+            config.TeclaPanico = TeclaPanico == "Escape" ? "Escape" : "F12";
             config.Atajos = new Dictionary<string, string>(Atajos);
 
             await _settingsService.GuardarConfiguracionAsync(config);
+            _startupService?.Sincronizar(IniciarConWindows);
 
             await _dialogService.MostrarDialogoAsync(
                 LocalizationService.T("Cfg_PreferenciasGuardadasTitulo"),
