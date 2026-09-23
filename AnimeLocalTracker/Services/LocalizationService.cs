@@ -266,6 +266,9 @@ public sealed class LocalizationService : INotifyPropertyChanged
         // === MODO NOCHE (compresor de audio) ===
         ["Player_ModoNoche"] = "Modo noche (nivela el volumen del diálogo)",
 
+        // === MENÚ "MÁS OPCIONES" (agrupa Captura + Modo Noche para no saturar la barra) ===
+        ["Player_MasOpciones"] = "Más opciones",
+
         // === CAJÓN LATERAL DE EPISODIOS (tecla L) ===
         ["Player_CajonEpisodios"] = "Episodios",
         ["Player_CajonEpisodiosTip"] = "Ver episodios (L)",
@@ -1141,6 +1144,9 @@ public sealed class LocalizationService : INotifyPropertyChanged
 
         // === NIGHT MODE (audio compressor) ===
         ["Player_ModoNoche"] = "Night mode (levels out dialogue volume)",
+
+        // === "MORE OPTIONS" MENU (groups Screenshot + Night mode to declutter the bar) ===
+        ["Player_MasOpciones"] = "More options",
 
         // === EPISODE DRAWER (key L) ===
         ["Player_CajonEpisodios"] = "Episodes",
