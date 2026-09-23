@@ -94,10 +94,63 @@ public partial class MainWindow : Window, IVentanaPrincipal
         {
             AppLogger.Warn("MainWindow", $"No se pudo inicializar el icono de la bandeja del sistema: {ex.Message}");
         }
+
+        try
+        {
+            _panicKeyService = App.ServiceProvider.GetService<IPanicKeyService>();
+            _panicKeyService?.Inicializar(hwnd);
+            var cfg = App.ServiceProvider.GetService<ISettingsService>()?.ObtenerConfiguracion();
+            _panicKeyService?.Aplicar(cfg?.TeclaPanicoActiva ?? false, cfg?.TeclaPanico ?? "F12");
+            if (_panicKeyService != null) _panicKeyService.Activado += PanicKeyService_Activado;
+
+            var settingsService = App.ServiceProvider.GetService<ISettingsService>();
+            if (settingsService != null)
+            {
+                settingsService.ConfiguracionModificada += nuevaCfg =>
+                    _panicKeyService?.Aplicar(nuevaCfg?.TeclaPanicoActiva ?? false, nuevaCfg?.TeclaPanico ?? "F12");
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn("MainWindow", $"No se pudo inicializar la tecla de pánico: {ex.Message}");
+        }
+    }
+
+    private IPanicKeyService? _panicKeyService;
+
+    /// <summary>
+    /// "Modo discreto": silencia el video en curso (si hay uno) y oculta la app a la bandeja al
+    /// instante. Se ejecuta en el hilo de UI porque llega desde WndProc, fuera del Dispatcher normal.
+    /// </summary>
+    private void PanicKeyService_Activado(object? sender, EventArgs e)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            try
+            {
+                if (DataContext is MainViewModel mvm && mvm.Navigation.ReproductorActivo is { } reproductor && !reproductor.IsMuted)
+                {
+                    reproductor.ToggleMuteCommand.Execute(null);
+                }
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("MainWindow", $"No se pudo silenciar el reproductor en modo pánico: {ex.Message}");
+            }
+
+            App.ServiceProvider.GetService<ISystemTrayService>()?.IniciarEnBandeja();
+            AppLogger.Info("MainWindow", "Modo discreto activado (tecla de pánico).");
+        });
     }
 
     private IntPtr WindowProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
+        if (_panicKeyService != null && _panicKeyService.ProcesarMensaje(msg, wParam))
+        {
+            handled = true;
+            return IntPtr.Zero;
+        }
+
         // WM_GETMINMAXINFO = 0x0024
         if (msg == 0x0024 && !IsFullScreen && !EsModoPiP)
         {

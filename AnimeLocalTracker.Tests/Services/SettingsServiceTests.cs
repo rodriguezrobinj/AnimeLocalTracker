@@ -45,7 +45,7 @@ public class SettingsServiceTests : IDisposable
         // Assert
         config.Should().NotBeNull();
         config.RutaBaseAnimes.Should().NotBeNullOrWhiteSpace();
-        config.AutoPlaySiguiente.Should().BeTrue();
+        config.AccionFinEpisodio.Should().Be(AccionFinEpisodioValores.AutoPlayCuentaAtras);
         config.SubtitulosPorDefecto.Should().BeTrue();
         config.DescargasSimultaneas.Should().Be(3);
     }
@@ -80,7 +80,7 @@ public class SettingsServiceTests : IDisposable
         var nuevosAjustes = new AppSettings
         {
             RutaBaseAnimes = _tempSettingsDir,
-            AutoPlaySiguiente = false,
+            AccionFinEpisodio = AccionFinEpisodioValores.PermanecerPausado,
             DescargasSimultaneas = 5
         };
 
@@ -89,7 +89,7 @@ public class SettingsServiceTests : IDisposable
 
         // Assert
         eventoDisparado.Should().BeTrue();
-        sut.ObtenerConfiguracion().AutoPlaySiguiente.Should().BeFalse();
+        sut.ObtenerConfiguracion().AccionFinEpisodio.Should().Be(AccionFinEpisodioValores.PermanecerPausado);
         sut.ObtenerConfiguracion().DescargasSimultaneas.Should().Be(5);
     }
 
@@ -239,7 +239,7 @@ public class SettingsServiceTests : IDisposable
         settingsMock.Setup(s => s.ObtenerConfiguracion()).Returns(new AppSettings
         {
             RutaBaseAnimes = @"D:\AnimesTest",
-            AutoPlaySiguiente = true,
+            AccionFinEpisodio = AccionFinEpisodioValores.AutoPlayInmediato,
             AutoSkipIntroOutro = true,
             SubtitulosPorDefecto = false,
             DescargasSimultaneas = 2
@@ -260,7 +260,7 @@ public class SettingsServiceTests : IDisposable
 
         // Assert
         vm.RutaBaseAnimes.Should().Be(@"D:\AnimesTest");
-        vm.AutoPlaySiguiente.Should().BeTrue();
+        vm.AccionFinEpisodio.Should().Be(AccionFinEpisodioValores.AutoPlayInmediato);
         vm.AutoSkipIntroOutro.Should().BeTrue();
         vm.SubtitulosPorDefecto.Should().BeFalse();
         vm.DescargasSimultaneas.Should().Be(2);

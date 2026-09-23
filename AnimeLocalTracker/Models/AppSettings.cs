@@ -7,7 +7,6 @@ namespace AnimeLocalTracker.Models;
 public class AppSettings
 {
     public string RutaBaseAnimes { get; set; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), "Anime");
-    public bool AutoPlaySiguiente { get; set; } = true;
     public bool AutoSkipIntroOutro { get; set; } = false;
     public bool SubtitulosPorDefecto { get; set; } = true;
     public int DescargasSimultaneas { get; set; } = 3;
@@ -33,6 +32,24 @@ public class AppSettings
     /// Independiente de <see cref="MinimizarABandejaAlCerrar"/>: activarlo mantiene un icono en la
     /// bandeja mientras la app está abierta aunque esa otra opción esté desactivada.</summary>
     public bool NotificarConBandejaSiempre { get; set; } = false;
+
+    /// <summary>Segundos que saltan los botones/atajos de retroceder y adelantar (5, 10, 30 o 60).</summary>
+    public int PasosSaltoSegundos { get; set; } = 10;
+
+    /// <summary>Evita que Windows apague la pantalla o active el protector mientras hay un video
+    /// reproduciéndose (SetThreadExecutionState). No afecta el suspendido manual del usuario.</summary>
+    public bool EvitarSuspensionPantalla { get; set; } = true;
+
+    /// <summary>Qué hacer al terminar un episodio: uno de los valores de <see cref="AccionFinEpisodioValores"/>.</summary>
+    public string AccionFinEpisodio { get; set; } = AccionFinEpisodioValores.AutoPlayCuentaAtras;
+
+    /// <summary>Activa un atajo de teclado GLOBAL (funciona aunque la app no tenga el foco) que silencia
+    /// el video y minimiza la app a la bandeja del sistema al instante ("boss key").</summary>
+    public bool TeclaPanicoActiva { get; set; } = false;
+
+    /// <summary>Tecla del atajo de pánico: "F12" o "Escape". Escape como atajo GLOBAL intercepta esa
+    /// tecla en TODAS las aplicaciones mientras esté activo, no solo en AnimeLocalTracker.</summary>
+    public string TeclaPanico { get; set; } = "F12";
 
     /// <summary>
     /// Atajos de teclado configurables del reproductor: acción → tecla.
@@ -65,4 +82,17 @@ public class AppSettings
             return tecla;
         return defecto;
     }
+}
+
+/// <summary>Valores válidos de <see cref="AppSettings.AccionFinEpisodio"/>.</summary>
+public static class AccionFinEpisodioValores
+{
+    /// <summary>Muestra una cuenta atrás de 5s (cancelable) y luego reproduce el siguiente episodio.</summary>
+    public const string AutoPlayCuentaAtras = "AutoPlayCuentaAtras";
+    /// <summary>Reproduce el siguiente episodio de inmediato, sin cuenta atrás.</summary>
+    public const string AutoPlayInmediato = "AutoPlayInmediato";
+    /// <summary>Sale del reproductor y vuelve a la ficha del anime.</summary>
+    public const string PausarYSalirFicha = "PausarYSalirFicha";
+    /// <summary>Se queda en pantalla completa, pausado en el último fotograma.</summary>
+    public const string PermanecerPausado = "PermanecerPausado";
 }

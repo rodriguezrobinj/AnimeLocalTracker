@@ -135,6 +135,15 @@ public class SystemTrayService : ISystemTrayService, IDisposable
         _notifyIcon?.ShowBalloonTip(4000, titulo, mensaje, System.Windows.Forms.ToolTipIcon.Info);
     }
 
+    public void IniciarEnBandeja()
+    {
+        if (_notifyIcon == null)
+        {
+            CrearIcono();
+        }
+        _ventana?.Hide();
+    }
+
     private void SalirDeVerdad()
     {
         _saliendoRealmente = true;

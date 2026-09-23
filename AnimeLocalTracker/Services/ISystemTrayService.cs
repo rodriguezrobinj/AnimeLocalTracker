@@ -32,4 +32,9 @@ public interface ISystemTrayService
 
     /// <summary>Muestra una notificación nativa de Windows (útil cuando la ventana está oculta).</summary>
     void MostrarNotificacion(string titulo, string mensaje);
+
+    /// <summary>Fuerza la existencia del icono de bandeja y oculta la ventana principal, sin importar
+    /// <see cref="AppSettings.MinimizarABandejaAlCerrar"/>. Usado al arrancar con Windows (para no abrir
+    /// una ventana visible en cada inicio de sesión) y por la tecla de pánico ("modo discreto").</summary>
+    void IniciarEnBandeja();
 }

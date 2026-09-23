@@ -376,6 +376,71 @@ public class ReproductorViewModelTests
         item.TieneProgresoGuardado.Should().BeFalse();
     }
 
+    [Theory]
+    [InlineData(5)]
+    [InlineData(10)]
+    [InlineData(30)]
+    [InlineData(60)]
+    public void RewindYForward_DeberianUsarElPasoDeSaltoConfigurado(int pasoSegundos)
+    {
+        // Arrange: Configuración → Reproducción → "Segundos de salto" (5/10/30/60s)
+        var sut = CreateSut();
+        sut.PasosSaltoSegundos = pasoSegundos;
+        sut.TotalSeconds = 10_000; // suficientemente lejos del límite superior para este caso
+        sut.CurrentSeconds = 1_000;
+
+        // Act
+        sut.Forward10Command.Execute(null);
+
+        // Assert
+        sut.CurrentSeconds.Should().Be(1_000 + pasoSegundos);
+
+        // Act: retroceder debe deshacer el mismo paso
+        sut.Rewind10Command.Execute(null);
+
+        // Assert
+        sut.CurrentSeconds.Should().Be(1_000);
+
+        sut.Dispose();
+    }
+
+    [Fact]
+    public void ForwardYRewind_DeberianAcotarseAlRangoValidoDelVideo()
+    {
+        // Arrange: paso grande (60s) cerca de ambos extremos del video
+        var sut = CreateSut();
+        sut.PasosSaltoSegundos = 60;
+        sut.TotalSeconds = 100;
+        sut.CurrentSeconds = 90;
+
+        // Act: adelantar no debe pasarse de la duración total
+        sut.Forward10Command.Execute(null);
+        sut.CurrentSeconds.Should().Be(100);
+
+        // Act: retroceder no debe bajar de 0
+        sut.CurrentSeconds = 30;
+        sut.Rewind10Command.Execute(null);
+        sut.CurrentSeconds.Should().Be(0);
+
+        sut.Dispose();
+    }
+
+    [Fact]
+    public void PasosSaltoSegundos_AlCambiar_DeberiaActualizarLosTextosDeTooltip()
+    {
+        // Arrange
+        var sut = CreateSut();
+
+        // Act
+        sut.PasosSaltoSegundos = 30;
+
+        // Assert: los tooltips de los botones ◄◄/►► reflejan el paso configurado, no un "10" fijo
+        sut.RetrocederTooltip.Should().Contain("30");
+        sut.AdelantarTooltip.Should().Contain("30");
+
+        sut.Dispose();
+    }
+
     [Fact]
     public void SkipIntroOutro_ConSegmentoActivo_DeberiaSaltarAlFinalDelIntervalo()
     {
