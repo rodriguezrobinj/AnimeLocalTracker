@@ -181,6 +181,12 @@ public partial class App : Application
         services.AddSingleton<ISkipTimesCoordinator, SkipTimesCoordinator>();
         services.AddSingleton<IMediaEnrichmentService, MediaEnrichmentService>();
 
+        // Extraídos de ReproductorViewModel (fase 1 del refactor): navegación de episodios es
+        // estado por sesión de reproducción (Transient, igual que ReproductorViewModel); la
+        // captura de frame no tiene estado propio (Singleton, igual que SkipTimesCoordinator).
+        services.AddTransient<IEpisodeNavigator, EpisodeNavigator>();
+        services.AddSingleton<IFrameCaptureService, FrameCaptureService>();
+
         // 4. Integración del Ecosistema de Automatización Python (Zero-Setup & Clean Architecture)
         services.AddSingleton<IPythonBridgeService, PythonBridgeService>();
         services.AddSingleton<PythonEpisodeEnricher>();
