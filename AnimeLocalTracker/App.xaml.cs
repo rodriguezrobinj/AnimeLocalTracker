@@ -133,7 +133,12 @@ public partial class App : Application
         
         services.AddHttpClient<IAniSkipService, AniSkipService>()
             .AddPolicyHandler(GetRetryPolicy());
-        
+
+        // Openings/endings vía AnimeThemes.moe: catálogo (JSON) + descarga del audio (.ogg → .mp3).
+        services.AddHttpClient<IAnimeThemesService, AnimeThemesService>()
+            .AddPolicyHandler(GetRetryPolicy());
+        services.AddSingleton<IAnimeThemesDownloadService, AnimeThemesDownloadService>();
+
         // Lo registramos como Singleton porque queremos que haya una sola conexión a la BD en toda la app
         services.AddSingleton<IDatabaseService, DatabaseService>();
         services.AddSingleton<IProximaEmisionService, ProximaEmisionService>();
