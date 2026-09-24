@@ -5,8 +5,10 @@ using AnimeLocalTracker.Models;
 
 namespace AnimeLocalTracker.Services.Franquicias;
 
-/// <summary>Una franquicia (o un anime suelto) con el tiempo total que le has dedicado.</summary>
-public sealed record TopFranquiciaItem(int FranquiciaId, string Titulo, double Segundos, int Episodios, int Titulos);
+/// <summary>Una franquicia (o un anime suelto) con el tiempo total que le has dedicado.
+/// <paramref name="AniListIdRepresentante"/> es el mismo título que da nombre a la franquicia
+/// (ver comentario en Calcular) — sirve para resolver su portada, p. ej. en la tarjeta Wrapped.</summary>
+public sealed record TopFranquiciaItem(int FranquiciaId, string Titulo, double Segundos, int Episodios, int Titulos, int AniListIdRepresentante);
 
 /// <summary>
 /// Top de lo más visto POR TIEMPO, sumando toda la franquicia (temporadas, películas, especiales, spin-offs).
@@ -62,7 +64,8 @@ public static class CalculadorTop
                     titulo,
                     grupo.Sum(x => x.Segundos),
                     grupo.Sum(x => x.Episodios),
-                    grupo.Count());
+                    grupo.Count(),
+                    representante.AnimeId);
             })
             .OrderByDescending(f => f.Segundos)
             .ThenBy(f => f.Titulo, StringComparer.OrdinalIgnoreCase)

@@ -30,6 +30,16 @@
                     </Grid>
                 </Border>
                 <TextBlock Text="{Binding NombreUsuario}" FontSize="28" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center" Margin="0,20,0,0"/>
+
+                <!-- Sello de rango (Logros): el mismo "Novato → ... → Leyenda" de Estadísticas, ya en
+                     mayúsculas desde el ViewModel (ConstruirDatosWrappedAsync) — para que la tarjeta se
+                     sienta ganada y no una plantilla genérica con números sueltos. -->
+                <Border Background="#3B2E5E" BorderBrush="#7C3AED" BorderThickness="1.5" CornerRadius="22" Padding="22,9" HorizontalAlignment="Center" Margin="0,16,0,0">
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon Kind="TrophyVariant" Foreground="#FBBF24" Width="20" Height="20" VerticalAlignment="Center" Margin="0,0,9,0"/>
+                        <TextBlock Text="{Binding RangoOtakuTexto}" FontSize="17" FontWeight="Bold" Foreground="#FDE68A"/>
+                    </StackPanel>
+                </Border>
             </StackPanel>
 
             <Border Height="1" Background="#332B55" Margin="0,0,0,44"/>
@@ -61,11 +71,35 @@
             </Grid>
 
             <StackPanel Margin="0,0,0,50">
-                <TextBlock Text="{Binding TopAnimesLabel}" FontSize="15" FontWeight="Bold" Foreground="#F472B6" Margin="0,0,0,16"/>
-                <ItemsControl ItemsSource="{Binding TopAnimesTitulos}">
+                <TextBlock Text="{Binding TopAnimesLabel}" FontSize="15" FontWeight="Bold" Foreground="#F472B6" Margin="0,0,0,20"/>
+                <ItemsControl ItemsSource="{Binding TopAnimesItems}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <TextBlock Text="{Binding}" FontSize="24" FontWeight="SemiBold" Foreground="White" Margin="0,0,0,10" TextTrimming="CharacterEllipsis"/>
+                            <Grid Margin="0,0,0,20">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Portada con el puesto (1/2/3) como medalla en la esquina -->
+                                <Grid Grid.Column="0" Width="76" Height="108" Margin="0,0,22,0">
+                                    <Border CornerRadius="10" Background="#2E2547" BorderBrush="#4C3B73" BorderThickness="1.5" ClipToBounds="True">
+                                        <Grid>
+                                            <!-- Placeholder DEBAJO de la portada: visible solo si Portada es null o falla la carga -->
+                                            <materialDesign:PackIcon Kind="ImageOutline" Foreground="#5B4A82" Width="28" Height="28" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            <Image Source="{Binding Portada}" Stretch="UniformToFill"/>
+                                        </Grid>
+                                    </Border>
+                                    <Border Width="30" Height="30" CornerRadius="15" Background="#F472B6"
+                                            HorizontalAlignment="Left" VerticalAlignment="Top" Margin="-10,-10,0,0">
+                                        <TextBlock Text="{Binding Posicion}" FontSize="15" FontWeight="Black" Foreground="White"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                </Grid>
+
+                                <TextBlock Grid.Column="1" Text="{Binding Titulo}" FontSize="26" FontWeight="SemiBold" Foreground="White"
+                                           VerticalAlignment="Center" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="100"/>
+                            </Grid>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>

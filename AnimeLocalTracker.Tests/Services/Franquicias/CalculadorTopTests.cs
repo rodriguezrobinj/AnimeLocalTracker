@@ -113,6 +113,18 @@ public class CalculadorTopTests
     }
 
     [Fact]
+    public void AniListIdRepresentante_EsElMismoTituloQueDaNombreALaFranquicia()
+    {
+        // Usado para resolver la portada (p. ej. en la tarjeta Wrapped): debe ser el AniListId
+        // de la 1.ª temporada ("Danmachi"), no el de la temporada más vista ("Danmachi V").
+        var animes = new List<AnimeItem> { Anime(1, "Danmachi", 2015), Anime(2, "Danmachi II", 2019), Anime(3, "Danmachi V", 2024) };
+        var vistos = Episodios(1, 13, 1440).Concat(Episodios(2, 12, 1440)).Concat(Episodios(3, 15, 1440)).ToList();
+        var franquicias = new Dictionary<int, int> { [1] = 1, [2] = 1, [3] = 1 };
+
+        CalculadorTop.Calcular(animes, vistos, franquicias).Single().AniListIdRepresentante.Should().Be(1);
+    }
+
+    [Fact]
     public void EpisodiosSinDuracion_UsanElPromedioGlobal_NoElDeSuGrupo()
     {
         // Promedio global de los que tienen duración: 1440 s. Los 10 episodios de B no tienen duración.
