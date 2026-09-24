@@ -5,6 +5,7 @@
 .DESCRIPTION
     Comprueba la firma Authenticode de:
       * el instalador (*Setup.exe),
+      * el instalador MSI (*.msi), si vpk lo generó (--msi),
       * los binarios propios dentro del Portable.zip: AnimeLocalTracker.exe, animetracker_core.dll y el motor
         Python (AnimeTrackerTools.exe) — es lo que Windows/SmartScreen evalúa cuando el usuario los ejecuta.
     Exige además sello de tiempo (RFC 3161): sin él, la firma deja de ser válida cuando caduca el certificado.
@@ -31,6 +32,10 @@ if ($setups.Count -eq 0) { throw "No hay ningún *Setup.exe en '$ReleasesDir'." 
 
 $aVerificar = @{}                           # etiqueta -> ruta
 foreach ($s in $setups) { $aVerificar[$s.Name] = $s.FullName }
+
+# El .msi es opcional (solo existe si vpk se corrió con --msi): si no está, no se exige.
+$msis = @(Get-ChildItem $ReleasesDir -Filter '*.msi' -ErrorAction SilentlyContinue)
+foreach ($m in $msis) { $aVerificar[$m.Name] = $m.FullName }
 
 # Binarios propios dentro del Portable.zip (se extraen a una carpeta temporal)
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ('sigcheck_' + [guid]::NewGuid().ToString('N'))

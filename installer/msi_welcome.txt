@@ -1,0 +1,7 @@
+Bienvenido al instalador de AnimeLocalTracker.
+
+Este asistente te va a guiar por la instalacion de la aplicacion en este equipo.
+Tus archivos de video nunca salen de tu maquina: AnimeLocalTracker solo se conecta
+a AniList si tu lo autorizas, para sincronizar tu progreso.
+
+Pulsa "Siguiente" para continuar.

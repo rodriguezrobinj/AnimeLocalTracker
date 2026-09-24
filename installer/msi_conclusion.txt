@@ -1,0 +1,4 @@
+AnimeLocalTracker se instalo correctamente.
+
+Abrela desde el menu de inicio para vincular tu cuenta de AniList y elegir la
+carpeta donde guardas tu anime. ¡Gracias por instalarla!
