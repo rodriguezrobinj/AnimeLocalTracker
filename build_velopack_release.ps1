@@ -50,13 +50,22 @@ Write-Host "  Versión: $Version" -ForegroundColor Yellow
 Write-Host "=================================================" -ForegroundColor Cyan
 
 # 1. Asegurar herramienta vpk instalada globalmente (versión fijada = reproducible)
+# 1.2.158: subido desde 1.2.0 al activar --msi (esa versión antigua tenía el banner/logo del MSI
+# intercambiados y otros bugs de MSI ya corregidos río arriba; ver CHANGELOG de Velopack). Se
+# compara la versión instalada (no solo si el comando existe): un runner/máquina con la 1.2.0 de
+# antes se actualiza solo, en vez de quedarse silenciosamente en la versión vieja con el bug.
 Write-Host "`n[1/5] Verificando herramienta vpk (Velopack CLI)..." -ForegroundColor Green
-$vpkInstalled = Get-Command vpk -ErrorAction SilentlyContinue
-if (-not $vpkInstalled) {
-    Write-Host "Instalando vpk 1.2.0 globalmente con dotnet tool..." -ForegroundColor Yellow
-    dotnet tool install -g vpk --version 1.2.0
+$vpkVersionRequerida = "1.2.158"
+$vpkInstaladaLinea = dotnet tool list -g 2>$null | Select-String "^vpk\s"
+$vpkInstaladaVersion = if ($vpkInstaladaLinea) { ($vpkInstaladaLinea -split '\s+')[1] } else { $null }
+if ($vpkInstaladaVersion -eq $vpkVersionRequerida) {
+    Write-Host "vpk $vpkVersionRequerida ya instalado." -ForegroundColor Gray
+} elseif ($vpkInstaladaVersion) {
+    Write-Host "vpk $vpkInstaladaVersion instalado, actualizando a $vpkVersionRequerida..." -ForegroundColor Yellow
+    dotnet tool update -g vpk --version $vpkVersionRequerida
 } else {
-    Write-Host "vpk encontrado: $($vpkInstalled.Source)" -ForegroundColor Gray
+    Write-Host "Instalando vpk $vpkVersionRequerida globalmente con dotnet tool..." -ForegroundColor Yellow
+    dotnet tool install -g vpk --version $vpkVersionRequerida
 }
 
 # 2. Compilar y publicar la aplicación WPF en modo Release SingleFile / Framework-Dependent
@@ -139,6 +148,16 @@ if (-not (Test-Path $releasesDir)) {
     New-Item -ItemType Directory -Path $releasesDir | Out-Null
 }
 
+# Además del Setup.exe de siempre, se genera un .msi con asistente completo
+# (bienvenida/licencia/readme/conclusión + elegir instalación por usuario o por máquina) — el
+# .msi sale ADEMÁS de los artefactos habituales, no los reemplaza, y las apps ya instaladas se
+# actualizan igual después vía Update.exe sin importar con cuál se instalaron.
+# instLicense usa una copia temporal del LICENSE real del repo (con extensión .txt, que es lo que
+# vpk sabe interpretar) para no duplicar el contenido de la licencia en dos archivos distintos.
+$licenciaTemp = Join-Path ([IO.Path]::GetTempPath()) "AnimeLocalTracker_LICENSE.txt"
+Copy-Item "$PSScriptRoot\LICENSE" $licenciaTemp -Force
+$instalerDir = "$PSScriptRoot\installer"
+
 $vpkArgs = @(
     "pack",
     "--packId", "AnimeLocalTracker",
@@ -148,7 +167,14 @@ $vpkArgs = @(
     "--packTitle", "AnimeLocalTracker",
     "--mainExe", "AnimeLocalTracker.exe",
     "--outputDir", $releasesDir,
-    "--channel", $Channel
+    "--channel", $Channel,
+    "--msi",
+    "--instWelcome", "$instalerDir\msi_welcome.txt",
+    "--instLicense", $licenciaTemp,
+    "--instReadme", "$instalerDir\msi_readme.txt",
+    "--instConclusion", "$instalerDir\msi_conclusion.txt",
+    "--msiTopBanner", "$instalerDir\msi_banner.bmp",
+    "--msiDialogBackground", "$instalerDir\msi_logo.bmp"
 )
 if ($SignTemplate) {
     $vpkArgs += @("--signTemplate", $SignTemplate)
