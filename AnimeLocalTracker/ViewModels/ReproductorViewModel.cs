@@ -23,11 +23,14 @@ namespace AnimeLocalTracker.ViewModels;
 public partial class ReproductorViewModel : ObservableObject, IDisposable
 {
     private readonly ISettingsService? _settingsService;
-    private readonly IVentanaPrincipal? _ventanaPrincipal;
     private readonly IPlaybackStateService _playbackState;
     private readonly ISkipTimesCoordinator _skipCoordinator;
     private readonly IEpisodeNavigator _episodeNavigator;
     private readonly IFrameCaptureService _frameCaptureService;
+    private readonly IPlaybackWindowModeCoordinator _windowModeCoordinator;
+    private readonly ISubtitleCoordinator _subtitleCoordinator;
+    private readonly IPlaybackVolumeCoordinator _volumeCoordinator;
+    private readonly IPlaybackSeekCoordinator _seekCoordinator;
     private readonly ISystemMediaControlsService? _smtc;
     private readonly IScreenSaverPreventionService? _screenSaverPrevention;
     private CancellationTokenSource? _skipCts;
@@ -112,7 +115,6 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     private bool _autoPlayEjecutado = false;
     private double _posicionInicioSegundos = 0;
     private volatile bool _haCompletadoOpen = false;
-    private double _seekPendienteAlAbrir = -1;
 
     private List<AniSkipResult> _skipTimes = new();
     public List<AniSkipResult> SkipTimes => _skipTimes;
@@ -132,8 +134,8 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     [ObservableProperty] private bool _isDraggingSlider = false;
 
     // Oculta el frame de video (queda solo la carátula/fondo) mientras se reanuda un episodio:
-    // el seek de reanudación se aplica diferido (ver AplicarSeekNativo) y sin esto se ve el video
-    // arrancar en el segundo 0 antes de saltar visiblemente al punto guardado.
+    // el seek de reanudación se aplica diferido (ver IPlaybackSeekCoordinator) y sin esto se ve
+    // el video arrancar en el segundo 0 antes de saltar visiblemente al punto guardado.
     [ObservableProperty] private bool _ocultarVideoInicio;
     private DateTime _ocultarVideoDesdeUtc = DateTime.MinValue;
     private static readonly TimeSpan MaxOcultarVideoInicio = TimeSpan.FromSeconds(5);
@@ -291,12 +293,15 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         IDialogService? dialogService = null,
         IScreenSaverPreventionService? screenSaverPreventionService = null,
         IEpisodeNavigator? episodeNavigator = null,
-        IFrameCaptureService? frameCaptureService = null)
+        IFrameCaptureService? frameCaptureService = null,
+        IPlaybackWindowModeCoordinator? windowModeCoordinator = null,
+        ISubtitleCoordinator? subtitleCoordinator = null,
+        IPlaybackVolumeCoordinator? volumeCoordinator = null,
+        IPlaybackSeekCoordinator? seekCoordinator = null)
     {
         _settingsService = settingsService;
         _logrosService = logrosService;
         DialogService = dialogService;
-        _ventanaPrincipal = ventanaPrincipal;
         _screenSaverPrevention = screenSaverPreventionService;
 
         _playbackState = playbackStateService ?? new PlaybackStateService(databaseService, animeTrackingService, authService);
@@ -304,6 +309,10 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         _skipCoordinator = skipTimesCoordinator ?? new SkipTimesCoordinator(aniSkipService);
         _episodeNavigator = episodeNavigator ?? new EpisodeNavigator();
         _frameCaptureService = frameCaptureService ?? new FrameCaptureService();
+        _windowModeCoordinator = windowModeCoordinator ?? new PlaybackWindowModeCoordinator(ventanaPrincipal);
+        _subtitleCoordinator = subtitleCoordinator ?? new SubtitleCoordinator();
+        _volumeCoordinator = volumeCoordinator ?? new PlaybackVolumeCoordinator();
+        _seekCoordinator = seekCoordinator ?? new PlaybackSeekCoordinator();
 
         // SMT-01: SMTC es un singleton (un único HWND); esta instancia se suscribe a sus
         // botones mientras controla la reproducción y se desuscribe en Dispose(). Al ser
@@ -349,21 +358,9 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
     private void OnVolumenChanged(int value)
     {
-        if (Player?.Audio != null)
+        if (_volumeCoordinator.AplicarVolumen(Player, value, IsMuted))
         {
-            try
-            {
-                Player.Audio.Volume = value;
-                if (value > 0 && IsMuted)
-                {
-                    IsMuted = false;
-                    Player.Audio.Mute = false;
-                }
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Debug("ReproductorViewModel", $"Error asignando volumen: {ex.Message}");
-            }
+            IsMuted = false;
         }
 
         ActualizarVolumenIcon();
@@ -376,15 +373,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         {
             IsMuted = false;
             Volumen = _volumenPrevioMute > 0 ? _volumenPrevioMute : 100;
-            if (Player?.Audio != null)
-            {
-                try
-                {
-                    Player.Audio.Mute = false;
-                    Player.Audio.Volume = Volumen;
-                }
-                catch { }
-            }
+            _volumeCoordinator.Desmutear(Player, Volumen);
         }
         else
         {
@@ -393,36 +382,14 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             // Bug: la barra de volumen seguía al máximo al silenciar porque Volumen
             // no cambiaba — ahora baja a 0 (y se restaura el previo al desmutear)
             Volumen = 0;
-            if (Player?.Audio != null)
-            {
-                try
-                {
-                    Player.Audio.Mute = true;
-                }
-                catch { }
-            }
+            _volumeCoordinator.Mutear(Player);
         }
         ActualizarVolumenIcon();
     }
 
     private void ActualizarVolumenIcon()
     {
-        if (IsMuted || Volumen == 0)
-        {
-            VolumenIcon = "VolumeOff";
-        }
-        else if (Volumen < 35)
-        {
-            VolumenIcon = "VolumeLow";
-        }
-        else if (Volumen < 70)
-        {
-            VolumenIcon = "VolumeMedium";
-        }
-        else
-        {
-            VolumenIcon = "VolumeHigh";
-        }
+        VolumenIcon = _volumeCoordinator.CalcularIcono(Volumen, IsMuted);
     }
 
     private static readonly object _engineLock = new();
@@ -604,12 +571,12 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                     catch { }
                 }
 
-                // IMPORTANTE: NO seekear aquí (ni _seekPendienteAlAbrir ni reanudación).
-                // En este punto el decoder de video aún está creando su contexto de
+                // IMPORTANTE: NO seekear aquí (ni el diferido-al-abrir del coordinador ni la
+                // reanudación). En este punto el decoder de video aún está creando su contexto de
                 // renderizado y un Player.CurTime inmediato interrumpe ese proceso
                 // en algunos archivos (HEVC/VFR) dejando la pantalla en negro con
-                // audio avanzando. El bucle de tracking aplica el seek por
-                // SolicitarSeekNativo cuando el video ya está reproduciendo de verdad.
+                // audio avanzando. El bucle de tracking aplica el seek vía
+                // IPlaybackSeekCoordinator cuando el video ya está reproduciendo de verdad.
             };
             return player;
         }
@@ -708,20 +675,6 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
     // === Scrubbing de la línea de tiempo ===
     private double _posicionAntesArrastre;
-    private DateTime _settleHastaUtc = DateTime.MinValue;
-
-    // Tras un seek, el reproductor tarda unos ms en reportar la nueva posición;
-    // durante esa ventana el bucle de tracking no repinta la posición para evitar rebotes.
-    private static readonly TimeSpan VentanaSettleSeek = TimeSpan.FromMilliseconds(900);
-
-    // === Coalescing de seeks (último-gana) ===
-    // Enviar CurTime a Flyleaf más rápido de lo que él procesa los seeks los ENCOLA y pueden
-    // aplicarse FUERA DE ORDEN: el video "no se coloca y vuelve donde estaba". Con un intervalo
-    // mínimo entre seeks y aplicando siempre el objetivo MÁS RECIENTE, el orden queda garantizado.
-    private double _seekPendiente = -1;
-    private DateTime _ultimoSeekAplicadoUtc = DateTime.MinValue;
-    private CancellationTokenSource? _seekDebounceCts;
-    private static readonly TimeSpan IntervaloMinimoSeek = TimeSpan.FromMilliseconds(250);
 
     private void ActualizarTextosTiempo(double posicionSegundos)
     {
@@ -746,79 +699,12 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         seconds = AcotarPosicion(seconds);
 
         // Actualizar UI inmediatamente para feedback instantáneo
-        _settleHastaUtc = DateTime.UtcNow + VentanaSettleSeek;
+        _seekCoordinator.IniciarVentanaDeSettle();
         _lastNotifiedSeconds = seconds;
         CurrentSeconds = seconds;
         ActualizarTextosTiempo(seconds);
 
-        SolicitarSeekNativo(seconds);
-    }
-
-    /// <summary>
-    /// Punto único de entrada al seek nativo. Aplica de inmediato si pasó el intervalo mínimo;
-    /// si no, guarda el objetivo MÁS RECIENTE y lo aplica al vencer el intervalo (último-gana).
-    /// </summary>
-    private void SolicitarSeekNativo(double segundos)
-    {
-        if (Player == null || Player.IsDisposed) return;
-
-        var transcurrido = DateTime.UtcNow - _ultimoSeekAplicadoUtc;
-        if (transcurrido >= IntervaloMinimoSeek)
-        {
-            AplicarSeekNativo(segundos);
-            return;
-        }
-
-        _seekPendiente = segundos;
-
-        _seekDebounceCts?.Cancel();
-        _seekDebounceCts?.Dispose();
-        _seekDebounceCts = new CancellationTokenSource();
-        var ct = _seekDebounceCts.Token;
-        var restante = IntervaloMinimoSeek - transcurrido;
-        if (restante < TimeSpan.Zero) restante = TimeSpan.Zero;
-
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                await Task.Delay(restante, ct);
-                double objetivo = Interlocked.Exchange(ref _seekPendiente, -1);
-                if (objetivo >= 0 && !ct.IsCancellationRequested)
-                {
-                    AplicarSeekNativo(objetivo);
-                }
-            }
-            catch (OperationCanceledException) { }
-            catch (Exception ex)
-            {
-                AppLogger.Debug("ReproductorViewModel", $"Error en seek coalescido: {ex.Message}");
-            }
-        }, ct);
-    }
-
-    private void AplicarSeekNativo(double segundos)
-    {
-        if (Player == null || Player.IsDisposed) return;
-
-        // Si el reproductor todavía se está abriendo o no ha completado la inicialización inicial del decodificador,
-        // no invocar Player.CurTime de inmediato (interrumpe la creación del contexto de video en FFmpeg/Flyleaf
-        // dejando la pantalla negra). Guardamos la posición para aplicarla en cuanto OpenCompleted se active.
-        if (!_haCompletadoOpen || Player.Status == Status.Opening || Player.Status == Status.Stopped)
-        {
-            _seekPendienteAlAbrir = segundos;
-            return;
-        }
-
-        _ultimoSeekAplicadoUtc = DateTime.UtcNow;
-        try
-        {
-            Player.CurTime = TimeSpan.FromSeconds(segundos).Ticks;
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Warn("ReproductorViewModel", $"Excepción al ajustar posición nativa del reproductor: {ex.Message}");
-        }
+        _seekCoordinator.SolicitarSeek(Player, seconds, () => _haCompletadoOpen);
     }
 
     /// <summary>
@@ -851,7 +737,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         CurrentSeconds = segundos;
         ActualizarTextosTiempo(segundos);
 
-        SolicitarSeekNativo(segundos);
+        _seekCoordinator.SolicitarSeek(Player, segundos, () => _haCompletadoOpen);
     }
 
     /// <summary>
@@ -878,16 +764,8 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     [RelayCommand]
     public void ToggleFullscreen()
     {
-        // ARC-04: sin cast a MainWindow — la ventana se consume vía contrato IVentanaPrincipal.
-        if (_ventanaPrincipal == null) return;
-
-        _ventanaPrincipal.TogglePantallaCompleta();
-        FullscreenIcon = _ventanaPrincipal.IsFullScreen ? "FullscreenExit" : "Fullscreen";
-
-        // Devolver foco a MainWindow para que las teclas sigan respondiendo
-        System.Windows.Application.Current?.Dispatcher?.BeginInvoke(
-            System.Windows.Threading.DispatcherPriority.Input,
-            () => _ventanaPrincipal.Enfocar());
+        string? icono = _windowModeCoordinator.AlternarPantallaCompleta();
+        if (icono != null) FullscreenIcon = icono;
     }
 
     [RelayCommand]
@@ -912,14 +790,14 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     public void MinimizarAMini()
     {
         EsModoMini = true;
-        _ventanaPrincipal?.EntrarModoPiP();
+        _windowModeCoordinator.EntrarModoMini();
     }
 
     [RelayCommand]
     public void RestaurarFormatoHabitual()
     {
         EsModoMini = false;
-        _ventanaPrincipal?.SalirModoPiP();
+        _windowModeCoordinator.SalirModoMini();
     }
 
 
@@ -927,9 +805,10 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     public void SelectSubtitleStream(object stream)
     {
         if (Player == null || stream == null) return;
-        
-        HabilitarSubtitulos();
-        Player.OpenAsync((dynamic)stream);
+
+        SubtitulosHabilitados = true;
+        SubtitulosIcon = "Subtitles";
+        _subtitleCoordinator.SeleccionarPista(Player, stream);
     }
 
     [RelayCommand]
@@ -942,29 +821,16 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     {
         try
         {
-            bool permitirSubtitulos = true;
-            if (_settingsService != null)
-            {
-                var config = _settingsService.ObtenerConfiguracion();
-                if (config != null)
-                {
-                    permitirSubtitulos = config.SubtitulosPorDefecto;
-                }
-            }
+            bool permitirSubtitulos = _settingsService?.ObtenerConfiguracion()?.SubtitulosPorDefecto ?? true;
 
-            if (!permitirSubtitulos)
+            if (_subtitleCoordinator.DebenHabilitarsePorDefecto(Player, permitirSubtitulos))
+            {
+                HabilitarSubtitulos();
+            }
+            else
             {
                 DeshabilitarSubtitulos();
-                return;
             }
-
-            if (Player?.Subtitles?.Streams == null || Player.Subtitles.Streams.Count == 0)
-            {
-                DeshabilitarSubtitulos();
-                return;
-            }
-
-            HabilitarSubtitulos();
         }
         catch (Exception ex)
         {
@@ -976,20 +842,14 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     {
         SubtitulosHabilitados = false;
         SubtitulosIcon = "SubtitlesOutline";
-        if (Player?.Config?.Subtitles != null)
-        {
-            Player.Config.Subtitles.Enabled = false;
-        }
+        _subtitleCoordinator.Deshabilitar(Player);
     }
 
     public void HabilitarSubtitulos()
     {
         SubtitulosHabilitados = true;
         SubtitulosIcon = "Subtitles";
-        if (Player?.Config?.Subtitles != null)
-        {
-            Player.Config.Subtitles.Enabled = true;
-        }
+        _subtitleCoordinator.Habilitar(Player);
     }
 
     public EpisodioItem? ObtenerSiguienteEpisodio() => _episodeNavigator.ObtenerSiguiente(_episodio);
@@ -1106,7 +966,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         _ = GuardarProgresoActualAsync();
 
         // Descartar seeks coalescidos pendientes del episodio anterior
-        CancelarSeekPendiente();
+        _seekCoordinator.Reiniciar();
 
         // Cancelar detección de skips previa
         _skipCts?.Cancel();
@@ -1155,7 +1015,6 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         _resumingPositionSeconds = 0;
         _posicionInicioSegundos = 0;
         _haCompletadoOpen = false;
-        _seekPendienteAlAbrir = -1;
 
         if (listaEpisodios != null)
         {
@@ -1198,17 +1057,8 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         _ = CargarSkipTimesAsync(animeId, episodio, currentSkipCts.Token);
 
         // 4. Sincronizar ícono de fullscreen con el estado actual de la ventana
-        try
-        {
-            if (_ventanaPrincipal != null)
-            {
-                FullscreenIcon = _ventanaPrincipal.IsFullScreen ? "FullscreenExit" : "Fullscreen";
-            }
-        }
-        catch
-        {
-            // Entornos de pruebas sin ventana principal
-        }
+        string? iconoFullscreen = _windowModeCoordinator.IconoPantallaCompletaActual();
+        if (iconoFullscreen != null) FullscreenIcon = iconoFullscreen;
 
         if (Player != null)
         {
@@ -1467,10 +1317,14 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                     // apertura). Se aplica aquí, con el video YA reproduciendo y la duración
                     // conocida: aplicar CurTime en OpenCompleted interrumpe la creación del
                     // contexto de video en algunos archivos (HEVC/VFR) y deja pantalla negra.
-                    if (durSeconds > 0 && (_seekPendienteAlAbrir >= 0 || _posicionInicioSegundos > 5))
+                    // Solo se consume el diferido del coordinador una vez que se conoce la
+                    // duración (igual que antes): si aún no se conoce, se queda pendiente para
+                    // un tick futuro en vez de perderse.
+                    double? seekDiferido = durSeconds > 0 ? _seekCoordinator.ConsumirSeekPendienteAlAbrir() : null;
+                    if (durSeconds > 0 && (seekDiferido.HasValue || _posicionInicioSegundos > 5))
                     {
-                        bool esReanudacion = _seekPendienteAlAbrir < 0 && _posicionInicioSegundos > 5;
-                        double posToSeek = _seekPendienteAlAbrir >= 0 ? _seekPendienteAlAbrir : _posicionInicioSegundos;
+                        bool esReanudacion = !seekDiferido.HasValue && _posicionInicioSegundos > 5;
+                        double posToSeek = seekDiferido ?? _posicionInicioSegundos;
 
                         // FUN-006: nunca buscar más allá de la duración real del archivo que se
                         // está reproduciendo (un archivo reemplazado por otro más corto haría
@@ -1480,16 +1334,15 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                             posToSeek = Math.Max(0, durSeconds - 1.0);
                         }
 
-                        _seekPendienteAlAbrir = -1;
                         _posicionInicioSegundos = 0;
 
                         // Antes de disparar el seek nativo: congelar el repintado para que la
                         // barra no "rebote" a la posición vieja mientras el seek se procesa.
-                        _settleHastaUtc = DateTime.UtcNow + VentanaSettleSeek;
+                        _seekCoordinator.IniciarVentanaDeSettle();
                         _lastNotifiedSeconds = posToSeek;
                         CurrentSeconds = posToSeek;
 
-                        SolicitarSeekNativo(posToSeek);
+                        _seekCoordinator.SolicitarSeek(Player, posToSeek, () => _haCompletadoOpen);
 
                         if (esReanudacion)
                         {
@@ -1517,7 +1370,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
                         // Durante la ventana de settle tras un seek, el reproductor aún reporta la
                         // posición vieja: no repintar para que la barra no "rebote" hacia atrás.
-                        bool enSettleSeek = DateTime.UtcNow < _settleHastaUtc;
+                        bool enSettleSeek = _seekCoordinator.EnVentanaDeSettle;
 
                         // El seek de reanudación ya se asentó: revelar el video en el punto correcto.
                         if (!enSettleSeek && OcultarVideoInicio)
@@ -1682,7 +1535,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     public void Cerrar()
     {
         EsModoMini = false;
-        _ventanaPrincipal?.SalirModoPiP();
+        _windowModeCoordinator.SalirModoMini();
         _ = GuardarProgresoActualAsync();
         Dispose();
         
@@ -1723,7 +1576,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
         _ = GuardarProgresoActualAsync();
 
-        CancelarSeekPendiente();
+        _seekCoordinator.Dispose();
 
         try
         {
@@ -1782,12 +1635,4 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     /// ventana nativa. La vista del reproductor los dibuja por su cuenta, encima del video, a partir de esto.
     /// </summary>
     public IDialogService? DialogService { get; }
-
-    private void CancelarSeekPendiente()
-    {
-        Interlocked.Exchange(ref _seekPendiente, -1);
-        try { _seekDebounceCts?.Cancel(); } catch { }
-        _seekDebounceCts?.Dispose();
-        _seekDebounceCts = null;
-    }
 }

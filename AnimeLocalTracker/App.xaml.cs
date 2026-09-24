@@ -187,6 +187,16 @@ public partial class App : Application
         services.AddTransient<IEpisodeNavigator, EpisodeNavigator>();
         services.AddSingleton<IFrameCaptureService, FrameCaptureService>();
 
+        // Fase 2 del refactor: modo ventana, subtítulos y volumen/mute — ninguno tiene estado
+        // por sesión de reproducción (Singleton, igual que FrameCaptureService).
+        services.AddSingleton<IPlaybackWindowModeCoordinator, PlaybackWindowModeCoordinator>();
+        services.AddSingleton<ISubtitleCoordinator, SubtitleCoordinator>();
+        services.AddSingleton<IPlaybackVolumeCoordinator, PlaybackVolumeCoordinator>();
+
+        // Fase 3 del refactor: coalescing de seek — sí tiene estado por sesión de reproducción
+        // (Transient, igual que EpisodeNavigator).
+        services.AddTransient<IPlaybackSeekCoordinator, PlaybackSeekCoordinator>();
+
         // 4. Integración del Ecosistema de Automatización Python (Zero-Setup & Clean Architecture)
         services.AddSingleton<IPythonBridgeService, PythonBridgeService>();
         services.AddSingleton<PythonEpisodeEnricher>();
