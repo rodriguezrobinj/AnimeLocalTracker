@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -12,7 +11,6 @@ using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using FlyleafLib;
 using FlyleafLib.MediaFramework.MediaDecoder;
-using FlyleafLib.MediaFramework.MediaDemuxer;
 using FlyleafLib.MediaPlayer;
 using AnimeLocalTracker.Messages;
 using AnimeLocalTracker.Models;
@@ -28,6 +26,8 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     private readonly IVentanaPrincipal? _ventanaPrincipal;
     private readonly IPlaybackStateService _playbackState;
     private readonly ISkipTimesCoordinator _skipCoordinator;
+    private readonly IEpisodeNavigator _episodeNavigator;
+    private readonly IFrameCaptureService _frameCaptureService;
     private readonly ISystemMediaControlsService? _smtc;
     private readonly IScreenSaverPreventionService? _screenSaverPrevention;
     private CancellationTokenSource? _skipCts;
@@ -167,13 +167,11 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         set => SetProperty(ref _episodioSiguienteTooltip, value);
     }
 
-    private List<EpisodioItem> _episodiosDisponibles = new();
-
     // === CAJÓN LATERAL DE EPISODIOS (tecla L) ===
-    // Reutiliza _episodiosDisponibles (ya filtrado a episodios con archivo local, ver
+    // Reutiliza la lista del navigator (ya filtrada a episodios con archivo local, ver
     // CargarVideoAsync) — sin consulta nueva a la BD/disco, el dato ya estaba cargado para
     // Siguiente/Anterior episodio.
-    public List<EpisodioItem> EpisodiosDelCajon => _episodiosDisponibles;
+    public IReadOnlyList<EpisodioItem> EpisodiosDelCajon => _episodeNavigator.EpisodiosDisponibles;
 
     [ObservableProperty] private bool _cajonEpisodiosAbierto;
 
@@ -185,7 +183,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     {
         if (episodio == null || string.IsNullOrWhiteSpace(episodio.RutaCompleta)) return;
         CajonEpisodiosAbierto = false;
-        CargarVideo(episodio.RutaCompleta, _animeId, TituloAnime, episodio.NumeroEpisodio, _episodiosDisponibles, _rutaPortada);
+        CargarVideo(episodio.RutaCompleta, _animeId, TituloAnime, episodio.NumeroEpisodio, _episodeNavigator.EpisodiosDisponibles.ToList(), _rutaPortada);
     }
 
     private string _fullscreenIcon = "Fullscreen";
@@ -291,7 +289,9 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         ISystemMediaControlsService? systemMediaControlsService = null,
         ILogrosService? logrosService = null,
         IDialogService? dialogService = null,
-        IScreenSaverPreventionService? screenSaverPreventionService = null)
+        IScreenSaverPreventionService? screenSaverPreventionService = null,
+        IEpisodeNavigator? episodeNavigator = null,
+        IFrameCaptureService? frameCaptureService = null)
     {
         _settingsService = settingsService;
         _logrosService = logrosService;
@@ -302,6 +302,8 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         _playbackState = playbackStateService ?? new PlaybackStateService(databaseService, animeTrackingService, authService);
 
         _skipCoordinator = skipTimesCoordinator ?? new SkipTimesCoordinator(aniSkipService);
+        _episodeNavigator = episodeNavigator ?? new EpisodeNavigator();
+        _frameCaptureService = frameCaptureService ?? new FrameCaptureService();
 
         // SMT-01: SMTC es un singleton (un único HWND); esta instancia se suscribe a sus
         // botones mientras controla la reproducción y se desuscribe en Dispose(). Al ser
@@ -990,21 +992,9 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         }
     }
 
-    public EpisodioItem? ObtenerSiguienteEpisodio()
-    {
-        return _episodiosDisponibles
-            .Where(e => e.NumeroEpisodio > _episodio && (!string.IsNullOrWhiteSpace(e.RutaCompleta)))
-            .OrderBy(e => e.NumeroEpisodio)
-            .FirstOrDefault();
-    }
+    public EpisodioItem? ObtenerSiguienteEpisodio() => _episodeNavigator.ObtenerSiguiente(_episodio);
 
-    public EpisodioItem? ObtenerAnteriorEpisodio()
-    {
-        return _episodiosDisponibles
-            .Where(e => e.NumeroEpisodio < _episodio && (!string.IsNullOrWhiteSpace(e.RutaCompleta)))
-            .OrderByDescending(e => e.NumeroEpisodio)
-            .FirstOrDefault();
-    }
+    public EpisodioItem? ObtenerAnteriorEpisodio() => _episodeNavigator.ObtenerAnterior(_episodio);
 
     public void ActualizarEstadosNavegacionEpisodios()
     {
@@ -1030,7 +1020,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         var siguiente = ObtenerSiguienteEpisodio();
         if (siguiente != null && !string.IsNullOrWhiteSpace(siguiente.RutaCompleta))
         {
-            CargarVideo(siguiente.RutaCompleta, _animeId, TituloAnime, siguiente.NumeroEpisodio, _episodiosDisponibles, _rutaPortada);
+            CargarVideo(siguiente.RutaCompleta, _animeId, TituloAnime, siguiente.NumeroEpisodio, _episodeNavigator.EpisodiosDisponibles.ToList(), _rutaPortada);
         }
     }
 
@@ -1040,68 +1030,16 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         var anterior = ObtenerAnteriorEpisodio();
         if (anterior != null && !string.IsNullOrWhiteSpace(anterior.RutaCompleta))
         {
-            CargarVideo(anterior.RutaCompleta, _animeId, TituloAnime, anterior.NumeroEpisodio, _episodiosDisponibles, _rutaPortada);
+            CargarVideo(anterior.RutaCompleta, _animeId, TituloAnime, anterior.NumeroEpisodio, _episodeNavigator.EpisodiosDisponibles.ToList(), _rutaPortada);
         }
     }
 
-    /// <summary>
-    /// ARQ-01: decisión pura (sin Player) de si toca disparar la pre-carga del siguiente episodio en
-    /// este instante del sondeo de progreso — al menos 95% visto, hay un siguiente episodio con
-    /// archivo, y no es el mismo que ya se precargó (como máximo una vez por episodio).
-    /// </summary>
+    /// <summary>ARQ-01: decisión pura de pre-carga — movida a <see cref="EpisodeNavigator"/>; se
+    /// mantiene este reenvío para no tocar los tests existentes que la llaman por este nombre.</summary>
     internal static bool DebePrecargarSiguienteEpisodio(double porcentaje, string? rutaSiguiente, string? rutaYaPrecargada) =>
-        porcentaje >= 0.95 && !string.IsNullOrWhiteSpace(rutaSiguiente) && rutaSiguiente != rutaYaPrecargada;
-
-    /// <summary>
-    /// Pre-buffering del siguiente episodio: abre un <see cref="Demuxer"/> de FlyleafLib APARTE del
-    /// Player en reproducción contra el archivo del siguiente episodio, y lo descarta enseguida. No
-    /// sustituye la apertura real del Player al cambiar de episodio — la API pública de FlyleafLib no
-    /// permite entregarle a un Player un demuxer ya abierto — pero adelanta el sondeo de
-    /// contenedor/streams (avformat_find_stream_info) y calienta la caché de E/S de Windows para ese
-    /// archivo, así que cuando SiguienteEpisodio() abra el Player real, esa parte del trabajo ya no
-    /// parte de cero. Estrictamente best-effort: nunca toca el Player en reproducción, y cualquier
-    /// fallo (archivo movido, formato no soportado) se descarta sin avisar al usuario.
-    /// </summary>
-    private async Task PrecargarSiguienteEpisodioAsync(string rutaSiguiente, CancellationToken ct)
-    {
-        try
-        {
-            await Task.Run(() =>
-            {
-                if (ct.IsCancellationRequested) return;
-
-                var config = new Config();
-                var demuxer = new Demuxer(config.Demuxer, MediaType.Video);
-                try
-                {
-                    string error = demuxer.Open(rutaSiguiente);
-                    if (!string.IsNullOrEmpty(error))
-                    {
-                        AppLogger.Debug("ReproductorViewModel", $"Precarga del siguiente episodio no pudo abrir '{rutaSiguiente}': {error}");
-                    }
-                }
-                finally
-                {
-                    demuxer.Dispose();
-                }
-            }, ct).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-            // Se cambió de episodio/se cerró el reproductor antes de que terminara: no hay nada que hacer.
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Debug("ReproductorViewModel", $"Precarga del siguiente episodio falló (no afecta la reproducción actual): {ex.Message}");
-        }
-    }
+        EpisodeNavigator.DebePrecargarSiguienteEpisodio(porcentaje, rutaSiguiente, rutaYaPrecargada);
 
     private CancellationTokenSource? _trackingCts;
-
-    /// <summary>Pre-buffering del siguiente episodio (ver <see cref="PrecargarSiguienteEpisodioAsync"/>):
-    /// evita relanzarlo más de una vez por episodio y se cancela si se cambia de video antes de terminar.</summary>
-    private CancellationTokenSource? _precargaCts;
-    private string? _rutaPrecargada;
 
     /// <summary>
     /// PERF: <see cref="ObtenerSiguienteEpisodio"/> recorre y ordena _episodiosDisponibles (puede tener
@@ -1185,10 +1123,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         MostrarCuentaAtrasSiguiente = false;
 
         // Cancelar la pre-carga del siguiente episodio del video anterior (si seguía en curso)
-        _precargaCts?.Cancel();
-        _precargaCts?.Dispose();
-        _precargaCts = new CancellationTokenSource();
-        _rutaPrecargada = null;
+        _episodeNavigator.CancelarPrecargaYReiniciar();
 
         if (_settingsService != null)
         {
@@ -1224,10 +1159,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
         if (listaEpisodios != null)
         {
-            _episodiosDisponibles = listaEpisodios
-                .Where(e => !string.IsNullOrWhiteSpace(e.RutaCompleta))
-                .OrderBy(e => e.NumeroEpisodio)
-                .ToList();
+            _episodeNavigator.EstablecerEpisodios(listaEpisodios);
             OnPropertyChanged(nameof(EpisodiosDelCajon));
         }
 
@@ -1325,50 +1257,24 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
-    /// Captura el fotograma que Flyleaf tiene actualmente renderizado directo desde su buffer
-    /// Direct3D (Player.TakeSnapshotToBitmapSource) — sin relanzar ffmpeg ni re-decodificar, y en
-    /// la resolución nativa del video. Si los subtítulos están activos ya quedan incluidos porque
-    /// Flyleaf los compone dentro del propio frame renderizado (no son un overlay WPF aparte).
-    /// Se guarda automáticamente en Imágenes\AnimeLocalTracker y se copia al portapapeles.
+    /// Captura el fotograma actual (ver <see cref="FrameCaptureService"/>: snapshot directo del
+    /// buffer Direct3D de Flyleaf, sin relanzar ffmpeg ni re-decodificar), lo copia al portapapeles
+    /// y lo guarda en Imágenes\AnimeLocalTracker. Este comando solo traduce el resultado a un toast.
     /// </summary>
     [RelayCommand]
     private async Task CapturarFrameAsync()
     {
-        if (Player == null) return;
+        string? ruta = await _frameCaptureService.CapturarYGuardarAsync(Player);
 
-        try
+        if (ruta == null)
         {
-            var bitmap = Player.TakeSnapshotToBitmapSource(0, 0);
-            if (bitmap == null)
-            {
-                _ = WeakReferenceMessenger.Default.Send(new Messages.MostrarDialogoRequestMessage(
-                    LocalizationService.T("Player_CapturaTitulo"), LocalizationService.T("Player_CapturaErrorMsj"), false, "AlertCircleOutline", "#EF4444"));
-                return;
-            }
-            bitmap.Freeze();
-
-            Clipboard.SetImage(bitmap);
-
-            string carpeta = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "AnimeLocalTracker");
-            string ruta = Path.Combine(carpeta, $"Captura_{DateTime.Now:yyyyMMdd_HHmmss}.png");
-            await Task.Run(() =>
-            {
-                Directory.CreateDirectory(carpeta);
-                var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
-                encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
-                using var fs = File.Create(ruta);
-                encoder.Save(fs);
-            });
-
-            _ = WeakReferenceMessenger.Default.Send(new Messages.MostrarDialogoRequestMessage(
-                LocalizationService.T("Player_CapturaTitulo"), string.Format(LocalizationService.T("Player_CapturaListaFormato"), ruta), false, "CameraOutline", "#4CAF50"));
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Error("ReproductorViewModel", "Error capturando fotograma", ex);
             _ = WeakReferenceMessenger.Default.Send(new Messages.MostrarDialogoRequestMessage(
                 LocalizationService.T("Player_CapturaTitulo"), LocalizationService.T("Player_CapturaErrorMsj"), false, "AlertCircleOutline", "#EF4444"));
+            return;
         }
+
+        _ = WeakReferenceMessenger.Default.Send(new Messages.MostrarDialogoRequestMessage(
+            LocalizationService.T("Player_CapturaTitulo"), string.Format(LocalizationService.T("Player_CapturaListaFormato"), ruta), false, "CameraOutline", "#4CAF50"));
     }
 
     public async Task GuardarProgresoActualAsync(bool forzarProgresoCero = false)
@@ -1648,12 +1554,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                     // tocar en absoluto la reproducción actual. Como máximo una vez por episodio.
                     if (TieneEpisodioSiguiente && !EsEntornoPruebas())
                     {
-                        var siguienteParaPrecarga = _siguienteEpisodioCache;
-                        if (DebePrecargarSiguienteEpisodio(porcentaje, siguienteParaPrecarga?.RutaCompleta, _rutaPrecargada))
-                        {
-                            _rutaPrecargada = siguienteParaPrecarga!.RutaCompleta;
-                            _ = PrecargarSiguienteEpisodioAsync(siguienteParaPrecarga.RutaCompleta, _precargaCts!.Token);
-                        }
+                        _episodeNavigator.ConsiderarPrecarga(porcentaje, _siguienteEpisodioCache?.RutaCompleta);
                     }
 
                     // Auto-Tracking al umbral configurado (FUN-003: antes fijo en 90%)
@@ -1842,11 +1743,9 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
         try
         {
-            _precargaCts?.Cancel();
-            _precargaCts?.Dispose();
+            _episodeNavigator.Dispose();
         }
         catch { }
-        _precargaCts = null;
 
         if (Player != null)
         {
