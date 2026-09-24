@@ -58,6 +58,13 @@
       <None Include="animetracker_core.dll" Condition="Exists('animetracker_core.dll')">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>
+      <!-- Copia sincronizada de tools/python/audio_skip_plugin.py (fuente de verdad; ver comentario
+           en SkipTimesCoordinator.RutaPluginAudioSkip). A diferencia de Tools\, esta carpeta SÍ va al
+           control de versiones: Tools\ está en .gitignore (solo existe tras compilar el binario de
+           PyInstaller) y en un build empaquetado desde un checkout limpio no traería este plugin. -->
+      <None Include="PythonPlugins\**">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
     </ItemGroup>
 
 </Project>

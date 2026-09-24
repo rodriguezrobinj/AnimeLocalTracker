@@ -54,6 +54,7 @@ public partial class DetalleViewModel : ObservableObject,
         _ctsCargaFicha?.Cancel();
         _ctsCargaFicha?.Dispose();
         _enrichmentCoordinator.Dispose();
+        _reproductorPreview?.Close();
         GC.SuppressFinalize(this);
     }
     
@@ -172,11 +173,15 @@ public partial class DetalleViewModel : ObservableObject,
         IVideoIntegrityService? videoIntegrityService = null,
         IProximaEmisionService? proximaEmision = null,
         IDatosExtraService? datosExtra = null,
-        IEmisionMonitorService? monitorEmision = null)
+        IEmisionMonitorService? monitorEmision = null,
+        IAnimeThemesService? animeThemesService = null,
+        IAnimeThemesDownloadService? animeThemesDownload = null)
     {
         _proximaEmision = proximaEmision;
         _datosExtra = datosExtra;
         _monitorEmision = monitorEmision;
+        _animeThemesService = animeThemesService;
+        _animeThemesDownload = animeThemesDownload;
         _animeTrackingService = animeTrackingService;
         _databaseService = databaseService;
         _authService = authService;
@@ -353,6 +358,7 @@ public partial class DetalleViewModel : ObservableObject,
     {
         ReiniciarContadorProximo();
         ReiniciarExtras();
+        ReiniciarMusica();
         EstaConectado = _authService.EstaAutenticado();
         AnimeSeleccionado = anime;
         EsFavoritoAnime = anime.EsFavorito;
@@ -469,6 +475,7 @@ public partial class DetalleViewModel : ObservableObject,
         _ = CalcularEspacioEnDiscoAsync(ctFicha);
         _ = CargarDatosExtraAsync(ctFicha);
         _ = CargarPreferenciasEmisionAsync(ctFicha);
+        _ = CargarTemasMusicalesAsync(ctFicha);
     }
 
     /// <summary>
