@@ -965,6 +965,62 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     {
         _ = GuardarProgresoActualAsync();
 
+        CancellationToken skipCtToken = CancelarTrabajoPendienteDelEpisodioAnterior();
+        RecargarConfiguracionDeSesion();
+        AsignarMetadatosDeEpisodio(rutaVideo, animeId, episodio, tituloAnime, rutaPortada);
+        EstablecerListaDeEpisodiosSiCorresponde(listaEpisodios);
+        ActualizarEstadosNavegacionEpisodios();
+
+        // Cancelar rastreo previo
+        _trackingCts?.Cancel();
+        _trackingCts?.Dispose();
+        _trackingCts = new CancellationTokenSource();
+
+        // 1. Asegurar que Player existe antes de configurar el nuevo archivo
+        AsegurarPlayerInicializado();
+        DetenerPlayerSiEstabaActivo();
+
+        // 2. Obtener progreso previo ANTES de abrir/reproducir para que comience de inmediato donde se dejó
+        await VerificarProgresoPrevioAsync(animeId, episodio);
+        _posicionInicioSegundos = _resumingPositionSeconds;
+
+        // Cubrir el video hasta que el seek de reanudación diferido se aplique de verdad
+        // (evita el "flash" del episodio arrancando en 0:00 antes de saltar al punto guardado).
+        OcultarVideoInicio = _posicionInicioSegundos > 5;
+        _ocultarVideoDesdeUtc = DateTime.UtcNow;
+
+        // 3. Cargar marcas de skip de AniSkip en segundo plano
+        _ = CargarSkipTimesAsync(animeId, episodio, skipCtToken);
+
+        // 4. Sincronizar ícono de fullscreen con el estado actual de la ventana
+        string? iconoFullscreen = _windowModeCoordinator.IconoPantallaCompletaActual();
+        if (iconoFullscreen != null) FullscreenIcon = iconoFullscreen;
+
+        if (Player != null)
+        {
+            Player.OpenAsync(rutaVideo);
+
+            // Velocidad de reproducción por defecto configurable
+            try
+            {
+                double velocidad = _settingsService?.ObtenerConfiguracion()?.VelocidadReproduccionDefecto ?? 1.0;
+                Player.Speed = (float)Math.Clamp(velocidad, 0.5, 2.0);
+            }
+            catch { }
+        }
+
+        _ = RastrearProgresoAsync(_trackingCts.Token);
+    }
+
+    /// <summary>
+    /// Cancela/reinicia todo lo que quedaba en curso del episodio anterior (seek coalescido,
+    /// detección de skips, pre-carga del siguiente). Devuelve el token de la detección de skips
+    /// YA capturado en una variable local — a propósito, no debe releerse <c>_skipCts</c> después
+    /// del primer <c>await</c> de <see cref="CargarVideoAsync"/>: una segunda llamada concurrente
+    /// (doble clic en "Siguiente") podría reasignar el campo antes de que se use el token.
+    /// </summary>
+    private CancellationToken CancelarTrabajoPendienteDelEpisodioAnterior()
+    {
         // Descartar seeks coalescidos pendientes del episodio anterior
         _seekCoordinator.Reiniciar();
 
@@ -985,19 +1041,25 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         // Cancelar la pre-carga del siguiente episodio del video anterior (si seguía en curso)
         _episodeNavigator.CancelarPrecargaYReiniciar();
 
-        if (_settingsService != null)
-        {
-            var config = _settingsService.ObtenerConfiguracion();
-            if (config != null)
-            {
-                AutoSkipIntroOutro = config.AutoSkipIntroOutro;
-                AccionFinEpisodio = string.IsNullOrWhiteSpace(config.AccionFinEpisodio) ? AccionFinEpisodioValores.AutoPlayCuentaAtras : config.AccionFinEpisodio;
-                PasosSaltoSegundos = config.PasosSaltoSegundos is 5 or 10 or 30 or 60 ? config.PasosSaltoSegundos : 10;
-                SubtitulosHabilitados = config.SubtitulosPorDefecto;
-                SubtitulosIcon = config.SubtitulosPorDefecto ? "Subtitles" : "SubtitlesOutline";
-            }
-        }
+        return currentSkipCts.Token;
+    }
 
+    private void RecargarConfiguracionDeSesion()
+    {
+        if (_settingsService == null) return;
+
+        var config = _settingsService.ObtenerConfiguracion();
+        if (config == null) return;
+
+        AutoSkipIntroOutro = config.AutoSkipIntroOutro;
+        AccionFinEpisodio = string.IsNullOrWhiteSpace(config.AccionFinEpisodio) ? AccionFinEpisodioValores.AutoPlayCuentaAtras : config.AccionFinEpisodio;
+        PasosSaltoSegundos = config.PasosSaltoSegundos is 5 or 10 or 30 or 60 ? config.PasosSaltoSegundos : 10;
+        SubtitulosHabilitados = config.SubtitulosPorDefecto;
+        SubtitulosIcon = config.SubtitulosPorDefecto ? "Subtitles" : "SubtitlesOutline";
+    }
+
+    private void AsignarMetadatosDeEpisodio(string rutaVideo, int animeId, int episodio, string tituloAnime, string? rutaPortada)
+    {
         _rutaVideo = rutaVideo;
         _animeId = animeId;
         _episodio = episodio;
@@ -1015,65 +1077,28 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         _resumingPositionSeconds = 0;
         _posicionInicioSegundos = 0;
         _haCompletadoOpen = false;
+    }
 
-        if (listaEpisodios != null)
+    private void EstablecerListaDeEpisodiosSiCorresponde(List<EpisodioItem>? listaEpisodios)
+    {
+        if (listaEpisodios == null) return;
+
+        _episodeNavigator.EstablecerEpisodios(listaEpisodios);
+        OnPropertyChanged(nameof(EpisodiosDelCajon));
+    }
+
+    private void DetenerPlayerSiEstabaActivo()
+    {
+        if (Player == null || Player.Status == Status.Stopped) return;
+
+        try
         {
-            _episodeNavigator.EstablecerEpisodios(listaEpisodios);
-            OnPropertyChanged(nameof(EpisodiosDelCajon));
+            Player.Stop();
         }
-
-        ActualizarEstadosNavegacionEpisodios();
-
-        // Cancelar rastreo previo
-        _trackingCts?.Cancel();
-        _trackingCts?.Dispose();
-        _trackingCts = new CancellationTokenSource();
-
-        // 1. Asegurar que Player existe antes de configurar el nuevo archivo
-        AsegurarPlayerInicializado();
-
-        if (Player != null && Player.Status != Status.Stopped)
+        catch (Exception ex)
         {
-            try
-            {
-                Player.Stop();
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Debug("ReproductorViewModel", $"Player stop antes de cambiar archivo: {ex.Message}");
-            }
+            AppLogger.Debug("ReproductorViewModel", $"Player stop antes de cambiar archivo: {ex.Message}");
         }
-
-        // 2. Obtener progreso previo ANTES de abrir/reproducir para que comience de inmediato donde se dejó
-        await VerificarProgresoPrevioAsync(animeId, episodio);
-        _posicionInicioSegundos = _resumingPositionSeconds;
-
-        // Cubrir el video hasta que el seek de reanudación diferido se aplique de verdad
-        // (evita el "flash" del episodio arrancando en 0:00 antes de saltar al punto guardado).
-        OcultarVideoInicio = _posicionInicioSegundos > 5;
-        _ocultarVideoDesdeUtc = DateTime.UtcNow;
-
-        // 3. Cargar marcas de skip de AniSkip en segundo plano
-        _ = CargarSkipTimesAsync(animeId, episodio, currentSkipCts.Token);
-
-        // 4. Sincronizar ícono de fullscreen con el estado actual de la ventana
-        string? iconoFullscreen = _windowModeCoordinator.IconoPantallaCompletaActual();
-        if (iconoFullscreen != null) FullscreenIcon = iconoFullscreen;
-
-        if (Player != null)
-        {
-            Player.OpenAsync(rutaVideo);
-
-            // Velocidad de reproducción por defecto configurable
-            try
-            {
-                double velocidad = _settingsService?.ObtenerConfiguracion()?.VelocidadReproduccionDefecto ?? 1.0;
-                Player.Speed = (float)Math.Clamp(velocidad, 0.5, 2.0);
-            }
-            catch { }
-        }
-
-        _ = RastrearProgresoAsync(_trackingCts.Token);
     }
 
     /// <summary>Tecla configurada para una acción del reproductor (con fallback).</summary>
@@ -1313,78 +1338,11 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                     double curSeconds = TimeSpan.FromTicks(Player.CurTime).TotalSeconds;
                     double durSeconds = TimeSpan.FromTicks(Player.Duration).TotalSeconds;
 
-                    // Seek de arranque diferido (reanudación o scrub del usuario durante la
-                    // apertura). Se aplica aquí, con el video YA reproduciendo y la duración
-                    // conocida: aplicar CurTime en OpenCompleted interrumpe la creación del
-                    // contexto de video en algunos archivos (HEVC/VFR) y deja pantalla negra.
-                    // Solo se consume el diferido del coordinador una vez que se conoce la
-                    // duración (igual que antes): si aún no se conoce, se queda pendiente para
-                    // un tick futuro en vez de perderse.
-                    double? seekDiferido = durSeconds > 0 ? _seekCoordinator.ConsumirSeekPendienteAlAbrir() : null;
-                    if (durSeconds > 0 && (seekDiferido.HasValue || _posicionInicioSegundos > 5))
-                    {
-                        bool esReanudacion = !seekDiferido.HasValue && _posicionInicioSegundos > 5;
-                        double posToSeek = seekDiferido ?? _posicionInicioSegundos;
+                    AplicarSeekDeArranqueDiferidoSiCorresponde(durSeconds);
 
-                        // FUN-006: nunca buscar más allá de la duración real del archivo que se
-                        // está reproduciendo (un archivo reemplazado por otro más corto haría
-                        // que el seek quedara fuera de rango y el video terminara al instante).
-                        if (durSeconds > 0 && posToSeek >= durSeconds)
-                        {
-                            posToSeek = Math.Max(0, durSeconds - 1.0);
-                        }
-
-                        _posicionInicioSegundos = 0;
-
-                        // Antes de disparar el seek nativo: congelar el repintado para que la
-                        // barra no "rebote" a la posición vieja mientras el seek se procesa.
-                        _seekCoordinator.IniciarVentanaDeSettle();
-                        _lastNotifiedSeconds = posToSeek;
-                        CurrentSeconds = posToSeek;
-
-                        _seekCoordinator.SolicitarSeek(Player, posToSeek, () => _haCompletadoOpen);
-
-                        if (esReanudacion)
-                        {
-                            var tPos = TimeSpan.FromSeconds(posToSeek);
-                            string tiempoFormateado = tPos.ToString(tPos.Hours > 0 ? @"hh\:mm\:ss" : @"mm\:ss");
-
-                            _ = WeakReferenceMessenger.Default.Send(new Messages.MostrarDialogoRequestMessage(
-                                LocalizationService.T("Player_ReanudarReproduccionTitulo"),
-                                string.Format(LocalizationService.T("Player_ContinuandoDesdeFormato"), tiempoFormateado),
-                                false, "PlaySpeed", "#2196F3"));
-                        }
-                    }
-                    
                     if (!IsDraggingSlider)
                     {
-                        // Cachear la duración (no cambia durante la reproducción; independiente del settle)
-                        if (!_durationCached && durSeconds > 0)
-                        {
-                            TotalSeconds = durSeconds;
-                            TimeSpan tDur = TimeSpan.FromSeconds(durSeconds);
-                            TiempoTotalTexto = tDur.ToString(tDur.Hours > 0 ? @"hh\:mm\:ss" : @"mm\:ss");
-                            _durationCached = true;
-                            TiempoCombinadoTexto = $"{TiempoActualTexto} / {TiempoTotalTexto}";
-                        }
-
-                        // Durante la ventana de settle tras un seek, el reproductor aún reporta la
-                        // posición vieja: no repintar para que la barra no "rebote" hacia atrás.
-                        bool enSettleSeek = _seekCoordinator.EnVentanaDeSettle;
-
-                        // El seek de reanudación ya se asentó: revelar el video en el punto correcto.
-                        if (!enSettleSeek && OcultarVideoInicio)
-                        {
-                            OcultarVideoInicio = false;
-                        }
-
-                        // Solo notificar si el cambio es significativo (> 0.3s)
-                        if (!enSettleSeek && Math.Abs(curSeconds - _lastNotifiedSeconds) >= 0.3)
-                        {
-                            CurrentSeconds = curSeconds;
-                            _lastNotifiedSeconds = curSeconds;
-                            ActualizarTextosTiempo(curSeconds);
-                        }
+                        ActualizarPosicionYDuracion(curSeconds, durSeconds);
                     }
 
                     if (PlayPauseIcon != "Pause") PlayPauseIcon = "Pause";
@@ -1415,81 +1373,12 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                     {
                         await RealizarAutoTrackingAsync();
                     }
-                    
-                    // Detección de Skip Intro / Outro con AniSkip
-                    if (_skipTimes.Count > 0)
-                    {
-                        var skip = _skipCoordinator.ObtenerSkipActivo(curSeconds, _skipTimes, margenFinalSegundos: 0.5);
-                        if (skip != null)
-                        {
-                            string skipKey = $"{skip.SkipType}_{skip.Interval.StartTime:F1}";
-                            if (AutoSkipIntroOutro && !_skipAutoEjecutados.Contains(skipKey))
-                            {
-                                _skipAutoEjecutados.Add(skipKey);
-                                // FUN-007: el salto automático se acota al final del video
-                                // (igual que el manual) para no disparar Ended prematuramente.
-                                double destino = skip.Interval.EndTime + 0.2;
-                                if (TotalSeconds > 0 && destino > TotalSeconds) destino = TotalSeconds;
-                                Seek(destino);
-                                MostrarSkipButton = false;
-                                MostrarSkipIntro = false;
-                                _currentActiveSkip = null;
 
-                                _ = WeakReferenceMessenger.Default.Send(new Messages.MostrarDialogoRequestMessage(
-                                    "AniSkip",
-                                    string.Format(LocalizationService.T("Player_SkipAutoFormato"), skip.TextoBoton),
-                                    false, skip.IconoBoton, "#2196F3"));
-                            }
-                            else if (!AutoSkipIntroOutro)
-                            {
-                                _currentActiveSkip = skip;
-                                SkipButtonTexto = $"{skip.TextoBoton} (S)";
-                                SkipButtonIcon = skip.IconoBoton;
-                                MostrarSkipButton = true;
-                                MostrarSkipIntro = true;
-                            }
-                        }
-                        else
-                        {
-                            if (MostrarSkipButton)
-                            {
-                                MostrarSkipButton = false;
-                                MostrarSkipIntro = false;
-                                _currentActiveSkip = null;
-                            }
-                        }
-                    }
-                    else
-                    {
-                        if (MostrarSkipButton)
-                        {
-                            MostrarSkipButton = false;
-                            MostrarSkipIntro = false;
-                            _currentActiveSkip = null;
-                        }
-                    }
+                    ProcesarDeteccionDeSkip(curSeconds);
                 }
                 else if (Player?.Status == Status.Ended && _haCompletadoOpen)
                 {
-                    _smtc?.ActualizarEstadoReproduccion(false);
-
-                    // Al finalizar, resetear progreso a 0
-                    _ = GuardarProgresoActualAsync(forzarProgresoCero: true);
-
-                    // FUN-012: solo marcar como visto si se alcanzó el final REAL del archivo:
-                    // un video truncado/corrupto también dispara Ended antes de tiempo.
-                    bool llegoAlFinalReal = TotalSeconds > 0 && CurrentSeconds >= TotalSeconds * UmbralMarcadoVistoActual;
-                    if (!_fueMarcadoComoVisto && llegoAlFinalReal)
-                    {
-                        await RealizarAutoTrackingAsync();
-                    }
-
-                    // Acción configurable al terminar el episodio (Configuración → Reproducción)
-                    if (!_autoPlayEjecutado)
-                    {
-                        _autoPlayEjecutado = true;
-                        await EjecutarAccionFinEpisodioAsync(ct);
-                    }
+                    await ManejarFinDeEpisodioAsync(ct);
                 }
 
                 // Sondeo adaptativo: 250ms mientras reproduce, 1000ms cuando está en pausa/detenido
@@ -1505,6 +1394,164 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                 AppLogger.Warn("ReproductorViewModel", $"Error en bucle de progreso: {ex.Message}");
                 await Task.Delay(1000, ct);
             }
+        }
+    }
+
+    /// <summary>
+    /// Seek de arranque diferido (reanudación o scrub del usuario durante la apertura). Se aplica
+    /// aquí, con el video YA reproduciendo y la duración conocida: aplicar CurTime en
+    /// OpenCompleted interrumpe la creación del contexto de video en algunos archivos (HEVC/VFR)
+    /// y deja pantalla negra. Solo se consume el diferido del coordinador una vez que se conoce
+    /// la duración: si aún no se conoce, se queda pendiente para un tick futuro en vez de perderse.
+    /// </summary>
+    private void AplicarSeekDeArranqueDiferidoSiCorresponde(double durSeconds)
+    {
+        double? seekDiferido = durSeconds > 0 ? _seekCoordinator.ConsumirSeekPendienteAlAbrir() : null;
+        if (!(durSeconds > 0 && (seekDiferido.HasValue || _posicionInicioSegundos > 5))) return;
+
+        bool esReanudacion = !seekDiferido.HasValue && _posicionInicioSegundos > 5;
+        double posToSeek = seekDiferido ?? _posicionInicioSegundos;
+
+        // FUN-006: nunca buscar más allá de la duración real del archivo que se
+        // está reproduciendo (un archivo reemplazado por otro más corto haría
+        // que el seek quedara fuera de rango y el video terminara al instante).
+        if (durSeconds > 0 && posToSeek >= durSeconds)
+        {
+            posToSeek = Math.Max(0, durSeconds - 1.0);
+        }
+
+        _posicionInicioSegundos = 0;
+
+        // Antes de disparar el seek nativo: congelar el repintado para que la
+        // barra no "rebote" a la posición vieja mientras el seek se procesa.
+        _seekCoordinator.IniciarVentanaDeSettle();
+        _lastNotifiedSeconds = posToSeek;
+        CurrentSeconds = posToSeek;
+
+        _seekCoordinator.SolicitarSeek(Player, posToSeek, () => _haCompletadoOpen);
+
+        if (esReanudacion)
+        {
+            var tPos = TimeSpan.FromSeconds(posToSeek);
+            string tiempoFormateado = tPos.ToString(tPos.Hours > 0 ? @"hh\:mm\:ss" : @"mm\:ss");
+
+            _ = WeakReferenceMessenger.Default.Send(new Messages.MostrarDialogoRequestMessage(
+                LocalizationService.T("Player_ReanudarReproduccionTitulo"),
+                string.Format(LocalizationService.T("Player_ContinuandoDesdeFormato"), tiempoFormateado),
+                false, "PlaySpeed", "#2196F3"));
+        }
+    }
+
+    /// <summary>Cachea la duración la primera vez, revela el video tras la ventana de settle, y
+    /// notifica la posición actual si el cambio es significativo. Solo se llama sin arrastre.</summary>
+    private void ActualizarPosicionYDuracion(double curSeconds, double durSeconds)
+    {
+        // Cachear la duración (no cambia durante la reproducción; independiente del settle)
+        if (!_durationCached && durSeconds > 0)
+        {
+            TotalSeconds = durSeconds;
+            TimeSpan tDur = TimeSpan.FromSeconds(durSeconds);
+            TiempoTotalTexto = tDur.ToString(tDur.Hours > 0 ? @"hh\:mm\:ss" : @"mm\:ss");
+            _durationCached = true;
+            TiempoCombinadoTexto = $"{TiempoActualTexto} / {TiempoTotalTexto}";
+        }
+
+        // Durante la ventana de settle tras un seek, el reproductor aún reporta la
+        // posición vieja: no repintar para que la barra no "rebote" hacia atrás.
+        bool enSettleSeek = _seekCoordinator.EnVentanaDeSettle;
+
+        // El seek de reanudación ya se asentó: revelar el video en el punto correcto.
+        if (!enSettleSeek && OcultarVideoInicio)
+        {
+            OcultarVideoInicio = false;
+        }
+
+        // Solo notificar si el cambio es significativo (> 0.3s)
+        if (!enSettleSeek && Math.Abs(curSeconds - _lastNotifiedSeconds) >= 0.3)
+        {
+            CurrentSeconds = curSeconds;
+            _lastNotifiedSeconds = curSeconds;
+            ActualizarTextosTiempo(curSeconds);
+        }
+    }
+
+    /// <summary>Detección de Skip Intro/Outro con AniSkip: auto-salta o muestra el botón, según
+    /// configuración, y limpia el estado del botón cuando no hay ningún skip activo.</summary>
+    private void ProcesarDeteccionDeSkip(double curSeconds)
+    {
+        if (_skipTimes.Count == 0)
+        {
+            if (MostrarSkipButton)
+            {
+                MostrarSkipButton = false;
+                MostrarSkipIntro = false;
+                _currentActiveSkip = null;
+            }
+            return;
+        }
+
+        var skip = _skipCoordinator.ObtenerSkipActivo(curSeconds, _skipTimes, margenFinalSegundos: 0.5);
+        if (skip == null)
+        {
+            if (MostrarSkipButton)
+            {
+                MostrarSkipButton = false;
+                MostrarSkipIntro = false;
+                _currentActiveSkip = null;
+            }
+            return;
+        }
+
+        string skipKey = $"{skip.SkipType}_{skip.Interval.StartTime:F1}";
+        if (AutoSkipIntroOutro && !_skipAutoEjecutados.Contains(skipKey))
+        {
+            _skipAutoEjecutados.Add(skipKey);
+            // FUN-007: el salto automático se acota al final del video
+            // (igual que el manual) para no disparar Ended prematuramente.
+            double destino = skip.Interval.EndTime + 0.2;
+            if (TotalSeconds > 0 && destino > TotalSeconds) destino = TotalSeconds;
+            Seek(destino);
+            MostrarSkipButton = false;
+            MostrarSkipIntro = false;
+            _currentActiveSkip = null;
+
+            _ = WeakReferenceMessenger.Default.Send(new Messages.MostrarDialogoRequestMessage(
+                "AniSkip",
+                string.Format(LocalizationService.T("Player_SkipAutoFormato"), skip.TextoBoton),
+                false, skip.IconoBoton, "#2196F3"));
+        }
+        else if (!AutoSkipIntroOutro)
+        {
+            _currentActiveSkip = skip;
+            SkipButtonTexto = $"{skip.TextoBoton} (S)";
+            SkipButtonIcon = skip.IconoBoton;
+            MostrarSkipButton = true;
+            MostrarSkipIntro = true;
+        }
+    }
+
+    /// <summary>Al terminar un episodio: resetea el progreso a 0, marca como visto si llegó al
+    /// final real, y ejecuta la acción de fin de episodio configurada (una sola vez).</summary>
+    private async Task ManejarFinDeEpisodioAsync(CancellationToken ct)
+    {
+        _smtc?.ActualizarEstadoReproduccion(false);
+
+        // Al finalizar, resetear progreso a 0
+        _ = GuardarProgresoActualAsync(forzarProgresoCero: true);
+
+        // FUN-012: solo marcar como visto si se alcanzó el final REAL del archivo:
+        // un video truncado/corrupto también dispara Ended antes de tiempo.
+        bool llegoAlFinalReal = TotalSeconds > 0 && CurrentSeconds >= TotalSeconds * UmbralMarcadoVistoActual;
+        if (!_fueMarcadoComoVisto && llegoAlFinalReal)
+        {
+            await RealizarAutoTrackingAsync();
+        }
+
+        // Acción configurable al terminar el episodio (Configuración → Reproducción)
+        if (!_autoPlayEjecutado)
+        {
+            _autoPlayEjecutado = true;
+            await EjecutarAccionFinEpisodioAsync(ct);
         }
     }
 
