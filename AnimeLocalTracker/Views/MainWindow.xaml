@@ -37,8 +37,22 @@
 
                 <!-- SIDEBAR -->
                 <Border Grid.Column="0" Background="Transparent" BorderBrush="#1AFFFFFF" BorderThickness="0,0,1,0" Panel.ZIndex="10">
+                    <!-- Antes el separador y el grupo inferior (Configuración/Acerca de) se posicionaban
+                         con un margen fijo "190px desde abajo" sobre un Grid sin filas: al crecer el
+                         grupo superior (ahora 8 pestañas) empezaba a invadir esa zona en cualquier
+                         ventana más baja que ~740px de alto (pantallas 1366x768 con barra de tareas,
+                         portátiles pequeños, etc.). Con filas de Grid el grupo inferior queda SIEMPRE
+                         pegado abajo sin superponerse, y si el grupo superior no cabe, se desplaza con
+                         scroll en vez de solaparse. -->
                     <Grid>
-                        <!-- BOTONES SUPERIORES -->
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- BOTONES SUPERIORES (con scroll interno si la ventana no tiene alto suficiente) -->
+                        <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly">
                         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Top">
                             <StackPanel.Style>
                                 <Style TargetType="StackPanel">
@@ -325,13 +339,14 @@
                                 </Border>
                             </Grid>
                         </StackPanel>
+                        </ScrollViewer>
 
                         <!-- SEPARADOR DE GRUPO -->
-                        <Border HorizontalAlignment="Center" VerticalAlignment="Bottom" Width="28" Height="1"
-                                Background="#262D38" Margin="0,0,0,190" IsHitTestVisible="False"/>
+                        <Border Grid.Row="1" HorizontalAlignment="Center" Width="28" Height="1"
+                                Background="#262D38" Margin="0,8" IsHitTestVisible="False"/>
 
                         <!-- BOTONES INFERIORES: CONFIGURACIÓN Y ACERCA DE -->
-                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,15">
+                        <StackPanel Grid.Row="2" HorizontalAlignment="Center" Margin="0,0,0,15">
                             <!-- BOTÓN CONFIGURACIÓN -->
                             <Grid Margin="0,4">
                                 <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"
