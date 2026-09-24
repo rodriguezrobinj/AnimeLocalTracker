@@ -131,8 +131,11 @@ jobs:
         }
 
     # SEC-05: firma de código. Requiere provisionar el certificado en los secrets
-    # SIGN_CERT_BASE64 / SIGN_CERT_PASSWORD. Sin secrets el paso se omite y la
-    # release sale SIN firmar (bloqueada hasta provisionar el certificado).
+    # SIGN_CERT_BASE64 / SIGN_CERT_PASSWORD. Sin secrets, la release sale SIN firmar
+    # (en vez de abortar el empaquetado) para no bloquear la publicación mientras se
+    # consigue el certificado — el aviso queda visible en el propio Release de GitHub
+    # (ver paso "Upload to GitHub Release"). En cuanto se configuren los secrets, este
+    # mismo paso vuelve a firmar automáticamente sin más cambios.
     # NOTA: GitHub no permite referenciar secrets en `if:` — se maneja en el script.
     - name: Prepare Code Signing Certificate
       id: cert
@@ -142,8 +145,8 @@ jobs:
         CERT_PASSWORD: ${{ secrets.SIGN_CERT_PASSWORD }}
       run: |
         if (-not $env:CERT_B64) {
-          Write-Host "::error::Sin certificado configurado: la release se genera SIN firma (SEC-05). Abortando empaquetado."
-          exit 1
+          Write-Host "::warning::Sin certificado configurado (SEC-05): la release se publica SIN firmar. Configura SIGN_CERT_BASE64/SIGN_CERT_PASSWORD en los secrets del repo para firmar releases futuras."
+          Write-Output "cert_ready=false" >> $env:GITHUB_OUTPUT
         } else {
           $pfx = Join-Path $env:RUNNER_TEMP "alt.pfx"
           [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:CERT_B64))
@@ -173,7 +176,19 @@ jobs:
         GH_TOKEN: ${{ github.token }}
       run: |
         $version = $env:GITHUB_REF_NAME.TrimStart('v')
+        $sinFirma = '${{ steps.cert.outputs.cert_ready }}' -ne 'true'
+        $titulo = "AnimeLocalTracker v$version (Pre-release)"
+        if ($sinFirma) { $titulo += " [SIN FIRMAR]" }
+
         gh release create $env:GITHUB_REF_NAME Releases/* `
-          --title "AnimeLocalTracker v$version (Pre-release)" `
+          --title $titulo `
           --prerelease `
           --generate-notes
+
+        # SEC-05: deja constancia visible para el usuario final de que este release en
+        # particular no está firmado (en vez de solo un log de CI que nadie más ve).
+        if ($sinFirma) {
+          $aviso = "> [!WARNING]`n> **Este instalador no está firmado digitalmente** (falta configurar el certificado de firma de código en los secrets del repositorio). Windows SmartScreen puede mostrar ``Windows protegió su PC`` al ejecutarlo — es esperado y no indica que el archivo esté comprometido.`n`n"
+          $notasActuales = gh release view $env:GITHUB_REF_NAME --json body -q .body
+          gh release edit $env:GITHUB_REF_NAME --notes ($aviso + $notasActuales)
+        }
