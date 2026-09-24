@@ -174,6 +174,27 @@ public class EstadisticasViewModelTests
     }
 
     [Fact]
+    public async Task Top_DeberiaResolverLaPortadaDelTituloRepresentante()
+    {
+        // La portada del Top (usada en la tarjeta Wrapped) debe ser la del título que da nombre
+        // a la franquicia (la 1.ª temporada), no la de la temporada con más tiempo visto.
+        var animes = new List<AnimeItem>
+        {
+            new() { AniListId = 1, Titulo = "Danmachi", AnioLanzamiento = 2015, UrlPortada = "https://cdn/danmachi1.jpg" },
+            new() { AniListId = 2, Titulo = "Danmachi V", AnioLanzamiento = 2024, UrlPortada = "https://cdn/danmachi5.jpg" }
+        };
+        var registros = Episodios(1, 13, 1440).Concat(Episodios(2, 15, 1440)).ToList();
+        var franquicias = Franquicias(new Dictionary<int, int> { [1] = 1, [2] = 1 });
+        var (vm, _) = CrearVm(animes, registros, franquicias.Object);
+
+        await vm.CargarEstadisticasAsync();
+
+        vm.TopAnimes.Should().ContainSingle();
+        vm.TopAnimes[0].Titulo.Should().Be("Danmachi");
+        vm.TopAnimes[0].RutaPortada.Should().Be("https://cdn/danmachi1.jpg");
+    }
+
+    [Fact]
     public async Task Top_SumaLaFranquiciaCompleta_TemporadasYPeliculas()
     {
         var animes = new List<AnimeItem>

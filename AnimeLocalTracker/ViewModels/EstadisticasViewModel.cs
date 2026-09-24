@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
@@ -29,12 +30,13 @@ public partial class EstadisticasViewModel : ObservableObject, IRecipient<Idioma
     private readonly IDialogService _dialogService;
     private readonly ILogrosService? _logrosService;
     private readonly IFranquiciaService? _franquiciaService;
+    private readonly IHttpClientFactory? _httpClientFactory;
 
     private static readonly IReadOnlyDictionary<int, int> SinFranquicias = new Dictionary<int, int>();
 
     public EstadisticasViewModel(IDatabaseService databaseService, IAnimeTrackingService animeTrackingService,
         IAuthService authService, IDialogService dialogService, ILogrosService? logrosService = null,
-        IFranquiciaService? franquiciaService = null)
+        IFranquiciaService? franquiciaService = null, IHttpClientFactory? httpClientFactory = null)
     {
         _databaseService = databaseService;
         _animeTrackingService = animeTrackingService;
@@ -42,6 +44,7 @@ public partial class EstadisticasViewModel : ObservableObject, IRecipient<Idioma
         _dialogService = dialogService;
         _logrosService = logrosService;
         _franquiciaService = franquiciaService;
+        _httpClientFactory = httpClientFactory;
 
         WeakReferenceMessenger.Default.RegisterAll(this);
     }
@@ -173,8 +176,13 @@ public partial class EstadisticasViewModel : ObservableObject, IRecipient<Idioma
         var top = CalculadorTop.Calcular(animes, vistos, franquicias);
         double maximo = Math.Max(1, top.Count > 0 ? top[0].Segundos : 1);
 
+        // Portada del título que da nombre a la franquicia (normalmente la 1.ª temporada) —
+        // la misma que ya está cacheada localmente para la Galería, reutilizada aquí para la
+        // tarjeta Wrapped (ver ConstruirDatosWrappedAsync). Un solo Where en vez de diccionario:
+        // el top nunca pasa de `cantidad` (5) elementos, no hace falta indexar toda la biblioteca.
         TopAnimes = top
-            .Select((f, i) => new TopAnime(i + 1, f.Titulo, f.Segundos, f.Episodios, f.Titulos)
+            .Select((f, i) => new TopAnime(i + 1, f.Titulo, f.Segundos, f.Episodios, f.Titulos,
+                    animes.FirstOrDefault(a => a.AniListId == f.AniListIdRepresentante)?.PortadaVisible)
             {
                 AnchoBarra = f.Segundos / maximo * 420.0
             })
@@ -495,16 +503,27 @@ public partial class EstadisticasViewModel : ObservableObject, IRecipient<Idioma
                 nombreUsuario = perfil.Name ?? nombreUsuario;
                 if (!string.IsNullOrWhiteSpace(perfil.Avatar?.Large))
                 {
-                    avatar = await CargarAvatarAsync(perfil.Avatar.Large);
+                    avatar = await CargarImagenAsync(perfil.Avatar.Large);
                 }
             }
         }
+
+        // Portadas de los primeros 3 del Top — en paralelo, cada una es un archivo local (rápido)
+        // o como mucho una descarga chica; no vale la pena serializarlas.
+        var top3 = TopAnimes.Take(3).ToList();
+        var portadas = await Task.WhenAll(top3.Select(t =>
+            string.IsNullOrWhiteSpace(t.RutaPortada) ? Task.FromResult<ImageSource?>(null) : CargarImagenAsync(t.RutaPortada)));
+
+        var topAnimesItems = top3
+            .Select((t, i) => new Models.WrappedTopAnimeItem { Posicion = i + 1, Titulo = t.Titulo, Portada = portadas[i] })
+            .ToList();
 
         return new Models.WrappedCardData
         {
             TituloCard = LocalizationService.T("Wrapped_Titulo"),
             NombreUsuario = nombreUsuario,
             Avatar = avatar,
+            RangoOtakuTexto = string.IsNullOrWhiteSpace(LogrosRangoNombre) ? "" : LogrosRangoNombre.ToUpperInvariant(),
             HorasVistasTexto = HorasVistasTexto,
             HorasLabel = LocalizationService.T("Wrapped_Horas"),
             EpisodiosVistosTexto = TotalEpisodiosVistos.ToString(),
@@ -514,24 +533,31 @@ public partial class EstadisticasViewModel : ObservableObject, IRecipient<Idioma
             RachaMaximaTexto = RachaMaxima,
             RachaLabel = LocalizationService.T("Wrapped_RachaMaxima"),
             TopAnimesLabel = LocalizationService.T("Wrapped_TopAnimes"),
-            TopAnimesTitulos = TopAnimes.Take(3).Select((t, i) => $"{i + 1}. {t.Titulo}").ToList(),
+            TopAnimesItems = topAnimesItems,
             Footer = LocalizationService.T("Wrapped_Footer"),
         };
     }
 
-    // CacheOption.OnLoad fuerza la descarga+decodificación completa dentro de EndInit(), y
-    // Freeze() quita la afinidad de hilo — necesario porque esto corre en un hilo de fondo
-    // (Task.Run) para no bloquear la UI mientras se descarga el avatar de AniList.
-    private static async Task<ImageSource?> CargarAvatarAsync(string url)
+    // Las portadas del Top (casi siempre una ruta LOCAL ya cacheada por la Galería) se cargan
+    // directo por UriSource: CacheOption.OnLoad sí es síncrono para file://, y Freeze() nunca
+    // falló en la práctica para ese caso. El avatar de AniList es remoto (http/https) y usa
+    // CargarImagenRemotaAsync en su lugar (ver comentario ahí abajo).
+    private async Task<ImageSource?> CargarImagenAsync(string rutaOUrl)
     {
         try
         {
+            if (rutaOUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                rutaOUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            {
+                return await CargarImagenRemotaAsync(rutaOUrl);
+            }
+
             return await Task.Run(() =>
             {
                 var bmp = new BitmapImage();
                 bmp.BeginInit();
                 bmp.CacheOption = BitmapCacheOption.OnLoad;
-                bmp.UriSource = new Uri(url);
+                bmp.UriSource = new Uri(rutaOUrl);
                 bmp.EndInit();
                 bmp.Freeze();
                 return (ImageSource)bmp;
@@ -539,9 +565,36 @@ public partial class EstadisticasViewModel : ObservableObject, IRecipient<Idioma
         }
         catch (Exception ex)
         {
-            AppLogger.Error("EstadisticasViewModel", "Error descargando avatar para tarjeta Wrapped", ex);
+            AppLogger.Error("EstadisticasViewModel", $"Error cargando imagen para tarjeta Wrapped ('{rutaOUrl}')", ex);
             return null;
         }
+    }
+
+    // BUG CONOCIDO: BitmapImage.UriSource + CacheOption.OnLoad NO es realmente síncrono para
+    // descargas http(s) — a veces deja el bitmap "a medias" (p. ej. con el avatar por defecto de
+    // AniList, default.png) y Freeze() lo rechaza con "Este objeto Freezable no puede estar
+    // inmovilizado". ImageCacheService ya evita esto para las portadas: descarga los bytes
+    // completos primero y decodifica desde StreamSource (100% en memoria, sin I/O pendiente).
+    // Mismo patrón aquí para el avatar.
+    private async Task<ImageSource?> CargarImagenRemotaAsync(string url)
+    {
+        if (_httpClientFactory == null) return null;
+
+        using var client = _httpClientFactory.CreateClient();
+        byte[] bytes = await client.GetByteArrayAsync(url);
+
+        return await Task.Run(() =>
+        {
+            using var stream = new MemoryStream(bytes);
+            var bmp = new BitmapImage();
+            bmp.BeginInit();
+            bmp.CacheOption = BitmapCacheOption.OnLoad;
+            bmp.CreateOptions = BitmapCreateOptions.IgnoreColorProfile;
+            bmp.StreamSource = stream;
+            bmp.EndInit();
+            bmp.Freeze();
+            return (ImageSource)bmp;
+        });
     }
 
     private static byte[] RenderizarTarjetaWrapped(Models.WrappedCardData datos)
@@ -599,18 +652,23 @@ public class TopAnime
     /// <summary>Cuántos títulos (temporadas, películas, especiales…) de la franquicia has visto.</summary>
     public int Titulos { get; }
 
+    /// <summary>Portada local (o URL de respaldo) del título que da nombre a la franquicia. Null si
+    /// ese anime no tiene portada resuelta — el binding simplemente no muestra imagen.</summary>
+    public string? RutaPortada { get; }
+
     public double AnchoBarra { get; set; }
 
     public string TiempoTexto => FormatoTiempo(Segundos);
     public string DetalleTexto => DetalleDe(EpisodiosVistos, Titulos);
 
-    public TopAnime(int posicion, string titulo, double segundos, int episodiosVistos, int titulos)
+    public TopAnime(int posicion, string titulo, double segundos, int episodiosVistos, int titulos, string? rutaPortada = null)
     {
         Posicion = posicion;
         Titulo = titulo;
         Segundos = segundos;
         EpisodiosVistos = episodiosVistos;
         Titulos = titulos;
+        RutaPortada = rutaPortada;
     }
 
     internal static string FormatoTiempo(double segundos)
