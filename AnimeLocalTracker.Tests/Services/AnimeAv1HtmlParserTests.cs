@@ -93,4 +93,94 @@ public class AnimeAv1HtmlParserTests
     {
         AnimeAv1HtmlParser.ExtraerVideoDirecto("<html>sin player</html>").Should().BeNull();
     }
+
+    // Fixture real (confirmada contra animeav1.com): el sitio publica dos pistas de audio,
+    // cada una con sus propios servidores.
+    private const string HtmlConDosPistasDeAudio = """
+        <script>{__sveltekit={data:[{type:"data",data:{
+        embeds:{SUB:[
+          {server:"UPNShare",url:"https://animeav1.uns.bio/#6uekra"},
+          {server:"Voe",url:"https://voe.sx/e/fm2zgn6plvtt"},
+          {server:"Byse",url:"https://byselapuix.com/e/yzkkh96luuwc"},
+          {server:"MP4Upload",url:"https://www.mp4upload.com/embed-mxk0txlex6iz.html"}
+        ],DUB:[
+          {server:"UPNShare",url:"https://animeav1.uns.bio/#hrpd8a"},
+          {server:"Voe",url:"https://voe.sx/e/ck6esmuuv5kc"},
+          {server:"Byse",url:"https://byselapuix.com/e/ml3gobpkkhe6"},
+          {server:"MP4Upload",url:"https://www.mp4upload.com/embed-p8ryayejs9d0.html"}
+        ]}}}]}}</script>
+        """;
+
+    [Fact]
+    public void ExtraerEmbeds_ConDosPistasDeAudio_DeberiaEtiquetarCadaServidorConSuPista()
+    {
+        var embeds = AnimeAv1HtmlParser.ExtraerEmbeds(HtmlConDosPistasDeAudio);
+
+        embeds.Should().HaveCount(8);
+        embeds.Count(e => e.Audio == "SUB").Should().Be(4);
+        embeds.Count(e => e.Audio == "DUB").Should().Be(4);
+
+        var mp4Sub = embeds.Single(e => e.Audio == "SUB" && e.Server == "MP4Upload");
+        mp4Sub.Url.Should().Be("https://www.mp4upload.com/embed-mxk0txlex6iz.html");
+
+        var mp4Dub = embeds.Single(e => e.Audio == "DUB" && e.Server == "MP4Upload");
+        mp4Dub.Url.Should().Be("https://www.mp4upload.com/embed-p8ryayejs9d0.html");
+    }
+
+    [Fact]
+    public void ExtraerEmbeds_ConUnaSolaPista_DeberiaEtiquetarlaIgual()
+    {
+        // Algunas páginas (películas, OVAs) solo publican una pista.
+        const string html = """
+            <script>embeds:{SUB:[{server:"MP4Upload",url:"https://www.mp4upload.com/embed-abc.html"}]}</script>
+            """;
+
+        var embeds = AnimeAv1HtmlParser.ExtraerEmbeds(html);
+
+        embeds.Should().ContainSingle();
+        embeds[0].Audio.Should().Be("SUB");
+    }
+
+    [Fact]
+    public void OrdenarEmbedsPorPreferencia_SinPreferencia_DeberiaOrdenarSoloPorServidor()
+    {
+        var embeds = AnimeAv1HtmlParser.ExtraerEmbeds(HtmlConDosPistasDeAudio);
+
+        var ordenados = AnimeAv1HtmlParser.OrdenarEmbedsPorPreferencia(embeds);
+
+        // MP4Upload primero (server de mayor preferencia) — SUB antes que DUB porque el sitio
+        // lo lista primero y no hay preferencia de audio que rompa el empate.
+        ordenados[0].Server.Should().Be("MP4Upload");
+        ordenados[0].Audio.Should().Be("SUB");
+        ordenados[1].Server.Should().Be("MP4Upload");
+        ordenados[1].Audio.Should().Be("DUB");
+    }
+
+    [Fact]
+    public void OrdenarEmbedsPorPreferencia_ConPreferenciaDub_DeberiaProbarPrimeroLosServidoresDub()
+    {
+        var embeds = AnimeAv1HtmlParser.ExtraerEmbeds(HtmlConDosPistasDeAudio);
+
+        var ordenados = AnimeAv1HtmlParser.OrdenarEmbedsPorPreferencia(embeds, "DUB");
+
+        // Los 4 servidores DUB (en orden de servidor) van antes que cualquier SUB.
+        ordenados.Take(4).Should().OnlyContain(e => e.Audio == "DUB");
+        ordenados[0].Server.Should().Be("MP4Upload");
+        ordenados.Skip(4).Should().OnlyContain(e => e.Audio == "SUB");
+    }
+
+    [Fact]
+    public void OrdenarEmbedsPorPreferencia_PistaPedidaSinServidores_DeberiaCaerALaOtra()
+    {
+        // Solo hay SUB; se pide DUB. No debe quedarse sin nada: cae al SUB disponible.
+        const string html = """
+            <script>embeds:{SUB:[{server:"MP4Upload",url:"https://www.mp4upload.com/embed-abc.html"}]}</script>
+            """;
+        var embeds = AnimeAv1HtmlParser.ExtraerEmbeds(html);
+
+        var ordenados = AnimeAv1HtmlParser.OrdenarEmbedsPorPreferencia(embeds, "DUB");
+
+        ordenados.Should().ContainSingle();
+        ordenados[0].Audio.Should().Be("SUB");
+    }
 }

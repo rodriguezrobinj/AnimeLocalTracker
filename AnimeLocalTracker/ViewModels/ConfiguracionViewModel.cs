@@ -42,6 +42,7 @@ public partial class ConfiguracionViewModel : ObservableObject
     [ObservableProperty] private int _pasosSaltoSegundos = 10;
     [ObservableProperty] private bool _evitarSuspensionPantalla = true;
     [ObservableProperty] private string _accionFinEpisodio = AccionFinEpisodioValores.AutoPlayCuentaAtras;
+    [ObservableProperty] private string _preferenciaAudioAnimeAv1 = "";
 
     // === PREFERENCIAS DE USUARIO ===
     [ObservableProperty] private int _umbralMarcadoVisto = 95;
@@ -140,6 +141,7 @@ public partial class ConfiguracionViewModel : ObservableObject
         PasosSaltoSegundos = config.PasosSaltoSegundos is 5 or 10 or 30 or 60 ? config.PasosSaltoSegundos : 10;
         EvitarSuspensionPantalla = config.EvitarSuspensionPantalla;
         AccionFinEpisodio = string.IsNullOrWhiteSpace(config.AccionFinEpisodio) ? AccionFinEpisodioValores.AutoPlayCuentaAtras : config.AccionFinEpisodio;
+        PreferenciaAudioAnimeAv1 = config.PreferenciaAudioAnimeAv1 ?? "";
         UmbralMarcadoVisto = config.UmbralMarcadoVisto is >= 1 and <= 100 ? config.UmbralMarcadoVisto : 90;
         NotificarNuevosEpisodios = config.NotificarNuevosEpisodios;
         MinimizarABandejaAlCerrar = config.MinimizarABandejaAlCerrar;
@@ -341,6 +343,7 @@ public partial class ConfiguracionViewModel : ObservableObject
             config.PasosSaltoSegundos = PasosSaltoSegundos;
             config.EvitarSuspensionPantalla = EvitarSuspensionPantalla;
             config.AccionFinEpisodio = AccionFinEpisodio;
+            config.PreferenciaAudioAnimeAv1 = string.IsNullOrEmpty(PreferenciaAudioAnimeAv1) ? null : PreferenciaAudioAnimeAv1;
             config.UmbralMarcadoVisto = Math.Clamp(UmbralMarcadoVisto, 1, 100);
             config.NotificarNuevosEpisodios = NotificarNuevosEpisodios;
             config.MinimizarABandejaAlCerrar = MinimizarABandejaAlCerrar;

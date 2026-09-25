@@ -15,12 +15,15 @@ namespace AnimeLocalTracker.Services;
 /// </summary>
 public static partial class AnimeAv1HtmlParser
 {
-    /// <summary>Servidor de video publicado por la página de episodio.</summary>
-    public readonly record struct EmbedServidor(string Server, string Url);
+    /// <summary>Servidor de video publicado por la página de episodio, y la pista de audio
+    /// a la que pertenece ("SUB" = japonés subtitulado, "DUB" = doblaje latino, tal cual las
+    /// publica el sitio — no se hardcodean más valores que esos dos por si el sitio cambia).</summary>
+    public readonly record struct EmbedServidor(string Server, string Url, string Audio);
 
     /// <summary>
-    /// Extrae los embeds de servidores de la página de episodio (SvelteKit). El sitio
-    /// incrusta la lista en JSON: embeds:{SUB:[{server:"HLS",url:"https://..."},...]}.
+    /// Extrae los embeds de servidores de la página de episodio (SvelteKit). El sitio incrusta
+    /// la lista en JSON con una clave por pista de audio: embeds:{SUB:[{server:"HLS",url:"https://..."},...],DUB:[...]}.
+    /// Cada pista se extrae por separado para poder etiquetar el idioma de cada servidor.
     /// Solo se devuelven URLs https; el filtrado por host permitido lo hace UrlSeguridad.
     /// </summary>
     public static List<EmbedServidor> ExtraerEmbeds(string html)
@@ -31,16 +34,24 @@ public static partial class AnimeAv1HtmlParser
         int inicio = html.IndexOf("embeds:{", StringComparison.Ordinal);
         if (inicio < 0) return lista;
 
+        // Se incluye el "]}" final: hace falta el corchete de cierre de la ÚLTIMA pista para
+        // que la regex de grupos (CLAVE:[...]) pueda delimitar su contenido.
         int fin = html.IndexOf("]}", inicio, StringComparison.Ordinal);
-        string seccion = fin > inicio ? html[inicio..fin] : html[inicio..];
+        string seccion = fin > inicio ? html[inicio..(fin + 2)] : html[inicio..];
 
-        foreach (Match m in EmbedServidorRegex().Matches(seccion))
+        foreach (Match grupo in AudioGrupoRegex().Matches(seccion))
         {
-            string server = m.Groups[1].Value.Trim();
-            string url = m.Groups[2].Value.Trim();
-            if (!string.IsNullOrWhiteSpace(server) && !string.IsNullOrWhiteSpace(url))
+            string audio = grupo.Groups[1].Value.Trim();
+            string contenido = grupo.Groups[2].Value;
+
+            foreach (Match m in EmbedServidorRegex().Matches(contenido))
             {
-                lista.Add(new EmbedServidor(server, url));
+                string server = m.Groups[1].Value.Trim();
+                string url = m.Groups[2].Value.Trim();
+                if (!string.IsNullOrWhiteSpace(server) && !string.IsNullOrWhiteSpace(url))
+                {
+                    lista.Add(new EmbedServidor(server, url, audio));
+                }
             }
         }
         return lista;
@@ -53,16 +64,32 @@ public static partial class AnimeAv1HtmlParser
     /// HLS se conserva como intento (403 limpio en el log) por si el sitio
     /// relaja Cloudflare. Mega se excluye.
     /// </summary>
-    public static List<EmbedServidor> OrdenarEmbedsPorPreferencia(IEnumerable<EmbedServidor> embeds)
+    /// <param name="audioPreferido">"SUB"/"DUB" (AppSettings.PreferenciaAudioAnimeAv1). Es una
+    /// PREFERENCIA con fallback, no un filtro estricto: si la pista pedida no tiene ningún
+    /// servidor disponible, se cae a la otra en vez de no descargar nada. Null/vacío = sin
+    /// preferencia, mismo orden de siempre (solo por servidor, sin importar el idioma).</param>
+    public static List<EmbedServidor> OrdenarEmbedsPorPreferencia(IEnumerable<EmbedServidor> embeds, string? audioPreferido = null)
     {
-        var preferencia = new[] { "MP4Upload", "HLS", "Voe", "UPNShare", "Byse" };
-        return preferencia
-            .SelectMany((nombre, i) => embeds
+        var preferenciaServidor = new[] { "MP4Upload", "HLS", "Voe", "UPNShare", "Byse" };
+
+        List<EmbedServidor> PorServidor(IEnumerable<EmbedServidor> fuente) => preferenciaServidor
+            .SelectMany((nombre, i) => fuente
                 .Where(e => e.Server.Equals(nombre, StringComparison.OrdinalIgnoreCase))
                 .Select(e => (e, i)))
             .OrderBy(x => x.i)
             .Select(x => x.e)
             .ToList();
+
+        var lista = embeds as ICollection<EmbedServidor> ?? embeds.ToList();
+
+        if (string.IsNullOrWhiteSpace(audioPreferido))
+        {
+            return PorServidor(lista);
+        }
+
+        var delAudioPedido = PorServidor(lista.Where(e => e.Audio.Equals(audioPreferido, StringComparison.OrdinalIgnoreCase)));
+        var delOtroAudio = PorServidor(lista.Where(e => !e.Audio.Equals(audioPreferido, StringComparison.OrdinalIgnoreCase)));
+        return delAudioPedido.Concat(delOtroAudio).ToList();
     }
 
     /// <summary>Extrae el ID de un embed de MP4Upload desde una página de animeav1.com.</summary>
@@ -189,6 +216,12 @@ public static partial class AnimeAv1HtmlParser
     [GeneratedRegex(@"server\s*:\s*""([^""]+)""\s*,\s*url\s*:\s*""(https?://[^""]+)""", RegexOptions.IgnoreCase)]
     private static partial Regex EmbedServidorRegex();
 
+    // Cada pista de audio es una clave de nivel superior dentro de embeds:{...}, ej. SUB:[...],DUB:[...].
+    // Como las urls/servidores no contienen '[' ni ']', el (.*?) no-goloso siempre para en el
+    // corchete de cierre correcto de esa pista, sin necesitar balanceo de llaves.
+    [GeneratedRegex(@"([A-Za-z]+)\s*:\s*\[(.*?)\]", RegexOptions.Singleline)]
+    private static partial Regex AudioGrupoRegex();
+
     [GeneratedRegex(@"destination:\{id:\d+,slug:""([^""]+)"",title:""([^""]+)""")]
     private static partial Regex RelationMediaRegex();
 
@@ -255,7 +288,7 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
         _titulosDesdeAniList = titulosDesdeAniList;
     }
 
-    public async Task<string?> BuscarUrlEpisodioAsync(IEnumerable<string> titulos, int numeroEpisodio, int? aniListId = null, CancellationToken cancellationToken = default)
+    public async Task<string?> BuscarUrlEpisodioAsync(IEnumerable<string> titulos, int numeroEpisodio, int? aniListId = null, string? audioPreferido = null, CancellationToken cancellationToken = default)
     {
         // FASE 1 (multi-servidor): obtener los embeds de la página del episodio.
         // El C# solo resuelve MP4Upload; los demás servidores los orquesta
@@ -263,7 +296,8 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
         var embeds = await ObtenerEmbedsEpisodioAsync(titulos, numeroEpisodio, aniListId, cancellationToken);
         if (embeds.Count == 0) return null;
 
-        var mp4 = embeds.FirstOrDefault(e => e.Server.Equals("MP4Upload", StringComparison.OrdinalIgnoreCase));
+        var ordenados = AnimeAv1HtmlParser.OrdenarEmbedsPorPreferencia(embeds, audioPreferido);
+        var mp4 = ordenados.FirstOrDefault(e => e.Server.Equals("MP4Upload", StringComparison.OrdinalIgnoreCase));
         if (string.IsNullOrEmpty(mp4.Url)) return null;
 
         return await GetVideoUrlAsync(mp4.Url, cancellationToken);

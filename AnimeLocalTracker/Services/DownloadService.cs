@@ -33,6 +33,7 @@ public class DownloadService : IDownloadService
     private readonly HttpClient _httpClient;
     private readonly IDownloadStateStore _stateStore;
     private readonly IVideoSourceResolver _sourceResolver;
+    private readonly ISettingsService? _settingsService;
     private readonly IPythonBridgeService? _pythonBridge;
     private readonly IDatabaseService? _database;
     private readonly ConcurrentDictionary<string, DownloadState> _activeDownloads = new();
@@ -82,6 +83,7 @@ public class DownloadService : IDownloadService
         _stateStore = stateStore ?? new DownloadStateStore();
         _sourceResolver = sourceResolver ?? new AnimeAv1VideoSourceResolver(_httpClient);
         _pythonBridge = pythonBridge;
+        _settingsService = settingsService;
 
         if (settingsService != null)
         {
@@ -422,7 +424,8 @@ public class DownloadService : IDownloadService
 
                     if (string.IsNullOrEmpty(state.VideoUrl))
                     {
-                        state.VideoUrl = await _sourceResolver.BuscarUrlEpisodioAsync(state.Titulos, state.NumeroEpisodio, state.AniListId, state.Cts.Token);
+                        string? audioPreferido = _settingsService?.ObtenerConfiguracion()?.PreferenciaAudioAnimeAv1;
+                        state.VideoUrl = await _sourceResolver.BuscarUrlEpisodioAsync(state.Titulos, state.NumeroEpisodio, state.AniListId, audioPreferido, state.Cts.Token);
                         if (string.IsNullOrEmpty(state.VideoUrl))
                         {
                             if (state.IsPaused || state.Cts.IsCancellationRequested) return;

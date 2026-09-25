@@ -43,6 +43,12 @@ public class AppSettings
     /// <summary>Qué hacer al terminar un episodio: uno de los valores de <see cref="AccionFinEpisodioValores"/>.</summary>
     public string AccionFinEpisodio { get; set; } = AccionFinEpisodioValores.AutoPlayCuentaAtras;
 
+    /// <summary>Pista de audio preferida al descargar de AnimeAV1: uno de los valores de
+    /// <see cref="PreferenciaAudioValores"/>, o null/vacío = sin preferencia (comportamiento
+    /// de siempre: se toma la primera pista que el sitio publique). Es una preferencia con
+    /// fallback, no un filtro estricto: si el episodio no tiene esa pista, se descarga en la otra.</summary>
+    public string? PreferenciaAudioAnimeAv1 { get; set; }
+
     /// <summary>Activa un atajo de teclado GLOBAL (funciona aunque la app no tenga el foco) que silencia
     /// el video y minimiza la app a la bandeja del sistema al instante ("boss key").</summary>
     public bool TeclaPanicoActiva { get; set; } = false;
@@ -95,4 +101,14 @@ public static class AccionFinEpisodioValores
     public const string PausarYSalirFicha = "PausarYSalirFicha";
     /// <summary>Se queda en pantalla completa, pausado en el último fotograma.</summary>
     public const string PermanecerPausado = "PermanecerPausado";
+}
+
+/// <summary>Valores válidos de <see cref="AppSettings.PreferenciaAudioAnimeAv1"/> — coinciden
+/// tal cual con las claves que publica el sitio (embeds:{SUB:[...],DUB:[...]}).</summary>
+public static class PreferenciaAudioValores
+{
+    /// <summary>Japonés con subtítulos.</summary>
+    public const string Subtitulado = "SUB";
+    /// <summary>Doblaje latino.</summary>
+    public const string Latino = "DUB";
 }

@@ -44,7 +44,7 @@ public class CSharpPluginLoaderTests : IDisposable
 
         public string Nombre => "PluginFalsoDePrueba";
 
-        public Task<string?> BuscarUrlEpisodioAsync(IEnumerable<string> titulos, int numeroEpisodio, int? aniListId = null, CancellationToken ct = default)
+        public Task<string?> BuscarUrlEpisodioAsync(IEnumerable<string> titulos, int numeroEpisodio, int? aniListId = null, string? audioPreferido = null, CancellationToken ct = default)
             => Task.FromResult<string?>(null);
 
         public Task<string?> GetVideoUrlAsync(string pageUrl, CancellationToken ct = default)
