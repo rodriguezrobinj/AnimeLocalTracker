@@ -183,4 +183,53 @@ public class AnimeAv1HtmlParserTests
         ordenados.Should().ContainSingle();
         ordenados[0].Audio.Should().Be("SUB");
     }
+
+    // Fixture con varios servidores en una sola pista (misma estructura real que publica el sitio).
+    private const string HtmlConVariosServidores = """
+        <script>embeds:{SUB:[
+          {server:"HLS",url:"https://player.zilla-networks.com/play/abc"},
+          {server:"UPNShare",url:"https://animeav1.uns.bio/#xyz"},
+          {server:"Voe",url:"https://voe.sx/e/def"},
+          {server:"Byse",url:"https://byselapuix.com/e/ghi"},
+          {server:"MP4Upload",url:"https://www.mp4upload.com/embed-jkl.html"}
+        ]}}</script>
+        """;
+
+    [Fact]
+    public void OrdenarEmbedsPorPreferencia_ConServidorPreferido_DeberiaProbarloPrimero()
+    {
+        var embeds = AnimeAv1HtmlParser.ExtraerEmbeds(HtmlConVariosServidores);
+
+        var ordenados = AnimeAv1HtmlParser.OrdenarEmbedsPorPreferencia(embeds, servidorPreferido: "Voe");
+
+        // Voe pasa al frente aunque MP4Upload sea el primero en el orden por defecto;
+        // el resto conserva su orden habitual detrás.
+        ordenados[0].Server.Should().Be("Voe");
+        ordenados.Select(e => e.Server).Should().Equal("Voe", "MP4Upload", "HLS", "UPNShare", "Byse");
+    }
+
+    [Fact]
+    public void OrdenarEmbedsPorPreferencia_ServidorPreferidoNoPublicado_DeberiaUsarElOrdenPorDefecto()
+    {
+        // Se pide un servidor que ese episodio no tiene: no debe fallar, cae al orden de siempre.
+        var embeds = AnimeAv1HtmlParser.ExtraerEmbeds(HtmlConVariosServidores);
+
+        var ordenados = AnimeAv1HtmlParser.OrdenarEmbedsPorPreferencia(embeds, servidorPreferido: "Mega");
+
+        ordenados.Select(e => e.Server).Should().Equal("MP4Upload", "HLS", "Voe", "UPNShare", "Byse");
+    }
+
+    [Fact]
+    public void OrdenarEmbedsPorPreferencia_ConAudioYServidorPreferidos_DeberiaCombinarAmbos()
+    {
+        var embeds = AnimeAv1HtmlParser.ExtraerEmbeds(HtmlConDosPistasDeAudio);
+
+        var ordenados = AnimeAv1HtmlParser.OrdenarEmbedsPorPreferencia(embeds, audioPreferido: "DUB", servidorPreferido: "Voe");
+
+        // Primero los 4 servidores DUB, con Voe al frente de ese grupo.
+        ordenados.Take(4).Should().OnlyContain(e => e.Audio == "DUB");
+        ordenados[0].Server.Should().Be("Voe");
+        ordenados.Skip(4).Should().OnlyContain(e => e.Audio == "SUB");
+        ordenados[4].Server.Should().Be("Voe");
+    }
 }

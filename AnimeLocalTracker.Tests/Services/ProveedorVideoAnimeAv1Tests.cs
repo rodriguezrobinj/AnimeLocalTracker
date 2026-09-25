@@ -174,6 +174,31 @@ public class ProveedorVideoAnimeAv1Tests
     }
 
     [Fact]
+    public async Task BuscarUrlEpisodioAsync_ConServidorPreferidoVoe_DeberiaProbarloAntesQueMp4UploadAunqueFuncione()
+    {
+        // Arrange: MISMO fixture que BuscarUrlEpisodioAsync_Mp4UploadDisponible_DeberiaUsarElExtractorDirecto
+        // (MP4Upload SÍ funciona) — la única diferencia es servidorPreferido: "Voe".
+        var (proveedor, bridge) = Crear(req =>
+        {
+            if (req.RequestUri!.Host.Contains("animeav1.com")) return Ok(FixturePaginaEpisodio);
+            if (req.RequestUri!.Host.Contains("mp4upload.com")) return Ok(FixturePlayerMp4Upload);
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        });
+        bridge.Setup(b => b.ExecuteCommandOneShotAsync<object, ProveedorVideoAnimeAv1.StreamResult>(
+                "resolve-stream", It.IsAny<object>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ProveedorVideoAnimeAv1.StreamResult { Success = true, DirectUrl = "https://cdn.voe.example.com/video.mp4" });
+
+        // Act: pidiendo Voe como servidor preferido
+        var url = await proveedor.BuscarUrlEpisodioAsync(Titulos, 9, servidorPreferido: "Voe");
+
+        // Assert: se resuelve por el daemon (Voe), no por el extractor directo de MP4Upload,
+        // aunque MP4Upload esté disponible y funcione — la preferencia se prueba primero.
+        url.Should().Be("https://cdn.voe.example.com/video.mp4");
+        bridge.Verify(b => b.ExecuteCommandOneShotAsync<object, ProveedorVideoAnimeAv1.StreamResult>(
+            It.IsAny<string>(), It.IsAny<object>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task BuscarUrlEpisodioAsync_Mp4UploadRoto_DeberiaCaerAlSiguienteServidorViaYtDlp()
     {
         // Arrange: mp4upload sin src (extracción falla) → Voe se resuelve con el daemon

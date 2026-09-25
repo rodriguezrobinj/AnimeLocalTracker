@@ -465,6 +465,20 @@
                                     </ctl:SettingRow>
                                     <Border Style="{StaticResource CfgDivider}"/>
 
+                                    <ctl:SettingRow Title="{Binding [Cfg_ServidorPreferido], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                    Description="{Binding [Cfg_ServidorPreferidoSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                        <ComboBox SelectedValue="{Binding ServidorPreferidoAnimeAv1}" SelectedValuePath="Tag" Height="36" MinWidth="230"
+                                                  AutomationProperties.Name="{Binding [Cfg_ServidorPreferido], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                            <ComboBoxItem Content="{Binding [Cfg_ServidorPreferido_Ninguno], Source={x:Static loc:LocalizationService.Instance}}" Tag=""/>
+                                            <ComboBoxItem Content="MP4Upload" Tag="MP4Upload"/>
+                                            <ComboBoxItem Content="HLS" Tag="HLS"/>
+                                            <ComboBoxItem Content="Voe" Tag="Voe"/>
+                                            <ComboBoxItem Content="UPNShare" Tag="UPNShare"/>
+                                            <ComboBoxItem Content="Byse" Tag="Byse"/>
+                                        </ComboBox>
+                                    </ctl:SettingRow>
+                                    <Border Style="{StaticResource CfgDivider}"/>
+
                                     <ctl:SettingRow Title="{Binding [Cfg_PasosSalto], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
                                                     Description="{Binding [Cfg_PasosSaltoSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
                                         <ComboBox SelectedValue="{Binding PasosSaltoSegundos}" SelectedValuePath="Tag" Height="36" MinWidth="90"

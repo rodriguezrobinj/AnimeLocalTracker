@@ -424,8 +424,10 @@ public class DownloadService : IDownloadService
 
                     if (string.IsNullOrEmpty(state.VideoUrl))
                     {
-                        string? audioPreferido = _settingsService?.ObtenerConfiguracion()?.PreferenciaAudioAnimeAv1;
-                        state.VideoUrl = await _sourceResolver.BuscarUrlEpisodioAsync(state.Titulos, state.NumeroEpisodio, state.AniListId, audioPreferido, state.Cts.Token);
+                        var configuracion = _settingsService?.ObtenerConfiguracion();
+                        string? audioPreferido = configuracion?.PreferenciaAudioAnimeAv1;
+                        string? servidorPreferido = configuracion?.ServidorPreferidoAnimeAv1;
+                        state.VideoUrl = await _sourceResolver.BuscarUrlEpisodioAsync(state.Titulos, state.NumeroEpisodio, state.AniListId, audioPreferido, servidorPreferido, state.Cts.Token);
                         if (string.IsNullOrEmpty(state.VideoUrl))
                         {
                             if (state.IsPaused || state.Cts.IsCancellationRequested) return;

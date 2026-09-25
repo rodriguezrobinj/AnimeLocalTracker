@@ -26,14 +26,14 @@ public class ProveedorVideoAnimeAv1 : IProveedorVideo
         _resolver = resolver;
     }
 
-    public async Task<string?> BuscarUrlEpisodioAsync(IEnumerable<string> titulos, int numeroEpisodio, int? aniListId = null, string? audioPreferido = null, CancellationToken ct = default)
+    public async Task<string?> BuscarUrlEpisodioAsync(IEnumerable<string> titulos, int numeroEpisodio, int? aniListId = null, string? audioPreferido = null, string? servidorPreferido = null, CancellationToken ct = default)
     {
         // La página del episodio publica los embeds de HLS, UPNShare, Voe, Byse,
         // Mega y MP4Upload. Se prueban en orden de preferencia; Mega se omite.
         // El AniListId se usa para verificar el MAL ID de la página (anti-confusión
         // entre animes con nombres parecidos).
         var embeds = await _resolver.ObtenerEmbedsEpisodioAsync(titulos, numeroEpisodio, aniListId, ct);
-        var ordenados = AnimeAv1HtmlParser.OrdenarEmbedsPorPreferencia(embeds, audioPreferido);
+        var ordenados = AnimeAv1HtmlParser.OrdenarEmbedsPorPreferencia(embeds, audioPreferido, servidorPreferido);
         if (ordenados.Count == 0) return null;
 
         foreach (var embed in ordenados)
