@@ -1318,6 +1318,32 @@
                                                 </Button.Style>
                                                 <materialDesign:PackIcon Kind="DownloadCircleOutline" Foreground="#60A5FA" Width="24" Height="24" VerticalAlignment="Center"/>
                                             </Button>
+
+                                            <!-- Fase 2d: elegir torrent manualmente (solo si la búsqueda por torrent está activa) -->
+                                            <Button Command="{Binding DataContext.ElegirTorrentManualCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}"
+                                                    Width="34" Height="34"
+                                                    ToolTip="{Binding [Det_ElegirTorrentTip], Source={x:Static loc:LocalizationService.Instance}}"
+                                                    AutomationProperties.Name="{Binding [Det_ElegirTorrentTip], Source={x:Static loc:LocalizationService.Instance}}"
+                                                    Cursor="Hand">
+                                                <Button.Style>
+                                                    <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Descargado}" Value="True">
+                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding IsDownloading}" Value="True">
+                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding DataContext.BusquedaTorrentHabilitada, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="False">
+                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
+                                                <materialDesign:PackIcon Kind="Magnify" Foreground="#94A3B8" Width="20" Height="20" VerticalAlignment="Center"/>
+                                            </Button>
                                         </StackPanel>
                                     </Grid>
                                 </Border>

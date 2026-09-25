@@ -56,6 +56,31 @@ public class AppSettings
     /// orden habitual en vez de fallar la descarga.</summary>
     public string? ServidorPreferidoAnimeAv1 { get; set; }
 
+    /// <summary>Busca y descarga por torrent en Nyaa.si (MonoTorrent) como último recurso,
+    /// solo cuando ninguna fuente HTTP encontró el episodio. Apagado por defecto: es una
+    /// superficie de red nueva (escucha peers entrantes, puede disparar el aviso de
+    /// Firewall de Windows la primera vez) que el usuario debe activar a propósito.</summary>
+    public bool BusquedaTorrentHabilitada { get; set; } = false;
+
+    /// <summary>Grupo de fansub preferido al elegir candidato de torrent (Fase 2b, ej.
+    /// "SubsPlease"). Texto libre: los nombres de grupo varían demasiado para una lista
+    /// cerrada. Preferencia con fallback — si ningún candidato es de este grupo, se elige
+    /// igual el de más semillas entre el resto.</summary>
+    public string? GrupoFansubPreferidoTorrent { get; set; }
+
+    /// <summary>Resolución preferida al elegir candidato de torrent (Fase 2b): uno de los
+    /// valores de <see cref="ResolucionTorrentValores"/>, o null = sin preferencia. Misma
+    /// preferencia con fallback que <see cref="GrupoFansubPreferidoTorrent"/>.</summary>
+    public string? ResolucionPreferidaTorrent { get; set; }
+
+    /// <summary>Fase 2c: al completar una descarga por torrent, seguir sembrando (subiendo
+    /// piezas a otros peers) en vez de detenerse de inmediato. Apagado por defecto — tiene
+    /// un costo real de ancho de banda de subida mientras la app esté abierta, y duplica
+    /// temporalmente el espacio en disco del episodio (queda una copia en la carpeta interna
+    /// del torrent además de la copia final en la biblioteca). Se detiene todo el sembrado
+    /// activo al cerrar la app — no hay sembrado persistente entre sesiones.</summary>
+    public bool SeguirSembrandoTorrents { get; set; } = false;
+
     /// <summary>Activa un atajo de teclado GLOBAL (funciona aunque la app no tenga el foco) que silencia
     /// el video y minimiza la app a la bandeja del sistema al instante ("boss key").</summary>
     public bool TeclaPanicoActiva { get; set; } = false;
@@ -131,4 +156,14 @@ public static class ServidorPreferidoValores
     public const string Voe = "Voe";
     public const string UpnShare = "UPNShare";
     public const string Byse = "Byse";
+}
+
+/// <summary>Valores válidos de <see cref="AppSettings.ResolucionPreferidaTorrent"/> (Fase 2b).
+/// Coinciden tal cual con cómo los títulos de Nyaa anuncian la resolución
+/// (ej. "(1080p)"), para poder buscarlos como substring sin parsing adicional.</summary>
+public static class ResolucionTorrentValores
+{
+    public const string Res1080p = "1080p";
+    public const string Res720p = "720p";
+    public const string Res480p = "480p";
 }

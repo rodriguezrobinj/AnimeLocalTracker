@@ -104,6 +104,240 @@ public class DownloadServiceTests
     }
 
     [Fact]
+    public async Task IniciarDescargaEpisodioAsync_ConTorrentHabilitadoYSinResultadoHttp_DeberiaCaerANyaaYCompletar()
+    {
+        // Arrange: el resolver HTTP no encuentra nada, pero BusquedaTorrentHabilitada = true
+        // y Nyaa sí tiene un candidato — la descarga debe completarse vía torrent.
+        var settingsMock = new Mock<ISettingsService>();
+        settingsMock.Setup(s => s.ObtenerConfiguracion())
+            .Returns(new AnimeLocalTracker.Models.AppSettings { DescargasSimultaneas = 2, BusquedaTorrentHabilitada = true });
+
+        var resolverMock = new Mock<IVideoSourceResolver>();
+        resolverMock
+            .Setup(r => r.BuscarUrlEpisodioAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<int?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string?)null);
+
+        var candidato = new CandidatoTorrent("[SubsPlease] Anime - 01 (1080p).mkv", "https://nyaa.si/download/1.torrent", "hash", 100, 500_000_000L);
+        var nyaaMock = new Mock<INyaaSourceService>();
+        nyaaMock
+            .Setup(n => n.BuscarEpisodioAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(candidato);
+
+        var torrentMock = new Mock<ITorrentDownloadService>();
+        torrentMock
+            .Setup(t => t.DescargarAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<bool>(), It.IsAny<IProgress<(double Progreso, double VelocidadBps)>?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string _, string _, string destino, int _, bool _, IProgress<(double, double)>? progress, CancellationToken _) =>
+            {
+                progress?.Report((100, 0));
+                return new ResultadoTorrent(true, destino, null);
+            });
+
+        var dbMock = new Mock<IDatabaseService>();
+        var guardada = new TaskCompletionSource<AnimeLocalTracker.Models.DescargaHistorial>(TaskCreationOptions.RunContinuationsAsynchronously);
+        dbMock.Setup(d => d.GuardarDescargaHistorialAsync(It.IsAny<AnimeLocalTracker.Models.DescargaHistorial>()))
+            .Callback<AnimeLocalTracker.Models.DescargaHistorial>(h => guardada.TrySetResult(h))
+            .Returns(Task.CompletedTask);
+
+        var sut = new DownloadService(
+            _httpClientFactoryMock.Object,
+            sourceResolver: resolverMock.Object,
+            settingsService: settingsMock.Object,
+            database: dbMock.Object,
+            nyaaSourceService: nyaaMock.Object,
+            torrentDownloadService: torrentMock.Object);
+
+        var carpeta = Path.Combine(Path.GetTempPath(), $"torrent_fallback_{Guid.NewGuid():N}");
+
+        // Act
+        await sut.IniciarDescargaEpisodioAsync(600, "Anime Torrent", carpeta, 1);
+        var historial = await guardada.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        // Assert
+        historial.Completada.Should().BeTrue();
+        historial.AniListId.Should().Be(600);
+        torrentMock.Verify(t => t.DescargarAsync(candidato.TorrentUrl, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<bool>(), It.IsAny<IProgress<(double, double)>?>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task IniciarDescargaTorrentManualAsync_ConCandidatoElegido_DeberiaDescargarloSinConsultarNyaaNiElResolver()
+    {
+        // Arrange: Fase 2d — el candidato ya viene elegido por el usuario (selector
+        // manual), no debe tocarse ni el resolver HTTP ni la búsqueda automática de Nyaa.
+        var candidatoElegido = new CandidatoTorrent("[Erai-raws] Anime - 05 [1080p]", "https://nyaa.si/download/9.torrent", "hash9", 80, 900_000_000L);
+
+        var nyaaMock = new Mock<INyaaSourceService>();
+        var resolverMock = new Mock<IVideoSourceResolver>();
+
+        string? torrentUrlRecibido = null;
+        var torrentMock = new Mock<ITorrentDownloadService>();
+        torrentMock
+            .Setup(t => t.DescargarAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<bool>(), It.IsAny<IProgress<(double Progreso, double VelocidadBps)>?>(), It.IsAny<CancellationToken>()))
+            .Callback<string, string, string, int, bool, IProgress<(double, double)>?, CancellationToken>((url, _, _, _, _, _, _) => torrentUrlRecibido = url)
+            .ReturnsAsync((string _, string _, string destino, int _, bool _, IProgress<(double, double)>? progress, CancellationToken _) =>
+            {
+                progress?.Report((100, 0));
+                return new ResultadoTorrent(true, destino, null);
+            });
+
+        var dbMock = new Mock<IDatabaseService>();
+        var guardada = new TaskCompletionSource<AnimeLocalTracker.Models.DescargaHistorial>(TaskCreationOptions.RunContinuationsAsynchronously);
+        dbMock.Setup(d => d.GuardarDescargaHistorialAsync(It.IsAny<AnimeLocalTracker.Models.DescargaHistorial>()))
+            .Callback<AnimeLocalTracker.Models.DescargaHistorial>(h => guardada.TrySetResult(h))
+            .Returns(Task.CompletedTask);
+
+        var sut = new DownloadService(
+            _httpClientFactoryMock.Object,
+            sourceResolver: resolverMock.Object,
+            settingsService: _settingsServiceMock.Object,
+            database: dbMock.Object,
+            nyaaSourceService: nyaaMock.Object,
+            torrentDownloadService: torrentMock.Object);
+
+        var carpeta = Path.Combine(Path.GetTempPath(), $"torrent_manual_{Guid.NewGuid():N}");
+
+        // Act
+        await sut.IniciarDescargaTorrentManualAsync(604, "Anime Manual", carpeta, 5, candidatoElegido);
+        var historial = await guardada.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        // Assert
+        historial.Completada.Should().BeTrue();
+        historial.NumeroEpisodio.Should().Be(5);
+        torrentUrlRecibido.Should().Be(candidatoElegido.TorrentUrl);
+        nyaaMock.Verify(n => n.BuscarEpisodioAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+        nyaaMock.Verify(n => n.BuscarCandidatosAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+        resolverMock.Verify(r => r.BuscarUrlEpisodioAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<int?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task IniciarDescargaEpisodioAsync_ConSeguirSembrandoHabilitado_DeberiaReenviarloAlTorrentDownloadService()
+    {
+        // Arrange: AppSettings.SeguirSembrandoTorrents = true debe llegar tal cual a
+        // ITorrentDownloadService.DescargarAsync.
+        var settingsMock = new Mock<ISettingsService>();
+        settingsMock.Setup(s => s.ObtenerConfiguracion())
+            .Returns(new AnimeLocalTracker.Models.AppSettings { DescargasSimultaneas = 2, BusquedaTorrentHabilitada = true, SeguirSembrandoTorrents = true });
+
+        var resolverMock = new Mock<IVideoSourceResolver>();
+        resolverMock
+            .Setup(r => r.BuscarUrlEpisodioAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<int?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string?)null);
+
+        var candidato = new CandidatoTorrent("[SubsPlease] Anime - 01 (1080p).mkv", "https://nyaa.si/download/1.torrent", "hash", 100, 500_000_000L);
+        var nyaaMock = new Mock<INyaaSourceService>();
+        nyaaMock
+            .Setup(n => n.BuscarEpisodioAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(candidato);
+
+        bool? seguirSembrandoRecibido = null;
+        var torrentMock = new Mock<ITorrentDownloadService>();
+        torrentMock
+            .Setup(t => t.DescargarAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<bool>(), It.IsAny<IProgress<(double Progreso, double VelocidadBps)>?>(), It.IsAny<CancellationToken>()))
+            .Callback<string, string, string, int, bool, IProgress<(double, double)>?, CancellationToken>((_, _, _, _, seguir, _, _) => seguirSembrandoRecibido = seguir)
+            .ReturnsAsync((string _, string _, string destino, int _, bool _, IProgress<(double, double)>? _, CancellationToken _) => new ResultadoTorrent(true, destino, null));
+
+        var sut = new DownloadService(
+            _httpClientFactoryMock.Object,
+            sourceResolver: resolverMock.Object,
+            settingsService: settingsMock.Object,
+            nyaaSourceService: nyaaMock.Object,
+            torrentDownloadService: torrentMock.Object);
+
+        var carpeta = Path.Combine(Path.GetTempPath(), $"seguir_sembrando_{Guid.NewGuid():N}");
+
+        // Act
+        await sut.IniciarDescargaEpisodioAsync(603, "Anime Sembrando", carpeta, 1);
+        await EsperarHastaAsync(() => seguirSembrandoRecibido != null);
+
+        // Assert
+        seguirSembrandoRecibido.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task IniciarDescargaEpisodioAsync_ConPreferenciasDeTorrentConfiguradas_DeberiaReenviarlasANyaa()
+    {
+        // Arrange: GrupoFansubPreferidoTorrent/ResolucionPreferidaTorrent deben llegar tal
+        // cual a INyaaSourceService.BuscarEpisodioAsync.
+        var settingsMock = new Mock<ISettingsService>();
+        settingsMock.Setup(s => s.ObtenerConfiguracion())
+            .Returns(new AnimeLocalTracker.Models.AppSettings
+            {
+                DescargasSimultaneas = 2,
+                BusquedaTorrentHabilitada = true,
+                GrupoFansubPreferidoTorrent = "SubsPlease",
+                ResolucionPreferidaTorrent = "720p",
+            });
+
+        var resolverMock = new Mock<IVideoSourceResolver>();
+        resolverMock
+            .Setup(r => r.BuscarUrlEpisodioAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<int?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string?)null);
+
+        string? grupoRecibido = null;
+        string? resolucionRecibida = null;
+        var nyaaMock = new Mock<INyaaSourceService>();
+        nyaaMock
+            .Setup(n => n.BuscarEpisodioAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .Callback<IEnumerable<string>, int, string?, string?, CancellationToken>((_, _, grupo, resolucion, _) =>
+            {
+                grupoRecibido = grupo;
+                resolucionRecibida = resolucion;
+            })
+            .ReturnsAsync((CandidatoTorrent?)null);
+
+        var sut = new DownloadService(
+            _httpClientFactoryMock.Object,
+            sourceResolver: resolverMock.Object,
+            settingsService: settingsMock.Object,
+            nyaaSourceService: nyaaMock.Object,
+            torrentDownloadService: new Mock<ITorrentDownloadService>().Object);
+
+        var carpeta = Path.Combine(Path.GetTempPath(), $"pref_torrent_{Guid.NewGuid():N}");
+
+        // Act
+        await sut.IniciarDescargaEpisodioAsync(602, "Anime Preferencia Torrent", carpeta, 1);
+        await EsperarHastaAsync(() => grupoRecibido != null);
+
+        // Assert
+        grupoRecibido.Should().Be("SubsPlease");
+        resolucionRecibida.Should().Be("720p");
+    }
+
+    [Fact]
+    public async Task IniciarDescargaEpisodioAsync_ConBusquedaTorrentDeshabilitada_NuncaDeberiaConsultarNyaa()
+    {
+        // Arrange: BusquedaTorrentHabilitada = false (por defecto) — sin resultado HTTP,
+        // el flujo debe fallar directo, sin tocar Nyaa/torrent aunque estén inyectados.
+        var settingsMock = new Mock<ISettingsService>();
+        settingsMock.Setup(s => s.ObtenerConfiguracion())
+            .Returns(new AnimeLocalTracker.Models.AppSettings { DescargasSimultaneas = 2, BusquedaTorrentHabilitada = false });
+
+        var resolverMock = new Mock<IVideoSourceResolver>();
+        resolverMock
+            .Setup(r => r.BuscarUrlEpisodioAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<int?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string?)null);
+
+        var nyaaMock = new Mock<INyaaSourceService>();
+        var torrentMock = new Mock<ITorrentDownloadService>();
+
+        var sut = new DownloadService(
+            _httpClientFactoryMock.Object,
+            sourceResolver: resolverMock.Object,
+            settingsService: settingsMock.Object,
+            nyaaSourceService: nyaaMock.Object,
+            torrentDownloadService: torrentMock.Object);
+
+        var carpeta = Path.Combine(Path.GetTempPath(), $"torrent_disabled_{Guid.NewGuid():N}");
+
+        // Act
+        await sut.IniciarDescargaEpisodioAsync(601, "Anime Sin Torrent", carpeta, 1);
+        await Task.Delay(300); // deja que el bucle de descarga llegue a fallar
+
+        // Assert
+        nyaaMock.Verify(n => n.BuscarEpisodioAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+        torrentMock.Verify(t => t.DescargarAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<bool>(), It.IsAny<IProgress<(double, double)>?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task DownloadVideoAsync_ConManifiestoHls_DeberiaDescargarConElDaemon()
     {
         // Arrange: URL m3u8 → se enruta al daemon (download-stream), nunca al HttpClient

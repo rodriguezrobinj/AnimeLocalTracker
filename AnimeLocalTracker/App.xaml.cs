@@ -114,6 +114,8 @@ public partial class App : Application
         // 3. Aquí registraremos los Servicios
         services.AddSingleton<ISettingsService, SettingsService>();
         services.AddSingleton<IDialogService, DialogService>();
+        // Fase 2d: overlay para elegir un torrent a mano entre varios candidatos.
+        services.AddSingleton<ISelectorTorrentService, SelectorTorrentService>();
         services.AddSingleton<IAuthService, AuthService>();
         services.AddSingleton<IGamepadService, GamepadService>();
         services.AddSingleton<IPluginService, PluginService>();
@@ -125,6 +127,14 @@ public partial class App : Application
         services.AddHttpClient("Downloader")
             .ConfigurePrimaryHttpMessageHandler(() => new System.Net.Http.HttpClientHandler { AllowAutoRedirect = false })
             .AddHttpMessageHandler(() => new RedirectSeguroHandler());
+
+        // Descargas por torrent (Nyaa.si + MonoTorrent, Fase MVP): último recurso opt-in
+        // cuando ninguna fuente HTTP encuentra el episodio — ver AppSettings.BusquedaTorrentHabilitada.
+        services.AddSingleton<INyaaSourceService>(sp =>
+            new NyaaSourceService(sp.GetRequiredService<IHttpClientFactory>().CreateClient("Downloader")));
+        services.AddSingleton<ITorrentDownloadService>(sp =>
+            new TorrentDownloadService(sp.GetRequiredService<IHttpClientFactory>().CreateClient("Downloader")));
+
         services.AddSingleton<IDownloadService, DownloadService>();
         
         // IHttpClientFactory nativo con Polly para Rate Limiting

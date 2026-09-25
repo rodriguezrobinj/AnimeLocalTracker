@@ -479,6 +479,41 @@
                                     </ctl:SettingRow>
                                     <Border Style="{StaticResource CfgDivider}"/>
 
+                                    <ctl:SettingRow Title="{Binding [Cfg_BusquedaTorrent], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                    Description="{Binding [Cfg_BusquedaTorrentSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                        <ToggleButton IsChecked="{Binding BusquedaTorrentHabilitada}" Style="{StaticResource CfgSwitch}"
+                                                      AutomationProperties.Name="{Binding [Cfg_BusquedaTorrent], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                    </ctl:SettingRow>
+                                    <Border Style="{StaticResource CfgDivider}"/>
+
+                                    <ctl:SettingRow Title="{Binding [Cfg_GrupoFansubPreferido], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                    Description="{Binding [Cfg_GrupoFansubPreferidoSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                        <TextBox Text="{Binding GrupoFansubPreferidoTorrent, UpdateSourceTrigger=PropertyChanged}"
+                                                 Style="{StaticResource MaterialDesignOutlinedTextBox}" Height="36" MinWidth="180"
+                                                 materialDesign:HintAssist.Hint="{Binding [Cfg_GrupoFansubPreferidoHint], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                 AutomationProperties.Name="{Binding [Cfg_GrupoFansubPreferido], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                    </ctl:SettingRow>
+                                    <Border Style="{StaticResource CfgDivider}"/>
+
+                                    <ctl:SettingRow Title="{Binding [Cfg_ResolucionPreferida], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                    Description="{Binding [Cfg_ResolucionPreferidaSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                        <ComboBox SelectedValue="{Binding ResolucionPreferidaTorrent}" SelectedValuePath="Tag" Height="36" MinWidth="150"
+                                                  AutomationProperties.Name="{Binding [Cfg_ResolucionPreferida], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                            <ComboBoxItem Content="{Binding [Cfg_ResolucionPreferida_Ninguna], Source={x:Static loc:LocalizationService.Instance}}" Tag=""/>
+                                            <ComboBoxItem Content="1080p" Tag="1080p"/>
+                                            <ComboBoxItem Content="720p" Tag="720p"/>
+                                            <ComboBoxItem Content="480p" Tag="480p"/>
+                                        </ComboBox>
+                                    </ctl:SettingRow>
+                                    <Border Style="{StaticResource CfgDivider}"/>
+
+                                    <ctl:SettingRow Title="{Binding [Cfg_SeguirSembrando], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                    Description="{Binding [Cfg_SeguirSembrandoSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                        <ToggleButton IsChecked="{Binding SeguirSembrandoTorrents}" Style="{StaticResource CfgSwitch}"
+                                                      AutomationProperties.Name="{Binding [Cfg_SeguirSembrando], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                    </ctl:SettingRow>
+                                    <Border Style="{StaticResource CfgDivider}"/>
+
                                     <ctl:SettingRow Title="{Binding [Cfg_PasosSalto], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
                                                     Description="{Binding [Cfg_PasosSaltoSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
                                         <ComboBox SelectedValue="{Binding PasosSaltoSegundos}" SelectedValuePath="Tag" Height="36" MinWidth="90"

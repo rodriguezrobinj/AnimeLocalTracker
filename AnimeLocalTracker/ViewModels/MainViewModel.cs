@@ -28,6 +28,8 @@ public partial class MainViewModel : ObservableObject,
 
     public NavigationService Navigation => (NavigationService)_navigationService;
     public IDialogService DialogService { get; }
+    /// <summary>Fase 2d: overlay para elegir un torrent a mano — mismo patrón que <see cref="DialogService"/>.</summary>
+    public ISelectorTorrentService SelectorTorrentService { get; }
 
     public string VersionAppTexto => _updateService.ObtenerVersionActual();
 
@@ -64,6 +66,7 @@ public partial class MainViewModel : ObservableObject,
         IDownloadService downloadService,
         IUpdateService updateService,
         IDialogService dialogService,
+        ISelectorTorrentService selectorTorrentService,
         IDatabaseService databaseService,
         IFileScannerService fileScannerService,
         NewEpisodeNotifier newEpisodeNotifier,
@@ -75,6 +78,7 @@ public partial class MainViewModel : ObservableObject,
         _downloadService = downloadService;
         _updateService = updateService;
         DialogService = dialogService;
+        SelectorTorrentService = selectorTorrentService;
         _databaseService = databaseService;
         _fileScannerService = fileScannerService;
         _newEpisodeNotifier = newEpisodeNotifier;
