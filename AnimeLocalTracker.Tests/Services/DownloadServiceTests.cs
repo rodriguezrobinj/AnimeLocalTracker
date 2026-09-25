@@ -30,7 +30,7 @@ public class DownloadServiceTests
             .Returns(new HttpClient());
 
         _sourceResolverMock
-            .Setup(r => r.BuscarUrlEpisodioAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<int?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.BuscarUrlEpisodioAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<int?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync("https://example.com/video.mp4");
 
         _settingsServiceMock
@@ -54,8 +54,8 @@ public class DownloadServiceTests
         string? audioRecibido = null;
         var resolverMock = new Mock<IVideoSourceResolver>();
         resolverMock
-            .Setup(r => r.BuscarUrlEpisodioAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<int?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
-            .Callback<IEnumerable<string>, int, int?, string?, CancellationToken>((_, _, _, audio, _) => audioRecibido = audio)
+            .Setup(r => r.BuscarUrlEpisodioAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<int?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .Callback<IEnumerable<string>, int, int?, string?, string?, CancellationToken>((_, _, _, audio, _, _) => audioRecibido = audio)
             .ReturnsAsync((string?)null); // sin URL: la descarga termina en "no encontrado", no hace falta simular la transferencia
 
         var sut = new DownloadService(
@@ -71,6 +71,36 @@ public class DownloadServiceTests
 
         // Assert
         audioRecibido.Should().Be("DUB");
+    }
+
+    [Fact]
+    public async Task IniciarDescargaEpisodioAsync_ConServidorPreferidoConfigurado_DeberiaReenviarloAlResolver()
+    {
+        // Arrange: AppSettings.ServidorPreferidoAnimeAv1 = "Voe" debe llegar tal cual al resolver.
+        var settingsMock = new Mock<ISettingsService>();
+        settingsMock.Setup(s => s.ObtenerConfiguracion())
+            .Returns(new AnimeLocalTracker.Models.AppSettings { DescargasSimultaneas = 2, ServidorPreferidoAnimeAv1 = "Voe" });
+
+        string? servidorRecibido = null;
+        var resolverMock = new Mock<IVideoSourceResolver>();
+        resolverMock
+            .Setup(r => r.BuscarUrlEpisodioAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<int?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .Callback<IEnumerable<string>, int, int?, string?, string?, CancellationToken>((_, _, _, _, servidor, _) => servidorRecibido = servidor)
+            .ReturnsAsync((string?)null);
+
+        var sut = new DownloadService(
+            _httpClientFactoryMock.Object,
+            sourceResolver: resolverMock.Object,
+            settingsService: settingsMock.Object);
+
+        var carpeta = Path.Combine(Path.GetTempPath(), $"pref_servidor_{Guid.NewGuid():N}");
+
+        // Act
+        await sut.IniciarDescargaEpisodioAsync(501, "Anime Preferencia Servidor", carpeta, 1);
+        await EsperarHastaAsync(() => servidorRecibido != null);
+
+        // Assert
+        servidorRecibido.Should().Be("Voe");
     }
 
     [Fact]
@@ -171,8 +201,8 @@ public class DownloadServiceTests
         var maxConcurrent = 0;
 
         _sourceResolverMock
-            .Setup(r => r.BuscarUrlEpisodioAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<int?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
-            .Returns(async (IEnumerable<string> t, int ep, int? aniListId, string? audio, CancellationToken ct) =>
+            .Setup(r => r.BuscarUrlEpisodioAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<int?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .Returns(async (IEnumerable<string> t, int ep, int? aniListId, string? audio, string? servidor, CancellationToken ct) =>
             {
                 int now = Interlocked.Increment(ref activeCounter);
                 InterlockedExchangeMax(ref maxConcurrent, now);
@@ -222,8 +252,8 @@ public class DownloadServiceTests
         var resolucionesIniciadas = 0;
 
         _sourceResolverMock
-            .Setup(r => r.BuscarUrlEpisodioAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<int?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
-            .Returns(async (IEnumerable<string> t, int ep, int? aniListId, string? audio, CancellationToken ct) =>
+            .Setup(r => r.BuscarUrlEpisodioAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<int?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .Returns(async (IEnumerable<string> t, int ep, int? aniListId, string? audio, string? servidor, CancellationToken ct) =>
             {
                 Interlocked.Increment(ref resolucionesIniciadas);
                 var puerta = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);

@@ -49,6 +49,13 @@ public class AppSettings
     /// fallback, no un filtro estricto: si el episodio no tiene esa pista, se descarga en la otra.</summary>
     public string? PreferenciaAudioAnimeAv1 { get; set; }
 
+    /// <summary>Servidor preferido al descargar de AnimeAV1: uno de los valores de
+    /// <see cref="ServidorPreferidoValores"/>, o null/vacío = sin preferencia (orden de
+    /// siempre: MP4Upload primero). Es una preferencia con fallback, no un filtro estricto:
+    /// si el servidor pedido no resuelve el episodio, se sigue probando el resto en el
+    /// orden habitual en vez de fallar la descarga.</summary>
+    public string? ServidorPreferidoAnimeAv1 { get; set; }
+
     /// <summary>Activa un atajo de teclado GLOBAL (funciona aunque la app no tenga el foco) que silencia
     /// el video y minimiza la app a la bandeja del sistema al instante ("boss key").</summary>
     public bool TeclaPanicoActiva { get; set; } = false;
@@ -111,4 +118,17 @@ public static class PreferenciaAudioValores
     public const string Subtitulado = "SUB";
     /// <summary>Doblaje latino.</summary>
     public const string Latino = "DUB";
+}
+
+/// <summary>Valores válidos de <see cref="AppSettings.ServidorPreferidoAnimeAv1"/> — coinciden
+/// tal cual con los nombres de servidor que publica el sitio. Hoy solo <see cref="Mp4Upload"/>
+/// resuelve de forma fiable (ver comentario de OrdenarEmbedsPorPreferencia); los demás quedan
+/// disponibles para cuando el sitio o el daemon ganen un extractor real.</summary>
+public static class ServidorPreferidoValores
+{
+    public const string Mp4Upload = "MP4Upload";
+    public const string Hls = "HLS";
+    public const string Voe = "Voe";
+    public const string UpnShare = "UPNShare";
+    public const string Byse = "Byse";
 }

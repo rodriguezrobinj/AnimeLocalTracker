@@ -68,9 +68,19 @@ public static partial class AnimeAv1HtmlParser
     /// PREFERENCIA con fallback, no un filtro estricto: si la pista pedida no tiene ningún
     /// servidor disponible, se cae a la otra en vez de no descargar nada. Null/vacío = sin
     /// preferencia, mismo orden de siempre (solo por servidor, sin importar el idioma).</param>
-    public static List<EmbedServidor> OrdenarEmbedsPorPreferencia(IEnumerable<EmbedServidor> embeds, string? audioPreferido = null)
+    /// <param name="servidorPreferido">Servidor preferido (AppSettings.ServidorPreferidoAnimeAv1,
+    /// ej. "MP4Upload"). También es PREFERENCIA con fallback: se prueba primero y, si no
+    /// resuelve, se sigue con el resto en el orden de siempre. Null/vacío = sin preferencia.</param>
+    public static List<EmbedServidor> OrdenarEmbedsPorPreferencia(IEnumerable<EmbedServidor> embeds, string? audioPreferido = null, string? servidorPreferido = null)
     {
         var preferenciaServidor = new[] { "MP4Upload", "HLS", "Voe", "UPNShare", "Byse" };
+        if (!string.IsNullOrWhiteSpace(servidorPreferido))
+        {
+            preferenciaServidor = preferenciaServidor
+                .Where(s => !s.Equals(servidorPreferido, StringComparison.OrdinalIgnoreCase))
+                .Prepend(servidorPreferido)
+                .ToArray();
+        }
 
         List<EmbedServidor> PorServidor(IEnumerable<EmbedServidor> fuente) => preferenciaServidor
             .SelectMany((nombre, i) => fuente
@@ -288,7 +298,7 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
         _titulosDesdeAniList = titulosDesdeAniList;
     }
 
-    public async Task<string?> BuscarUrlEpisodioAsync(IEnumerable<string> titulos, int numeroEpisodio, int? aniListId = null, string? audioPreferido = null, CancellationToken cancellationToken = default)
+    public async Task<string?> BuscarUrlEpisodioAsync(IEnumerable<string> titulos, int numeroEpisodio, int? aniListId = null, string? audioPreferido = null, string? servidorPreferido = null, CancellationToken cancellationToken = default)
     {
         // FASE 1 (multi-servidor): obtener los embeds de la página del episodio.
         // El C# solo resuelve MP4Upload; los demás servidores los orquesta
@@ -296,7 +306,7 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
         var embeds = await ObtenerEmbedsEpisodioAsync(titulos, numeroEpisodio, aniListId, cancellationToken);
         if (embeds.Count == 0) return null;
 
-        var ordenados = AnimeAv1HtmlParser.OrdenarEmbedsPorPreferencia(embeds, audioPreferido);
+        var ordenados = AnimeAv1HtmlParser.OrdenarEmbedsPorPreferencia(embeds, audioPreferido, servidorPreferido);
         var mp4 = ordenados.FirstOrDefault(e => e.Server.Equals("MP4Upload", StringComparison.OrdinalIgnoreCase));
         if (string.IsNullOrEmpty(mp4.Url)) return null;
 

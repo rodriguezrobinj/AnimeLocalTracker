@@ -21,8 +21,10 @@ public interface IProveedorVideo
     /// (MAL ID) y evitar confusiones entre títulos parecidos. audioPreferido es
     /// una PREFERENCIA con fallback (AppSettings.PreferenciaAudioAnimeAv1, "SUB"/"DUB"):
     /// si la pista pedida no está disponible para el episodio, se resuelve igual en la otra.
+    /// servidorPreferido también es preferencia con fallback (AppSettings.ServidorPreferidoAnimeAv1,
+    /// ej. "MP4Upload"): se prueba primero y, si falla, se sigue con el resto en el orden de siempre.
     /// </summary>
-    Task<string?> BuscarUrlEpisodioAsync(IEnumerable<string> titulos, int numeroEpisodio, int? aniListId = null, string? audioPreferido = null, CancellationToken ct = default);
+    Task<string?> BuscarUrlEpisodioAsync(IEnumerable<string> titulos, int numeroEpisodio, int? aniListId = null, string? audioPreferido = null, string? servidorPreferido = null, CancellationToken ct = default);
 
     /// <summary>
     /// Extrae la URL directa desde una página concreta del proveedor (solo si la

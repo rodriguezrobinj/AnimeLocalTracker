@@ -31,7 +31,7 @@ public class OrquestadorMultiProveedorTests
         public string Nombre { get; }
         public int? UltimoAniListId { get; private set; }
 
-        public Task<string?> BuscarUrlEpisodioAsync(IEnumerable<string> titulos, int numeroEpisodio, int? aniListId = null, string? audioPreferido = null, CancellationToken ct = default)
+        public Task<string?> BuscarUrlEpisodioAsync(IEnumerable<string> titulos, int numeroEpisodio, int? aniListId = null, string? audioPreferido = null, string? servidorPreferido = null, CancellationToken ct = default)
         {
             Llamadas++;
             UltimoAniListId = aniListId;
