@@ -42,6 +42,81 @@ public class PlaybackStateServiceTests
     }
 
     [Fact]
+    public async Task MarcarComoVistoYSincronizarAsync_ConEpisodioAnteriorAlRemoto_NoDeberiaRegresarElProgreso()
+    {
+        // Arrange: en AniList ya se llegó al episodio 8 (p. ej. progreso de otro dispositivo o de
+        // una sesión anterior); el usuario re-ve el episodio 5 (un recap). El progreso remoto no
+        // debe regresar a 5.
+        _authMock.Setup(a => a.ObtenerTokenGuardado()).Returns("token-valido");
+        _trackingMock.Setup(t => t.ObtenerSeguimientoUsuarioAsync(16498, "token-valido"))
+            .ReturnsAsync(new AniListMediaList { Progress = 8, Status = "CURRENT" });
+        var sut = CrearSut();
+
+        // Act
+        bool resultado = await sut.MarcarComoVistoYSincronizarAsync(16498, 5, @"C:\videos\Ep05.mkv", 1500);
+
+        // Assert: se marca localmente, pero NUNCA se sube progress=5 a AniList.
+        resultado.Should().BeTrue();
+        _dbMock.Verify(d => d.GuardarRegistroEpisodioAsync(It.IsAny<RegistroEpisodio>()), Times.Once);
+        _trackingMock.Verify(t => t.ActualizarProgresoAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task MarcarComoVistoYSincronizarAsync_ConEpisodioIgualAlRemoto_NoDeberiaReenviarProgreso()
+    {
+        // Arrange: re-ver el mismo último episodio (progreso remoto ya está en 8, se ve el 8 de nuevo).
+        _authMock.Setup(a => a.ObtenerTokenGuardado()).Returns("token-valido");
+        _trackingMock.Setup(t => t.ObtenerSeguimientoUsuarioAsync(16498, "token-valido"))
+            .ReturnsAsync(new AniListMediaList { Progress = 8, Status = "CURRENT" });
+        var sut = CrearSut();
+
+        // Act
+        bool resultado = await sut.MarcarComoVistoYSincronizarAsync(16498, 8, @"C:\videos\Ep08.mkv", 1500);
+
+        // Assert
+        resultado.Should().BeTrue();
+        _trackingMock.Verify(t => t.ActualizarProgresoAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task MarcarComoVistoYSincronizarAsync_ConAvanceNormal_SiDeberiaSubirElProgreso()
+    {
+        // Arrange: progreso remoto en 4, se ve el episodio 5 (avance normal) — comportamiento
+        // existente, no debe romperse con el guard anti-regresión.
+        _authMock.Setup(a => a.ObtenerTokenGuardado()).Returns("token-valido");
+        _trackingMock.Setup(t => t.ObtenerSeguimientoUsuarioAsync(16498, "token-valido"))
+            .ReturnsAsync(new AniListMediaList { Progress = 4, Status = "CURRENT" });
+        _trackingMock.Setup(t => t.ActualizarProgresoAsync(16498, 5, "token-valido")).ReturnsAsync(true);
+        var sut = CrearSut();
+
+        // Act
+        bool resultado = await sut.MarcarComoVistoYSincronizarAsync(16498, 5, @"C:\videos\Ep05.mkv", 1500);
+
+        // Assert
+        resultado.Should().BeTrue();
+        _trackingMock.Verify(t => t.ActualizarProgresoAsync(16498, 5, "token-valido"), Times.Once);
+    }
+
+    [Fact]
+    public async Task MarcarComoVistoYSincronizarAsync_SinSeguimientoRemotoPrevio_SiDeberiaSubirElProgreso()
+    {
+        // Arrange: anime nunca trackeado en AniList (ObtenerSeguimientoUsuarioAsync devuelve null) —
+        // debe seguir subiendo el progreso normalmente.
+        _authMock.Setup(a => a.ObtenerTokenGuardado()).Returns("token-valido");
+        _trackingMock.Setup(t => t.ObtenerSeguimientoUsuarioAsync(16498, "token-valido"))
+            .ReturnsAsync((AniListMediaList?)null);
+        _trackingMock.Setup(t => t.ActualizarProgresoAsync(16498, 3, "token-valido")).ReturnsAsync(true);
+        var sut = CrearSut();
+
+        // Act
+        bool resultado = await sut.MarcarComoVistoYSincronizarAsync(16498, 3, @"C:\videos\Ep03.mkv", 1500);
+
+        // Assert
+        resultado.Should().BeTrue();
+        _trackingMock.Verify(t => t.ActualizarProgresoAsync(16498, 3, "token-valido"), Times.Once);
+    }
+
+    [Fact]
     public async Task GuardarProgresoAsync_ConEpisodioInvalido_NoDeberiaPersistir()
     {
         // Arrange

@@ -169,16 +169,24 @@ public class PlaybackStateService : IPlaybackStateService
             var token = _authService.ObtenerTokenGuardado();
             if (!string.IsNullOrEmpty(token))
             {
-                // Solo el visionado REAL fija fechas. La entrada de AniList se lee ANTES de subir el progreso:
-                // después ya no se sabría si el usuario venía de cero (inicio) o de un re-visionado.
+                // La entrada de AniList se lee ANTES de subir el progreso: por un lado, para fechas
+                // (después ya no se sabría si el usuario venía de cero -inicio- o de un re-visionado);
+                // por otro, para no REGRESAR un progreso remoto ya más avanzado (ver guard debajo).
                 AniListMediaList? remotoPrevio = null;
-                if (registrarReproduccion)
-                {
-                    try { remotoPrevio = await _animeTrackingService.ObtenerSeguimientoUsuarioAsync(animeId, token); }
-                    catch (Exception ex) { AppLogger.Debug("PlaybackStateService", $"No se pudo leer el seguimiento previo de {animeId}: {ex.Message}"); }
-                }
+                try { remotoPrevio = await _animeTrackingService.ObtenerSeguimientoUsuarioAsync(animeId, token); }
+                catch (Exception ex) { AppLogger.Debug("PlaybackStateService", $"No se pudo leer el seguimiento previo de {animeId}: {ex.Message}"); }
 
-                bool progresoSubido = await _animeTrackingService.ActualizarProgresoAsync(animeId, episodio, token);
+                // Anti-regresión (mismo criterio que SyncService/FUN-001): re-ver un episodio anterior
+                // (ej. un recap) no debe bajar el progreso ya alcanzado en AniList.
+                bool progresoSubido;
+                if (remotoPrevio != null && episodio <= remotoPrevio.Progress)
+                {
+                    progresoSubido = true;
+                }
+                else
+                {
+                    progresoSubido = await _animeTrackingService.ActualizarProgresoAsync(animeId, episodio, token);
+                }
 
                 if (progresoSubido && registrarReproduccion)
                 {

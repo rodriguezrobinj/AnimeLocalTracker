@@ -1014,7 +1014,8 @@ public partial class DetalleViewModel : ObservableObject,
         foreach (var ep in episodios)
         {
             ep.Visto = true;
-            listaRegistros.Add(new RegistroEpisodio 
+            ep.ProgresoSegundos = 0;
+            listaRegistros.Add(new RegistroEpisodio
             {
                 AniListId = AnimeSeleccionado.AniListId,
                 NumeroEpisodio = ep.NumeroEpisodio,
@@ -1051,7 +1052,8 @@ public partial class DetalleViewModel : ObservableObject,
         foreach (var ep in episodios)
         {
             ep.Visto = false;
-            listaRegistros.Add(new RegistroEpisodio 
+            ep.ProgresoSegundos = 0;
+            listaRegistros.Add(new RegistroEpisodio
             {
                 AniListId = AnimeSeleccionado.AniListId,
                 NumeroEpisodio = ep.NumeroEpisodio,
@@ -1076,6 +1078,7 @@ public partial class DetalleViewModel : ObservableObject,
         if (episodio == null || AnimeSeleccionado == null) return;
 
         episodio.Visto = !episodio.Visto;
+        episodio.ProgresoSegundos = 0; // consistente con el reset que hace la BD al marcar manualmente
 
         var registro = new RegistroEpisodio
         {
@@ -1111,6 +1114,7 @@ public partial class DetalleViewModel : ObservableObject,
         foreach (var ep in aMarcar)
         {
             ep.Visto = true;
+            ep.ProgresoSegundos = 0;
             listaRegistros.Add(new RegistroEpisodio
             {
                 AniListId = AnimeSeleccionado.AniListId,
@@ -1146,6 +1150,7 @@ public partial class DetalleViewModel : ObservableObject,
         foreach (var ep in aMarcar)
         {
             ep.Visto = true;
+            ep.ProgresoSegundos = 0;
             listaRegistros.Add(new RegistroEpisodio
             {
                 AniListId = AnimeSeleccionado.AniListId,
