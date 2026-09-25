@@ -1,8 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
+using System.Linq;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows.Threading;
 using AnimeLocalTracker.Messages;
 using AnimeLocalTracker.Models;
 using AnimeLocalTracker.Services;
@@ -82,6 +86,159 @@ public class AgregarAnimeViewModelTests : IDisposable
         sut.MostrandoTendencias.Should().BeTrue();
         sut.TituloSeccion.Should().Be("Tendencias de la temporada");
         sut.BusquedaSinResultados.Should().BeFalse();
+    }
+
+    /// <summary>
+    /// El debounce de la búsqueda en vivo usa un Task.Delay(350) real: su continuación se reanuda
+    /// en un hilo de threadpool, y la mutación posterior de <c>Resultados</c> (ObservableCollection
+    /// envuelta en un CollectionView) exige el mismo hilo que la creó — en la app real ese hilo
+    /// tiene el Dispatcher de WPF y el SynchronizationContext ambiental ya lo garantiza "gratis".
+    /// En un test xUnit puro no hay Dispatcher, así que se instala uno explícito y se bombea su cola
+    /// de mensajes mientras se espera, en vez de un simple Task.Delay.
+    /// </summary>
+    private static void BombearHastaQue(Func<bool> condicion, int timeoutMs = 3000)
+    {
+        var frame = new DispatcherFrame();
+        var cronometro = Stopwatch.StartNew();
+        var timer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(15) };
+        timer.Tick += (_, _) =>
+        {
+            if (condicion() || cronometro.ElapsedMilliseconds > timeoutMs)
+            {
+                frame.Continue = false;
+            }
+        };
+        timer.Start();
+        Dispatcher.PushFrame(frame);
+        timer.Stop();
+    }
+
+    [Fact]
+    public void TextoBusqueda_ConDosCaracteresOMas_DeberiaBuscarEnVivoYNoMostrarTendencias()
+    {
+        // Arrange
+        _trackingMock.Setup(t => t.BuscarAnimesEnVivoAsync("Bleach", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<AniListMedia>
+            {
+                new() { Id = 50, Title = new AniListTitle { Romaji = "Bleach" }, Status = "FINISHED", Episodes = 366 }
+            });
+
+        var contextoPrevio = SynchronizationContext.Current;
+        SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext());
+        try
+        {
+            var sut = CreateSut(); // la carga inicial (mocks ya resueltos) completa sincrónicamente aquí
+
+            // Act: IsSearching solo vuelve a false en el "finally" de EjecutarBusquedaEnVivoAsync,
+            // después de que Resultados ya quedó actualizado — señal precisa de "terminó".
+            sut.TextoBusqueda = "Bleach";
+            BombearHastaQue(() => !sut.IsSearching && !sut.MostrandoTendencias);
+
+            // Assert
+            sut.MostrandoTendencias.Should().BeFalse();
+            sut.Resultados.Should().ContainSingle(r => r.TituloPrincipal == "Bleach");
+            _trackingMock.Verify(t => t.BuscarAnimesEnVivoAsync("Bleach", It.IsAny<CancellationToken>()), Times.Once);
+        }
+        finally
+        {
+            SynchronizationContext.SetSynchronizationContext(contextoPrevio);
+        }
+    }
+
+    [Fact]
+    public async Task TextoBusqueda_ConUnSoloCaracter_DeberiaVolverATendencias()
+    {
+        // Arrange
+        var sut = CreateSut();
+        await Task.Delay(50);
+
+        // Act: un solo carácter no dispara búsqueda en vivo; cae de vuelta a tendencias.
+        sut.TextoBusqueda = "B";
+        await Task.Delay(200);
+
+        // Assert
+        sut.MostrandoTendencias.Should().BeTrue();
+        _trackingMock.Verify(t => t.BuscarAnimesEnVivoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task FiltroDeGenero_DeberiaMostrarSoloResultadosConEseGenero_YLimpiarFiltrosLosRestaura()
+    {
+        // Arrange: dos animes de tendencias con géneros distintos.
+        _trackingMock.Setup(t => t.ObtenerAnimesTendenciaAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<AniListMedia>
+            {
+                new() { Id = 1, Title = new AniListTitle { Romaji = "Frieren" }, Status = "FINISHED", Episodes = 28, Genres = ["Fantasy", "Drama"] },
+                new() { Id = 2, Title = new AniListTitle { Romaji = "Solo Leveling" }, Status = "RELEASING", Episodes = 12, Genres = ["Action"] }
+            });
+        var sut = CreateSut();
+        await Task.Delay(50);
+
+        // Act: filtrar por "Action"
+        sut.GeneroSeleccionado = "Action";
+
+        // Assert
+        var visibles = sut.ResultadosFiltrados.Cast<AnimeBusquedaItem>().ToList();
+        visibles.Should().ContainSingle(a => a.TituloPrincipal == "Solo Leveling");
+
+        // Act: limpiar filtros
+        sut.LimpiarFiltrosCommand.Execute(null);
+
+        // Assert
+        sut.GeneroSeleccionado.Should().Be(AgregarAnimeViewModel.TodosLosGeneros);
+        sut.ResultadosFiltrados.Cast<AnimeBusquedaItem>().Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task ReceiveAnimeAñadido_ConItemYaEnResultados_DeberiaMarcarloEnBiblioteca()
+    {
+        // Arrange
+        var sut = CreateSut();
+        await Task.Delay(50); // deja completar la carga inicial: trae "Frieren" (Id=1) a Resultados
+
+        sut.Resultados.Should().ContainSingle(r => r.Media.Id == 1 && !r.EstaEnBiblioteca);
+
+        // Act: se añadió ese mismo anime desde otra pantalla (o desde AñadirAnimeAsync)
+        sut.Receive(new AnimeAñadidoMensaje(new AnimeItem { AniListId = 1, Titulo = "Frieren" }));
+
+        // Assert: el ítem ya visible en Resultados refleja el cambio sin releer la BD.
+        sut.Resultados.Single(r => r.Media.Id == 1).EstaEnBiblioteca.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task CargarTendencias_SiLaApiFalla_DeberiaMostrarToastDeError()
+    {
+        // Arrange: la carga inicial del constructor debe completar SIN fallar antes de armar el
+        // mock que lanza, para no contaminar el conteo de invocaciones del toast.
+        var sut = CreateSut();
+        await Task.Delay(50);
+        _trackingMock.Setup(t => t.ObtenerAnimesTendenciaAsync(It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new HttpRequestException("network down"));
+
+        // Act
+        await sut.CargarTendenciasAsync();
+
+        // Assert: el usuario no debe quedarse sin ninguna señal del fallo de red.
+        _dialogMock.Verify(d => d.MostrarToast(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task EjecutarBusquedaEnVivo_SiLaApiFalla_DeberiaMostrarToastDeError()
+    {
+        // Arrange
+        var sut = CreateSut();
+        await Task.Delay(50);
+        _trackingMock.Setup(t => t.BuscarAnimesEnVivoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new HttpRequestException("network down"));
+
+        // Act
+        sut.TextoBusqueda = "Bleach";
+        await Task.Delay(500);
+
+        // Assert
+        _dialogMock.Verify(d => d.MostrarToast(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Once);
     }
 
     [Fact]

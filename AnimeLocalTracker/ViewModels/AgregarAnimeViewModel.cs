@@ -47,9 +47,22 @@ public partial class AgregarAnimeViewModel : ObservableObject,
     [ObservableProperty]
     private string _anioSeleccionado = TodosLosAños;
 
-    public bool HayFiltrosTemporadaActivos => TemporadaSeleccionada != TodasLasTemporadas || AnioSeleccionado != TodosLosAños;
+    // Reutiliza la misma clave que GaleriaViewModel para "todos los géneros" (igual que ya se
+    // reutilizan Gal_TodasLasTemporadas/Gal_TodosLosAnios): es un texto genérico, no específico de Galería.
+    public static string TodosLosGeneros => LocalizationService.T("Gal_TodosLosGeneros");
 
-    /// <summary>Sin coincidencias por temporada/año, aunque la búsqueda en sí trajo resultados.</summary>
+    [ObservableProperty]
+    private ObservableCollection<string> _generosDisponibles = [TodosLosGeneros];
+
+    [ObservableProperty]
+    private string _generoSeleccionado = TodosLosGeneros;
+
+    public bool HayFiltrosActivos =>
+        TemporadaSeleccionada != TodasLasTemporadas ||
+        AnioSeleccionado != TodosLosAños ||
+        GeneroSeleccionado != TodosLosGeneros;
+
+    /// <summary>Sin coincidencias por temporada/año/género, aunque la búsqueda en sí trajo resultados.</summary>
     public bool SinResultadosFiltrados => Resultados.Count > 0 && (ResultadosFiltrados?.IsEmpty ?? false);
 
     public bool MostrarSinResultados => BusquedaSinResultados || SinResultadosFiltrados;
@@ -57,7 +70,7 @@ public partial class AgregarAnimeViewModel : ObservableObject,
     private void RefrescarFiltroTemporada()
     {
         ResultadosFiltrados.Refresh();
-        OnPropertyChanged(nameof(HayFiltrosTemporadaActivos));
+        OnPropertyChanged(nameof(HayFiltrosActivos));
         OnPropertyChanged(nameof(SinResultadosFiltrados));
         OnPropertyChanged(nameof(MostrarSinResultados));
     }
@@ -66,14 +79,17 @@ public partial class AgregarAnimeViewModel : ObservableObject,
 
     partial void OnAnioSeleccionadoChanged(string value) => RefrescarFiltroTemporada();
 
+    partial void OnGeneroSeleccionadoChanged(string value) => RefrescarFiltroTemporada();
+
     [RelayCommand]
-    private void LimpiarFiltrosTemporada()
+    private void LimpiarFiltros()
     {
         TemporadaSeleccionada = TodasLasTemporadas;
         AnioSeleccionado = TodosLosAños;
+        GeneroSeleccionado = TodosLosGeneros;
     }
 
-    private bool FiltrarPorTemporadaYAño(object obj)
+    private bool FiltrarResultado(object obj)
     {
         if (obj is not AnimeBusquedaItem item) return true;
 
@@ -85,6 +101,12 @@ public partial class AgregarAnimeViewModel : ObservableObject,
 
         if (AnioSeleccionado != TodosLosAños &&
             item.AñoTexto != AnioSeleccionado)
+        {
+            return false;
+        }
+
+        if (GeneroSeleccionado != TodosLosGeneros &&
+            (item.Media.Genres == null || !item.Media.Genres.Any(g => g.Equals(GeneroSeleccionado, StringComparison.OrdinalIgnoreCase))))
         {
             return false;
         }
@@ -134,6 +156,26 @@ public partial class AgregarAnimeViewModel : ObservableObject,
         string prevAnio = AnioSeleccionado;
         AniosDisponibles = new ObservableCollection<string>(nuevaListaAnios);
         AnioSeleccionado = nuevaListaAnios.Contains(prevAnio) ? prevAnio : TodosLosAños;
+    }
+
+    /// <summary>Igual que <see cref="ActualizarTemporadasYAniosDisponibles"/> pero para género: el valor
+    /// real se guarda en inglés (tal cual lo entrega AniList) — el ComboBox solo TRADUCE lo que se
+    /// muestra vía el converter GeneroTraducido, mismo patrón que GaleriaViewModel.</summary>
+    private void ActualizarGenerosDisponibles()
+    {
+        var generosUnicos = Resultados
+            .SelectMany(r => r.Media?.Genres ?? [])
+            .Where(g => !string.IsNullOrWhiteSpace(g))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(g => g)
+            .ToList();
+
+        var nuevaLista = new List<string> { TodosLosGeneros };
+        nuevaLista.AddRange(generosUnicos);
+
+        string prevGenero = GeneroSeleccionado;
+        GenerosDisponibles = new ObservableCollection<string>(nuevaLista);
+        GeneroSeleccionado = nuevaLista.Contains(prevGenero) ? prevGenero : TodosLosGeneros;
     }
 
     [ObservableProperty]
@@ -188,7 +230,7 @@ public partial class AgregarAnimeViewModel : ObservableObject,
         // Resultados es una única instancia estable durante toda la vida del VM (solo se
         // Clear()+Add() en cada búsqueda): la vista filtrada se crea una sola vez aquí.
         ResultadosFiltrados = CollectionViewSource.GetDefaultView(Resultados);
-        ResultadosFiltrados.Filter = FiltrarPorTemporadaYAño;
+        ResultadosFiltrados.Filter = FiltrarResultado;
 
         _ = CargarInicialAsync();
     }
@@ -250,6 +292,7 @@ public partial class AgregarAnimeViewModel : ObservableObject,
 
             BusquedaSinResultados = Resultados.Count == 0;
             ActualizarTemporadasYAniosDisponibles();
+            ActualizarGenerosDisponibles();
             RefrescarFiltroTemporada();
         }
         catch (OperationCanceledException)
@@ -258,6 +301,11 @@ public partial class AgregarAnimeViewModel : ObservableObject,
         catch (Exception ex)
         {
             AppLogger.Error("AgregarAnimeViewModel", "Error cargando tendencias", ex);
+            _dialogService.MostrarToast(
+                LocalizationService.T("Add_ErrorBusquedaTitulo"),
+                LocalizationService.T("Add_ErrorBusquedaMsj"),
+                "AlertCircle",
+                "#FF5252");
         }
         finally
         {
@@ -306,6 +354,7 @@ public partial class AgregarAnimeViewModel : ObservableObject,
 
             BusquedaSinResultados = Resultados.Count == 0;
             ActualizarTemporadasYAniosDisponibles();
+            ActualizarGenerosDisponibles();
             RefrescarFiltroTemporada();
         }
         catch (OperationCanceledException)
@@ -314,6 +363,11 @@ public partial class AgregarAnimeViewModel : ObservableObject,
         catch (Exception ex)
         {
             AppLogger.Error("AgregarAnimeViewModel", $"Error buscando animes para '{busqueda}'", ex);
+            _dialogService.MostrarToast(
+                LocalizationService.T("Add_ErrorBusquedaTitulo"),
+                LocalizationService.T("Add_ErrorBusquedaMsj"),
+                "AlertCircle",
+                "#FF5252");
         }
         finally
         {
@@ -427,14 +481,16 @@ public partial class AgregarAnimeViewModel : ObservableObject,
         }
     }
 
-    /// <summary>LOC-08: regenera el título de sección y los desplegables de temporada/año
-    /// (texto plano, no se refrescan solos al cambiar de idioma).</summary>
+    /// <summary>LOC-08: regenera el título de sección y los desplegables de temporada/año/género
+    /// (texto plano, no se refrescan solos al cambiar de idioma; el género además necesita
+    /// reconstruirse para que el converter GeneroTraducido re-evalúe la traducción mostrada).</summary>
     public void Receive(IdiomaCambiadoMensaje message)
     {
         TituloSeccion = !MostrandoTendencias && TieneTextoBusqueda
             ? string.Format(LocalizationService.T("Add_ResultadosParaFormato"), TextoBusqueda.Trim())
             : LocalizationService.T("Add_TendenciasTemporada");
         ActualizarTemporadasYAniosDisponibles();
+        ActualizarGenerosDisponibles();
         RefrescarFiltroTemporada();
     }
 
