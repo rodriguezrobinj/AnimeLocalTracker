@@ -3,6 +3,8 @@ from urllib.parse import urlparse
 import os
 import yt_dlp
 
+from resolvers.browser_stream_extractor import BrowserStreamExtractor, es_dominio_byse
+
 # Impersonación (opcional): el player de zilla-networks (HLS de animeav1) está tras
 # Cloudflare anti-bot; yt-dlp puede pasar el challenge si curl_cffi está instalado.
 try:
@@ -42,6 +44,11 @@ class StreamExtractor:
         """
         if not StreamExtractor._is_safe_http_url(url):
             return {"success": False, "error": "URL no permitida (solo http/https)."}
+
+        # Byse es una SPA sin nada server-side que scrapear y yt-dlp no tiene
+        # extractor para el sitio: se resuelve con el navegador (ver BrowserStreamExtractor).
+        if es_dominio_byse(urlparse(url).netloc):
+            return BrowserStreamExtractor.extract_byse(url, custom_headers)
 
         ydl_opts: Dict[str, Any] = {
             'quiet': True,
