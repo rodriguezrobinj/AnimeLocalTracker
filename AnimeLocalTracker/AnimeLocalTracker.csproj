@@ -17,6 +17,7 @@
         <!-- DEV-09: versión única del producto; el pipeline de release la lee del tag
              (vX.Y.Z) y los builds locales del script de empaquetado la toman de aquí. -->
         <Version>1.0.5</Version>
+        <ApplicationIcon>Resources\app.ico</ApplicationIcon>
     </PropertyGroup>
 
     <ItemGroup>
@@ -65,6 +66,10 @@
       <None Include="PythonPlugins\**">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>
+    </ItemGroup>
+
+    <ItemGroup>
+      <Resource Include="Resources\app.ico" />
     </ItemGroup>
 
 </Project>
