@@ -31,6 +31,10 @@ def build_standalone_binary():
         "--distpath", tools_output_dir,
         "--workpath", build_dir,
         "--specpath", script_dir,
+        # Playwright empaqueta su driver (binarios + scripts Node) fuera del código
+        # Python normal; sin --collect-all, PyInstaller lo deja fuera y el daemon
+        # falla al lanzar el navegador solo en el .exe compilado (no en desarrollo).
+        "--collect-all", "playwright",
         cli_path
     ]
     
