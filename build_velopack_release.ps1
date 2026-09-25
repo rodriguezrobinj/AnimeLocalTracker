@@ -156,7 +156,8 @@ if (-not (Test-Path $releasesDir)) {
 # vpk sabe interpretar) para no duplicar el contenido de la licencia en dos archivos distintos.
 $licenciaTemp = Join-Path ([IO.Path]::GetTempPath()) "AnimeLocalTracker_LICENSE.txt"
 Copy-Item "$PSScriptRoot\LICENSE" $licenciaTemp -Force
-$instalerDir = "$PSScriptRoot\installer"
+$installerDir = "$PSScriptRoot\installer"
+$iconPath = "$PSScriptRoot\AnimeLocalTracker\Resources\app.ico"
 
 $vpkArgs = @(
     "pack",
@@ -165,16 +166,17 @@ $vpkArgs = @(
     "--packDir", $publishDir,
     "--packAuthors", "Robin Rodriguez",
     "--packTitle", "AnimeLocalTracker",
+    "--icon", $iconPath,
     "--mainExe", "AnimeLocalTracker.exe",
     "--outputDir", $releasesDir,
     "--channel", $Channel,
     "--msi",
-    "--instWelcome", "$instalerDir\msi_welcome.txt",
+    "--instWelcome", "$installerDir\msi_welcome.txt",
     "--instLicense", $licenciaTemp,
-    "--instReadme", "$instalerDir\msi_readme.txt",
-    "--instConclusion", "$instalerDir\msi_conclusion.txt",
-    "--msiTopBanner", "$instalerDir\msi_banner.bmp",
-    "--msiDialogBackground", "$instalerDir\msi_logo.bmp"
+    "--instReadme", "$installerDir\msi_readme.txt",
+    "--instConclusion", "$installerDir\msi_conclusion.txt",
+    "--msiTopBanner", "$installerDir\msi_banner.bmp",
+    "--msiDialogBackground", "$installerDir\msi_logo.bmp"
 )
 if ($SignTemplate) {
     $vpkArgs += @("--signTemplate", $SignTemplate)
