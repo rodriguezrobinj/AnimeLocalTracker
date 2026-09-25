@@ -114,6 +114,34 @@ public class DetalleViewModelTests
     }
 
     [Fact]
+    public async Task AlternarVistoEpisodioCommand_ConEpisodioAMedioVer_DeberiaLimpiarElProgresoYaEnMemoria()
+    {
+        // Arrange: episodio a medio ver (barra de progreso visible). EpisodioItem.Visto no
+        // notificaba TieneProgresoGuardado, así que la barra no desaparecía hasta recargar Detalle.
+        var anime = new AnimeItem { AniListId = 300, Titulo = "Bleach", TotalEpisodios = 5 };
+        var sut = CreateSut();
+        sut.AnimeSeleccionado = anime;
+
+        var episodio = new EpisodioItem { NumeroEpisodio = 3, Visto = false, ProgresoSegundos = 600, TotalSegundos = 1200 };
+        episodio.TieneProgresoGuardado.Should().BeTrue();
+
+        // Act: marcar como visto
+        await sut.AlternarVistoEpisodioCommand.ExecuteAsync(episodio);
+
+        // Assert: visto y sin progreso guardado, en memoria, sin releer de la BD.
+        episodio.Visto.Should().BeTrue();
+        episodio.ProgresoSegundos.Should().Be(0);
+        episodio.TieneProgresoGuardado.Should().BeFalse();
+
+        // Act: alternar de nuevo a no visto (no debe resucitar el progreso viejo)
+        await sut.AlternarVistoEpisodioCommand.ExecuteAsync(episodio);
+
+        // Assert
+        episodio.Visto.Should().BeFalse();
+        episodio.TieneProgresoGuardado.Should().BeFalse();
+    }
+
+    [Fact]
     public void Receive_UsuarioLogeadoMensaje_DeberiaActualizarEstaConectado()
     {
         // Arrange

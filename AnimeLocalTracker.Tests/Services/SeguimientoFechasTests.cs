@@ -211,8 +211,11 @@ public class SeguimientoFechasTests
     }
 
     [Fact]
-    public async Task MarcadoManual_NoLeeElSeguimientoNiGuardaFechas()
+    public async Task MarcadoManual_NoGuardaFechasPeroSiConsultaProgresoRemotoParaEvitarRegresion()
     {
+        // El marcado manual (registrarReproduccion: false) nunca fija fechas de inicio/fin, pero
+        // SÍ debe consultar el progreso remoto: el guard anti-regresión (no bajar el progreso ya
+        // alcanzado en AniList) aplica tanto al visionado real como al marcado manual.
         var auth = new Mock<IAuthService>();
         auth.Setup(a => a.ObtenerTokenGuardado()).Returns("tok");
         _tracking.Setup(t => t.ActualizarProgresoAsync(7, 5, "tok")).ReturnsAsync(true);
@@ -222,7 +225,8 @@ public class SeguimientoFechasTests
         await sut.MarcarComoVistoYSincronizarAsync(7, 5, @"C:\v\5.mkv", 1400, registrarReproduccion: false);
 
         _tracking.Verify(t => t.GuardarFechasSeguimientoAsync(It.IsAny<int>(), It.IsAny<DateTime?>(), It.IsAny<DateTime?>(), It.IsAny<string>(), It.IsAny<bool>()), Times.Never);
-        _tracking.Verify(t => t.ObtenerSeguimientoUsuarioAsync(It.IsAny<int>(), It.IsAny<string>()), Times.Never);
+        _tracking.Verify(t => t.ObtenerSeguimientoUsuarioAsync(7, "tok"), Times.Once);
+        _tracking.Verify(t => t.ActualizarProgresoAsync(7, 5, "tok"), Times.Once);
     }
 
     [Fact]

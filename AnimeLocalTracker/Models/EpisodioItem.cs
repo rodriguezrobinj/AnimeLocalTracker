@@ -22,7 +22,8 @@ public partial class EpisodioItem : ObservableObject
     public int NumeroEpisodio { get; set; }
 
     [ObservableProperty]
-    private bool _visto; 
+    [NotifyPropertyChangedFor(nameof(TieneProgresoGuardado))]
+    private bool _visto;
     
     [ObservableProperty]
     private bool _favorito;
