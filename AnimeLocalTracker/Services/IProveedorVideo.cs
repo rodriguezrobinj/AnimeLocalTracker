@@ -18,9 +18,11 @@ public interface IProveedorVideo
     /// Resuelve la URL directa del episodio (archivo) o un manifiesto HLS/DASH
     /// (que el descargador procesa con el daemon). Null si el proveedor no tiene
     /// el episodio o falló. aniListId permite verificar la identidad del anime
-    /// (MAL ID) y evitar confusiones entre títulos parecidos.
+    /// (MAL ID) y evitar confusiones entre títulos parecidos. audioPreferido es
+    /// una PREFERENCIA con fallback (AppSettings.PreferenciaAudioAnimeAv1, "SUB"/"DUB"):
+    /// si la pista pedida no está disponible para el episodio, se resuelve igual en la otra.
     /// </summary>
-    Task<string?> BuscarUrlEpisodioAsync(IEnumerable<string> titulos, int numeroEpisodio, int? aniListId = null, CancellationToken ct = default);
+    Task<string?> BuscarUrlEpisodioAsync(IEnumerable<string> titulos, int numeroEpisodio, int? aniListId = null, string? audioPreferido = null, CancellationToken ct = default);
 
     /// <summary>
     /// Extrae la URL directa desde una página concreta del proveedor (solo si la

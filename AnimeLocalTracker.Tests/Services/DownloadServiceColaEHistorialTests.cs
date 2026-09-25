@@ -45,8 +45,8 @@ public class DownloadServiceColaEHistorialTests
         var orden = new List<int>();
         var puertas = new Dictionary<int, TaskCompletionSource<bool>>();
         _resolver
-            .Setup(r => r.BuscarUrlEpisodioAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()))
-            .Returns(async (IEnumerable<string> _, int ep, int? _, CancellationToken ct) =>
+            .Setup(r => r.BuscarUrlEpisodioAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<int?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .Returns(async (IEnumerable<string> _, int ep, int? _, string? _, CancellationToken ct) =>
             {
                 var puerta = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
                 lock (orden) { orden.Add(ep); puertas[ep] = puerta; }
@@ -115,7 +115,7 @@ public class DownloadServiceColaEHistorialTests
     public async Task SiNoSeEncuentraElEpisodio_GuardaLaFallidaEnElHistorialYAvisa()
     {
         _resolver
-            .Setup(r => r.BuscarUrlEpisodioAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.BuscarUrlEpisodioAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<int?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((string?)null);
         var guardada = new TaskCompletionSource<DescargaHistorial>(TaskCreationOptions.RunContinuationsAsynchronously);
         _db.Setup(d => d.GuardarDescargaHistorialAsync(It.IsAny<DescargaHistorial>()))

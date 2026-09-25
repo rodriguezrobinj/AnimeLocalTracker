@@ -37,6 +37,27 @@ public class ProveedorVideoAnimeAv1Tests
         <html><script>var config = { src: "https://cdn.mp4upload.com/r0xdfbvme2yy/720p/video.mp4", type: "video/mp4" };</script></html>
         """;
 
+    // Misma ficha que FixturePaginaEpisodio pero con las dos pistas de audio que el sitio
+    // realmente publica (SUB y DUB), cada una con su propio MP4Upload.
+    private const string FixturePaginaEpisodioDosPistas = """
+        <html><body>
+        <script>{__sveltekit_1p4gm49 = {data: [{type:"data",data:{media:{id:4408,title:"Grand Blue Season 3",slug:"grand-blue-season-3",malId:62542,episodes:[{id:60052,number:9}]},episode:{number:9},
+        embeds:{SUB:[
+          {server:"MP4Upload",url:"https://www.mp4upload.com/embed-subsubsub01.html"}
+        ],DUB:[
+          {server:"MP4Upload",url:"https://www.mp4upload.com/embed-dubdubdub02.html"}
+        ]}}]}}</script>
+        </body></html>
+        """;
+
+    private const string FixturePlayerMp4UploadSub = """
+        <html><script>var config = { src: "https://cdn.mp4upload.com/subsubsub01/720p/video.mp4", type: "video/mp4" };</script></html>
+        """;
+
+    private const string FixturePlayerMp4UploadDub = """
+        <html><script>var config = { src: "https://cdn.mp4upload.com/dubdubdub02/720p/video.mp4", type: "video/mp4" };</script></html>
+        """;
+
     private const string FixturePeliculaMedia = """
         <html><body>
         <script>{__sveltekit_1p4gm49 = {data: [{type:"data",data:{media:{id:1328,title:"Dragon Ball Z Película 14: Battle of Gods",slug:"dragon-ball-z-movie-14-kami-to-kami",malId:14837,category:{id:2,name:"Película",slug:"pelicula"},episodes:[{id:21013,number:14}],relations:[{type:5,destination:{id:350,slug:"dragon-ball-z"}}]}}}]}}</script>
@@ -112,6 +133,44 @@ public class ProveedorVideoAnimeAv1Tests
         url.Should().Be("https://cdn.mp4upload.com/r0xdfbvme2yy/720p/video.mp4");
         bridge.Verify(b => b.ExecuteCommandOneShotAsync<object, ProveedorVideoAnimeAv1.StreamResult>(
             It.IsAny<string>(), It.IsAny<object>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task BuscarUrlEpisodioAsync_ConPreferenciaDub_DeberiaResolverElMp4UploadDeLaPistaDub()
+    {
+        // Arrange: la página trae SUB y DUB, cada una con su propio MP4Upload.
+        var (proveedor, _) = Crear(req =>
+        {
+            if (req.RequestUri!.Host.Contains("animeav1.com")) return Ok(FixturePaginaEpisodioDosPistas);
+            if (req.RequestUri!.AbsoluteUri.Contains("dubdubdub02")) return Ok(FixturePlayerMp4UploadDub);
+            if (req.RequestUri!.AbsoluteUri.Contains("subsubsub01")) return Ok(FixturePlayerMp4UploadSub);
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        });
+
+        // Act: pidiendo doblaje latino
+        var url = await proveedor.BuscarUrlEpisodioAsync(Titulos, 9, audioPreferido: "DUB");
+
+        // Assert: resuelve el mp4upload de la pista DUB, no el de SUB.
+        url.Should().Be("https://cdn.mp4upload.com/dubdubdub02/720p/video.mp4");
+    }
+
+    [Fact]
+    public async Task BuscarUrlEpisodioAsync_SinPreferenciaDeAudio_DeberiaResolverLaPrimeraPistaQuePublicaElSitio()
+    {
+        // Arrange: mismo fixture de dos pistas, pero sin pedir ninguna preferencia.
+        var (proveedor, _) = Crear(req =>
+        {
+            if (req.RequestUri!.Host.Contains("animeav1.com")) return Ok(FixturePaginaEpisodioDosPistas);
+            if (req.RequestUri!.AbsoluteUri.Contains("dubdubdub02")) return Ok(FixturePlayerMp4UploadDub);
+            if (req.RequestUri!.AbsoluteUri.Contains("subsubsub01")) return Ok(FixturePlayerMp4UploadSub);
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        });
+
+        // Act: sin audioPreferido (comportamiento de siempre)
+        var url = await proveedor.BuscarUrlEpisodioAsync(Titulos, 9);
+
+        // Assert: el sitio lista SUB primero, así que sin preferencia se resuelve ese.
+        url.Should().Be("https://cdn.mp4upload.com/subsubsub01/720p/video.mp4");
     }
 
     [Fact]

@@ -454,6 +454,17 @@
                                     </ctl:SettingRow>
                                     <Border Style="{StaticResource CfgDivider}"/>
 
+                                    <ctl:SettingRow Title="{Binding [Cfg_PreferenciaAudio], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                    Description="{Binding [Cfg_PreferenciaAudioSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                        <ComboBox SelectedValue="{Binding PreferenciaAudioAnimeAv1}" SelectedValuePath="Tag" Height="36" MinWidth="230"
+                                                  AutomationProperties.Name="{Binding [Cfg_PreferenciaAudio], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                            <ComboBoxItem Content="{Binding [Cfg_PreferenciaAudio_Ninguna], Source={x:Static loc:LocalizationService.Instance}}" Tag=""/>
+                                            <ComboBoxItem Content="{Binding [Cfg_PreferenciaAudio_Sub], Source={x:Static loc:LocalizationService.Instance}}" Tag="SUB"/>
+                                            <ComboBoxItem Content="{Binding [Cfg_PreferenciaAudio_Dub], Source={x:Static loc:LocalizationService.Instance}}" Tag="DUB"/>
+                                        </ComboBox>
+                                    </ctl:SettingRow>
+                                    <Border Style="{StaticResource CfgDivider}"/>
+
                                     <ctl:SettingRow Title="{Binding [Cfg_PasosSalto], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
                                                     Description="{Binding [Cfg_PasosSaltoSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
                                         <ComboBox SelectedValue="{Binding PasosSaltoSegundos}" SelectedValuePath="Tag" Height="36" MinWidth="90"
