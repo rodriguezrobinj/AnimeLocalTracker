@@ -60,6 +60,7 @@ public class ViewModelStressAndLifecycleTests
         try
         {
             var sut = new MainViewModel(navigationService, _trackingMock.Object, sp.GetRequiredService<AnimeLibraryService>(), _downloadMock.Object, _updateMock.Object, new Mock<IDialogService>().Object,
+                Mock.Of<ISelectorTorrentService>(),
                 Mock.Of<IDatabaseService>(), Mock.Of<IFileScannerService>(),
                 new NewEpisodeNotifier(Mock.Of<IDatabaseService>(), Mock.Of<IFileScannerService>(), Mock.Of<ISettingsService>()),
                 Mock.Of<ISystemTrayService>());

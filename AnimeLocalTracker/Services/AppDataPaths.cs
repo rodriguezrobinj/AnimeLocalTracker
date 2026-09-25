@@ -23,6 +23,7 @@ public static class AppDataPaths
     /// <summary>Openings/endings descargados de AnimeThemes.moe, convertidos a mp3, en subcarpetas por AniListId.</summary>
     public static string MusicDir { get; } = Path.Combine(DataRoot, "Music");
     public static string PluginsFolder { get; } = Path.Combine(DataRoot, "Plugins");
+    public static string TorrentsCacheDir { get; } = Path.Combine(DataRoot, "TorrentsCache");
     public static string BibliotecaDb { get; } = Path.Combine(DataRoot, "biblioteca.db");
     public static string TokenPath { get; } = Path.Combine(DataRoot, "anilist_token.txt");
     public static string SettingsPath { get; } = Path.Combine(DataRoot, "settings.json");

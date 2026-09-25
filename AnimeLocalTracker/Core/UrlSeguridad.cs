@@ -61,6 +61,21 @@ public static class UrlSeguridad
         return EsHostPermitido(uri.Host, HostsEmbedsAnimeAv1);
     }
 
+    /// <summary>Host permitido para la búsqueda de torrents (Fase MVP: Nyaa.si).</summary>
+    private static readonly string[] HostsNyaa = { "nyaa.si" };
+
+    /// <summary>
+    /// URL del feed RSS o de un archivo .torrent de Nyaa.si: solo https y el host
+    /// esperado. Igual criterio que <see cref="EsUrlEmbedPermitida"/> pero para la
+    /// fuente de descargas por BitTorrent.
+    /// </summary>
+    public static bool EsUrlNyaaPermitida(string? url)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)) return false;
+        if (uri.Scheme != Uri.UriSchemeHttps) return false;
+        return EsHostPermitido(uri.Host, HostsNyaa);
+    }
+
     /// <summary>
     /// True si la URL es un manifiesto HLS/DASH (.m3u8/.mpd). En esta fase el
     /// descargador solo maneja archivos directos; los manifiestos se omiten

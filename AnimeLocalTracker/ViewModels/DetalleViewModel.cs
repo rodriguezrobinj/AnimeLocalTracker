@@ -33,6 +33,9 @@ public partial class DetalleViewModel : ObservableObject,
     private readonly PythonEpisodeEnricher? _enricher;
     private readonly IPluginService? _pluginService;
     private readonly IVideoIntegrityService? _videoIntegrityService;
+    private readonly INyaaSourceService? _nyaaSourceService;
+    private readonly ISelectorTorrentService? _selectorTorrentService;
+    private readonly ISettingsService? _settingsService;
 
     // Enriquecimiento de metadata/miniaturas de episodios (extraído a EpisodeEnrichmentCoordinator).
     private readonly EpisodeEnrichmentCoordinator _enrichmentCoordinator = new();
@@ -160,6 +163,9 @@ public partial class DetalleViewModel : ObservableObject,
     ];
 
     [ObservableProperty] private bool _estaConectado;
+    /// <summary>Fase 2d: espeja AppSettings.BusquedaTorrentHabilitada — controla si se
+    /// muestra el botón "elegir torrent manualmente" junto al de descargar.</summary>
+    [ObservableProperty] private bool _busquedaTorrentHabilitada;
 
     public DetalleViewModel(
         IAnimeTrackingService animeTrackingService, 
@@ -175,7 +181,10 @@ public partial class DetalleViewModel : ObservableObject,
         IDatosExtraService? datosExtra = null,
         IEmisionMonitorService? monitorEmision = null,
         IAnimeThemesService? animeThemesService = null,
-        IAnimeThemesDownloadService? animeThemesDownload = null)
+        IAnimeThemesDownloadService? animeThemesDownload = null,
+        INyaaSourceService? nyaaSourceService = null,
+        ISelectorTorrentService? selectorTorrentService = null,
+        ISettingsService? settingsService = null)
     {
         _proximaEmision = proximaEmision;
         _datosExtra = datosExtra;
@@ -191,12 +200,30 @@ public partial class DetalleViewModel : ObservableObject,
         _enricher = enricher;
         _pluginService = pluginService;
         _videoIntegrityService = videoIntegrityService;
-        
+        _nyaaSourceService = nyaaSourceService;
+        _selectorTorrentService = selectorTorrentService;
+        _settingsService = settingsService;
+
         WeakReferenceMessenger.Default.Register<UsuarioLogeadoMensaje>(this);
         WeakReferenceMessenger.Default.Register<UsuarioDesconectadoMensaje>(this);
         WeakReferenceMessenger.Default.Register<EpisodioActualizadoMensaje>(this);
         WeakReferenceMessenger.Default.Register<DescargaProgresoMensaje>(this);
         EstaConectado = _authService.EstaAutenticado();
+
+        // Fase 2d: el botón "elegir torrent manualmente" solo tiene sentido si la
+        // búsqueda por torrent está activa — se mantiene sincronizado con Configuración.
+        BusquedaTorrentHabilitada = _settingsService?.ObtenerConfiguracion()?.BusquedaTorrentHabilitada ?? false;
+        if (_settingsService != null)
+        {
+            _settingsService.ConfiguracionModificada += config =>
+            {
+                var dispatcher = System.Windows.Application.Current?.Dispatcher;
+                if (dispatcher != null && !dispatcher.HasShutdownStarted)
+                {
+                    dispatcher.Invoke(() => BusquedaTorrentHabilitada = config?.BusquedaTorrentHabilitada ?? false);
+                }
+            };
+        }
     }
 
     public void Receive(UsuarioLogeadoMensaje message) => EstaConectado = true;
@@ -1336,10 +1363,59 @@ public partial class DetalleViewModel : ObservableObject,
         }
 
         await _downloadService.IniciarDescargaEpisodioAsync(
-            AnimeSeleccionado.AniListId, 
-            AnimeSeleccionado.Titulo, 
-            AnimeSeleccionado.RutaCarpeta, 
+            AnimeSeleccionado.AniListId,
+            AnimeSeleccionado.Titulo,
+            AnimeSeleccionado.RutaCarpeta,
             episodio.NumeroEpisodio,
+            titulosCandidatos);
+    }
+
+    /// <summary>
+    /// Fase 2d: busca todos los candidatos de torrent válidos para el episodio (en vez
+    /// de dejar que la app elija sola el de más semillas), muestra el selector, y si el
+    /// usuario elige uno, lo descarga directo por torrent — sin pasar por el resolver
+    /// HTTP ni por la búsqueda automática de Nyaa.
+    /// </summary>
+    [RelayCommand]
+    private async Task ElegirTorrentManualAsync(EpisodioItem episodio)
+    {
+        if (episodio == null || AnimeSeleccionado == null) return;
+        if (episodio.IsDownloading) return;
+        if (_nyaaSourceService == null || _selectorTorrentService == null) return;
+
+        var titulosCandidatos = new List<string> { AnimeSeleccionado.Titulo };
+        if (!string.IsNullOrWhiteSpace(AnimeSeleccionado.NombresAlternativos))
+        {
+            titulosCandidatos.AddRange(AnimeSeleccionado.NombresAlternativos.Split([" | ", ";"], StringSplitOptions.RemoveEmptyEntries));
+        }
+
+        var configuracion = _settingsService?.ObtenerConfiguracion();
+        var candidatos = await _nyaaSourceService.BuscarCandidatosAsync(
+            titulosCandidatos, episodio.NumeroEpisodio,
+            configuracion?.GrupoFansubPreferidoTorrent, configuracion?.ResolucionPreferidaTorrent);
+
+        if (candidatos.Count == 0)
+        {
+            _dialogService.MostrarToast(
+                LocalizationService.T("Sel_Titulo"),
+                LocalizationService.T("Sel_SinCandidatos"),
+                "AlertCircleOutline", "#F59E0B");
+            return;
+        }
+
+        string tituloEpisodio = $"{AnimeSeleccionado.Titulo} — {episodio.TituloVisual}";
+        var elegido = await _selectorTorrentService.MostrarSelectorAsync(tituloEpisodio, candidatos);
+        if (elegido == null) return; // el usuario canceló
+
+        episodio.IsDownloading = true;
+        episodio.DownloadProgress = 0;
+
+        await _downloadService.IniciarDescargaTorrentManualAsync(
+            AnimeSeleccionado.AniListId,
+            AnimeSeleccionado.Titulo,
+            AnimeSeleccionado.RutaCarpeta,
+            episodio.NumeroEpisodio,
+            elegido.Value,
             titulosCandidatos);
     }
 }

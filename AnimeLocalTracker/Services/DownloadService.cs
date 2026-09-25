@@ -36,6 +36,8 @@ public class DownloadService : IDownloadService
     private readonly ISettingsService? _settingsService;
     private readonly IPythonBridgeService? _pythonBridge;
     private readonly IDatabaseService? _database;
+    private readonly INyaaSourceService? _nyaaSourceService;
+    private readonly ITorrentDownloadService? _torrentDownloadService;
     private readonly ConcurrentDictionary<string, DownloadState> _activeDownloads = new();
 
     // Gestor de slots de concurrencia (redimensionable en caliente según DescargasSimultaneas)
@@ -55,6 +57,8 @@ public class DownloadService : IDownloadService
         public int NumeroEpisodio { get; set; }
         public double Progreso { get; set; }
         public string RutaDestino { get; set; } = string.Empty;
+        /// <summary>Fuente que efectivamente resolvió el episodio: "AnimeAv1" (por defecto) o "Nyaa" (torrent, Fase 1c).</summary>
+        public string Fuente { get; set; } = "AnimeAv1";
         public string RutaTemporal { get; set; } = string.Empty;
         public string? VideoUrl { get; set; }
         public bool IsPaused { get; set; }
@@ -76,7 +80,9 @@ public class DownloadService : IDownloadService
         IVideoSourceResolver? sourceResolver = null,
         ISettingsService? settingsService = null,
         IPythonBridgeService? pythonBridge = null,
-        IDatabaseService? database = null)
+        IDatabaseService? database = null,
+        INyaaSourceService? nyaaSourceService = null,
+        ITorrentDownloadService? torrentDownloadService = null)
     {
         _database = database;
         _httpClient = httpClientFactory.CreateClient("Downloader");
@@ -84,6 +90,8 @@ public class DownloadService : IDownloadService
         _sourceResolver = sourceResolver ?? new AnimeAv1VideoSourceResolver(_httpClient);
         _pythonBridge = pythonBridge;
         _settingsService = settingsService;
+        _nyaaSourceService = nyaaSourceService;
+        _torrentDownloadService = torrentDownloadService;
 
         if (settingsService != null)
         {
@@ -332,6 +340,7 @@ public class DownloadService : IDownloadService
                 AniListId = s.AniListId,
                 AnimeTitulo = s.AnimeTitulo,
                 NumeroEpisodio = s.NumeroEpisodio,
+                Fuente = s.Fuente,
                 Progreso = s.Progreso,
                 IsDownloading = true,
                 IsCompleted = false,
@@ -350,11 +359,44 @@ public class DownloadService : IDownloadService
     public Task IniciarDescargaAutomaticaAsync(int aniListId, string animeTitulo, string carpetaDestino, int numeroEpisodio, IEnumerable<string>? titulosAlternativos = null)
         => IniciarInterno(aniListId, animeTitulo, carpetaDestino, numeroEpisodio, titulosAlternativos, automatica: true);
 
-    private Task IniciarInterno(int aniListId, string animeTitulo, string carpetaDestino, int numeroEpisodio, IEnumerable<string>? titulosAlternativos, bool automatica)
+    /// <summary>
+    /// Fase 2d: descarga por torrent el candidato que el usuario eligió a mano (desde
+    /// el selector de la ficha del anime), sin pasar por el resolver HTTP ni por la
+    /// búsqueda automática de Nyaa — va directo a <see cref="ITorrentDownloadService"/>
+    /// con ese candidato. No-op si ya hay una descarga activa para ese episodio.
+    /// </summary>
+    public Task IniciarDescargaTorrentManualAsync(int aniListId, string animeTitulo, string carpetaDestino, int numeroEpisodio, CandidatoTorrent candidatoElegido, IEnumerable<string>? titulosAlternativos = null)
     {
+        if (_torrentDownloadService == null) return Task.CompletedTask;
+
         string key = $"{aniListId}_{numeroEpisodio}";
         if (_activeDownloads.ContainsKey(key)) return Task.CompletedTask;
 
+        var state = new DownloadState
+        {
+            Orden = Interlocked.Increment(ref _ordenCounter),
+            AniListId = aniListId,
+            AnimeTitulo = animeTitulo,
+            Titulos = ConstruirListaTitulos(animeTitulo, titulosAlternativos),
+            NumeroEpisodio = numeroEpisodio,
+            Progreso = 0,
+            RutaDestino = Path.Combine(carpetaDestino, $"Episodio {numeroEpisodio:D2}.mp4"),
+            Automatica = false,
+        };
+        state.RutaTemporal = state.RutaDestino + ".downloading";
+        state.CarpetaDestino = carpetaDestino;
+
+        if (!_activeDownloads.TryAdd(key, state)) return Task.CompletedTask;
+        if (!Directory.Exists(carpetaDestino)) Directory.CreateDirectory(carpetaDestino);
+
+        WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(aniListId, numeroEpisodio, 0, isDownloading: true, isCompleted: false, isPaused: false, "", null, animeTitulo, enCola: true));
+
+        EjecutarDescargaTorrentManualAsync(state, key, candidatoElegido);
+        return Task.CompletedTask;
+    }
+
+    private static List<string> ConstruirListaTitulos(string animeTitulo, IEnumerable<string>? titulosAlternativos)
+    {
         var todosLosTitulos = new List<string> { animeTitulo };
         if (titulosAlternativos != null)
         {
@@ -366,6 +408,15 @@ public class DownloadService : IDownloadService
                 }
             }
         }
+        return todosLosTitulos;
+    }
+
+    private Task IniciarInterno(int aniListId, string animeTitulo, string carpetaDestino, int numeroEpisodio, IEnumerable<string>? titulosAlternativos, bool automatica)
+    {
+        string key = $"{aniListId}_{numeroEpisodio}";
+        if (_activeDownloads.ContainsKey(key)) return Task.CompletedTask;
+
+        var todosLosTitulos = ConstruirListaTitulos(animeTitulo, titulosAlternativos);
 
         var state = new DownloadState
         {
@@ -431,6 +482,14 @@ public class DownloadService : IDownloadService
                         if (string.IsNullOrEmpty(state.VideoUrl))
                         {
                             if (state.IsPaused || state.Cts.IsCancellationRequested) return;
+
+                            // Último recurso (opt-in, Fase 1c): buscar y descargar por torrent en
+                            // Nyaa.si antes de darlo por no encontrado.
+                            if (configuracion?.BusquedaTorrentHabilitada == true && _nyaaSourceService != null && _torrentDownloadService != null)
+                            {
+                                if (await IntentarDescargaTorrentAsync(state, key)) return;
+                                if (state.IsPaused || state.Cts.IsCancellationRequested) return;
+                            }
 
                             // FUN-016: trazabilidad del ciclo de descarga en app.log (antes solo Debug)
                             AppLogger.Warn("DownloadService", $"No se encontró enlace para '{state.AnimeTitulo}' Ep {state.NumeroEpisodio}.");
@@ -529,6 +588,137 @@ public class DownloadService : IDownloadService
                 }
             }
         });
+    }
+
+    /// <summary>
+    /// Último recurso (Fase 1c, opt-in): busca el episodio en Nyaa.si y, si hay un
+    /// release de un solo episodio con semillas suficientes, lo descarga por
+    /// BitTorrent directo a <see cref="DownloadState.RutaDestino"/> (el motor de
+    /// torrent maneja su propia carpeta temporal, no <see cref="DownloadState.RutaTemporal"/>).
+    /// True si terminó de descargar con éxito (ya registró el historial y avisó a la
+    /// UI); false si no encontró nada o la descarga falló — el llamador cae al
+    /// mensaje de "no encontrado" habitual.
+    /// </summary>
+    private async Task<bool> IntentarDescargaTorrentAsync(DownloadState state, string key)
+    {
+        var configuracion = _settingsService?.ObtenerConfiguracion();
+
+        CandidatoTorrent? candidato;
+        try
+        {
+            candidato = await _nyaaSourceService!.BuscarEpisodioAsync(
+                state.Titulos, state.NumeroEpisodio,
+                configuracion?.GrupoFansubPreferidoTorrent, configuracion?.ResolucionPreferidaTorrent,
+                state.Cts.Token);
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("DownloadService", $"Búsqueda en Nyaa falló para '{state.AnimeTitulo}' Ep {state.NumeroEpisodio}: {ex.Message}");
+            return false;
+        }
+
+        if (candidato == null) return false;
+
+        AppLogger.Info("DownloadService", $"'{state.AnimeTitulo}' Ep {state.NumeroEpisodio}: probando Nyaa/torrent ({candidato.Value.Seeders} semillas).");
+        return await DescargarTorrentYCompletarAsync(state, key, candidato.Value, configuracion?.SeguirSembrandoTorrents ?? false);
+    }
+
+    /// <summary>
+    /// Fase 2d: descarga el candidato de torrent YA ELEGIDO (el usuario lo escogió a
+    /// mano, sin pasar por la búsqueda automática de Nyaa ni por el resolver HTTP) y,
+    /// si tiene éxito, marca el historial/UI. Comparte el mismo tramo final que
+    /// <see cref="IntentarDescargaTorrentAsync"/> (<see cref="DescargarTorrentYCompletarAsync"/>)
+    /// para no duplicar la lógica de "descargar y completar".
+    /// </summary>
+    private void EjecutarDescargaTorrentManualAsync(DownloadState state, string key, CandidatoTorrent candidato)
+    {
+        _ = Task.Run(async () =>
+        {
+            bool slotAdquirido = false;
+            try
+            {
+                await AdquirirSlotAsync(key, state, state.Cts.Token);
+                slotAdquirido = true;
+                state.EnCola = false;
+
+                if (state.Cts.IsCancellationRequested || state.IsPaused) return;
+
+                WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, state.Progreso, isDownloading: true, isCompleted: false, isPaused: false, state.RutaDestino, null, state.AnimeTitulo, enCola: false));
+
+                bool seguirSembrando = _settingsService?.ObtenerConfiguracion()?.SeguirSembrandoTorrents ?? false;
+                bool exito = await DescargarTorrentYCompletarAsync(state, key, candidato, seguirSembrando);
+                if (!exito)
+                {
+                    _activeDownloads.TryRemove(key, out _);
+                    string error = "No se pudo descargar el torrent elegido.";
+                    WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, 0, isDownloading: false, isCompleted: false, isPaused: false, "", error, state.AnimeTitulo));
+                    RegistrarEnHistorial(state, completada: false, error);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                AppLogger.Info("DownloadService", $"Descarga por torrent (manual) interrumpida: {state.AnimeTitulo} Ep {state.NumeroEpisodio}. Pausado: {state.IsPaused}");
+                if (!state.IsPaused) _activeDownloads.TryRemove(key, out _);
+            }
+            catch (Exception ex)
+            {
+                if (state.IsPaused || state.Cts.IsCancellationRequested) return;
+                AppLogger.Error("DownloadService", $"Error en descarga por torrent (manual) {state.AnimeTitulo} Ep {state.NumeroEpisodio}", ex);
+                _activeDownloads.TryRemove(key, out _);
+                WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, 0, isDownloading: false, isCompleted: false, isPaused: false, "", ex.Message, state.AnimeTitulo));
+                RegistrarEnHistorial(state, completada: false, ex.Message);
+            }
+            finally
+            {
+                if (slotAdquirido) LiberarSlot();
+            }
+        });
+    }
+
+    /// <summary>
+    /// Tramo común a la búsqueda automática (<see cref="IntentarDescargaTorrentAsync"/>)
+    /// y a la elección manual (<see cref="EjecutarDescargaTorrentManualAsync"/>): pide
+    /// la descarga a <see cref="ITorrentDownloadService"/>, reporta progreso, y si
+    /// tiene éxito marca la descarga como completada (Fuente="Nyaa", mensaje de UI,
+    /// historial). True si terminó con éxito.
+    /// </summary>
+    private async Task<bool> DescargarTorrentYCompletarAsync(DownloadState state, string key, CandidatoTorrent candidato, bool seguirSembrando)
+    {
+        var progress = new Progress<(double Progreso, double VelocidadBps)>(p =>
+        {
+            state.Progreso = p.Progreso;
+            string speedText = FormatearVelocidad(p.VelocidadBps);
+            WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, p.Progreso, isDownloading: true, isCompleted: false, isPaused: false, state.RutaDestino, null, state.AnimeTitulo, speedText, velocidadBps: p.VelocidadBps));
+        });
+
+        string carpetaTemporalTorrent = Path.Combine(Path.GetTempPath(), "AnimeLocalTrackerTorrents", key);
+        ResultadoTorrent resultado;
+        try
+        {
+            resultado = await _torrentDownloadService!.DescargarAsync(
+                candidato.TorrentUrl, carpetaTemporalTorrent, state.RutaDestino, state.NumeroEpisodio,
+                seguirSembrando: seguirSembrando,
+                progress: progress, ct: state.Cts.Token);
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            AppLogger.Warn("DownloadService", $"Descarga por torrent falló para '{state.AnimeTitulo}' Ep {state.NumeroEpisodio}: {ex.Message}");
+            return false;
+        }
+
+        if (!resultado.Exito)
+        {
+            AppLogger.Warn("DownloadService", $"Torrent no se pudo descargar para '{state.AnimeTitulo}' Ep {state.NumeroEpisodio}: {resultado.Error}");
+            return false;
+        }
+
+        state.Fuente = "Nyaa";
+        _activeDownloads.TryRemove(key, out _);
+        WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, 100, isDownloading: false, isCompleted: true, isPaused: false, state.RutaDestino, null, state.AnimeTitulo));
+        RegistrarEnHistorial(state, completada: true, null);
+        return true;
     }
 
     /// <summary>

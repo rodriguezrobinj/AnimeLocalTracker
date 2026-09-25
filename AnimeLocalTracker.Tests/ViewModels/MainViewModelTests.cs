@@ -73,6 +73,7 @@ public class MainViewModelTests : IDisposable
             _downloadMock.Object,
             _updateMock.Object,
             dialogService ?? new Mock<IDialogService>().Object,
+            Mock.Of<ISelectorTorrentService>(),
             Mock.Of<IDatabaseService>(),
             Mock.Of<IFileScannerService>(),
             new NewEpisodeNotifier(Mock.Of<IDatabaseService>(), Mock.Of<IFileScannerService>(), Mock.Of<ISettingsService>()),

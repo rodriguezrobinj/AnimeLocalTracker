@@ -522,6 +522,76 @@
                     </materialDesign:Card>
                 </Grid>
 
+                <!-- SELECTOR DE TORRENT MANUAL (Fase 2d): elegir entre varios candidatos de Nyaa.si -->
+                <Grid Visibility="{Binding SelectorTorrentService.SelectorVisible, Converter={StaticResource BoolToVis}}"
+                      Grid.Column="0" Grid.ColumnSpan="2"
+                      Background="#B2000000" Panel.ZIndex="2001">
+                    <materialDesign:Card Width="520" MaxHeight="600" VerticalAlignment="Center" HorizontalAlignment="Center"
+                                         UniformCornerRadius="14" Background="{DynamicResource MaterialDesignPaper}"
+                                         materialDesign:ElevationAssist.Elevation="Dp8" Padding="25"
+                                         KeyboardNavigation.TabNavigation="Cycle">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                <materialDesign:PackIcon Kind="Magnify" Width="28" Height="28" Foreground="#3F51B5" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <TextBlock Text="{Binding [Sel_Titulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <TextBlock Text="{Binding SelectorTorrentService.TituloEpisodio}" FontSize="13" Opacity="0.7" Margin="0,0,0,15" TextWrapping="Wrap"/>
+
+                            <ListBox ItemsSource="{Binding SelectorTorrentService.Candidatos}" MaxHeight="380"
+                                     ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                     VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
+                                     ScrollViewer.CanContentScroll="True" BorderThickness="0" Background="Transparent">
+                                <ListBox.ItemContainerStyle>
+                                    <Style TargetType="ListBoxItem">
+                                        <Setter Property="Padding" Value="0"/>
+                                        <Setter Property="Margin" Value="0,0,0,8"/>
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                        <Setter Property="Focusable" Value="False"/>
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="ListBoxItem">
+                                                    <ContentPresenter/>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </ListBox.ItemContainerStyle>
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Button Command="{Binding DataContext.SelectorTorrentService.SeleccionarCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                CommandParameter="{Binding}"
+                                                Cursor="Hand" HorizontalContentAlignment="Stretch"
+                                                AutomationProperties.Name="{Binding Titulo}">
+                                            <Button.Style>
+                                                <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignFlatButton}">
+                                                    <Setter Property="Padding" Value="12"/>
+                                                    <Setter Property="HorizontalAlignment" Value="Stretch"/>
+                                                </Style>
+                                            </Button.Style>
+                                            <StackPanel HorizontalAlignment="Left">
+                                                <TextBlock Text="{Binding Titulo}" TextWrapping="Wrap" FontSize="13" FontWeight="SemiBold" TextAlignment="Left"/>
+                                                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                                    <materialDesign:PackIcon Kind="ArrowUpBold" Width="14" Height="14" Foreground="#4ADE80" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="{Binding Seeders}" FontSize="12" Foreground="#94A3B8" Margin="2,0,10,0" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="{Binding TamanoTexto}" FontSize="12" Foreground="#94A3B8" VerticalAlignment="Center"/>
+                                                    <Border Background="#33F59E0B" CornerRadius="4" Padding="6,1" Margin="10,0,0,0"
+                                                            Visibility="{Binding EsBatch, Converter={StaticResource BoolToVis}}">
+                                                        <TextBlock Text="{Binding [Sel_Batch], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="10" Foreground="#F59E0B" FontWeight="Bold"/>
+                                                    </Border>
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </Button>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
+                                <Button Content="{Binding [Dlg_Cancelar], Source={x:Static loc:LocalizationService.Instance}}" Command="{Binding SelectorTorrentService.CancelarSelectorCommand}" Style="{StaticResource MaterialDesignFlatButton}"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </materialDesign:Card>
+                </Grid>
+
                 <!-- TOAST NOTIFICATION (Residual) -->
                 <Border Grid.Column="0" Grid.ColumnSpan="2" HorizontalAlignment="Center" VerticalAlignment="Bottom" Panel.ZIndex="3000" IsHitTestVisible="False" AutomationProperties.LiveSetting="Assertive">
                     <Border.Style>

@@ -44,6 +44,10 @@ public partial class ConfiguracionViewModel : ObservableObject
     [ObservableProperty] private string _accionFinEpisodio = AccionFinEpisodioValores.AutoPlayCuentaAtras;
     [ObservableProperty] private string _preferenciaAudioAnimeAv1 = "";
     [ObservableProperty] private string _servidorPreferidoAnimeAv1 = "";
+    [ObservableProperty] private bool _busquedaTorrentHabilitada;
+    [ObservableProperty] private string _grupoFansubPreferidoTorrent = "";
+    [ObservableProperty] private string _resolucionPreferidaTorrent = "";
+    [ObservableProperty] private bool _seguirSembrandoTorrents;
 
     // === PREFERENCIAS DE USUARIO ===
     [ObservableProperty] private int _umbralMarcadoVisto = 95;
@@ -144,6 +148,10 @@ public partial class ConfiguracionViewModel : ObservableObject
         AccionFinEpisodio = string.IsNullOrWhiteSpace(config.AccionFinEpisodio) ? AccionFinEpisodioValores.AutoPlayCuentaAtras : config.AccionFinEpisodio;
         PreferenciaAudioAnimeAv1 = config.PreferenciaAudioAnimeAv1 ?? "";
         ServidorPreferidoAnimeAv1 = config.ServidorPreferidoAnimeAv1 ?? "";
+        BusquedaTorrentHabilitada = config.BusquedaTorrentHabilitada;
+        GrupoFansubPreferidoTorrent = config.GrupoFansubPreferidoTorrent ?? "";
+        ResolucionPreferidaTorrent = config.ResolucionPreferidaTorrent ?? "";
+        SeguirSembrandoTorrents = config.SeguirSembrandoTorrents;
         UmbralMarcadoVisto = config.UmbralMarcadoVisto is >= 1 and <= 100 ? config.UmbralMarcadoVisto : 90;
         NotificarNuevosEpisodios = config.NotificarNuevosEpisodios;
         MinimizarABandejaAlCerrar = config.MinimizarABandejaAlCerrar;
@@ -347,6 +355,10 @@ public partial class ConfiguracionViewModel : ObservableObject
             config.AccionFinEpisodio = AccionFinEpisodio;
             config.PreferenciaAudioAnimeAv1 = string.IsNullOrEmpty(PreferenciaAudioAnimeAv1) ? null : PreferenciaAudioAnimeAv1;
             config.ServidorPreferidoAnimeAv1 = string.IsNullOrEmpty(ServidorPreferidoAnimeAv1) ? null : ServidorPreferidoAnimeAv1;
+            config.BusquedaTorrentHabilitada = BusquedaTorrentHabilitada;
+            config.GrupoFansubPreferidoTorrent = string.IsNullOrEmpty(GrupoFansubPreferidoTorrent) ? null : GrupoFansubPreferidoTorrent;
+            config.ResolucionPreferidaTorrent = string.IsNullOrEmpty(ResolucionPreferidaTorrent) ? null : ResolucionPreferidaTorrent;
+            config.SeguirSembrandoTorrents = SeguirSembrandoTorrents;
             config.UmbralMarcadoVisto = Math.Clamp(UmbralMarcadoVisto, 1, 100);
             config.NotificarNuevosEpisodios = NotificarNuevosEpisodios;
             config.MinimizarABandejaAlCerrar = MinimizarABandejaAlCerrar;

@@ -5,6 +5,7 @@
 
 # Temporary binaries, publish and scratch folders
 scratch/
+cache/
 flyleaf_readme.md
 AnimeLocalTracker/FFmpeg/
 AnimeLocalTracker/Tools/

@@ -37,6 +37,8 @@
       <PackageReference Include="FlyleafLib.Controls.WPF" Version="1.7.3" />
       <PackageReference Include="MaterialDesignThemes" Version="5.3.3-ci1462" />
       <PackageReference Include="MdXaml" Version="1.27.0" />
+      <!-- Descargas por torrent (Nyaa.si, MVP): MIT, activamente mantenida. -->
+      <PackageReference Include="MonoTorrent" Version="3.0.2" />
       <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
       <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.1" />
       <PackageReference Include="Microsoft.Extensions.Http.Polly" Version="8.0.1" />
