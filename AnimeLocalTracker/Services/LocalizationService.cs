@@ -481,7 +481,13 @@ public sealed class LocalizationService : INotifyPropertyChanged
         ["Add_EnBiblioteca"] = "En tu biblioteca",
         ["Add_TemporadaTip"] = "Filtrar por temporada de estreno",
         ["Add_AnioTip"] = "Filtrar por año de estreno",
-        ["Add_LimpiarFiltrosTemporada"] = "Limpiar filtros de temporada/año",
+        ["Add_GeneroTip"] = "Filtrar por género",
+        ["Add_LimpiarFiltrosTemporada"] = "Limpiar filtros",
+        ["Add_EpisodiosBadgeFormato"] = "{0} eps",
+        ["Add_ProximoEpisodioBadge"] = "Ep {0}+",
+        ["Add_EpisodiosDesconocidoBadge"] = "Eps desc.",
+        ["Add_ErrorBusquedaTitulo"] = "Error de conexión",
+        ["Add_ErrorBusquedaMsj"] = "No se pudo conectar con AniList. Revisa tu conexión e inténtalo de nuevo.",
 
         // === REPRODUCTOR (tooltips) ===
         ["Player_VolverFicha"] = "Volver a la ficha del anime",
@@ -719,6 +725,7 @@ public sealed class LocalizationService : INotifyPropertyChanged
         ["Media_EpisodiosDesconocido"] = "Episodios: ?",
         ["Media_AnioDesconocido"] = "Año ?",
         ["Media_SinGeneros"] = "Sin géneros",
+        ["Media_TituloDesconocido"] = "Sin título",
 
         // --- Configuración: diálogos y estados de texto ---
         ["Cfg_EspacioCalculando"] = "Calculando...",
@@ -1398,7 +1405,13 @@ public sealed class LocalizationService : INotifyPropertyChanged
         ["Add_EnBiblioteca"] = "In your library",
         ["Add_TemporadaTip"] = "Filter by release season",
         ["Add_AnioTip"] = "Filter by release year",
-        ["Add_LimpiarFiltrosTemporada"] = "Clear season/year filters",
+        ["Add_GeneroTip"] = "Filter by genre",
+        ["Add_LimpiarFiltrosTemporada"] = "Clear filters",
+        ["Add_EpisodiosBadgeFormato"] = "{0} eps",
+        ["Add_ProximoEpisodioBadge"] = "Ep {0}+",
+        ["Add_EpisodiosDesconocidoBadge"] = "Eps ?",
+        ["Add_ErrorBusquedaTitulo"] = "Connection error",
+        ["Add_ErrorBusquedaMsj"] = "Couldn't connect to AniList. Check your connection and try again.",
 
         // === PLAYER (tooltips) ===
         ["Player_VolverFicha"] = "Back to anime details",
@@ -1636,6 +1649,7 @@ public sealed class LocalizationService : INotifyPropertyChanged
         ["Media_EpisodiosDesconocido"] = "Episodes: ?",
         ["Media_AnioDesconocido"] = "Year ?",
         ["Media_SinGeneros"] = "No genres",
+        ["Media_TituloDesconocido"] = "Untitled",
 
         // --- Settings: dialogs and status text ---
         ["Cfg_EspacioCalculando"] = "Calculating...",

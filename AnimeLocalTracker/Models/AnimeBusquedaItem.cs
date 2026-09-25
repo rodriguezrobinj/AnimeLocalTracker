@@ -13,8 +13,11 @@ public partial class AnimeBusquedaItem : ObservableObject
     [ObservableProperty]
     private bool _estaGuardando;
 
-    public string TituloPrincipal => 
-        Media?.Title?.Romaji ?? Media?.Title?.UserPreferred ?? Media?.Title?.English ?? "Sin título";
+    public string TituloPrincipal =>
+        !string.IsNullOrWhiteSpace(Media?.Title?.Romaji) ? Media!.Title!.Romaji :
+        !string.IsNullOrWhiteSpace(Media?.Title?.UserPreferred) ? Media!.Title!.UserPreferred! :
+        !string.IsNullOrWhiteSpace(Media?.Title?.English) ? Media!.Title!.English! :
+        Services.LocalizationService.T("Media_TituloDesconocido");
 
     public string TituloSecundario => 
         !string.IsNullOrEmpty(Media?.Title?.English) && Media.Title.English != TituloPrincipal 
@@ -26,10 +29,12 @@ public partial class AnimeBusquedaItem : ObservableObject
             ? string.Join(" • ", Media.Genres.Take(3)) 
             : "";
 
-    public string EpisodiosTexto => 
-        Media?.Episodes != null 
-            ? $"{Media.Episodes} eps" 
-            : (Media?.NextAiringEpisode != null ? $"Ep {Media.NextAiringEpisode.Episode - 1}+" : "Eps desc.");
+    public string EpisodiosTexto =>
+        Media?.Episodes != null
+            ? string.Format(Services.LocalizationService.T("Add_EpisodiosBadgeFormato"), Media.Episodes)
+            : (Media?.NextAiringEpisode != null
+                ? string.Format(Services.LocalizationService.T("Add_ProximoEpisodioBadge"), Media.NextAiringEpisode.Episode - 1)
+                : Services.LocalizationService.T("Add_EpisodiosDesconocidoBadge"));
 
     public string AñoTexto => Media?.StartDate?.Year?.ToString() ?? "";
 
@@ -39,7 +44,7 @@ public partial class AnimeBusquedaItem : ObservableObject
 
     public bool TieneTemporada => !string.IsNullOrEmpty(TemporadaTexto);
 
-    public string EstadoTexto => Media?.FormattedStatus ?? "Desconocido";
+    public string EstadoTexto => Media?.FormattedStatus ?? Services.LocalizationService.T("Media_EstadoDesconocido");
 
     public string EstadoColor => Media?.StatusColorBrush ?? "#2196F3";
 

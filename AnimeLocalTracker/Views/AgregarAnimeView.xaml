@@ -98,8 +98,21 @@
                 </Border>
             </StackPanel>
 
-            <!-- FILTROS DE TEMPORADA Y AÑO (sobre los resultados de búsqueda/tendencias) -->
+            <!-- FILTROS DE GÉNERO, TEMPORADA Y AÑO (sobre los resultados de búsqueda/tendencias) -->
             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                <!-- Selector de Género: el valor real (GeneroSeleccionado, usado para filtrar contra
+                     AniListMedia.Genres) sigue en inglés como lo entrega AniList — el ItemTemplate
+                     solo traduce lo que se MUESTRA (mismo patrón que GaleriaView). -->
+                <ComboBox ItemsSource="{Binding GenerosDisponibles}"
+                          SelectedItem="{Binding GeneroSeleccionado}"
+                          ToolTip="{Binding [Add_GeneroTip], Source={x:Static loc:LocalizationService.Instance}}"
+                          Height="34" Margin="0,0,8,0" VerticalAlignment="Center">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Converter={StaticResource GeneroTraducido}}"/>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
                 <ComboBox ItemsSource="{Binding TemporadasDisponibles}"
                           SelectedItem="{Binding TemporadaSeleccionada}"
                           ToolTip="{Binding [Add_TemporadaTip], Source={x:Static loc:LocalizationService.Instance}}"
@@ -108,10 +121,11 @@
                           SelectedItem="{Binding AnioSeleccionado}"
                           ToolTip="{Binding [Add_AnioTip], Source={x:Static loc:LocalizationService.Instance}}"
                           Height="34" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                <Button Command="{Binding LimpiarFiltrosTemporadaCommand}"
-                        Visibility="{Binding HayFiltrosTemporadaActivos, Converter={StaticResource BoolToVis}}"
-                        Style="{StaticResource MaterialDesignIconButton}" Width="34" Height="34" Padding="0"
-                        ToolTip="{Binding [Add_LimpiarFiltrosTemporada], Source={x:Static loc:LocalizationService.Instance}}">
+                <Button Command="{Binding LimpiarFiltrosCommand}"
+                        Visibility="{Binding HayFiltrosActivos, Converter={StaticResource BoolToVis}}"
+                        Style="{StaticResource MaterialDesignIconButton}" Width="34" Height="34" Padding="0" Cursor="Hand"
+                        ToolTip="{Binding [Add_LimpiarFiltrosTemporada], Source={x:Static loc:LocalizationService.Instance}}"
+                        AutomationProperties.Name="{Binding [Add_LimpiarFiltrosTemporada], Source={x:Static loc:LocalizationService.Instance}}">
                     <materialDesign:PackIcon Kind="FilterRemoveOutline" Width="18" Height="18" Foreground="#9CA3AF"/>
                 </Button>
             </StackPanel>
@@ -139,7 +153,7 @@
                 <TextBlock Text="{Binding [Add_SinResultadosTitulo], Source={x:Static loc:LocalizationService.Instance}}" FontSize="18" Foreground="#E2E8F0" FontWeight="Bold" HorizontalAlignment="Center"/>
                 <TextBlock Text="{Binding [Add_SinResultadosSub], Source={x:Static loc:LocalizationService.Instance}}"
                            FontSize="13" Foreground="#9CA3AF" HorizontalAlignment="Center" Margin="0,6,0,0" TextAlignment="Center"/>
-                <Button Command="{Binding LimpiarFiltrosTemporadaCommand}"
+                <Button Command="{Binding LimpiarFiltrosCommand}"
                         Visibility="{Binding SinResultadosFiltrados, Converter={StaticResource BoolToVis}}"
                         Style="{StaticResource MaterialDesignOutlinedButton}"
                         BorderBrush="#3B82F6" Foreground="#60A5FA" Margin="0,18,0,0"
