@@ -322,4 +322,22 @@ public class EstadisticasViewModelTests
 
         vm.NecesitaRecargar().Should().BeTrue("los textos y géneros ya calculados están en el otro idioma");
     }
+
+    [Theory]
+    [InlineData("Fantasía", 50, "🔮 VIAJERO DE FANTASÍA")]
+    [InlineData("Action", 50, "⚡ DEVORADOR DE SHONEN")]
+    [InlineData("Romance", 50, "💖 ROMÁNTICO INCURABLE")]
+    [InlineData("Comedia", 50, "🎭 COLECCIONISTA DE RISAS")]
+    [InlineData("Sci-Fi", 50, "🚀 PIONERO CYBERPUNK")]
+    [InlineData("Misterio", 50, "🔍 ESTRATEGA IMPLACABLE")]
+    [InlineData("Slice of Life", 50, "☕ MAESTRO DEL IYASHIKEI")]
+    [InlineData("Desconocido", 50, "✨ MAESTRO DEL BINGE-WATCHING")]
+    [InlineData("Acción", 2, "🌱 EXPLORADOR NOVATO")]
+    [InlineData("Acción", 1500, "👑 TITÁN DEL ANIME")]
+    public void DeterminarArquetipo_AsignaArquetipoCorrectoSegunGeneroYEpisodios(string genero, int episodios, string tituloEsperado)
+    {
+        var (titulo, descripcion) = EstadisticasViewModel.DeterminarArquetipo(genero, episodios);
+        titulo.Should().Be(tituloEsperado);
+        descripcion.Should().NotBeNullOrWhiteSpace();
+    }
 }

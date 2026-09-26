@@ -3,109 +3,462 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
              Width="1080" Height="1350">
-    <Grid Width="1080" Height="1350">
-        <Grid.Background>
-            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                <GradientStop Color="#0B1020" Offset="0"/>
-                <GradientStop Color="#1E1B4B" Offset="0.55"/>
-                <GradientStop Color="#3B1650" Offset="1"/>
-            </LinearGradientBrush>
-        </Grid.Background>
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
 
-        <StackPanel VerticalAlignment="Center" Margin="70,0">
+        <!-- Gradiente de fondo del podio #1 Oro -->
+        <LinearGradientBrush x:Key="GoldCardBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#241B3B" Offset="0"/>
+            <GradientStop Color="#1A152E" Offset="1"/>
+        </LinearGradientBrush>
 
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,26">
-                <materialDesign:PackIcon Kind="Star" Foreground="#A78BFA" Width="18" Height="18" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                <TextBlock Text="ANIMELOCALTRACKER" FontSize="20" FontWeight="Bold" Foreground="#C4B5FD"/>
-            </StackPanel>
+        <!-- Gradiente de fondo tarjetas estándar -->
+        <LinearGradientBrush x:Key="GlassCardBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#1C2138" Offset="0"/>
+            <GradientStop Color="#12162A" Offset="1"/>
+        </LinearGradientBrush>
+    </UserControl.Resources>
 
-            <TextBlock Text="{Binding TituloCard}" FontSize="54" FontWeight="Black" Foreground="White"
-                       HorizontalAlignment="Center" TextAlignment="Center" Margin="0,0,0,44"/>
+    <Grid Width="1080" Height="1350" ClipToBounds="True" Background="#080A16">
+        <!-- ══ CAPA 1: ORBES AMBIENTALES DE LUZ NEÓN (GLOW EFECTO SPOTIFY WRAPPED) ══ -->
+        <Canvas IsHitTestVisible="False">
+            <!-- Orbe Azul/Cian Superior Izquierda -->
+            <Ellipse Width="560" Height="560" Canvas.Left="-180" Canvas.Top="-160" Opacity="0.32">
+                <Ellipse.Fill>
+                    <RadialGradientBrush>
+                        <GradientStop Color="#2563EB" Offset="0"/>
+                        <GradientStop Color="#002563EB" Offset="1"/>
+                    </RadialGradientBrush>
+                </Ellipse.Fill>
+                <Ellipse.Effect>
+                    <BlurEffect Radius="140" KernelType="Gaussian"/>
+                </Ellipse.Effect>
+            </Ellipse>
 
-            <StackPanel HorizontalAlignment="Center" Margin="0,0,0,50">
-                <Border Width="170" Height="170" CornerRadius="85" Background="#2E2547" BorderBrush="#A78BFA" BorderThickness="4">
-                    <Grid>
-                        <materialDesign:PackIcon Kind="Account" Foreground="#8B7EC8" Width="76" Height="76" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        <Ellipse x:Name="AvatarEllipse" Width="162" Height="162"/>
-                    </Grid>
-                </Border>
-                <TextBlock Text="{Binding NombreUsuario}" FontSize="28" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center" Margin="0,20,0,0"/>
+            <!-- Orbe Violeta/Púrpura Superior Derecha -->
+            <Ellipse Width="620" Height="620" Canvas.Left="640" Canvas.Top="-120" Opacity="0.38">
+                <Ellipse.Fill>
+                    <RadialGradientBrush>
+                        <GradientStop Color="#7C3AED" Offset="0"/>
+                        <GradientStop Color="#007C3AED" Offset="1"/>
+                    </RadialGradientBrush>
+                </Ellipse.Fill>
+                <Ellipse.Effect>
+                    <BlurEffect Radius="160" KernelType="Gaussian"/>
+                </Ellipse.Effect>
+            </Ellipse>
 
-                <!-- Sello de rango (Logros): el mismo "Novato → ... → Leyenda" de Estadísticas, ya en
-                     mayúsculas desde el ViewModel (ConstruirDatosWrappedAsync) — para que la tarjeta se
-                     sienta ganada y no una plantilla genérica con números sueltos. -->
-                <Border Background="#3B2E5E" BorderBrush="#7C3AED" BorderThickness="1.5" CornerRadius="22" Padding="22,9" HorizontalAlignment="Center" Margin="0,16,0,0">
-                    <StackPanel Orientation="Horizontal">
-                        <materialDesign:PackIcon Kind="TrophyVariant" Foreground="#FBBF24" Width="20" Height="20" VerticalAlignment="Center" Margin="0,0,9,0"/>
-                        <TextBlock Text="{Binding RangoOtakuTexto}" FontSize="17" FontWeight="Bold" Foreground="#FDE68A"/>
+            <!-- Orbe Magenta Central -->
+            <Ellipse Width="500" Height="500" Canvas.Left="-140" Canvas.Top="480" Opacity="0.22">
+                <Ellipse.Fill>
+                    <RadialGradientBrush>
+                        <GradientStop Color="#DB2777" Offset="0"/>
+                        <GradientStop Color="#00DB2777" Offset="1"/>
+                    </RadialGradientBrush>
+                </Ellipse.Fill>
+                <Ellipse.Effect>
+                    <BlurEffect Radius="150" KernelType="Gaussian"/>
+                </Ellipse.Effect>
+            </Ellipse>
+
+            <!-- Orbe Índigo/Púrpura Inferior Derecha -->
+            <Ellipse Width="550" Height="550" Canvas.Left="660" Canvas.Top="850" Opacity="0.32">
+                <Ellipse.Fill>
+                    <RadialGradientBrush>
+                        <GradientStop Color="#4F46E5" Offset="0"/>
+                        <GradientStop Color="#004F46E5" Offset="1"/>
+                    </RadialGradientBrush>
+                </Ellipse.Fill>
+                <Ellipse.Effect>
+                    <BlurEffect Radius="150" KernelType="Gaussian"/>
+                </Ellipse.Effect>
+            </Ellipse>
+
+            <!-- Orbe Ámbar Inferior Izquierda -->
+            <Ellipse Width="420" Height="420" Canvas.Left="-80" Canvas.Top="980" Opacity="0.18">
+                <Ellipse.Fill>
+                    <RadialGradientBrush>
+                        <GradientStop Color="#F59E0B" Offset="0"/>
+                        <GradientStop Color="#00F59E0B" Offset="1"/>
+                    </RadialGradientBrush>
+                </Ellipse.Fill>
+                <Ellipse.Effect>
+                    <BlurEffect Radius="130" KernelType="Gaussian"/>
+                </Ellipse.Effect>
+            </Ellipse>
+        </Canvas>
+
+        <!-- ══ CAPA 2: CONTENIDO PRINCIPAL ESTRUCTURADO ══ -->
+        <Grid Margin="50,42,50,34">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/> <!-- 0: Header & Brand -->
+                <RowDefinition Height="Auto"/> <!-- 1: User Profile & Arquetipo -->
+                <RowDefinition Height="Auto"/> <!-- 2: 4 Core Stat Cards (2x2) -->
+                <RowDefinition Height="Auto"/> <!-- 3: Top Géneros Bar Strip -->
+                <RowDefinition Height="*"/>    <!-- 4: Podio de Honor (Top 3) -->
+                <RowDefinition Height="Auto"/> <!-- 5: Footer Watermark -->
+            </Grid.RowDefinitions>
+
+            <!-- ── 0. HEADER & BRAND ── -->
+            <StackPanel Grid.Row="0" HorizontalAlignment="Center" Margin="0,0,0,16">
+                <!-- Pill Badge Brand -->
+                <Border CornerRadius="16" Background="#1AFFFFFF" BorderBrush="#33FFFFFF" BorderThickness="1"
+                        Padding="16,6" HorizontalAlignment="Center" Margin="0,0,0,8">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <materialDesign:PackIcon Kind="Sparkles" Foreground="#C4B5FD" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <TextBlock Text="ANIMELOCALTRACKER" FontSize="13" FontWeight="Black" Foreground="#E0E7FF" VerticalAlignment="Center"/>
+                        <TextBlock Text=" • " FontSize="13" FontWeight="Bold" Foreground="#818CF8" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding AnioTexto}" FontSize="13" FontWeight="Black" Foreground="#A78BFA" VerticalAlignment="Center"/>
                     </StackPanel>
                 </Border>
+
+                <!-- Título Impactante con Gradiente -->
+                <TextBlock Text="{Binding TituloCard}" FontSize="46" FontWeight="Black" HorizontalAlignment="Center" TextAlignment="Center" Margin="0,0,0,2">
+                    <TextBlock.Foreground>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                            <GradientStop Color="#FFFFFF" Offset="0"/>
+                            <GradientStop Color="#F1F5F9" Offset="0.5"/>
+                            <GradientStop Color="#C4B5FD" Offset="1"/>
+                        </LinearGradientBrush>
+                    </TextBlock.Foreground>
+                    <TextBlock.Effect>
+                        <DropShadowEffect Color="#7C3AED" BlurRadius="28" ShadowDepth="0" Opacity="0.45"/>
+                    </TextBlock.Effect>
+                </TextBlock>
+
+                <TextBlock Text="RESUMEN OFICIAL DE VISIONADO" FontSize="12.5" FontWeight="Bold" Foreground="#94A3B8"
+                           HorizontalAlignment="Center"/>
             </StackPanel>
 
-            <Border Height="1" Background="#332B55" Margin="0,0,0,44"/>
+            <!-- ── 1. USER PROFILE & ARQUETIPO CARD ── -->
+            <Border Grid.Row="1" Background="{StaticResource GlassCardBrush}" BorderBrush="#2D3A5C" BorderThickness="1.5"
+                    CornerRadius="22" Padding="20,14" Margin="0,0,0,16">
+                <Border.Effect>
+                    <DropShadowEffect Color="#000000" BlurRadius="22" ShadowDepth="4" Opacity="0.45"/>
+                </Border.Effect>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/> <!-- Avatar -->
+                        <ColumnDefinition Width="*"/>    <!-- Username + Arquetipo -->
+                        <ColumnDefinition Width="Auto"/> <!-- Badges de Rango & Racha -->
+                    </Grid.ColumnDefinitions>
 
-            <Grid Margin="0,0,0,50">
+                    <!-- Avatar Circular con Anillo de Luz Gradiente -->
+                    <Border Grid.Column="0" Width="84" Height="84" CornerRadius="42" Padding="3" Margin="0,0,18,0" VerticalAlignment="Center">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                <GradientStop Color="#EC4899" Offset="0"/>
+                                <GradientStop Color="#8B5CF6" Offset="0.5"/>
+                                <GradientStop Color="#3B82F6" Offset="1"/>
+                            </LinearGradientBrush>
+                        </Border.Background>
+                        <Border CornerRadius="39" Background="#1E1B4B" ClipToBounds="True">
+                            <Grid>
+                                <materialDesign:PackIcon Kind="Account" Foreground="#8B7EC8" Width="44" Height="44" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                <Ellipse x:Name="AvatarEllipse" Width="78" Height="78"/>
+                            </Grid>
+                        </Border>
+                    </Border>
+
+                    <!-- Username & Arquetipo -->
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding NombreUsuario}" FontSize="24" FontWeight="Black" Foreground="White" Margin="0,0,0,4"/>
+
+                        <!-- Chip de Arquetipo Otaku -->
+                        <Border CornerRadius="12" Background="#221C42" BorderBrush="#7C3AED" BorderThickness="1"
+                                Padding="12,4" HorizontalAlignment="Left" Margin="0,0,0,4">
+                            <TextBlock Text="{Binding ArquetipoTitulo}" FontSize="12.5" FontWeight="Black" Foreground="#F472B6"/>
+                        </Border>
+
+                        <TextBlock Text="{Binding ArquetipoDescripcion}" FontSize="11.5" Foreground="#94A3B8" TextTrimming="CharacterEllipsis"/>
+                    </StackPanel>
+
+                    <!-- Badges Laterales: Rango y Racha -->
+                    <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="10,0,0,0">
+                        <!-- Badge de Rango -->
+                        <Border CornerRadius="14" Background="#2A2244" BorderBrush="#F59E0B" BorderThickness="1"
+                                Padding="14,6" Margin="0,0,0,6" HorizontalAlignment="Right">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <materialDesign:PackIcon Kind="TrophyVariant" Foreground="#FBBF24" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                <TextBlock Text="{Binding RangoOtakuTexto}" FontSize="12" FontWeight="Black" Foreground="#FDE68A" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Badge de Puntos de Logros -->
+                        <Border CornerRadius="14" Background="#1E293B" BorderBrush="#38BDF8" BorderThickness="1"
+                                Padding="12,4" HorizontalAlignment="Right">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <materialDesign:PackIcon Kind="StarCircle" Foreground="#38BDF8" Width="15" Height="15" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                <TextBlock Text="{Binding PuntosLogrosTexto}" FontSize="11" FontWeight="Bold" Foreground="#BAE6FD" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- ── 2. CUATRO MÉTRICAS PRINCIPALES (GRID 2x2 GLASSMORPHISM) ── -->
+            <Grid Grid.Row="2" Margin="0,0,0,16">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/><ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,10,36">
-                    <TextBlock Text="{Binding HorasLabel}" FontSize="15" FontWeight="Bold" Foreground="#A78BFA"/>
-                    <TextBlock Text="{Binding HorasVistasTexto}" FontSize="50" FontWeight="Black" Foreground="White" Margin="0,4,0,0"/>
-                </StackPanel>
-                <StackPanel Grid.Row="0" Grid.Column="1" Margin="10,0,0,36">
-                    <TextBlock Text="{Binding EpisodiosLabel}" FontSize="15" FontWeight="Bold" Foreground="#60A5FA"/>
-                    <TextBlock Text="{Binding EpisodiosVistosTexto}" FontSize="50" FontWeight="Black" Foreground="White" Margin="0,4,0,0"/>
-                </StackPanel>
-                <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,10,0">
-                    <TextBlock Text="{Binding GeneroLabel}" FontSize="15" FontWeight="Bold" Foreground="#34D399"/>
-                    <TextBlock Text="{Binding GeneroFavorito}" FontSize="32" FontWeight="Bold" Foreground="White" Margin="0,4,0,0" TextTrimming="CharacterEllipsis"/>
-                </StackPanel>
-                <StackPanel Grid.Row="1" Grid.Column="1" Margin="10,0,0,0">
-                    <TextBlock Text="{Binding RachaLabel}" FontSize="15" FontWeight="Bold" Foreground="#FBBF24"/>
-                    <TextBlock Text="{Binding RachaMaximaTexto}" FontSize="32" FontWeight="Bold" Foreground="White" Margin="0,4,0,0"/>
-                </StackPanel>
+                <!-- CARD 1: HORAS VISTAS -->
+                <Border Grid.Row="0" Grid.Column="0" Background="{StaticResource GlassCardBrush}" BorderBrush="#253556" BorderThickness="1.5"
+                        CornerRadius="18" Padding="18,12" Margin="0,0,8,10">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="{Binding HorasLabel}" FontSize="11" FontWeight="Bold" Foreground="#38BDF8"/>
+                            <TextBlock Text="{Binding HorasVistasTexto}" FontSize="38" FontWeight="Black" Foreground="White" Margin="0,2,0,0"/>
+                            <TextBlock Text="tiempo acumulado frente a la pantalla" FontSize="10" Foreground="#64748B"/>
+                        </StackPanel>
+                        <Border Grid.Column="1" Width="44" Height="44" CornerRadius="22" Background="#152642" VerticalAlignment="Top">
+                            <materialDesign:PackIcon Kind="ClockOutline" Foreground="#38BDF8" Width="24" Height="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <!-- CARD 2: EPISODIOS DEVORADOS -->
+                <Border Grid.Row="0" Grid.Column="1" Background="{StaticResource GlassCardBrush}" BorderBrush="#2F2556" BorderThickness="1.5"
+                        CornerRadius="18" Padding="18,12" Margin="8,0,0,10">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="{Binding EpisodiosLabel}" FontSize="11" FontWeight="Bold" Foreground="#A78BFA"/>
+                            <TextBlock Text="{Binding EpisodiosVistosTexto}" FontSize="38" FontWeight="Black" Foreground="White" Margin="0,2,0,0"/>
+                            <TextBlock Text="capítulos reproducidos y completados" FontSize="10" Foreground="#64748B"/>
+                        </StackPanel>
+                        <Border Grid.Column="1" Width="44" Height="44" CornerRadius="22" Background="#241B45" VerticalAlignment="Top">
+                            <materialDesign:PackIcon Kind="PlayCircleOutline" Foreground="#A78BFA" Width="24" Height="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <!-- CARD 3: RACHA MÁXIMA -->
+                <Border Grid.Row="1" Grid.Column="0" Background="{StaticResource GlassCardBrush}" BorderBrush="#4A341E" BorderThickness="1.5"
+                        CornerRadius="18" Padding="18,12" Margin="0,0,8,0">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="{Binding RachaLabel}" FontSize="11" FontWeight="Bold" Foreground="#F59E0B"/>
+                            <TextBlock Text="{Binding RachaMaximaTexto}" FontSize="32" FontWeight="Black" Foreground="White" Margin="0,2,0,0"/>
+                            <TextBlock Text="días seguidos viendo anime" FontSize="10" Foreground="#64748B"/>
+                        </StackPanel>
+                        <Border Grid.Column="1" Width="44" Height="44" CornerRadius="22" Background="#3D2411" VerticalAlignment="Top">
+                            <materialDesign:PackIcon Kind="Fire" Foreground="#F59E0B" Width="24" Height="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <!-- CARD 4: GÉNERO PREDILECTO -->
+                <Border Grid.Row="1" Grid.Column="1" Background="{StaticResource GlassCardBrush}" BorderBrush="#1C4234" BorderThickness="1.5"
+                        CornerRadius="18" Padding="18,12" Margin="8,0,0,0">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="{Binding GeneroLabel}" FontSize="11" FontWeight="Bold" Foreground="#34D399"/>
+                            <TextBlock Text="{Binding GeneroFavorito}" FontSize="30" FontWeight="Black" Foreground="White" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Text="tu categoría temática predilecta" FontSize="10" Foreground="#64748B"/>
+                        </StackPanel>
+                        <Border Grid.Column="1" Width="44" Height="44" CornerRadius="22" Background="#113527" VerticalAlignment="Top">
+                            <materialDesign:PackIcon Kind="CompassOutline" Foreground="#34D399" Width="24" Height="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </Grid>
+                </Border>
             </Grid>
 
-            <StackPanel Margin="0,0,0,50">
-                <TextBlock Text="{Binding TopAnimesLabel}" FontSize="15" FontWeight="Bold" Foreground="#F472B6" Margin="0,0,0,20"/>
-                <ItemsControl ItemsSource="{Binding TopAnimesItems}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <Grid Margin="0,0,0,20">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
+            <!-- ── 3. TOP GÉNEROS FAVORITOS (BAR STRIP) ── -->
+            <Border Grid.Row="3" Background="{StaticResource GlassCardBrush}" BorderBrush="#25314C" BorderThickness="1.5"
+                    CornerRadius="18" Padding="20,12" Margin="0,0,0,16" Visibility="{Binding HasGeneros, Converter={StaticResource BoolToVis}}">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                        <materialDesign:PackIcon Kind="ShapePlus" Foreground="#F472B6" Width="15" Height="15" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <TextBlock Text="TOP GÉNEROS MÁS CONSUMIDOS" FontSize="11" FontWeight="Black" Foreground="#CBD5E1"/>
+                    </StackPanel>
 
-                                <!-- Portada con el puesto (1/2/3) como medalla en la esquina -->
-                                <Grid Grid.Column="0" Width="76" Height="108" Margin="0,0,22,0">
-                                    <Border CornerRadius="10" Background="#2E2547" BorderBrush="#4C3B73" BorderThickness="1.5" ClipToBounds="True">
-                                        <Grid>
-                                            <!-- Placeholder DEBAJO de la portada: visible solo si Portada es null o falla la carga -->
-                                            <materialDesign:PackIcon Kind="ImageOutline" Foreground="#5B4A82" Width="28" Height="28" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                            <Image Source="{Binding Portada, TargetNullValue={x:Null}}" Stretch="UniformToFill"/>
+                    <ItemsControl ItemsSource="{Binding GenerosTop}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <UniformGrid Columns="3"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Margin="6,0" Background="#101426" CornerRadius="12" Padding="12,8" BorderBrush="#1E2842" BorderThickness="1">
+                                    <StackPanel>
+                                        <Grid Margin="0,0,0,6">
+                                            <TextBlock Text="{Binding Nombre}" FontSize="12" FontWeight="Bold" Foreground="White" TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Text="{Binding PorcentajeTexto}" FontSize="12" FontWeight="Black" Foreground="{Binding ColorHex}" HorizontalAlignment="Right"/>
                                         </Grid>
-                                    </Border>
-                                    <Border Width="30" Height="30" CornerRadius="15" Background="#F472B6"
-                                            HorizontalAlignment="Left" VerticalAlignment="Top" Margin="-10,-10,0,0">
-                                        <TextBlock Text="{Binding Posicion}" FontSize="15" FontWeight="Black" Foreground="White"
-                                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    </Border>
+                                        <ProgressBar Value="{Binding Porcentaje, Mode=OneWay}" Minimum="0" Maximum="100" Height="6"
+                                                     Background="#1E293B" Foreground="{Binding ColorBrush}" BorderThickness="0"/>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+            <!-- ── 4. PODIO DE HONOR OLÍMPICO (TOP 3) ── -->
+            <Grid Grid.Row="4" Margin="0,0,0,12">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,12">
+                    <materialDesign:PackIcon Kind="Crown" Foreground="#F59E0B" Width="20" Height="20" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <TextBlock Text="{Binding TopAnimesLabel}" FontSize="16" FontWeight="Black" Foreground="#F472B6"/>
+                </StackPanel>
+
+                <!-- Podio de 3 Columnas: #2 Plata (Izq), #1 Oro (Centro Alto), #3 Bronce (Der) -->
+                <Grid Grid.Row="1">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="1*"/>    <!-- Puesto 2: Plata -->
+                        <ColumnDefinition Width="1.22*"/> <!-- Puesto 1: Oro (Centro destacado) -->
+                        <ColumnDefinition Width="1*"/>    <!-- Puesto 3: Bronce -->
+                    </Grid.ColumnDefinitions>
+
+                    <!-- 🥈 PUESTO #2: PLATA -->
+                    <Border Grid.Column="0" Background="{StaticResource GlassCardBrush}" BorderBrush="#475569" BorderThickness="1.5"
+                            CornerRadius="20" Padding="14,14" Margin="0,32,10,0" VerticalAlignment="Stretch"
+                            Visibility="{Binding HasTop2, Converter={StaticResource BoolToVis}}" DataContext="{Binding Top2}">
+                        <Border.Effect>
+                            <DropShadowEffect Color="#334155" BlurRadius="20" ShadowDepth="4" Opacity="0.4"/>
+                        </Border.Effect>
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/> <!-- Badge -->
+                                <RowDefinition Height="*"/>    <!-- Portada -->
+                                <RowDefinition Height="Auto"/> <!-- Título & Detalle -->
+                            </Grid.RowDefinitions>
+
+                            <Border Grid.Row="0" CornerRadius="12" Background="#1E293B" BorderBrush="#94A3B8" BorderThickness="1"
+                                    Padding="10,4" HorizontalAlignment="Center" Margin="0,0,0,10">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="🥈 #2 PLATA" FontSize="11.5" FontWeight="Black" Foreground="#E2E8F0"/>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Grid.Row="1" CornerRadius="12" Background="#1A2035" BorderBrush="#334155" BorderThickness="1.5" ClipToBounds="True" Margin="0,0,0,10">
+                                <Grid>
+                                    <materialDesign:PackIcon Kind="ImageOutline" Foreground="#475569" Width="36" Height="36" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    <Image Source="{Binding Portada, TargetNullValue={x:Null}}" Stretch="UniformToFill"/>
                                 </Grid>
+                            </Border>
 
-                                <TextBlock Grid.Column="1" Text="{Binding Titulo}" FontSize="26" FontWeight="SemiBold" Foreground="White"
-                                           VerticalAlignment="Center" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="100"/>
-                            </Grid>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                            <StackPanel Grid.Row="2">
+                                <TextBlock Text="{Binding Titulo}" FontSize="16" FontWeight="Bold" Foreground="White"
+                                           TextAlignment="Center" TextTrimming="CharacterEllipsis" MaxHeight="44" TextWrapping="Wrap"/>
+                                <TextBlock Text="{Binding DetalleTexto}" FontSize="12" FontWeight="SemiBold" Foreground="#94A3B8"
+                                           TextAlignment="Center" Margin="0,3,0,0"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- 👑 PUESTO #1: ORO CAMPEÓN (CENTRO MAS ALTO Y BRILLANTE) -->
+                    <Border Grid.Column="1" Background="{StaticResource GoldCardBrush}" BorderBrush="#F59E0B" BorderThickness="2.5"
+                            CornerRadius="24" Padding="16,16" Margin="6,0,6,0" VerticalAlignment="Stretch"
+                            Visibility="{Binding HasTop1, Converter={StaticResource BoolToVis}}" DataContext="{Binding Top1}">
+                        <Border.Effect>
+                            <DropShadowEffect Color="#F59E0B" BlurRadius="34" ShadowDepth="4" Opacity="0.55"/>
+                        </Border.Effect>
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/> <!-- Crown Badge -->
+                                <RowDefinition Height="*"/>    <!-- Portada Grande -->
+                                <RowDefinition Height="Auto"/> <!-- Título & Detalle -->
+                            </Grid.RowDefinitions>
+
+                            <Border Grid.Row="0" CornerRadius="14" Background="#78350F" BorderBrush="#F59E0B" BorderThickness="1.5"
+                                    Padding="14,6" HorizontalAlignment="Center" Margin="0,0,0,10">
+                                <StackPanel Orientation="Horizontal">
+                                    <materialDesign:PackIcon Kind="Crown" Foreground="#FDE047" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <TextBlock Text="👑 #1 ORO CAMPEÓN" FontSize="13" FontWeight="Black" Foreground="#FDE047"/>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Grid.Row="1" CornerRadius="16" Background="#241B3B" BorderBrush="#F59E0B" BorderThickness="2" ClipToBounds="True" Margin="0,0,0,10">
+                                <Grid>
+                                    <materialDesign:PackIcon Kind="ImageOutline" Foreground="#78350F" Width="44" Height="44" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    <Image Source="{Binding Portada, TargetNullValue={x:Null}}" Stretch="UniformToFill"/>
+                                </Grid>
+                            </Border>
+
+                            <StackPanel Grid.Row="2">
+                                <TextBlock Text="{Binding Titulo}" FontSize="20" FontWeight="Black" Foreground="White"
+                                           TextAlignment="Center" TextTrimming="CharacterEllipsis" MaxHeight="52" TextWrapping="Wrap"/>
+                                <Border Background="#451A03" BorderBrush="#F59E0B" BorderThickness="1" CornerRadius="10"
+                                        Padding="10,4" HorizontalAlignment="Center" Margin="0,6,0,0">
+                                    <TextBlock Text="{Binding DetalleTexto}" FontSize="13" FontWeight="Black" Foreground="#FDE047"/>
+                                </Border>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- 🥉 PUESTO #3: BRONCE -->
+                    <Border Grid.Column="2" Background="{StaticResource GlassCardBrush}" BorderBrush="#7C2D12" BorderThickness="1.5"
+                            CornerRadius="20" Padding="14,14" Margin="10,50,0,0" VerticalAlignment="Stretch"
+                            Visibility="{Binding HasTop3, Converter={StaticResource BoolToVis}}" DataContext="{Binding Top3}">
+                        <Border.Effect>
+                            <DropShadowEffect Color="#7C2D12" BlurRadius="20" ShadowDepth="4" Opacity="0.4"/>
+                        </Border.Effect>
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/> <!-- Badge -->
+                                <RowDefinition Height="*"/>    <!-- Portada -->
+                                <RowDefinition Height="Auto"/> <!-- Título & Detalle -->
+                            </Grid.RowDefinitions>
+
+                            <Border Grid.Row="0" CornerRadius="12" Background="#431407" BorderBrush="#F97316" BorderThickness="1"
+                                    Padding="10,4" HorizontalAlignment="Center" Margin="0,0,0,10">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="🥉 #3 BRONCE" FontSize="11.5" FontWeight="Black" Foreground="#FDBA74"/>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Grid.Row="1" CornerRadius="12" Background="#1F1524" BorderBrush="#7C2D12" BorderThickness="1.5" ClipToBounds="True" Margin="0,0,0,10">
+                                <Grid>
+                                    <materialDesign:PackIcon Kind="ImageOutline" Foreground="#7C2D12" Width="36" Height="36" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    <Image Source="{Binding Portada, TargetNullValue={x:Null}}" Stretch="UniformToFill"/>
+                                </Grid>
+                            </Border>
+
+                            <StackPanel Grid.Row="2">
+                                <TextBlock Text="{Binding Titulo}" FontSize="16" FontWeight="Bold" Foreground="White"
+                                           TextAlignment="Center" TextTrimming="CharacterEllipsis" MaxHeight="44" TextWrapping="Wrap"/>
+                                <TextBlock Text="{Binding DetalleTexto}" FontSize="12" FontWeight="SemiBold" Foreground="#FDBA74"
+                                           TextAlignment="Center" Margin="0,3,0,0"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </Grid>
+
+            <!-- ── 5. FOOTER WATERMARK ── -->
+            <StackPanel Grid.Row="5" HorizontalAlignment="Center">
+                <TextBlock Text="✨ GENERADO CON ANIMELOCALTRACKER • COLECCIÓN LOCAL Y PRIVADA"
+                           FontSize="11" FontWeight="Bold" Foreground="#64748B"/>
             </StackPanel>
-
-            <TextBlock Text="{Binding Footer}" FontSize="16" Foreground="#6B7280" HorizontalAlignment="Center"/>
-        </StackPanel>
+        </Grid>
     </Grid>
 </UserControl>
+
