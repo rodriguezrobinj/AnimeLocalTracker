@@ -515,27 +515,86 @@ public partial class EstadisticasViewModel : ObservableObject, IRecipient<Idioma
             string.IsNullOrWhiteSpace(t.RutaPortada) ? Task.FromResult<ImageSource?>(null) : CargarImagenAsync(t.RutaPortada)));
 
         var topAnimesItems = top3
-            .Select((t, i) => new Models.WrappedTopAnimeItem { Posicion = i + 1, Titulo = t.Titulo, Portada = portadas[i] })
+            .Select((t, i) => new Models.WrappedTopAnimeItem
+            {
+                Posicion = i + 1,
+                Titulo = t.Titulo,
+                Portada = portadas[i],
+                EpisodiosVistos = t.EpisodiosVistos,
+                DetalleTexto = t.DetalleTexto,
+                TiempoTexto = t.TiempoTexto
+            })
             .ToList();
+
+        // Top 3 Géneros con porcentajes calculados
+        var top3GenerosRaw = VistosPorGenero.Take(3).ToList();
+        int sumaTopGeneros = Math.Max(1, top3GenerosRaw.Sum(g => g.Valor));
+        var paletaTop3 = new[] { "#EC4899", "#8B5CF6", "#06B6D4" };
+        var generosTop = top3GenerosRaw.Select((g, i) => new Models.WrappedGeneroItem
+        {
+            Nombre = g.Etiqueta,
+            Cantidad = g.Valor,
+            Porcentaje = Math.Max(1, (int)Math.Round((g.Valor * 100.0) / sumaTopGeneros)),
+            ColorHex = paletaTop3[i % paletaTop3.Length]
+        }).ToList();
+
+        var (arquetipo, arquetipoDesc) = DeterminarArquetipo(GeneroFavorito, TotalEpisodiosVistos);
 
         return new Models.WrappedCardData
         {
             TituloCard = LocalizationService.T("Wrapped_Titulo"),
+            AnioTexto = DateTime.Now.Year.ToString(),
             NombreUsuario = nombreUsuario,
             Avatar = avatar,
-            RangoOtakuTexto = string.IsNullOrWhiteSpace(LogrosRangoNombre) ? "" : LogrosRangoNombre.ToUpperInvariant(),
+            RangoOtakuTexto = string.IsNullOrWhiteSpace(LogrosRangoNombre) ? "AFICIONADO" : LogrosRangoNombre.ToUpperInvariant(),
+            PuntosLogrosTexto = string.IsNullOrWhiteSpace(LogrosPuntosTexto) ? "0 PTS" : LogrosPuntosTexto.ToUpperInvariant(),
+            ArquetipoTitulo = arquetipo,
+            ArquetipoDescripcion = arquetipoDesc,
             HorasVistasTexto = HorasVistasTexto,
             HorasLabel = LocalizationService.T("Wrapped_Horas"),
-            EpisodiosVistosTexto = TotalEpisodiosVistos.ToString(),
+            EpisodiosVistosTexto = TotalEpisodiosVistos.ToString("N0"),
             EpisodiosLabel = LocalizationService.T("Wrapped_Episodios"),
-            GeneroFavorito = GeneroFavorito,
+            GeneroFavorito = string.IsNullOrWhiteSpace(GeneroFavorito) ? "—" : GeneroFavorito,
             GeneroLabel = LocalizationService.T("Wrapped_GeneroFavorito"),
             RachaMaximaTexto = RachaMaxima,
+            RachaActualTexto = RachaActual,
             RachaLabel = LocalizationService.T("Wrapped_RachaMaxima"),
             TopAnimesLabel = LocalizationService.T("Wrapped_TopAnimes"),
             TopAnimesItems = topAnimesItems,
+            GenerosTop = generosTop,
             Footer = LocalizationService.T("Wrapped_Footer"),
         };
+    }
+
+    internal static (string Titulo, string Descripcion) DeterminarArquetipo(string? generoFavorito, int episodios)
+    {
+        if (episodios < 5)
+            return ("🌱 EXPLORADOR NOVATO", "Dando los primeros pasos en el inmenso multiverso del anime.");
+
+        if (episodios >= 1000)
+            return ("👑 TITÁN DEL ANIME", "Tu biblioteca es una fortaleza y tu pasión por el anime no tiene límites.");
+
+        string gen = (generoFavorito ?? "").Trim().ToLowerInvariant();
+        if (gen.Contains("fantas") || gen.Contains("adventur") || gen.Contains("aventura"))
+            return ("🔮 VIAJERO DE FANTASÍA", "Mundos mágicos, hechizos antiguos y viajes legendarios sin fin.");
+        if (gen.Contains("acci") || gen.Contains("action") || gen.Contains("shounen") || gen.Contains("shonen"))
+            return ("⚡ DEVORADOR DE SHONEN", "Adrenalina pura, superación personal y batallas épicas inolvidables.");
+        if (gen.Contains("romance") || gen.Contains("shoujo"))
+            return ("💖 ROMÁNTICO INCURABLE", "Vives cada declaración y mirada intensa con el corazón en un puño.");
+        if (gen.Contains("comedia") || gen.Contains("comedy"))
+            return ("🎭 COLECCIONISTA DE RISAS", "El humor desternillante y las situaciones absurdas son tu templo.");
+        if (gen.Contains("sci-fi") || gen.Contains("ciencia") || gen.Contains("mecha"))
+            return ("🚀 PIONERO CYBERPUNK", "Futuros distópicos, tecnología estelar y misterios cósmicos.");
+        if (gen.Contains("drama") || gen.Contains("psicol") || gen.Contains("psychological"))
+            return ("🧠 EXPLORADOR PSICOLÓGICO", "Historias profundas que desafían la mente y conmueven el alma.");
+        if (gen.Contains("slice") || gen.Contains("vida") || gen.Contains("iyashikei"))
+            return ("☕ MAESTRO DEL IYASHIKEI", "La paz, la calidez cotidiana y los pequeños momentos de la vida.");
+        if (gen.Contains("misterio") || gen.Contains("thriller") || gen.Contains("suspens"))
+            return ("🔍 ESTRATEGA IMPLACABLE", "Descifras cada sospecha y giro argumental antes del clímax.");
+        if (gen.Contains("deporte") || gen.Contains("sport"))
+            return ("🏆 ESPÍRITU COMPETITIVO", "Pasión, trabajo en equipo y sudor para alcanzar la gloria.");
+
+        return ("✨ MAESTRO DEL BINGE-WATCHING", "Una devoción imparable por las grandes historias animadas.");
     }
 
     // Las portadas del Top (casi siempre una ruta LOCAL ya cacheada por la Galería) se cargan
