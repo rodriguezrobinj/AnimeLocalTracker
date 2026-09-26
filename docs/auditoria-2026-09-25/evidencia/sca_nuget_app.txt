@@ -1,0 +1,5 @@
+
+Se han usado los orígenes siguientes:
+   https://api.nuget.org/v3/index.json
+
+El proyecto "AnimeLocalTracker" especificado no tiene paquetes vulnerables en los orígenes actuales.

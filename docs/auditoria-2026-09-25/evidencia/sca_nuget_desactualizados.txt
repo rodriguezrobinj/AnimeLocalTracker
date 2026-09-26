@@ -1,0 +1,14 @@
+
+Se han usado los orígenes siguientes:
+   https://api.nuget.org/v3/index.json
+
+El proyecto "AnimeLocalTracker" tiene las actualizaciones siguientes para sus paquetes
+   [net8.0-windows10.0.26100]: 
+   Paquete de nivel superior                         Solicitado   Resuelto   Más reciente
+   > FlyleafLib                                      3.11.3       3.11.3     3.11.11     
+   > FlyleafLib.Controls.WPF                         1.7.3        1.7.3      1.7.11      
+   > Microsoft.Extensions.DependencyInjection        8.0.1        8.0.1      10.0.12     
+   > Microsoft.Extensions.Http                       8.0.1        8.0.1      10.0.12     
+   > Microsoft.Extensions.Http.Polly                 8.0.1        8.0.1      10.0.12     
+   > System.Security.Cryptography.ProtectedData      8.0.0        8.0.0      10.0.12     
+

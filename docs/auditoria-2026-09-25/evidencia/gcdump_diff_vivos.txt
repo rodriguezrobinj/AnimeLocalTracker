@@ -1,0 +1,25 @@
+gcdump (objetos VIVOS tras GC forzado). BASE = ficha abierta, sin reproducir. DESPUÉS = tras 4 ciclos abrir/reproducir/cerrar.
+BASE  :
+     75,426,214  GC Heap bytes
+364,401  GC Heap objects
+DESPUES:
+     77,809,103  GC Heap bytes
+406,166  GC Heap objects
+
+Tipos propios/Flyleaf con mas instancias vivas que la base (conteo):
+    6  AnimeLocalTracker.Services.LogEntry
+    4  FlyleafLib.Controls.WPF.AvailableWindows
+    4  AnimeLocalTracker.Models.EstiloSubtitulos
+    2  System.Collections.Generic.List<AnimeLocalTracker.Models.EpisodioItem>
+    2  System.Collections.Generic.List<AnimeLocalTracker.Models.AniSkipResult>
+    2  FlyleafLib.LogHandler
+    2  FlyleafLib.Controls.WPF.FlyleafHost
+    2  AnimeLocalTracker.Views.ReproductorView
+    2  AnimeLocalTracker.ViewModels.ReproductorViewModel
+    2  AnimeLocalTracker.Services.PlaybackSeekCoordinator
+    2  AnimeLocalTracker.Services.EpisodeNavigator
+    2  AnimeLocalTracker.Models.EpisodioItem[]
+    2  AnimeLocalTracker.Models.AniSkipResult[]
+    2  AnimeLocalTracker.Models.AniSkipResult
+    2  AnimeLocalTracker.Models.AniSkipInterval
+    2  AnimeLocalTracker.Controls.SubtitleTextView

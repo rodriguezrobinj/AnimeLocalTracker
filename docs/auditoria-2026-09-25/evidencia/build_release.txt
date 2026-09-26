@@ -1,0 +1,10 @@
+  Determinando los proyectos que se van a restaurar...
+  Todos los proyectos están actualizados para la restauración.
+  AnimeLocalTracker -> C:\Users\<user>\RiderProjects\AnimeLocalTracker\AnimeLocalTracker\bin\Release\net8.0-windows10.0.26100.0\AnimeLocalTracker.dll
+
+Compilación correcta.
+    0 Advertencia(s)
+    0 Errores
+
+Tiempo transcurrido 00:01:36.01
+elapsed_s=97

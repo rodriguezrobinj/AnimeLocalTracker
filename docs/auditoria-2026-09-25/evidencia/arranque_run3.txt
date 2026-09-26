@@ -1,0 +1,24 @@
+Ventana principal visible a los: 4,39 s
+GalerÃ­a lista (log [Perf]) a los: 7,20 s
+--- lÃ­neas de arranque del log:
+[2026-09-25 21:15:40] [INFO] [App] AnimeLocalTracker iniciando (versiÃ³n 1.0.5.0, x64).
+[2026-09-25 21:15:41] [INFO] [DatabaseService] Backup de la biblioteca creado: <datos>\AnimeLocalTrackerData\Backups\biblioteca.backup.1.db
+[2026-09-25 21:15:41] [INFO] [PythonBridge] Motor Python nativo detectado: <perfil>\RiderProjects\AnimeLocalTracker\AnimeLocalTracker\bin\Release\net8.0-windows10.0.26100.0\Tools\AnimeTrackerTools\AnimeTrackerTools.exe
+[2026-09-25 21:15:44] [INFO] [SystemMediaControlsService] SMTC inicializado exitosamente para la ventana principal.
+[2026-09-25 21:15:46] [INFO] [GaleriaViewModel] [Perf] Portadas: 205/205 listas en 2043 ms; primeras 24 tarjetas visibles completas a los 204 ms.
+--- muestreo (reposo, cada 2 s) t, WS_MB, Private_MB, CPU_%, Hilos, Handles, Hijos
+    9s    363,8    251,3   18,46    40   1003  1
+   11s    368,4    252,0   20,77    40   1009  1
+   13s    346,7    230,7    4,83    40   1009  1
+   16s    346,9    230,9    0,75    40   1006  1
+--- procesos hijos:
+  AnimeTrackerTools.exe pid=26600 WS=68,0 MB  cmd="C:\Users\<user>\RiderProjects\AnimeLocalTracker\AnimeLocalTracker\bin\Release\net8.0-windows10.0.26100.0\Tools\AnimeTra
+  (total hijos: 1)
+--- sockets (TCP escuchando / conectados, UDP):
+  TCP Bound     :::54071 -> :::0  (AnimeLocalTracker pid 33332)
+  TCP Bound     :::54070 -> :::0  (AnimeLocalTracker pid 33332)
+  TCP Bound     :::54069 -> :::0  (AnimeLocalTracker pid 33332)
+  TCP Established 192.168.0.204:54071 -> 104.26.14.71:443  (AnimeLocalTracker pid 33332)
+  TCP Established 192.168.0.204:54070 -> 104.26.14.71:443  (AnimeLocalTracker pid 33332)
+  TCP Established 192.168.0.204:54069 -> 104.26.14.71:443  (AnimeLocalTracker pid 33332)
+--- pico WS en reposo: 368,4 MB

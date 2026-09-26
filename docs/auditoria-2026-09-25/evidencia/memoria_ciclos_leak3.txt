@@ -1,0 +1,15 @@
+
+Punto                               WS_MB Priv_MB Hilos Handles
+-----                               ----- ------- ----- -------
+antes del 1er ciclo (ficha abierta) 408,4   287,9    38    1025
+ciclo 1 reproduciendo               514,3   381,2    51    1232
+ciclo 1 tras cerrar (+10 s)         450,9   300,4    42    1142
+ciclo 2 reproduciendo               530,2   388,5    50    1287
+ciclo 2 tras cerrar (+10 s)         471,1   317,9    39    1176
+ciclo 3 reproduciendo               569,4   412,6    49    1255
+ciclo 3 tras cerrar (+10 s)         494,4   333,7    36    1135
+ciclo 4 reproduciendo               574,9   424,6    48    1283
+ciclo 4 tras cerrar (+10 s)         518,9   354,6    36    1168
+
+
+

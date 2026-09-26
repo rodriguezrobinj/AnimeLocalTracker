@@ -1,0 +1,8 @@
+jit run1 | Ventana principal visible a los: 4,49 s | GalerÃ­a lista (log [Perf]) a los: 7,34 s
+jit run2 | Ventana principal visible a los: 3,98 s | GalerÃ­a lista (log [Perf]) a los: 6,80 s
+jit run3 | Ventana principal visible a los: 3,79 s | GalerÃ­a lista (log [Perf]) a los: 6,54 s
+jit run4 | Ventana principal visible a los: 3,71 s | GalerÃ­a lista (log [Perf]) a los: 6,38 s
+r2r run1 | Ventana principal visible a los: 3,81 s | GalerÃ­a lista (log [Perf]) a los: 6,74 s
+r2r run2 | Ventana principal visible a los: 3,21 s | GalerÃ­a lista (log [Perf]) a los: 6,04 s
+r2r run3 | Ventana principal visible a los: 3,15 s | GalerÃ­a lista (log [Perf]) a los: 5,88 s
+r2r run4 | Ventana principal visible a los: 3,19 s | GalerÃ­a lista (log [Perf]) a los: 5,89 s
