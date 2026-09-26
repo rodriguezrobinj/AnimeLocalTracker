@@ -11,8 +11,9 @@
 - La mejor combinación encontrada: **AniList** (personajes, pistas, imágenes de escenas) + **AnisongDB** (audio de
   openings/endings con dificultad) + **base local de la app** (funciona sin red) + **anime-offline-database**
   (conjunto grande de títulos para distractores, también offline).
-- **AnimeThemes está caída** (HTTP 522 hasta en la raíz del sitio, ~20 s de espera). Con AnisongDB ya hay una
-  alternativa real para el audio.
+- **AnimeThemes estuvo caída el 25-sep (HTTP 522) y el 26-sep ya responde** (200 en <1 s, audio `.ogg` descargable).
+  Sigue con un fallo parcial: `song.artists` da 500; los artistas se piden por `song.performances.artist`
+  (corregido en `AnimeThemesService`). Con AnisongDB hay además una alternativa real para el audio.
 - **Sin clave ni registro** funcionan AniList, AnisongDB, Kitsu, Jikan (parcial), trace.moe, AnimeChan, Bangumi y
   ANN. Con clave gratuita: TMDB (no probada aquí).
 
@@ -25,7 +26,7 @@
 | **Audio de AnisongDB** (CDN de AnimeMusicQuiz) | ✅ `.mp3` ~320 kbps; soporta `Range` (respuesta 206) → se puede pedir solo un tramo | Es el CDN de otro proyecto: uso ligero y con caché; sin garantías |
 | **Jikan** (MyAnimeList no oficial) | ⚠️ `/anime/{id}` respondió bien, pero `/characters`, `/pictures` y `/random` dieron **504** ("MyAnimeList may be down") en los 3 intentos | 60 peticiones/min, respuestas en caché 24 h. Depende de que MAL responda |
 | **Kitsu** (JSON:API) | ✅ Metadatos, póster, portada, `youtubeVideoId`, rankings de popularidad y nota. Sin miniaturas de episodio en el anime probado; el endpoint de personajes devolvió vacío | Sin clave; no se vieron límites |
-| **AnimeThemes** | ❌ **522** en la raíz y en la API, ~20 s por intento (además de los timeouts de tu `app.log`) | Ya integrada en la app; sirve como respaldo cuando esté arriba |
+| **AnimeThemes** | 25-sep: ❌ **522** en la raíz y en la API (~20 s por intento, además de los timeouts de tu `app.log`). 26-sep: ✅ 200 en <1 s; `.ogg` de 3,5 MB descargado en ~3,5 s. ⚠️ `include=song.artists` → **500** en todos los animes probados; funciona `song.performances.artist` | Ya integrada en la app (emparejamiento por ID de AniList, ver hallazgo 7). Estuvo caída una semana: no depender de ella en línea, cachear |
 | **trace.moe** | ✅ Identificó una captura de *Slime* con similitud 0.996: anime, episodio, segundo exacto y vídeo/imagen de vista previa | Anónimo: concurrencia 1 y cuota mensual (`/me` mostró 100; la documentación habla de más); clave opcional |
 | **AnimeChan** | ✅ Frases aleatorias con anime y personaje | **100 peticiones/día** gratis (1 000/hora de pago) |
 | **anime-offline-database** (GitHub) | ✅ Volcado semanal de todo el catálogo; última versión `2026-27`, **62 MB** (6 MB comprimido `.zst`) | Licencia **ODbL + DbCL**: exige atribución y compartir igual las bases derivadas |
@@ -53,6 +54,22 @@
    filtrada por popularidad, no los 62 MB completos) da distractores creíbles offline.
 6. **Cuidado con el presupuesto de AniList:** una partida de 10 rondas con una consulta por anime son ~10
    peticiones de las 30/min disponibles. Hay que agrupar y cachear en SQLite.
+7. **Precisión del emparejamiento de OP/ED con AnimeThemes (medida el 26-sep con los 207 animes de la biblioteca):**
+   la app no busca por título sino por **ID de AniList** (`/resource?filter[site]=AniList&filter[external_id]=…`).
+   - 153 de 207 quedaron emparejados y **ninguno con el anime equivocado**: los 2 títulos poco parecidos
+     (*Kami no Tou* / *Kami no Tou: Tower of God*, *Honzuki no Gekokujou…*) son solo nombres más cortos o más largos
+     del mismo anime y año.
+   - 49 sin mapeo: casi todo películas (One Piece, Dragon Ball), OVAs/especiales, "Break Time" de Re:Zero y
+     temporadas aún sin estrenar. Devolver vacío es lo correcto (no hay tema que traer).
+   - **Fallos por omisión (nunca por mezcla) — corregidos el 26-sep:** `ResolverSlugAsync` solo miraba el primer
+     *resource* y el primer anime. *Grand Blue Season 3* (199111) devuelve un resource vacío y otro con el anime, así
+     que se perdía; *Re:Zero OVAs* (100049) tiene 2 resources con 2 animes distintos y solo se leía uno. Ahora
+     `ResolverSlugsAsync`/`ExtraerSlugs` leen todos y `MapearVarios` junta sus temas; el segundo anime lleva sufijo
+     en el slug (`ED1-2`) porque ambos OVAs tienen un "ED1" v1 y compartirían archivo local.
+   - Calidad de los 565 temas de los 155 animes: 0 sin título de canción, 2 sin audio, **148 (26 %) sin artista**
+     (p. ej. One Piece OP3–OP10, por lo que "¿quién lo canta?" debe omitirse cuando falte), 37 con marca de spoiler
+     y **73 temas con varias versiones con audio** (el mapeo genera una fila por versión: para un juego hay que
+     deduplicar por `Slug`).
 
 ## Qué fuente para qué juego
 
@@ -60,7 +77,7 @@
 |---|---|---|---|
 | Adivina el anime (pistas) | Base local de la app (`AnimeItem`, `DatosExtraAnime`) | AniList (etiquetas, sinónimos) | ✅ |
 | Adivina el anime (escena) | Fotogramas de tus episodios (daemon Python) | AniList `streamingEpisodes` | ✅ / online |
-| Adivina el OP/ED | **AnisongDB** (audio, dificultad, IDs) | AnimeThemes (cuando esté arriba) | Con clips cacheados |
+| Adivina el OP/ED | **AnisongDB** (audio, dificultad, IDs) | AnimeThemes (de nuevo operativa desde el 26-sep; sin dificultad y ~26 % de temas sin artista) | Con clips cacheados |
 | Adivina el personaje | **AniList** (personajes, VA, nombres alternativos) | Jikan (poco fiable hoy) | Con caché |
 | Frase → anime/personaje (reto diario) | AnimeChan (100/día) | — | Con caché |
 | Distractores y catálogo | anime-offline-database (subconjunto) | AniList populares | ✅ |
@@ -70,7 +87,7 @@
 
 | Riesgo | Detalle | Mitigación |
 |---|---|---|
-| Servicios comunitarios inestables | AnimeThemes caída; Jikan con 504; AnisongDB y su CDN sin contrato | Caché local de todo lo usado, cada juego con al menos una fuente offline, mensajes claros si no hay red |
+| Servicios comunitarios inestables | AnimeThemes caída el 25-sep y con un include roto el 26-sep; Jikan con 504; AnisongDB y su CDN sin contrato | Caché local de todo lo usado, cada juego con al menos una fuente offline, mensajes claros si no hay red |
 | Hotlinking a CDN ajenos (AMQ, Crunchyroll, AniList) | Ancho de banda de terceros | Descargar solo lo necesario, cachear en `AppDataPaths`, `User-Agent` propio, no empaquetar contenido |
 | Licencias | ODbL (atribución + compartir igual) en anime-offline-database; TMDB exige atribución | Usarlo como dato de apoyo, citar la fuente en Acerca de |
 | Derechos del audio | Los clips son de openings comerciales | Solo clips cortos, uso personal, sin redistribuir |

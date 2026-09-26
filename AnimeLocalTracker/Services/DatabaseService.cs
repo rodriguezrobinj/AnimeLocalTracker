@@ -89,8 +89,19 @@ public class DatabaseService : IDatabaseService, IDisposable
         (7, "historial de descargas (completadas y fallidas)", CrearTablaHistorialDescargasAsync),
         (8, "copia local de la próxima emisión (cuenta atrás)", CrearTablaProximaEmisionAsync),
         (9, "preferencias de emisión (avisos/descarga automática) y datos extra de AniList", CrearTablasPreferenciasYDatosExtraAsync),
-        (10, "eliminar índices duplicados creados por [Indexed] (DB-01)", EliminarIndicesRedundantesAsync)
+        (10, "eliminar índices duplicados creados por [Indexed] (DB-01)", EliminarIndicesRedundantesAsync),
+        (11, "partidas de minijuegos (récords y logros) + índice (JuegoId, Puntos)", CrearTablaPartidasMinijuegoAsync)
     };
+
+    /// <summary>
+    /// v11: partidas de minijuegos terminadas. El índice (JuegoId, Puntos) se crea aquí de forma explícita (no con
+    /// [Indexed], que solo aplica a bases nuevas y volvería a duplicar índices como en DB-01).
+    /// </summary>
+    private static async Task CrearTablaPartidasMinijuegoAsync(SQLiteAsyncConnection conexion)
+    {
+        await conexion.CreateTableAsync<PartidaMinijuego>();
+        await conexion.ExecuteAsync("CREATE INDEX IF NOT EXISTS IX_PartidaMinijuego_JuegoPuntos ON PartidaMinijuego(JuegoId, Puntos);");
+    }
 
     /// <summary>
     /// v10 (DB-01): los atributos [Indexed] de los modelos generaban, en bases nuevas, índices automáticos que duplicaban a
@@ -756,6 +767,7 @@ public class DatabaseService : IDatabaseService, IDisposable
             db.Execute("DELETE FROM ProximaEmisionLocal;");
             db.Execute("DELETE FROM PreferenciaEmision;");
             db.Execute("DELETE FROM DatosExtraAnime;");
+            db.Execute("DELETE FROM PartidaMinijuego;");
         });
     }
 
@@ -814,6 +826,17 @@ public class DatabaseService : IDatabaseService, IDisposable
                     logro.LogroId, logro.Nivel, logro.FechaUtc);
             }
         });
+    }
+
+    public async Task<List<PartidaMinijuego>> ObtenerPartidasMinijuegoAsync()
+    {
+        return await _conexion.Table<PartidaMinijuego>().ToListAsync();
+    }
+
+    public async Task GuardarPartidaMinijuegoAsync(PartidaMinijuego partida)
+    {
+        if (partida == null || string.IsNullOrWhiteSpace(partida.JuegoId)) return;
+        await _conexion.InsertAsync(partida);
     }
 
     public async Task<PreferenciaEmision?> ObtenerPreferenciaEmisionAsync(int aniListId)

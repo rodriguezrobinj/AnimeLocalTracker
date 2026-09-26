@@ -1,0 +1,101 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Estilos compartidos por los minijuegos. Los colores salen siempre de la paleta de App.xaml (Brush.*). -->
+
+    <!-- Botón principal: blanco sobre #2563EB (contraste AA, ver ui-wpf-vistas.md) -->
+    <Style x:Key="MiniBotonPrincipal" TargetType="Button">
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Raiz" Background="#2563EB" CornerRadius="10" Padding="26,11">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Raiz" Property="Background" Value="{DynamicResource Brush.AccentStrong}"/>
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Raiz" Property="BorderBrush" Value="{DynamicResource Brush.AccentSoft}"/>
+                            <Setter TargetName="Raiz" Property="BorderThickness" Value="2"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Botón secundario (contorno) -->
+    <Style x:Key="MiniBotonSecundario" TargetType="Button">
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Foreground" Value="{DynamicResource Brush.AccentSoft}"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Raiz" Background="Transparent" BorderBrush="{DynamicResource Brush.BorderStrong}"
+                            BorderThickness="1" CornerRadius="10" Padding="18,9">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Raiz" Property="Background" Value="{DynamicResource Brush.Surface3}"/>
+                            <Setter TargetName="Raiz" Property="BorderBrush" Value="{DynamicResource Brush.Accent}"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.4"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Opción de respuesta: neutra → verde (correcta) / roja (la que elegiste y falló) -->
+    <Style x:Key="MiniOpcionStyle" TargetType="Button">
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Raiz" Background="{DynamicResource Brush.Surface1}" BorderBrush="{DynamicResource Brush.Border}"
+                            BorderThickness="1.5" CornerRadius="12" Padding="14,10" Margin="0,0,8,8">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Border Background="{DynamicResource Brush.Surface3}" CornerRadius="13" Width="26" Height="26" Margin="0,0,12,0" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Numero}" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource Brush.AccentSoft}"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Grid.Column="1" Text="{Binding Titulo}" FontSize="14" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource Brush.TextPrimary}" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Raiz" Property="BorderBrush" Value="{DynamicResource Brush.Accent}"/>
+                            <Setter TargetName="Raiz" Property="Background" Value="{DynamicResource Brush.Surface2}"/>
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Raiz" Property="BorderBrush" Value="{DynamicResource Brush.AccentSoft}"/>
+                        </Trigger>
+                        <DataTrigger Binding="{Binding EsCorrecta}" Value="True">
+                            <Setter TargetName="Raiz" Property="BorderBrush" Value="{DynamicResource Brush.Success}"/>
+                            <Setter TargetName="Raiz" Property="Background" Value="{DynamicResource Brush.SuccessTint}"/>
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding EsIncorrecta}" Value="True">
+                            <Setter TargetName="Raiz" Property="BorderBrush" Value="{DynamicResource Brush.Danger}"/>
+                        </DataTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+</ResourceDictionary>

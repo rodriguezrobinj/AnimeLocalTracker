@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using AnimeLocalTracker.Models;
+using AnimeLocalTracker.Services.Minijuegos;
 
 namespace AnimeLocalTracker.Services.Logros;
 
@@ -15,8 +16,11 @@ public static class MotorLogros
     /// <summary>Mide todas las métricas que consumen las familias del catálogo (clave = Id de la familia).</summary>
     public static Dictionary<string, double> CalcularMetricas(
         IReadOnlyList<AnimeItem> animes,
-        IReadOnlyList<RegistroEpisodio> registros)
+        IReadOnlyList<RegistroEpisodio> registros,
+        IReadOnlyList<PartidaMinijuego>? partidas = null)
     {
+        partidas ??= Array.Empty<PartidaMinijuego>();
+
         var animesPorId = new Dictionary<int, AnimeItem>();
         foreach (var anime in animes) animesPorId.TryAdd(anime.AniListId, anime);
 
@@ -77,6 +81,14 @@ public static class MotorLogros
 
             ["insomnio"] = MaximoPorGrupo(conFecha.Where(x => x.Local.Hour < 6).GroupBy(x => x.Local.Date)),
             ["de_una_sentada"] = MaximoPorGrupo(conFecha.GroupBy(x => (x.Registro.AniListId, x.Local.Date))),
+
+            // Minijuegos: una partida cuenta al terminar (llegar al resumen), no al abandonarla.
+            ["mini_partidas"] = partidas.Count,
+            ["mini_aciertos"] = partidas.Sum(p => p.Aciertos),
+            ["mini_puntuacion"] = partidas.Count > 0 ? partidas.Max(p => p.Puntos) : 0,
+            ["mini_perfectas"] = partidas.Count(RecordsMinijuego.EsPerfecta),
+            ["mini_racha"] = partidas.Count > 0 ? partidas.Max(p => p.RachaMaxima) : 0,
+            ["mini_oped"] = partidas.Where(p => p.JuegoId == JuegosMinijuego.AdivinaOpEd).Sum(p => p.Aciertos),
         };
     }
 

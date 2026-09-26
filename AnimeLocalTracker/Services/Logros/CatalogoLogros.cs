@@ -40,6 +40,14 @@ public static class CatalogoLogros
         new("clasicos", CategoriaLogro.Epocas, "TelevisionClassic", "#94A3B8", new double[] { 1, 3, 6, 12, 25 }),
         new("decadas", CategoriaLogro.Epocas, "Hourglass", "#38BDF8", new double[] { 2, 3, 4, 5, 6 }),
 
+        // ── Minijuegos: sus métricas salen de las partidas terminadas (tabla PartidaMinijuego) ──
+        new("mini_partidas", CategoriaLogro.Minijuegos, "GamepadVariant", "#60A5FA", new double[] { 1, 5, 15, 40, 100 }),
+        new("mini_aciertos", CategoriaLogro.Minijuegos, "Target", "#34D399", new double[] { 10, 50, 150, 400, 1000 }),
+        new("mini_puntuacion", CategoriaLogro.Minijuegos, "TrophyVariant", "#FBBF24", new double[] { 300, 500, 700, 850, 1000 }),
+        new("mini_perfectas", CategoriaLogro.Minijuegos, "StarCircle", "#F472B6", new double[] { 1, 3, 7, 15, 30 }),
+        new("mini_racha", CategoriaLogro.Minijuegos, "LightningBolt", "#FB923C", new double[] { 3, 5, 7, 9, 10 }),
+        new("mini_oped", CategoriaLogro.Minijuegos, "MusicNote", "#A78BFA", new double[] { 10, 40, 100, 250, 500 }),
+
         // ── Secretos: nombre y descripción ocultos hasta conseguir el primer nivel ──
         new("insomnio", CategoriaLogro.Secretos, "BedClock", "#818CF8", new double[] { 3, 6 }, Secreto: true),
         new("de_una_sentada", CategoriaLogro.Secretos, "FlagCheckered", "#34D399", new double[] { 12, 24 }, Secreto: true),

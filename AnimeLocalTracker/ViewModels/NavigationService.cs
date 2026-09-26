@@ -22,6 +22,7 @@ public interface INavigationService : System.ComponentModel.INotifyPropertyChang
     bool EsEstadisticasActivo { get; }
     bool EsHistorialActivo { get; }
     bool EsLogrosActivo { get; }
+    bool EsMinijuegosActivo { get; }
     bool EsActualizacionesActivo { get; }
 
     GaleriaViewModel ObtenerGaleria();
@@ -33,6 +34,7 @@ public interface INavigationService : System.ComponentModel.INotifyPropertyChang
     EstadisticasViewModel ObtenerEstadisticas();
     HistorialViewModel ObtenerHistorial();
     LogrosViewModel ObtenerLogros();
+    MinijuegosViewModel ObtenerMinijuegos();
     ActualizacionesViewModel ObtenerActualizaciones();
     DetalleViewModel CrearDetalle();
     ReproductorViewModel CrearReproductor();
@@ -49,6 +51,7 @@ public sealed partial class NavigationService : ObservableObject, INavigationSer
     IRecipient<NavegarMensaje_Estadisticas>,
     IRecipient<NavegarMensaje_Historial>,
     IRecipient<NavegarMensaje_Logros>,
+    IRecipient<NavegarMensaje_Minijuegos>,
     IRecipient<NavegarMensaje_Actualizaciones>,
     IRecipient<NavegarMensaje_Reproductor>,
     IRecipient<NavegarMensaje_VolverDelReproductor>
@@ -67,6 +70,7 @@ public sealed partial class NavigationService : ObservableObject, INavigationSer
     [NotifyPropertyChangedFor(nameof(EsEstadisticasActivo))]
     [NotifyPropertyChangedFor(nameof(EsHistorialActivo))]
     [NotifyPropertyChangedFor(nameof(EsLogrosActivo))]
+    [NotifyPropertyChangedFor(nameof(EsMinijuegosActivo))]
     [NotifyPropertyChangedFor(nameof(EsActualizacionesActivo))]
     private ObservableObject _vistaActual = null!;
 
@@ -82,6 +86,7 @@ public sealed partial class NavigationService : ObservableObject, INavigationSer
     public bool EsEstadisticasActivo => VistaActual is EstadisticasViewModel;
     public bool EsHistorialActivo => VistaActual is HistorialViewModel;
     public bool EsLogrosActivo => VistaActual is LogrosViewModel;
+    public bool EsMinijuegosActivo => VistaActual is MinijuegosViewModel;
     public bool EsActualizacionesActivo => VistaActual is ActualizacionesViewModel;
 
     public NavigationService(IServiceProvider serviceProvider)
@@ -99,6 +104,7 @@ public sealed partial class NavigationService : ObservableObject, INavigationSer
     public EstadisticasViewModel ObtenerEstadisticas() => _serviceProvider.GetRequiredService<EstadisticasViewModel>();
     public HistorialViewModel ObtenerHistorial() => _serviceProvider.GetRequiredService<HistorialViewModel>();
     public LogrosViewModel ObtenerLogros() => _serviceProvider.GetRequiredService<LogrosViewModel>();
+    public MinijuegosViewModel ObtenerMinijuegos() => _serviceProvider.GetRequiredService<MinijuegosViewModel>();
     public ActualizacionesViewModel ObtenerActualizaciones() => _serviceProvider.GetRequiredService<ActualizacionesViewModel>();
     public DetalleViewModel CrearDetalle() => _serviceProvider.GetRequiredService<DetalleViewModel>();
     public ReproductorViewModel CrearReproductor() => _serviceProvider.GetRequiredService<ReproductorViewModel>();
@@ -251,6 +257,26 @@ public sealed partial class NavigationService : ObservableObject, INavigationSer
         catch (Exception ex)
         {
             AppLogger.Error("NavigationService", "Error navegando a logros", ex);
+        }
+    }
+
+    public void Receive(NavegarMensaje_Minijuegos message)
+    {
+        _ = NavegarMinijuegos();
+    }
+
+    private async Task NavegarMinijuegos()
+    {
+        try
+        {
+            var minijuegosVm = ObtenerMinijuegos();
+            VistaActual = minijuegosVm;
+            // Recuenta los animes disponibles al entrar; no interrumpe una partida en curso.
+            await minijuegosVm.PrepararAsync();
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("NavigationService", "Error navegando a minijuegos", ex);
         }
     }
 

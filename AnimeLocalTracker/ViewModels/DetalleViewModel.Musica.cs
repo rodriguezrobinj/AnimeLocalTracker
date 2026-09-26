@@ -3,7 +3,6 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Windows.Media;
 using AnimeLocalTracker.Models;
 using AnimeLocalTracker.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -11,45 +10,154 @@ using CommunityToolkit.Mvvm.Input;
 
 namespace AnimeLocalTracker.ViewModels;
 
-/// <summary>Un opening/ending en la lista de la Ficha, con su estado de descarga/reproducción local.</summary>
-public partial class TemaAnimeItem : ObservableObject
-{
-    public required AnimeThemeInfo Info { get; init; }
-
-    public string Slug => Info.Slug;
-    public string Tipo => Info.Tipo;
-    public string TituloCancion => string.IsNullOrWhiteSpace(Info.TituloCancion) ? Slug : Info.TituloCancion;
-    public string Artistas => Info.Artistas;
-    public string RangoTexto => string.IsNullOrWhiteSpace(Info.RangoEpisodios)
-        ? LocalizationService.T("Det_MusicaTodosLosEpisodios")
-        : string.Format(LocalizationService.T("Det_MusicaEpisodiosFormato"), Info.RangoEpisodios);
-
-    [ObservableProperty] private bool _descargado;
-    [ObservableProperty] private bool _descargando;
-    [ObservableProperty] private bool _reproduciendo;
-}
-
 /// <summary>
-/// Openings/endings del anime (AnimeThemes.moe): catálogo, descarga+conversión a mp3 y reproducción
-/// de vista previa. Los mp3 ya descargados también alimentan la detección de saltos de OP/ED por
+/// Openings/endings del anime (AnimeThemes.moe): catálogo, vista previa antes de guardar, descarga+conversión a mp3 y
+/// reproducción con barra de progreso. Los mp3 ya descargados también alimentan la detección de saltos de OP/ED por
 /// audio de referencia en SkipTimesCoordinator — descargar aquí "activa" ese salto más preciso.
+/// La vista previa es la canción completa en una caché temporal: "Guardar" la mueve a la carpeta de música sin bajarla otra vez.
 /// </summary>
 public partial class DetalleViewModel
 {
+    /// <summary>El volumen elegido dura toda la sesión (no se vuelve a poner al abrir otra ficha).</summary>
+    private static double _volumenMusicaSesion = 0.8;
+
     private readonly IAnimeThemesService? _animeThemesService;
     private readonly IAnimeThemesDownloadService? _animeThemesDownload;
-    private MediaPlayer? _reproductorPreview;
-    private TemaAnimeItem? _temaEnReproduccion;
+    private readonly IAudioTrackPlayer? _audioTrackPlayerInyectado;
+    private readonly IAudioDurationService? _audioDuration;
+    private ControlReproduccionTemas? _controlMusica;
+    private CancellationTokenSource _ctsMusica = new();
+    private CancellationTokenSource? _ctsGuardadoAjustesMusica;
+    private bool _ajustesMusicaPendientes;
+    private bool _aplicandoAjustesMusicaGuardados;
+
+    /// <summary>Espera tras el último cambio de volumen antes de escribir settings.json (cada guardado reescribe el archivo entero).
+    /// Ajustable solo en pruebas.</summary>
+    internal TimeSpan RetrasoGuardadoAjustesMusica { get; set; } = TimeSpan.FromMilliseconds(500);
+
+    /// <summary>Última lectura de duraciones en curso (para que las pruebas puedan esperarla).</summary>
+    internal Task CargaDuracionesTarea { get; private set; } = Task.CompletedTask;
 
     public ObservableCollection<TemaAnimeItem> TemasMusicales { get; } = [];
 
     [ObservableProperty] private bool _cargandoTemasMusicales;
     [ObservableProperty] private bool _mostrandoPanelMusica;
 
+    /// <summary>Volumen de la música de la ficha, de 0 a 1.</summary>
+    [ObservableProperty] private double _volumenMusica = _volumenMusicaSesion;
+
+    /// <summary>Al terminar un tema, pasa solo al siguiente que se pueda escuchar (guardado o con vista previa).</summary>
+    [ObservableProperty] private bool _reproduccionContinuaMusica = true;
+
     public bool TieneTemasMusicales => TemasMusicales.Count > 0;
+
+    /// <summary>Controlador de reproducción (se crea al primer uso: abrir una ficha no debe crear un reproductor).</summary>
+    internal ControlReproduccionTemas ControlMusica => _controlMusica ??= CrearControlMusica();
+
+    private ControlReproduccionTemas CrearControlMusica()
+    {
+        var control = new ControlReproduccionTemas(_audioTrackPlayerInyectado ?? new AudioTrackPlayer()) { Volumen = VolumenMusica };
+        control.FalloReproduccion += (_, tema) => _dialogService.MostrarToast(
+            LocalizationService.T("Det_MusicaErrorReproducirTitulo"),
+            string.Format(LocalizationService.T("Det_MusicaErrorReproducirMsjFormato"), tema.TituloCancion),
+            "AlertCircleOutline", "#EF4444");
+        control.PistaTerminada += (_, tema) => AlTerminarPistaMusica(tema);
+        return control;
+    }
+
+    partial void OnVolumenMusicaChanged(double value)
+    {
+        _volumenMusicaSesion = Math.Clamp(value, 0, 1);
+        if (_controlMusica != null) _controlMusica.Volumen = value;
+        if (!_aplicandoAjustesMusicaGuardados) ProgramarGuardadoAjustesMusica(conRetraso: true);
+    }
+
+    partial void OnReproduccionContinuaMusicaChanged(bool value)
+    {
+        if (!_aplicandoAjustesMusicaGuardados) ProgramarGuardadoAjustesMusica(conRetraso: false);
+    }
+
+    /// <summary>Lee los ajustes guardados de la música (volumen y reproducción continua). Sin servicio de ajustes se usan los de la sesión.</summary>
+    private void CargarAjustesMusica()
+    {
+        var config = _settingsService?.ObtenerConfiguracion();
+        if (config == null) return;
+
+        // Aplicar lo guardado no es un cambio del usuario: no debe volver a escribir el archivo.
+        _aplicandoAjustesMusicaGuardados = true;
+        try
+        {
+            VolumenMusica = double.IsFinite(config.VolumenMusica) ? Math.Clamp(config.VolumenMusica, 0, 1) : VolumenMusica;
+            ReproduccionContinuaMusica = config.ReproduccionContinuaMusica;
+        }
+        finally
+        {
+            _aplicandoAjustesMusicaGuardados = false;
+        }
+    }
+
+    /// <summary>
+    /// Guarda el volumen y la reproducción continua en settings.json. El volumen se guarda al dejar de mover el slider
+    /// (no en cada paso: cada guardado reescribe todo el archivo y avisa a quien escucha los cambios de configuración).
+    /// </summary>
+    private void ProgramarGuardadoAjustesMusica(bool conRetraso)
+    {
+        if (_settingsService == null) return;
+
+        _ajustesMusicaPendientes = true;
+        _ctsGuardadoAjustesMusica?.Cancel();
+        _ctsGuardadoAjustesMusica?.Dispose();
+        _ctsGuardadoAjustesMusica = new CancellationTokenSource();
+
+        _ = GuardarAjustesMusicaTrasRetrasoAsync(conRetraso ? RetrasoGuardadoAjustesMusica : TimeSpan.Zero, _ctsGuardadoAjustesMusica.Token);
+    }
+
+    private async Task GuardarAjustesMusicaTrasRetrasoAsync(TimeSpan retraso, CancellationToken ct)
+    {
+        try
+        {
+            if (retraso > TimeSpan.Zero) await Task.Delay(retraso, ct);
+            await GuardarAjustesMusicaAsync();
+        }
+        catch (OperationCanceledException)
+        {
+            // Llegó otro cambio: el guardado pendiente lo hará ese.
+        }
+    }
+
+    /// <summary>Escribe ya lo pendiente (si hay algo). También al salir de la ficha, para no perder un cambio reciente.</summary>
+    internal async Task GuardarAjustesMusicaAsync()
+    {
+        var servicio = _settingsService;
+        if (servicio == null || !_ajustesMusicaPendientes) return;
+        _ajustesMusicaPendientes = false;
+
+        try
+        {
+            var config = servicio.ObtenerConfiguracion();
+            if (config == null) return;
+
+            config.VolumenMusica = Math.Clamp(VolumenMusica, 0, 1);
+            config.ReproduccionContinuaMusica = ReproduccionContinuaMusica;
+            await servicio.GuardarConfiguracionAsync(config);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("DetalleViewModel", $"No se pudieron guardar los ajustes de música: {ex.Message}");
+        }
+    }
+
+    private void GuardarAjustesMusicaPendientesYa()
+    {
+        _ctsGuardadoAjustesMusica?.Cancel();
+        _ = GuardarAjustesMusicaAsync();
+    }
 
     [RelayCommand]
     private void ToggleMusica() => MostrandoPanelMusica = !MostrandoPanelMusica;
+
+    [RelayCommand]
+    private void AlternarReproduccionContinuaMusica() => ReproduccionContinuaMusica = !ReproduccionContinuaMusica;
 
     internal async Task CargarTemasMusicalesAsync(CancellationToken cancellationToken = default)
     {
@@ -69,9 +177,12 @@ public partial class DetalleViewModel
             {
                 var item = new TemaAnimeItem { Info = tema };
                 item.Descargado = descargas.EstaDescargado(anime.AniListId, tema);
+                // Una vista previa ya preparada (p. ej. al volver a la ficha) se puede escuchar sin bajarla otra vez.
+                item.VistaPreviaLista = !item.Descargado && descargas.ObtenerRutaVistaPrevia(anime.AniListId, tema) != null;
                 TemasMusicales.Add(item);
             }
             OnPropertyChanged(nameof(TieneTemasMusicales));
+            CargaDuracionesTarea = LeerDuracionesAsync(TemasMusicales.ToList(), anime.AniListId, _ctsMusica.Token);
         }
         catch (Exception ex)
         {
@@ -83,18 +194,72 @@ public partial class DetalleViewModel
         }
     }
 
+    /// <summary>"Escuchar antes de descargar": prepara la canción completa en la caché temporal y la reproduce.</summary>
+    [RelayCommand]
+    private async Task PrevisualizarTemaAsync(TemaAnimeItem? tema)
+    {
+        var servicio = _animeThemesDownload;
+        var anime = AnimeSeleccionado;
+        if (tema == null || servicio == null || anime == null) return;
+        if (tema.Descargado || tema.Descargando || tema.PreparandoVistaPrevia) return;
+
+        if (tema.VistaPreviaLista)
+        {
+            ReproducirTema(tema);
+            return;
+        }
+
+        var ct = _ctsMusica.Token;
+        tema.ProgresoPreparacion = 0;
+        tema.PreparandoVistaPrevia = true;
+        try
+        {
+            var progreso = new Progress<double>(p => tema.ProgresoPreparacion = p);
+            string? ruta = await servicio.PrepararVistaPreviaAsync(anime.AniListId, tema.Info, progreso, ct);
+
+            // Si se cambió de ficha (o se cerró) mientras se preparaba, no se arranca sonido de un anime que ya no está en pantalla.
+            if (ct.IsCancellationRequested || !ReferenceEquals(anime, AnimeSeleccionado)) return;
+
+            tema.VistaPreviaLista = ruta != null;
+            if (ruta == null)
+            {
+                _dialogService.MostrarToast(
+                    LocalizationService.T("Det_MusicaErrorPrevistaTitulo"),
+                    string.Format(LocalizationService.T("Det_MusicaErrorPrevistaMsjFormato"), tema.TituloCancion),
+                    "AlertCircleOutline", "#EF4444");
+                return;
+            }
+
+            _ = LeerDuracionAsync(tema, anime.AniListId, ct);
+            ControlMusica.Alternar(tema, ruta);
+        }
+        finally
+        {
+            tema.PreparandoVistaPrevia = false;
+        }
+    }
+
+    /// <summary>
+    /// Descarga el mp3 a la carpeta de música. Si ya se había escuchado en vista previa, solo mueve ese archivo
+    /// (instantáneo, sin bajar nada de nuevo, y sin cortar lo que esté sonando).
+    /// </summary>
     [RelayCommand]
     private async Task DescargarTemaAsync(TemaAnimeItem? tema)
     {
-        if (tema == null || tema.Descargando || _animeThemesDownload == null) return;
+        if (tema == null || tema.Descargando || tema.PreparandoVistaPrevia || _animeThemesDownload == null) return;
         var anime = AnimeSeleccionado;
         if (anime == null) return;
 
+        if (tema.VistaPreviaLista && GuardarVistaPrevia(tema, anime.AniListId)) return;
+
+        tema.ProgresoDescarga = 0;
         tema.Descargando = true;
         try
         {
-            string? ruta = await _animeThemesDownload.DescargarYConvertirAsync(anime.AniListId, tema.Info);
+            var progreso = new Progress<double>(p => tema.ProgresoDescarga = p);
+            string? ruta = await _animeThemesDownload.DescargarYConvertirAsync(anime.AniListId, tema.Info, progreso, CancellationToken.None);
             tema.Descargado = ruta != null;
+            if (ruta != null) _ = LeerDuracionAsync(tema, anime.AniListId, _ctsMusica.Token);
             if (ruta == null)
             {
                 _dialogService.MostrarToast(
@@ -109,47 +274,49 @@ public partial class DetalleViewModel
         }
     }
 
+    /// <summary>Convierte la vista previa en descarga moviendo el archivo. False si no se pudo (entonces se descarga normalmente).</summary>
+    private bool GuardarVistaPrevia(TemaAnimeItem tema, int aniListId)
+    {
+        var servicio = _animeThemesDownload!;
+        bool guardado = false;
+
+        ControlMusica.ConservandoPosicion(tema, () =>
+        {
+            guardado = servicio.GuardarVistaPrevia(aniListId, tema.Info);
+            return guardado ? servicio.ObtenerRutaLocalEsperada(aniListId, tema.Info) : null;
+        });
+
+        if (!guardado) return false;
+
+        tema.Descargado = true;
+        tema.VistaPreviaLista = false;
+        return true;
+    }
+
     [RelayCommand]
     private void ReproducirTema(TemaAnimeItem? tema)
     {
         var anime = AnimeSeleccionado;
-        if (tema == null || anime == null || !tema.Descargado || _animeThemesDownload == null) return;
+        if (tema == null || anime == null || !tema.PuedeReproducir || _animeThemesDownload == null) return;
 
-        // Un solo preview a la vez: si ya sonaba este, actúa como Pausa/Play; si sonaba otro, lo corta.
-        if (ReferenceEquals(_temaEnReproduccion, tema) && tema.Reproduciendo)
-        {
-            _reproductorPreview?.Pause();
-            tema.Reproduciendo = false;
-            return;
-        }
-
-        if (_temaEnReproduccion != null)
-        {
-            _temaEnReproduccion.Reproduciendo = false;
-        }
-
-        string ruta = _animeThemesDownload.ObtenerRutaLocalEsperada(anime.AniListId, tema.Info);
+        string? ruta = RutaDeTema(tema, anime.AniListId);
+        if (ruta == null) return;
 
         try
         {
-            if (_reproductorPreview == null)
-            {
-                _reproductorPreview = new MediaPlayer();
-                _reproductorPreview.MediaEnded += (_, _) =>
-                {
-                    if (_temaEnReproduccion != null) _temaEnReproduccion.Reproduciendo = false;
-                };
-            }
-
-            _reproductorPreview.Open(new Uri(ruta, UriKind.Absolute));
-            _reproductorPreview.Play();
-            _temaEnReproduccion = tema;
-            tema.Reproduciendo = true;
+            ControlMusica.Alternar(tema, ruta);
         }
         catch (Exception ex)
         {
             AppLogger.Debug("DetalleViewModel", $"No se pudo reproducir '{tema.Slug}': {ex.Message}");
         }
+    }
+
+    /// <summary>Salto desde la barra de progreso (segundos). Solo vale para la pista que está cargada.</summary>
+    internal void BuscarTema(TemaAnimeItem? tema, double segundos)
+    {
+        if (tema == null || _controlMusica == null) return;
+        _controlMusica.Buscar(tema, segundos);
     }
 
     [RelayCommand]
@@ -158,24 +325,105 @@ public partial class DetalleViewModel
         var anime = AnimeSeleccionado;
         if (tema == null || anime == null || _animeThemesDownload == null) return;
 
-        if (ReferenceEquals(_temaEnReproduccion, tema))
-        {
-            _reproductorPreview?.Stop();
-            tema.Reproduciendo = false;
-            _temaEnReproduccion = null;
-        }
+        // Suelta el archivo antes de borrarlo: Windows no deja borrar uno que el reproductor tiene abierto.
+        if (ReferenceEquals(_controlMusica?.Actual, tema)) _controlMusica!.Detener();
 
         _animeThemesDownload.Eliminar(anime.AniListId, tema.Info);
         tema.Descargado = false;
+        tema.DuracionArchivoSegundos = 0;
     }
 
-    /// <summary>Estado limpio al cargar otro anime: corta cualquier preview en curso.</summary>
+    /// <summary>El archivo que suena para este tema: el guardado, o si no la vista previa. Null si no hay ninguno.</summary>
+    private string? RutaDeTema(TemaAnimeItem tema, int aniListId)
+    {
+        var descargas = _animeThemesDownload;
+        if (descargas == null) return null;
+
+        return tema.Descargado
+            ? descargas.ObtenerRutaLocalEsperada(aniListId, tema.Info)
+            : descargas.ObtenerRutaVistaPrevia(aniListId, tema.Info);
+    }
+
+    /// <summary>Lee la duración de los temas que ya tienen archivo, para mostrarla antes de reproducir. En segundo plano y de uno en uno.</summary>
+    private async Task LeerDuracionesAsync(System.Collections.Generic.IReadOnlyList<TemaAnimeItem> temas, int aniListId, CancellationToken ct)
+    {
+        foreach (var tema in temas)
+        {
+            if (ct.IsCancellationRequested) return;
+            if (tema.PuedeReproducir) await LeerDuracionAsync(tema, aniListId, ct);
+        }
+    }
+
+    private async Task LeerDuracionAsync(TemaAnimeItem tema, int aniListId, CancellationToken ct)
+    {
+        var servicio = _audioDuration;
+        if (servicio == null) return;
+
+        try
+        {
+            string? ruta = RutaDeTema(tema, aniListId);
+            if (ruta == null) return;
+
+            var duracion = await servicio.ObtenerDuracionAsync(ruta, ct);
+            if (duracion is { } d && !ct.IsCancellationRequested) tema.DuracionArchivoSegundos = d.TotalSeconds;
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("DetalleViewModel", $"No se pudo leer la duración de '{tema.Slug}': {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Reproducción continua: al terminar un tema pasa al siguiente de la lista que se pueda escuchar (guardado o con vista
+    /// previa), saltándose los que aún no tienen archivo. Al llegar al final se detiene. No baja nada por su cuenta.
+    /// </summary>
+    private void AlTerminarPistaMusica(TemaAnimeItem terminado)
+    {
+        if (!ReproduccionContinuaMusica) return;
+
+        int indice = TemasMusicales.IndexOf(terminado);
+        if (indice < 0) return;
+
+        for (int i = indice + 1; i < TemasMusicales.Count; i++)
+        {
+            var siguiente = TemasMusicales[i];
+            if (!siguiente.PuedeReproducir) continue;
+
+            // Se aplaza un instante: el reproductor está en mitad de su evento de "terminó" y no debe cerrarse desde dentro.
+            var dispatcher = System.Windows.Application.Current?.Dispatcher;
+            if (dispatcher != null && dispatcher.CheckAccess())
+                dispatcher.BeginInvoke(new Action(() => ReproducirTema(siguiente)), System.Windows.Threading.DispatcherPriority.Background);
+            else
+                ReproducirTema(siguiente);
+            return;
+        }
+    }
+
+    /// <summary>Estado limpio al cargar otro anime: corta el sonido y cancela lo que se estuviera preparando.</summary>
     private void ReiniciarMusica()
     {
-        _reproductorPreview?.Stop();
-        _temaEnReproduccion = null;
+        _ctsMusica.Cancel();
+        _ctsMusica.Dispose();
+        _ctsMusica = new CancellationTokenSource();
+
+        _controlMusica?.Detener();
         TemasMusicales.Clear();
         MostrandoPanelMusica = false;
         OnPropertyChanged(nameof(TieneTemasMusicales));
+    }
+
+    /// <summary>Corta el sonido sin tocar la lista (al salir de la ficha hacia otra pestaña).</summary>
+    public void DetenerMusica()
+    {
+        _controlMusica?.Detener();
+        GuardarAjustesMusicaPendientesYa();
+    }
+
+    private void LiberarMusica()
+    {
+        GuardarAjustesMusicaPendientesYa();
+        _ctsMusica.Cancel();
+        _ctsMusica.Dispose();
+        _controlMusica?.Dispose();
     }
 }

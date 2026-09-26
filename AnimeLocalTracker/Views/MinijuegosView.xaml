@@ -1,0 +1,120 @@
+<UserControl x:Class="AnimeLocalTracker.Views.MinijuegosView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+             xmlns:loc="clr-namespace:AnimeLocalTracker.Services"
+             xmlns:vm="clr-namespace:AnimeLocalTracker.ViewModels"
+             xmlns:views="clr-namespace:AnimeLocalTracker.Views"
+             TextElement.Foreground="{DynamicResource MaterialDesignBody}"
+             Background="Transparent">
+
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="MinijuegosEstilos.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+
+            <!-- Cada juego se dibuja con su propia vista al abrirlo -->
+            <DataTemplate DataType="{x:Type vm:AdivinaAnimeViewModel}">
+                <views:AdivinaAnimeView/>
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:AdivinaOpEdViewModel}">
+                <views:AdivinaOpEdView/>
+            </DataTemplate>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <Grid MaxWidth="1280" Style="{StaticResource AppPageRoot}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>  <!-- 0: encabezado -->
+            <RowDefinition Height="*"/>     <!-- 1: menú o juego abierto -->
+        </Grid.RowDefinitions>
+
+        <!-- ═══ FILA 0: ENCABEZADO ═══ -->
+        <Grid Grid.Row="0" Margin="0,0,0,18">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <Border Background="{DynamicResource Brush.Surface3}" CornerRadius="12" Width="48" Height="48" Margin="0,0,14,0" VerticalAlignment="Center">
+                    <materialDesign:PackIcon Kind="GamepadVariantOutline" Foreground="{DynamicResource Brush.Accent}" Width="26" Height="26" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="{Binding [Mini_Titulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.PageTitle}"/>
+                    <TextBlock Text="{Binding [Mini_Subtitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.Caption}" Margin="0,3,0,0"/>
+                </StackPanel>
+            </StackPanel>
+
+            <!-- Volver al menú: solo con un juego abierto -->
+            <Button Grid.Column="1" Command="{Binding VolverAlMenuCommand}" Style="{StaticResource MiniBotonSecundario}" VerticalAlignment="Center"
+                    Visibility="{Binding EnMenu, Converter={StaticResource InverseBoolToVis}}"
+                    AutomationProperties.Name="{Binding [Mini_VolverAlMenu], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                <StackPanel Orientation="Horizontal">
+                    <materialDesign:PackIcon Kind="ArrowLeft" Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding [Mini_VolverAlMenu], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" VerticalAlignment="Center"/>
+                </StackPanel>
+            </Button>
+        </Grid>
+
+        <!-- ═══ FILA 1: MENÚ / JUEGO ═══ -->
+        <Grid Grid.Row="1">
+
+            <!-- Menú: una tarjeta por juego. UniformGrid las iguala en alto y el botón "Jugar" va anclado abajo, así
+                 quedan alineados aunque las descripciones midan distinto. -->
+            <UniformGrid Columns="2" Rows="1" HorizontalAlignment="Left" VerticalAlignment="Top" MaxWidth="740"
+                         Visibility="{Binding EnMenu, Converter={StaticResource BoolToVis}}">
+                <Border Style="{StaticResource AppCard}" Padding="24,22" Margin="0,0,16,16">
+                    <DockPanel LastChildFill="True">
+                        <Button DockPanel.Dock="Bottom" Command="{Binding AbrirAdivinaAnimeCommand}" Style="{StaticResource MiniBotonPrincipal}" HorizontalAlignment="Left" Margin="0,18,0,0"
+                                AutomationProperties.Name="{Binding [Mini_AdivinaTitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                            <StackPanel Orientation="Horizontal">
+                                <materialDesign:PackIcon Kind="Play" Width="20" Height="20" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding [Mini_Jugar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <StackPanel>
+                            <Border Background="{DynamicResource Brush.Surface3}" CornerRadius="26" Width="52" Height="52" Margin="0,0,0,14" HorizontalAlignment="Left">
+                                <materialDesign:PackIcon Kind="HelpCircleOutline" Foreground="{DynamicResource Brush.Accent}" Width="28" Height="28" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Text="{Binding [Mini_AdivinaTitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.Section}"/>
+                            <TextBlock Text="{Binding [Mini_AdivinaDesc], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.Secondary}"
+                                       TextWrapping="Wrap" Margin="0,8,0,0"/>
+                            <TextBlock Text="{Binding AdivinaAnime.RecordTexto}" Style="{StaticResource AppText.Micro}" Foreground="{DynamicResource Brush.Warning}"
+                                       TextWrapping="Wrap" Margin="0,10,0,0"
+                                       Visibility="{Binding AdivinaAnime.HayRecord, Converter={StaticResource BoolToVis}}"/>
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+
+                <Border Style="{StaticResource AppCard}" Padding="24,22" Margin="0,0,16,16">
+                    <DockPanel LastChildFill="True">
+                        <Button DockPanel.Dock="Bottom" Command="{Binding AbrirAdivinaOpEdCommand}" Style="{StaticResource MiniBotonPrincipal}" HorizontalAlignment="Left" Margin="0,18,0,0"
+                                AutomationProperties.Name="{Binding [Mini_OpEdTitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                            <StackPanel Orientation="Horizontal">
+                                <materialDesign:PackIcon Kind="Play" Width="20" Height="20" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding [Mini_Jugar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <StackPanel>
+                            <Border Background="{DynamicResource Brush.Surface3}" CornerRadius="26" Width="52" Height="52" Margin="0,0,0,14" HorizontalAlignment="Left">
+                                <materialDesign:PackIcon Kind="MusicNote" Foreground="{DynamicResource Brush.Accent}" Width="28" Height="28" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Text="{Binding [Mini_OpEdTitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.Section}"/>
+                            <TextBlock Text="{Binding [Mini_OpEdDesc], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.Secondary}"
+                                       TextWrapping="Wrap" Margin="0,8,0,0"/>
+                            <TextBlock Text="{Binding AdivinaOpEd.RecordTexto}" Style="{StaticResource AppText.Micro}" Foreground="{DynamicResource Brush.Warning}"
+                                       TextWrapping="Wrap" Margin="0,10,0,0"
+                                       Visibility="{Binding AdivinaOpEd.HayRecord, Converter={StaticResource BoolToVis}}"/>
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+            </UniformGrid>
+
+            <!-- Juego abierto -->
+            <ContentControl Content="{Binding JuegoActivo}" Focusable="False"
+                            Visibility="{Binding EnMenu, Converter={StaticResource InverseBoolToVis}}"/>
+        </Grid>
+    </Grid>
+</UserControl>

@@ -53,8 +53,19 @@ public sealed class AnimeThemeSongDto
     [JsonPropertyName("title")]
     public string? Title { get; set; }
 
+    // Forma antigua de la API. Desde sept-2026 "song.artists" responde HTTP 500: los artistas
+    // vienen en "performances[].artist". Se conserva por si la API vuelve a exponerlo.
     [JsonPropertyName("artists")]
     public List<AnimeThemeArtistDto> Artists { get; set; } = new();
+
+    [JsonPropertyName("performances")]
+    public List<AnimeThemePerformanceDto> Performances { get; set; } = new();
+}
+
+public sealed class AnimeThemePerformanceDto
+{
+    [JsonPropertyName("artist")]
+    public AnimeThemeArtistDto? Artist { get; set; }
 }
 
 public sealed class AnimeThemeArtistDto

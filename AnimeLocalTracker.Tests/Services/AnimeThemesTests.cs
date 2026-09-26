@@ -204,4 +204,178 @@ public class AnimeThemesTests
         tema.RangoEpisodios.Should().Be("2-4, 7-12");
         tema.AudioUrlOgg.Should().Be("https://a.animethemes.moe/YoujoSenki-OP1.ogg");
     }
+
+    /// <summary>
+    /// JSON real capturado el 2026-09-26: "song.artists" responde HTTP 500, los artistas llegan por
+    /// "song.performances[].artist". Si se rompe este mapeo, el OP/ED se muestra sin cantante.
+    /// </summary>
+    [Fact]
+    public void AnimeThemesAnimeResponse_ArtistasVienenDePerformances()
+    {
+        const string json = """
+        {"anime":{"id":2611,"name":"Shingeki no Kyojin","slug":"shingeki_no_kyojin","animethemes":[
+            {"id":1,"slug":"OP1","type":"OP",
+             "song":{"id":5279,"title":"Guren no Yumiya","performances":[
+                 {"id":2162,"alias":null,"as":null,"relevance":1,
+                  "artist":{"id":121,"name":"Linked Horizon","slug":"linked_horizon","information":null}}]},
+             "animethemeentries":[{"id":2,"episodes":"1-13","spoiler":false,"version":1,
+                 "videos":[{"id":3,"basename":"ShingekiNoKyojin-OP1.webm",
+                     "audio":{"id":4,"basename":"ShingekiNoKyojin-OP1.ogg","link":"https:\/\/a.animethemes.moe\/ShingekiNoKyojin-OP1.ogg"}}]}]}
+        ]}}
+        """;
+
+        var dto = JsonSerializer.Deserialize<AnimeThemesAnimeResponse>(json, JsonOptions);
+        var temas = AnimeThemesService.MapearTemas(dto?.Anime);
+
+        temas.Should().ContainSingle();
+        temas[0].TituloCancion.Should().Be("Guren no Yumiya");
+        temas[0].Artistas.Should().Be("Linked Horizon");
+    }
+
+    /// <summary>JSON real (26-sep-2026) de Grand Blue S3: el primer "resource" viene sin anime y el segundo sí.</summary>
+    [Fact]
+    public void ExtraerSlugs_ConPrimerResourceVacio_DeberiaEncontrarElAnimeDelSegundo()
+    {
+        const string json = """
+        {"resources":[
+          {"id":1,"external_id":199111,"site":"AniList","anime":[]},
+          {"id":2,"external_id":199111,"site":"AniList",
+           "anime":[{"id":9,"name":"Grand Blue Season 3","slug":"grand_blue_season_3","year":2026,"season":"Summer"}]}
+        ]}
+        """;
+
+        var dto = JsonSerializer.Deserialize<AnimeThemesResourceResponse>(json, JsonOptions);
+
+        AnimeThemesService.ExtraerSlugs(dto).Should().Equal("grand_blue_season_3");
+    }
+
+    /// <summary>JSON real (26-sep-2026) de Re:Zero OVAs: dos "resources", cada uno con un OVA distinto.</summary>
+    [Fact]
+    public void ExtraerSlugs_ConVariosResources_DeberiaDevolverTodosLosAnimesSinDuplicarEnOrden()
+    {
+        const string json = """
+        {"resources":[
+          {"id":1,"external_id":100049,"site":"AniList","anime":[
+            {"slug":"rezero_kara_hajimeru_isekai_seikatsu_memory_snow","name":"Memory Snow"}]},
+          {"id":2,"external_id":100049,"site":"AniList","anime":[
+            {"slug":"rezero_kara_hajimeru_isekai_seikatsu_hyouketsu_no_kizuna","name":"Hyouketsu no Kizuna"},
+            {"slug":"rezero_kara_hajimeru_isekai_seikatsu_memory_snow","name":"Memory Snow"}]}
+        ]}
+        """;
+
+        var dto = JsonSerializer.Deserialize<AnimeThemesResourceResponse>(json, JsonOptions);
+
+        AnimeThemesService.ExtraerSlugs(dto).Should().Equal(
+            "rezero_kara_hajimeru_isekai_seikatsu_memory_snow",
+            "rezero_kara_hajimeru_isekai_seikatsu_hyouketsu_no_kizuna");
+    }
+
+    [Fact]
+    public void ExtraerSlugs_SinResourcesOSinAnimes_DeberiaDevolverVacio()
+    {
+        AnimeThemesService.ExtraerSlugs(null).Should().BeEmpty();
+        AnimeThemesService.ExtraerSlugs(new AnimeThemesResourceResponse()).Should().BeEmpty();
+    }
+
+    /// <summary>
+    /// Los dos OVAs de Re:Zero tienen un "ED1" versión 1 para todos los episodios: sin sufijo compartirían
+    /// nombre de archivo local (descargar uno marcaría el otro como descargado y lo pisaría).
+    /// </summary>
+    [Fact]
+    public void MapearVarios_ConMismoSlugEnDosAnimes_DeberiaGenerarArchivosLocalesDistintos()
+    {
+        static AnimeThemesAnimeDto Ovas(string cancion, string audio) => new()
+        {
+            AnimeThemes = new List<AnimeThemeDto>
+            {
+                new()
+                {
+                    Slug = "ED1",
+                    Type = "ED",
+                    Song = new AnimeThemeSongDto { Title = cancion },
+                    AnimeThemeEntries = new List<AnimeThemeEntryDto>
+                    {
+                        new()
+                        {
+                            Version = 1,
+                            Videos = new List<AnimeThemeVideoDto> { new() { Audio = new AnimeThemeAudioDto { Link = audio } } }
+                        }
+                    }
+                }
+            }
+        };
+
+        var temas = AnimeThemesService.MapearVarios(new[]
+        {
+            Ovas("White White Snow", "https://a.animethemes.moe/MemorySnow-ED1.ogg"),
+            Ovas("Yuki no Hate ni Kimi no Na wo", "https://a.animethemes.moe/HyouketsuNoKizuna-ED1.ogg")
+        });
+
+        temas.Should().HaveCount(2);
+        temas[0].Slug.Should().Be("ED1", "el primer anime conserva su slug para no invalidar mp3 ya descargados");
+        temas[1].Slug.Should().Be("ED1-2");
+        temas.Select(t => t.NombreArchivoLocal()).Should().OnlyHaveUniqueItems();
+        temas.Select(t => t.TituloCancion).Should().Equal("White White Snow", "Yuki no Hate ni Kimi no Na wo");
+    }
+
+    [Fact]
+    public void MapearVarios_ConUnSoloAnime_NoDeberiaAlterarLosSlugs()
+    {
+        var anime = new AnimeThemesAnimeDto
+        {
+            AnimeThemes = new List<AnimeThemeDto>
+            {
+                new()
+                {
+                    Slug = "OP1", Type = "OP", Song = new AnimeThemeSongDto { Title = "X" },
+                    AnimeThemeEntries = new List<AnimeThemeEntryDto>
+                    {
+                        new() { Videos = new List<AnimeThemeVideoDto> { new() { Audio = new AnimeThemeAudioDto { Link = "https://a.animethemes.moe/x.ogg" } } } }
+                    }
+                }
+            }
+        };
+
+        AnimeThemesService.MapearVarios(new[] { anime }).Should().ContainSingle().Which.Slug.Should().Be("OP1");
+    }
+
+    [Fact]
+    public void MapearTemas_ConVariosArtistasYRepetidos_DeberiaUnirlosSinDuplicar()
+    {
+        var anime = new AnimeThemesAnimeDto
+        {
+            AnimeThemes = new List<AnimeThemeDto>
+            {
+                new()
+                {
+                    Slug = "ED1",
+                    Type = "ED",
+                    Song = new AnimeThemeSongDto
+                    {
+                        Title = "Duo",
+                        Performances = new List<AnimeThemePerformanceDto>
+                        {
+                            new() { Artist = new AnimeThemeArtistDto { Name = "Aimer" } },
+                            new() { Artist = new AnimeThemeArtistDto { Name = "milet" } },
+                            new() { Artist = null }
+                        },
+                        Artists = new List<AnimeThemeArtistDto> { new() { Name = "aimer" } }
+                    },
+                    AnimeThemeEntries = new List<AnimeThemeEntryDto>
+                    {
+                        new()
+                        {
+                            Videos = new List<AnimeThemeVideoDto>
+                            {
+                                new() { Audio = new AnimeThemeAudioDto { Link = "https://a.animethemes.moe/Duo-ED1.ogg" } }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        AnimeThemesService.MapearTemas(anime).Should().ContainSingle()
+            .Which.Artistas.Should().Be("Aimer, milet");
+    }
 }

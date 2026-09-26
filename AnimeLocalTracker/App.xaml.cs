@@ -148,6 +148,7 @@ public partial class App : Application
         services.AddHttpClient<IAnimeThemesService, AnimeThemesService>()
             .AddPolicyHandler(GetRetryPolicy());
         services.AddSingleton<IAnimeThemesDownloadService, AnimeThemesDownloadService>();
+        services.AddSingleton<IAudioDurationService, AudioDurationService>();
 
         // Lo registramos como Singleton porque queremos que haya una sola conexión a la BD en toda la app
         services.AddSingleton<IDatabaseService, DatabaseService>();
@@ -302,6 +303,13 @@ public partial class App : Application
         services.AddSingleton<EstadisticasViewModel>();
         services.AddSingleton<LogrosViewModel>();
 
+        // Minijuegos (singleton: una partida en curso sobrevive al cambiar de pestaña)
+        services.AddSingleton<AnimeLocalTracker.Services.Minijuegos.IClipPlayer, AnimeLocalTracker.Services.Minijuegos.ClipPlayer>();
+        services.AddSingleton<AnimeLocalTracker.Services.Minijuegos.IMinijuegosRecordsService, AnimeLocalTracker.Services.Minijuegos.MinijuegosRecordsService>();
+        services.AddSingleton<AdivinaAnimeViewModel>();
+        services.AddSingleton<AdivinaOpEdViewModel>();
+        services.AddSingleton<MinijuegosViewModel>();
+
         // Historial de reproducción
         services.AddSingleton<HistorialViewModel>();
 
@@ -408,6 +416,11 @@ public partial class App : Application
             // BAK-02: se dispara en segundo plano para no retrasar la aparición de la
             // ventana; DatabaseService captura y registra sus propios errores.
             _ = dbService.CrearBackupRotativoAsync();
+
+            // Las vistas previas de música (openings/endings escuchados sin guardar) son temporales: se vacían al arrancar.
+            // En segundo plano y antes de que nadie pueda pedir una nueva (aún no hay ficha abierta).
+            var descargasMusica = ServiceProvider.GetRequiredService<IAnimeThemesDownloadService>();
+            _ = System.Threading.Tasks.Task.Run(descargasMusica.LimpiarVistasPrevias);
 
             // Iniciar sincronización periódica en segundo plano.
             // FUN-005: el intervalo es el configurado (ya no 5 min fijos) y se reinicia al guardar.

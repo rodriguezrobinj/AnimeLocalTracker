@@ -223,6 +223,9 @@ public partial class MainViewModel : ObservableObject,
     [RelayCommand]
     private void NavegarLogros() => WeakReferenceMessenger.Default.Send(new NavegarMensaje_Logros());
 
+    [RelayCommand]
+    private void NavegarMinijuegos() => WeakReferenceMessenger.Default.Send(new NavegarMensaje_Minijuegos());
+
     /// <summary>
     /// Avisos y diálogos que otros ViewModels piden por mensaje (reproductor: "Episodio marcado como visto",
     /// AniSkip, reanudar…; calendario). El receptor se perdió en el refactor de IDialogService y esos avisos

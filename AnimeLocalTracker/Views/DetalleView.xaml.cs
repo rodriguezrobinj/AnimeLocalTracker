@@ -14,6 +14,12 @@ public partial class DetalleView : UserControl
 {
     private DetalleViewModel? _vmObservado;
 
+    /// <summary>
+    /// Último ViewModel que tuvo esta vista. Al salir de pantalla WPF quita el DataContext heredado ANTES de lanzar Unloaded
+    /// (por eso <c>_vmObservado</c> ya es null ahí): la limpieza de Unloaded (parar la música y el contador) debe usar este.
+    /// </summary>
+    private DetalleViewModel? _ultimoVm;
+
     public DetalleView()
     {
         InitializeComponent();
@@ -21,16 +27,41 @@ public partial class DetalleView : UserControl
         {
             if (_vmObservado != null) _vmObservado.PropertyChanged -= Vm_PropertyChanged;
             _vmObservado = DataContext as DetalleViewModel;
+            if (_vmObservado != null) _ultimoVm = _vmObservado;
             if (_vmObservado != null) _vmObservado.PropertyChanged += Vm_PropertyChanged;
         };
         Loaded += (_, _) => (DataContext as DetalleViewModel)?.ReanudarContador();
         Unloaded += (_, _) =>
         {
             // El contador de próximo episodio no debe seguir corriendo con la ficha oculta.
-            _vmObservado?.DetenerContador();
+            _ultimoVm?.DetenerContador();
+            // La música de la ficha no debe seguir sonando en otras pestañas.
+            _ultimoVm?.DetenerMusica();
             if (_vmObservado != null) _vmObservado.PropertyChanged -= Vm_PropertyChanged;
             _vmObservado = null;
         };
+    }
+
+    // === Barra de progreso de la música: ver TemaAnimeItem.Sincronizando/Arrastrando ===
+
+    /// <summary>
+    /// Cualquier cambio de la barra que no venga de la sincronización con el reproductor es del usuario (arrastre, clic en
+    /// la barra o teclado): salta a ese punto ahora mismo, así que arrastrar "escucha" el audio mientras se mueve.
+    /// </summary>
+    private void BarraTema_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (sender is not Slider barra || barra.DataContext is not TemaAnimeItem tema || tema.Sincronizando) return;
+        _vmObservado?.BuscarTema(tema, e.NewValue);
+    }
+
+    private void BarraTema_DragStarted(object sender, DragStartedEventArgs e)
+    {
+        if (sender is Slider { DataContext: TemaAnimeItem tema }) tema.Arrastrando = true;
+    }
+
+    private void BarraTema_DragCompleted(object sender, DragCompletedEventArgs e)
+    {
+        if (sender is Slider { DataContext: TemaAnimeItem tema }) tema.Arrastrando = false;
     }
 
     /// <summary>

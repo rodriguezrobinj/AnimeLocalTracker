@@ -1,0 +1,209 @@
+<UserControl x:Class="AnimeLocalTracker.Views.AdivinaOpEdView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+             xmlns:loc="clr-namespace:AnimeLocalTracker.Services"
+             xmlns:views="clr-namespace:AnimeLocalTracker.Views"
+             TextElement.Foreground="{DynamicResource MaterialDesignBody}"
+             Background="Transparent"
+             Focusable="True"
+             FocusVisualStyle="{x:Null}">
+
+    <!-- Atajos: 1-4 responden, P pide otra pista, R vuelve a escuchar, Enter continúa. -->
+    <UserControl.InputBindings>
+        <KeyBinding Key="D1" Command="{Binding ResponderNumeroCommand}" CommandParameter="1"/>
+        <KeyBinding Key="D2" Command="{Binding ResponderNumeroCommand}" CommandParameter="2"/>
+        <KeyBinding Key="D3" Command="{Binding ResponderNumeroCommand}" CommandParameter="3"/>
+        <KeyBinding Key="D4" Command="{Binding ResponderNumeroCommand}" CommandParameter="4"/>
+        <KeyBinding Key="NumPad1" Command="{Binding ResponderNumeroCommand}" CommandParameter="1"/>
+        <KeyBinding Key="NumPad2" Command="{Binding ResponderNumeroCommand}" CommandParameter="2"/>
+        <KeyBinding Key="NumPad3" Command="{Binding ResponderNumeroCommand}" CommandParameter="3"/>
+        <KeyBinding Key="NumPad4" Command="{Binding ResponderNumeroCommand}" CommandParameter="4"/>
+        <KeyBinding Key="P" Command="{Binding PedirPistaCommand}"/>
+        <KeyBinding Key="R" Command="{Binding EscucharCommand}"/>
+        <KeyBinding Key="Return" Command="{Binding SiguienteCommand}"/>
+    </UserControl.InputBindings>
+
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="MinijuegosEstilos.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <Grid>
+        <!-- Cargando la biblioteca -->
+        <ProgressBar Style="{StaticResource MaterialDesignCircularProgressBar}"
+                     IsIndeterminate="True" Width="44" Height="44" Value="0" Foreground="{DynamicResource Brush.Accent}"
+                     HorizontalAlignment="Center" VerticalAlignment="Center"
+                     Visibility="{Binding EstaCargando, Converter={StaticResource BoolToVis}}"/>
+
+        <!-- Sin animes suficientes -->
+        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,40,0,40"
+                    Visibility="{Binding MostrarSinAnimes, Converter={StaticResource BoolToVis}}">
+            <Border Background="{DynamicResource Brush.Surface3}" CornerRadius="36" Width="72" Height="72" Margin="0,0,0,16" HorizontalAlignment="Center">
+                <materialDesign:PackIcon Kind="MusicNoteOff" Foreground="{DynamicResource Brush.TextTertiary}" Width="36" Height="36" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+            <TextBlock Text="{Binding [Mini_NoHayAnimesTitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppEmptyTitle}"/>
+            <TextBlock Text="{Binding SinAnimesTexto}" Style="{StaticResource AppEmptyText}" Margin="0,6,0,0" MaxWidth="420" TextWrapping="Wrap"/>
+        </StackPanel>
+
+        <!-- Presentación del juego -->
+        <Border Style="{StaticResource AppCard}" MaxWidth="560" Padding="32,28" VerticalAlignment="Top" HorizontalAlignment="Center"
+                Visibility="{Binding MostrarPresentacion, Converter={StaticResource BoolToVis}}">
+            <StackPanel HorizontalAlignment="Center">
+                <Border Background="{DynamicResource Brush.Surface3}" CornerRadius="32" Width="64" Height="64" Margin="0,0,0,16" HorizontalAlignment="Center">
+                    <materialDesign:PackIcon Kind="MusicNote" Foreground="{DynamicResource Brush.Accent}" Width="34" Height="34" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+                <TextBlock Text="{Binding [Mini_OpEdTitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.Section}" HorizontalAlignment="Center"/>
+                <TextBlock Text="{Binding [Mini_OpEdDesc], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.Secondary}"
+                           TextWrapping="Wrap" TextAlignment="Center" Margin="0,10,0,0"/>
+                <TextBlock Text="{Binding RecordTexto}" Style="{StaticResource AppText.Micro}" Foreground="{DynamicResource Brush.Warning}"
+                           HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" Margin="0,12,0,0"
+                           Visibility="{Binding HayRecord, Converter={StaticResource BoolToVis}}"/>
+                <TextBlock Text="{Binding ReglasTexto}" Style="{StaticResource AppText.Micro}" Foreground="{DynamicResource Brush.TextTertiary}"
+                           HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" Margin="0,12,0,22"/>
+
+                <!-- Error de la partida anterior (sin conexión y sin temas descargados, etc.) -->
+                <Border Background="{DynamicResource Brush.Surface2}" BorderBrush="{DynamicResource Brush.Danger}" BorderThickness="1" CornerRadius="10"
+                        Padding="14,10" Margin="0,0,0,18" Visibility="{Binding HayError, Converter={StaticResource BoolToVis}}">
+                    <TextBlock Text="{Binding MensajeError}" Style="{StaticResource AppText.Secondary}" Foreground="{DynamicResource Brush.Danger}" TextWrapping="Wrap"/>
+                </Border>
+
+                <Button Command="{Binding IniciarPartidaCommand}" Style="{StaticResource MiniBotonPrincipal}" HorizontalAlignment="Center"
+                        AutomationProperties.Name="{Binding [Mini_Jugar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon Kind="Play" Width="20" Height="20" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding [Mini_Jugar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Border>
+
+        <!-- Partida en curso -->
+        <Grid Visibility="{Binding EsJugando, Converter={StaticResource BoolToVis}}">
+
+            <!-- Preparando la ronda: consulta a AnimeThemes + descarga del clip la primera vez -->
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,40,0,40"
+                        Visibility="{Binding EstaPreparandoRonda, Converter={StaticResource BoolToVis}}">
+                <ProgressBar Style="{StaticResource MaterialDesignCircularProgressBar}"
+                             IsIndeterminate="True" Width="44" Height="44" Value="0" Foreground="{DynamicResource Brush.Accent}"
+                             HorizontalAlignment="Center"/>
+                <TextBlock Text="{Binding [Mini_OpEd_Preparando], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                           Style="{StaticResource AppText.Secondary}" Margin="0,14,0,0" HorizontalAlignment="Center"/>
+            </StackPanel>
+
+            <ScrollViewer x:Name="ScrollPartida" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,16,0"
+                          Visibility="{Binding MostrarContenidoRonda, Converter={StaticResource BoolToVis}}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Tarjeta de audio: antes de responder, tipo del tema y duración del clip; después, portada y canción -->
+                    <StackPanel Grid.Column="0" Width="230" VerticalAlignment="Top" Margin="0,0,28,0">
+                        <Border Height="345" CornerRadius="14" ClipToBounds="True"
+                                Background="{DynamicResource Brush.Surface2}" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1">
+                            <Grid>
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"
+                                            Visibility="{Binding HaRespondido, Converter={StaticResource InverseBoolToVis}}">
+                                    <materialDesign:PackIcon Width="64" Height="64" HorizontalAlignment="Center">
+                                        <materialDesign:PackIcon.Style>
+                                            <Style TargetType="materialDesign:PackIcon">
+                                                <Setter Property="Kind" Value="MusicNote"/>
+                                                <Setter Property="Foreground" Value="{DynamicResource Brush.TextTertiary}"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding EstaSonando}" Value="True">
+                                                        <Setter Property="Kind" Value="VolumeHigh"/>
+                                                        <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </materialDesign:PackIcon.Style>
+                                    </materialDesign:PackIcon>
+                                    <TextBlock Text="{Binding TipoTemaTexto}" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource Brush.TextPrimary}"
+                                               HorizontalAlignment="Center" Margin="0,14,0,0"/>
+                                    <TextBlock Text="{Binding SegundosClipTexto}" Style="{StaticResource AppText.Caption}" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                                </StackPanel>
+
+                                <Grid Visibility="{Binding HaRespondido, Converter={StaticResource BoolToVis}}">
+                                    <materialDesign:PackIcon Kind="ImageOutline" Foreground="{DynamicResource Brush.TextTertiary}" Width="48" Height="48"
+                                                             HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    <Image Source="{Binding PortadaRespuesta, TargetNullValue={x:Null}, FallbackValue={x:Null}}"
+                                           Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality"/>
+                                    <Border Background="{DynamicResource Brush.Scrim}" VerticalAlignment="Bottom" Padding="12,10">
+                                        <TextBlock Text="{Binding TemaReveladoTexto}" Foreground="White" FontSize="13" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                    </Border>
+                                </Grid>
+                            </Grid>
+                        </Border>
+
+                        <Button Command="{Binding EscucharCommand}" Style="{StaticResource MiniBotonSecundario}" Margin="0,12,0,0"
+                                AutomationProperties.Name="{Binding [Mini_OpEd_Escuchar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <materialDesign:PackIcon Kind="Replay" Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding [Mini_OpEd_Escuchar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" MaxWidth="760" HorizontalAlignment="Left">
+
+                        <!-- Ronda y puntos -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
+                            <Border Style="{StaticResource AppBadge}" Margin="0,0,8,0">
+                                <TextBlock Text="{Binding RondaTexto}" Style="{StaticResource AppText.Micro}" VerticalAlignment="Center"/>
+                            </Border>
+                            <Border Style="{StaticResource AppBadge}" Background="{DynamicResource Brush.WarningTint}">
+                                <TextBlock Text="{Binding PuntosTexto}" Style="{StaticResource AppText.Micro}" Foreground="{DynamicResource Brush.Warning}" VerticalAlignment="Center"/>
+                            </Border>
+                        </StackPanel>
+
+                        <!-- Pistas de texto reveladas (las de "más audio" alargan el clip, no añaden tarjeta) -->
+                        <ItemsControl ItemsSource="{Binding Pistas}" Margin="0,0,0,10">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Style="{StaticResource AppCard}" Margin="0,0,0,6" Padding="14,8">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <materialDesign:PackIcon Kind="{Binding Icono}" Foreground="{DynamicResource Brush.Accent}" Width="20" Height="20"
+                                                                     VerticalAlignment="Top" Margin="0,2,12,0"/>
+                                            <StackPanel Grid.Column="1">
+                                                <TextBlock Text="{Binding Etiqueta}" Style="{StaticResource AppText.Micro}" Foreground="{DynamicResource Brush.TextTertiary}"/>
+                                                <TextBlock Text="{Binding Texto}" Style="{StaticResource AppText.Body}" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <!-- Pedir otra ayuda -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,18"
+                                    Visibility="{Binding HaRespondido, Converter={StaticResource InverseBoolToVis}}">
+                            <Button Command="{Binding PedirPistaCommand}" Style="{StaticResource MiniBotonSecundario}"
+                                    IsEnabled="{Binding PuedePedirPista}"
+                                    AutomationProperties.Name="{Binding [Mini_PedirPista], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                <StackPanel Orientation="Horizontal">
+                                    <materialDesign:PackIcon Kind="LightbulbOnOutline" Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding [Mini_PedirPista], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            <TextBlock Text="{Binding PuntosPosiblesTexto}" Style="{StaticResource AppText.Caption}" VerticalAlignment="Center" Margin="14,0,0,0"/>
+                        </StackPanel>
+
+                        <views:MinijuegoOpcionesView/>
+                    </StackPanel>
+                </Grid>
+            </ScrollViewer>
+        </Grid>
+
+        <!-- Resumen final -->
+        <views:MinijuegoResumenView VerticalAlignment="Top" Visibility="{Binding EsResumen, Converter={StaticResource BoolToVis}}"/>
+    </Grid>
+</UserControl>

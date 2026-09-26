@@ -12,6 +12,7 @@ public enum CategoriaLogro
     Generos,
     Horarios,
     Epocas,
+    Minijuegos,
     Secretos
 }
 
