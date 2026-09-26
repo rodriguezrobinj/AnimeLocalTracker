@@ -24,6 +24,62 @@ public partial class ConfiguracionViewModel : ObservableObject
     // === PLUGINS ===
     [ObservableProperty] private System.Collections.ObjectModel.ObservableCollection<string> _pluginsInstalados = new();
 
+    // SEC-01: los plugins son código de terceros con los permisos de la app. Apagados por defecto; cada archivo
+    // requiere que el usuario confíe en él (huella SHA-256 fijada). Estas acciones se aplican al instante.
+    [ObservableProperty] private bool _pluginsHabilitados;
+    [ObservableProperty] private bool _pluginsRequiereReinicio;
+    public System.Collections.ObjectModel.ObservableCollection<PluginItemViewModel> PluginsDetalle { get; } = new();
+    private bool _cargandoPlugins;
+
+    /// <summary>Icono del aviso al confiar en un plugin (tono ámbar de advertencia).</summary>
+    internal const string IconoConfiarPlugin = "ShieldAlertOutline";
+
+    partial void OnPluginsHabilitadosChanged(bool value)
+    {
+        if (_cargandoPlugins) return; // se está rellenando desde la configuración guardada
+        _ = GuardarPluginsHabilitadosAsync(value);
+    }
+
+    private async Task GuardarPluginsHabilitadosAsync(bool valor)
+    {
+        try
+        {
+            var config = _settingsService.ObtenerConfiguracion();
+            config.PluginsHabilitados = valor;
+            await _settingsService.GuardarConfiguracionAsync(config);
+            PluginsRequiereReinicio = true; // los .dll solo se cargan al iniciar la app
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("ConfiguracionViewModel", "Error guardando el interruptor de plugins", ex);
+        }
+    }
+
+    [RelayCommand]
+    private async Task AlternarConfianzaPluginAsync(PluginItemViewModel? plugin)
+    {
+        if (plugin == null) return;
+
+        bool confiar = !plugin.EsConfiable; // "Sin confiar" y "Modificado" → confiar; "Confiable" → retirar
+        if (confiar)
+        {
+            // Confiar = ejecutar código de terceros con los permisos del usuario: pedir confirmación explícita.
+            bool aceptado = await _dialogService.MostrarDialogoAsync(
+                LocalizationService.T("Cfg_PluginConfiarTitulo"),
+                string.Format(LocalizationService.T("Cfg_PluginConfiarMsj"), plugin.Nombre, plugin.HashCompleto),
+                true,
+                IconoConfiarPlugin,
+                "#F59E0B");
+            if (!aceptado) return;
+        }
+
+        if (await _pluginService.EstablecerConfianzaAsync(plugin.Nombre, confiar))
+        {
+            PluginsRequiereReinicio = true;
+            CargarPlugins();
+        }
+    }
+
     // === ALMACENAMIENTO ===
     [ObservableProperty] private string _rutaBaseAnimes = string.Empty;
     [ObservableProperty] private string _espacioLibreTexto = LocalizationService.T("Cfg_EspacioCalculando");
@@ -48,6 +104,80 @@ public partial class ConfiguracionViewModel : ObservableObject
     [ObservableProperty] private string _grupoFansubPreferidoTorrent = "";
     [ObservableProperty] private string _resolucionPreferidaTorrent = "";
     [ObservableProperty] private bool _seguirSembrandoTorrents;
+
+    // === ESTILO DE SUBTÍTULOS (la vista previa se recalcula sola al cambiar cualquiera) ===
+    [ObservableProperty] private string _estiloFuente = EstiloSubtitulos.FuentePorDefecto;
+    [ObservableProperty] private double _estiloTamano = 44;
+    [ObservableProperty] private bool _estiloNegrita = true;
+    [ObservableProperty] private bool _estiloCursiva;
+    [ObservableProperty] private bool _estiloSubrayado;
+    [ObservableProperty] private string _estiloColorTexto = "#FFFFFF";
+    [ObservableProperty] private string _estiloColorContorno = "#000000";
+    [ObservableProperty] private double _estiloGrosorContorno = 3;
+    [ObservableProperty] private double _estiloOpacidadFondo;
+    [ObservableProperty] private double _estiloGrosorBorde;
+    [ObservableProperty] private string _estiloColorBorde = "#FFFFFF";
+    [ObservableProperty] private EstiloSubtitulos _estiloVistaPrevia = new();
+
+    /// <summary>Tipografías disponibles para los subtítulos.</summary>
+    public IReadOnlyList<string> FuentesSubtitulos => EstiloSubtitulos.FuentesDisponibles;
+
+    /// <summary>Paleta compartida por los tres selectores de color (texto, contorno y borde de la caja).</summary>
+    public IReadOnlyList<ColorEstiloOpcion> ColoresSubtitulos { get; } =
+        EstiloSubtitulos.Paleta.Select(c => new ColorEstiloOpcion(c.Clave, c.Hex)).ToList();
+
+    private static readonly HashSet<string> PropiedadesDelEstilo = new()
+    {
+        nameof(EstiloFuente), nameof(EstiloTamano), nameof(EstiloNegrita), nameof(EstiloCursiva),
+        nameof(EstiloSubrayado), nameof(EstiloColorTexto), nameof(EstiloColorContorno),
+        nameof(EstiloGrosorContorno), nameof(EstiloOpacidadFondo), nameof(EstiloGrosorBorde), nameof(EstiloColorBorde)
+    };
+
+    protected override void OnPropertyChanged(System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        base.OnPropertyChanged(e);
+        if (e.PropertyName != null && PropiedadesDelEstilo.Contains(e.PropertyName))
+        {
+            EstiloVistaPrevia = ConstruirEstilo();
+        }
+    }
+
+    /// <summary>Junta los valores de la pantalla en un estilo válido (los fuera de rango se corrigen).</summary>
+    private EstiloSubtitulos ConstruirEstilo() => new EstiloSubtitulos
+    {
+        Fuente = EstiloFuente,
+        Tamano = EstiloTamano,
+        Negrita = EstiloNegrita,
+        Cursiva = EstiloCursiva,
+        Subrayado = EstiloSubrayado,
+        ColorTexto = EstiloColorTexto,
+        ColorContorno = EstiloColorContorno,
+        GrosorContorno = EstiloGrosorContorno,
+        OpacidadFondo = (int)Math.Round(EstiloOpacidadFondo),
+        GrosorBorde = EstiloGrosorBorde,
+        ColorBorde = EstiloColorBorde
+    }.Normalizar();
+
+    private void AplicarEstilo(EstiloSubtitulos? origen)
+    {
+        var e = (origen ?? new EstiloSubtitulos()).Normalizar();
+        EstiloFuente = e.Fuente;
+        EstiloTamano = e.Tamano;
+        EstiloNegrita = e.Negrita;
+        EstiloCursiva = e.Cursiva;
+        EstiloSubrayado = e.Subrayado;
+        EstiloColorTexto = e.ColorTexto;
+        EstiloColorContorno = e.ColorContorno;
+        EstiloGrosorContorno = e.GrosorContorno;
+        EstiloOpacidadFondo = e.OpacidadFondo;
+        EstiloGrosorBorde = e.GrosorBorde;
+        EstiloColorBorde = e.ColorBorde;
+        EstiloVistaPrevia = ConstruirEstilo();
+    }
+
+    /// <summary>Vuelve el estilo al de fábrica. Solo cambia la pantalla: se aplica al reproductor con "Guardar preferencias".</summary>
+    [RelayCommand]
+    private void RestablecerEstiloSubtitulos() => AplicarEstilo(new EstiloSubtitulos());
 
     // === PREFERENCIAS DE USUARIO ===
     [ObservableProperty] private int _umbralMarcadoVisto = 95;
@@ -78,6 +208,8 @@ public partial class ConfiguracionViewModel : ObservableObject
         OnPropertyChanged(nameof(IdiomaTexto));
         // LOC-04: el contador compone el texto localizado de forma no reactiva → refrescarlo aquí
         OnPropertyChanged(nameof(TotalAnimesTexto));
+        foreach (var color in ColoresSubtitulos) color.Refrescar();
+        foreach (var plugin in PluginsDetalle) plugin.RefrescarTextos();
         // LOC-08: avisa a los ViewModels con colecciones/texto compuesto en código (Galería,
         // Agregar Anime, Acerca de) para que se regeneren en el nuevo idioma.
         WeakReferenceMessenger.Default.Send(new IdiomaCambiadoMensaje());
@@ -141,6 +273,7 @@ public partial class ConfiguracionViewModel : ObservableObject
         RutaBaseAnimes = config.RutaBaseAnimes ?? string.Empty;
         AutoSkipIntroOutro = config.AutoSkipIntroOutro;
         SubtitulosPorDefecto = config.SubtitulosPorDefecto;
+        AplicarEstilo(config.EstiloSubtitulos);
         DescargasSimultaneas = config.DescargasSimultaneas;
         IntervaloSincronizacionMinutos = config.IntervaloSincronizacionMinutos;
         PasosSaltoSegundos = config.PasosSaltoSegundos is 5 or 10 or 30 or 60 ? config.PasosSaltoSegundos : 10;
@@ -169,6 +302,9 @@ public partial class ConfiguracionViewModel : ObservableObject
         CalcularEspacioDisco(RutaBaseAnimes);
         _ = ActualizarEstadisticasBibliotecaAsync();
         ActualizarEstadoAutenticacion();
+        _cargandoPlugins = true;
+        PluginsHabilitados = config.PluginsHabilitados;
+        _cargandoPlugins = false;
         CargarPlugins();
     }
 
@@ -177,10 +313,16 @@ public partial class ConfiguracionViewModel : ObservableObject
         try
         {
             PluginsInstalados.Clear();
-            var plugins = _pluginService.ObtenerPluginsInstalados();
+            var plugins = _pluginService.ObtenerPluginsInstalados() ?? new List<string>();
             foreach (var plugin in plugins)
             {
                 PluginsInstalados.Add(plugin);
+            }
+
+            PluginsDetalle.Clear();
+            foreach (var info in _pluginService.ObtenerDetallesPlugins() ?? Array.Empty<PluginInfo>())
+            {
+                PluginsDetalle.Add(new PluginItemViewModel(info));
             }
         }
         catch (Exception ex)
@@ -348,6 +490,7 @@ public partial class ConfiguracionViewModel : ObservableObject
             var config = _settingsService.ObtenerConfiguracion();
             config.AutoSkipIntroOutro = AutoSkipIntroOutro;
             config.SubtitulosPorDefecto = SubtitulosPorDefecto;
+            config.EstiloSubtitulos = ConstruirEstilo();
             config.DescargasSimultaneas = DescargasSimultaneas;
             config.IntervaloSincronizacionMinutos = IntervaloSincronizacionMinutos;
             config.PasosSaltoSegundos = PasosSaltoSegundos;

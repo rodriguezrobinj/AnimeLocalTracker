@@ -27,7 +27,7 @@ public class DescargaHistorial
     public long TamanoBytes { get; set; }
 
     /// <summary>Momento en que terminó (UTC). sqlite-net lo devuelve con Kind Unspecified: tratarlo como UTC al mostrarlo.</summary>
-    [Indexed]
+    // DB-01: sin [Indexed]; el índice IX_DescargaHistorial_FechaUtc lo crea la migración v7.
     public DateTime FechaUtc { get; set; }
 
     public bool Completada { get; set; }

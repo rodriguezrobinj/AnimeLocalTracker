@@ -5,6 +5,7 @@
              xmlns:loc="clr-namespace:AnimeLocalTracker.Services"
              xmlns:ctl="clr-namespace:AnimeLocalTracker.Controls"
              xmlns:vm="clr-namespace:AnimeLocalTracker.ViewModels"
+             xmlns:mdl="clr-namespace:AnimeLocalTracker.Models"
              xmlns:sys="clr-namespace:System;assembly=mscorlib"
              TextElement.Foreground="{DynamicResource MaterialDesignBody}"
              Background="Transparent">
@@ -104,6 +105,46 @@
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="Cursor" Value="Hand"/>
         </Style>
+
+        <!-- Botón de formato de texto (negrita / cursiva / subrayado): cuadrado, se ilumina en el azul de la app al activarse -->
+        <Style x:Key="CfgFormatToggle" TargetType="ToggleButton">
+            <Setter Property="Width" Value="38"/>
+            <Setter Property="Height" Value="36"/>
+            <Setter Property="Margin" Value="0,0,6,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="Marco" CornerRadius="8" BorderThickness="1"
+                                Background="{DynamicResource Brush.Surface2}" BorderBrush="{DynamicResource Brush.BorderStrong}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Marco" Property="BorderBrush" Value="{DynamicResource Brush.Accent}"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Marco" Property="Background" Value="{DynamicResource Brush.AccentStrong}"/>
+                                <Setter TargetName="Marco" Property="BorderBrush" Value="{DynamicResource Brush.AccentStrong}"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Marco" Property="BorderBrush" Value="{DynamicResource Brush.AccentSoft}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Elemento de la paleta de colores de los subtítulos: muestra + nombre traducido -->
+        <DataTemplate x:Key="CfgColorItemTemplate" DataType="{x:Type mdl:ColorEstiloOpcion}">
+            <StackPanel Orientation="Horizontal">
+                <Border Width="16" Height="16" CornerRadius="8" BorderThickness="1" Margin="0,0,10,0" VerticalAlignment="Center"
+                        Background="{Binding Hex}" BorderBrush="{DynamicResource Brush.TextTertiary}"/>
+                <TextBlock Text="{Binding Nombre}" VerticalAlignment="Center"/>
+            </StackPanel>
+        </DataTemplate>
 
         <!-- Botón de la barra de categorías -->
         <Style x:Key="CfgNavButton" TargetType="Button">
@@ -489,8 +530,12 @@
                                     <ctl:SettingRow Title="{Binding [Cfg_GrupoFansubPreferido], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
                                                     Description="{Binding [Cfg_GrupoFansubPreferidoSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
                                         <TextBox Text="{Binding GrupoFansubPreferidoTorrent, UpdateSourceTrigger=PropertyChanged}"
-                                                 Style="{StaticResource MaterialDesignOutlinedTextBox}" Height="36" MinWidth="180"
+                                                 Style="{StaticResource MaterialDesignOutlinedTextBox}" MinWidth="180"
                                                  materialDesign:HintAssist.Hint="{Binding [Cfg_GrupoFansubPreferidoHint], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                 materialDesign:HintAssist.IsFloating="False"
+                                                 FontSize="13" VerticalContentAlignment="Center"
+                                                 Height="42" Padding="10,6"
+                                                 Foreground="{DynamicResource Brush.TextPrimary}" Background="{DynamicResource Brush.Surface2}" BorderBrush="{DynamicResource Brush.BorderStrong}"
                                                  AutomationProperties.Name="{Binding [Cfg_GrupoFansubPreferido], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
                                     </ctl:SettingRow>
                                     <Border Style="{StaticResource CfgDivider}"/>
@@ -570,6 +615,151 @@
                                             <ComboBoxItem Content="1.5x"><ComboBoxItem.Tag><sys:Double>1.5</sys:Double></ComboBoxItem.Tag></ComboBoxItem>
                                             <ComboBoxItem Content="2x"><ComboBoxItem.Tag><sys:Double>2.0</sys:Double></ComboBoxItem.Tag></ComboBoxItem>
                                         </ComboBox>
+                                    </ctl:SettingRow>
+                                </StackPanel>
+                            </Border>
+                            <TextBlock Text="{Binding [Cfg_GrupoEstiloSubtitulos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource CfgGroupCaption}" Margin="4,4,0,8"/>
+                            <Border Style="{StaticResource CfgGroup}">
+                                <StackPanel>
+                                    <!-- Vista previa: una "pantalla" de 1280 px de ancho reducida al espacio disponible, para que el
+                                         tamaño de letra se aprecie en la misma proporción que en el reproductor. Usa el mismo control
+                                         (SubtitleTextView) que el reproductor: lo que se ve aquí es lo que se ve al ver un capítulo. -->
+                                    <Border Margin="20,16,20,6" CornerRadius="10" ClipToBounds="True" BorderThickness="1" BorderBrush="{DynamicResource Brush.Border}"
+                                            AutomationProperties.Name="{Binding [Cfg_EstiloVistaPrevia], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                        <Viewbox Stretch="Uniform">
+                                            <Grid Width="1280" Height="320">
+                                                <Grid.Background>
+                                                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                                        <GradientStop Color="#0F172A" Offset="0"/>
+                                                        <GradientStop Color="#3B6FB6" Offset="0.3"/>
+                                                        <GradientStop Color="#DCEBFA" Offset="0.62"/>
+                                                        <GradientStop Color="#F7F7F2" Offset="0.78"/>
+                                                        <GradientStop Color="#2F6B3A" Offset="1"/>
+                                                    </LinearGradientBrush>
+                                                </Grid.Background>
+                                                <Viewbox VerticalAlignment="Bottom" Margin="40,40,40,25" StretchDirection="DownOnly" MaxHeight="320">
+                                                    <ctl:SubtitleTextView MaxWidth="1200"
+                                                                          Texto="{Binding [Cfg_EstiloVistaPreviaTexto], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                                          Estilo="{Binding EstiloVistaPrevia}"/>
+                                                </Viewbox>
+                                            </Grid>
+                                        </Viewbox>
+                                    </Border>
+                                    <TextBlock Text="{Binding [Cfg_EstiloVistaPreviaSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.Caption}" TextWrapping="Wrap" Margin="22,0,20,12"/>
+                                    <Border Style="{StaticResource CfgDivider}"/>
+
+                                    <ctl:SettingRow Title="{Binding [Cfg_EstiloFuente], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                    Description="{Binding [Cfg_EstiloFuenteSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                        <ComboBox ItemsSource="{Binding FuentesSubtitulos}" SelectedItem="{Binding EstiloFuente}" Height="36" MinWidth="180"
+                                                  AutomationProperties.Name="{Binding [Cfg_EstiloFuente], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                            <ComboBox.ItemTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding}" FontFamily="{Binding}" FontSize="15"/>
+                                                </DataTemplate>
+                                            </ComboBox.ItemTemplate>
+                                        </ComboBox>
+                                    </ctl:SettingRow>
+                                    <Border Style="{StaticResource CfgDivider}"/>
+
+                                    <ctl:SettingRow Title="{Binding [Cfg_EstiloTamano], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                    Description="{Binding [Cfg_EstiloTamanoSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <Slider Style="{StaticResource CfgSlider}" Minimum="24" Maximum="80" TickFrequency="2" IsSnapToTickEnabled="True" Width="170"
+                                                    Value="{Binding EstiloTamano}"
+                                                    AutomationProperties.Name="{Binding [Cfg_EstiloTamano], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                            <TextBlock Text="{Binding EstiloTamano, StringFormat='{}{0:0} px'}"
+                                                       Foreground="{DynamicResource Brush.AccentSoft}" FontWeight="Bold" FontSize="13" Margin="12,0,0,0" VerticalAlignment="Center" MinWidth="48" TextAlignment="Right"/>
+                                        </StackPanel>
+                                    </ctl:SettingRow>
+                                    <Border Style="{StaticResource CfgDivider}"/>
+
+                                    <ctl:SettingRow Title="{Binding [Cfg_EstiloFormato], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                    Description="{Binding [Cfg_EstiloFormatoSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <ToggleButton IsChecked="{Binding EstiloNegrita}" Style="{StaticResource CfgFormatToggle}"
+                                                          ToolTip="{Binding [Cfg_EstiloNegrita], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                          AutomationProperties.Name="{Binding [Cfg_EstiloNegrita], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                                <materialDesign:PackIcon Kind="FormatBold" Width="20" Height="20"/>
+                                            </ToggleButton>
+                                            <ToggleButton IsChecked="{Binding EstiloCursiva}" Style="{StaticResource CfgFormatToggle}"
+                                                          ToolTip="{Binding [Cfg_EstiloCursiva], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                          AutomationProperties.Name="{Binding [Cfg_EstiloCursiva], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                                <materialDesign:PackIcon Kind="FormatItalic" Width="20" Height="20"/>
+                                            </ToggleButton>
+                                            <ToggleButton IsChecked="{Binding EstiloSubrayado}" Style="{StaticResource CfgFormatToggle}"
+                                                          ToolTip="{Binding [Cfg_EstiloSubrayado], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                          AutomationProperties.Name="{Binding [Cfg_EstiloSubrayado], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                                <materialDesign:PackIcon Kind="FormatUnderline" Width="20" Height="20"/>
+                                            </ToggleButton>
+                                        </StackPanel>
+                                    </ctl:SettingRow>
+                                    <Border Style="{StaticResource CfgDivider}"/>
+
+                                    <ctl:SettingRow Title="{Binding [Cfg_EstiloColorTexto], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                    Description="{Binding [Cfg_EstiloColorTextoSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                        <ComboBox ItemsSource="{Binding ColoresSubtitulos}" SelectedValue="{Binding EstiloColorTexto}" SelectedValuePath="Hex"
+                                                  ItemTemplate="{StaticResource CfgColorItemTemplate}" Height="36" MinWidth="160"
+                                                  AutomationProperties.Name="{Binding [Cfg_EstiloColorTexto], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                    </ctl:SettingRow>
+                                    <Border Style="{StaticResource CfgDivider}"/>
+
+                                    <ctl:SettingRow Title="{Binding [Cfg_EstiloContornoColor], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                    Description="{Binding [Cfg_EstiloContornoColorSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                        <ComboBox ItemsSource="{Binding ColoresSubtitulos}" SelectedValue="{Binding EstiloColorContorno}" SelectedValuePath="Hex"
+                                                  ItemTemplate="{StaticResource CfgColorItemTemplate}" Height="36" MinWidth="160"
+                                                  AutomationProperties.Name="{Binding [Cfg_EstiloContornoColor], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                    </ctl:SettingRow>
+                                    <Border Style="{StaticResource CfgDivider}"/>
+
+                                    <ctl:SettingRow Title="{Binding [Cfg_EstiloContornoGrosor], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                    Description="{Binding [Cfg_EstiloContornoGrosorSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <Slider Style="{StaticResource CfgSlider}" Minimum="0" Maximum="8" TickFrequency="0.5" IsSnapToTickEnabled="True" Width="170"
+                                                    Value="{Binding EstiloGrosorContorno}"
+                                                    AutomationProperties.Name="{Binding [Cfg_EstiloContornoGrosor], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                            <TextBlock Text="{Binding EstiloGrosorContorno, StringFormat='{}{0:0.#}'}"
+                                                       Foreground="{DynamicResource Brush.AccentSoft}" FontWeight="Bold" FontSize="13" Margin="12,0,0,0" VerticalAlignment="Center" MinWidth="48" TextAlignment="Right"/>
+                                        </StackPanel>
+                                    </ctl:SettingRow>
+                                    <Border Style="{StaticResource CfgDivider}"/>
+
+                                    <ctl:SettingRow Title="{Binding [Cfg_EstiloFondo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                    Description="{Binding [Cfg_EstiloFondoSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <Slider Style="{StaticResource CfgSlider}" Minimum="0" Maximum="100" TickFrequency="5" IsSnapToTickEnabled="True" Width="170"
+                                                    Value="{Binding EstiloOpacidadFondo}"
+                                                    AutomationProperties.Name="{Binding [Cfg_EstiloFondo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                            <TextBlock Text="{Binding EstiloOpacidadFondo, StringFormat='{}{0:0}%'}"
+                                                       Foreground="{DynamicResource Brush.AccentSoft}" FontWeight="Bold" FontSize="13" Margin="12,0,0,0" VerticalAlignment="Center" MinWidth="48" TextAlignment="Right"/>
+                                        </StackPanel>
+                                    </ctl:SettingRow>
+                                    <Border Style="{StaticResource CfgDivider}"/>
+
+                                    <ctl:SettingRow Title="{Binding [Cfg_EstiloBordeGrosor], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                    Description="{Binding [Cfg_EstiloBordeGrosorSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <Slider Style="{StaticResource CfgSlider}" Minimum="0" Maximum="6" TickFrequency="0.5" IsSnapToTickEnabled="True" Width="170"
+                                                    Value="{Binding EstiloGrosorBorde}"
+                                                    AutomationProperties.Name="{Binding [Cfg_EstiloBordeGrosor], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                            <TextBlock Text="{Binding EstiloGrosorBorde, StringFormat='{}{0:0.#}'}"
+                                                       Foreground="{DynamicResource Brush.AccentSoft}" FontWeight="Bold" FontSize="13" Margin="12,0,0,0" VerticalAlignment="Center" MinWidth="48" TextAlignment="Right"/>
+                                        </StackPanel>
+                                    </ctl:SettingRow>
+                                    <Border Style="{StaticResource CfgDivider}"/>
+
+                                    <ctl:SettingRow Title="{Binding [Cfg_EstiloBordeColor], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                    Description="{Binding [Cfg_EstiloBordeColorSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                        <ComboBox ItemsSource="{Binding ColoresSubtitulos}" SelectedValue="{Binding EstiloColorBorde}" SelectedValuePath="Hex"
+                                                  ItemTemplate="{StaticResource CfgColorItemTemplate}" Height="36" MinWidth="160"
+                                                  AutomationProperties.Name="{Binding [Cfg_EstiloBordeColor], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                    </ctl:SettingRow>
+                                    <Border Style="{StaticResource CfgDivider}"/>
+
+                                    <ctl:SettingRow Title="{Binding [Cfg_EstiloRestablecer], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                    Description="{Binding [Cfg_EstiloRestablecerSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                        <Button Command="{Binding RestablecerEstiloSubtitulosCommand}" Style="{StaticResource CfgRowButton}"
+                                                Content="{Binding [Cfg_EstiloRestablecer], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                AutomationProperties.Name="{Binding [Cfg_EstiloRestablecer], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
                                     </ctl:SettingRow>
                                 </StackPanel>
                             </Border>
@@ -792,38 +982,108 @@
                                 </StackPanel>
                             </StackPanel>
 
-                            <Border Style="{StaticResource CfgGroup}" Margin="0" Padding="20,14">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
+                            <Border Style="{StaticResource CfgGroup}" Margin="0">
+                                <StackPanel>
+                                    <!-- SEC-01: interruptor general. Apagado por defecto: un plugin corre con TODOS los permisos de la app. -->
+                                    <ctl:SettingRow Title="{Binding [Cfg_PluginsPermitir], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                    Description="{Binding [Cfg_PluginsPermitirSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                        <ToggleButton IsChecked="{Binding PluginsHabilitados}" Style="{StaticResource CfgSwitch}"
+                                                      AutomationProperties.Name="{Binding [Cfg_PluginsPermitir], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                    </ctl:SettingRow>
+                                    <Border Style="{StaticResource CfgDivider}"/>
 
-                                    <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
-                                        <ItemsControl ItemsSource="{Binding PluginsInstalados}">
+                                    <!-- Aviso de riesgo -->
+                                    <Border Margin="20,14,20,4" Padding="14,10" CornerRadius="10" Background="{DynamicResource Brush.WarningTint}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <materialDesign:PackIcon Kind="ShieldAlertOutline" Width="20" Height="20" VerticalAlignment="Top" Margin="0,1,10,0"
+                                                                     Foreground="{DynamicResource Brush.Warning}"/>
+                                            <TextBlock Text="{Binding [Cfg_PluginsAviso], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.Secondary}" TextWrapping="Wrap" MaxWidth="620"
+                                                       Foreground="{DynamicResource Brush.TextPrimary}"/>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- Lista de plugins con su estado de confianza -->
+                                    <StackPanel Margin="20,10,20,6">
+                                        <ItemsControl ItemsSource="{Binding PluginsDetalle}">
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate>
-                                                    <StackPanel Orientation="Horizontal" Margin="0,3">
-                                                        <materialDesign:PackIcon Kind="FileCode" Foreground="{DynamicResource Brush.Accent}" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                                        <TextBlock Text="{Binding}" Style="{StaticResource AppText.Body}" FontSize="13" VerticalAlignment="Center"/>
-                                                    </StackPanel>
+                                                    <Border Style="{StaticResource AppCard}" Background="{DynamicResource Brush.Surface2}" Padding="14,10" Margin="0,0,0,8">
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                                <ColumnDefinition Width="*"/>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                            </Grid.ColumnDefinitions>
+
+                                                            <materialDesign:PackIcon Kind="FileCode" Foreground="{DynamicResource Brush.Accent}" Width="20" Height="20"
+                                                                                     VerticalAlignment="Center" Margin="0,0,12,0"/>
+
+                                                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,12,0">
+                                                                <TextBlock Text="{Binding Nombre}" Style="{StaticResource AppText.BodyStrong}" FontSize="13" TextTrimming="CharacterEllipsis"/>
+                                                                <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                                                    <TextBlock Text="{Binding Tipo}" Style="{StaticResource AppText.Caption}"/>
+                                                                    <TextBlock Text="  ·  SHA-256 " Style="{StaticResource AppText.Caption}"/>
+                                                                    <TextBlock Text="{Binding HashCorto}" Style="{StaticResource AppText.Caption}" FontFamily="Consolas"
+                                                                               ToolTip="{Binding HashCompleto}"/>
+                                                                </StackPanel>
+                                                            </StackPanel>
+
+                                                            <Border Grid.Column="2" CornerRadius="7" Padding="9,3" VerticalAlignment="Center" Margin="0,0,12,0">
+                                                                <TextBlock Text="{Binding TextoEstado}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource Brush.TextPrimary}"/>
+                                                                <Border.Style>
+                                                                    <Style TargetType="Border">
+                                                                        <Setter Property="Background" Value="{DynamicResource Brush.Surface3}"/>
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding Estado}" Value="Confiable">
+                                                                                <Setter Property="Background" Value="{DynamicResource Brush.SuccessTint}"/>
+                                                                            </DataTrigger>
+                                                                            <DataTrigger Binding="{Binding Estado}" Value="Modificado">
+                                                                                <Setter Property="Background" Value="{DynamicResource Brush.WarningTint}"/>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </Border.Style>
+                                                            </Border>
+
+                                                            <Button Grid.Column="3" Style="{StaticResource CfgRowButton}" MinWidth="128" Height="34"
+                                                                    Command="{Binding DataContext.AlternarConfianzaPluginCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                    CommandParameter="{Binding}"
+                                                                    AutomationProperties.Name="{Binding TextoAccion}">
+                                                                <TextBlock Text="{Binding TextoAccion}" FontWeight="SemiBold" FontSize="12"/>
+                                                            </Button>
+                                                        </Grid>
+                                                    </Border>
                                                 </DataTemplate>
                                             </ItemsControl.ItemTemplate>
                                         </ItemsControl>
 
                                         <TextBlock Text="{Binding [Cfg_SinPlugins], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                                   Style="{StaticResource AppText.Secondary}" FontStyle="Italic"
-                                                   Visibility="{Binding PluginsInstalados.Count, Converter={StaticResource ZeroToVis}}"/>
-                                    </StackPanel>
+                                                   Style="{StaticResource AppText.Secondary}" FontStyle="Italic" Margin="0,4,0,8"
+                                                   Visibility="{Binding PluginsDetalle.Count, Converter={StaticResource ZeroToVis}}"/>
 
-                                    <Button Grid.Column="1" Command="{Binding AbrirCarpetaPluginsCommand}" Style="{StaticResource CfgRowButton}" VerticalAlignment="Center"
-                                            AutomationProperties.Name="{Binding [Cfg_AbrirCarpetaPlugins], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
-                                        <StackPanel Orientation="Horizontal">
-                                            <materialDesign:PackIcon Kind="FolderOpen" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,7,0"/>
-                                            <TextBlock Text="{Binding [Cfg_AbrirCarpetaPlugins], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="12"/>
-                                        </StackPanel>
-                                    </Button>
-                                </Grid>
+                                        <!-- Los .dll solo se cargan al iniciar la app -->
+                                        <TextBlock Text="{Binding [Cfg_PluginsReiniciar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.Caption}" Foreground="{DynamicResource Brush.Warning}"
+                                                   TextWrapping="Wrap" Margin="0,2,0,6"
+                                                   Visibility="{Binding PluginsRequiereReinicio, Converter={StaticResource BoolToVis}}"/>
+                                    </StackPanel>
+                                    <Border Style="{StaticResource CfgDivider}"/>
+
+                                    <Grid Margin="20,12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding [Cfg_PluginsSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.Caption}" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,16,0"/>
+                                        <Button Grid.Column="1" Command="{Binding AbrirCarpetaPluginsCommand}" Style="{StaticResource CfgRowButton}" VerticalAlignment="Center"
+                                                AutomationProperties.Name="{Binding [Cfg_AbrirCarpetaPlugins], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                            <StackPanel Orientation="Horizontal">
+                                                <materialDesign:PackIcon Kind="FolderOpen" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,7,0"/>
+                                                <TextBlock Text="{Binding [Cfg_AbrirCarpetaPlugins], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="12"/>
+                                            </StackPanel>
+                                        </Button>
+                                    </Grid>
+                                </StackPanel>
                             </Border>
                         </StackPanel>
                     </ScrollViewer>

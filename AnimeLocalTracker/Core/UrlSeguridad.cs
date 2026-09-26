@@ -1,4 +1,6 @@
 using System;
+using System.Net;
+using System.Net.Sockets;
 
 namespace AnimeLocalTracker.Core;
 
@@ -47,7 +49,70 @@ public static class UrlSeguridad
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)) return false;
         if (uri.Scheme != Uri.UriSchemeHttps) return false;
         if (!string.IsNullOrEmpty(uri.UserInfo)) return false;
+        // SEC-02: nunca hacia la propia máquina ni la red local (una URL sacada de un scraper/yt-dlp no debe poder
+        // hacer que la app pida https://127.0.0.1/…, https://192.168.x.x/… o el endpoint de metadatos de una nube).
+        return EsHostPublico(uri);
+    }
+
+    /// <summary>
+    /// True si el host de la URL puede ser un servidor de Internet: no es una IP literal privada/loopback/enlace
+    /// local/reservada, ni "localhost", ni un nombre de una sola etiqueta (intranet) o de sufijos locales
+    /// (.local, .localhost, .internal, .lan, .home.arpa). Solo mira el texto: la resolución DNS se valida aparte
+    /// (<see cref="EsIpPublica"/> en <c>RedirectSeguroHandler</c>).
+    /// </summary>
+    public static bool EsHostPublico(Uri uri)
+    {
+        string host = uri.DnsSafeHost;
+        if (string.IsNullOrWhiteSpace(host)) return false;
+
+        if (IPAddress.TryParse(host, out var ip)) return EsIpPublica(ip);
+
+        host = host.TrimEnd('.').ToLowerInvariant();
+        if (!host.Contains('.')) return false; // "localhost", "nas", "router"…
+        string[] sufijosLocales = { ".localhost", ".local", ".internal", ".lan", ".home.arpa", ".localdomain" };
+        foreach (var sufijo in sufijosLocales)
+        {
+            if (host.EndsWith(sufijo, StringComparison.Ordinal)) return false;
+        }
         return true;
+    }
+
+    /// <summary>
+    /// True si la IP es enrutable en Internet. Rechaza loopback, "esta red" (0.0.0.0/8), privadas RFC 1918,
+    /// compartidas CGNAT (100.64/10), enlace local (169.254/16 y fe80::/10 — incluye 169.254.169.254, el endpoint de
+    /// metadatos de las nubes), ULA (fc00::/7), site-local, multicast, reservadas (240/4), benchmark (198.18/15) y
+    /// documentación (2001:db8::/32). Una IPv6 "mapeada" a IPv4 (::ffff:a.b.c.d) se juzga por su IPv4.
+    /// </summary>
+    public static bool EsIpPublica(IPAddress ip)
+    {
+        if (ip.IsIPv4MappedToIPv6) ip = ip.MapToIPv4();
+
+        if (ip.AddressFamily == AddressFamily.InterNetwork)
+        {
+            var b = ip.GetAddressBytes();
+            if (b[0] == 0) return false;                                  // 0.0.0.0/8
+            if (b[0] == 10) return false;                                 // 10.0.0.0/8
+            if (b[0] == 100 && b[1] >= 64 && b[1] <= 127) return false;  // 100.64.0.0/10 (CGNAT)
+            if (b[0] == 127) return false;                                // loopback
+            if (b[0] == 169 && b[1] == 254) return false;                // enlace local
+            if (b[0] == 172 && b[1] >= 16 && b[1] <= 31) return false;   // 172.16.0.0/12
+            if (b[0] == 192 && b[1] == 0 && b[2] == 0) return false;      // 192.0.0.0/24 (IETF)
+            if (b[0] == 192 && b[1] == 168) return false;                 // 192.168.0.0/16
+            if (b[0] == 198 && (b[1] == 18 || b[1] == 19)) return false;  // 198.18.0.0/15
+            if (b[0] >= 224) return false;                                // multicast + reservadas + broadcast
+            return true;
+        }
+
+        if (ip.AddressFamily == AddressFamily.InterNetworkV6)
+        {
+            if (IPAddress.IsLoopback(ip) || ip.Equals(IPAddress.IPv6None) || ip.Equals(IPAddress.IPv6Any)) return false;
+            if (ip.IsIPv6LinkLocal || ip.IsIPv6SiteLocal || ip.IsIPv6Multicast || ip.IsIPv6UniqueLocal) return false;
+            var b = ip.GetAddressBytes();
+            if (b[0] == 0x20 && b[1] == 0x01 && b[2] == 0x0d && b[3] == 0xb8) return false; // 2001:db8::/32
+            return true;
+        }
+
+        return false;
     }
 
     /// <summary>

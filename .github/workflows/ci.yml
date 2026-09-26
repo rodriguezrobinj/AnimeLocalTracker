@@ -57,11 +57,16 @@ jobs:
       with:
         python-version: '3.11'
         cache: 'pip'
+        cache-dependency-path: tools/python/requirements.txt
 
     - name: Install Python Tools and Dependencies
       run: |
         python -m pip install --upgrade pip
-        python -m pip install -e tools/python
+        # SEC-04: dependencias del daemon fijadas con hashes SHA-256 (tools/python/requirements.txt, generado con
+        # pip-compile a partir de pyproject.toml + requirements.in). Un paquete cuyo contenido cambie en PyPI sin
+        # cambiar de versión, o una versión nueva no revisada, hace fallar la instalación en vez de colarse en el build.
+        python -m pip install --require-hashes -r tools/python/requirements.txt
+        python -m pip install --no-deps -e tools/python
 
     # ARC-14: los tests del daemon Python deben bloquear el CI (hoy solo existían
     # en local y nadie los ejecutaba).
@@ -74,8 +79,15 @@ jobs:
     - name: Cargo Security Audit (Rust SCA)
       working-directory: native/animetracker_core
       run: |
-        # DEV-01b: versión pineada para runs reproducibles
-        cargo install cargo-audit --locked --version 0.22.2
+        # DEV-01b: versión pineada para runs reproducibles.
+        # CI-01: la caché restaura ~/.cargo/bin (con cargo-audit.exe) pero NO ~/.cargo/.crates.toml, así que
+        # `cargo install` veía un binario "desconocido" y fallaba con "binary cargo-audit.exe already exists
+        # in destination" (≈18 % de los runs). Se instala solo si falta la versión fijada, y con --force por
+        # si el binario cacheado no coincide.
+        $versionInstalada = (& cargo audit --version 2>$null) -join ' '
+        if ($versionInstalada -notmatch '0\.22\.2') {
+          cargo install cargo-audit --locked --version 0.22.2 --force
+        }
         cargo audit
 
     - name: Python SCA Audit (pip-audit)

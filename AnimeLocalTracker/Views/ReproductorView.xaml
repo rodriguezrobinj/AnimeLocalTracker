@@ -6,6 +6,7 @@
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         xmlns:primitives="clr-namespace:System.Windows.Controls.Primitives;assembly=PresentationFramework"
         xmlns:loc="clr-namespace:AnimeLocalTracker.Services"
+        xmlns:ctl="clr-namespace:AnimeLocalTracker.Controls"
         TextElement.Foreground="{DynamicResource MaterialDesignBody}"
         Background="Transparent"
         Focusable="True"
@@ -239,27 +240,14 @@
             <Grid>
                 <!-- Bindings vía ElementName: FlyleafHost sobrescribe el DataContext de su contenido -->
 
-                <!-- Subtítulos optimizados: 2 TextBlocks en vez de 9 -->
-                <Viewbox VerticalAlignment="Bottom" Margin="40,40,40,25" StretchDirection="DownOnly" MaxHeight="150" IsHitTestVisible="False">
-                    <Grid MaxWidth="1200">
-                        <Grid.Effect>
-                            <DropShadowEffect Color="Black" BlurRadius="8" ShadowDepth="0" Opacity="0.9"/>
-                        </Grid.Effect>
-
-                        <!-- Stroke negro (una sola capa con outline grueso simulado por shadow) -->
-                        <TextBlock Text="{Binding DataContext.Player.Subtitles.SubsText, ElementName=RootWindow}"
-                                   Foreground="Black" FontSize="44" FontFamily="Trebuchet MS, Arial"
-                                   FontWeight="Bold" TextWrapping="Wrap" TextAlignment="Center">
-                            <TextBlock.Effect>
-                                <BlurEffect Radius="2.5" KernelType="Gaussian"/>
-                            </TextBlock.Effect>
-                        </TextBlock>
-
-                        <!-- Texto interior blanco -->
-                        <TextBlock Text="{Binding DataContext.Player.Subtitles.SubsText, ElementName=RootWindow}"
-                                   Foreground="White" FontSize="44" FontFamily="Trebuchet MS, Arial"
-                                   FontWeight="Bold" TextWrapping="Wrap" TextAlignment="Center" />
-                    </Grid>
+                <!-- Subtítulos. Un solo elemento (SubtitleTextView) que dibuja el texto con el estilo elegido en
+                     Configuración → Reproducción (tipografía, tamaño, color, contorno, caja).
+                     Está en la raíz del contenido del FlyleafHost (no se desvanece con los controles), así que
+                     su texto y su estilo los empuja el code-behind (EnlazarSubtitulos), no un Binding: en esa raíz
+                     los bindings se quedan congelados y los subtítulos nunca aparecían (ver memoria del proyecto).
+                     MaxHeight amplio: con letra grande y dos líneas el bloque supera los 150 px y se encogía. -->
+                <Viewbox VerticalAlignment="Bottom" Margin="40,40,40,25" StretchDirection="DownOnly" MaxHeight="320" IsHitTestVisible="False">
+                    <ctl:SubtitleTextView x:Name="SubtitulosVista" MaxWidth="1200"/>
                 </Viewbox>
 
                 <!-- Controles Overlays -->

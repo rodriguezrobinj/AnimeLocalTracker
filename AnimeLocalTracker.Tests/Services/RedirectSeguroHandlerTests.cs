@@ -35,9 +35,87 @@ public class RedirectSeguroHandlerTests
         return respuesta;
     }
 
+    private static readonly IPAddress IpPublica = IPAddress.Parse("93.184.216.34");
+
+    /// <summary>Resolutor falso: los tests no deben depender del DNS real.</summary>
+    private static Func<string, CancellationToken, Task<IPAddress[]>> ResolverA(params string[] ips)
+        => (_, _) => Task.FromResult(Array.ConvertAll(ips, IPAddress.Parse));
+
     private static HttpClient ClienteCon(params Func<HttpRequestMessage, HttpResponseMessage>[] fabricas)
     {
-        return new HttpClient(new RedirectSeguroHandler { InnerHandler = new StubHandler(fabricas) });
+        return new HttpClient(new RedirectSeguroHandler(ResolverA("93.184.216.34")) { InnerHandler = new StubHandler(fabricas) });
+    }
+
+    private static HttpClient ClienteConResolutor(Func<string, CancellationToken, Task<IPAddress[]>> resolutor, params Func<HttpRequestMessage, HttpResponseMessage>[] fabricas)
+    {
+        return new HttpClient(new RedirectSeguroHandler(resolutor) { InnerHandler = new StubHandler(fabricas) });
+    }
+
+    [Theory]
+    [InlineData("127.0.0.1")]
+    [InlineData("10.0.0.5")]
+    [InlineData("192.168.1.50")]
+    [InlineData("169.254.169.254")]
+    [InlineData("::1")]
+    [InlineData("fd00::1")]
+    public async Task SendAsync_ConNombreQueResuelveAIpPrivada_DeberiaBloquearSinLlamarAlServidor(string ip)
+    {
+        int llamadas = 0;
+        using var client = ClienteConResolutor(ResolverA(ip), _ => { llamadas++; return new HttpResponseMessage(HttpStatusCode.OK); });
+
+        using var respuesta = await client.GetAsync("https://parece-publico.example.com/video.mp4");
+
+        respuesta.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        llamadas.Should().Be(0, "el bloqueo ocurre ANTES de conectar");
+    }
+
+    [Fact]
+    public async Task SendAsync_ConNombreConUnaIpPublicaYOtraPrivada_DeberiaBloquear()
+    {
+        using var client = ClienteConResolutor(ResolverA("93.184.216.34", "10.1.2.3"), _ => new HttpResponseMessage(HttpStatusCode.OK));
+
+        using var respuesta = await client.GetAsync("https://mixto.example.com/archivo");
+
+        respuesta.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task SendAsync_ConRedireccionQueApuntaALaRedLocal_DeberiaBloquearElSalto()
+    {
+        // El origen resuelve a IP pública, pero el 302 lleva a un host que resuelve a una IP privada
+        Func<string, CancellationToken, Task<IPAddress[]>> resolutor = (host, _) =>
+            Task.FromResult(new[] { host.StartsWith("interno") ? IPAddress.Parse("192.168.0.10") : IpPublica });
+        using var client = ClienteConResolutor(resolutor,
+            _ => Redireccion("https://interno.example.com/admin"),
+            _ => new HttpResponseMessage(HttpStatusCode.OK));
+
+        using var respuesta = await client.GetAsync("https://origen.example.com/archivo");
+
+        respuesta.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task SendAsync_ConIpLiteralPrivada_DeberiaBloquearSinResolverDns()
+    {
+        bool resolvio = false;
+        using var client = ClienteConResolutor((_, _) => { resolvio = true; return Task.FromResult(new[] { IpPublica }); },
+            _ => new HttpResponseMessage(HttpStatusCode.OK));
+
+        using var respuesta = await client.GetAsync("https://192.168.1.10/video.mp4");
+
+        respuesta.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        resolvio.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task SendAsync_SiElDnsFalla_NoDeberiaBloquearAqui_ElErrorLlegaAlConectar()
+    {
+        using var client = ClienteConResolutor((_, _) => throw new System.Net.Sockets.SocketException(11001),
+            _ => new HttpResponseMessage(HttpStatusCode.OK));
+
+        using var respuesta = await client.GetAsync("https://sin-dns.example.com/archivo");
+
+        respuesta.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     [Fact]

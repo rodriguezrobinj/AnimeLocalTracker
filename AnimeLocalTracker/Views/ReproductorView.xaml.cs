@@ -49,6 +49,63 @@ namespace AnimeLocalTracker.Views
 
             EnlazarToast((e.NewValue as ReproductorViewModel)?.DialogService);
             EnlazarCuentaAtras(e.NewValue as ReproductorViewModel);
+            EnlazarSubtitulos(e.NewValue as ReproductorViewModel);
+        }
+
+        // === Texto de los subtítulos: mismo patrón que el toast/cuenta atrás (ver comentario en el XAML).
+        // Escucha Player.Subtitles.SubsText; si el Player se recrea, se vuelve a enganchar al nuevo. ===
+        private ReproductorViewModel? _vmSubtitulos;
+        private INotifyPropertyChanged? _subtitulosPlayer;
+
+        private void EnlazarSubtitulos(ReproductorViewModel? vm)
+        {
+            if (ReferenceEquals(_vmSubtitulos, vm)) return;
+
+            if (_vmSubtitulos != null) _vmSubtitulos.PropertyChanged -= VmSubtitulos_PropertyChanged;
+            _vmSubtitulos = vm;
+            if (_vmSubtitulos != null) _vmSubtitulos.PropertyChanged += VmSubtitulos_PropertyChanged;
+
+            EnlazarSubtitulosDelPlayer(vm?.Player?.Subtitles);
+        }
+
+        private void VmSubtitulos_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(ReproductorViewModel.EstiloSubtitulos))
+            {
+                if (Dispatcher.CheckAccess()) ActualizarTextoSubtitulos();
+                else Dispatcher.InvokeAsync(ActualizarTextoSubtitulos);
+                return;
+            }
+
+            if (e.PropertyName != nameof(ReproductorViewModel.Player)) return;
+
+            if (Dispatcher.CheckAccess()) EnlazarSubtitulosDelPlayer(_vmSubtitulos?.Player?.Subtitles);
+            else Dispatcher.InvokeAsync(() => EnlazarSubtitulosDelPlayer(_vmSubtitulos?.Player?.Subtitles));
+        }
+
+        private void EnlazarSubtitulosDelPlayer(INotifyPropertyChanged? subtitulos)
+        {
+            if (ReferenceEquals(_subtitulosPlayer, subtitulos)) return;
+
+            if (_subtitulosPlayer != null) _subtitulosPlayer.PropertyChanged -= Subtitulos_PropertyChanged;
+            _subtitulosPlayer = subtitulos;
+            if (_subtitulosPlayer != null) _subtitulosPlayer.PropertyChanged += Subtitulos_PropertyChanged;
+
+            ActualizarTextoSubtitulos();
+        }
+
+        private void Subtitulos_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName != nameof(FlyleafLib.MediaPlayer.Subtitles.SubsText)) return;
+
+            if (Dispatcher.CheckAccess()) ActualizarTextoSubtitulos();
+            else Dispatcher.InvokeAsync(ActualizarTextoSubtitulos);
+        }
+
+        private void ActualizarTextoSubtitulos()
+        {
+            SubtitulosVista.Texto = (_subtitulosPlayer as FlyleafLib.MediaPlayer.Subtitles)?.SubsText ?? string.Empty;
+            SubtitulosVista.Estilo = _vmSubtitulos?.EstiloSubtitulos;
         }
 
         /// <summary>Se suscribe a los cambios del toast de IDialogService (y se desuscribe del anterior).</summary>
@@ -168,6 +225,7 @@ namespace AnimeLocalTracker.Views
         private void ReproductorView_Loaded(object sender, RoutedEventArgs e)
         {
             EnlazarToast((DataContext as ReproductorViewModel)?.DialogService);
+            EnlazarSubtitulos(DataContext as ReproductorViewModel);
             DesactivarInteraccionNativaDelHost();
 
             // Suscribir al pipeline global de input DESPUÉS de que FlyleafHost
@@ -250,6 +308,7 @@ namespace AnimeLocalTracker.Views
             ToastReproductor.BeginAnimation(OpacityProperty, null);
             ToastReproductor.Opacity = 0;
 
+            EnlazarSubtitulos(null);
             EnlazarCuentaAtras(null);
             _cuentaAtrasMostrada = false;
             CuentaAtrasSiguiente.BeginAnimation(OpacityProperty, null);

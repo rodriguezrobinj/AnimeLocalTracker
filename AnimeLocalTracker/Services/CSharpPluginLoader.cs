@@ -27,7 +27,9 @@ public static class CSharpPluginLoader
 {
     private static readonly TimeSpan TiempoMaximoPorDefecto = TimeSpan.FromSeconds(5);
 
-    public static List<IProveedorVideo> CargarProveedoresVideo(string carpetaPlugins, TimeSpan? tiempoMaximoPorPlugin = null)
+    /// <param name="esConfiable">SEC-01: si se indica, solo se cargan los .dll para los que devuelve true (la app pasa
+    /// aquí "plugins activados Y archivo aprobado con su huella SHA-256"). Null = cargar todos (pruebas).</param>
+    public static List<IProveedorVideo> CargarProveedoresVideo(string carpetaPlugins, TimeSpan? tiempoMaximoPorPlugin = null, Func<string, bool>? esConfiable = null)
     {
         var resultado = new List<IProveedorVideo>();
 
@@ -40,6 +42,12 @@ public static class CSharpPluginLoader
 
         foreach (string rutaDll in Directory.GetFiles(carpetaPlugins, "*.dll"))
         {
+            if (esConfiable != null && !esConfiable(rutaDll))
+            {
+                AppLogger.Info("CSharpPluginLoader", $"Plugin '{Path.GetFileName(rutaDll)}' omitido: plugins desactivados o archivo sin confianza (Configuración → Plugins).");
+                continue;
+            }
+
             resultado.AddRange(CargarConLimite(rutaDll, limite));
         }
 

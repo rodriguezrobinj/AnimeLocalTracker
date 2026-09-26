@@ -87,7 +87,7 @@
                                         <Grid>
                                             <!-- Placeholder DEBAJO de la portada: visible solo si Portada es null o falla la carga -->
                                             <materialDesign:PackIcon Kind="ImageOutline" Foreground="#5B4A82" Width="28" Height="28" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                            <Image Source="{Binding Portada}" Stretch="UniformToFill"/>
+                                            <Image Source="{Binding Portada, TargetNullValue={x:Null}}" Stretch="UniformToFill"/>
                                         </Grid>
                                     </Border>
                                     <Border Width="30" Height="30" CornerRadius="15" Background="#F472B6"

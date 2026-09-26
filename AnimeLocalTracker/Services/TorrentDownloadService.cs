@@ -62,6 +62,12 @@ public class TorrentDownloadService : ITorrentDownloadService, IDisposable
     // que ya usa BrowserStreamExtractor (Python) para su propio sondeo activo.
     private const int IntervaloSondeoMs = 500;
 
+    /// <summary>SEC-03: tamaño máximo aceptado para un archivo .torrent (los reales pesan decenas de KB).</summary>
+    internal const long MaxTorrentBytes = 5 * 1024 * 1024;
+
+    /// <summary>PERF-04: tiempo máximo que el cierre de la app espera a detener el sembrado.</summary>
+    private static readonly TimeSpan EsperaMaximaAlCerrar = TimeSpan.FromSeconds(3);
+
     private readonly HttpClient _httpClient;
     private readonly ClientEngine _engine;
     // Fase 2c: torrents que siguen sembrando tras completar (seguirSembrando=true) —
@@ -108,7 +114,8 @@ public class TorrentDownloadService : ITorrentDownloadService, IDisposable
                 using var res = await _httpClient.SendAsync(req, ct);
                 if (!res.IsSuccessStatusCode)
                     return new ResultadoTorrent(false, null, $"No se pudo descargar el .torrent (HTTP {(int) res.StatusCode}).");
-                torrentBytes = await res.Content.ReadAsByteArrayAsync(ct);
+                // SEC-03: un .torrent real pesa KB; el tope evita que un Nyaa comprometido (o un MITM) llene la memoria.
+                torrentBytes = await Core.EntradaSegura.LeerAcotadoAsync(res.Content, MaxTorrentBytes, ct);
             }
 
             var torrent = await Torrent.LoadAsync(torrentBytes);
@@ -156,6 +163,13 @@ public class TorrentDownloadService : ITorrentDownloadService, IDisposable
             manager = null;
 
             string rutaFinal = archivoElegido.DownloadCompleteFullPath;
+            // SEC-03 (defensa en profundidad): la ruta sale del contenido del .torrent; nunca mover/copiar un archivo
+            // que quede fuera de la carpeta temporal de esta descarga aunque MonoTorrent no lo hubiera impedido.
+            if (!Core.EntradaSegura.EstaDentroDe(carpetaTemporal, rutaFinal))
+            {
+                AppLogger.Warn("TorrentDownloadService", "El torrent apunta a una ruta fuera de la carpeta temporal; se descarta.");
+                return new ResultadoTorrent(false, null, "El torrent contiene una ruta de archivo no válida.");
+            }
             if (!File.Exists(rutaFinal))
                 return new ResultadoTorrent(false, null, "El torrent terminó pero no se encontró el archivo descargado.");
 
@@ -238,8 +252,15 @@ public class TorrentDownloadService : ITorrentDownloadService, IDisposable
         // Sync-over-async deliberado: Dispose (y el handler de ProcessExit que lo llama)
         // es síncrono, pero hace falta detener el sembrado activo antes de tirar el motor
         // — nunca dejar sembrando de fondo tras cerrar la app.
-        try { DetenerTodoElSeedingAsync().GetAwaiter().GetResult(); }
-        catch (Exception ex) { AppLogger.Debug("TorrentDownloadService", $"Error deteniendo el sembrado al cerrar: {ex.Message}"); }
+        // PERF-04: con tope de espera; si MonoTorrent se cuelga al detener, el cierre de la app no se queda colgado
+        // (el proceso termina igualmente y el sembrado muere con él).
+        try
+        {
+            var detener = Task.Run(DetenerTodoElSeedingAsync);
+            if (!detener.Wait(EsperaMaximaAlCerrar))
+                AppLogger.Warn("TorrentDownloadService", $"Detener el sembrado tardó más de {EsperaMaximaAlCerrar.TotalSeconds:0} s; se continúa con el cierre.");
+        }
+        catch (Exception ex) { AppLogger.Debug("TorrentDownloadService", $"Error deteniendo el sembrado al cerrar: {ex.GetBaseException().Message}"); }
         _engine.Dispose();
         GC.SuppressFinalize(this);
     }
