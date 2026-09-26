@@ -1,0 +1,47 @@
+db size MB 0.8 | wal MB 4.14
+user_version 9 | page_size 4096 | integrity ok
+TABLAS:
+  AnimeItem                  filas=   205 indices=[]
+      cols: AniListId,MalId,Titulo,NombresAlternativos,RutaCarpeta,UrlPortada,Sinopsis,Generos,TotalEpisodios,Estado,EstadoUsuario,Temporada,AnioLanzamiento,EsFavorito
+  RegistroEpisodio           filas=  3301 indices=['IX_RegistroEpisodio_UltimaReproduccion', 'IX_RegistroEpisodio_SyncCola', 'IX_RegistroEpisodio_AnimeEp', 'RegistroEpisodio_AniListId']
+      cols: Id,AniListId,NumeroEpisodio,RutaArchivo,VistoLocal,FavoritoLocal,SincronizadoEnNube,ProgresoSegundos,TotalSegundos,UltimaReproduccion,Resolucion,CodecVideo,Fps,
+  LogroDesbloqueado          filas=    46 indices=['IX_LogroDesbloqueado_Unico']
+      cols: Id,LogroId,Nivel,FechaUtc
+  RelacionAnime              filas=   714 indices=['IX_RelacionAnime_Unica']
+      cols: Id,AnimeId,RelacionadoId,Tipo
+  RelacionAnimeSync          filas=   345 indices=[]
+      cols: AnimeId,FechaUtc
+  DescargaHistorial          filas=    56 indices=['IX_DescargaHistorial_FechaUtc', 'DescargaHistorial_FechaUtc']
+      cols: Id,AniListId,AnimeTitulo,NumeroEpisodio,CarpetaDestino,RutaArchivo,TamanoBytes,FechaUtc,Completada,Error,TitulosAlternativos
+  ProximaEmisionLocal        filas=    54 indices=[]
+      cols: AniListId,Episodio,EmisionUnixUtc,ConsultadoUtc
+  PreferenciaEmision         filas=     5 indices=[]
+      cols: AniListId,Avisar,AutoDescargar,UltimoAvisado,UltimoDescargado
+  DatosExtraAnime            filas=    36 indices=[]
+      cols: AniListId,Formato,DuracionMin,NotaMedia,Estudio,Fuente,TrailerId,TrailerSitio,ConsultadoUtc
+CONSULTAS TÍPICAS (cache caliente):
+  galeria: todos los animes          min=   1.72 ms med=   1.94 ms filas=  205
+      PLAN: SCAN AnimeItem | USE TEMP B-TREE FOR ORDER BY
+  animes viendo                      min=   0.57 ms med=   0.63 ms filas=   38
+      PLAN: SCAN AnimeItem
+  historial (feed, OR + ORDER BY)    min=   1.50 ms med=   2.83 ms filas=   78
+      PLAN: SCAN RegistroEpisodio USING INDEX IX_RegistroEpisodio_UltimaReproduccion
+  episodios de un anime              min=   4.34 ms med=   5.67 ms filas= 1179
+      PLAN: SEARCH RegistroEpisodio USING INDEX IX_RegistroEpisodio_AnimeEp (AniListId=?) | SCALAR SUBQUERY 1 | SCAN AnimeItem
+  conteo por anime (GROUP BY)        min=   0.34 ms med=   0.37 ms filas=  111
+      PLAN: SCAN RegistroEpisodio USING COVERING INDEX RegistroEpisodio_AniListId
+ESCALABILIDAD (sintético sobre la copia):
+  --- x10: 32950 episodios
+  historial (feed)                   min=   0.79 ms med=   0.84 ms filas=  200
+      PLAN: SCAN RegistroEpisodio USING INDEX IX_RegistroEpisodio_UltimaReproduccion
+  episodios de un anime              min=   0.06 ms med=   0.07 ms filas=   15
+      PLAN: SEARCH RegistroEpisodio USING INDEX IX_RegistroEpisodio_AnimeEp (AniListId=?)
+  conteo por anime (GROUP BY)        min=   4.43 ms med=   5.39 ms filas= 2156
+      PLAN: SCAN RegistroEpisodio USING COVERING INDEX RegistroEpisodio_AniListId
+  --- x50: 164750 episodios
+  historial (feed)                   min=   0.87 ms med=   0.90 ms filas=  200
+      PLAN: SCAN RegistroEpisodio USING INDEX IX_RegistroEpisodio_UltimaReproduccion
+  episodios de un anime              min=   0.07 ms med=   0.07 ms filas=   16
+      PLAN: SEARCH RegistroEpisodio USING INDEX IX_RegistroEpisodio_AnimeEp (AniListId=?)
+  conteo por anime (GROUP BY)        min=  29.47 ms med=  32.24 ms filas=10353
+      PLAN: SCAN RegistroEpisodio USING COVERING INDEX RegistroEpisodio_AniListId

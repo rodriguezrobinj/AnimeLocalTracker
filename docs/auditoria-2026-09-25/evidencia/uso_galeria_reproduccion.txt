@@ -1,0 +1,8 @@
+inicio                     WS medio    340 MB (max    340) | Priv max    224 MB | CPU medio  26,2% (pico  26,2%) | Hilos max 38 | Handles max 988 | Hijos 1 (68 MB)
+A reposo galeria           WS medio    338 MB (max    340) | Priv max    224 MB | CPU medio   0,9% (pico   1,7%) | Hilos max 38 | Handles max 994 | Hijos 1 (68 MB)
+B scroll galeria           WS medio    418 MB (max    429) | Priv max    310 MB | CPU medio   5,1% (pico  19,0%) | Hilos max 36 | Handles max 981 | Hijos 1 (68 MB)
+C buscar y abrir ficha     WS medio    436 MB (max    438) | Priv max    310 MB | CPU medio  13,3% (pico  16,9%) | Hilos max 36 | Handles max 1006 | Hijos 1 (68 MB)
+D reproduciendo (video)    WS medio    542 MB (max    581) | Priv max    441 MB | CPU medio  10,4% (pico  23,9%) | Hilos max 52 | Handles max 1253 | Hijos 1 (69 MB)
+E tras cerrar player       WS medio    500 MB (max    529) | Priv max    390 MB | CPU medio   5,9% (pico   9,7%) | Hilos max 38 | Handles max 1121 | Hijos 1 (69 MB)
+F navegar Config/Estad     WS medio    475 MB (max    495) | Priv max    341 MB | CPU medio   2,0% (pico   9,8%) | Hilos max 35 | Handles max 1126 | Hijos 1 (69 MB)
+G reposo final             WS medio    466 MB (max    466) | Priv max    308 MB | CPU medio   0,1% (pico   0,2%) | Hilos max 35 | Handles max 1125 | Hijos 1 (69 MB)

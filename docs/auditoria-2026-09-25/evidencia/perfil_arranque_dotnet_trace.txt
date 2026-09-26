@@ -1,0 +1,70 @@
+Hilo principal: 9976 ms de actividad muestreada (de 46 a 10022 ms)
+
+Tiempo inclusivo de frames relevantes (ms):
+     9016 ms  x56  ALT.App.Main()
+     8466 ms  x71  PresentationFramework.il!System.Windows.Application.RunDispatcher(class System.Object)
+     8444 ms  x61  PresentationFramework.il!System.Windows.Application.RunInternal(class System.Windows.Window)
+     3330 ms  x145 ALT.App+<OnStartup>d__9.MoveNext()
+     2847 ms  x142 System.Private.CoreLib.il!System.Runtime.CompilerServices.AsyncTaskMethodBuilder`1+AsyncStateMachineBox`1[System.Threading.Tasks.VoidTa
+     2828 ms  x138 System.Private.CoreLib.il!System.Runtime.CompilerServices.AsyncTaskMethodBuilder`1+AsyncStateMachineBox`1[System.Threading.Tasks.VoidTa
+     2822 ms  x134 System.Private.CoreLib.il!System.Runtime.CompilerServices.AsyncTaskMethodBuilder`1+AsyncStateMachineBox`1[System.Threading.Tasks.VoidTa
+     1938 ms  x136 PresentationFramework.il!System.Windows.Window.ShowHelper(class System.Object)
+     1938 ms  x136 PresentationFramework.il!System.Windows.Window.Show()
+     1519 ms  x530 PresentationFramework.il!System.Windows.ResourceDictionary.GetValue(class System.Object,bool&)
+     1260 ms  x454 PresentationFramework.il!System.Windows.ResourceDictionary.GetValueWithoutLock(class System.Object,bool&)
+     1249 ms  x37  PresentationFramework.il!System.Windows.Application.LoadComponent(class System.Object,class System.Uri)
+     1198 ms  x24  Microsoft.Extensions.DependencyInjection!Microsoft.Extensions.DependencyInjection.ServiceProvider.GetService(value class Microsoft.Exte
+     1196 ms  x22  Microsoft.Extensions.DependencyInjection.Abstractions!Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequ
+     1196 ms  x22  Microsoft.Extensions.DependencyInjection.Abstractions!Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequ
+     1174 ms  x22  Microsoft.Extensions.DependencyInjection!Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.Resolve(class M
+     1057 ms  x221 PresentationFramework.il!System.Windows.ResourceDictionary.set_Source(class System.Uri)
+      697 ms  x10  ALT.Views.MainWindow..ctor(class AnimeLocalTracker.ViewModels.MainViewModel)
+      688 ms  x10  ALT.Views.MainWindow.InitializeComponent()
+      519 ms  x9   ALT.ViewModels.GaleriaViewModel+<CargarBibliotecaAsync>d__79.MoveNext()
+      503 ms  x8   System.Private.CoreLib.il!System.Runtime.CompilerServices.AsyncTaskMethodBuilder`1+AsyncStateMachineBox`1[System.Threading.Tasks.VoidTa
+      503 ms  x8   System.Private.CoreLib.il!System.Runtime.CompilerServices.AsyncTaskMethodBuilder`1+AsyncStateMachineBox`1[System.Threading.Tasks.VoidTa
+      503 ms  x8   System.Private.CoreLib.il!System.Runtime.CompilerServices.AsyncTaskMethodBuilder`1+AsyncStateMachineBox`1[System.Threading.Tasks.VoidTa
+      474 ms  x1   ALT.App.OnStartup(class System.Windows.StartupEventArgs)
+      445 ms  x7   ALT.ViewModels.GaleriaViewModel.CargarTemporadasYAniosFaltantesEnSegundoPlanoAsync(class System.Collections.Generic.IEnumerable`1<class
+      443 ms  x8   ALT.ViewModels.GaleriaViewModel+<CargarTemporadasYAniosFaltantesEnSegundoPlanoAsync>d__80.MoveNext()
+      405 ms  x116 PresentationFramework.il!System.Windows.ResourceDictionary.OnGettingValuePrivate(class System.Object,class System.Object&,bool&)
+      405 ms  x116 PresentationFramework.il!System.Windows.ResourceDictionary.OnGettingValue(class System.Object,class System.Object&,bool&)
+      385 ms  x109 PresentationFramework.il!System.Windows.ResourceDictionary.CreateObject(class System.Windows.Baml2006.KeyRecord)
+      382 ms  x6   Polly!Polly.Wrap.AsyncPolicyWrapEngine.ImplementationAsync(class System.Func`3<class Polly.Context,value class System.Threading.Cancell
+      382 ms  x6   Polly!Polly.Wrap.AsyncPolicyWrapEngine+<ImplementationAsync>d__0`1[System.__Canon].MoveNext()
+      382 ms  x6   Polly!Polly.Wrap.AsyncPolicyWrapEngine+<>c__DisplayClass0_0`1[System.__Canon].<ImplementationAsync>b__0(class Polly.Context,value class
+      382 ms  x6   Polly!Polly.Wrap.AsyncPolicyWrapEngine+<>c__DisplayClass0_0`1+<<ImplementationAsync>b__0>d[System.__Canon].MoveNext()
+      382 ms  x6   Polly!Polly.Retry.AsyncRetryEngine.ImplementationAsync(class System.Func`3<class Polly.Context,value class System.Threading.Cancellatio
+      382 ms  x6   Polly!Polly.Retry.AsyncRetryEngine+<ImplementationAsync>d__0`1[System.__Canon].MoveNext()
+      382 ms  x6   Polly!Polly.CircuitBreaker.AsyncCircuitBreakerEngine.ImplementationAsync(class System.Func`3<class Polly.Context,value class System.Thr
+      382 ms  x6   Polly!Polly.CircuitBreaker.AsyncCircuitBreakerEngine+<ImplementationAsync>d__0`1[System.__Canon].MoveNext()
+      321 ms  x1   ALT.Views.MainWindow.OnSourceInitialized(class System.EventArgs)
+      317 ms  x7   ALT.App.InitializeComponent()
+      276 ms  x1   ALT.App..ctor()
+
+Top 25 por tiempo inclusivo (sin infraestructura genérica):
+    16129 ms  PresentationCore.il!System.Windows.UIElement.Measure(value class System.Windows.Size)
+    16121 ms  PresentationFramework.il!System.Windows.FrameworkElement.MeasureCore(value class System.Windows.Size)
+     9016 ms  ALT.App.Main()
+     8444 ms  PresentationFramework.il!System.Windows.Application.RunInternal(class System.Windows.Window)
+     8175 ms  UNMANAGED_CODE_TIME
+     6717 ms  System.Private.CoreLib.il!System.Runtime.CompilerServices.AsyncMethodBuilderCore.Start(!!0&)
+     5757 ms  ?!?
+     5511 ms  System.Private.CoreLib.il!System.Runtime.CompilerServices.AsyncTaskMethodBuilder`1[System.__Canon].Start(!!0&)
+     4717 ms  WindowsBase.il!MS.Win32.HwndSubclass.SubclassWndProc(int,int32,int,int)
+     4568 ms  WindowsBase.il!MS.Win32.HwndWrapper.WndProc(int,int32,int,int,bool&)
+     4484 ms  PresentationFramework.il!System.Windows.Controls.Grid.MeasureOverride(value class System.Windows.Size)
+     3395 ms  PresentationCore.il!System.Windows.UIElement.Arrange(value class System.Windows.Rect)
+     3330 ms  ALT.App+<OnStartup>d__9.MoveNext()
+     3264 ms  PresentationFramework.il!System.Windows.FrameworkElement.ArrangeCore(value class System.Windows.Rect)
+     2796 ms  PresentationFramework.il!MS.Internal.Helper.MeasureElementWithSingleChild(class System.Windows.UIElement,value class System.Windows.Siz
+     2659 ms  PresentationFramework.il!System.Windows.Controls.Grid.MeasureCell(int32,bool)
+     2659 ms  PresentationFramework.il!System.Windows.Controls.Grid.MeasureCellsGroup(int32,value class System.Windows.Size,bool,bool,bool&)
+     2582 ms  PresentationFramework.il!System.Windows.Markup.WpfXamlLoader.TransformNodes(class System.Xaml.XamlReader,class System.Xaml.XamlObjectWr
+     2581 ms  PresentationFramework.il!System.Windows.Markup.WpfXamlLoader.Load(class System.Xaml.XamlReader,class System.Xaml.IXamlObjectWriterFacto
+     2313 ms  PresentationFramework.il!System.Windows.Controls.Border.MeasureOverride(value class System.Windows.Size)
+     2304 ms  PresentationFramework.il!System.Windows.Markup.XamlReader.LoadBaml(class System.IO.Stream,class System.Windows.Markup.ParserContext,cla
+     2287 ms  PresentationFramework.il!System.Windows.Markup.WpfXamlLoader.LoadBaml(class System.Xaml.XamlReader,bool,class System.Object,class Syste
+     2286 ms  System.Xaml.il!System.Xaml.XamlObjectWriter.WriteEndMember()
+     2151 ms  PresentationFramework.il!System.Windows.Controls.Control.MeasureOverride(value class System.Windows.Size)
+     2081 ms  System.Xaml.il!System.Xaml.XamlObjectWriter.Logic_DoAssignmentToParentProperty(class MS.Internal.Xaml.Context.ObjectWriterContext)

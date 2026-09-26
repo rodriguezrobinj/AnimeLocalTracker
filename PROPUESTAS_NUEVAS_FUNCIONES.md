@@ -311,6 +311,7 @@ Estas funcionalidades resuelven dolores de cabeza reales, fricción diaria y pé
      * Arrastra un meme o captura y la app localiza el anime, episodio y segundo exacto en tu disco.
 118. **Minijuego "Anime Music Quiz" Local**:
      * Trivia interactiva que reproduce 10s de openings al azar de tu biblioteca para adivinar el anime.
+     * *Investigación de viabilidad (adivina OP/ED, personaje y anime): [docs/investigacion-minijuegos.md](docs/investigacion-minijuegos.md).*
 119. **Creador de Tier Lists Interactivo (Drag & Drop a PNG)**:
      * Organiza tus series en niveles S, A, B, C, D y exporta la imagen en alta calidad.
 120. **Generador de Cartas Coleccionables (Anime TCG Card)**:

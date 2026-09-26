@@ -1,0 +1,358 @@
+Run started:2026-09-26 02:09:10.756042+00:00
+
+Test results:
+>> Issue: [B404:blacklist] Consider possible security implications associated with the subprocess module.
+   Severity: Low   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_imports.html#b404-import-subprocess
+   Location: .\audio_skip_plugin.py:2:0
+1	import os
+2	import subprocess
+3	import json
+
+--------------------------------------------------
+>> Issue: [B603:subprocess_without_shell_equals_true] subprocess call - check for execution of untrusted input.
+   Severity: Low   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b603_subprocess_without_shell_equals_true.html
+   Location: .\audio_skip_plugin.py:173:15
+172	    try:
+173	        proc = subprocess.run(cmd, capture_output=True, text=True)
+174	        if proc.returncode != 0:
+
+--------------------------------------------------
+>> Issue: [B603:subprocess_without_shell_equals_true] subprocess call - check for execution of untrusted input.
+   Severity: Low   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b603_subprocess_without_shell_equals_true.html
+   Location: .\audio_skip_plugin.py:193:11
+192	
+193	    proc = subprocess.run(cmd, capture_output=True)
+194	    if proc.returncode != 0 or len(proc.stdout) == 0:
+
+--------------------------------------------------
+>> Issue: [B311:blacklist] Standard pseudo-random generators are not suitable for security/cryptographic purposes.
+   Severity: Low   Confidence: High
+   CWE: CWE-330 (https://cwe.mitre.org/data/definitions/330.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b311-random
+   Location: .\automation\db_mock_generator.py:77:27
+76	                title = f"Mock Anime Series #{i:04d} - The Legendary Journey"
+77	                ep_count = random.choice([12, 24, 26, 50, 100])
+78	                status = random.choice(statuses)
+
+--------------------------------------------------
+>> Issue: [B311:blacklist] Standard pseudo-random generators are not suitable for security/cryptographic purposes.
+   Severity: Low   Confidence: High
+   CWE: CWE-330 (https://cwe.mitre.org/data/definitions/330.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b311-random
+   Location: .\automation\db_mock_generator.py:78:25
+77	                ep_count = random.choice([12, 24, 26, 50, 100])
+78	                status = random.choice(statuses)
+79	                genre_str = ", ".join(random.sample(genres, k=min(3, len(genres))))
+
+--------------------------------------------------
+>> Issue: [B311:blacklist] Standard pseudo-random generators are not suitable for security/cryptographic purposes.
+   Severity: Low   Confidence: High
+   CWE: CWE-330 (https://cwe.mitre.org/data/definitions/330.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b311-random
+   Location: .\automation\db_mock_generator.py:79:38
+78	                status = random.choice(statuses)
+79	                genre_str = ", ".join(random.sample(genres, k=min(3, len(genres))))
+80	                
+
+--------------------------------------------------
+>> Issue: [B311:blacklist] Standard pseudo-random generators are not suitable for security/cryptographic purposes.
+   Severity: Low   Confidence: High
+   CWE: CWE-330 (https://cwe.mitre.org/data/definitions/330.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b311-random
+   Location: .\automation\db_mock_generator.py:91:37
+90	                    f"https://placehold.co/300x400/png?text=Anime+{i}", "TV", status, ep_count, 2024,
+91	                    genre_str, round(random.uniform(6.0, 9.8), 1), random.randint(1000, 500000),
+92	                    1 if random.random() > 0.8 else 0,
+
+--------------------------------------------------
+>> Issue: [B311:blacklist] Standard pseudo-random generators are not suitable for security/cryptographic purposes.
+   Severity: Low   Confidence: High
+   CWE: CWE-330 (https://cwe.mitre.org/data/definitions/330.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b311-random
+   Location: .\automation\db_mock_generator.py:91:67
+90	                    f"https://placehold.co/300x400/png?text=Anime+{i}", "TV", status, ep_count, 2024,
+91	                    genre_str, round(random.uniform(6.0, 9.8), 1), random.randint(1000, 500000),
+92	                    1 if random.random() > 0.8 else 0,
+
+--------------------------------------------------
+>> Issue: [B311:blacklist] Standard pseudo-random generators are not suitable for security/cryptographic purposes.
+   Severity: Low   Confidence: High
+   CWE: CWE-330 (https://cwe.mitre.org/data/definitions/330.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b311-random
+   Location: .\automation\db_mock_generator.py:92:25
+91	                    genre_str, round(random.uniform(6.0, 9.8), 1), random.randint(1000, 500000),
+92	                    1 if random.random() > 0.8 else 0,
+93	                    1 if random.random() > 0.7 else 0,
+
+--------------------------------------------------
+>> Issue: [B311:blacklist] Standard pseudo-random generators are not suitable for security/cryptographic purposes.
+   Severity: Low   Confidence: High
+   CWE: CWE-330 (https://cwe.mitre.org/data/definitions/330.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b311-random
+   Location: .\automation\db_mock_generator.py:93:25
+92	                    1 if random.random() > 0.8 else 0,
+93	                    1 if random.random() > 0.7 else 0,
+94	                    random.randint(1, 5)
+
+--------------------------------------------------
+>> Issue: [B311:blacklist] Standard pseudo-random generators are not suitable for security/cryptographic purposes.
+   Severity: Low   Confidence: High
+   CWE: CWE-330 (https://cwe.mitre.org/data/definitions/330.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b311-random
+   Location: .\automation\db_mock_generator.py:94:20
+93	                    1 if random.random() > 0.7 else 0,
+94	                    random.randint(1, 5)
+95	                ))
+
+--------------------------------------------------
+>> Issue: [B311:blacklist] Standard pseudo-random generators are not suitable for security/cryptographic purposes.
+   Severity: Low   Confidence: High
+   CWE: CWE-330 (https://cwe.mitre.org/data/definitions/330.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b311-random
+   Location: .\automation\db_mock_generator.py:110:24
+109	                        f"C:\\Animes\\MockAnime_{i}\\Episodio_{ep:02d}.mkv",
+110	                        random.randint(300_000_000, 1_400_000_000),
+111	                        1440.0, is_watched, 1440.0 if is_watched else 0.0
+
+--------------------------------------------------
+>> Issue: [B404:blacklist] Consider possible security implications associated with the subprocess module.
+   Severity: Low   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_imports.html#b404-import-subprocess
+   Location: .\automation\package_release.py:2:0
+1	import os
+2	import subprocess
+3	import sys
+
+--------------------------------------------------
+>> Issue: [B603:subprocess_without_shell_equals_true] subprocess call - check for execution of untrusted input.
+   Severity: Low   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b603_subprocess_without_shell_equals_true.html
+   Location: .\automation\package_release.py:31:12
+30	            print("[Release] Compilando AnimeTrackerTools.exe...")
+31	            subprocess.run([sys.executable, build_py], cwd=os.path.dirname(build_py))
+32	            
+
+--------------------------------------------------
+>> Issue: [B603:subprocess_without_shell_equals_true] subprocess call - check for execution of untrusted input.
+   Severity: Low   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b603_subprocess_without_shell_equals_true.html
+   Location: .\automation\package_release.py:42:14
+41	        ]
+42	        res = subprocess.run(dotnet_cmd)
+43	        if res.returncode != 0:
+
+--------------------------------------------------
+>> Issue: [B603:subprocess_without_shell_equals_true] subprocess call - check for execution of untrusted input.
+   Severity: Low   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b603_subprocess_without_shell_equals_true.html
+   Location: .\automation\package_release.py:56:22
+55	        try:
+56	            vpk_res = subprocess.run(vpk_cmd)
+57	            if vpk_res.returncode == 0:
+
+--------------------------------------------------
+>> Issue: [B404:blacklist] Consider possible security implications associated with the subprocess module.
+   Severity: Low   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_imports.html#b404-import-subprocess
+   Location: .\build_binary.py:2:0
+1	import os
+2	import subprocess
+3	import shutil
+
+--------------------------------------------------
+>> Issue: [B603:subprocess_without_shell_equals_true] subprocess call - check for execution of untrusted input.
+   Severity: Low   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b603_subprocess_without_shell_equals_true.html
+   Location: .\build_binary.py:41:10
+40	    
+41	    res = subprocess.run(cmd, cwd=script_dir)
+42	    if res.returncode == 0:
+
+--------------------------------------------------
+>> Issue: [B404:blacklist] Consider possible security implications associated with the subprocess module.
+   Severity: Low   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_imports.html#b404-import-subprocess
+   Location: .\media\episode_metadata.py:2:0
+1	import json
+2	import subprocess
+3	from typing import Dict, Any, List
+
+--------------------------------------------------
+>> Issue: [B607:start_process_with_partial_path] Starting a process with a partial executable path
+   Severity: Low   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b607_start_process_with_partial_path.html
+   Location: .\media\episode_metadata.py:18:22
+17	
+18	            ffprobe = subprocess.run(
+19	                ["ffprobe", *argumentos_ffprobe(),
+20	                 "-print_format", "json", "-show_format", "-show_streams", video_path],
+21	                capture_output=True, text=True, timeout=30
+22	            )
+23	            if ffprobe.returncode != 0:
+
+--------------------------------------------------
+>> Issue: [B603:subprocess_without_shell_equals_true] subprocess call - check for execution of untrusted input.
+   Severity: Low   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b603_subprocess_without_shell_equals_true.html
+   Location: .\media\episode_metadata.py:18:22
+17	
+18	            ffprobe = subprocess.run(
+19	                ["ffprobe", *argumentos_ffprobe(),
+20	                 "-print_format", "json", "-show_format", "-show_streams", video_path],
+21	                capture_output=True, text=True, timeout=30
+22	            )
+23	            if ffprobe.returncode != 0:
+
+--------------------------------------------------
+>> Issue: [B404:blacklist] Consider possible security implications associated with the subprocess module.
+   Severity: Low   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_imports.html#b404-import-subprocess
+   Location: .\media\episode_metadata.py:83:12
+82	
+83	            import subprocess as sp
+84	            result = sp.run(
+
+--------------------------------------------------
+>> Issue: [B607:start_process_with_partial_path] Starting a process with a partial executable path
+   Severity: Low   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b607_start_process_with_partial_path.html
+   Location: .\media\episode_metadata.py:84:21
+83	            import subprocess as sp
+84	            result = sp.run(
+85	                ["ffmpeg", "-y", "-nostdin", "-max_alloc", MAX_ALLOC,
+86	                 "-ss", str(timestamp), "-i", video_path,
+87	                 "-frames:v", "1", "-vf", f"scale={width}:-2", "-q:v", "3", output_path],
+88	                capture_output=True, text=True, timeout=60
+89	            )
+90	            if result.returncode == 0:
+
+--------------------------------------------------
+>> Issue: [B603:subprocess_without_shell_equals_true] subprocess call - check for execution of untrusted input.
+   Severity: Low   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b603_subprocess_without_shell_equals_true.html
+   Location: .\media\episode_metadata.py:84:21
+83	            import subprocess as sp
+84	            result = sp.run(
+85	                ["ffmpeg", "-y", "-nostdin", "-max_alloc", MAX_ALLOC,
+86	                 "-ss", str(timestamp), "-i", video_path,
+87	                 "-frames:v", "1", "-vf", f"scale={width}:-2", "-q:v", "3", output_path],
+88	                capture_output=True, text=True, timeout=60
+89	            )
+90	            if result.returncode == 0:
+
+--------------------------------------------------
+>> Issue: [B404:blacklist] Consider possible security implications associated with the subprocess module.
+   Severity: Low   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_imports.html#b404-import-subprocess
+   Location: .\media\scene_detector.py:4:0
+3	import shutil
+4	import subprocess
+5	from typing import Dict, Any, List, Optional, Tuple
+
+--------------------------------------------------
+>> Issue: [B603:subprocess_without_shell_equals_true] subprocess call - check for execution of untrusted input.
+   Severity: Low   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b603_subprocess_without_shell_equals_true.html
+   Location: .\media\scene_detector.py:224:19
+223	            ]
+224	            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+225	            if proc.returncode != 0:
+
+--------------------------------------------------
+>> Issue: [B603:subprocess_without_shell_equals_true] subprocess call - check for execution of untrusted input.
+   Severity: Low   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b603_subprocess_without_shell_equals_true.html
+   Location: .\media\scene_detector.py:261:21
+260	        try:
+261	            result = subprocess.run(
+262	                [ffprobe, *argumentos_ffprobe(),
+263	                 "-show_entries", "format=duration",
+264	                 "-of", "json", video_path],
+265	                capture_output=True, text=True, timeout=30
+266	            )
+267	            data = json.loads(result.stdout)
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b110_try_except_pass.html
+   Location: .\parsers\anime_parser.py:46:20
+45	                        break
+46	                    except Exception:
+47	                        pass
+48	
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b110_try_except_pass.html
+   Location: .\parsers\anime_parser.py:55:12
+54	                season_number = int(re.sub(r'[^\d]', '', str(season_raw)))
+55	            except Exception:
+56	                pass
+57	        if season_number is None:
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b110_try_except_pass.html
+   Location: .\parsers\anime_parser.py:62:16
+61	                    season_number = int(s_match.group(1))
+62	                except Exception:
+63	                    pass
+64	
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.4/plugins/b110_try_except_pass.html
+   Location: .\resolvers\browser_stream_extractor.py:127:20
+126	                        page.mouse.click(640, 360)
+127	                    except Exception:
+128	                        pass
+129	
+
+--------------------------------------------------
+
+Code scanned:
+	Total lines of code: 1359
+	Total lines skipped (#nosec): 0
+	Total potential issues skipped due to specifically being disabled (e.g., #nosec BXXX): 0
+
+Run metrics:
+	Total issues (by severity):
+		Undefined: 0
+		Low: 31
+		Medium: 0
+		High: 0
+	Total issues (by confidence):
+		Undefined: 0
+		Low: 0
+		Medium: 0
+		High: 31
+Files skipped (0):
