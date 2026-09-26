@@ -1,0 +1,21 @@
+# Dependencias EXTRA del daemon Python, además de las de pyproject.toml (que es la fuente de las versiones directas).
+# Se compilan juntas a requirements.txt (con hashes SHA-256) con:
+#   py -3.11 -m pip install pip-tools
+#   py -3.11 -m piptools compile --pre --allow-unsafe --generate-hashes --strip-extras -o requirements.txt pyproject.toml requirements.in
+#   (revisar después que ningún paquete salvo anitopy quede en versión rc/beta: grep -E "==.*(rc|a|b)[0-9]" requirements.txt)
+# El lock se instala con:  python -m pip install --require-hashes -r tools/python/requirements.txt
+#                          python -m pip install --no-deps -e tools/python
+
+# Solo existe como pre-lanzamiento (2.2.0rc2); pyproject pide >=2.1.2 y el resolvedor de pip-compile no admite
+# pre-lanzamientos salvo que se fijen explícitamente.
+anitopy==2.2.0rc2
+
+# Suplantación de huella TLS para yt-dlp (la usaba el script de release por su cuenta).
+curl_cffi>=0.10,<0.11
+
+# Empaquetado del daemon (.exe).
+pyinstaller>=6.22,<7
+
+# El lock se compila con --pre (por anitopy): sin este tope el resolvedor eligió un BETA de pydantic (2.14.0b2).
+# Se fija a la versión estable con la que se probó el daemon.
+pydantic==2.13.4
