@@ -11,7 +11,9 @@
 anitopy==2.2.0rc2
 
 # Suplantación de huella TLS para yt-dlp (la usaba el script de release por su cuenta).
-curl_cffi>=0.10,<0.11
+# >=0.15 por PYSEC-2026-2431 (pip-audit en CI); yt-dlp 2026.8.19 soporta curl_cffi hasta 0.16.x. Se fija a la última
+# estable: con --pre (por anitopy) el resolvedor elegía un beta (0.16.4b1).
+curl_cffi==0.16.3
 
 # Empaquetado del daemon (.exe).
 pyinstaller>=6.22,<7
