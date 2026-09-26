@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -71,7 +72,7 @@ public class DetalleMusicaTests
         var op = new AnimeThemeInfo { Slug = "OP1", Tipo = "OP", AudioUrlOgg = "https://a.animethemes.moe/op.ogg" };
         _themesService.Setup(s => s.ObtenerTemasAsync(7, It.IsAny<CancellationToken>())).ReturnsAsync(new List<AnimeThemeInfo> { op });
         _themesDownload.Setup(d => d.EstaDescargado(7, op)).Returns(false);
-        _themesDownload.Setup(d => d.DescargarYConvertirAsync(7, op, It.IsAny<CancellationToken>())).ReturnsAsync(@"C:\Music\7\OP_OP1_v1_eptodos.mp3");
+        _themesDownload.Setup(d => d.DescargarYConvertirAsync(7, op, It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>())).ReturnsAsync(@"C:\Music\7\OP_OP1_v1_eptodos.mp3");
 
         var sut = await AbrirFichaAsync();
         await sut.CargarTemasMusicalesAsync();
@@ -89,7 +90,7 @@ public class DetalleMusicaTests
         var op = new AnimeThemeInfo { Slug = "OP1", Tipo = "OP", TituloCancion = "Yuusha", AudioUrlOgg = "https://a.animethemes.moe/op.ogg" };
         _themesService.Setup(s => s.ObtenerTemasAsync(7, It.IsAny<CancellationToken>())).ReturnsAsync(new List<AnimeThemeInfo> { op });
         _themesDownload.Setup(d => d.EstaDescargado(7, op)).Returns(false);
-        _themesDownload.Setup(d => d.DescargarYConvertirAsync(7, op, It.IsAny<CancellationToken>())).ReturnsAsync((string?)null);
+        _themesDownload.Setup(d => d.DescargarYConvertirAsync(7, op, It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>())).ReturnsAsync((string?)null);
 
         var sut = await AbrirFichaAsync();
         await sut.CargarTemasMusicalesAsync();

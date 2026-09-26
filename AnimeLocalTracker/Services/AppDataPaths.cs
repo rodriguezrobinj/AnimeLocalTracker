@@ -22,6 +22,8 @@ public static class AppDataPaths
     public static string ThumbnailsDir { get; } = Path.Combine(DataRoot, "Thumbnails");
     /// <summary>Openings/endings descargados de AnimeThemes.moe, convertidos a mp3, en subcarpetas por AniListId.</summary>
     public static string MusicDir { get; } = Path.Combine(DataRoot, "Music");
+    /// <summary>Vistas previas (temporales) de openings/endings aún no guardados; se vacía al arrancar la app.</summary>
+    public static string MusicPreviewsDir { get; } = Path.Combine(DataRoot, "MusicPreviews");
     public static string PluginsFolder { get; } = Path.Combine(DataRoot, "Plugins");
     public static string TorrentsCacheDir { get; } = Path.Combine(DataRoot, "TorrentsCache");
     public static string BibliotecaDb { get; } = Path.Combine(DataRoot, "biblioteca.db");

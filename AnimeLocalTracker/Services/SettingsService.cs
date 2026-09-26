@@ -56,6 +56,8 @@ public class SettingsService : ISettingsService
                         bool migrado = MigrarAtajoAnteriorEpisodioLegado(config);
                         // ATA-01: el settings.json puede estar editado a mano — sanear los atajos
                         SanitizarAtajos(config);
+                        // El volumen de la música también puede venir editado a mano (fuera de rango, NaN…)
+                        config.VolumenMusica = double.IsFinite(config.VolumenMusica) ? Math.Clamp(config.VolumenMusica, 0, 1) : new AppSettings().VolumenMusica;
                         // El estilo de subtítulos también puede venir editado a mano (o nulo)
                         config.EstiloSubtitulos = (config.EstiloSubtitulos ?? new EstiloSubtitulos()).Normalizar();
                         // SEC-01: la lista de plugins de confianza también puede venir editada a mano (o nula)

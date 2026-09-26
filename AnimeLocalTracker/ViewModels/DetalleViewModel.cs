@@ -57,7 +57,7 @@ public partial class DetalleViewModel : ObservableObject,
         _ctsCargaFicha?.Cancel();
         _ctsCargaFicha?.Dispose();
         _enrichmentCoordinator.Dispose();
-        _reproductorPreview?.Close();
+        LiberarMusica();
         GC.SuppressFinalize(this);
     }
     
@@ -182,6 +182,8 @@ public partial class DetalleViewModel : ObservableObject,
         IEmisionMonitorService? monitorEmision = null,
         IAnimeThemesService? animeThemesService = null,
         IAnimeThemesDownloadService? animeThemesDownload = null,
+        IAudioTrackPlayer? audioTrackPlayer = null,
+        IAudioDurationService? audioDuration = null,
         INyaaSourceService? nyaaSourceService = null,
         ISelectorTorrentService? selectorTorrentService = null,
         ISettingsService? settingsService = null)
@@ -191,6 +193,8 @@ public partial class DetalleViewModel : ObservableObject,
         _monitorEmision = monitorEmision;
         _animeThemesService = animeThemesService;
         _animeThemesDownload = animeThemesDownload;
+        _audioTrackPlayerInyectado = audioTrackPlayer;
+        _audioDuration = audioDuration;
         _animeTrackingService = animeTrackingService;
         _databaseService = databaseService;
         _authService = authService;
@@ -203,6 +207,7 @@ public partial class DetalleViewModel : ObservableObject,
         _nyaaSourceService = nyaaSourceService;
         _selectorTorrentService = selectorTorrentService;
         _settingsService = settingsService;
+        CargarAjustesMusica();
 
         WeakReferenceMessenger.Default.Register<UsuarioLogeadoMensaje>(this);
         WeakReferenceMessenger.Default.Register<UsuarioDesconectadoMensaje>(this);
@@ -931,6 +936,10 @@ public partial class DetalleViewModel : ObservableObject,
         {
             // Enviamos un mensaje a la aplicación principal para que abra nuestra nueva ventana de reproductor
             var episodiosDisponibles = _todosLosEpisodios.Where(e => e.Descargado && File.Exists(e.RutaCompleta)).ToList();
+
+            // El reproductor se dibuja encima de la ficha sin descargarla: la música de la ficha no debe sonar bajo el video.
+            DetenerMusica();
+
             WeakReferenceMessenger.Default.Send(new NavegarMensaje_Reproductor(
                 episodio.RutaCompleta,
                 AnimeSeleccionado.AniListId,

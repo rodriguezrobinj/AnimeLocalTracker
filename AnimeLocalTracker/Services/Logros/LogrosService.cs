@@ -50,7 +50,8 @@ public sealed class LogrosService : ILogrosService, IDisposable
         await _candado.WaitAsync();
         try
         {
-            var metricas = await Task.Run(() => MotorLogros.CalcularMetricas(animes, registros));
+            var partidas = await _databaseService.ObtenerPartidasMinijuegoAsync() ?? new List<PartidaMinijuego>();
+            var metricas = await Task.Run(() => MotorLogros.CalcularMetricas(animes, registros, partidas));
 
             var almacenados = await _databaseService.ObtenerLogrosDesbloqueadosAsync() ?? new List<LogroDesbloqueado>();
             bool primeraEvaluacion = !almacenados.Any(l => l.LogroId == MarcadorBase);

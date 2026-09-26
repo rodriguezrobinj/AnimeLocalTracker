@@ -1,7 +1,36 @@
 # Investigación: minijuegos dentro de la app
 
-> **Estado: investigación (no implementado).** Hecha el 2026-09-25 contra el código del repo y con pruebas reales
-> de las APIs externas. Amplía la propuesta #118 ("Anime Music Quiz") de `PROPUESTAS_NUEVAS_FUNCIONES.md`.
+> **Estado:** investigación hecha el 2026-09-25 contra el código del repo y con pruebas reales de las APIs externas.
+> Amplía la propuesta #118 ("Anime Music Quiz") de `PROPUESTAS_NUEVAS_FUNCIONES.md`.
+>
+> **Implementado el 2026-09-26 (sin commit todavía): "Adivina el anime" por pistas** — pestaña *Minijuegos*
+> (`MinijuegosViewModel`/`MinijuegosView`, lógica pura en `Services/Minijuegos/AdivinaAnimeJuego.cs`): 10 rondas de 4
+> opciones con animes de tu biblioteca, hasta 5 pistas progresivas (géneros → estreno → episodios → estudio/formato/fuente
+> → sinopsis con el título tapado), portada difuminada que se aclara, 100 pts menos 20 por pista extra (mínimo 20), atajos
+> 1-4 / P / Enter, ES/EN. Funciona sin red.
+>
+> **Implementado el 2026-09-26 (sin commit todavía): "Adivina el OP/ED"** — mismo esquema de 10 rondas y 4 opciones, pero
+> suena un clip de un opening/ending (6 s; "más audio" lo alarga a 12 y 20 s) y hay que decir de qué anime de tu biblioteca
+> es. Ayudas que restan 20 pts cada una: más audio, artista, estreno, géneros, título de la canción (artista y canción solo
+> se conocen con conexión). Al responder suena un trozo de 30 s y se ve la portada. Los clips salen de AnimeThemes (audio
+> `.ogg` → mp3 con el ffmpeg de la app) y se guardan en `Music/{id}` (la misma caché que las descargas de la ficha, ~2 MB
+> cada uno): una vez guardados se juega sin conexión, y si AnimeThemes no responde (12 s) se sigue solo con lo ya descargado.
+> La ronda siguiente se prepara en segundo plano mientras se juega la actual. Medido en la app real: primera ronda en ~8 s,
+> siguientes casi instantáneas. La pestaña *Minijuegos* pasó a ser un menú (`MinijuegosViewModel`) con un ViewModel por juego
+> (`AdivinaAnimeViewModel`, `AdivinaOpEdViewModel`, base común `MinijuegoViewModelBase`); lógica pura en
+> `AdivinaOpEdJuego.cs`, audio en `ClipPlayer` (un `MediaPlayer` nuevo por reproducción).
+>
+> **Implementado el 2026-09-26 (sin commit todavía): récords y logros de minijuegos.** Cada partida que llega al resumen se
+> guarda en la tabla `PartidaMinijuego` (migración v11: juego, fecha UTC, puntos, rondas, aciertos, mejor racha; las
+> abandonadas no cuentan; "Borrar todos mis datos" también las borra). De ahí salen los **récords** por juego (mejor
+> puntuación, partidas jugadas, % de aciertos; se ven en las tarjetas del menú, en la presentación de cada juego y en el
+> resumen con "¡Nuevo récord!" y el récord anterior; la primera partida no cuenta como récord) y una categoría nueva de
+> **logros "Minijuegos"** con 6 familias de 5 niveles (`mini_partidas`, `mini_aciertos`, `mini_puntuacion`,
+> `mini_perfectas`, `mini_racha`, `mini_oped`), que se evalúan al terminar cada partida y avisan con el toast habitual.
+> Lógica en `RecordsMinijuego`/`MinijuegosRecordsService`; el catálogo pasa de 79 a 109 niveles.
+>
+> **Aún no hecho:** fotograma de un episodio local, modo escritura libre, "solo animes que he visto", récords en la
+> pestaña Estadísticas, y Adivina el personaje.
 
 ## Pregunta
 
@@ -43,9 +72,16 @@ así que el primer minijuego puede funcionar **sin internet**.
 - **Fuente B (tu propio disco):** recortar el opening de un episodio local usando el rango que ya detecta la app.
   Funciona offline, pero **hay que comprobar** si esos rangos se guardan de forma persistente (no aparecen en la BD;
   hoy parecen calcularse al reproducir).
-- **Problema real medido hoy:** `api.animethemes.moe` respondió **HTTP 522 (servidor caído) en 3 de 3 intentos**, y tu
-  `app.log` ya muestra timeouts frecuentes contra ese servicio. Por eso el diseño debe ser **offline-first**: descargar
-  y cachear los clips (ya existe `AnimeThemesDownloadService` y la carpeta `Music`) y jugar solo con lo cacheado.
+- **Estado de AnimeThemes:** el 25-sep `api.animethemes.moe` respondió **HTTP 522 en 3 de 3 intentos** y tu `app.log`
+  ya muestra timeouts frecuentes. **El 26-sep volvió** (200 en <1 s, audio descargable), pero `song.artists` da 500
+  (los artistas se piden ahora por `song.performances.artist`). Por la inestabilidad, el diseño sigue siendo
+  **offline-first**: descargar y cachear los clips (ya existe `AnimeThemesDownloadService` y la carpeta `Music`) y
+  jugar solo con lo cacheado.
+- **Precisión del emparejamiento:** se hace por ID de AniList, no por título. Probado con los 207 animes de la
+  biblioteca: 153 emparejados sin ningún error de anime, 49 sin mapeo (películas/OVAs/sin estrenar, correcto que
+  salgan vacíos). Solo había omisiones en casos con varios *resources* (Grand Blue S3, Re:Zero OVAs), ya corregidas (26-sep). Para el juego:
+  deduplicar por `Slug` (73 temas tienen varias versiones), omitir la pregunta del artista cuando falte (26 %) y
+  respetar `EsSpoiler`. Detalle en `investigacion-fuentes-datos-minijuegos.md` (hallazgo 7).
 
 ### 3. Adivina el personaje — viabilidad: **media-alta, la silueta NO es viable**
 
@@ -85,7 +121,7 @@ favoritos y descripción. Con *Tensei shitara Slime Datta Ken* salieron Rimuru, 
 
 | Riesgo | Mitigación |
 |---|---|
-| AnimeThemes inestable (522/timeouts, medido hoy) | Caché local de clips, jugar solo con lo descargado, mensaje claro si no hay red |
+| AnimeThemes inestable (522 el 25-sep, include de artistas roto el 26-sep) | Caché local de clips, jugar solo con lo descargado, mensaje claro si no hay red |
 | AniList: hoy limita a **30 peticiones/min** (medido en la cabecera `X-RateLimit-Limit`; el valor "normal" de 90 lleva tiempo degradado) | Presupuesto de peticiones, consultas por lotes y caché en SQLite; cargar personajes solo al abrir el juego |
 | Spoilers en descripciones y personajes | Censura de nombres + modo "solo lo que he visto" |
 | Biblioteca pequeña → preguntas repetitivas | Mezclar con pool global popular (AniList) cuando haya red |
@@ -95,14 +131,14 @@ favoritos y descripción. Con *Tensei shitara Slime Datta Ken* salieron Rimuru, 
 
 1. **Adivina el anime** por pistas + fotograma local (S): todo offline, sin dependencias nuevas; valida pestaña,
    puntuación y logros.
-2. **Adivina el OP/ED** con caché (M): añade audio y descarga; requiere resolver la fiabilidad de AnimeThemes.
+2. **Adivina el OP/ED** con caché (M): añade audio y descarga; AnimeThemes ya responde (26-sep) y el emparejamiento por ID es fiable, y las omisiones con varios *resources* ya están corregidas; falta deduplicar versiones (por `Slug`) en el juego y cachear los clips por el historial de caídas.
 3. **Adivina el personaje** con revelado progresivo (M-L): tabla nueva, imágenes en caché, censura de spoilers.
 4. Extras (reto diario, rachas) (S cada uno).
 
 ## Lo que se probó y lo que no
 
-- **Probado:** consulta real a AniList (campos de personajes, imagen `230×345` RGB sin alfa); AnimeThemes (3 intentos,
-  `522`); revisión del código de `AnimeThemesService`, modelos, daemon Python y logros.
+- **Probado:** consulta real a AniList (campos de personajes, imagen `230×345` RGB sin alfa); AnimeThemes (25-sep: 3 intentos,
+  `522`; 26-sep: operativa, emparejamiento probado con los 207 animes de la biblioteca); revisión del código de `AnimeThemesService`, modelos, daemon Python y logros.
 - **Sin probar todavía:** reproducción de audio `.ogg` recortado (Flyleaf en modo solo audio vs. otro reproductor),
   rendimiento de extraer fotogramas en lote, y persistencia de los rangos de OP detectados.
 

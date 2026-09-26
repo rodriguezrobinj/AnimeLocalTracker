@@ -33,6 +33,10 @@ public class AppSettings
     public bool NotificarNuevosEpisodios { get; set; } = true;
     /// <summary>Idioma de la interfaz: "es" o "en".</summary>
     public string Idioma { get; set; } = "es";
+    /// <summary>Volumen de la música de openings/endings de la ficha (0 a 1). Se recuerda entre sesiones.</summary>
+    public double VolumenMusica { get; set; } = 0.8;
+    /// <summary>Al terminar un opening/ending de la ficha, pasa solo al siguiente que se pueda escuchar.</summary>
+    public bool ReproduccionContinuaMusica { get; set; } = true;
     /// <summary>Velocidad de reproducción aplicada al abrir un video (0.5 a 2.0).</summary>
     public double VelocidadReproduccionDefecto { get; set; } = 1.0;
     /// <summary>Compresor de rango dinámico de audio ("modo noche") activo por defecto al abrir un video.</summary>

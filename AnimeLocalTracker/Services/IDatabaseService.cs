@@ -46,6 +46,10 @@ public interface IDatabaseService
     Task<List<LogroDesbloqueado>> ObtenerLogrosDesbloqueadosAsync();
     Task GuardarLogrosDesbloqueadosAsync(IEnumerable<LogroDesbloqueado> logros);
 
+    // === MINIJUEGOS: partidas terminadas (de ahí salen los récords y las métricas de los logros de Minijuegos) ===
+    Task<List<PartidaMinijuego>> ObtenerPartidasMinijuegoAsync();
+    Task GuardarPartidaMinijuegoAsync(PartidaMinijuego partida);
+
     // === PRÓXIMA EMISIÓN: copia local del próximo episodio de animes en emisión (cuenta atrás sin red) ===
     Task<ProximaEmisionLocal?> ObtenerProximaEmisionAsync(int aniListId);
     Task GuardarProximaEmisionAsync(ProximaEmisionLocal proxima);
