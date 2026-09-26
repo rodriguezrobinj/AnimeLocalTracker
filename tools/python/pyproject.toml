@@ -9,7 +9,6 @@ dependencies = [
     "yt-dlp==2026.8.19",
     "playwright>=1.45.0",
     "pydantic>=2.7.0",
-    "opencv-python-headless>=4.9.0",
     "numpy>=1.26.0"
 ]
 

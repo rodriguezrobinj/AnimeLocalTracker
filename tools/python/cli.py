@@ -11,7 +11,6 @@ if hasattr(sys.stdout, 'reconfigure'):
 
 from parsers.anime_parser import AnimeFileParser
 from resolvers.stream_extractor import StreamExtractor
-from media.scene_detector import SceneDetector
 from media.episode_fingerprint import EpisodeFingerprint
 from media.episode_metadata import EpisodeMetadata, Thumbnail
 
@@ -64,11 +63,6 @@ def process_command(command: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         output_path = payload.get("output_path", "")
         headers = payload.get("headers")
         return StreamExtractor.download_stream(url, output_path, headers)
-
-    elif command == "detect-scenes":
-        video_path = payload.get("video_path", "")
-        max_sec = int(payload.get("max_seconds", 300))
-        return SceneDetector.detect_skip_candidates(video_path, max_sec)
 
     elif command == "inspect-episode":
         video_path = payload.get("video_path", "")

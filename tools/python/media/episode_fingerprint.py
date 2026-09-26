@@ -1,6 +1,12 @@
-import cv2
-import numpy as np
-from typing import Dict, Any, List, Tuple
+import subprocess
+from typing import Dict, Any, List
+
+from media.ffmpeg_guard import es_ruta_media_segura, MAX_ALLOC
+
+# dHash: se reduce el fotograma a 9x8 en gris y se compara cada columna con la siguiente (8x8 = 64 bits).
+ANCHO_HASH = 9
+ALTO_HASH = 8
+TIMEOUT_SEGUNDOS = 60
 
 
 class EpisodeFingerprint:
@@ -9,43 +15,59 @@ class EpisodeFingerprint:
     Permite:
     - find-duplicates: agrupar archivos que comparten el mismo contenido (hashing cercano)
     - fingerprint: generar la firma de un episodio para comparación posterior
+
+    El fotograma lo extrae ffmpeg (ya va incluido con la app); antes se usaba OpenCV, que solo servía para
+    esto y añadía ~110 MB al instalador.
     """
 
-    HASH_SPACES = {
-        "video": (0.0, 0.0, 0.0),        # t=30s frame clave (default)
-    }
+    @staticmethod
+    def _comando_ffmpeg(video_path: str, timestamp: float) -> List[str]:
+        return [
+            "ffmpeg", "-hide_banner", "-nostats", "-loglevel", "error", "-nostdin",
+            "-max_alloc", MAX_ALLOC,
+            "-ss", f"{max(timestamp, 0.0):.3f}", "-i", video_path,
+            "-frames:v", "1", "-an", "-sn",
+            "-vf", f"scale={ANCHO_HASH}:{ALTO_HASH}:flags=area,format=gray",
+            "-f", "rawvideo", "pipe:1",
+        ]
+
+    @staticmethod
+    def calcular_dhash(pixeles: bytes) -> str:
+        """dHash de 64 bits (16 hex) a partir de 9x8 píxeles en gris (fila a fila)."""
+        bits = 0
+        for fila in range(ALTO_HASH):
+            base = fila * ANCHO_HASH
+            for col in range(ANCHO_HASH - 1):
+                bits = (bits << 1) | (1 if pixeles[base + col + 1] > pixeles[base + col] else 0)
+        return f"{bits:016x}"
 
     @staticmethod
     def compute_fingerprint(video_path: str, timestamp: float = 30.0) -> Dict[str, Any]:
         """Extrae un frame en 'timestamp' y calcula su dHash de 8x8 (64 bits)."""
         try:
-            cap = cv2.VideoCapture(video_path)
-            if not cap.isOpened():
-                return {"success": False, "error": "no se pudo abrir el video"}
-            fps = cap.get(cv2.CAP_PROP_FPS)
-            if fps <= 0:
-                fps = 24.0
-            frame_number = int(timestamp * fps)
-            cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number)
-            ok, frame = cap.read()
-            width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) if cap.isOpened() else 0
-            cap.release()
-            if not ok or frame is None:
-                return {"success": False, "error": "no se pudo extraer el frame"}
+            # Hardening: solo archivos locales de video (nunca URLs ni esquemas de ffmpeg)
+            if not es_ruta_media_segura(video_path):
+                return {"success": False, "error": "ruta de video no permitida"}
 
-            # dHash: diferencia entre columnas contiguas, reducido a 8x8
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            small = cv2.resize(gray, (9, 8), interpolation=cv2.INTER_AREA)
-            diffs = small[:, 1:] > small[:, :-1]  # 8x8 booleano
-            bits = ''.join('1' if b else '0' for row in diffs for b in row)
-            hash_val = int(bits, 2)
+            proc = subprocess.run(
+                EpisodeFingerprint._comando_ffmpeg(video_path, timestamp),
+                capture_output=True, timeout=TIMEOUT_SEGUNDOS,
+            )
+            if proc.returncode != 0:
+                detalle = proc.stderr.decode("utf-8", "replace").strip().splitlines()
+                return {"success": False, "error": detalle[-1] if detalle else "ffmpeg fallo"}
+
+            pixeles = proc.stdout
+            if len(pixeles) < ANCHO_HASH * ALTO_HASH:
+                return {"success": False, "error": "no se pudo extraer el frame"}
 
             return {
                 "success": True,
-                "hash": f"{hash_val:016x}",
+                "hash": EpisodeFingerprint.calcular_dhash(pixeles),
                 "timestamp": timestamp,
-                "width": width,
             }
+        except subprocess.TimeoutExpired:
+            return {"success": False, "error": "timeout"}
         except Exception as ex:
             return {"success": False, "error": str(ex)}
 

@@ -35,18 +35,3 @@ def argumentos_ffprobe() -> list:
     """
     return ["-max_alloc", MAX_ALLOC, "-v", "error"]
 
-
-# Umbral del filtro scdet de ffmpeg: porcentaje 0-100 del cambio máximo entre fotogramas (default 10).
-# Con 10 un episodio de anime da ~1 corte por segundo; con 30 quedan solo los cortes fuertes (~14 en los
-# primeros 200 s), que es lo que esperan las heurísticas de intro/ending de scene_detector.
-SCDET_UMBRAL = 30
-
-
-def filtro_scdet(umbral: int = SCDET_UMBRAL) -> str:
-    """Cadena de filtros para detectar cortes de escena y volcarlos por stdout (``pts_time:...``).
-
-    ``t`` es el umbral (0-100) y ``s=1`` hace que pasen SOLO los fotogramas que son cambio de escena.
-    Antes se usaba ``scdet=s=0.30:sc=1``: ``s`` es un booleano (no un umbral) y ``sc`` no existe, por lo
-    que ffmpeg rechazaba el filtro ("Unable to parse 's' option value '0.30' as boolean").
-    """
-    return f"scdet=t={umbral}:s=1,metadata=print:file=-"
