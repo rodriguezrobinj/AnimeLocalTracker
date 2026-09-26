@@ -335,3 +335,6 @@ Comparación comando a comando contra el daemon anterior (ping, parse-filename, 
 **Para tener en cuenta**
 - Los hashes de la huella de respaldo cambian un poco (4 de 64 bits en la muestra) al usar otro reescalado; solo se comparan entre sí dentro de una misma consulta y la huella principal sigue siendo la de Rust, así que no hay datos guardados que invalidar.
 - Si algún día se quiere detección automática de intro/ending, hay un prototipo que usa un solo proceso de ffmpeg por ventana (28 s en AV1 frente a 750 s con OpenCV); no se integró porque no hay consumidor.
+
+### 12.1 `curl_cffi` actualizado por pip-audit en CI (2026-09-26)
+`pip-audit` en CI marcó `curl-cffi 0.10.0` (PYSEC-2026-2431, corregido en 0.15.0). Se fijó `curl_cffi==0.16.3` en `requirements.in` (yt-dlp 2026.8.19 admite hasta 0.16.x; con `--pre` el resolvedor elegía el beta 0.16.4b1, de ahí el pin exacto) y se recompiló el lock: es el único paquete que cambia. `pip-audit -r requirements.txt` local: sin vulnerabilidades. Daemon recompilado (64 MB) y comando por comando igual que antes.
