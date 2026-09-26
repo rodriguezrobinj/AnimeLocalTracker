@@ -9,6 +9,19 @@ public class AppSettings
     public string RutaBaseAnimes { get; set; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), "Anime");
     public bool AutoSkipIntroOutro { get; set; } = false;
     public bool SubtitulosPorDefecto { get; set; } = true;
+    /// <summary>Apariencia de los subtítulos (tipografía, tamaño, color, contorno, caja). Los valores
+    /// por defecto conservan el aspecto anterior a que fuera configurable.</summary>
+    public EstiloSubtitulos EstiloSubtitulos { get; set; } = new();
+    /// <summary>SEC-01: interruptor general de los plugins de terceros (.dll y .py de la carpeta Plugins). Apagado por
+    /// defecto: un plugin corre con TODOS los permisos de la app, así que solo se ejecuta si el usuario lo permite
+    /// aquí Y ha marcado ese archivo concreto como confiable (<see cref="PluginsConfiables"/>).</summary>
+    public bool PluginsHabilitados { get; set; } = false;
+
+    /// <summary>SEC-01: archivos de plugin en los que el usuario confió: nombre de archivo → huella SHA-256 (hex
+    /// en mayúsculas) del contenido en el momento de confiar. Si el archivo cambia, la huella ya no coincide y deja de
+    /// ser confiable hasta que el usuario lo confirme otra vez.</summary>
+    public Dictionary<string, string> PluginsConfiables { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
     public int DescargasSimultaneas { get; set; } = 3;
     public int IntervaloSincronizacionMinutos { get; set; } = 5;
     public bool BuscarActualizacionesAlIniciar { get; set; } = true;

@@ -56,6 +56,11 @@ public class SettingsService : ISettingsService
                         bool migrado = MigrarAtajoAnteriorEpisodioLegado(config);
                         // ATA-01: el settings.json puede estar editado a mano — sanear los atajos
                         SanitizarAtajos(config);
+                        // El estilo de subtítulos también puede venir editado a mano (o nulo)
+                        config.EstiloSubtitulos = (config.EstiloSubtitulos ?? new EstiloSubtitulos()).Normalizar();
+                        // SEC-01: la lista de plugins de confianza también puede venir editada a mano (o nula)
+                        config.PluginsConfiables = new Dictionary<string, string>(
+                            config.PluginsConfiables ?? new Dictionary<string, string>(), StringComparer.OrdinalIgnoreCase);
                         if (migrado) GuardarEnDiscoInterno(config);
                         return config;
                     }

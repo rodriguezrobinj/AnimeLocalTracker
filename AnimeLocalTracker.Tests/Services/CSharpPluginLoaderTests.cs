@@ -117,4 +117,28 @@ public class CSharpPluginLoaderTests : IDisposable
         proveedores.Should().BeEmpty();
         reloj.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(3));
     }
+
+    // === SEC-01: predicado de confianza ===
+
+    [Fact]
+    public void CargarProveedoresVideo_SiElPredicadoRechazaElArchivo_NoDeberiaCargarloNiEjecutarSuConstructor()
+    {
+        CopiarEnsambladoDeTestsComoPlugin();
+        var consultados = new List<string>();
+
+        var proveedores = CSharpPluginLoader.CargarProveedoresVideo(_carpeta, esConfiable: ruta => { consultados.Add(Path.GetFileName(ruta)); return false; });
+
+        proveedores.Should().BeEmpty();
+        consultados.Should().Equal("PluginDePrueba.dll");
+    }
+
+    [Fact]
+    public void CargarProveedoresVideo_SiElPredicadoAceptaElArchivo_DeberiaCargarlo()
+    {
+        CopiarEnsambladoDeTestsComoPlugin();
+
+        var proveedores = CSharpPluginLoader.CargarProveedoresVideo(_carpeta, esConfiable: _ => true);
+
+        proveedores.Should().Contain(p => p.Nombre == "PluginFalsoDePrueba");
+    }
 }

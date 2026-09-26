@@ -44,6 +44,11 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private bool _esModoMini;
 
+    /// <summary>Estilo de los subtítulos (Configuración → Reproducción). Se relee al abrir cada episodio,
+    /// así los cambios guardados se ven en el siguiente capítulo sin reiniciar la app.</summary>
+    [ObservableProperty]
+    private EstiloSubtitulos _estiloSubtitulos = new();
+
     [ObservableProperty]
     private string _tituloAnime = string.Empty;
 
@@ -339,6 +344,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                 _subtitulosHabilitados = config.SubtitulosPorDefecto;
                 _subtitulosIcon = config.SubtitulosPorDefecto ? "Subtitles" : "SubtitlesOutline";
                 _modoNocheActivo = config.ModoNocheActivo;
+                _estiloSubtitulos = (config.EstiloSubtitulos ?? new EstiloSubtitulos()).Normalizar();
             }
         }
     }
@@ -1056,6 +1062,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         PasosSaltoSegundos = config.PasosSaltoSegundos is 5 or 10 or 30 or 60 ? config.PasosSaltoSegundos : 10;
         SubtitulosHabilitados = config.SubtitulosPorDefecto;
         SubtitulosIcon = config.SubtitulosPorDefecto ? "Subtitles" : "SubtitlesOutline";
+        EstiloSubtitulos = (config.EstiloSubtitulos ?? new EstiloSubtitulos()).Normalizar();
     }
 
     private void AsignarMetadatosDeEpisodio(string rutaVideo, int animeId, int episodio, string tituloAnime, string? rutaPortada)

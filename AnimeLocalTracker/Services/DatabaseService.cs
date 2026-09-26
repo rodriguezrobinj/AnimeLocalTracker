@@ -88,8 +88,24 @@ public class DatabaseService : IDatabaseService, IDisposable
         (6, "relaciones entre animes (franquicias) + marca de sincronización", CrearTablasRelacionesAsync),
         (7, "historial de descargas (completadas y fallidas)", CrearTablaHistorialDescargasAsync),
         (8, "copia local de la próxima emisión (cuenta atrás)", CrearTablaProximaEmisionAsync),
-        (9, "preferencias de emisión (avisos/descarga automática) y datos extra de AniList", CrearTablasPreferenciasYDatosExtraAsync)
+        (9, "preferencias de emisión (avisos/descarga automática) y datos extra de AniList", CrearTablasPreferenciasYDatosExtraAsync),
+        (10, "eliminar índices duplicados creados por [Indexed] (DB-01)", EliminarIndicesRedundantesAsync)
     };
+
+    /// <summary>
+    /// v10 (DB-01): los atributos [Indexed] de los modelos generaban, en bases nuevas, índices automáticos que duplicaban a
+    /// los que crean las migraciones explícitas (mismo o menos columnas): <c>DescargaHistorial_FechaUtc</c>,
+    /// <c>RegistroEpisodio_UltimaReproduccion</c> y <c>RegistroEpisodio_AniListId</c> (prefijo de
+    /// IX_RegistroEpisodio_AnimeEp). Cada índice de más se actualiza en cada escritura sin ayudar a ninguna consulta.
+    /// Se quitan los [Indexed] de los modelos y aquí se borran los ya creados; es idempotente.
+    /// </summary>
+    private static async Task EliminarIndicesRedundantesAsync(SQLiteAsyncConnection conexion)
+    {
+        foreach (var indice in new[] { "DescargaHistorial_FechaUtc", "RegistroEpisodio_UltimaReproduccion", "RegistroEpisodio_AniListId" })
+        {
+            await conexion.ExecuteAsync($"DROP INDEX IF EXISTS {indice};");
+        }
+    }
 
     /// <summary>v9: avisos/descarga automática por anime y caché semanal de los datos extra de AniList.</summary>
     private static async Task CrearTablasPreferenciasYDatosExtraAsync(SQLiteAsyncConnection conexion)

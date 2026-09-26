@@ -18,6 +18,11 @@
              (vX.Y.Z) y los builds locales del script de empaquetado la toman de aquí. -->
         <Version>1.0.5</Version>
         <ApplicationIcon>Resources\app.ico</ApplicationIcon>
+        <!-- PERF-01 (auditoría 2026-09-25): precompila el ensamblado de la app a código nativo al PUBLICAR
+             (no afecta a dotnet build/test). Medido en Release con la biblioteca real: la ventana aparece en
+             3,34 s en vez de 3,99 s (-16 %) y la galería lista en 6,14 s en vez de 6,77 s (-9 %), a cambio de
+             ~13 MB más en el paquete. Solo con RuntimeIdentifier (el script de release publica con -r win-x64). -->
+        <PublishReadyToRun Condition="'$(RuntimeIdentifier)' == 'win-x64'">true</PublishReadyToRun>
     </PropertyGroup>
 
     <ItemGroup>

@@ -5,7 +5,7 @@
 [![.NET 8](https://img.shields.io/badge/.NET-8.0_WPF-512BD4?style=for-the-badge&logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
 [![AniList API](https://img.shields.io/badge/AniList-GraphQL_Sync-02A9FF?style=for-the-badge&logo=anilist&logoColor=white)](https://anilist.co/)
 [![Flyleaf Video Engine](https://img.shields.io/badge/Engine-Flyleaf_DirectX11-FF6B00?style=for-the-badge&logo=ffmpeg&logoColor=white)](https://github.com/FredTinc/Flyleaf)
-[![Tests Passing](https://img.shields.io/badge/Tests-913%2F913_Passing-28a745?style=for-the-badge&logo=githubactions&logoColor=white)](https://github.com/rodriguezrobinj/AnimeLocalTracker)
+[![Tests Passing](https://img.shields.io/badge/Tests-1112%2F1112_Passing-28a745?style=for-the-badge&logo=githubactions&logoColor=white)](https://github.com/rodriguezrobinj/AnimeLocalTracker)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](LICENSE)
 
 ---
@@ -92,7 +92,7 @@ cd AnimeLocalTracker
 # 2. Restaura dependencias y compila (Requiere .NET 8 SDK)
 dotnet build
 
-# 3. Verifica nuestra obsesión por la fiabilidad (Ejecuta más de 327 Tests Unitarios)
+# 3. Verifica nuestra obsesión por la fiabilidad (Ejecuta más de 1112 Tests Unitarios)
 dotnet test --no-build
 
 # 4. Inicia la experiencia en entorno de depuración

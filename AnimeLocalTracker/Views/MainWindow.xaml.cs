@@ -60,6 +60,12 @@ public partial class MainWindow : Window, IVentanaPrincipal
             }
             e.Handled = true;
         }
+        else if (e.Key == System.Windows.Input.Key.Escape && DataContext is MainViewModel vmSel && vmSel.SelectorTorrentService.SelectorVisible)
+        {
+            // Esc en el selector de torrents = Cancelar (igual que en las confirmaciones)
+            vmSel.SelectorTorrentService.CancelarSelectorCommand.Execute(null);
+            e.Handled = true;
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════

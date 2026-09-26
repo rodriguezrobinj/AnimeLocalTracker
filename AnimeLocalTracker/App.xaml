@@ -73,6 +73,7 @@
             <conv:GeneroTraducidoConverter x:Key="GeneroTraducido" />
             <conv:InverseBoolConverter x:Key="InverseBool" />
             <conv:EpisodioActualBrushConverter x:Key="EpisodioActualBrush" />
+            <conv:DialogoTonoConverter x:Key="DialogoTono" />
 
             <!-- ═══════════════════════════════════════════════════════════════ -->
             <!--  SISTEMA DE DISEÑO (tokens canónicos = paleta de DetalleView)  -->
@@ -96,6 +97,10 @@
             <SolidColorBrush x:Key="Brush.Warning" Color="#F59E0B" />
             <SolidColorBrush x:Key="Brush.Rose" Color="#F43F5E" />
             <SolidColorBrush x:Key="Brush.Scrim" Color="#99000000" />
+            <!-- Tintes: los colores semánticos de arriba al ~16 % de opacidad, para chips e insignias con icono -->
+            <SolidColorBrush x:Key="Brush.AccentTint" Color="#2960A5FA" />
+            <SolidColorBrush x:Key="Brush.SuccessTint" Color="#2934D399" />
+            <SolidColorBrush x:Key="Brush.WarningTint" Color="#29F59E0B" />
 
             <!-- ── Escala tipográfica (única fuente de verdad para tamaños) ── -->
             <Style x:Key="AppText.PageTitle" TargetType="TextBlock">
@@ -197,6 +202,126 @@
             </Style>
             <Style x:Key="AppOutlinedButton" TargetType="Button" BasedOn="{StaticResource MaterialDesignOutlinedButton}">
                 <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}"/>
+            </Style>
+
+            <!-- ── Diálogos modales (confirmaciones, avisos y selector de torrents) ── -->
+            <!-- Fondo que oscurece la ventana; aparece con un fundido corto. -->
+            <Style x:Key="AppOverlayScrim" TargetType="Grid">
+                <Setter Property="Background" Value="#B2000000"/>
+                <Style.Triggers>
+                    <Trigger Property="IsVisible" Value="True">
+                        <Trigger.EnterActions>
+                            <BeginStoryboard>
+                                <Storyboard>
+                                    <DoubleAnimation Storyboard.TargetProperty="Opacity" From="0" To="1" Duration="0:0:0.18"/>
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </Trigger.EnterActions>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+            <!-- Tarjeta del diálogo: misma piel que las tarjetas de la app, con sombra profunda y entrada suave. -->
+            <Style x:Key="AppDialogCard" TargetType="Border">
+                <Setter Property="Background" Value="{DynamicResource Brush.Surface1}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource Brush.BorderStrong}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="CornerRadius" Value="16"/>
+                <Setter Property="HorizontalAlignment" Value="Center"/>
+                <Setter Property="VerticalAlignment" Value="Center"/>
+                <Setter Property="SnapsToDevicePixels" Value="True"/>
+                <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
+                <Setter Property="RenderTransform">
+                    <Setter.Value>
+                        <ScaleTransform ScaleX="1" ScaleY="1"/>
+                    </Setter.Value>
+                </Setter>
+                <Setter Property="Effect">
+                    <Setter.Value>
+                        <DropShadowEffect BlurRadius="44" ShadowDepth="10" Direction="270" Opacity="0.6" Color="Black"/>
+                    </Setter.Value>
+                </Setter>
+                <Style.Triggers>
+                    <Trigger Property="IsVisible" Value="True">
+                        <Trigger.EnterActions>
+                            <BeginStoryboard>
+                                <Storyboard>
+                                    <DoubleAnimation Storyboard.TargetProperty="Opacity" From="0" To="1" Duration="0:0:0.2"/>
+                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" From="0.94" To="1" Duration="0:0:0.22">
+                                        <DoubleAnimation.EasingFunction>
+                                            <CubicEase EasingMode="EaseOut"/>
+                                        </DoubleAnimation.EasingFunction>
+                                    </DoubleAnimation>
+                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" From="0.94" To="1" Duration="0:0:0.22">
+                                        <DoubleAnimation.EasingFunction>
+                                            <CubicEase EasingMode="EaseOut"/>
+                                        </DoubleAnimation.EasingFunction>
+                                    </DoubleAnimation>
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </Trigger.EnterActions>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+            <!-- Botón secundario del diálogo (Cancelar) -->
+            <Style x:Key="AppDialogGhostButton" TargetType="Button" BasedOn="{StaticResource MaterialDesignOutlinedButton}">
+                <Setter Property="Height" Value="38"/>
+                <Setter Property="MinWidth" Value="104"/>
+                <Setter Property="Padding" Value="18,0"/>
+                <Setter Property="FontSize" Value="13"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource Brush.BorderStrong}"/>
+                <Setter Property="materialDesign:ButtonAssist.CornerRadius" Value="8"/>
+            </Style>
+            <!-- Botón principal del diálogo (Aceptar): el color de relleno lo pone cada diálogo según su tono -->
+            <Style x:Key="AppDialogPrimaryButton" TargetType="Button" BasedOn="{StaticResource MaterialDesignRaisedButton}">
+                <Setter Property="Height" Value="38"/>
+                <Setter Property="MinWidth" Value="116"/>
+                <Setter Property="Padding" Value="20,0"/>
+                <Setter Property="FontSize" Value="13"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="Foreground" Value="White"/>
+                <Setter Property="materialDesign:ButtonAssist.CornerRadius" Value="8"/>
+            </Style>
+            <!-- Chip informativo (semillas, tamaño, resolución…): el fondo lo pone quien lo usa -->
+            <Style x:Key="AppChip" TargetType="Border">
+                <Setter Property="CornerRadius" Value="7"/>
+                <Setter Property="Padding" Value="8,3"/>
+                <Setter Property="MinHeight" Value="24"/>
+                <Setter Property="Margin" Value="0,0,6,6"/>
+            </Style>
+            <!-- Tarjeta clicable de un candidato de torrent -->
+            <Style x:Key="AppTorrentCandidateButton" TargetType="Button">
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                <Setter Property="VerticalContentAlignment" Value="Center"/>
+                <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="Tarjeta" Background="{DynamicResource Brush.Surface2}" BorderBrush="{DynamicResource Brush.Border}"
+                                    BorderThickness="1" CornerRadius="10" Padding="16,13,12,7" SnapsToDevicePixels="True">
+                                <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                  VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Tarjeta" Property="Background" Value="{DynamicResource Brush.Surface3}"/>
+                                    <Setter TargetName="Tarjeta" Property="BorderBrush" Value="{DynamicResource Brush.Accent}"/>
+                                </Trigger>
+                                <Trigger Property="IsKeyboardFocused" Value="True">
+                                    <Setter TargetName="Tarjeta" Property="BorderBrush" Value="{DynamicResource Brush.AccentSoft}"/>
+                                    <Setter TargetName="Tarjeta" Property="BorderThickness" Value="2"/>
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="Tarjeta" Property="Background" Value="{DynamicResource Brush.Surface1}"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
             </Style>
 
             <!-- ═══════════════════════════════════════════════════════════════ -->

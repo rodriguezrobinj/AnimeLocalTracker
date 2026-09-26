@@ -274,7 +274,12 @@ public partial class App : Application
             // Plugins C# "drop-in": cualquier IProveedorVideo hallado en la carpeta de plugins
             // se suma a los proveedores nativos — el orquestador no distingue entre ambos.
             var proveedores = new List<IProveedorVideo> { sp.GetRequiredService<ProveedorVideoAnimeAv1>() };
-            proveedores.AddRange(CSharpPluginLoader.CargarProveedoresVideo(AppDataPaths.PluginsFolder));
+            // SEC-01: un .dll solo se carga si los plugins están activados Y el usuario confió en ese archivo con su
+            // huella SHA-256 actual (Configuración → Plugins). Por defecto no se carga ninguno.
+            var settingsPlugins = sp.GetRequiredService<ISettingsService>();
+            proveedores.AddRange(CSharpPluginLoader.CargarProveedoresVideo(
+                AppDataPaths.PluginsFolder,
+                esConfiable: ruta => AnimeLocalTracker.Core.ConfianzaPlugins.PuedeEjecutarse(settingsPlugins.ObtenerConfiguracion(), ruta)));
             return new OrquestadorMultiProveedor(proveedores);
         });
 
@@ -392,20 +397,9 @@ public partial class App : Application
             // Pedimos la instancia del servicio de base de datos
             var dbService = ServiceProvider.GetRequiredService<IDatabaseService>();
 
-            // Inicializar reproductor de video nativo (Flyleaf).
-            // NO es fatal: si falla, el reproductor degrada gracefully (CreateOptimizedPlayer lo maneja).
-            try
-            {
-                FlyleafLib.Engine.Start(new FlyleafLib.EngineConfig()
-                {
-                    FFmpegPath = ":FFmpeg", // Usa las DLLs del paquete NuGet Flyleaf.FFmpeg
-                    UIRefresh = true
-                });
-            }
-            catch (Exception flyleafEx)
-            {
-                AppLogger.Error("App", "No se pudo iniciar el motor Flyleaf (el reproductor quedará degradado)", flyleafEx);
-            }
+            // PERF-01: el motor de video (Flyleaf) ya NO se inicia aquí: cargar FFmpeg cuesta 0,4-0,55 s y
+            // retrasaba la aparición de la ventana. Se inicia justo después de mostrarla (ver
+            // IniciarMotorFlyleafTrasMostrarVentana).
 
             // Obligamos a que se cree el archivo y la tabla antes de continuar
             await dbService.InicializarBaseDatosAsync();
@@ -467,6 +461,7 @@ public partial class App : Application
             // con todas sus dependencias ya inyectadas.
             var mainWindow = ServiceProvider.GetRequiredService<MainWindow>();
             mainWindow.Show();
+            IniciarMotorFlyleafTrasMostrarVentana();
 
             // Arranque con Windows (StartupService añade "--bandeja" al comando del registro):
             // ocultar directo a la bandeja para no interrumpir el inicio de sesión con una ventana.
@@ -491,6 +486,33 @@ public partial class App : Application
                             "Error de inicio", MessageBoxButton.OK, MessageBoxImage.Error);
             Shutdown(1);
         }
+    }
+
+    /// <summary>
+    /// Inicializa el motor de video nativo (Flyleaf) cuando la interfaz ya está pintada y en reposo.
+    /// Engine.Start exige el hilo de UI y no tiene versión asíncrona útil (StartAsync también bloquea ~0,5 s
+    /// antes de volver y deja IsLoaded=false), así que en vez de sacarlo del hilo se retrasa hasta que la
+    /// ventana ya es visible. Es idempotente: si el usuario abre un video antes, ReproductorViewModel lo
+    /// inicia por su cuenta y esta llamada posterior cuesta 0 ms. NO es fatal: si falla, el reproductor
+    /// degrada (CreateOptimizedPlayer lo maneja).
+    /// </summary>
+    private void IniciarMotorFlyleafTrasMostrarVentana()
+    {
+        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.ApplicationIdle, () =>
+        {
+            try
+            {
+                FlyleafLib.Engine.Start(new FlyleafLib.EngineConfig()
+                {
+                    FFmpegPath = ":FFmpeg", // Usa las DLLs del paquete NuGet Flyleaf.FFmpeg
+                    UIRefresh = true
+                });
+            }
+            catch (Exception flyleafEx)
+            {
+                AppLogger.Error("App", "No se pudo iniciar el motor Flyleaf (el reproductor quedará degradado)", flyleafEx);
+            }
+        });
     }
 
     protected override void OnExit(ExitEventArgs e)

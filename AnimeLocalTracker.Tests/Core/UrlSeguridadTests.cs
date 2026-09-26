@@ -109,4 +109,62 @@ public class UrlSeguridadTests
     {
         UrlSeguridad.EsUrlDescargaHttpSegura(url).Should().BeFalse();
     }
+
+    // === SEC-02: destinos locales/privados ===
+
+    [Theory]
+    [InlineData("https://127.0.0.1/video.mp4")]
+    [InlineData("https://localhost/video.mp4")]
+    [InlineData("https://LOCALHOST:8443/video.mp4")]
+    [InlineData("https://10.0.0.7/video.mp4")]
+    [InlineData("https://172.16.5.4/video.mp4")]
+    [InlineData("https://172.31.255.1/video.mp4")]
+    [InlineData("https://192.168.0.10/video.mp4")]
+    [InlineData("https://169.254.169.254/latest/meta-data")]
+    [InlineData("https://100.64.1.1/video.mp4")]
+    [InlineData("https://0.0.0.0/video.mp4")]
+    [InlineData("https://[::1]/video.mp4")]
+    [InlineData("https://[fe80::1]/video.mp4")]
+    [InlineData("https://[fd12:3456::1]/video.mp4")]
+    [InlineData("https://[::ffff:192.168.1.1]/video.mp4")]
+    [InlineData("https://nas/video.mp4")]
+    [InlineData("https://impresora.local/video.mp4")]
+    [InlineData("https://servicio.internal/video.mp4")]
+    [InlineData("https://router.lan/video.mp4")]
+    public void EsUrlDescargaHttpSegura_HostLocalOPrivado_DeberiaRechazar(string url)
+    {
+        UrlSeguridad.EsUrlDescargaHttpSegura(url).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData("https://8.8.8.8/video.mp4")]
+    [InlineData("https://93.184.216.34/video.mp4")]
+    [InlineData("https://172.32.0.1/video.mp4")]   // justo fuera de 172.16/12
+    [InlineData("https://172.15.0.1/video.mp4")]
+    [InlineData("https://100.63.0.1/video.mp4")]   // justo fuera de 100.64/10
+    [InlineData("https://[2606:4700:4700::1111]/video.mp4")]
+    [InlineData("https://cdn.ejemplo.com/video.mp4")]
+    [InlineData("https://mi-local.com/video.mp4")] // "local" en medio del nombre no es el sufijo .local
+    public void EsUrlDescargaHttpSegura_HostPublico_DeberiaAceptar(string url)
+    {
+        UrlSeguridad.EsUrlDescargaHttpSegura(url).Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData("192.168.1.1", false)]
+    [InlineData("8.8.4.4", true)]
+    [InlineData("198.18.0.1", false)]
+    [InlineData("198.20.0.1", true)]
+    [InlineData("224.0.0.1", false)]
+    [InlineData("255.255.255.255", false)]
+    [InlineData("240.0.0.1", false)]
+    [InlineData("2001:db8::1", false)]
+    [InlineData("2001:4860:4860::8888", true)]
+    [InlineData("ff02::1", false)]
+    [InlineData("::ffff:10.0.0.1", false)]
+    [InlineData("::ffff:8.8.8.8", true)]
+    public void EsIpPublica_DeberiaClasificarLosRangos(string ip, bool esperado)
+    {
+        UrlSeguridad.EsIpPublica(System.Net.IPAddress.Parse(ip)).Should().Be(esperado);
+    }
 }

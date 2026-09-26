@@ -7,7 +7,9 @@ public class RegistroEpisodio
     [PrimaryKey, AutoIncrement]
     public int Id { get; set; }
     
-    [Indexed] // Indexado para que las búsquedas sean ultrarrápidas
+    // DB-01: SIN [Indexed]. Las búsquedas por anime usan el índice compuesto IX_RegistroEpisodio_AnimeEp
+    // (AniListId, NumeroEpisodio), que ya cubre AniListId como prefijo; el índice automático de [Indexed] era redundante
+    // y solo encarecía cada escritura. Los índices se crean con migraciones explícitas (ver DatabaseService.Migraciones).
     public int AniListId { get; set; } // Para saber a qué anime pertenece este capítulo
     
     public int NumeroEpisodio { get; set; }
@@ -23,7 +25,7 @@ public class RegistroEpisodio
     // Reanudación de reproducción (Resume Playback):
     public double ProgresoSegundos { get; set; }
     public double TotalSegundos { get; set; }
-    [Indexed]
+    // DB-01: sin [Indexed]; el índice IX_RegistroEpisodio_UltimaReproduccion lo crea la migración v3.
     public System.DateTime? UltimaReproduccion { get; set; }
 
     // Metadatos técnicos persistentes (ffprobe + miniaturas locales)
