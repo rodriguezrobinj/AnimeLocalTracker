@@ -43,6 +43,12 @@ public partial class DescargaItem : ObservableObject
     [NotifyPropertyChangedFor(nameof(DetalleTexto))]
     private int _reintentos;
 
+    /// <summary>Sin internet: espera a que vuelva la red para seguir sola.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(EstadoTexto))]
+    [NotifyPropertyChangedFor(nameof(DetalleTexto))]
+    private bool _sinConexion;
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(DetalleTexto))]
     private string _velocidadDescarga = string.Empty;
@@ -110,6 +116,7 @@ public partial class DescargaItem : ObservableObject
     public string EstadoTexto =>
         IsPaused ? LocalizationService.T("Desc_EnPausa")
         : EnCola ? LocalizationService.T("Desc_EstadoEnCola")
+        : SinConexion ? LocalizationService.T("Desc_EstadoSinConexion")
         : Reintentos > 0 && Progreso <= 0 ? string.Format(LocalizationService.T("Desc_ReintentoFormato"), Reintentos)
         : LocalizationService.T("Desc_EstadoDescargando");
 
@@ -119,6 +126,7 @@ public partial class DescargaItem : ObservableObject
         get
         {
             if (IsPaused || EnCola) return string.Empty;
+            if (SinConexion) return LocalizationService.T("Desc_DetalleSinConexion");
             var partes = new List<string>(3);
             if (!string.IsNullOrEmpty(VelocidadDescarga)) partes.Add(VelocidadDescarga);
             if (!string.IsNullOrEmpty(TiempoRestante)) partes.Add(string.Format(LocalizationService.T("Desc_EtaFormato"), TiempoRestante));

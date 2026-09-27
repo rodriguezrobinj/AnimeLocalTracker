@@ -20,30 +20,8 @@ public partial class FileScannerService : IFileScannerService
 
             var dirInfo = new DirectoryInfo(carpeta);
 
-            // Limpiar archivos residuales incompletos de descargas interrumpidas propias
-            try
-            {
-                var residuales = dirInfo.EnumerateFiles("Episodio *.downloading", SearchOption.TopDirectoryOnly);
-                foreach (var res in residuales)
-                {
-                    try
-                    {
-                        res.Delete();
-                    }
-                    catch (IOException)
-                    {
-                        // Archivo en uso por una descarga activa actual: omitir limpiamente
-                    }
-                    catch (Exception ex)
-                    {
-                        AppLogger.Debug("FileScannerService", $"No se pudo eliminar archivo residual '{res.FullName}': {ex.Message}");
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Debug("FileScannerService", $"Error al limpiar residuales en {carpeta}: {ex.Message}");
-            }
+            // Solo parciales abandonados: los de descargas en pausa o por reanudar se conservan
+            LimpiezaDescargasParciales.LimpiarAbandonados(dirInfo, DateTime.UtcNow);
 
             try
             {

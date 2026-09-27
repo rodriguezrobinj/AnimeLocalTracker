@@ -258,6 +258,7 @@ public partial class DescargasViewModel : ObservableObject, IRecipient<DescargaP
             }
             item.EnCola = message.EnCola;
             item.Reintentos = message.Reintentos;
+            item.SinConexion = message.SinConexion;
             item.Progreso = message.Progreso;
             item.IsDownloading = message.IsDownloading;
             item.IsCompleted = message.IsCompleted;
@@ -310,6 +311,7 @@ public partial class DescargasViewModel : ObservableObject, IRecipient<DescargaP
                 IsPaused = message.IsPaused,
                 EnCola = message.EnCola,
                 Reintentos = message.Reintentos,
+                SinConexion = message.SinConexion,
                 VelocidadBps = message.VelocidadBps,
                 VelocidadDescarga = message.VelocidadDescarga ?? string.Empty
             });

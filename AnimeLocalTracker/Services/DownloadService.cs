@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -24,9 +25,41 @@ public class DownloadService : IDownloadService
     private const int MinimoTrozos = 6;
     private const int MaxReintentosPorTrozo = 4;
     private const int ConexionesTotalesObjetivo = 12;
+    private const int MinConexionesPorDescarga = 3;
+    private const int MaxConexionesPorDescarga = 8;
+    // Ajuste automático (fase 4): una descarga puede subir por encima del reparto justo si medir
+    // demuestra que va más rápido, sin pasar de estos topes (por descarga y entre todas).
+    private const int TechoAbsolutoConexionesPorDescarga = 16;
+    private const int PresupuestoMaximoConexiones = 32;
+    // Sondeo inicial (tamaño/rangos). Medido en uso real: a3.mp4upload.com tarda 14–26 s solo en la
+    // negociación segura (TLS); con 6 s el sondeo fallaba siempre y se caía a UNA conexión (~85 KB/s).
+    internal TimeSpan TiempoMaximoSondeo { get; init; } = TimeSpan.FromSeconds(45);
+    // Intentos seguidos en los que el servidor no respondió a tiempo sin llegar a mandar datos:
+    // pasado esto se considera caído (se prueba torrent si está activado) en vez de agotar los 5 reintentos.
+    private const int MaxIntentosSinRespuesta = 2;
+    // Reintentos de un sondeo rechazado con 403 por exceso de conexiones (cada uno espera turno antes).
+    private const int MaxSondeosRechazadosPorTope = 10;
+    /// <summary>
+    /// Si el servidor tarda al menos esto en contestar cada petición, se piden varios trozos por
+    /// petición (ver <see cref="AgrupadorTrozos"/>). Los tests lo acortan.
+    /// </summary>
+    internal TimeSpan UmbralServidorLento { get; init; } = TimeSpan.FromSeconds(5);
+    /// <summary>Cada cuánto se mide la velocidad para decidir si probar más conexiones (los tests lo acortan).</summary>
+    internal TimeSpan VentanaMedicionConexiones { get; init; } = TimeSpan.FromSeconds(4);
+    // Torrents de Nyaa que la descarga automática prueba (en orden de preferencia) antes de rendirse.
+    private const int MaxCandidatosTorrentAutomaticos = 2;
+    // Cada cuánto un trabajador sin turno vuelve a mirar si el reparto le deja trabajar.
+    private static readonly TimeSpan IntervaloReparto = TimeSpan.FromMilliseconds(500);
+    private const int TamanoBufferLectura = 128 * 1024;
+    private static readonly TimeSpan TiempoMaximoInactividad = TimeSpan.FromSeconds(60);
+    // Tope a la espera que pida un servidor saturado (Retry-After), para no quedar parado minutos.
+    private static readonly TimeSpan EsperaMaximaRetryAfter = TimeSpan.FromSeconds(60);
     private const int LimiteDescargasPorDefecto = 3;
     // FUN-017: máximo de reintentos automáticos ante cortes de red transitorios antes de abandonar.
     private const int MaxReintentosDescargaTransitoria = 5;
+    // Sin internet se espera en tramos de un minuto sin gastar reintentos; tras ~1 h se abandona como antes.
+    private static readonly TimeSpan EsperaMaximaSinConexion = TimeSpan.FromMinutes(1);
+    private const int MaxEsperasSinConexion = 60;
     // SEC-03: tope de seguridad por archivo en el modo secuencial (el segmentado ya lo acota).
     private const long MaxArchivoDescargaBytes = 35L * 1024 * 1024 * 1024;
 
@@ -38,6 +71,7 @@ public class DownloadService : IDownloadService
     private readonly IDatabaseService? _database;
     private readonly INyaaSourceService? _nyaaSourceService;
     private readonly ITorrentDownloadService? _torrentDownloadService;
+    private readonly IConectividadRed? _conectividad;
     private readonly ConcurrentDictionary<string, DownloadState> _activeDownloads = new();
 
     // Gestor de slots de concurrencia (redimensionable en caliente según DescargasSimultaneas)
@@ -45,6 +79,12 @@ public class DownloadService : IDownloadService
     private readonly List<(string Key, TaskCompletionSource<bool> Tcs)> _slotWaiters = new();
     private int _slotsActivos;
     private int _limiteDescargas = LimiteDescargasPorDefecto;
+    // Descargas transfiriendo por trozos ahora mismo (reparto de conexiones en caliente).
+    private int _descargasHttpActivas;
+    // Conexiones abiertas y tope aprendido por servidor de video, compartido entre TODAS las descargas.
+    private readonly LimitadorPorServidor _limitadorServidores = new();
+    // Último tope avisado en el registro por servidor (el aviso solo se repite si cambia).
+    private readonly ConcurrentDictionary<string, int> _ultimoTopeAvisado = new(StringComparer.OrdinalIgnoreCase);
 
     private long _ordenCounter = 0;
 
@@ -72,6 +112,10 @@ public class DownloadService : IDownloadService
         public bool Automatica { get; set; }
         /// <summary>El usuario pidió saltar la cola antes de que la descarga llegara a registrarse como waiter.</summary>
         public volatile bool Priorizada;
+        /// <summary>Torrent en curso (elegido a mano o hallado en Nyaa): reanudar debe seguir con él, no volver a AnimeAv1.</summary>
+        public CandidatoTorrent? Torrent { get; set; }
+        /// <summary>Esperas de hasta un minuto hechas por falta de internet (acotadas por <see cref="MaxEsperasSinConexion"/>).</summary>
+        public int EsperasSinConexion { get; set; }
     }
 
     public DownloadService(
@@ -82,9 +126,11 @@ public class DownloadService : IDownloadService
         IPythonBridgeService? pythonBridge = null,
         IDatabaseService? database = null,
         INyaaSourceService? nyaaSourceService = null,
-        ITorrentDownloadService? torrentDownloadService = null)
+        ITorrentDownloadService? torrentDownloadService = null,
+        IConectividadRed? conectividad = null)
     {
         _database = database;
+        _conectividad = conectividad;
         _httpClient = httpClientFactory.CreateClient("Downloader");
         _stateStore = stateStore ?? new DownloadStateStore();
         _sourceResolver = sourceResolver ?? new AnimeAv1VideoSourceResolver(_httpClient);
@@ -257,7 +303,7 @@ public class DownloadService : IDownloadService
         if (_activeDownloads.TryRemove(key, out var state))
         {
             try { state.Cts.Cancel(); } catch { }
-            _stateStore.EliminarArchivosTemporales(state.RutaTemporal);
+            LimpiarTemporalesSiNoHayTareaViva(state, key);
             WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(aniListId, numeroEpisodio, 0, isDownloading: false, isCompleted: false, isPaused: false, "", "Descarga cancelada", state.AnimeTitulo));
         }
     }
@@ -269,7 +315,7 @@ public class DownloadService : IDownloadService
             if (_activeDownloads.TryRemove(kvp.Key, out var state))
             {
                 try { state.Cts.Cancel(); } catch { }
-                _stateStore.EliminarArchivosTemporales(state.RutaTemporal);
+                LimpiarTemporalesSiNoHayTareaViva(state, kvp.Key);
                 WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, 0, isDownloading: false, isCompleted: false, isPaused: false, "", "Descarga cancelada", state.AnimeTitulo));
             }
         }
@@ -311,8 +357,63 @@ public class DownloadService : IDownloadService
             state.Cts = new CancellationTokenSource();
             state.EnCola = true;
             WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(aniListId, numeroEpisodio, state.Progreso, isDownloading: true, isCompleted: false, isPaused: false, state.RutaDestino, null, state.AnimeTitulo));
+            RelanzarDescarga(state, key);
+        }
+    }
+
+    /// <summary>
+    /// Reanuda por el mismo camino por el que iba la descarga: un torrent (elegido a mano o
+    /// hallado en Nyaa) sigue con ese torrent y retoma sus piezas; si no, el bucle HTTP.
+    /// </summary>
+    private void RelanzarDescarga(DownloadState state, string key)
+    {
+        if (state.Torrent is CandidatoTorrent torrent && _torrentDownloadService != null)
+        {
+            EjecutarDescargaTorrentAsync(state, key, torrent);
+        }
+        else
+        {
             EjecutarBucleDescargaAsync(state);
         }
+    }
+
+    /// <summary>
+    /// Cancelar la saca de la lista antes de detenerla; pausar la deja. Se decide por eso y no por
+    /// IsPaused, que Reanudar vuelve a poner en false mientras esta tarea aún se detiene.
+    /// </summary>
+    private bool FueCanceladaDefinitivamente(DownloadState state, string key)
+        => !_activeDownloads.TryGetValue(key, out var actual) || !ReferenceEquals(actual, state);
+
+    private static string RutaCarpetaTemporalTorrent(string key)
+        => Path.Combine(Path.GetTempPath(), "AnimeLocalTrackerTorrents", key);
+
+    /// <summary>
+    /// Borra las piezas de un torrent cancelado de forma definitiva. Solo se llama cuando ninguna
+    /// tarea sigue usando la carpeta: tras detenerse el torrent, o al cancelar uno ya en pausa.
+    /// </summary>
+    private static void EliminarTemporalTorrent(string key)
+    {
+        string carpeta = RutaCarpetaTemporalTorrent(key);
+        try
+        {
+            if (Directory.Exists(carpeta)) Directory.Delete(carpeta, recursive: true);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("DownloadService", $"No se pudo borrar la carpeta temporal del torrent cancelado: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Al cancelar: una descarga en pausa no tiene tarea viva, así que sus temporales se borran aquí.
+    /// Si está en marcha (o en cola), los borra su propia tarea al terminar de detenerse: hacerlo
+    /// aquí fallaba con "el archivo está en uso" porque las conexiones aún lo tenían abierto.
+    /// </summary>
+    private void LimpiarTemporalesSiNoHayTareaViva(DownloadState state, string key)
+    {
+        if (!state.IsPaused) return;
+        _stateStore.EliminarArchivosTemporales(state.RutaTemporal);
+        if (state.Torrent != null) EliminarTemporalTorrent(key);
     }
 
     public void ReanudarTodas()
@@ -326,7 +427,7 @@ public class DownloadService : IDownloadService
                 state.Cts = new CancellationTokenSource();
                 state.EnCola = true;
                 WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, state.Progreso, isDownloading: true, isCompleted: false, isPaused: false, state.RutaDestino, null, state.AnimeTitulo));
-                EjecutarBucleDescargaAsync(state);
+                RelanzarDescarga(state, kvp.Key);
             }
         }
     }
@@ -382,6 +483,7 @@ public class DownloadService : IDownloadService
             Progreso = 0,
             RutaDestino = Path.Combine(carpetaDestino, $"Episodio {numeroEpisodio:D2}.mp4"),
             Automatica = false,
+            Torrent = candidatoElegido,
         };
         state.RutaTemporal = state.RutaDestino + ".downloading";
         state.CarpetaDestino = carpetaDestino;
@@ -391,7 +493,7 @@ public class DownloadService : IDownloadService
 
         WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(aniListId, numeroEpisodio, 0, isDownloading: true, isCompleted: false, isPaused: false, "", null, animeTitulo, enCola: true));
 
-        EjecutarDescargaTorrentManualAsync(state, key, candidatoElegido);
+        EjecutarDescargaTorrentAsync(state, key, candidatoElegido);
         return Task.CompletedTask;
     }
 
@@ -445,22 +547,53 @@ public class DownloadService : IDownloadService
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// True si Windows indica que no hay internet y aún queda margen para esperarlo. El margen
+    /// (<see cref="MaxEsperasSinConexion"/> esperas de hasta un minuto) evita esperar para siempre
+    /// si el indicador de Windows se equivoca (redes que bloquean su comprobación).
+    /// </summary>
+    private bool PuedeEsperarConexion(DownloadState state)
+        => _conectividad != null && state.EsperasSinConexion < MaxEsperasSinConexion && !_conectividad.HayInternet;
+
+    /// <summary>
+    /// Si no hay internet, marca la descarga como "sin conexión" en la UI y espera hasta un minuto
+    /// a que vuelva (cancelable con pausa/cancelar). Tras cada espera se vuelve a intentar.
+    /// </summary>
+    private async Task EsperarConexionSiHaceFaltaAsync(DownloadState state, CancellationToken ct)
+    {
+        if (!PuedeEsperarConexion(state)) return;
+
+        state.EsperasSinConexion++;
+        WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, state.Progreso, isDownloading: true, isCompleted: false, isPaused: false, state.RutaDestino, null, state.AnimeTitulo, reintentos: state.Reintentos, sinConexion: true));
+
+        if (await _conectividad!.EsperarInternetAsync(EsperaMaximaSinConexion, ct))
+        {
+            AppLogger.Info("DownloadService", $"Volvió la conexión: se reanuda '{state.AnimeTitulo}' Ep {state.NumeroEpisodio}.");
+            WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, state.Progreso, isDownloading: true, isCompleted: false, isPaused: false, state.RutaDestino, null, state.AnimeTitulo, reintentos: state.Reintentos));
+        }
+    }
+
     private void EjecutarBucleDescargaAsync(DownloadState state)
     {
         string key = $"{state.AniListId}_{state.NumeroEpisodio}";
 
+        // El token de ESTA ejecución: Reanudar crea otro en state.Cts, y esta tarea (que puede seguir
+        // deteniéndose tras la pausa) no debe confundir el nuevo con el suyo.
+        var ct = state.Cts.Token;
         _ = Task.Run(async () =>
         {
             bool slotAdquirido = false;
             int reintentosResolucion = 0;
             int reintentosDescarga = 0;
+            int intentosSinRespuesta = 0;
+            double progresoAlUltimoCorte = state.Progreso;
             try
             {
-                await AdquirirSlotAsync(key, state, state.Cts.Token);
+                await AdquirirSlotAsync(key, state, ct);
                 slotAdquirido = true;
                 state.EnCola = false;
 
-                if (state.Cts.IsCancellationRequested || state.IsPaused) return;
+                if (ct.IsCancellationRequested) return;
 
                 WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, state.Progreso, isDownloading: true, isCompleted: false, isPaused: false, state.RutaDestino, null, state.AnimeTitulo, enCola: false, reintentos: state.Reintentos));
 
@@ -471,24 +604,30 @@ public class DownloadService : IDownloadService
                 // 403/404/410): se re-resuelve UNA vez con un enlace nuevo antes de fallar.
                 while (!descargaCompletada)
                 {
-                    if (state.Cts.IsCancellationRequested || state.IsPaused) return;
+                    if (ct.IsCancellationRequested) return;
 
                     if (string.IsNullOrEmpty(state.VideoUrl))
                     {
+                        // Sin internet la búsqueda no encuentra nada y el episodio se daría por inexistente.
+                        await EsperarConexionSiHaceFaltaAsync(state, ct);
+
                         var configuracion = _settingsService?.ObtenerConfiguracion();
                         string? audioPreferido = configuracion?.PreferenciaAudioAnimeAv1;
                         string? servidorPreferido = configuracion?.ServidorPreferidoAnimeAv1;
-                        state.VideoUrl = await _sourceResolver.BuscarUrlEpisodioAsync(state.Titulos, state.NumeroEpisodio, state.AniListId, audioPreferido, servidorPreferido, state.Cts.Token);
+                        state.VideoUrl = await _sourceResolver.BuscarUrlEpisodioAsync(state.Titulos, state.NumeroEpisodio, state.AniListId, audioPreferido, servidorPreferido, ct);
                         if (string.IsNullOrEmpty(state.VideoUrl))
                         {
-                            if (state.IsPaused || state.Cts.IsCancellationRequested) return;
+                            if (ct.IsCancellationRequested) return;
+
+                            // La red se cayó durante la búsqueda: repetirla cuando vuelva, no darlo por no encontrado.
+                            if (PuedeEsperarConexion(state)) continue;
 
                             // Último recurso (opt-in, Fase 1c): buscar y descargar por torrent en
                             // Nyaa.si antes de darlo por no encontrado.
                             if (configuracion?.BusquedaTorrentHabilitada == true && _nyaaSourceService != null && _torrentDownloadService != null)
                             {
-                                if (await IntentarDescargaTorrentAsync(state, key)) return;
-                                if (state.IsPaused || state.Cts.IsCancellationRequested) return;
+                                if (await IntentarDescargaTorrentAsync(state, key, ct)) return;
+                                if (ct.IsCancellationRequested) return;
                             }
 
                             // FUN-016: trazabilidad del ciclo de descarga en app.log (antes solo Debug)
@@ -503,7 +642,7 @@ public class DownloadService : IDownloadService
                         }
                     }
 
-                    if (state.Cts.IsCancellationRequested || state.IsPaused) return;
+                    if (ct.IsCancellationRequested) return;
 
                     progress ??= new Progress<(double Progress, double Speed)>(p =>
                     {
@@ -514,7 +653,7 @@ public class DownloadService : IDownloadService
 
                     try
                     {
-                        await DownloadVideoAsync(state.VideoUrl, state.RutaTemporal, progress, state.Cts.Token);
+                        await DownloadVideoAsync(state.VideoUrl, state.RutaTemporal, progress, ct);
 
                         // Un enlace caducado a veces devuelve una página de error con código 200:
                         // si lo descargado no es un video se descarta y se repite limpio.
@@ -525,25 +664,55 @@ public class DownloadService : IDownloadService
                         }
                         descargaCompletada = true;
                     }
-                    catch (Exception ex) when (EsRechazoDeEnlace(ex) && reintentosResolucion == 0 && !state.IsPaused && !state.Cts.IsCancellationRequested)
+                    catch (Exception ex) when (EsRechazoDeEnlace(ex) && reintentosResolucion == 0 && !ct.IsCancellationRequested)
                     {
                         reintentosResolucion++;
                         AppLogger.Warn("DownloadService", $"El servidor rechazó el enlace de '{state.AnimeTitulo}' Ep {state.NumeroEpisodio} ({(int?)((HttpRequestException)ex).StatusCode}): re-resolviendo el episodio (intento 2).");
-                        EliminarParcialSeguro(state.RutaTemporal);
+                        // El enlace nuevo suele apuntar al mismo archivo: lo bajado por trozos se conserva y se
+                        // reanuda (si el archivo resulta ser otro, el tamaño no coincide y se empieza limpio).
+                        // El modo secuencial no tiene esa comprobación, así que su parcial sí se descarta.
+                        if (!File.Exists(state.RutaTemporal + ".state")) EliminarParcialSeguro(state.RutaTemporal);
                         state.VideoUrl = null;
                     }
                     // FUN-017: los cortes de red (timeouts, conexión reiniciada, inactividad) son
                     // habituales en servidores de streaming gratuitos y no implican que el enlace
                     // sea inválido. Se reintenta varias veces conservando el progreso (el .state y
                     // el archivo parcial no se borran) en vez de abandonar la descarga a la primera.
-                    catch (Exception ex) when (EsErrorTransitorioDeRed(ex) && reintentosDescarga < MaxReintentosDescargaTransitoria && !state.IsPaused && !state.Cts.IsCancellationRequested)
+                    catch (Exception ex) when (EsErrorTransitorioDeRed(ex) && !ct.IsCancellationRequested)
                     {
+                        // Sin internet (wifi caído, router reiniciándose) no se gastan reintentos:
+                        // se espera a que vuelva la red y se sigue desde donde iba.
+                        if (PuedeEsperarConexion(state))
+                        {
+                            AppLogger.Warn("DownloadService", $"Sin conexión a internet descargando '{state.AnimeTitulo}' Ep {state.NumeroEpisodio} ({ex.Message}): se espera a que vuelva la red sin perder el progreso.");
+                            await EsperarConexionSiHaceFaltaAsync(state, ct);
+                            continue;
+                        }
+
+                        // Si la descarga avanzó desde el corte anterior, son cortes sueltos de un servidor
+                        // inestable (no un fallo persistente): no deben sumar hacia el abandono.
+                        bool avanzo = state.Progreso > progresoAlUltimoCorte;
+                        if (avanzo) { reintentosDescarga = 0; intentosSinRespuesta = 0; }
+                        progresoAlUltimoCorte = state.Progreso;
+
+                        // Un servidor que ni siquiera contesta a tiempo (caído o saturado) no suele
+                        // recuperarse en el minuto siguiente: tras un par de intentos se da por perdido.
+                        if (!avanzo && EsTiempoDeEsperaAgotado(ex)) intentosSinRespuesta++;
+
+                        if (reintentosDescarga >= MaxReintentosDescargaTransitoria || intentosSinRespuesta >= MaxIntentosSinRespuesta)
+                        {
+                            // Antes de rendirse: si el usuario tiene activada la búsqueda por torrent, el
+                            // mismo episodio suele estar en Nyaa aunque el servidor de video esté caído.
+                            if (await IntentarTorrentTrasFalloHttpAsync(state, key, ex, ct)) return;
+                            throw;
+                        }
+
                         reintentosDescarga++;
                         state.Reintentos = reintentosDescarga;
                         var espera = TimeSpan.FromSeconds(Math.Min(2 * reintentosDescarga, 15));
                         AppLogger.Warn("DownloadService", $"Fallo transitorio de red descargando '{state.AnimeTitulo}' Ep {state.NumeroEpisodio} (intento {reintentosDescarga}/{MaxReintentosDescargaTransitoria}): {ex.Message}. Reintentando en {espera.TotalSeconds:F0}s sin perder el progreso.");
                         WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, state.Progreso, isDownloading: true, isCompleted: false, isPaused: false, state.RutaDestino, null, state.AnimeTitulo, reintentos: reintentosDescarga));
-                        await Task.Delay(espera, state.Cts.Token);
+                        await Task.Delay(espera, ct);
                     }
                 }
 
@@ -555,18 +724,22 @@ public class DownloadService : IDownloadService
                 WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, 100, isDownloading: false, isCompleted: true, isPaused: false, state.RutaDestino, null, state.AnimeTitulo));
                 RegistrarEnHistorial(state, completada: true, null);
             }
-            catch (OperationCanceledException)
+            // Solo una pausa o cancelación del usuario es "interrupción". Un tiempo de espera agotado
+            // también llega como OperationCanceledException (TaskCanceledException), y antes caía aquí:
+            // la descarga desaparecía de la lista sin error ni rastro en el historial.
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
-                AppLogger.Info("DownloadService", $"Descarga interrumpida: {state.AnimeTitulo} Ep {state.NumeroEpisodio}. Pausado: {state.IsPaused}");
-                if (!state.IsPaused)
+                bool cancelada = FueCanceladaDefinitivamente(state, key);
+                AppLogger.Info("DownloadService", $"Descarga interrumpida: {state.AnimeTitulo} Ep {state.NumeroEpisodio}. Pausado: {!cancelada}");
+                if (cancelada)
                 {
                     _stateStore.EliminarArchivosTemporales(state.RutaTemporal);
-                    _activeDownloads.TryRemove(key, out _);
+                    if (state.Torrent != null) EliminarTemporalTorrent(key);
                 }
             }
             catch (Exception ex)
             {
-                if (state.IsPaused || state.Cts.IsCancellationRequested)
+                if (ct.IsCancellationRequested)
                 {
                     AppLogger.Debug("DownloadService", $"Descarga pausada generó excepción esperada: {ex.Message}");
                     return;
@@ -577,8 +750,9 @@ public class DownloadService : IDownloadService
                 // reintentos automáticos, pero conservar el progreso permite que un reintento manual
                 // del usuario retome la descarga en vez de empezar desde cero.
                 _activeDownloads.TryRemove(key, out _);
-                WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, 0, isDownloading: false, isCompleted: false, isPaused: false, "", ex.Message, state.AnimeTitulo));
-                RegistrarEnHistorial(state, completada: false, ex.Message);
+                string error = DescribirErrorParaUsuario(ex);
+                WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, 0, isDownloading: false, isCompleted: false, isPaused: false, "", error, state.AnimeTitulo));
+                RegistrarEnHistorial(state, completada: false, error);
             }
             finally
             {
@@ -590,6 +764,31 @@ public class DownloadService : IDownloadService
         });
     }
 
+    /// <summary>Tiempo de espera agotado (conectar, negociar la conexión segura o esperar respuesta), no una pausa del usuario.</summary>
+    private static bool EsTiempoDeEsperaAgotado(Exception ex)
+        => ex is OperationCanceledException || ex.InnerException is TimeoutException or OperationCanceledException;
+
+    /// <summary>"The operation was canceled." no le dice nada al usuario: los tiempos agotados se explican.</summary>
+    private static string DescribirErrorParaUsuario(Exception ex)
+        => EsTiempoDeEsperaAgotado(ex) ? LocalizationService.T("Desc_ErrorServidorNoResponde") : ex.Message;
+
+    /// <summary>
+    /// El servidor de video (MP4Upload) falló del todo: si la búsqueda por torrent está activada se
+    /// prueba Nyaa antes de dar la descarga por fallida. True si el torrent la completó.
+    /// </summary>
+    private async Task<bool> IntentarTorrentTrasFalloHttpAsync(DownloadState state, string key, Exception fallo, CancellationToken ct)
+    {
+        var configuracion = _settingsService?.ObtenerConfiguracion();
+        if (configuracion?.BusquedaTorrentHabilitada != true || _nyaaSourceService == null || _torrentDownloadService == null) return false;
+
+        AppLogger.Warn("DownloadService", $"El servidor de video falló para '{state.AnimeTitulo}' Ep {state.NumeroEpisodio} ({fallo.Message}): se prueba por torrent (Nyaa).");
+        if (!await IntentarDescargaTorrentAsync(state, key, ct)) return false;
+
+        // Lo bajado por HTTP ya no sirve: el episodio llegó completo por torrent.
+        _stateStore.EliminarArchivosTemporales(state.RutaTemporal);
+        return true;
+    }
+
     /// <summary>
     /// Último recurso (Fase 1c, opt-in): busca el episodio en Nyaa.si y, si hay un
     /// release de un solo episodio con semillas suficientes, lo descarga por
@@ -599,75 +798,89 @@ public class DownloadService : IDownloadService
     /// UI); false si no encontró nada o la descarga falló — el llamador cae al
     /// mensaje de "no encontrado" habitual.
     /// </summary>
-    private async Task<bool> IntentarDescargaTorrentAsync(DownloadState state, string key)
+    private async Task<bool> IntentarDescargaTorrentAsync(DownloadState state, string key, CancellationToken ct)
     {
         var configuracion = _settingsService?.ObtenerConfiguracion();
 
-        CandidatoTorrent? candidato;
+        List<CandidatoTorrent> candidatos;
         try
         {
-            candidato = await _nyaaSourceService!.BuscarEpisodioAsync(
+            candidatos = await _nyaaSourceService!.BuscarCandidatosAsync(
                 state.Titulos, state.NumeroEpisodio,
                 configuracion?.GrupoFansubPreferidoTorrent, configuracion?.ResolucionPreferidaTorrent,
-                state.Cts.Token);
+                ct);
         }
-        catch (OperationCanceledException) { throw; }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
         catch (Exception ex)
         {
             AppLogger.Debug("DownloadService", $"Búsqueda en Nyaa falló para '{state.AnimeTitulo}' Ep {state.NumeroEpisodio}: {ex.Message}");
             return false;
         }
 
-        if (candidato == null) return false;
+        // Si el mejor candidato no arranca (sin fuentes reales pese a las semillas que anuncia Nyaa,
+        // o un error del torrent), se prueba el siguiente en vez de rendirse a la primera.
+        foreach (var candidato in candidatos.Take(MaxCandidatosTorrentAutomaticos))
+        {
+            AppLogger.Info("DownloadService", $"'{state.AnimeTitulo}' Ep {state.NumeroEpisodio}: probando Nyaa/torrent \"{candidato.Titulo}\" ({candidato.Seeders} semillas).");
+            state.Torrent = candidato;
+            var (exito, motivo) = await DescargarTorrentYCompletarAsync(state, key, candidato, configuracion?.SeguirSembrandoTorrents ?? false, ct);
+            if (exito) return true;
+            if (ct.IsCancellationRequested) return false;
+            AppLogger.Info("DownloadService", $"El torrent \"{candidato.Titulo}\" no funcionó ({motivo}).");
+        }
 
-        AppLogger.Info("DownloadService", $"'{state.AnimeTitulo}' Ep {state.NumeroEpisodio}: probando Nyaa/torrent ({candidato.Value.Seeders} semillas).");
-        return await DescargarTorrentYCompletarAsync(state, key, candidato.Value, configuracion?.SeguirSembrandoTorrents ?? false);
+        state.Torrent = null;
+        return false;
     }
 
     /// <summary>
     /// Fase 2d: descarga el candidato de torrent YA ELEGIDO (el usuario lo escogió a
     /// mano, sin pasar por la búsqueda automática de Nyaa ni por el resolver HTTP) y,
-    /// si tiene éxito, marca el historial/UI. Comparte el mismo tramo final que
+    /// si tiene éxito, marca el historial/UI. También retoma un torrent en pausa (manual o
+    /// hallado en Nyaa). Comparte el mismo tramo final que
     /// <see cref="IntentarDescargaTorrentAsync"/> (<see cref="DescargarTorrentYCompletarAsync"/>)
     /// para no duplicar la lógica de "descargar y completar".
     /// </summary>
-    private void EjecutarDescargaTorrentManualAsync(DownloadState state, string key, CandidatoTorrent candidato)
+    private void EjecutarDescargaTorrentAsync(DownloadState state, string key, CandidatoTorrent candidato)
     {
+        var ct = state.Cts.Token; // ver EjecutarBucleDescargaAsync
         _ = Task.Run(async () =>
         {
             bool slotAdquirido = false;
             try
             {
-                await AdquirirSlotAsync(key, state, state.Cts.Token);
+                await AdquirirSlotAsync(key, state, ct);
                 slotAdquirido = true;
                 state.EnCola = false;
 
-                if (state.Cts.IsCancellationRequested || state.IsPaused) return;
+                if (ct.IsCancellationRequested) return;
 
                 WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, state.Progreso, isDownloading: true, isCompleted: false, isPaused: false, state.RutaDestino, null, state.AnimeTitulo, enCola: false));
 
                 bool seguirSembrando = _settingsService?.ObtenerConfiguracion()?.SeguirSembrandoTorrents ?? false;
-                bool exito = await DescargarTorrentYCompletarAsync(state, key, candidato, seguirSembrando);
+                var (exito, motivo) = await DescargarTorrentYCompletarAsync(state, key, candidato, seguirSembrando, ct);
                 if (!exito)
                 {
                     _activeDownloads.TryRemove(key, out _);
-                    string error = "No se pudo descargar el torrent elegido.";
+                    string error = string.IsNullOrWhiteSpace(motivo) ? "No se pudo descargar el torrent elegido." : motivo;
                     WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, 0, isDownloading: false, isCompleted: false, isPaused: false, "", error, state.AnimeTitulo));
                     RegistrarEnHistorial(state, completada: false, error);
                 }
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
-                AppLogger.Info("DownloadService", $"Descarga por torrent (manual) interrumpida: {state.AnimeTitulo} Ep {state.NumeroEpisodio}. Pausado: {state.IsPaused}");
-                if (!state.IsPaused) _activeDownloads.TryRemove(key, out _);
+                bool cancelada = FueCanceladaDefinitivamente(state, key);
+                AppLogger.Info("DownloadService", $"Descarga por torrent interrumpida: {state.AnimeTitulo} Ep {state.NumeroEpisodio}. Pausado: {!cancelada}");
+                if (cancelada) EliminarTemporalTorrent(key);
             }
             catch (Exception ex)
             {
-                if (state.IsPaused || state.Cts.IsCancellationRequested) return;
+                if (ct.IsCancellationRequested) return;
                 AppLogger.Error("DownloadService", $"Error en descarga por torrent (manual) {state.AnimeTitulo} Ep {state.NumeroEpisodio}", ex);
                 _activeDownloads.TryRemove(key, out _);
-                WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, 0, isDownloading: false, isCompleted: false, isPaused: false, "", ex.Message, state.AnimeTitulo));
-                RegistrarEnHistorial(state, completada: false, ex.Message);
+                string error = DescribirErrorParaUsuario(ex);
+                WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, 0, isDownloading: false, isCompleted: false, isPaused: false, "", error, state.AnimeTitulo));
+                RegistrarEnHistorial(state, completada: false, error);
             }
             finally
             {
@@ -681,9 +894,9 @@ public class DownloadService : IDownloadService
     /// y a la elección manual (<see cref="EjecutarDescargaTorrentManualAsync"/>): pide
     /// la descarga a <see cref="ITorrentDownloadService"/>, reporta progreso, y si
     /// tiene éxito marca la descarga como completada (Fuente="Nyaa", mensaje de UI,
-    /// historial). True si terminó con éxito.
+    /// historial). Exito=true si terminó; si no, Error explica por qué (para mostrarlo al usuario).
     /// </summary>
-    private async Task<bool> DescargarTorrentYCompletarAsync(DownloadState state, string key, CandidatoTorrent candidato, bool seguirSembrando)
+    private async Task<(bool Exito, string? Error)> DescargarTorrentYCompletarAsync(DownloadState state, string key, CandidatoTorrent candidato, bool seguirSembrando, CancellationToken ct)
     {
         var progress = new Progress<(double Progreso, double VelocidadBps)>(p =>
         {
@@ -692,33 +905,33 @@ public class DownloadService : IDownloadService
             WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, p.Progreso, isDownloading: true, isCompleted: false, isPaused: false, state.RutaDestino, null, state.AnimeTitulo, speedText, velocidadBps: p.VelocidadBps));
         });
 
-        string carpetaTemporalTorrent = Path.Combine(Path.GetTempPath(), "AnimeLocalTrackerTorrents", key);
+        string carpetaTemporalTorrent = RutaCarpetaTemporalTorrent(key);
         ResultadoTorrent resultado;
         try
         {
             resultado = await _torrentDownloadService!.DescargarAsync(
                 candidato.TorrentUrl, carpetaTemporalTorrent, state.RutaDestino, state.NumeroEpisodio,
                 seguirSembrando: seguirSembrando,
-                progress: progress, ct: state.Cts.Token);
+                progress: progress, ct: ct);
         }
-        catch (OperationCanceledException) { throw; }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
         catch (Exception ex)
         {
             AppLogger.Warn("DownloadService", $"Descarga por torrent falló para '{state.AnimeTitulo}' Ep {state.NumeroEpisodio}: {ex.Message}");
-            return false;
+            return (false, ex.Message);
         }
 
         if (!resultado.Exito)
         {
             AppLogger.Warn("DownloadService", $"Torrent no se pudo descargar para '{state.AnimeTitulo}' Ep {state.NumeroEpisodio}: {resultado.Error}");
-            return false;
+            return (false, resultado.Error);
         }
 
         state.Fuente = "Nyaa";
         _activeDownloads.TryRemove(key, out _);
         WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, 100, isDownloading: false, isCompleted: true, isPaused: false, state.RutaDestino, null, state.AnimeTitulo));
         RegistrarEnHistorial(state, completada: true, null);
-        return true;
+        return (true, null);
     }
 
     /// <summary>
@@ -847,60 +1060,8 @@ public class DownloadService : IDownloadService
         }
 
         if (!reanudandoSegmentada)
-        using (var headReq = new HttpRequestMessage(HttpMethod.Head, videoUrl))
         {
-            headReq.Headers.Add("User-Agent", UserAgent);
-            headReq.Headers.Add("Referer", "https://www.mp4upload.com/");
-
-            try
-            {
-                using var probeCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                probeCts.CancelAfter(TimeSpan.FromSeconds(6));
-
-                using var headRes = await _httpClient.SendAsync(headReq, HttpCompletionOption.ResponseHeadersRead, probeCts.Token);
-                if (headRes.IsSuccessStatusCode)
-                {
-                    totalBytes = headRes.Content.Headers.ContentLength ?? -1;
-                    supportsRanges = headRes.Headers.AcceptRanges.Contains("bytes") || headRes.Content.Headers.ContentRange != null;
-                }
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Debug("DownloadService", $"Sondeo HEAD para '{SanitizarUrlParaLog(videoUrl)}' omitido/timeout: {ex.Message}");
-            }
-        }
-
-        // Si HEAD no devolvió tamaño o soporte de rangos, probar con GET range 0-0
-        if (!reanudandoSegmentada && (totalBytes <= 0 || !supportsRanges))
-        {
-            using var testReq = new HttpRequestMessage(HttpMethod.Get, videoUrl);
-            testReq.Headers.Add("User-Agent", UserAgent);
-            testReq.Headers.Add("Referer", "https://www.mp4upload.com/");
-            testReq.Headers.Range = new RangeHeaderValue(0, 0);
-
-            try
-            {
-                using var probeGetCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                probeGetCts.CancelAfter(TimeSpan.FromSeconds(6));
-
-                using var testRes = await _httpClient.SendAsync(testReq, HttpCompletionOption.ResponseHeadersRead, probeGetCts.Token);
-                if (testRes.StatusCode == System.Net.HttpStatusCode.PartialContent)
-                {
-                    supportsRanges = true;
-                    if (testRes.Content.Headers.ContentRange?.Length.HasValue == true)
-                    {
-                        totalBytes = testRes.Content.Headers.ContentRange.Length.Value;
-                    }
-                }
-                else if (testRes.IsSuccessStatusCode && totalBytes <= 0)
-                {
-                    totalBytes = testRes.Content.Headers.ContentLength ?? -1;
-                }
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Debug("DownloadService", $"Sondeo GET Range(0,0) para '{SanitizarUrlParaLog(videoUrl)}' omitido/timeout: {ex.Message}");
-            }
+            (totalBytes, supportsRanges) = await SondearServidorAsync(videoUrl, cancellationToken);
         }
 
         // Descarga segmentada en paralelo si el servidor soporta Range y conocemos el tamaño (> 3MB)
@@ -916,12 +1077,141 @@ public class DownloadService : IDownloadService
                 // por rangos corrompería el video, así que se descarga completo en una sola conexión.
                 AppLogger.Warn("DownloadService", $"{ex.Message} Se reinicia la descarga en modo secuencial.");
                 _stateStore.EliminarArchivosTemporales(destinationPath);
-                await DownloadSequentialAsync(videoUrl, destinationPath, -1, progress, cancellationToken);
+                await DescargarSecuencialConTurnoAsync(videoUrl, destinationPath, -1, progress, cancellationToken);
             }
         }
         else
         {
-            await DownloadSequentialAsync(videoUrl, destinationPath, totalBytes, progress, cancellationToken);
+            await DescargarSecuencialConTurnoAsync(videoUrl, destinationPath, totalBytes, progress, cancellationToken);
+        }
+    }
+
+    private readonly record struct RespuestaSondeo(bool Exito, bool Parcial, long Total, bool AnunciaRangos, System.Net.HttpStatusCode? Estado = null);
+
+    /// <summary>
+    /// Tamaño del video y soporte de rangos. HEAD y GET Range(0,0) se lanzan A LA VEZ (antes uno
+    /// detrás de otro, hasta 12 s cuando mp4upload no contestaba al HEAD): el GET con 206 lo dice
+    /// todo, así que si llega primero no se espera al HEAD; si no, se combinan como antes.
+    /// </summary>
+    private async Task<(long Total, bool AdmiteRangos)> SondearServidorAsync(string videoUrl, CancellationToken cancellationToken)
+    {
+        // El plazo de cada sondeo (TiempoMaximoSondeo) corre desde que tiene conexión, no mientras
+        // espera turno: con el servidor al tope por otras descargas, esperar turno no es un fallo.
+        using var cancelarHead = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+
+        // Si el servidor ya demostró limitar las conexiones simultáneas (otra descarga suya en marcha),
+        // no se gasta una en el HEAD: el GET con rango basta para saber tamaño y soporte de rangos.
+        string servidor = new Uri(videoUrl).Authority;
+        bool servidorLimitado = _limitadorServidores.Tope(servidor, DateTime.UtcNow) != null;
+        var head = servidorLimitado
+            ? Task.FromResult(default(RespuestaSondeo))
+            : SondearConTurnoAsync(videoUrl, servidor, HttpMethod.Head, conRango: false, cancelarHead.Token);
+        var rango = SondearConTurnoAsync(videoUrl, servidor, HttpMethod.Get, conRango: true, cancellationToken);
+
+        var respuestaRango = await rango;
+        if (respuestaRango.Parcial && respuestaRango.Total > 0)
+        {
+            cancelarHead.Cancel(); // el HEAD ya no aporta nada
+            await head;
+            return (respuestaRango.Total, true);
+        }
+
+        var respuestaHead = await head;
+        long total = respuestaHead.Exito ? respuestaHead.Total : -1;
+        bool rangos = respuestaHead.Exito && respuestaHead.AnunciaRangos;
+
+        if (total <= 0 || !rangos)
+        {
+            if (respuestaRango.Parcial)
+            {
+                rangos = true;
+                if (respuestaRango.Total > 0) total = respuestaRango.Total;
+            }
+            else if (respuestaRango.Exito && total <= 0)
+            {
+                total = respuestaRango.Total;
+            }
+        }
+        return (total, rangos);
+    }
+
+    /// <summary>
+    /// Sondeo que respeta el tope de conexiones del servidor (ver <see cref="LimitadorPorServidor"/>):
+    /// espera turno (sin límite de tiempo: solo la cancelación de la descarga lo corta) y, si recibe 403
+    /// por exceso de conexiones, lo reintenta en vez de darlo por fallido (un sondeo fallido deja la
+    /// descarga en UNA sola conexión). Uso real: con 4 episodios de a3.mp4upload.com a la vez, el sondeo
+    /// del quinto agotó sus 45 s esperando turno y acabó en un falso "enlace rechazado".
+    /// </summary>
+    private async Task<RespuestaSondeo> SondearConTurnoAsync(string videoUrl, string servidor, HttpMethod metodo, bool conRango, CancellationToken ct)
+    {
+        try
+        {
+            for (int intento = 1; ; intento++)
+            {
+                var conexion = await AbrirConexionAsync(servidor, ct);
+                RespuestaSondeo respuesta;
+                bool rechazoPorTope;
+                try
+                {
+                    using var plazo = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                    plazo.CancelAfter(TiempoMaximoSondeo);
+                    respuesta = await SondearAsync(videoUrl, metodo, conRango, plazo.Token);
+                    if (respuesta.Exito) conexion.MarcarTransfiriendo(DateTime.UtcNow); // prueba de que el enlace funciona
+                    rechazoPorTope = respuesta.Estado == System.Net.HttpStatusCode.Forbidden
+                                     && _limitadorServidores.RegistrarRechazo(conexion, DateTime.UtcNow) != null;
+                }
+                finally
+                {
+                    conexion.Cerrar();
+                }
+
+                if (!rechazoPorTope || intento >= MaxSondeosRechazadosPorTope) return respuesta;
+                await Task.Delay(EsperaConVariacion(TimeSpan.FromSeconds(1)), ct);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            return default; // cancelación: la descarga la detectará enseguida
+        }
+    }
+
+    private async Task<RespuestaSondeo> SondearAsync(string videoUrl, HttpMethod metodo, bool conRango, CancellationToken ct)
+    {
+        try
+        {
+            using var req = new HttpRequestMessage(metodo, videoUrl);
+            req.Headers.Add("User-Agent", UserAgent);
+            req.Headers.Add("Referer", "https://www.mp4upload.com/");
+            if (conRango) req.Headers.Range = new RangeHeaderValue(0, 0);
+
+            using var res = await _httpClient.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
+            if (res.StatusCode == System.Net.HttpStatusCode.PartialContent)
+            {
+                return new RespuestaSondeo(true, true, res.Content.Headers.ContentRange?.Length ?? -1, true);
+            }
+            if (!res.IsSuccessStatusCode) return new RespuestaSondeo(false, false, -1, false, res.StatusCode);
+
+            bool anunciaRangos = res.Headers.AcceptRanges.Contains("bytes") || res.Content.Headers.ContentRange != null;
+            return new RespuestaSondeo(true, false, res.Content.Headers.ContentLength ?? -1, anunciaRangos);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("DownloadService", $"Sondeo {metodo}{(conRango ? " Range(0,0)" : "")} para '{SanitizarUrlParaLog(videoUrl)}' omitido/timeout: {ex.Message}");
+            return default;
+        }
+    }
+
+    private static bool ParcialCoincideConTamano(string destinationPath, long totalBytes)
+    {
+        try
+        {
+            var info = new FileInfo(destinationPath);
+            return info.Exists && info.Length == totalBytes;
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("DownloadService", $"No se pudo comprobar el archivo parcial: {ex.Message}");
+            return false;
         }
     }
 
@@ -960,6 +1250,17 @@ public class DownloadService : IDownloadService
 
         string statePath = destinationPath + ".state";
         int totalTrozos = (int)Math.Max(MinimoTrozos, (totalBytes + TamanoTrozoBytes - 1) / TamanoTrozoBytes);
+
+        // Un .state solo describe el archivo parcial junto al que se guardó. Si ese parcial desapareció
+        // (lo borró alguien mientras la descarga estaba en pausa o esperando un reintento) o no mide lo
+        // que debe, reutilizarlo daría por descargados trozos que en el archivo nuevo serían ceros.
+        if (File.Exists(statePath) && !ParcialCoincideConTamano(destinationPath, totalBytes))
+        {
+            AppLogger.Warn("DownloadService", "El archivo parcial no coincide con su estado guardado (falta o cambió de tamaño): la descarga se reinicia limpia para no dejar huecos.");
+            try { File.Delete(statePath); }
+            catch (Exception ex) { AppLogger.Debug("DownloadService", $"No se pudo borrar el estado huérfano: {ex.Message}"); }
+        }
+
         DownloadStateInfo stateInfo = await _stateStore.CargarOInicializarAsync(statePath, totalBytes, totalTrozos);
         var trozos = stateInfo.Segments;
 
@@ -994,7 +1295,14 @@ public class DownloadService : IDownloadService
 
         var acumulador = new ProgresoAgregado(progress, totalBytes, trozos.Sum(s => s.CurrentOffset - s.Start));
         int siguienteTrozo = -1;
-        int conexiones = Math.Min(ConexionesPorDescarga(), trozos.Count);
+        // Se crean trabajadores para el máximo posible, pero solo trabajan los que el reparto actual
+        // permite (ver ConexionesPermitidas): así una descarga que empieza sola usa todas sus
+        // conexiones y cede parte cuando arrancan otras, sin reiniciar nada.
+        int conexiones = Math.Min(TechoAbsolutoConexionesPorDescarga, trozos.Count);
+        var control = new ControlConexionesDescarga();
+        var agrupador = new AgrupadorTrozos(UmbralServidorLento);
+        string servidor = new Uri(videoUrl).Authority;
+        Interlocked.Increment(ref _descargasHttpActivas);
 
         using var trabajoCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         using var guardadorCts = CancellationTokenSource.CreateLinkedTokenSource(trabajoCts.Token);
@@ -1014,18 +1322,49 @@ public class DownloadService : IDownloadService
             catch (OperationCanceledException) { }
         }, CancellationToken.None);
 
+        // Tramo final: quedan menos trozos por repartir que conexiones (la velocidad baja sola).
+        bool EnFinal() => trozos.Count - (Volatile.Read(ref siguienteTrozo) + 1) < ConexionesPermitidas(control);
+        var ajustador = Task.Run(() => AjustarConexionesAsync(control, acumulador, servidor, agrupador, EnFinal, guardadorCts.Token), CancellationToken.None);
+
         var trabajadores = new Task[conexiones];
         for (int i = 0; i < conexiones; i++)
         {
+            int indiceTrabajador = i;
             trabajadores[i] = Task.Run(async () =>
             {
                 try
                 {
                     while (!trabajoCts.IsCancellationRequested)
                     {
-                        int idx = Interlocked.Increment(ref siguienteTrozo);
-                        if (idx >= trozos.Count) return;
-                        await DescargarTrozoConReintentosAsync(videoUrl, fileHandle, trozos[idx], totalBytes, acumulador, trabajoCts.Token);
+                        // Arranque prudente: sin pruebas recientes de que el enlace funciona (al reanudar no se
+                        // sondea), primero va una sola conexión. Si las 8 se abrieran a la vez y el servidor
+                        // rechazara las de más con 403, no habría forma de distinguirlo de un enlace caducado.
+                        if (indiceTrabajador > 0 && !_limitadorServidores.HayExitoReciente(servidor, DateTime.UtcNow))
+                        {
+                            if (Volatile.Read(ref siguienteTrozo) + 1 >= trozos.Count) return;
+                            await Task.Delay(IntervaloReparto, trabajoCts.Token);
+                            continue;
+                        }
+
+                        if (indiceTrabajador >= ConexionesPermitidas(control))
+                        {
+                            // Sin turno ahora mismo: si ya no quedan trozos por repartir no hace falta esperar.
+                            if (Volatile.Read(ref siguienteTrozo) + 1 >= trozos.Count) return;
+                            await Task.Delay(IntervaloReparto, trabajoCts.Token);
+                            continue;
+                        }
+
+                        // Servidor lento en conectar → varios trozos por petición (ver AgrupadorTrozos).
+                        int restantes = trozos.Count - (Volatile.Read(ref siguienteTrozo) + 1);
+                        int cuantos = agrupador.TrozosPorPeticion(restantes, ConexionesPermitidas(control));
+                        int ultimo = Interlocked.Add(ref siguienteTrozo, cuantos);
+                        int primero = ultimo - cuantos + 1;
+                        if (primero >= trozos.Count) return;
+
+                        foreach (var tramo in AgrupadorTrozos.ArmarTramos(trozos, primero, Math.Min(ultimo, trozos.Count - 1)))
+                        {
+                            await DescargarTramoConReintentosAsync(videoUrl, servidor, fileHandle, tramo, totalBytes, acumulador, control, agrupador, trabajoCts.Token);
+                        }
                     }
                 }
                 catch
@@ -1040,9 +1379,11 @@ public class DownloadService : IDownloadService
 
         try { await Task.WhenAll(trabajadores); }
         catch { /* se analiza abajo, cuando TODOS los trabajadores ya terminaron */ }
+        finally { Interlocked.Decrement(ref _descargasHttpActivas); }
 
         guardadorCts.Cancel();
         await guardador;
+        await ajustador;
 
         var falloReal = trabajadores
             .Where(t => t.IsFaulted)
@@ -1074,43 +1415,136 @@ public class DownloadService : IDownloadService
         progress?.Report((100.0, 0));
     }
 
-    private async Task DescargarTrozoConReintentosAsync(string videoUrl, SafeFileHandle fileHandle, SegmentState trozo, long totalBytes, ProgresoAgregado acumulador, CancellationToken ct)
+    /// <summary>
+    /// Descarga un tramo de trozos consecutivos (normalmente uno; varios si el servidor tarda en
+    /// conectar), reintentando desde el último byte recibido si se corta.
+    /// </summary>
+    private async Task DescargarTramoConReintentosAsync(string videoUrl, string servidor, SafeFileHandle fileHandle, IReadOnlyList<SegmentState> tramo, long totalBytes, ProgresoAgregado acumulador, ControlConexionesDescarga control, AgrupadorTrozos agrupador, CancellationToken ct)
     {
         int intentosFallidos = 0;
-        while (trozo.CurrentOffset <= trozo.End)
+        while (tramo[^1].CurrentOffset <= tramo[^1].End)
         {
-            long offsetAntes = trozo.CurrentOffset;
+            long bytesAntes = BytesRecibidos(tramo);
+            int completosAntes = TrozosCompletos(tramo);
             try
             {
-                await DescargarTramoAsync(videoUrl, fileHandle, trozo, totalBytes, acumulador, ct);
+                // Turno con el servidor: si ya demostró no aceptar más conexiones a la vez, se espera a que se libere una.
+                var conexion = await AbrirConexionAsync(servidor, ct);
+                try
+                {
+                    await DescargarTramoAsync(videoUrl, fileHandle, tramo, totalBytes, acumulador, agrupador, conexion, ct);
+                }
+                // El filtro se evalúa ANTES del finally de abajo, con esta conexión aún abierta:
+                // 403 con otras conexiones recibiendo datos = el servidor limita conexiones, no un enlace caducado.
+                catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Forbidden
+                                                      && ex is not ServidorSaturadoException
+                                                      && !ct.IsCancellationRequested
+                                                      && _limitadorServidores.RegistrarRechazo(conexion, DateTime.UtcNow) is int tope)
+                {
+                    throw new ServidorSaturadoException(System.Net.HttpStatusCode.Forbidden, null, tope);
+                }
+                finally
+                {
+                    conexion.Cerrar();
+                }
             }
             catch (Exception ex) when (!ct.IsCancellationRequested
                                        && EsErrorTransitorioDeRed(ex)
                                        && !EsRechazoDeEnlace(ex))
             {
-                // Si el trozo avanzó antes de cortarse, el fallo no cuenta como intento agotado.
-                if (trozo.CurrentOffset > offsetAntes) intentosFallidos = 0;
+                // Si el tramo avanzó antes de cortarse, el fallo no cuenta como intento agotado.
+                if (BytesRecibidos(tramo) > bytesAntes) intentosFallidos = 0;
                 if (++intentosFallidos > MaxReintentosPorTrozo) throw;
 
-                var espera = TimeSpan.FromSeconds(Math.Min(1 << (intentosFallidos - 1), 8));
-                AppLogger.Debug("DownloadService", $"Corte en un trozo (intento {intentosFallidos}/{MaxReintentosPorTrozo}): {ex.Message}. Reintentando en {espera.TotalSeconds:F0}s.");
+                var espera = EsperaConVariacion(TimeSpan.FromSeconds(Math.Min(1 << (intentosFallidos - 1), 8)));
+                if (ex is ServidorSaturadoException { TopeConexiones: int topeServidor })
+                {
+                    // Ya no se reduce a la mitad: el tope aprendido para este servidor (compartido entre
+                    // descargas) hace esperar a las conexiones de más. Reintento rápido: esperará su turno.
+                    espera = EsperaConVariacion(TimeSpan.FromSeconds(1));
+                    if (_ultimoTopeAvisado.TryGetValue(servidor, out int avisado) is false || avisado != topeServidor)
+                    {
+                        _ultimoTopeAvisado[servidor] = topeServidor;
+                        AppLogger.Info("DownloadService", $"{servidor} limita las conexiones simultáneas: se usan como mucho {topeServidor} a la vez con ese servidor.");
+                    }
+                }
+                else if (ex is ServidorSaturadoException saturado)
+                {
+                    // El servidor pide calma (429/503): menos conexiones a la vez y respetar su espera.
+                    int antes = ConexionesPermitidas(control);
+                    control.Reducir(ConexionesPorDescarga(), TechoConexionesPorDescarga(), DateTime.UtcNow);
+                    int despues = ConexionesPermitidas(control);
+                    if (despues < antes) AppLogger.Info("DownloadService", $"El servidor pidió calma: se baja de {antes} a {despues} conexiones para esta descarga.");
+                    if (saturado.EsperaSugerida is TimeSpan sugerida && sugerida > espera)
+                        espera = sugerida < EsperaMaximaRetryAfter ? sugerida : EsperaMaximaRetryAfter;
+                }
+                AppLogger.Debug("DownloadService", $"Corte en un trozo (intento {intentosFallidos}/{MaxReintentosPorTrozo}): {ex.Message}. Reintentando en {espera.TotalSeconds:F1}s.");
                 await Task.Delay(espera, ct);
+            }
+            finally
+            {
+                for (int i = TrozosCompletos(tramo) - completosAntes; i > 0; i--) control.RegistrarTrozoCompletado();
             }
         }
     }
 
-    private async Task DescargarTramoAsync(string videoUrl, SafeFileHandle fileHandle, SegmentState trozo, long totalBytes, ProgresoAgregado acumulador, CancellationToken ct)
+    /// <summary>Espera turno con el servidor (su tope aprendido de conexiones simultáneas) y abre una conexión.</summary>
+    private async Task<LimitadorPorServidor.Conexion> AbrirConexionAsync(string servidor, CancellationToken ct)
     {
+        LimitadorPorServidor.Conexion? conexion;
+        while ((conexion = _limitadorServidores.IntentarAbrir(servidor, DateTime.UtcNow)) == null)
+        {
+            await Task.Delay(IntervaloReparto, ct);
+        }
+        return conexion;
+    }
+
+    private static long BytesRecibidos(IReadOnlyList<SegmentState> tramo)
+    {
+        long total = 0;
+        foreach (var t in tramo) total += t.CurrentOffset - t.Start;
+        return total;
+    }
+
+    private static int TrozosCompletos(IReadOnlyList<SegmentState> tramo)
+    {
+        int n = 0;
+        foreach (var t in tramo) if (t.CurrentOffset > t.End) n++;
+        return n;
+    }
+
+    /// <summary>
+    /// ±25 % aleatorio sobre la espera: si varias conexiones se cortan a la vez, no vuelven todas
+    /// en el mismo instante (lo que el servidor castigaría con otro corte).
+    /// </summary>
+    private static TimeSpan EsperaConVariacion(TimeSpan espera)
+        => TimeSpan.FromMilliseconds(espera.TotalMilliseconds * (0.75 + Random.Shared.NextDouble() * 0.5));
+
+    private async Task DescargarTramoAsync(string videoUrl, SafeFileHandle fileHandle, IReadOnlyList<SegmentState> tramo, long totalBytes, ProgresoAgregado acumulador, AgrupadorTrozos agrupador, LimitadorPorServidor.Conexion conexion, CancellationToken ct)
+    {
+        // El tramo pendiente es continuo: desde el byte actual del primer trozo sin terminar hasta el
+        // final del último (los trozos siguientes al primero están sin empezar, ver ArmarTramos).
+        int indice = 0;
+        while (tramo[indice].CurrentOffset > tramo[indice].End) indice++;
+        long desdeByte = tramo[indice].CurrentOffset;
+        long hastaByte = tramo[^1].End;
+
         using var req = new HttpRequestMessage(HttpMethod.Get, videoUrl);
         req.Headers.Add("User-Agent", UserAgent);
         req.Headers.Add("Referer", "https://www.mp4upload.com/");
-        req.Headers.Range = new RangeHeaderValue(trozo.CurrentOffset, trozo.End);
+        req.Headers.Range = new RangeHeaderValue(desdeByte, hastaByte);
 
+        var reloj = Stopwatch.StartNew();
         using var response = await _httpClient.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
+        agrupador.RegistrarLatencia(reloj.Elapsed);
 
         if (response.StatusCode == System.Net.HttpStatusCode.RequestedRangeNotSatisfiable)
         {
             throw new RangoInvalidoException("El servidor rechazó el rango pedido (416): el archivo cambió o no admite rangos.");
+        }
+        if (response.StatusCode is System.Net.HttpStatusCode.TooManyRequests or System.Net.HttpStatusCode.ServiceUnavailable)
+        {
+            throw new ServidorSaturadoException(response.StatusCode, LeerRetryAfter(response));
         }
         response.EnsureSuccessStatusCode();
 
@@ -1126,55 +1560,141 @@ public class DownloadService : IDownloadService
         {
             throw new RangoInvalidoException($"El tamaño del archivo cambió en el servidor ({totalBytes} → {longitudReal} bytes).");
         }
-        if (contentRange?.From is long desde && desde != trozo.CurrentOffset)
+        if (contentRange?.From is long desde && desde != desdeByte)
         {
-            throw new IOException($"El servidor devolvió el rango desde el byte {desde} en vez de {trozo.CurrentOffset}.");
+            throw new IOException($"El servidor devolvió el rango desde el byte {desde} en vez de {desdeByte}.");
         }
+        conexion.MarcarTransfiriendo(DateTime.UtcNow);
 
         using var stream = await response.Content.ReadAsStreamAsync(ct);
-        byte[] buffer = new byte[131072];
-
-        while (trozo.CurrentOffset <= trozo.End)
+        // Búfer prestado del pool: uno nuevo de 128 KB por trozo (cientos por episodio) iba a la
+        // zona de objetos grandes de la memoria y forzaba limpiezas pesadas durante la descarga.
+        byte[] buffer = ArrayPool<byte>.Shared.Rent(TamanoBufferLectura);
+        // FUN-015: watchdog de inactividad — 60 s sin recibir datos abortan el tramo. Un solo
+        // temporizador por tramo, reprogramado en cada lectura, en vez de crear uno por lectura.
+        using var idleCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        try
         {
-            int bytesToRead = (int)Math.Min(buffer.Length, trozo.End - trozo.CurrentOffset + 1);
-
-            int read;
-            try
+            while (indice < tramo.Count)
             {
-                // FUN-015: watchdog de inactividad — 60 s sin recibir datos abortan el tramo.
-                using var idleCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                idleCts.CancelAfter(TimeSpan.FromSeconds(60));
-                read = await stream.ReadAsync(buffer.AsMemory(0, bytesToRead), idleCts.Token);
-            }
-            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
-            {
-                throw new IOException("La descarga se detuvo por inactividad (60 s sin recibir datos del servidor).");
-            }
-            if (read == 0) break;
+                var trozo = tramo[indice];
+                // Nunca se lee más allá del final del trozo actual: así cada byte se anota en su trozo.
+                int bytesToRead = (int)Math.Min(TamanoBufferLectura, trozo.End - trozo.CurrentOffset + 1);
 
-            await RandomAccess.WriteAsync(fileHandle, buffer.AsMemory(0, read), trozo.CurrentOffset, ct);
-            trozo.CurrentOffset += read;
-            acumulador.Sumar(read);
+                int read;
+                try
+                {
+                    idleCts.CancelAfter(TiempoMaximoInactividad);
+                    read = await stream.ReadAsync(buffer.AsMemory(0, bytesToRead), idleCts.Token);
+                }
+                catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+                {
+                    throw new IOException("La descarga se detuvo por inactividad (60 s sin recibir datos del servidor).");
+                }
+                if (read == 0) break;
+
+                await RandomAccess.WriteAsync(fileHandle, buffer.AsMemory(0, read), trozo.CurrentOffset, ct);
+                trozo.CurrentOffset += read;
+                acumulador.Sumar(read);
+                if (trozo.CurrentOffset > trozo.End) indice++;
+            }
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
         }
 
         // FUN-018: un cierre prematuro de la conexión (host gratuito saturado) deja el stream en
         // EOF antes de entregar todo el rango. Se trata como corte transitorio: se reintenta
         // desde el último byte recibido en vez de dar el trozo por terminado.
-        if (trozo.CurrentOffset <= trozo.End)
+        var ultimoTrozo = tramo[^1];
+        if (ultimoTrozo.CurrentOffset <= ultimoTrozo.End)
         {
-            throw new IOException($"El servidor cerró la conexión antes de completar el trozo (recibidos hasta el byte {trozo.CurrentOffset} de {trozo.End}).");
+            long recibidoHasta = indice < tramo.Count ? tramo[indice].CurrentOffset : ultimoTrozo.CurrentOffset;
+            throw new IOException($"El servidor cerró la conexión antes de completar el trozo (recibidos hasta el byte {recibidoHasta} de {ultimoTrozo.End}).");
         }
     }
 
     /// <summary>
     /// Conexiones simultáneas por descarga: se reparte un presupuesto total (~12) entre las
-    /// descargas en paralelo para no saturar al servidor (que respondería con cortes o más lento).
+    /// descargas que están transfiriendo AHORA para no saturar al servidor (que respondería con
+    /// cortes o más lento). Antes se dividía por el límite configurado: con 5 descargas simultáneas
+    /// permitidas, un episodio descargándose solo usaba 3 conexiones en vez de 8.
     /// </summary>
     private int ConexionesPorDescarga()
     {
-        int limite;
-        lock (_slotLock) limite = _limiteDescargas;
-        return Math.Clamp(ConexionesTotalesObjetivo / Math.Max(1, limite), 3, 8);
+        int activas = Math.Max(1, Volatile.Read(ref _descargasHttpActivas));
+        return Math.Clamp(ConexionesTotalesObjetivo / activas, MinConexionesPorDescarga, MaxConexionesPorDescarga);
+    }
+
+    /// <summary>
+    /// Tope de conexiones que el ajuste automático puede alcanzar por descarga: un presupuesto
+    /// total repartido entre las activas, para no abrir decenas de conexiones al mismo servidor.
+    /// </summary>
+    private int TechoConexionesPorDescarga()
+    {
+        int activas = Math.Max(1, Volatile.Read(ref _descargasHttpActivas));
+        return Math.Clamp(PresupuestoMaximoConexiones / activas, MinConexionesPorDescarga, TechoAbsolutoConexionesPorDescarga);
+    }
+
+    private int ConexionesPermitidas(ControlConexionesDescarga control)
+        => control.Permitidas(ConexionesPorDescarga(), TechoConexionesPorDescarga());
+
+    /// <summary>
+    /// Mide la velocidad de la descarga cada <see cref="VentanaMedicionConexiones"/> y deja que
+    /// <see cref="ControlConexionesDescarga"/> decida si probar más conexiones o quitarlas.
+    /// </summary>
+    private async Task AjustarConexionesAsync(ControlConexionesDescarga control, ProgresoAgregado acumulador, string servidor, AgrupadorTrozos agrupador, Func<bool> enFinal, CancellationToken ct)
+    {
+        using var timer = new PeriodicTimer(VentanaMedicionConexiones);
+        long bytesAnteriores = acumulador.Descargado;
+        var reloj = Stopwatch.StartNew();
+        try
+        {
+            while (await timer.WaitForNextTickAsync(ct))
+            {
+                long bytes = acumulador.Descargado;
+                double segundos = reloj.Elapsed.TotalSeconds;
+                reloj.Restart();
+                double velocidad = segundos > 0 ? (bytes - bytesAnteriores) / segundos : 0;
+                bytesAnteriores = bytes;
+
+                var ahora = DateTime.UtcNow;
+                bool servidorAlTope = _limitadorServidores.Tope(servidor, ahora) is int tope && _limitadorServidores.Abiertas(servidor) >= tope;
+                int ventanas = ControlConexionesDescarga.VentanasParaLatencia(agrupador.LatenciaMedia, VentanaMedicionConexiones);
+                string? cambio = control.EvaluarVentana(velocidad, ConexionesPorDescarga(), TechoConexionesPorDescarga(), ahora,
+                    servidorAlTope, ventanas, enFinal());
+                if (cambio != null) AppLogger.Info("DownloadService", cambio);
+            }
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    /// <summary>429/503: el servidor está saturado o limita peticiones; reintentable, con la espera que sugiera.</summary>
+    private sealed class ServidorSaturadoException : HttpRequestException
+    {
+        public TimeSpan? EsperaSugerida { get; }
+        /// <summary>Solo para el 403 por exceso de conexiones: tope aprendido para ese servidor.</summary>
+        public int? TopeConexiones { get; }
+
+        public ServidorSaturadoException(System.Net.HttpStatusCode estado, TimeSpan? esperaSugerida, int? topeConexiones = null)
+            : base($"El servidor está saturado ({(int)estado}).", null, estado)
+        {
+            EsperaSugerida = esperaSugerida;
+            TopeConexiones = topeConexiones;
+        }
+    }
+
+    private static TimeSpan? LeerRetryAfter(HttpResponseMessage response)
+    {
+        var retryAfter = response.Headers.RetryAfter;
+        if (retryAfter?.Delta is TimeSpan delta) return delta;
+        if (retryAfter?.Date is DateTimeOffset fecha)
+        {
+            var espera = fecha - DateTimeOffset.UtcNow;
+            return espera > TimeSpan.Zero ? espera : null;
+        }
+        return null;
     }
 
     /// <summary>
@@ -1188,6 +1708,8 @@ public class DownloadService : IDownloadService
         private readonly object _lock = new();
         private long _descargado;
         private long _ultimoTotal;
+
+        public long Descargado => Interlocked.Read(ref _descargado);
         private DateTime _ultimoInstante = DateTime.UtcNow;
         private double _ultimoPorcentaje = -1.0;
         private double _velocidadSuavizada;
@@ -1229,6 +1751,23 @@ public class DownloadService : IDownloadService
             }
 
             if (reportar) _progress.Report((porcentaje, velocidad));
+        }
+    }
+
+    /// <summary>
+    /// El modo de una sola conexión también ocupa turno con el servidor: antes se saltaba el tope y,
+    /// con el servidor lleno por otras descargas, recibía un 403 que parecía un enlace rechazado.
+    /// </summary>
+    private async Task DescargarSecuencialConTurnoAsync(string videoUrl, string destinationPath, long totalBytes, IProgress<(double Progress, double Speed)>? progress, CancellationToken cancellationToken)
+    {
+        var conexion = await AbrirConexionAsync(new Uri(videoUrl).Authority, cancellationToken);
+        try
+        {
+            await DownloadSequentialAsync(videoUrl, destinationPath, totalBytes, progress, cancellationToken);
+        }
+        finally
+        {
+            conexion.Cerrar();
         }
     }
 
@@ -1294,15 +1833,16 @@ public class DownloadService : IDownloadService
         var lastReportedPercentage = -1.0;
         var lastReportTime = DateTime.UtcNow;
         var lastReportedTotalBytes = totalRead;
+        // FUN-015: watchdog de inactividad — 60 s sin datos abortan la descarga secuencial
+        // (un temporizador reprogramado en cada lectura).
+        using var idleCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
         do
         {
             int read;
             try
             {
-                // FUN-015: watchdog de inactividad — 60 s sin datos abortan la descarga secuencial.
-                using var idleCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                idleCts.CancelAfter(TimeSpan.FromSeconds(60));
+                idleCts.CancelAfter(TiempoMaximoInactividad);
                 read = await contentStream.ReadAsync(buffer.AsMemory(0, buffer.Length), idleCts.Token);
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
@@ -1387,6 +1927,7 @@ public class DownloadService : IDownloadService
     private static bool EsRechazoDeEnlace(Exception ex)
     {
         return ex is HttpRequestException hre
+               && ex is not ServidorSaturadoException
                && hre.StatusCode is System.Net.HttpStatusCode.Forbidden
                    or System.Net.HttpStatusCode.NotFound
                    or System.Net.HttpStatusCode.Gone;
@@ -1422,6 +1963,9 @@ public class DownloadService : IDownloadService
             if (fs.Length < 12) return false;
             var cabecera = new byte[512];
             int leidos = fs.Read(cabecera, 0, cabecera.Length);
+            // Una cabecera entera a ceros es espacio preasignado que nunca se escribió, no un video
+            // (MP4 empieza por ceros, pero el tamaño de su primera caja y "ftyp" llegan en los primeros bytes).
+            if (cabecera.AsSpan(0, leidos).IndexOfAnyExcept((byte)0) < 0) return false;
             for (int i = 0; i < leidos; i++)
             {
                 byte b = cabecera[i];

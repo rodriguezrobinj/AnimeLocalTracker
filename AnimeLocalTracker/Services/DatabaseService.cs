@@ -92,8 +92,12 @@ public class DatabaseService : IDatabaseService, IDisposable
         (10, "eliminar índices duplicados creados por [Indexed] (DB-01)", EliminarIndicesRedundantesAsync),
         (11, "partidas de minijuegos (récords y logros) + índice (JuegoId, Puntos)", CrearTablaPartidasMinijuegoAsync),
         (12, "personajes de AniList por anime (Adivina el personaje) + índice único (AnimeId, PersonajeId)", CrearTablasPersonajesAsync),
-        (13, "análisis guardados de OP/ED por episodio (marcadores y saltos) + índices", CrearTablasSkipAsync)
+        (13, "análisis guardados de OP/ED por episodio (marcadores y saltos) + índices", CrearTablasSkipAsync),
+        (14, "página de animeav1 ya verificada por anime (descargas sin repetir la búsqueda)", CrearTablaMediaAnimeAv1Async)
     };
+
+    /// <summary>v14: AniListId → página de animeav1 verificada (clave primaria = AniListId, sin más índices).</summary>
+    private static Task CrearTablaMediaAnimeAv1Async(SQLiteAsyncConnection conexion) => conexion.CreateTableAsync<MediaAnimeAv1Verificado>();
 
     /// <summary>
     /// v13: tramos de opening/ending/resumen ya ubicados en cada episodio, para no volver a detectarlos ni consultar la nube. Los índices
@@ -797,6 +801,7 @@ public class DatabaseService : IDatabaseService, IDisposable
             db.Execute("DELETE FROM PersonajesAnimeSync;");
             db.Execute("DELETE FROM AnalisisSkipEpisodio;");
             db.Execute("DELETE FROM SegmentoSkipGuardado;");
+            db.Execute("DELETE FROM MediaAnimeAv1Verificado;");
         });
     }
 
@@ -986,6 +991,17 @@ public class DatabaseService : IDatabaseService, IDisposable
     {
         if (proxima == null || proxima.AniListId <= 0) return;
         await _conexion.InsertOrReplaceAsync(proxima);
+    }
+
+    public async Task<MediaAnimeAv1Verificado?> ObtenerMediaAnimeAv1Async(int aniListId)
+    {
+        return await _conexion.FindAsync<MediaAnimeAv1Verificado>(aniListId);
+    }
+
+    public async Task GuardarMediaAnimeAv1Async(MediaAnimeAv1Verificado media)
+    {
+        if (media == null || media.AniListId <= 0 || string.IsNullOrWhiteSpace(media.Slug)) return;
+        await _conexion.InsertOrReplaceAsync(media);
     }
 
     // Tope de filas del historial de descargas: lo más antiguo se descarta para que la tabla no crezca sin límite.

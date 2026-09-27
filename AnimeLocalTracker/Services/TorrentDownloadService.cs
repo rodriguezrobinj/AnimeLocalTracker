@@ -55,6 +55,49 @@ public static class SeleccionArchivoTorrent
     }
 }
 
+/// <summary>
+/// Detecta un torrent que no avanza — lógica pura (reloj inyectado por parámetro) para poder
+/// testearse sin MonoTorrent. Sin esto, un torrent sin nadie compartiéndolo esperaba para
+/// siempre y ocupaba uno de los huecos de descarga de la app.
+/// </summary>
+public sealed class VigilanteEstancamientoTorrent
+{
+    /// <summary>Margen para encontrar fuentes (DHT, trackers) antes de recibir el primer dato.</summary>
+    public static readonly TimeSpan MaximoSinPrimerDato = TimeSpan.FromMinutes(5);
+
+    /// <summary>Margen sin avanzar una vez que ya llegaban datos (las fuentes se fueron).</summary>
+    public static readonly TimeSpan MaximoSinAvance = TimeSpan.FromMinutes(10);
+
+    private double _mejorProgreso;
+    private DateTime _ultimoAvance;
+    private bool _huboAvance;
+
+    public VigilanteEstancamientoTorrent(double progresoInicial, DateTime ahoraUtc)
+    {
+        _mejorProgreso = progresoInicial;
+        _ultimoAvance = ahoraUtc;
+    }
+
+    /// <summary>Registra el progreso actual; devuelve el motivo si el torrent se considera estancado, o null.</summary>
+    public string? Registrar(double progreso, DateTime ahoraUtc)
+    {
+        if (progreso > _mejorProgreso)
+        {
+            _mejorProgreso = progreso;
+            _ultimoAvance = ahoraUtc;
+            _huboAvance = true;
+            return null;
+        }
+
+        var quieto = ahoraUtc - _ultimoAvance;
+        if (!_huboAvance && quieto >= MaximoSinPrimerDato)
+            return $"Nadie está compartiendo este torrent (sin datos en {MaximoSinPrimerDato.TotalMinutes:0} min).";
+        if (_huboAvance && quieto >= MaximoSinAvance)
+            return $"El torrent dejó de avanzar ({MaximoSinAvance.TotalMinutes:0} min sin recibir datos).";
+        return null;
+    }
+}
+
 public class TorrentDownloadService : ITorrentDownloadService, IDisposable
 {
     // Sondeo de progreso: MonoTorrent no expone un evento "progreso cambió", así que
@@ -86,7 +129,13 @@ public class TorrentDownloadService : ITorrentDownloadService, IDisposable
         Directory.CreateDirectory(AppDataPaths.TorrentsCacheDir);
         var engineSettings = new EngineSettingsBuilder
         {
-            CacheDirectory = AppDataPaths.TorrentsCacheDir
+            CacheDirectory = AppDataPaths.TorrentsCacheDir,
+            // Por defecto MonoTorrent intenta conectar con solo 8 personas a la vez: encontrar a
+            // quien sí comparte tarda mucho en torrents con pocas semillas (lo normal en anime).
+            MaximumHalfOpenConnections = 32,
+            MaximumConnections = 200,
+            // 5 MB por defecto: con descargas rápidas obliga a escribir en disco a trozos pequeños.
+            DiskCacheBytes = 32 * 1024 * 1024,
         }.ToSettings();
         _engine = new ClientEngine(engineSettings);
         AppDomain.CurrentDomain.ProcessExit += (_, _) => Dispose();
@@ -106,6 +155,7 @@ public class TorrentDownloadService : ITorrentDownloadService, IDisposable
 
         TorrentManager? manager = null;
         bool dejandoSembrando = false;
+        bool conservarTemporal = false;
         try
         {
             byte[] torrentBytes;
@@ -121,8 +171,9 @@ public class TorrentDownloadService : ITorrentDownloadService, IDisposable
             var torrent = await Torrent.LoadAsync(torrentBytes);
 
             Directory.CreateDirectory(carpetaTemporal);
-            var settings = new TorrentSettingsBuilder { AllowDht = true, AllowPeerExchange = true }.ToSettings();
+            var settings = new TorrentSettingsBuilder { AllowDht = true, AllowPeerExchange = true, MaximumConnections = 100 }.ToSettings();
             manager = await _engine.AddAsync(torrent, carpetaTemporal, settings);
+            await AnadirRastreadoresPublicosAsync(manager, torrent);
 
             var archivosDelTorrent = manager.Files.Select(f => (f.Path, f.Length)).ToList();
             string? rutaElegida = SeleccionArchivoTorrent.ElegirArchivoDelEpisodio(archivosDelTorrent, numeroEpisodio)
@@ -141,9 +192,31 @@ public class TorrentDownloadService : ITorrentDownloadService, IDisposable
 
             await manager.StartAsync();
 
+            var vigilante = new VigilanteEstancamientoTorrent(manager.Progress, DateTime.UtcNow);
             while (manager.Progress < 100.0)
             {
                 ct.ThrowIfCancellationRequested();
+
+                // Un error de MonoTorrent (disco lleno, archivo bloqueado...) detiene el torrent
+                // para siempre: sin esta salida el bucle esperaba un 100 % que nunca llegaría.
+                if (manager.State == TorrentState.Error)
+                {
+                    string motivo = manager.Error?.Exception?.Message ?? "error desconocido del motor de torrent";
+                    AppLogger.Warn("TorrentDownloadService", $"El torrent entró en estado de error: {motivo}");
+                    await DetenerYQuitarAsync(manager);
+                    manager = null;
+                    return new ResultadoTorrent(false, null, $"Error del torrent: {motivo}");
+                }
+
+                string? estancado = vigilante.Registrar(manager.Progress, DateTime.UtcNow);
+                if (estancado != null)
+                {
+                    AppLogger.Warn("TorrentDownloadService", $"{estancado} Progreso: {manager.Progress:F1} %, conexiones: {manager.OpenConnections}.");
+                    await DetenerYQuitarAsync(manager);
+                    manager = null;
+                    return new ResultadoTorrent(false, null, estancado);
+                }
+
                 progress?.Report((manager.Progress, manager.Monitor.DownloadRate));
                 await Task.Delay(IntervaloSondeoMs, ct);
             }
@@ -190,6 +263,10 @@ public class TorrentDownloadService : ITorrentDownloadService, IDisposable
         }
         catch (OperationCanceledException)
         {
+            // Pausa o cancelación: se conservan las piezas ya bajadas para que reanudar las
+            // retome (MonoTorrent las verifica al volver a añadir el torrent en esta carpeta).
+            // Si era una cancelación definitiva, el llamador borra la carpeta.
+            conservarTemporal = true;
             await DetenerYQuitarAsync(manager);
             throw;
         }
@@ -202,12 +279,42 @@ public class TorrentDownloadService : ITorrentDownloadService, IDisposable
         finally
         {
             // Si sigue sembrando, MonoTorrent necesita que esta carpeta siga existiendo
-            // (es de donde sirve las piezas a otros peers) — no se borra en ese caso.
-            if (!dejandoSembrando)
+            // (es de donde sirve las piezas a otros peers) — no se borra en ese caso. Tampoco
+            // tras una pausa/cancelación: ahí están las piezas que reanudar debe retomar.
+            if (!dejandoSembrando && !conservarTemporal)
             {
                 try { if (Directory.Exists(carpetaTemporal)) Directory.Delete(carpetaTemporal, recursive: true); }
                 catch (Exception ex) { AppLogger.Debug("TorrentDownloadService", $"No se pudo limpiar la carpeta temporal: {ex.Message}"); }
             }
+        }
+    }
+
+    /// <summary>
+    /// Rastreadores públicos veteranos que se suman a los del .torrent (como la opción "añadir
+    /// rastreadores automáticamente" de qBittorrent): el .torrent de Nyaa trae pocos, y más
+    /// rastreadores = más personas encontradas que comparten el mismo archivo.
+    /// </summary>
+    internal static readonly string[] RastreadoresPublicos =
+    {
+        "udp://tracker.opentrackr.org:1337/announce",
+        "udp://open.stealth.si:80/announce",
+        "udp://tracker.torrent.eu.org:451/announce",
+        "udp://exodus.desync.com:6969/announce",
+        "udp://open.demonii.com:1337/announce",
+        "http://nyaa.tracker.wf:7777/announce",
+    };
+
+    private static async Task AnadirRastreadoresPublicosAsync(TorrentManager manager, Torrent torrent)
+    {
+        // Un torrent privado solo puede usar sus propios rastreadores (reglas del sitio que lo publica).
+        if (torrent.IsPrivate) return;
+
+        var yaIncluidos = new HashSet<string>(
+            torrent.AnnounceUrls.SelectMany(nivel => nivel), StringComparer.OrdinalIgnoreCase);
+        foreach (var url in RastreadoresPublicos.Where(u => !yaIncluidos.Contains(u)))
+        {
+            try { await manager.TrackerManager.AddTrackerAsync(new Uri(url)); }
+            catch (Exception ex) { AppLogger.Debug("TorrentDownloadService", $"No se pudo añadir el rastreador {url}: {ex.Message}"); }
         }
     }
 

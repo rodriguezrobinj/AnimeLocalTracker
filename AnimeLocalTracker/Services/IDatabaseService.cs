@@ -68,6 +68,10 @@ public interface IDatabaseService
     Task<ProximaEmisionLocal?> ObtenerProximaEmisionAsync(int aniListId);
     Task GuardarProximaEmisionAsync(ProximaEmisionLocal proxima);
 
+    // === PÁGINA DE ANIMEAV1 VERIFICADA por anime (las descargas van directo a ella, también tras reiniciar) ===
+    Task<MediaAnimeAv1Verificado?> ObtenerMediaAnimeAv1Async(int aniListId);
+    Task GuardarMediaAnimeAv1Async(MediaAnimeAv1Verificado media);
+
     // === PREFERENCIAS DE EMISIÓN (avisar / descargar automáticamente) y DATOS EXTRA de AniList (etiquetas de la ficha) ===
     Task<PreferenciaEmision?> ObtenerPreferenciaEmisionAsync(int aniListId);
     Task GuardarPreferenciaEmisionAsync(PreferenciaEmision preferencia);
