@@ -114,6 +114,83 @@ public class AnimeAv1ResolverMemoriaTests
         handler.BusquedasCatalogo.Should().Be(referencia.BusquedasCatalogo, "una sola búsqueda completa; los demás usan la página encontrada");
     }
 
+    /// <summary>Página del sitio SIN malId (el sitio no lo publica para todas las series).</summary>
+    private static string PaginaSinMalId(string titulo) => PlantillaSinMalId.Replace("TITULO", titulo);
+
+    private const string PlantillaSinMalId = """
+        <html><body>
+        <script>{__sveltekit_1p4gm49 = {data: [{type:"data",data:{media:{id:77,title:"TITULO",slug:"serie-sin-malid",episodes:[{id:1,number:9}]},episode:{number:9},
+        embeds:{SUB:[
+          {server:"MP4Upload",url:"https://www.mp4upload.com/embed-r0xdfbvme2yy.html"}
+        ]}}]}}</script>
+        </body></html>
+        """;
+
+    private sealed class PaginaFijaHandler : HttpMessageHandler
+    {
+        private readonly string _html;
+        public int Peticiones;
+
+        public PaginaFijaHandler(string html) => _html = html;
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref Peticiones);
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(_html) });
+        }
+    }
+
+    private static Mock<IDatabaseService> BdConPaginaGuardadaSinMalId(int aniListId)
+    {
+        var db = new Mock<IDatabaseService>();
+        db.Setup(d => d.ObtenerMediaAnimeAv1Async(aniListId)).ReturnsAsync(new AnimeLocalTracker.Models.MediaAnimeAv1Verificado
+        {
+            AniListId = aniListId, Slug = "serie-sin-malid", MalId = null, VerificadoUtc = DateTime.UtcNow
+        });
+        return db;
+    }
+
+    [Fact]
+    public async Task ObtenerEmbedsEpisodioAsync_PaginaGuardadaSinMalIdQueElSitioReutilizoParaOtraSerie_NoDescargaLaEquivocada()
+    {
+        // Sin MAL ID, el atajo solo comprobaba que el episodio existiera: si el sitio reutilizaba la
+        // dirección para otra serie, se descargaba el episodio equivocado sin avisar.
+        var handler = new PaginaFijaHandler(PaginaSinMalId("Kimetsu no Yaiba"));
+        var resolver = new AnimeAv1VideoSourceResolver(new HttpClient(handler), database: BdConPaginaGuardadaSinMalId(905).Object);
+
+        var embeds = await resolver.ObtenerEmbedsEpisodioAsync(TitulosGrandBlue, 9, aniListId: 905);
+
+        embeds.Should().BeEmpty("la página guardada ahora es de otra serie (y la búsqueda completa tampoco encuentra la buena)");
+    }
+
+    [Fact]
+    public async Task ObtenerEmbedsEpisodioAsync_PaginaGuardadaSinMalIdDelMismoAnime_SigueUsandoElAtajo()
+    {
+        var handler = new PaginaFijaHandler(PaginaSinMalId("Grand Blue Season 3"));
+        var resolver = new AnimeAv1VideoSourceResolver(new HttpClient(handler), database: BdConPaginaGuardadaSinMalId(906).Object);
+
+        var embeds = await resolver.ObtenerEmbedsEpisodioAsync(TitulosGrandBlue, 9, aniListId: 906);
+
+        embeds.Should().NotBeEmpty();
+        handler.Peticiones.Should().Be(2, "página del anime + página del episodio, sin búsqueda completa");
+    }
+
+    [Fact]
+    public async Task ObtenerEmbedsEpisodioAsync_PaginaGuardadaAceptadaPorNombreJapones_ElAtajoUsaLosTitulosDeAniList()
+    {
+        // La búsqueda completa la aceptó gracias al título nativo de AniList; el atajo debe poder hacer lo mismo.
+        var handler = new PaginaFijaHandler(PaginaSinMalId("ぐらんぶる Season 3"));
+        var resolver = new AnimeAv1VideoSourceResolver(
+            new HttpClient(handler),
+            titulosDesdeAniList: (_, _) => Task.FromResult<System.Collections.Generic.List<string>?>(new() { "ぐらんぶる Season 3" }),
+            database: BdConPaginaGuardadaSinMalId(907).Object);
+
+        var embeds = await resolver.ObtenerEmbedsEpisodioAsync(TitulosGrandBlue, 9, aniListId: 907);
+
+        embeds.Should().NotBeEmpty();
+        handler.Peticiones.Should().Be(2);
+    }
+
     [Fact]
     public async Task ObtenerEmbedsEpisodioAsync_SiLaBaseDeDatosFalla_HaceLaBusquedaCompletaIgual()
     {
