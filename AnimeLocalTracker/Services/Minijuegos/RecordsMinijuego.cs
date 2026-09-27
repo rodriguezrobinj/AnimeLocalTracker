@@ -10,6 +10,7 @@ public static class JuegosMinijuego
 {
     public const string AdivinaAnime = "adivina_anime";
     public const string AdivinaOpEd = "adivina_oped";
+    public const string AdivinaPersonaje = "adivina_personaje";
 }
 
 /// <summary>Récords y totales de un juego, calculados a partir de sus partidas terminadas.</summary>

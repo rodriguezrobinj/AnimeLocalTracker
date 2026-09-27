@@ -149,6 +149,9 @@ public partial class App : Application
             .AddPolicyHandler(GetRetryPolicy());
         services.AddSingleton<IAnimeThemesDownloadService, AnimeThemesDownloadService>();
         services.AddSingleton<IAudioDurationService, AudioDurationService>();
+        // Enlaces externos de la sección de música: cada fuente es un IProveedorEnlacesMusica (AniPlaylist de serie).
+        services.AddSingleton<AnimeLocalTracker.Services.EnlacesMusica.IProveedorEnlacesMusica, AnimeLocalTracker.Services.EnlacesMusica.AniPlaylistProveedor>();
+        services.AddSingleton<AnimeLocalTracker.Services.EnlacesMusica.IEnlacesMusicaService, AnimeLocalTracker.Services.EnlacesMusica.EnlacesMusicaService>();
 
         // Lo registramos como Singleton porque queremos que haya una sola conexión a la BD en toda la app
         services.AddSingleton<IDatabaseService, DatabaseService>();
@@ -189,6 +192,8 @@ public partial class App : Application
         services.AddSingleton<AnimeLocalTracker.Services.Franquicias.IFranquiciaService, AnimeLocalTracker.Services.Franquicias.FranquiciaService>();
 
         // Orquestación de skip-times (resolución MAL ID + reglas de evaluación)
+        // Audio oficial de los OP/ED (AnimeThemes) para ubicarlos dentro de los episodios sin pasos manuales, y su caché en disco
+        services.AddSingleton<IReferenciasAudioService, ReferenciasAudioService>();
         services.AddSingleton<ISkipTimesCoordinator, SkipTimesCoordinator>();
         services.AddSingleton<IMediaEnrichmentService, MediaEnrichmentService>();
 
@@ -202,6 +207,7 @@ public partial class App : Application
         // por sesión de reproducción (Singleton, igual que FrameCaptureService).
         services.AddSingleton<IPlaybackWindowModeCoordinator, PlaybackWindowModeCoordinator>();
         services.AddSingleton<ISubtitleCoordinator, SubtitleCoordinator>();
+        services.AddSingleton<ISubtitleCuesExtractorService, SubtitleCuesExtractorService>();
         services.AddSingleton<IPlaybackVolumeCoordinator, PlaybackVolumeCoordinator>();
 
         // Fase 3 del refactor: coalescing de seek — sí tiene estado por sesión de reproducción
@@ -308,6 +314,8 @@ public partial class App : Application
         services.AddSingleton<AnimeLocalTracker.Services.Minijuegos.IMinijuegosRecordsService, AnimeLocalTracker.Services.Minijuegos.MinijuegosRecordsService>();
         services.AddSingleton<AdivinaAnimeViewModel>();
         services.AddSingleton<AdivinaOpEdViewModel>();
+        services.AddHttpClient<IPersonajesService, PersonajesService>(); // sin reintentos largos: un juego no espera minutos a AniList
+        services.AddSingleton<AdivinaPersonajeViewModel>();
         services.AddSingleton<MinijuegosViewModel>();
 
         // Historial de reproducción

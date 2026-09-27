@@ -721,6 +721,46 @@ public class AniListTrackingService : IAnimeTrackingService
         }
     }
 
+    public async Task<(bool Exito, AniListNextAiringEpisode? Ultimo)> ObtenerUltimoEpisodioEmitidoAsync(int mediaId)
+    {
+        try
+        {
+            var query = @"
+            query ($mediaId: Int, $airingAtLesser: Int) {
+                Page (perPage: 1) {
+                    airingSchedules (mediaId_in: [$mediaId], airingAt_lesser: $airingAtLesser, sort: TIME_DESC) {
+                        episode
+                        airingAt
+                    }
+                }
+            }";
+
+            var variables = new { mediaId, airingAtLesser = (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds() };
+            var jsonContent = JsonSerializer.Serialize(new { query, variables }, JsonOptions);
+            var request = CrearRequest(jsonContent);
+            var response = await EnviarYDetectarSesionAsync(request);
+            if (!response.IsSuccessStatusCode) return (false, null);
+
+            var content = await response.Content.ReadAsStringAsync();
+            if (content.Contains("\"errors\""))
+            {
+                AppLogger.Warn("AniListTrackingService", $"AniList devolvió error al pedir el último episodio emitido de MediaId {mediaId}: {Truncar(content)}");
+                return (false, null);
+            }
+
+            var result = JsonSerializer.Deserialize<AniListResponse>(content, JsonOptions);
+            var nodo = result?.Data?.Page?.AiringSchedules?.FirstOrDefault();
+            if (nodo == null || nodo.Episode <= 0 || nodo.AiringAt <= 0) return (true, null);
+
+            return (true, new AniListNextAiringEpisode { Episode = nodo.Episode, AiringAt = nodo.AiringAt });
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("AniListTrackingService", $"No se pudo consultar el último episodio emitido de MediaId {mediaId}: {ex.Message}");
+            return (false, null);
+        }
+    }
+
     public async Task<(bool Exito, AniListMedia? Media)> ObtenerDatosExtraAsync(int mediaId)
     {
         try

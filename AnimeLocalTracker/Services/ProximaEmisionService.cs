@@ -56,6 +56,16 @@ public sealed class ProximaEmisionService : IProximaEmisionService
             var (exito, proximo) = await _tracking.ObtenerProximaEmisionAsync(aniListId);
             if (exito)
             {
+                // AniList a veces todavía no tiene programada la fecha del episodio SIGUIENTE (falta confirmar el
+                // horario) aunque el anterior ya haya salido — sin este respaldo el anime se queda "congelado" en su
+                // último total conocido hasta que AniList publique el próximo horario. Se pregunta entonces por el
+                // último episodio que SÍ consta como emitido en su calendario.
+                if (proximo == null && estadoAnime == "RELEASING")
+                {
+                    var (exitoUltimo, ultimo) = await _tracking.ObtenerUltimoEpisodioEmitidoAsync(aniListId);
+                    if (exitoUltimo && ultimo != null) proximo = ultimo;
+                }
+
                 local = new ProximaEmisionLocal
                 {
                     AniListId = aniListId,

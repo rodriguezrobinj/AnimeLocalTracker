@@ -4,6 +4,7 @@
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
              xmlns:vwp="clr-namespace:WpfToolkit.Controls;assembly=VirtualizingWrapPanel"
              xmlns:loc="clr-namespace:AnimeLocalTracker.Services"
+             xmlns:views="clr-namespace:AnimeLocalTracker.Views"
              TextElement.Foreground="{DynamicResource MaterialDesignBody}"
              Background="Transparent">
 
@@ -48,6 +49,8 @@
     <!-- Raíz sin márgenes: el panel "Qué veo hoy" la cubre por completo (antes quedaba dentro de la
          página con márgenes y dejaba a la vista un marco y la barra de scroll de la galería). -->
     <Grid>
+    <!-- Cambiar entre Biblioteca y Minijuegos es un cambio en seco: se oculta el contenedor, no la página (que es la que anima al aparecer). -->
+    <Grid Visibility="{Binding MostrandoBiblioteca, Converter={StaticResource BoolToVis}}">
     <Grid MaxWidth="1248">
         <Grid.Style>
             <Style TargetType="Grid" BasedOn="{StaticResource AppPageRoot}">
@@ -92,6 +95,9 @@
                                Foreground="{DynamicResource Brush.Accent}"
                                VerticalAlignment="Center" HorizontalAlignment="Center" TextAlignment="Center"/>
                 </Border>
+
+                <!-- Selector Biblioteca | Minijuegos -->
+                <views:SelectorSeccionGaleria Margin="22,0,0,0"/>
             </StackPanel>
             
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
@@ -928,6 +934,25 @@
                 </DataTemplate>
             </ListBox.ItemTemplate>
         </ListBox>
+    </Grid>
+    </Grid>
+
+    <!-- SECCIÓN MINIJUEGOS de la Galería: misma página (título + selector) pero con los juegos como contenido. La vista de los
+         juegos solo existe mientras esta sección está abierta (ContenidoMinijuegos es null en la biblioteca). -->
+    <Grid Visibility="{Binding MostrandoMinijuegos, Converter={StaticResource BoolToVis}}">
+    <Grid MaxWidth="1248" Style="{StaticResource AppPageRoot}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,20">
+            <TextBlock Text="{Binding [Gal_Titulo], Source={x:Static loc:LocalizationService.Instance}}" Style="{StaticResource AppText.PageTitle}" VerticalAlignment="Center"/>
+            <views:SelectorSeccionGaleria Margin="22,0,0,0"/>
+        </StackPanel>
+
+        <ContentControl Grid.Row="1" Content="{Binding ContenidoMinijuegos}" Focusable="False" IsTabStop="False"/>
+    </Grid>
     </Grid>
 
     <!-- ═══ QUÉ VEO HOY: panel modal con ruleta de portadas ═══ -->

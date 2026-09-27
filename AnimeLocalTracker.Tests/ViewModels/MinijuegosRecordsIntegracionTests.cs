@@ -306,14 +306,17 @@ public class MinijuegosRecordsIntegracionTests
     {
         _records.Setup(r => r.ObtenerAsync(JuegosMinijuego.AdivinaAnime)).ReturnsAsync(new RecordsMinijuego(760, DateTime.UtcNow, 3, 20, 30, 0, 4));
         _records.Setup(r => r.ObtenerAsync(JuegosMinijuego.AdivinaOpEd)).ReturnsAsync(new RecordsMinijuego(430, DateTime.UtcNow, 2, 9, 20, 0, 3));
+        _records.Setup(r => r.ObtenerAsync(JuegosMinijuego.AdivinaPersonaje)).ReturnsAsync(new RecordsMinijuego(310, DateTime.UtcNow, 1, 6, 10, 0, 2));
         var hub = new MinijuegosViewModel(
             new AdivinaAnimeViewModel(_db.Object, _records.Object),
-            new AdivinaOpEdViewModel(_db.Object, Mock.Of<IAnimeThemesService>(), Mock.Of<IAnimeThemesDownloadService>(), Mock.Of<IClipPlayer>(), _records.Object));
+            new AdivinaOpEdViewModel(_db.Object, Mock.Of<IAnimeThemesService>(), Mock.Of<IAnimeThemesDownloadService>(), Mock.Of<IClipPlayer>(), _records.Object),
+            new AdivinaPersonajeViewModel(_db.Object, Mock.Of<IPersonajesService>(), _records.Object));
 
         await hub.PrepararAsync();
 
         hub.AdivinaAnime.RecordTexto.Should().Contain("760");
         hub.AdivinaOpEd.RecordTexto.Should().Contain("430");
+        hub.AdivinaPersonaje.RecordTexto.Should().Contain("310");
         _db.Verify(d => d.ObtenerTodosLosAnimesAsync(), Times.Never, "en el menú solo se leen los récords, no la biblioteca");
     }
 }

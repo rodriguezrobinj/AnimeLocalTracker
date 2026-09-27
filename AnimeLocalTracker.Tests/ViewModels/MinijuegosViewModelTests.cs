@@ -33,7 +33,8 @@ public class MinijuegosViewModelTests
 
         return new MinijuegosViewModel(
             new AdivinaAnimeViewModel(_db.Object),
-            new AdivinaOpEdViewModel(_db.Object, themes.Object, descargas.Object, _player.Object));
+            new AdivinaOpEdViewModel(_db.Object, themes.Object, descargas.Object, _player.Object),
+            new AdivinaPersonajeViewModel(_db.Object, Mock.Of<IPersonajesService>()));
     }
 
     [Fact]

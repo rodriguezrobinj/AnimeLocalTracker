@@ -29,8 +29,25 @@
 > `mini_perfectas`, `mini_racha`, `mini_oped`), que se evalúan al terminar cada partida y avisan con el toast habitual.
 > Lógica en `RecordsMinijuego`/`MinijuegosRecordsService`; el catálogo pasa de 79 a 109 niveles.
 >
-> **Aún no hecho:** fotograma de un episodio local, modo escritura libre, "solo animes que he visto", récords en la
-> pestaña Estadísticas, y Adivina el personaje.
+> **Implementado el 2026-09-26 (sin commit todavía): "Adivina el personaje".** Sale la imagen de un personaje de un anime
+> de tu biblioteca, muy **pixelada** (10 px de ancho, sube hasta 80 con cada pista; al responder sale entera), y hay que
+> elegir su nombre entre 4 (dos del mismo género que la respuesta). Pistas de menos a más reveladoras: papel en la
+> historia, género, edad, "también le llaman" (primer apodo que no delate el nombre), anime y inicial; cada una resta 20
+> puntos como en los otros juegos. Los personajes se piden a AniList **por lotes de 5 animes** (12 personajes por anime,
+> principales primero) y se guardan en las tablas `PersonajeAnime`/`PersonajesAnimeSync` (migración v12, vigencia de
+> 30 días, "Borrar todos mis datos" también las limpia); las imágenes, en `AppDataPaths.CharactersDir` con tope de 200
+> archivos (se borran las más antiguas). Toda la partida —personajes e imágenes— se prepara al pulsar Jugar (8 s la
+> primera vez con 10 animes nuevos, ~2 s con la caché) y después se juega sin conexión. No se usa la descripción del
+> personaje (spoilers). Récords y un logro nuevo (`mini_personajes`, "Ojo de fan"; catálogo de 109 a 114 niveles).
+> Lógica pura en `AdivinaPersonajeJuego`, datos en `PersonajesService`, imagen pixelada con `PersonajePixeladoConverter`.
+>
+> **Ubicación (2026-09-26):** los minijuegos ya no tienen pestaña propia en la barra lateral: son una **sección de la Galería**,
+> con un selector *Biblioteca | Minijuegos* junto al título (`GaleriaViewModel.Minijuegos.cs`, `SelectorSeccionGaleria`). Al cambiar
+> de sección o de pestaña una partida en curso se conserva; el audio de "Adivina el OP/ED" se corta al volver a la biblioteca.
+> El menú muestra las tres tarjetas en una fila.
+>
+> **Aún no hecho:** fotograma de un episodio local, modo escritura libre, "solo animes que he visto", y récords en la
+> pestaña Estadísticas.
 
 ## Pregunta
 
@@ -132,7 +149,7 @@ favoritos y descripción. Con *Tensei shitara Slime Datta Ken* salieron Rimuru, 
 1. **Adivina el anime** por pistas + fotograma local (S): todo offline, sin dependencias nuevas; valida pestaña,
    puntuación y logros.
 2. **Adivina el OP/ED** con caché (M): añade audio y descarga; AnimeThemes ya responde (26-sep) y el emparejamiento por ID es fiable, y las omisiones con varios *resources* ya están corregidas; falta deduplicar versiones (por `Slug`) en el juego y cachear los clips por el historial de caídas.
-3. **Adivina el personaje** con revelado progresivo (M-L): tabla nueva, imágenes en caché, censura de spoilers.
+3. ~~**Adivina el personaje** con revelado progresivo (M-L): tabla nueva, imágenes en caché, censura de spoilers.~~ Hecho (26-sep): pixelado progresivo en vez de censura, porque no se usa la descripción.
 4. Extras (reto diario, rachas) (S cada uno).
 
 ## Lo que se probó y lo que no

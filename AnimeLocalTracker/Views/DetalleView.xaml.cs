@@ -74,6 +74,11 @@ public partial class DetalleView : UserControl
         {
             EditorSeguimientoCard.Language = XmlLanguage.GetLanguage(LocalizationService.Cultura.IetfLanguageTag);
         }
+        else if (e.PropertyName == nameof(DetalleViewModel.MostrandoPanelMusica) && _vmObservado?.MostrandoPanelMusica == true)
+        {
+            // El foco dentro de la ventana de música hace que Escape (KeyBinding de la tarjeta) la cierre.
+            Dispatcher.BeginInvoke(new Action(() => PanelMusicaCard.Focus()), System.Windows.Threading.DispatcherPriority.Input);
+        }
         else if (e.PropertyName == nameof(DetalleViewModel.MostrandoCalendarioFecha) && _vmObservado?.MostrandoCalendarioFecha == true)
         {
             // Cada vez que se abre: idioma de la app, vista de días y el mes de la fecha ya elegida (o de hoy).
@@ -83,6 +88,14 @@ public partial class DetalleView : UserControl
             CalendarioFecha.SelectedDate = _vmObservado.CalendarioTieneFecha ? fecha : null;
             CalendarioFecha.DisplayDate = fecha;
         }
+    }
+
+    /// <summary>Un clic en el fondo oscuro (fuera de la tarjeta) cierra la ventana de música.</summary>
+    private void FondoMusica_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (!ReferenceEquals(e.OriginalSource, FondoMusica)) return;
+        if (_vmObservado?.ToggleMusicaCommand.CanExecute(null) == true) _vmObservado.ToggleMusicaCommand.Execute(null);
+        e.Handled = true;
     }
 
     /// <summary>

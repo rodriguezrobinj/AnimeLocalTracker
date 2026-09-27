@@ -29,6 +29,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     private readonly IFrameCaptureService _frameCaptureService;
     private readonly IPlaybackWindowModeCoordinator _windowModeCoordinator;
     private readonly ISubtitleCoordinator _subtitleCoordinator;
+    private readonly ISubtitleCuesExtractorService _subtitleCuesExtractor;
     private readonly IPlaybackVolumeCoordinator _volumeCoordinator;
     private readonly IPlaybackSeekCoordinator _seekCoordinator;
     private readonly ISystemMediaControlsService? _smtc;
@@ -124,6 +125,10 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     private List<AniSkipResult> _skipTimes = new();
     public List<AniSkipResult> SkipTimes => _skipTimes;
 
+    /// <summary>Opening/ending/resumen del episodio para dibujarlos en la barra de progreso (vacío hasta que llegan los tramos).</summary>
+    [ObservableProperty]
+    private IReadOnlyList<SegmentoLineaTiempo> _segmentosLineaTiempo = Array.Empty<SegmentoLineaTiempo>();
+
     private AniSkipResult? _currentActiveSkip;
     public AniSkipResult? CurrentActiveSkip => _currentActiveSkip;
 
@@ -214,6 +219,92 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         set => SetProperty(ref _subtitulosHabilitados, value);
     }
 
+    // ── Subtítulos que se solapan: hasta 2 líneas a la vez (arriba/abajo), ver SubtitulosSolapadosResolver ──
+
+    /// <summary>
+    /// True cuando ya se extrajo la pista completa y se puede resolver el solape por nuestra cuenta; el code-behind
+    /// usa esto para decidir si confía en <see cref="SubtituloLineaAbajo"/>/<see cref="SubtituloLineaArriba"/> o si
+    /// sigue mostrando el texto único de Flyleaf (<c>Player.Subtitles.SubsText</c>) como respaldo — por ejemplo
+    /// mientras la extracción todavía está en curso, o si falló (formato no soportado, archivo dañado, etc.).
+    /// </summary>
+    [ObservableProperty] private bool _subtitulosDobleLineaActivo;
+
+    [ObservableProperty] private string _subtituloLineaAbajo = string.Empty;
+    [ObservableProperty] private string _subtituloLineaArriba = string.Empty;
+
+    private IReadOnlyList<Models.SubtitleCue> _subtitleCues = Array.Empty<Models.SubtitleCue>();
+    private CancellationTokenSource? _subtitleCuesCts;
+
+    /// <summary>
+    /// Se llama tras abrir el video y tras cada cambio de pista de subtítulos (mismo punto: <c>OpenCompleted</c>
+    /// vuelve a disparar cuando <see cref="SelectSubtitleStream"/> reabre el Player con otra pista). Extrae la
+    /// pista completa en segundo plano; hasta que termine (o si falla) se sigue mostrando el texto único de
+    /// Flyleaf, así los subtítulos nunca desaparecen por culpa de esta mejora.
+    /// </summary>
+    private void CargarCuesSubtitulosSiCorresponde()
+    {
+        _subtitleCuesCts?.Cancel();
+        _subtitleCuesCts?.Dispose();
+        _subtitleCuesCts = null;
+
+        SubtitulosDobleLineaActivo = false;
+        _subtitleCues = Array.Empty<Models.SubtitleCue>();
+
+        var subtitulos = Player?.Subtitles;
+        AppLogger.Debug("ReproductorViewModel", $"Pistas de subtítulos disponibles: {subtitulos?.Streams?.Count ?? -1}, activa (StreamIndex): {subtitulos?.StreamIndex ?? -99}.");
+        if (subtitulos == null || subtitulos.StreamIndex < 0) return;
+        var stream = subtitulos.Streams?.FirstOrDefault(s => s.StreamIndex == subtitulos.StreamIndex);
+        if (stream == null) return;
+
+        // Una pista externa (.srt/.ass suelto junto al video) trae su ruta real en ExternalStream.Url; una pista
+        // incrustada en el propio contenedor no tiene ExternalStream y se identifica por su índice de flujo.
+        string? rutaExterna = stream.ExternalStream?.Url;
+        int? streamIndexEmbebido = rutaExterna == null ? stream.StreamIndex : null;
+        string rutaVideo = _rutaVideo;
+
+        var cts = new CancellationTokenSource();
+        _subtitleCuesCts = cts;
+
+        _ = CargarCuesSubtitulosAsync(rutaVideo, streamIndexEmbebido, rutaExterna, cts);
+    }
+
+    private async Task CargarCuesSubtitulosAsync(string rutaVideo, int? streamIndexEmbebido, string? rutaExterna, CancellationTokenSource cts)
+    {
+        try
+        {
+            var cues = await _subtitleCuesExtractor.ExtraerAsync(rutaVideo, streamIndexEmbebido, rutaExterna, cts.Token);
+            if (cts.IsCancellationRequested || !ReferenceEquals(_subtitleCuesCts, cts)) return; // se abrió otra pista/video mientras tanto
+
+            _subtitleCues = cues;
+            SubtitulosDobleLineaActivo = cues.Count > 0;
+            AppLogger.Debug("ReproductorViewModel", cues.Count > 0
+                ? $"Pista de subtítulos extraída: {cues.Count} líneas."
+                : "Extracción de subtítulos sin resultado: se sigue mostrando el texto único de Flyleaf.");
+        }
+        catch (OperationCanceledException)
+        {
+            // Se canceló porque se abrió otra pista/video: nada que hacer, el nuevo pedido ya está en curso.
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("ReproductorViewModel", $"No se pudo extraer la pista de subtítulos: {ex.Message}");
+        }
+    }
+
+    /// <summary>Se llama en el mismo sondeo de progreso (cada 250 ms mientras reproduce): resuelve qué línea va
+    /// arriba y cuál abajo para el instante actual. No hace nada si no hay pista extraída (ver <see cref="SubtitulosDobleLineaActivo"/>).</summary>
+    private void ActualizarLineasSubtitulosSolapados(double curSeconds)
+    {
+        if (!SubtitulosHabilitados || !SubtitulosDobleLineaActivo)
+        {
+            return;
+        }
+
+        var (abajo, arriba) = Core.SubtitulosSolapadosResolver.Resolver(_subtitleCues, TimeSpan.FromSeconds(curSeconds));
+        SubtituloLineaAbajo = abajo ?? string.Empty;
+        SubtituloLineaArriba = arriba ?? string.Empty;
+    }
+
     private bool _modoNocheActivo = false;
     /// <summary>
     /// "Modo noche": compresor de rango dinámico (FFmpeg acompressor) sobre el audio para que
@@ -301,6 +392,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         IFrameCaptureService? frameCaptureService = null,
         IPlaybackWindowModeCoordinator? windowModeCoordinator = null,
         ISubtitleCoordinator? subtitleCoordinator = null,
+        ISubtitleCuesExtractorService? subtitleCuesExtractorService = null,
         IPlaybackVolumeCoordinator? volumeCoordinator = null,
         IPlaybackSeekCoordinator? seekCoordinator = null)
     {
@@ -316,6 +408,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         _frameCaptureService = frameCaptureService ?? new FrameCaptureService();
         _windowModeCoordinator = windowModeCoordinator ?? new PlaybackWindowModeCoordinator(ventanaPrincipal);
         _subtitleCoordinator = subtitleCoordinator ?? new SubtitleCoordinator();
+        _subtitleCuesExtractor = subtitleCuesExtractorService ?? new SubtitleCuesExtractorService();
         _volumeCoordinator = volumeCoordinator ?? new PlaybackVolumeCoordinator();
         _seekCoordinator = seekCoordinator ?? new PlaybackSeekCoordinator();
 
@@ -543,6 +636,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             {
                 _haCompletadoOpen = true;
                 EvaluarSubtitulosPorDefecto();
+                CargarCuesSubtitulosSiCorresponde();
 
                 // Diagnóstico: qué decodificador se negoció de verdad para este archivo. El soporte de
                 // AV1/HEVC 10-bit por GPU varía mucho entre tarjetas — sin este log, una caída
@@ -849,6 +943,11 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         SubtitulosHabilitados = false;
         SubtitulosIcon = "SubtitlesOutline";
         _subtitleCoordinator.Deshabilitar(Player);
+
+        // No hace falta volver a extraer al reactivarlos: la pista no cambió. Solo se limpian las líneas para que
+        // no quede una imagen fantasma mientras están apagados.
+        SubtituloLineaAbajo = string.Empty;
+        SubtituloLineaArriba = string.Empty;
     }
 
     public void HabilitarSubtitulos()
@@ -949,10 +1048,17 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         {
             // AniSkip API como fuente primaria; si no hay datos, detección local por escenas (Python/ffmpeg)
             // usando la ruta del video local actual (requiere un archivo en disco).
-            var results = await _skipCoordinator.CargarSkipTimesAsync(animeId, episodio, TotalSeconds, RutaVideo, ct);
+            // Los tramos parciales (solo el audio, luego con AniSkip) se aplican según llegan: la barra no espera al final del análisis.
+            // Progress se crea aquí, en el hilo de la UI, así que sus avisos también se ejecutan en él.
+            var progreso = new Progress<IReadOnlyList<AniSkipResult>>(parcial =>
+            {
+                if (!ct.IsCancellationRequested) AplicarSkipTimes(parcial);
+            });
+
+            var results = await _skipCoordinator.CargarSkipTimesAsync(animeId, episodio, TotalSeconds, RutaVideo, progreso, ct);
             if (!ct.IsCancellationRequested && results != null && results.Count > 0)
             {
-                Interlocked.Exchange(ref _skipTimes, new List<AniSkipResult>(results));
+                AplicarSkipTimes(results);
             }
         }
         catch (OperationCanceledException) { }
@@ -960,6 +1066,13 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         {
             AppLogger.Debug("ReproductorViewModel", $"Error cargando skip times de AniSkip: {ex.Message}");
         }
+    }
+
+    /// <summary>Deja los tramos como los vigentes del episodio (saltos y marcadores de la barra).</summary>
+    private void AplicarSkipTimes(IReadOnlyList<AniSkipResult> tramos)
+    {
+        Interlocked.Exchange(ref _skipTimes, new List<AniSkipResult>(tramos));
+        SegmentosLineaTiempo = SegmentoLineaTiempo.Crear(tramos, TotalSeconds);
     }
 
     public void CargarVideo(string rutaVideo, int animeId, string tituloAnime, int episodio, List<EpisodioItem>? listaEpisodios = null, string? rutaPortada = null)
@@ -1037,6 +1150,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         var currentSkipCts = _skipCts;
 
         Interlocked.Exchange(ref _skipTimes, new List<AniSkipResult>());
+        SegmentosLineaTiempo = Array.Empty<SegmentoLineaTiempo>();
         _skipAutoEjecutados.Clear();
         _currentActiveSkip = null;
         MostrarSkipButton = false;
@@ -1382,6 +1496,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                     }
 
                     ProcesarDeteccionDeSkip(curSeconds);
+                    ActualizarLineasSubtitulosSolapados(curSeconds);
                 }
                 else if (Player?.Status == Status.Ended && _haCompletadoOpen)
                 {
@@ -1631,6 +1746,17 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         _ = GuardarProgresoActualAsync();
 
         _seekCoordinator.Dispose();
+
+        try
+        {
+            _subtitleCuesCts?.Cancel();
+            _subtitleCuesCts?.Dispose();
+            _subtitleCuesCts = null;
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("ReproductorViewModel", $"Error al cancelar la extracción de subtítulos: {ex.Message}");
+        }
 
         try
         {
