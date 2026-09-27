@@ -16,6 +16,8 @@ public readonly record struct ResultadoTorrent(bool Exito, string? RutaArchivo, 
 public interface ITorrentDownloadService
 {
     /// <summary>
+    /// Nunca espera indefinidamente: si MonoTorrent entra en error o el torrent no avanza
+    /// (ver <see cref="VigilanteEstancamientoTorrent"/>) devuelve un resultado fallido.
     /// Descarga el archivo de video del episodio pedido dentro del torrent (el resto
     /// de archivos, si los hay, se excluyen con Priority.DoNotDownload) y lo mueve a
     /// <paramref name="rutaDestinoEsperada"/> al terminar. Sirve tanto para releases de
@@ -27,7 +29,9 @@ public interface ITorrentDownloadService
     /// <param name="torrentUrl">URL https del archivo .torrent (no magnet — tener el
     /// archivo completo da la lista de archivos sin depender de peers).</param>
     /// <param name="carpetaTemporal">Carpeta de trabajo de MonoTorrent para este
-    /// torrent (se borra al terminar, con éxito o sin él).</param>
+    /// torrent (se borra al terminar, con éxito o sin él). Si se cancela <paramref name="ct"/>
+    /// (pausa o cancelación) se CONSERVA: llamar de nuevo con la misma carpeta retoma lo ya
+    /// descargado; borrarla tras una cancelación definitiva es cosa del llamador.</param>
     /// <param name="rutaDestinoEsperada">Ruta final del archivo de video.</param>
     /// <param name="numeroEpisodio">Episodio pedido — usado para elegir el archivo
     /// correcto dentro de un torrent con varios videos (batch).</param>

@@ -18,9 +18,12 @@ public class DescargaProgresoMensaje
     public bool EnCola { get; }
     /// <summary>Reintentos automáticos por cortes de red realizados hasta ahora.</summary>
     public int Reintentos { get; }
+    /// <summary>Sin internet: la descarga espera a que vuelva la red para seguir sola.</summary>
+    public bool SinConexion { get; }
 
-    public DescargaProgresoMensaje(int aniListId, int numeroEpisodio, double progreso, bool isDownloading, bool isCompleted, bool isPaused, string rutaArchivo, string? error = null, string animeTitulo = "", string velocidadDescarga = "", double velocidadBps = 0, bool enCola = false, int reintentos = 0)
+    public DescargaProgresoMensaje(int aniListId, int numeroEpisodio, double progreso, bool isDownloading, bool isCompleted, bool isPaused, string rutaArchivo, string? error = null, string animeTitulo = "", string velocidadDescarga = "", double velocidadBps = 0, bool enCola = false, int reintentos = 0, bool sinConexion = false)
     {
+        SinConexion = sinConexion;
         AniListId = aniListId;
         NumeroEpisodio = numeroEpisodio;
         Progreso = progreso;

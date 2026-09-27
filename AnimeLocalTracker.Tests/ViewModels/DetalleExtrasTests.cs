@@ -94,6 +94,12 @@ public class DetalleExtrasTests : IDisposable
         var sut = CrearSut();
         await sut.InicializarAsync(anime);
 
+        // Cancelar la carga de fondo disparada por InicializarAsync para que no pise el test
+        var campo = typeof(DetalleViewModel).GetField("_ctsCargaFicha", BindingFlags.NonPublic | BindingFlags.Instance);
+        ((CancellationTokenSource?)campo?.GetValue(sut))?.Cancel();
+        sut.TieneEspacioEnDisco = false;
+        sut.EspacioEnDiscoTexto = string.Empty;
+
         using var cts = new CancellationTokenSource();
         cts.Cancel();
         await sut.CalcularEspacioEnDiscoAsync(cts.Token);

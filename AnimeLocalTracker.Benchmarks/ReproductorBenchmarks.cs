@@ -161,6 +161,8 @@ public Task ActualizarAnimesAsync(IEnumerable<AnimeItem> animes) => Task.Complet
         public Task GuardarDatosExtraAsync(DatosExtraAnime datos) => Task.CompletedTask;
         public Task<ProximaEmisionLocal?> ObtenerProximaEmisionAsync(int aniListId) => Task.FromResult<ProximaEmisionLocal?>(null);
         public Task GuardarProximaEmisionAsync(ProximaEmisionLocal proxima) => Task.CompletedTask;
+        public Task<MediaAnimeAv1Verificado?> ObtenerMediaAnimeAv1Async(int aniListId) => Task.FromResult<MediaAnimeAv1Verificado?>(null);
+        public Task GuardarMediaAnimeAv1Async(MediaAnimeAv1Verificado media) => Task.CompletedTask;
         public Task<List<DescargaHistorial>> ObtenerDescargasHistorialAsync(int limite = 300) => Task.FromResult(new List<DescargaHistorial>());
         public Task GuardarDescargaHistorialAsync(DescargaHistorial descarga) => Task.CompletedTask;
         public Task EliminarDescargaHistorialAsync(int id) => Task.CompletedTask;

@@ -120,8 +120,8 @@ public class DownloadServiceTests
         var candidato = new CandidatoTorrent("[SubsPlease] Anime - 01 (1080p).mkv", "https://nyaa.si/download/1.torrent", "hash", 100, 500_000_000L);
         var nyaaMock = new Mock<INyaaSourceService>();
         nyaaMock
-            .Setup(n => n.BuscarEpisodioAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(candidato);
+            .Setup(n => n.BuscarCandidatosAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<CandidatoTorrent> { candidato });
 
         var torrentMock = new Mock<ITorrentDownloadService>();
         torrentMock
@@ -225,8 +225,8 @@ public class DownloadServiceTests
         var candidato = new CandidatoTorrent("[SubsPlease] Anime - 01 (1080p).mkv", "https://nyaa.si/download/1.torrent", "hash", 100, 500_000_000L);
         var nyaaMock = new Mock<INyaaSourceService>();
         nyaaMock
-            .Setup(n => n.BuscarEpisodioAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(candidato);
+            .Setup(n => n.BuscarCandidatosAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<CandidatoTorrent> { candidato });
 
         bool? seguirSembrandoRecibido = null;
         var torrentMock = new Mock<ITorrentDownloadService>();
@@ -256,7 +256,7 @@ public class DownloadServiceTests
     public async Task IniciarDescargaEpisodioAsync_ConPreferenciasDeTorrentConfiguradas_DeberiaReenviarlasANyaa()
     {
         // Arrange: GrupoFansubPreferidoTorrent/ResolucionPreferidaTorrent deben llegar tal
-        // cual a INyaaSourceService.BuscarEpisodioAsync.
+        // cual a INyaaSourceService.BuscarCandidatosAsync.
         var settingsMock = new Mock<ISettingsService>();
         settingsMock.Setup(s => s.ObtenerConfiguracion())
             .Returns(new AnimeLocalTracker.Models.AppSettings
@@ -276,13 +276,13 @@ public class DownloadServiceTests
         string? resolucionRecibida = null;
         var nyaaMock = new Mock<INyaaSourceService>();
         nyaaMock
-            .Setup(n => n.BuscarEpisodioAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .Setup(n => n.BuscarCandidatosAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Callback<IEnumerable<string>, int, string?, string?, CancellationToken>((_, _, grupo, resolucion, _) =>
             {
                 grupoRecibido = grupo;
                 resolucionRecibida = resolucion;
             })
-            .ReturnsAsync((CandidatoTorrent?)null);
+            .ReturnsAsync(new List<CandidatoTorrent>());
 
         var sut = new DownloadService(
             _httpClientFactoryMock.Object,
@@ -334,6 +334,7 @@ public class DownloadServiceTests
 
         // Assert
         nyaaMock.Verify(n => n.BuscarEpisodioAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+        nyaaMock.Verify(n => n.BuscarCandidatosAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
         torrentMock.Verify(t => t.DescargarAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<bool>(), It.IsAny<IProgress<(double, double)>?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -833,6 +834,894 @@ public class DownloadServiceTests
         finally
         {
             try { File.Delete(destino); File.Delete(destino + ".state"); } catch { }
+        }
+    }
+
+    [Fact]
+    public async Task DownloadVideoAsync_ConEstadoGuardadoPeroSinArchivoParcial_DescargaTodoEnVezDeDejarCeros()
+    {
+        // Regresión: un escaneo de carpeta borraba el parcial de una descarga en pausa pero dejaba el .state;
+        // al reanudar, los trozos "ya descargados" quedaban a ceros en un archivo nuevo y el video salía corrupto.
+        const int totalTrozos = 6;
+        var datos = GenerarVideoFalso(12 * 1024 * 1024);
+        var destino = Path.Combine(Path.GetTempPath(), $"huerfano_{Guid.NewGuid():N}.mp4");
+        var store = new DownloadStateStore();
+        var estado = await store.CargarOInicializarAsync(destino + ".state", datos.Length, totalTrozos);
+        for (int i = 0; i < 4; i++) estado.Segments[i].CurrentOffset = estado.Segments[i].End + 1;
+        await store.GuardarAsync(destino + ".state", estado);
+
+        var sut = CrearServicioConServidor(new ServidorRangosHandler(datos));
+
+        try
+        {
+            await sut.DownloadVideoAsync("https://cdn.example.com/video.mp4", destino);
+
+            (await File.ReadAllBytesAsync(destino)).Should().Equal(datos);
+        }
+        finally
+        {
+            try { File.Delete(destino); File.Delete(destino + ".state"); } catch { }
+        }
+    }
+
+    private static Mock<IDatabaseService> CrearBdQueCapturaHistorial(TaskCompletionSource<AnimeLocalTracker.Models.DescargaHistorial> guardada)
+    {
+        var dbMock = new Mock<IDatabaseService>();
+        dbMock.Setup(d => d.GuardarDescargaHistorialAsync(It.IsAny<AnimeLocalTracker.Models.DescargaHistorial>()))
+            .Callback<AnimeLocalTracker.Models.DescargaHistorial>(h => guardada.TrySetResult(h))
+            .Returns(Task.CompletedTask);
+        return dbMock;
+    }
+
+    [Fact]
+    public async Task ReanudarDescarga_DeUnTorrentEnPausa_SigueConElMismoTorrentYSuCarpetaSinIrAAnimeAv1()
+    {
+        // Regresión: reanudar un torrent elegido a mano lanzaba la búsqueda en AnimeAv1 en vez de seguir con él.
+        var candidato = new CandidatoTorrent("[SubsPlease] Anime - 03 (1080p).mkv", "https://nyaa.si/download/3.torrent", "hash3", 50, 700_000_000L);
+        var carpetas = new System.Collections.Concurrent.ConcurrentQueue<string>();
+        var urls = new System.Collections.Concurrent.ConcurrentQueue<string>();
+        int llamadas = 0;
+        var primeraEnCurso = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var torrentMock = new Mock<ITorrentDownloadService>();
+        torrentMock
+            .Setup(t => t.DescargarAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<bool>(), It.IsAny<IProgress<(double Progreso, double VelocidadBps)>?>(), It.IsAny<CancellationToken>()))
+            .Returns(async (string url, string carpeta, string destino, int _, bool _, IProgress<(double, double)>? _, CancellationToken ct) =>
+            {
+                urls.Enqueue(url);
+                carpetas.Enqueue(carpeta);
+                if (Interlocked.Increment(ref llamadas) == 1)
+                {
+                    primeraEnCurso.TrySetResult();
+                    await Task.Delay(Timeout.Infinite, ct); // la pausa cancela esta primera descarga
+                }
+                return new ResultadoTorrent(true, destino, null);
+            });
+
+        var guardada = new TaskCompletionSource<AnimeLocalTracker.Models.DescargaHistorial>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var resolverMock = new Mock<IVideoSourceResolver>();
+        var sut = new DownloadService(
+            _httpClientFactoryMock.Object,
+            sourceResolver: resolverMock.Object,
+            settingsService: _settingsServiceMock.Object,
+            database: CrearBdQueCapturaHistorial(guardada).Object,
+            nyaaSourceService: new Mock<INyaaSourceService>().Object,
+            torrentDownloadService: torrentMock.Object);
+
+        var carpeta = Path.Combine(Path.GetTempPath(), $"torrent_pausa_{Guid.NewGuid():N}");
+        try
+        {
+            await sut.IniciarDescargaTorrentManualAsync(605, "Anime Pausa", carpeta, 3, candidato);
+            await primeraEnCurso.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+            sut.PausarDescarga(605, 3);
+            sut.ReanudarDescarga(605, 3);
+            var historial = await guardada.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+            historial.Completada.Should().BeTrue();
+            llamadas.Should().Be(2);
+            urls.Should().OnlyContain(u => u == candidato.TorrentUrl);
+            carpetas.Distinct().Should().HaveCount(1, "reanudar debe usar la misma carpeta para retomar las piezas ya bajadas");
+            resolverMock.Verify(r => r.BuscarUrlEpisodioAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<int?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+        }
+        finally
+        {
+            try { Directory.Delete(carpeta, recursive: true); } catch { }
+        }
+    }
+
+    [Fact]
+    public async Task IniciarDescargaTorrentManualAsync_SiElTorrentFalla_GuardaElMotivoRealEnElHistorial()
+    {
+        var candidato = new CandidatoTorrent("[SubsPlease] Anime - 04 (1080p).mkv", "https://nyaa.si/download/4.torrent", "hash4", 0, 700_000_000L);
+        const string motivo = "Nadie está compartiendo este torrent (sin datos en 5 min).";
+        var torrentMock = new Mock<ITorrentDownloadService>();
+        torrentMock
+            .Setup(t => t.DescargarAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<bool>(), It.IsAny<IProgress<(double Progreso, double VelocidadBps)>?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ResultadoTorrent(false, null, motivo));
+
+        var guardada = new TaskCompletionSource<AnimeLocalTracker.Models.DescargaHistorial>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var sut = new DownloadService(
+            _httpClientFactoryMock.Object,
+            sourceResolver: new Mock<IVideoSourceResolver>().Object,
+            settingsService: _settingsServiceMock.Object,
+            database: CrearBdQueCapturaHistorial(guardada).Object,
+            torrentDownloadService: torrentMock.Object);
+
+        await sut.IniciarDescargaTorrentManualAsync(606, "Anime Sin Semillas", Path.Combine(Path.GetTempPath(), $"torrent_falla_{Guid.NewGuid():N}"), 4, candidato);
+        var historial = await guardada.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        historial.Completada.Should().BeFalse();
+        historial.Error.Should().Be(motivo);
+    }
+
+    /// <summary>
+    /// Servidor de rangos que tarda un poco en cada trozo y mide cuántas conexiones de trozo
+    /// llegan a estar abiertas a la vez; opcionalmente contesta 429 a las primeras peticiones,
+    /// o no contesta nunca al HEAD (como mp4upload a veces).
+    /// </summary>
+    private sealed class ServidorConcurrenteHandler : HttpMessageHandler
+    {
+        private readonly byte[] _datos;
+        private int _enCurso;
+        private int _rechazos429Pendientes;
+        public int MaxSimultaneas;
+        public bool HeadNoResponde { get; init; }
+        public TimeSpan RetrasoPorTrozo { get; init; } = TimeSpan.FromMilliseconds(150);
+
+        public ServidorConcurrenteHandler(byte[] datos, int rechazos429 = 0)
+        {
+            _datos = datos;
+            _rechazos429Pendientes = rechazos429;
+        }
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            if (request.Method == HttpMethod.Head)
+            {
+                if (HeadNoResponde) await Task.Delay(Timeout.Infinite, cancellationToken);
+                var head = new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new ByteArrayContent(Array.Empty<byte>()) };
+                head.Content.Headers.ContentLength = _datos.Length;
+                head.Headers.AcceptRanges.Add("bytes");
+                return head;
+            }
+
+            var rango = request.Headers.Range!.Ranges.First();
+            long desde = rango.From ?? 0;
+            long hasta = Math.Min(rango.To ?? _datos.Length - 1, _datos.Length - 1);
+            bool esSondeo = desde == 0 && hasta == 0;
+
+            if (!esSondeo)
+            {
+                if (Interlocked.Decrement(ref _rechazos429Pendientes) >= 0)
+                {
+                    var saturado = new HttpResponseMessage(System.Net.HttpStatusCode.TooManyRequests);
+                    saturado.Headers.RetryAfter = new System.Net.Http.Headers.RetryConditionHeaderValue(TimeSpan.FromMilliseconds(200));
+                    return saturado;
+                }
+
+                int ahora = Interlocked.Increment(ref _enCurso);
+                InterlockedExchangeMax(ref MaxSimultaneas, ahora);
+                try { await Task.Delay(RetrasoPorTrozo, cancellationToken); }
+                finally { Interlocked.Decrement(ref _enCurso); }
+            }
+
+            var respuesta = new HttpResponseMessage(System.Net.HttpStatusCode.PartialContent)
+            {
+                Content = new ByteArrayContent(_datos, (int)desde, (int)(hasta - desde + 1))
+            };
+            respuesta.Content.Headers.ContentRange = new System.Net.Http.Headers.ContentRangeHeaderValue(desde, hasta, _datos.Length);
+            return respuesta;
+        }
+    }
+
+    private static DownloadService CrearServicioConLimite(HttpMessageHandler handler, int descargasSimultaneas)
+    {
+        var factoryMock = new Mock<IHttpClientFactory>();
+        factoryMock.Setup(f => f.CreateClient(It.IsAny<string>())).Returns(new HttpClient(handler));
+        var settingsMock = new Mock<ISettingsService>();
+        settingsMock.Setup(s => s.ObtenerConfiguracion()).Returns(new AnimeLocalTracker.Models.AppSettings { DescargasSimultaneas = descargasSimultaneas });
+        return new DownloadService(factoryMock.Object, sourceResolver: _sourceResolverMockEstatico.Object, settingsService: settingsMock.Object);
+    }
+
+    private static readonly Mock<IVideoSourceResolver> _sourceResolverMockEstatico = new();
+
+    [Fact]
+    public async Task DownloadVideoAsync_UnaSolaDescargaConLimiteDe5_UsaTodasSusConexiones()
+    {
+        // Antes: las conexiones se repartían según el LÍMITE configurado (12 / 5 → 3) aunque el
+        // episodio se estuviera descargando solo. Ahora se reparten entre las descargas activas.
+        var datos = GenerarVideoFalso(36 * 1024 * 1024 + 7); // 10 trozos de 4 MB
+        var destino = Path.Combine(Path.GetTempPath(), $"conexiones_{Guid.NewGuid():N}.mp4");
+        var servidor = new ServidorConcurrenteHandler(datos);
+        var sut = CrearServicioConLimite(servidor, descargasSimultaneas: 5);
+
+        try
+        {
+            await sut.DownloadVideoAsync("https://cdn.example.com/video.mp4", destino);
+
+            (await File.ReadAllBytesAsync(destino)).Should().Equal(datos);
+            servidor.MaxSimultaneas.Should().Be(8);
+        }
+        finally
+        {
+            try { File.Delete(destino); File.Delete(destino + ".state"); } catch { }
+        }
+    }
+
+    [Fact]
+    public async Task DownloadVideoAsync_SiElServidorPideCalma_ReintentaYTerminaIntacto()
+    {
+        var datos = GenerarVideoFalso(24 * 1024 * 1024);
+        var destino = Path.Combine(Path.GetTempPath(), $"saturado_{Guid.NewGuid():N}.mp4");
+        var servidor = new ServidorConcurrenteHandler(datos, rechazos429: 3);
+        var sut = CrearServicioConLimite(servidor, descargasSimultaneas: 1);
+
+        try
+        {
+            await sut.DownloadVideoAsync("https://cdn.example.com/video.mp4", destino);
+
+            (await File.ReadAllBytesAsync(destino)).Should().Equal(datos);
+        }
+        finally
+        {
+            try { File.Delete(destino); File.Delete(destino + ".state"); } catch { }
+        }
+    }
+
+    [Fact]
+    public async Task DownloadVideoAsync_SiElHeadNoResponde_NoEsperaSuTiempoLimiteParaEmpezar()
+    {
+        // Antes: HEAD (hasta 6 s) y luego GET Range(0,0), uno detrás de otro.
+        var datos = GenerarVideoFalso(8 * 1024 * 1024);
+        var destino = Path.Combine(Path.GetTempPath(), $"sondeo_{Guid.NewGuid():N}.mp4");
+        var servidor = new ServidorConcurrenteHandler(datos) { HeadNoResponde = true, RetrasoPorTrozo = TimeSpan.Zero };
+        var sut = CrearServicioConLimite(servidor, descargasSimultaneas: 1);
+
+        try
+        {
+            var reloj = System.Diagnostics.Stopwatch.StartNew();
+            await sut.DownloadVideoAsync("https://cdn.example.com/video.mp4", destino);
+
+            reloj.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(4));
+            (await File.ReadAllBytesAsync(destino)).Should().Equal(datos);
+        }
+        finally
+        {
+            try { File.Delete(destino); File.Delete(destino + ".state"); } catch { }
+        }
+    }
+
+    /// <summary>Stream que entrega sus datos a ritmo limitado (como un servidor que limita cada conexión).</summary>
+    private sealed class StreamLento : Stream
+    {
+        private readonly MemoryStream _interno;
+        private readonly TimeSpan _pausaPorLectura;
+        private readonly int _bytesPorLectura;
+        private readonly Action _alCerrar;
+        private int _cerrado;
+
+        public StreamLento(byte[] datos, int desde, int longitud, int bytesPorLectura, TimeSpan pausaPorLectura, Action alCerrar)
+        {
+            _interno = new MemoryStream(datos, desde, longitud, writable: false);
+            _bytesPorLectura = bytesPorLectura;
+            _pausaPorLectura = pausaPorLectura;
+            _alCerrar = alCerrar;
+        }
+
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            await Task.Delay(_pausaPorLectura, cancellationToken);
+            int leidos = _interno.Read(buffer.Span[..Math.Min(buffer.Length, _bytesPorLectura)]);
+            if (leidos == 0) Cerrar();
+            return leidos;
+        }
+
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+            => ReadAsync(buffer.AsMemory(offset, count), cancellationToken).AsTask();
+
+        public override int Read(byte[] buffer, int offset, int count) => ReadAsync(buffer, offset, count, CancellationToken.None).GetAwaiter().GetResult();
+
+        private void Cerrar()
+        {
+            if (Interlocked.Exchange(ref _cerrado, 1) == 0) _alCerrar();
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing) Cerrar();
+            base.Dispose(disposing);
+        }
+
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+        public override void Flush() { }
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    }
+
+    /// <summary>Servidor que limita la velocidad de CADA conexión: más conexiones = más velocidad total.</summary>
+    private sealed class ServidorLimitadoPorConexionHandler : HttpMessageHandler
+    {
+        private readonly byte[] _datos;
+        private int _abiertas;
+        public int MaxSimultaneas;
+
+        public ServidorLimitadoPorConexionHandler(byte[] datos) => _datos = datos;
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            if (request.Method == HttpMethod.Head)
+            {
+                var head = new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new ByteArrayContent(Array.Empty<byte>()) };
+                head.Content.Headers.ContentLength = _datos.Length;
+                head.Headers.AcceptRanges.Add("bytes");
+                return Task.FromResult(head);
+            }
+
+            var rango = request.Headers.Range!.Ranges.First();
+            long desde = rango.From ?? 0;
+            long hasta = Math.Min(rango.To ?? _datos.Length - 1, _datos.Length - 1);
+            int longitud = (int)(hasta - desde + 1);
+
+            HttpContent contenido;
+            if (desde == 0 && hasta == 0)
+            {
+                contenido = new ByteArrayContent(_datos, 0, 1);
+            }
+            else
+            {
+                InterlockedExchangeMax(ref MaxSimultaneas, Interlocked.Increment(ref _abiertas));
+                // ~1,6 MB/s por conexión (64 KB cada 40 ms)
+                contenido = new StreamContent(new StreamLento(_datos, (int)desde, longitud, 64 * 1024, TimeSpan.FromMilliseconds(40), () => Interlocked.Decrement(ref _abiertas)));
+            }
+
+            var respuesta = new HttpResponseMessage(System.Net.HttpStatusCode.PartialContent) { Content = contenido };
+            respuesta.Content.Headers.ContentRange = new System.Net.Http.Headers.ContentRangeHeaderValue(desde, hasta, _datos.Length);
+            return Task.FromResult(respuesta);
+        }
+    }
+
+    [Fact]
+    public async Task DownloadVideoAsync_SiMasConexionesAceleran_SubePorEncimaDe8()
+    {
+        // Fase 4: con un servidor que limita cada conexión, abrir más conexiones sube la velocidad
+        // total; el ajuste automático lo mide y pasa del reparto fijo de 8.
+        var datos = GenerarVideoFalso(96 * 1024 * 1024);
+        var destino = Path.Combine(Path.GetTempPath(), $"ajuste_{Guid.NewGuid():N}.mp4");
+        var servidor = new ServidorLimitadoPorConexionHandler(datos);
+
+        var factoryMock = new Mock<IHttpClientFactory>();
+        factoryMock.Setup(f => f.CreateClient(It.IsAny<string>())).Returns(new HttpClient(servidor));
+        var sut = new DownloadService(factoryMock.Object, sourceResolver: _sourceResolverMock.Object, settingsService: _settingsServiceMock.Object)
+        {
+            VentanaMedicionConexiones = TimeSpan.FromMilliseconds(300)
+        };
+
+        try
+        {
+            await sut.DownloadVideoAsync("https://cdn.example.com/video.mp4", destino);
+
+            (await File.ReadAllBytesAsync(destino)).Should().Equal(datos);
+            servidor.MaxSimultaneas.Should().BeGreaterThan(8);
+        }
+        finally
+        {
+            try { File.Delete(destino); File.Delete(destino + ".state"); } catch { }
+        }
+    }
+
+    /// <summary>Servidor que tarda en contestar CADA petición (como a3.mp4upload.com con Connection: close); anota los rangos pedidos.</summary>
+    private sealed class ServidorLentoEnConectarHandler : HttpMessageHandler
+    {
+        private readonly byte[] _datos;
+        private readonly TimeSpan _latencia;
+        public readonly System.Collections.Concurrent.ConcurrentBag<long> TamanosPedidos = new();
+        public long BytesServidos;
+
+        public ServidorLentoEnConectarHandler(byte[] datos, TimeSpan latencia)
+        {
+            _datos = datos;
+            _latencia = latencia;
+        }
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            await Task.Delay(_latencia, cancellationToken);
+            if (request.Method == HttpMethod.Head)
+            {
+                var head = new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new ByteArrayContent(Array.Empty<byte>()) };
+                head.Content.Headers.ContentLength = _datos.Length;
+                head.Headers.AcceptRanges.Add("bytes");
+                return head;
+            }
+
+            var rango = request.Headers.Range!.Ranges.First();
+            long desde = rango.From ?? 0;
+            long hasta = Math.Min(rango.To ?? _datos.Length - 1, _datos.Length - 1);
+            int longitud = (int)(hasta - desde + 1);
+            if (!(desde == 0 && hasta == 0))
+            {
+                TamanosPedidos.Add(longitud);
+                Interlocked.Add(ref BytesServidos, longitud);
+            }
+
+            var respuesta = new HttpResponseMessage(System.Net.HttpStatusCode.PartialContent) { Content = new ByteArrayContent(_datos, (int)desde, longitud) };
+            respuesta.Content.Headers.ContentRange = new System.Net.Http.Headers.ContentRangeHeaderValue(desde, hasta, _datos.Length);
+            return respuesta;
+        }
+    }
+
+    [Fact]
+    public async Task DownloadVideoAsync_ServidorLentoEnConectar_PideVariosTrozosJuntosYNoCorrompe()
+    {
+        // Al reanudar hay trozos completos, uno a medias y el resto sin empezar: agrupar no debe
+        // volver a pedir lo ya bajado ni dejar huecos.
+        const long Trozo = 4L * 1024 * 1024;
+        var datos = GenerarVideoFalso((int)(25 * Trozo));
+        var destino = Path.Combine(Path.GetTempPath(), $"agrupado_{Guid.NewGuid():N}.mp4");
+        var store = new DownloadStateStore();
+        var estado = await store.CargarOInicializarAsync(destino + ".state", datos.Length, 25);
+        var parcial = new byte[datos.Length];
+        void Marcar(int i, long bytes)
+        {
+            var t = estado.Segments[i];
+            Array.Copy(datos, t.Start, parcial, t.Start, bytes);
+            t.CurrentOffset = t.Start + bytes;
+        }
+        Marcar(0, Trozo);      // completo
+        Marcar(9, Trozo / 3);  // a medias
+        Marcar(12, Trozo);     // completo
+        await File.WriteAllBytesAsync(destino, parcial);
+        await store.GuardarAsync(destino + ".state", estado);
+        long pendientes = estado.Segments.Sum(t => t.End - t.CurrentOffset + 1);
+
+        var servidor = new ServidorLentoEnConectarHandler(datos, TimeSpan.FromMilliseconds(120));
+        var factoryMock = new Mock<IHttpClientFactory>();
+        factoryMock.Setup(f => f.CreateClient(It.IsAny<string>())).Returns(new HttpClient(servidor));
+        var sut = new DownloadService(factoryMock.Object, sourceResolver: _sourceResolverMock.Object, settingsService: _settingsServiceMock.Object)
+        {
+            UmbralServidorLento = TimeSpan.FromMilliseconds(40)
+        };
+
+        try
+        {
+            await sut.DownloadVideoAsync("https://cdn.example.com/video.mp4", destino);
+
+            (await File.ReadAllBytesAsync(destino)).Should().Equal(datos);
+            servidor.BytesServidos.Should().Be(pendientes, "no se vuelve a pedir nada ya descargado");
+            servidor.TamanosPedidos.Should().Contain(t => t > Trozo, "con el servidor lento se piden varios trozos por petición");
+        }
+        finally
+        {
+            try { File.Delete(destino); File.Delete(destino + ".state"); } catch { }
+        }
+    }
+
+    [Fact]
+    public async Task DownloadVideoAsync_ServidorRapido_PideUnTrozoPorPeticion()
+    {
+        const long Trozo = 4L * 1024 * 1024;
+        var datos = GenerarVideoFalso((int)(25 * Trozo));
+        var destino = Path.Combine(Path.GetTempPath(), $"no_agrupado_{Guid.NewGuid():N}.mp4");
+        var servidor = new ServidorLentoEnConectarHandler(datos, TimeSpan.FromMilliseconds(5));
+        var factoryMock = new Mock<IHttpClientFactory>();
+        factoryMock.Setup(f => f.CreateClient(It.IsAny<string>())).Returns(new HttpClient(servidor));
+        var sut = new DownloadService(factoryMock.Object, sourceResolver: _sourceResolverMock.Object, settingsService: _settingsServiceMock.Object);
+
+        try
+        {
+            await sut.DownloadVideoAsync("https://cdn.example.com/video.mp4", destino);
+
+            (await File.ReadAllBytesAsync(destino)).Should().Equal(datos);
+            servidor.TamanosPedidos.Should().OnlyContain(t => t <= Trozo);
+        }
+        finally
+        {
+            try { File.Delete(destino); File.Delete(destino + ".state"); } catch { }
+        }
+    }
+
+    /// <summary>
+    /// Servidor que acepta como mucho <c>tope</c> peticiones a la vez y responde 403 a las de más
+    /// (como a4.mp4upload.com con varias conexiones del mismo usuario). Con tope 0 rechaza todo (enlace caducado).
+    /// </summary>
+    private sealed class ServidorConTopeHandler : HttpMessageHandler
+    {
+        private readonly byte[] _datos;
+        private readonly int _tope;
+        private int _enCurso;
+        public int Rechazos;
+        public int MaxAceptadas;
+
+        public ServidorConTopeHandler(byte[] datos, int tope)
+        {
+            _datos = datos;
+            _tope = tope;
+        }
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            int ahora = Interlocked.Increment(ref _enCurso);
+            if (ahora > _tope)
+            {
+                Interlocked.Decrement(ref _enCurso);
+                Interlocked.Increment(ref Rechazos);
+                return new HttpResponseMessage(System.Net.HttpStatusCode.Forbidden);
+            }
+
+            try
+            {
+                InterlockedExchangeMax(ref MaxAceptadas, ahora);
+                await Task.Delay(80, cancellationToken);
+
+                if (request.Method == HttpMethod.Head)
+                {
+                    var head = new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new ByteArrayContent(Array.Empty<byte>()) };
+                    head.Content.Headers.ContentLength = _datos.Length;
+                    head.Headers.AcceptRanges.Add("bytes");
+                    return head;
+                }
+
+                var rango = request.Headers.Range!.Ranges.First();
+                long desde = rango.From ?? 0;
+                long hasta = Math.Min(rango.To ?? _datos.Length - 1, _datos.Length - 1);
+                var respuesta = new HttpResponseMessage(System.Net.HttpStatusCode.PartialContent) { Content = new ByteArrayContent(_datos, (int)desde, (int)(hasta - desde + 1)) };
+                respuesta.Content.Headers.ContentRange = new System.Net.Http.Headers.ContentRangeHeaderValue(desde, hasta, _datos.Length);
+                return respuesta;
+            }
+            finally
+            {
+                Interlocked.Decrement(ref _enCurso);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task DownloadVideoAsync_SiElServidorLimitaConexionesCon403_SeAdaptaYTerminaIntacto()
+    {
+        // Log real (16:08): un 403 esporádico con 10 conexiones cortaba toda la descarga, buscaba otro
+        // enlace y tiraba lo descargado. Ahora el 403 con otras conexiones funcionando es "demasiadas".
+        var datos = GenerarVideoFalso(40 * 1024 * 1024);
+        var destino = Path.Combine(Path.GetTempPath(), $"tope403_{Guid.NewGuid():N}.mp4");
+        var servidor = new ServidorConTopeHandler(datos, tope: 5);
+        var sut = CrearServicioConServidor(servidor);
+
+        try
+        {
+            await sut.DownloadVideoAsync("https://cdn.example.com/video.mp4", destino);
+
+            (await File.ReadAllBytesAsync(destino)).Should().Equal(datos);
+            servidor.Rechazos.Should().BeGreaterThan(0, "el test debe provocar el 403 por exceso de conexiones");
+        }
+        finally
+        {
+            try { File.Delete(destino); File.Delete(destino + ".state"); } catch { }
+        }
+    }
+
+    [Fact]
+    public async Task DownloadVideoAsync_AlReanudarContraUnServidorConTope_NoLoConfundeConEnlaceRechazado()
+    {
+        // Al reanudar no hay sondeo (no hay prueba reciente de que el enlace funciona): si se abrieran las 8
+        // conexiones a la vez, los 403 por exceso parecerían un enlace caducado. Arranque prudente: una primero.
+        const int totalTrozos = 10;
+        var datos = GenerarVideoFalso(totalTrozos * 4 * 1024 * 1024);
+        var destino = Path.Combine(Path.GetTempPath(), $"tope_reanuda_{Guid.NewGuid():N}.mp4");
+        var store = new DownloadStateStore();
+        var estado = await store.CargarOInicializarAsync(destino + ".state", datos.Length, totalTrozos);
+        var parcial = new byte[datos.Length];
+        for (int i = 0; i < 2; i++)
+        {
+            var t = estado.Segments[i];
+            Array.Copy(datos, t.Start, parcial, t.Start, t.End - t.Start + 1);
+            t.CurrentOffset = t.End + 1;
+        }
+        await File.WriteAllBytesAsync(destino, parcial);
+        await store.GuardarAsync(destino + ".state", estado);
+
+        var servidor = new ServidorConTopeHandler(datos, tope: 4);
+        var sut = CrearServicioConServidor(servidor);
+
+        try
+        {
+            await sut.DownloadVideoAsync("https://cdn.example.com/video.mp4", destino);
+
+            (await File.ReadAllBytesAsync(destino)).Should().Equal(datos);
+        }
+        finally
+        {
+            try { File.Delete(destino); File.Delete(destino + ".state"); } catch { }
+        }
+    }
+
+    [Fact]
+    public async Task DownloadVideoAsync_DosEpisodiosDelMismoServidorConTope_TerminanAmbos()
+    {
+        // Log real (14:30): con Clevatess ep 12 bajando de a4, el ep 9 del mismo servidor recibía 403
+        // en cada intento y fallaba. El tope se comparte entre descargas: el segundo espera su turno.
+        var datos1 = GenerarVideoFalso(24 * 1024 * 1024);
+        var datos2 = new byte[20 * 1024 * 1024];
+        new Random(7).NextBytes(datos2);
+        var destino1 = Path.Combine(Path.GetTempPath(), $"tope_a_{Guid.NewGuid():N}.mp4");
+        var destino2 = Path.Combine(Path.GetTempPath(), $"tope_b_{Guid.NewGuid():N}.mp4");
+
+        var servidor1 = new ServidorConTopeHandler(datos1, tope: 6);
+        var servidor2 = new ServidorConTopeHandler(datos2, tope: 6);
+        var enrutador = new EnrutadorPorArchivoHandler(("video1.mp4", servidor1), ("video2.mp4", servidor2));
+        var tope = new TopeCompartidoHandler(6) { InnerHandler = enrutador };
+        var sut = CrearServicioConServidor(tope);
+
+        try
+        {
+            await Task.WhenAll(
+                sut.DownloadVideoAsync("https://cdn.example.com/video1.mp4", destino1),
+                sut.DownloadVideoAsync("https://cdn.example.com/video2.mp4", destino2));
+
+            (await File.ReadAllBytesAsync(destino1)).Should().Equal(datos1);
+            (await File.ReadAllBytesAsync(destino2)).Should().Equal(datos2);
+        }
+        finally
+        {
+            foreach (var d in new[] { destino1, destino2 })
+            {
+                try { File.Delete(d); File.Delete(d + ".state"); } catch { }
+            }
+        }
+    }
+
+    [Fact]
+    public async Task DownloadVideoAsync_ConElServidorAlTope_ElSondeoEsperaTurnoAunqueTardeMasQueSuPlazo()
+    {
+        // Log real (16:39–16:40): con 4 episodios de a3 en marcha, el sondeo del quinto agotó su plazo
+        // esperando turno, cayó al modo de una conexión (sin turno) y recibió un 403 → falso "enlace rechazado".
+        var datosA = GenerarVideoFalso(24 * 1024 * 1024);
+        var datosB = new byte[8 * 1024 * 1024];
+        new Random(11).NextBytes(datosB);
+        var destinoA = Path.Combine(Path.GetTempPath(), $"turno_a_{Guid.NewGuid():N}.mp4");
+        var destinoB = Path.Combine(Path.GetTempPath(), $"turno_b_{Guid.NewGuid():N}.mp4");
+
+        var enrutador = new EnrutadorPorArchivoHandler(
+            ("videoA.mp4", new ServidorConTopeHandler(datosA, tope: 100)),
+            ("videoB.mp4", new ServidorConTopeHandler(datosB, tope: 100)));
+        var factoryMock = new Mock<IHttpClientFactory>();
+        factoryMock.Setup(f => f.CreateClient(It.IsAny<string>())).Returns(new HttpClient(new TopeCompartidoHandler(3) { InnerHandler = enrutador }));
+        var sut = new DownloadService(factoryMock.Object, sourceResolver: _sourceResolverMock.Object, settingsService: _settingsServiceMock.Object)
+        {
+            TiempoMaximoSondeo = TimeSpan.FromMilliseconds(150)
+        };
+
+        try
+        {
+            var descargaA = sut.DownloadVideoAsync("https://cdn.example.com/videoA.mp4", destinoA);
+            await Task.Delay(400); // A ya llenó el servidor y aprendió su tope
+            await sut.DownloadVideoAsync("https://cdn.example.com/videoB.mp4", destinoB);
+            await descargaA;
+
+            (await File.ReadAllBytesAsync(destinoA)).Should().Equal(datosA);
+            (await File.ReadAllBytesAsync(destinoB)).Should().Equal(datosB, "B no debe caer al modo sin turno ni fallar por el 403");
+        }
+        finally
+        {
+            foreach (var d in new[] { destinoA, destinoB })
+            {
+                try { File.Delete(d); File.Delete(d + ".state"); } catch { }
+            }
+        }
+    }
+
+    [Fact]
+    public async Task DownloadVideoAsync_SiElEnlaceEstaRechazadoDeVerdad_FallaRapidoCon403()
+    {
+        // Sin ninguna conexión funcionando, un 403 sí es del enlace: no hay que quedarse esperando turno.
+        var servidor = new ServidorConTopeHandler(GenerarVideoFalso(8 * 1024 * 1024), tope: 0);
+        var sut = CrearServicioConServidor(servidor);
+        var destino = Path.Combine(Path.GetTempPath(), $"rechazado_{Guid.NewGuid():N}.mp4");
+
+        try
+        {
+            var reloj = System.Diagnostics.Stopwatch.StartNew();
+            var accion = () => sut.DownloadVideoAsync("https://cdn.example.com/video.mp4", destino);
+
+            (await accion.Should().ThrowAsync<HttpRequestException>()).Which.StatusCode.Should().Be(System.Net.HttpStatusCode.Forbidden);
+            reloj.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(10));
+        }
+        finally
+        {
+            try { File.Delete(destino); File.Delete(destino + ".state"); } catch { }
+        }
+    }
+
+    /// <summary>Reparte las peticiones entre servidores falsos según el nombre del archivo pedido.</summary>
+    private sealed class EnrutadorPorArchivoHandler : HttpMessageHandler
+    {
+        private readonly (string Archivo, HttpMessageHandler Handler)[] _rutas;
+        private readonly System.Reflection.MethodInfo _send = typeof(HttpMessageHandler).GetMethod("SendAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+
+        public EnrutadorPorArchivoHandler(params (string Archivo, HttpMessageHandler Handler)[] rutas) => _rutas = rutas;
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var handler = _rutas.First(r => request.RequestUri!.AbsolutePath.EndsWith(r.Archivo, StringComparison.Ordinal)).Handler;
+            return (Task<HttpResponseMessage>)_send.Invoke(handler, new object[] { request, cancellationToken })!;
+        }
+    }
+
+    /// <summary>Tope de peticiones simultáneas del SERVIDOR (host) entero, compartido por todos sus archivos.</summary>
+    private sealed class TopeCompartidoHandler : DelegatingHandler
+    {
+        private readonly int _tope;
+        private int _enCurso;
+
+        public TopeCompartidoHandler(int tope) => _tope = tope;
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            if (Interlocked.Increment(ref _enCurso) > _tope)
+            {
+                Interlocked.Decrement(ref _enCurso);
+                return new HttpResponseMessage(System.Net.HttpStatusCode.Forbidden);
+            }
+            try { return await base.SendAsync(request, cancellationToken); }
+            finally { Interlocked.Decrement(ref _enCurso); }
+        }
+    }
+
+    /// <summary>Servidor que nunca responde a tiempo (como a3.mp4upload.com saturado): todo acaba en tiempo agotado.</summary>
+    private sealed class ServidorSinRespuestaHandler : HttpMessageHandler
+    {
+        public int Peticiones;
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref Peticiones);
+            throw new TaskCanceledException("The operation was canceled.", new TimeoutException("La conexión tardó demasiado."));
+        }
+    }
+
+    private DownloadService CrearServicioSinRespuesta(ServidorSinRespuestaHandler servidor, bool torrentHabilitado, Mock<IDatabaseService> db,
+        INyaaSourceService? nyaa = null, ITorrentDownloadService? torrent = null)
+    {
+        var factoryMock = new Mock<IHttpClientFactory>();
+        factoryMock.Setup(f => f.CreateClient(It.IsAny<string>())).Returns(new HttpClient(servidor));
+        var settingsMock = new Mock<ISettingsService>();
+        settingsMock.Setup(s => s.ObtenerConfiguracion()).Returns(new AnimeLocalTracker.Models.AppSettings { DescargasSimultaneas = 2, BusquedaTorrentHabilitada = torrentHabilitado });
+        return new DownloadService(factoryMock.Object, sourceResolver: _sourceResolverMock.Object, settingsService: settingsMock.Object,
+            database: db.Object, nyaaSourceService: nyaa, torrentDownloadService: torrent);
+    }
+
+    [Fact]
+    public async Task Descarga_SiElServidorNuncaResponde_FallaConUnErrorVisibleYQuedaEnElHistorial()
+    {
+        // Regresión (log real con a3.mp4upload.com): agotados los reintentos por tiempo de espera,
+        // la descarga desaparecía de la lista sin error ni historial ("Descarga interrumpida... Pausado: False").
+        var guardada = new TaskCompletionSource<AnimeLocalTracker.Models.DescargaHistorial>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var sut = CrearServicioSinRespuesta(new ServidorSinRespuestaHandler(), torrentHabilitado: false, CrearBdQueCapturaHistorial(guardada));
+
+        var carpeta = Path.Combine(Path.GetTempPath(), $"sin_respuesta_{Guid.NewGuid():N}");
+        try
+        {
+            await sut.IniciarDescargaEpisodioAsync(608, "Anime Servidor Caido", carpeta, 14);
+            var historial = await guardada.Task.WaitAsync(TimeSpan.FromSeconds(20));
+
+            historial.Completada.Should().BeFalse();
+            historial.Error.Should().Be(LocalizationService.T("Desc_ErrorServidorNoResponde"));
+            sut.EstaDescargando(608, 14, out _).Should().BeFalse();
+        }
+        finally
+        {
+            try { Directory.Delete(carpeta, recursive: true); } catch { }
+        }
+    }
+
+    [Fact]
+    public async Task Descarga_SiElServidorNuncaRespondeYHayTorrent_LaCompletaPorNyaa()
+    {
+        var candidato = new CandidatoTorrent("[SubsPlease] Anime - 14 (1080p).mkv", "https://nyaa.si/download/14.torrent", "hash14", 200, 1_400_000_000L);
+        var nyaaMock = new Mock<INyaaSourceService>();
+        nyaaMock
+            .Setup(n => n.BuscarCandidatosAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<CandidatoTorrent> { candidato });
+        var torrentMock = new Mock<ITorrentDownloadService>();
+        torrentMock
+            .Setup(t => t.DescargarAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<bool>(), It.IsAny<IProgress<(double Progreso, double VelocidadBps)>?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string _, string _, string destino, int _, bool _, IProgress<(double, double)>? _, CancellationToken _) => new ResultadoTorrent(true, destino, null));
+
+        var guardada = new TaskCompletionSource<AnimeLocalTracker.Models.DescargaHistorial>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var servidor = new ServidorSinRespuestaHandler();
+        var sut = CrearServicioSinRespuesta(servidor, torrentHabilitado: true, CrearBdQueCapturaHistorial(guardada), nyaaMock.Object, torrentMock.Object);
+
+        var carpeta = Path.Combine(Path.GetTempPath(), $"sin_respuesta_torrent_{Guid.NewGuid():N}");
+        try
+        {
+            await sut.IniciarDescargaEpisodioAsync(609, "Anime Servidor Caido Torrent", carpeta, 14);
+            var historial = await guardada.Task.WaitAsync(TimeSpan.FromSeconds(20));
+
+            historial.Completada.Should().BeTrue();
+            torrentMock.Verify(t => t.DescargarAsync(candidato.TorrentUrl, It.IsAny<string>(), It.IsAny<string>(), 14, It.IsAny<bool>(), It.IsAny<IProgress<(double, double)>?>(), It.IsAny<CancellationToken>()), Times.Once);
+        }
+        finally
+        {
+            try { Directory.Delete(carpeta, recursive: true); } catch { }
+        }
+    }
+
+    /// <summary>Conectividad controlada por el test: esperar a la red la "devuelve" al instante.</summary>
+    private sealed class ConectividadFalsa : IConectividadRed
+    {
+        public volatile bool Online = true;
+        public int Esperas;
+
+        public bool HayInternet => Online;
+
+        public Task<bool> EsperarInternetAsync(TimeSpan maximo, CancellationToken ct)
+        {
+            Interlocked.Increment(ref Esperas);
+            Online = true;
+            return Task.FromResult(true);
+        }
+    }
+
+    /// <summary>Falla toda petición mientras la conectividad falsa esté sin red.</summary>
+    private sealed class CaidaDeRedHandler : DelegatingHandler
+    {
+        private readonly ConectividadFalsa _red;
+
+        public CaidaDeRedHandler(ConectividadFalsa red, HttpMessageHandler interno) : base(interno) => _red = red;
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            => _red.Online ? base.SendAsync(request, cancellationToken) : throw new HttpRequestException("No se puede establecer la conexión (sin red).");
+    }
+
+    [Fact]
+    public async Task Descarga_SiSeCaeInternet_EsperaALaRedSinGastarReintentosYTermina()
+    {
+        // Regresión: con el wifi caído unos minutos, los 5 reintentos se agotaban y la descarga fallaba.
+        var datos = GenerarVideoFalso(1024 * 1024);
+        new byte[] { 0, 0, 0, 0x20, (byte)'f', (byte)'t', (byte)'y', (byte)'p' }.CopyTo(datos, 0); // cabecera MP4
+        var red = new ConectividadFalsa();
+
+        var factoryMock = new Mock<IHttpClientFactory>();
+        factoryMock.Setup(f => f.CreateClient(It.IsAny<string>())).Returns(new HttpClient(new CaidaDeRedHandler(red, new ServidorRangosHandler(datos))));
+
+        var resolverMock = new Mock<IVideoSourceResolver>();
+        resolverMock
+            .Setup(r => r.BuscarUrlEpisodioAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<int?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .Callback(() => red.Online = false) // la red se cae justo cuando empieza a descargar
+            .ReturnsAsync("https://cdn.example.com/video.mp4");
+
+        var guardada = new TaskCompletionSource<AnimeLocalTracker.Models.DescargaHistorial>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var sut = new DownloadService(
+            factoryMock.Object,
+            sourceResolver: resolverMock.Object,
+            settingsService: _settingsServiceMock.Object,
+            database: CrearBdQueCapturaHistorial(guardada).Object,
+            conectividad: red);
+
+        var mensajes = new System.Collections.Concurrent.ConcurrentQueue<DescargaProgresoMensaje>();
+        var receptor = new object();
+        WeakReferenceMessenger.Default.Register<DescargaProgresoMensaje>(receptor, (_, m) => { if (m.AniListId == 607) mensajes.Enqueue(m); });
+
+        var carpeta = Path.Combine(Path.GetTempPath(), $"sin_red_{Guid.NewGuid():N}");
+        try
+        {
+            await sut.IniciarDescargaEpisodioAsync(607, "Anime Sin Red", carpeta, 1);
+            var historial = await guardada.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+            historial.Completada.Should().BeTrue();
+            (await File.ReadAllBytesAsync(historial.RutaArchivo)).Should().Equal(datos);
+            red.Esperas.Should().Be(1);
+            mensajes.Should().Contain(m => m.SinConexion, "la fila debe mostrar que espera a la red");
+            mensajes.Should().OnlyContain(m => m.Reintentos == 0, "esperar a la red no gasta reintentos");
+        }
+        finally
+        {
+            WeakReferenceMessenger.Default.Unregister<DescargaProgresoMensaje>(receptor);
+            try { Directory.Delete(carpeta, recursive: true); } catch { }
         }
     }
 }

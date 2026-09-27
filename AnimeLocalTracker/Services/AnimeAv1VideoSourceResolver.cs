@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -290,13 +291,18 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
         HttpClient httpClient,
         Func<int, CancellationToken, Task<int?>>? malIdResolver = null,
         Func<List<string>, List<string>, CancellationToken, Task<double?>>? similitudNombres = null,
-        Func<int, CancellationToken, Task<List<string>?>>? titulosDesdeAniList = null)
+        Func<int, CancellationToken, Task<List<string>?>>? titulosDesdeAniList = null,
+        IDatabaseService? database = null)
     {
         _httpClient = httpClient;
         _malIdResolver = malIdResolver;
         _similitudNombres = similitudNombres;
         _titulosDesdeAniList = titulosDesdeAniList;
+        _database = database;
     }
+
+    /// <summary>Donde se guarda la página verificada de cada anime para que sobreviva al cierre de la app (null en tests).</summary>
+    private readonly IDatabaseService? _database;
 
     public async Task<string?> BuscarUrlEpisodioAsync(IEnumerable<string> titulos, int numeroEpisodio, int? aniListId = null, string? audioPreferido = null, string? servidorPreferido = null, CancellationToken cancellationToken = default)
     {
@@ -329,32 +335,59 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
         var titulosLista = titulos.Where(t => !string.IsNullOrWhiteSpace(t)).ToList();
         if (titulosLista.Count == 0) return [];
 
-        // Títulos adicionales desde AniList (native japonés, synonyms…) — la
-        // biblioteca local puede no tenerlos guardados (refresh pendiente del detalle)
-        if (aniListId.HasValue && _titulosDesdeAniList != null)
+        // Atajo: si ya se verificó qué página del sitio es este anime (p. ej. al bajar el episodio
+        // anterior de la misma temporada, hoy o en otra sesión), se va directo a ella en vez de
+        // repetir toda la búsqueda.
+        string? slugYaProbado = null;
+        if (aniListId.HasValue && await ObtenerMediaConocidoAsync(aniListId.Value) is MediaVerificado conocido)
         {
-            try
-            {
-                var extra = await _titulosDesdeAniList(aniListId.Value, cancellationToken);
-                if (extra != null)
-                {
-                    foreach (var t in extra)
-                    {
-                        if (!string.IsNullOrWhiteSpace(t) &&
-                            !titulosLista.Contains(t, StringComparer.OrdinalIgnoreCase))
-                        {
-                            titulosLista.Add(t);
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Debug("AnimeAv1VideoSourceResolver", $"No se pudieron obtener títulos de AniList para {aniListId}: {ex.Message}");
-            }
+            var embedsConocidos = await ObtenerEmbedsDeMediaConocidoAsync(conocido, numeroEpisodio, cancellationToken);
+            if (embedsConocidos.Count > 0) return embedsConocidos;
+            // El episodio no está en esa página (aún no publicado, o el sitio lo separó en otra): búsqueda completa.
+            slugYaProbado = conocido.Slug;
         }
 
-        var malIdEsperado = await ObtenerMalIdEsperadoAsync(aniListId, cancellationToken);
+        if (!aniListId.HasValue) return await BuscarEmbedsCompletoAsync(titulosLista, numeroEpisodio, null, cancellationToken);
+
+        // Una sola búsqueda completa a la vez por anime: al pedir 5 episodios de golpe de un anime aún
+        // no guardado, cada uno repetía la misma búsqueda (decenas de peticiones iguales en paralelo).
+        // Los demás esperan y usan la página que encuentre el primero.
+        var candado = _busquedasPorAnime.GetOrAdd(aniListId.Value, _ => new SemaphoreSlim(1, 1));
+        try { await candado.WaitAsync(cancellationToken); }
+        catch (OperationCanceledException) { return []; }
+        try
+        {
+            if (await ObtenerMediaConocidoAsync(aniListId.Value) is MediaVerificado encontradoPorOtro
+                && !string.Equals(encontradoPorOtro.Slug, slugYaProbado, StringComparison.OrdinalIgnoreCase))
+            {
+                var embeds = await ObtenerEmbedsDeMediaConocidoAsync(encontradoPorOtro, numeroEpisodio, cancellationToken);
+                if (embeds.Count > 0) return embeds;
+            }
+            return await BuscarEmbedsCompletoAsync(titulosLista, numeroEpisodio, aniListId, cancellationToken);
+        }
+        finally
+        {
+            candado.Release();
+        }
+    }
+
+    /// <summary>Candado por anime para no repetir en paralelo la misma búsqueda completa.</summary>
+    private readonly ConcurrentDictionary<int, SemaphoreSlim> _busquedasPorAnime = new();
+
+    /// <summary>Búsqueda completa en el catálogo (sin atajo): candidatos, verificación y embeds del episodio.</summary>
+    private async Task<List<AnimeAv1HtmlParser.EmbedServidor>> BuscarEmbedsCompletoAsync(
+        List<string> titulosLista, int numeroEpisodio, int? aniListId, CancellationToken cancellationToken)
+    {
+        // Títulos adicionales desde AniList (native japonés, synonyms…) — la biblioteca local puede
+        // no tenerlos guardados — y el MAL ID esperado: son independientes, se piden a la vez.
+        var tareaTitulosExtra = ObtenerTitulosExtraAsync(aniListId, cancellationToken);
+        var tareaMalId = ObtenerMalIdEsperadoAsync(aniListId, cancellationToken);
+        foreach (var t in await tareaTitulosExtra)
+        {
+            if (!titulosLista.Contains(t, StringComparer.OrdinalIgnoreCase)) titulosLista.Add(t);
+        }
+
+        var malIdEsperado = await tareaMalId;
         var slugs = await ObtenerSlugsCandidatosAsync(titulosLista, malIdEsperado, cancellationToken);
 
         // Media-first con crawl de relations: cuando un media se prueba, sus
@@ -372,6 +405,29 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
         var probados = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var encolados = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
+        // Precarga: mientras se verifica un candidato ya se piden las páginas de los siguientes,
+        // para no esperar una petición completa por cada uno cuando el bueno no es el primero.
+        var paginas = new Dictionary<string, Task<InfoMedia?>>(StringComparer.OrdinalIgnoreCase);
+        Task<InfoMedia?> PedirMedia(string s)
+        {
+            if (!paginas.TryGetValue(s, out var tarea))
+            {
+                tarea = ObtenerInfoMediaAsync(s, cancellationToken);
+                paginas[s] = tarea;
+            }
+            return tarea;
+        }
+        void PrecargarSiguientes(int desde)
+        {
+            int pedidas = 0;
+            for (int j = desde; j < slugs.Count && pedidas < MediaPrecargados && probes + pedidas < MaxMediaProbes; j++)
+            {
+                if (probados.Contains(slugs[j])) continue;
+                PedirMedia(slugs[j]);
+                pedidas++;
+            }
+        }
+
         for (int i = 0; i < slugs.Count && probes < MaxMediaProbes; i++)
         {
             if (cancellationToken.IsCancellationRequested) return [];
@@ -379,7 +435,8 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
             if (!probados.Add(slug)) continue;
 
             probes++;
-            var media = await ObtenerInfoMediaAsync(slug, cancellationToken);
+            PrecargarSiguientes(i + 1);
+            var media = await PedirMedia(slug);
             if (media == null) continue;
 
             // Crawl inmediato: encolar las relations del media justo detrás de él
@@ -393,7 +450,11 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
                 {
                     if (encolados.Add(r.Slug) && !probados.Contains(r.Slug)) nuevos.Add(r.Slug);
                 }
-                if (nuevos.Count > 0) slugs.InsertRange(i + 1, nuevos);
+                if (nuevos.Count > 0)
+                {
+                    slugs.InsertRange(i + 1, nuevos);
+                    PrecargarSiguientes(i + 1);
+                }
             }
 
             if (!await EsMediaCoincidenteAsync(media, malIdEsperado, titulosLista, cancellationToken))
@@ -405,10 +466,98 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
             if (!objetivo.HasValue) continue;
 
             var embeds = await ObtenerEmbedsDeEpisodioAsync(slug, objetivo.Value, malIdEsperado, cancellationToken);
-            if (embeds.Count > 0) return embeds;
+            if (embeds.Count > 0)
+            {
+                if (aniListId.HasValue) await RecordarMediaAsync(aniListId.Value, new MediaVerificado(slug, malIdEsperado ?? media.MalId));
+                return embeds;
+            }
         }
 
         return [];
+    }
+
+    /// <summary>Página del sitio ya verificada como la de un anime (slug + MAL ID para seguir verificando).</summary>
+    private readonly record struct MediaVerificado(string Slug, int? MalId);
+
+    /// <summary>
+    /// AniListId → página del sitio ya verificada: descargar los 12 episodios de una temporada hace
+    /// la búsqueda completa una vez en lugar de doce. Se guarda también en la base de datos para que
+    /// el primer episodio tras reiniciar la app no la repita.
+    /// </summary>
+    private readonly ConcurrentDictionary<int, MediaVerificado> _mediaPorAniList = new();
+
+    private async Task<MediaVerificado?> ObtenerMediaConocidoAsync(int aniListId)
+    {
+        if (_mediaPorAniList.TryGetValue(aniListId, out var enMemoria)) return enMemoria;
+        if (_database == null) return null;
+
+        try
+        {
+            var guardado = await _database.ObtenerMediaAnimeAv1Async(aniListId);
+            if (guardado == null || string.IsNullOrWhiteSpace(guardado.Slug)) return null;
+            var media = new MediaVerificado(guardado.Slug, guardado.MalId);
+            _mediaPorAniList[aniListId] = media;
+            return media;
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("AnimeAv1VideoSourceResolver", $"No se pudo leer la página guardada de {aniListId}: {ex.Message}");
+            return null;
+        }
+    }
+
+    private async Task RecordarMediaAsync(int aniListId, MediaVerificado media)
+    {
+        _mediaPorAniList[aniListId] = media;
+        if (_database == null) return;
+
+        try
+        {
+            await _database.GuardarMediaAnimeAv1Async(new Models.MediaAnimeAv1Verificado
+            {
+                AniListId = aniListId,
+                Slug = media.Slug,
+                MalId = media.MalId,
+                VerificadoUtc = DateTime.UtcNow
+            });
+        }
+        catch (Exception ex)
+        {
+            // No guardarla solo cuesta repetir la búsqueda tras reiniciar: nunca debe romper la descarga.
+            AppLogger.Debug("AnimeAv1VideoSourceResolver", $"No se pudo guardar la página de {aniListId}: {ex.Message}");
+        }
+    }
+
+    /// <summary>Páginas de candidatos que se piden por adelantado mientras se verifica el actual.</summary>
+    private const int MediaPrecargados = 2;
+
+    /// <summary>Búsquedas de catálogo a la vez: bastante más rápido que en serie sin acribillar al sitio.</summary>
+    private const int BusquedasCatalogoSimultaneas = 4;
+
+    private async Task<List<AnimeAv1HtmlParser.EmbedServidor>> ObtenerEmbedsDeMediaConocidoAsync(MediaVerificado conocido, int numeroEpisodio, CancellationToken ct)
+    {
+        // Mismas comprobaciones que la búsqueda completa (el episodio figura en la lista del sitio y
+        // su página declara el MAL ID esperado), pero con 2 peticiones en vez de decenas.
+        var media = await ObtenerInfoMediaAsync(conocido.Slug, ct);
+        if (media == null) return [];
+        int? objetivo = ResolverNumeroEpisodio(media, numeroEpisodio);
+        if (!objetivo.HasValue) return [];
+        return await ObtenerEmbedsDeEpisodioAsync(conocido.Slug, objetivo.Value, conocido.MalId, ct);
+    }
+
+    private async Task<List<string>> ObtenerTitulosExtraAsync(int? aniListId, CancellationToken ct)
+    {
+        if (!aniListId.HasValue || _titulosDesdeAniList == null) return [];
+        try
+        {
+            var extra = await _titulosDesdeAniList(aniListId.Value, ct);
+            return extra?.Where(t => !string.IsNullOrWhiteSpace(t)).ToList() ?? [];
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("AnimeAv1VideoSourceResolver", $"No se pudieron obtener títulos de AniList para {aniListId}: {ex.Message}");
+            return [];
+        }
     }
 
     /// <summary>Resuelve el MAL ID esperado del anime (si hay AniListId y resolver).</summary>
@@ -458,46 +607,67 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
             .Where(t => terminosVistos.Add(t.Termino))
             .OrderBy(t => t.Prioridad);
 
-        foreach (var (termino, _) in terminosOrdenados)
+        // Las búsquedas se lanzan en paralelo (unas pocas a la vez) y sus resultados se
+        // juntan DESPUÉS en el mismo orden de fiabilidad: el orden de los candidatos no cambia.
+        var terminos = terminosOrdenados.Select(t => t.Termino).ToList();
+        using var limite = new SemaphoreSlim(BusquedasCatalogoSimultaneas);
+        var resultados = await Task.WhenAll(terminos.Select(t => BuscarEnCatalogoAsync(t, limite, ct)));
+
+        for (int i = 0; i < terminos.Count; i++)
         {
-            try
+            // Sin gate de heurística aquí: el veredicto (malId exacto o
+            // nombres con rapidfuzz/C#) decide por cada media. La heurística
+            // de slugs rechazaba películas correctas ("movie-N-") cuando el
+            // malId no era comparable.
+            int nuevos = 0;
+            foreach (string discoveredSlug in resultados[i])
             {
-                string searchUrl = $"https://animeav1.com/catalogo?search={Uri.EscapeDataString(termino)}";
-                using var req = new HttpRequestMessage(HttpMethod.Get, searchUrl);
-                req.Headers.Add("User-Agent", UserAgent);
-
-                using var res = await _httpClient.SendAsync(req, ct);
-                if (!res.IsSuccessStatusCode) continue;
-
-                var html = await res.Content.ReadAsStringAsync(ct);
-                // Sin gate de heurística aquí: el veredicto (malId exacto o
-                // nombres con rapidfuzz/C#) decide por cada media. La heurística
-                // de slugs rechazaba películas correctas ("movie-N-") cuando el
-                // malId no era comparable.
-                int nuevos = 0;
-                foreach (string discoveredSlug in AnimeAv1HtmlParser.ExtraerSlugs(html))
+                if (vistos.Add(discoveredSlug))
                 {
-                    if (vistos.Add(discoveredSlug))
-                    {
-                        slugs.Add(discoveredSlug);
-                        nuevos++;
-                    }
-                }
-                // Diagnóstico: solo se loguea cuando un término aporta slugs nuevos
-                // (los 0s por variante inundaban el log: ~40 líneas por anime).
-                if (nuevos > 0)
-                {
-                    AppLogger.Debug("AnimeAv1VideoSourceResolver",
-                        $"Búsqueda de catálogo '{termino}': {nuevos} slugs nuevos ({slugs.Count} totales).");
+                    slugs.Add(discoveredSlug);
+                    nuevos++;
                 }
             }
-            catch (Exception ex)
+            // Diagnóstico: solo se loguea cuando un término aporta slugs nuevos
+            // (los 0s por variante inundaban el log: ~40 líneas por anime).
+            if (nuevos > 0)
             {
-                Debug.WriteLine($"[AnimeAv1VideoSourceResolver] Error en búsqueda de catálogo para '{termino}': {ex.Message}");
+                AppLogger.Debug("AnimeAv1VideoSourceResolver",
+                    $"Búsqueda de catálogo '{terminos[i]}': {nuevos} slugs nuevos ({slugs.Count} totales).");
             }
         }
 
         return slugs;
+    }
+
+    /// <summary>Slugs que devuelve el catálogo para un término (vacío si falla: nunca lanza).</summary>
+    private async Task<List<string>> BuscarEnCatalogoAsync(string termino, SemaphoreSlim limite, CancellationToken ct)
+    {
+        bool dentro = false;
+        try
+        {
+            await limite.WaitAsync(ct);
+            dentro = true;
+
+            string searchUrl = $"https://animeav1.com/catalogo?search={Uri.EscapeDataString(termino)}";
+            using var req = new HttpRequestMessage(HttpMethod.Get, searchUrl);
+            req.Headers.Add("User-Agent", UserAgent);
+
+            using var res = await _httpClient.SendAsync(req, ct);
+            if (!res.IsSuccessStatusCode) return [];
+
+            var html = await res.Content.ReadAsStringAsync(ct);
+            return AnimeAv1HtmlParser.ExtraerSlugs(html).ToList();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[AnimeAv1VideoSourceResolver] Error en búsqueda de catálogo para '{termino}': {ex.Message}");
+            return [];
+        }
+        finally
+        {
+            if (dentro) limite.Release();
+        }
     }
 
     private readonly record struct TerminoConPrioridad(string Termino, int Prioridad);

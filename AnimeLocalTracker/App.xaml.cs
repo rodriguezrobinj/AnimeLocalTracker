@@ -124,17 +124,42 @@ public partial class App : Application
 
         // SEC-03: el cliente "Downloader" (scraper + descargas) no sigue redirects a ciegas:
         // cada salto se valida con UrlSeguridad (solo https, sin credenciales embebidas).
+        // ConnectTimeout (incluye la negociación TLS): medido en uso real, a3.mp4upload.com tarda
+        // 14–26 s solo en negociar la conexión segura; 15 s cortaba casi todas sus conexiones. 60 s
+        // deja entrar a un servidor lento pero sigue fallando antes que los 100 s generales si está
+        // caído. PooledConnectionLifetime renueva las conexiones reutilizadas (IPs del CDN que cambian).
         services.AddHttpClient("Downloader")
-            .ConfigurePrimaryHttpMessageHandler(() => new System.Net.Http.HttpClientHandler { AllowAutoRedirect = false })
+            .ConfigurePrimaryHttpMessageHandler(() => new System.Net.Http.SocketsHttpHandler
+            {
+                AllowAutoRedirect = false,
+                ConnectTimeout = TimeSpan.FromSeconds(60),
+                PooledConnectionLifetime = TimeSpan.FromMinutes(5)
+            })
+            .AddHttpMessageHandler(() => new RedirectSeguroHandler());
+
+        // Igual que "Downloader" pero pidiendo las páginas comprimidas (gzip/brotli): el HTML de
+        // AnimeAv1 y el RSS de Nyaa llegan varias veces más pequeños y la búsqueda del episodio
+        // termina antes. Solo para páginas: en el video, comprimir rompería las cuentas de bytes
+        // de las descargas por trozos.
+        services.AddHttpClient("Scraper")
+            .ConfigurePrimaryHttpMessageHandler(() => new System.Net.Http.SocketsHttpHandler
+            {
+                AllowAutoRedirect = false,
+                ConnectTimeout = TimeSpan.FromSeconds(30),
+                PooledConnectionLifetime = TimeSpan.FromMinutes(5),
+                AutomaticDecompression = System.Net.DecompressionMethods.All
+            })
             .AddHttpMessageHandler(() => new RedirectSeguroHandler());
 
         // Descargas por torrent (Nyaa.si + MonoTorrent, Fase MVP): último recurso opt-in
         // cuando ninguna fuente HTTP encuentra el episodio — ver AppSettings.BusquedaTorrentHabilitada.
         services.AddSingleton<INyaaSourceService>(sp =>
-            new NyaaSourceService(sp.GetRequiredService<IHttpClientFactory>().CreateClient("Downloader")));
+            new NyaaSourceService(sp.GetRequiredService<IHttpClientFactory>().CreateClient("Scraper")));
         services.AddSingleton<ITorrentDownloadService>(sp =>
             new TorrentDownloadService(sp.GetRequiredService<IHttpClientFactory>().CreateClient("Downloader")));
 
+        // Las descargas esperan a que vuelva internet en vez de gastar sus reintentos sin red.
+        services.AddSingleton<IConectividadRed, ConectividadRedWindows>();
         services.AddSingleton<IDownloadService, DownloadService>();
         
         // IHttpClientFactory nativo con Polly para Rate Limiting
@@ -224,7 +249,7 @@ public partial class App : Application
         // prioridad con degradación por salud (fallos → cooldown → reintento).
         services.AddSingleton<AnimeAv1VideoSourceResolver>(sp =>
         {
-            var http = sp.GetRequiredService<IHttpClientFactory>().CreateClient("Downloader");
+            var http = sp.GetRequiredService<IHttpClientFactory>().CreateClient("Scraper");
             // Anti-confusión: AniListId → MAL ID para verificar que la página del
             // episodio es del anime correcto (nombres parecidos ya no descargan
             // episodios equivocados).
@@ -273,7 +298,9 @@ public partial class App : Application
                     {
                         return (List<string>?)null;
                     }
-                });
+                },
+                // Página verificada de cada anime: el primer episodio tras reiniciar la app no repite la búsqueda
+                sp.GetRequiredService<IDatabaseService>());
         });
         services.AddSingleton<ProveedorVideoAnimeAv1>();
         services.AddSingleton<IVideoSourceResolver>(sp =>
