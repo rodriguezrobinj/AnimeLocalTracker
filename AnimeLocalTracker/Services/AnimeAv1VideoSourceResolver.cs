@@ -341,7 +341,7 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
         string? slugYaProbado = null;
         if (aniListId.HasValue && await ObtenerMediaConocidoAsync(aniListId.Value) is MediaVerificado conocido)
         {
-            var embedsConocidos = await ObtenerEmbedsDeMediaConocidoAsync(conocido, numeroEpisodio, cancellationToken);
+            var embedsConocidos = await ObtenerEmbedsDeMediaConocidoAsync(conocido, numeroEpisodio, titulosLista, aniListId, cancellationToken);
             if (embedsConocidos.Count > 0) return embedsConocidos;
             // El episodio no está en esa página (aún no publicado, o el sitio lo separó en otra): búsqueda completa.
             slugYaProbado = conocido.Slug;
@@ -360,7 +360,7 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
             if (await ObtenerMediaConocidoAsync(aniListId.Value) is MediaVerificado encontradoPorOtro
                 && !string.Equals(encontradoPorOtro.Slug, slugYaProbado, StringComparison.OrdinalIgnoreCase))
             {
-                var embeds = await ObtenerEmbedsDeMediaConocidoAsync(encontradoPorOtro, numeroEpisodio, cancellationToken);
+                var embeds = await ObtenerEmbedsDeMediaConocidoAsync(encontradoPorOtro, numeroEpisodio, titulosLista, aniListId, cancellationToken);
                 if (embeds.Count > 0) return embeds;
             }
             return await BuscarEmbedsCompletoAsync(titulosLista, numeroEpisodio, aniListId, cancellationToken);
@@ -534,12 +534,31 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
     /// <summary>Búsquedas de catálogo a la vez: bastante más rápido que en serie sin acribillar al sitio.</summary>
     private const int BusquedasCatalogoSimultaneas = 4;
 
-    private async Task<List<AnimeAv1HtmlParser.EmbedServidor>> ObtenerEmbedsDeMediaConocidoAsync(MediaVerificado conocido, int numeroEpisodio, CancellationToken ct)
+    private async Task<List<AnimeAv1HtmlParser.EmbedServidor>> ObtenerEmbedsDeMediaConocidoAsync(
+        MediaVerificado conocido, int numeroEpisodio, List<string> titulosLista, int? aniListId, CancellationToken ct)
     {
-        // Mismas comprobaciones que la búsqueda completa (el episodio figura en la lista del sitio y
-        // su página declara el MAL ID esperado), pero con 2 peticiones en vez de decenas.
+        // Mismas comprobaciones que la búsqueda completa (la página es de este anime, el episodio figura
+        // en su lista y su página declara el MAL ID esperado), pero con 2 peticiones en vez de decenas.
         var media = await ObtenerInfoMediaAsync(conocido.Slug, ct);
         if (media == null) return [];
+
+        // Mismo veredicto que la búsqueda completa: MAL ID si ambos lo tienen; si no, parecido de nombres.
+        // Sin esto, una página guardada sin MAL ID que el sitio reutilizara para otra serie descargaría
+        // episodios de la serie equivocada sin ningún aviso.
+        bool malIdComparable = conocido.MalId.HasValue && media.MalId.HasValue;
+        var titulos = titulosLista;
+        if (!malIdComparable)
+        {
+            // Los títulos alternativos de AniList (japonés, sinónimos) son los que pudieron aceptar la
+            // página en la búsqueda completa: sin ellos este atajo fallaría siempre para ese anime.
+            titulos = new List<string>(titulosLista);
+            foreach (var t in await ObtenerTitulosExtraAsync(aniListId, ct))
+            {
+                if (!titulos.Contains(t, StringComparer.OrdinalIgnoreCase)) titulos.Add(t);
+            }
+        }
+        if (!await EsMediaCoincidenteAsync(media, conocido.MalId, titulos, ct)) return [];
+
         int? objetivo = ResolverNumeroEpisodio(media, numeroEpisodio);
         if (!objetivo.HasValue) return [];
         return await ObtenerEmbedsDeEpisodioAsync(conocido.Slug, objetivo.Value, conocido.MalId, ct);
