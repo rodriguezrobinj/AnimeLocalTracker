@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
+using AnimeLocalTracker.Models;
 using AnimeLocalTracker.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 
@@ -54,6 +55,8 @@ public partial class DetalleViewModel
             ActualizarContadorProximo();
             if (proxima != null) ReanudarContador();
             else DetenerContador();
+
+            await SincronizarUltimoEmitidoAsync(anime, proxima);
         }
         catch (Exception ex)
         {
@@ -62,6 +65,38 @@ public partial class DetalleViewModel
         finally
         {
             _refrescandoProximaEmision = false;
+        }
+    }
+
+    /// <summary>
+    /// Si ya salió un episodio que la lista de la ficha aún no muestra —el caso típico: tienes la ficha abierta y el
+    /// episodio aparece mientras tanto en Actualizaciones—, añade su fila (sin descargar) y sube <c>TotalEpisodios</c>.
+    /// Reutiliza el mismo dato que ya usa la cuenta atrás (<see cref="IEmisionMonitorService.UltimoEmitido"/>), así que
+    /// no hace ninguna consulta nueva a AniList; se llama tanto al abrir la ficha como en cada revisión de la cuenta
+    /// atrás mientras sigue abierta.
+    /// </summary>
+    private async Task SincronizarUltimoEmitidoAsync(AnimeItem anime, ProximaEmision? proxima)
+    {
+        if (_monitorEmision == null || !ReferenceEquals(anime, AnimeSeleccionado)) return;
+
+        int emitido = _monitorEmision.UltimoEmitido(proxima, anime, DateTime.UtcNow);
+        int maxActual = _todosLosEpisodios.Count; // filas 1..N contiguas: ver InicializarAsync
+        if (emitido <= maxActual) return;
+
+        for (int numero = maxActual + 1; numero <= emitido; numero++)
+        {
+            _todosLosEpisodios.Add(new EpisodioItem { NumeroEpisodio = numero });
+        }
+        anime.TotalEpisodios = emitido;
+        AplicarFiltrosYOrdenamiento();
+
+        try
+        {
+            await _databaseService.ActualizarAnimeAsync(anime);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("DetalleViewModel", $"No se pudo guardar el nuevo total de episodios de {anime.Titulo}: {ex.Message}");
         }
     }
 

@@ -46,7 +46,7 @@ public class SkipTimesCoordinatorTests : System.IDisposable
     private string RutaEpisodioFicticia() => Path.Combine(_carpetaEpisodioVacia, "Episodio 05.mkv");
 
     [Fact]
-    public async Task CargarSkipTimesAsync_ConReferenciaOpLocalAplicable_DeberiaUsarlaYNoConsultarAniSkip()
+    public async Task CargarSkipTimesAsync_ConReferenciaOpLocalAplicable_DeberiaUsarlaParaElOpeningYConsultarAniSkipSoloPorLoQueFalta()
     {
         var opLocal = new TemaLocalDisponible("OP", "OP1", 1, "1-16", @"C:\Music\1\OP_OP1_v1_ep1-16.mp3");
         _themesDownloadMock.Setup(t => t.ListarDescargasLocales(101)).Returns(new List<TemaLocalDisponible> { opLocal });
@@ -75,8 +75,9 @@ public class SkipTimesCoordinatorTests : System.IDisposable
         resultado[0].SkipType.Should().Be("op");
         resultado[0].Interval.StartTime.Should().Be(90.0);
         resultado[0].Interval.EndTime.Should().Be(180.0);
-        _aniSkipMock.Verify(a => a.ObtenerMalIdDesdeAniListAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never,
-            "si la referencia local ya dio resultado, no debería hacer falta ir a la nube");
+        resultado[0].Origen.Should().Be("audio");
+        // El opening ya salió del audio; lo único que falta es el ending, así que la nube se consulta una vez (y solo para eso).
+        _aniSkipMock.Verify(a => a.ObtenerMalIdDesdeAniListAsync(101, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -106,7 +107,7 @@ public class SkipTimesCoordinatorTests : System.IDisposable
     }
 
     [Fact]
-    public async Task CargarSkipTimesAsync_ConReferenciaQueNoAplicaAlEpisodio_DeberiaIgnorarlaYCaerAAniSkip()
+    public async Task CargarSkipTimesAsync_ConReferenciaQueNoAplicaPorRangoYNoAcierta_DeberiaCaerAAniSkip()
     {
         // OP1 solo aplica a los episodios 1-16; se pide el episodio 20.
         var opLocal = new TemaLocalDisponible("OP", "OP1", 1, "1-16", @"C:\Music\1\OP_OP1_v1_ep1-16.mp3");
@@ -119,10 +120,12 @@ public class SkipTimesCoordinatorTests : System.IDisposable
         var resultado = await sut.CargarSkipTimesAsync(101, 20, 1400, RutaEpisodioFicticia());
 
         resultado.Should().BeEmpty();
+        // OP1 no cubre el episodio 20 por rango, pero se prueba igualmente como último intento (la numeración de los archivos no siempre
+        // coincide con la de AnimeThemes); al no acertar, se cae a AniSkip.
         _pythonBridgeMock.Verify(
             p => p.ExecuteCommandAsync<It.IsAnyType, PluginDaemonResponse<SkipTimesCoordinator.AudioReferenceSkipResult>>(
                 It.IsAny<string>(), It.IsAny<It.IsAnyType>(), It.IsAny<CancellationToken>()),
-            Times.Never, "OP1 no cubre el episodio 20: no debería intentar comparar contra esa referencia");
+            Times.Once);
         _aniSkipMock.Verify(a => a.ObtenerMalIdDesdeAniListAsync(101, It.IsAny<CancellationToken>()), Times.Once);
     }
 

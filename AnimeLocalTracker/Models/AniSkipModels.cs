@@ -32,6 +32,14 @@ public class AniSkipResult
     [JsonPropertyName("episodeLength")]
     public double EpisodeLength { get; set; }
 
+    /// <summary>De dónde salió el tramo: "audio" (referencia de AnimeThemes), "aniskip" (comunidad) o "escenas". Vacío si no se sabe.</summary>
+    [JsonIgnore]
+    public string Origen { get; set; } = string.Empty;
+
+    /// <summary>Confianza de la detección por audio (0 a 1); 0 cuando el tramo no viene de una detección.</summary>
+    [JsonIgnore]
+    public double Confianza { get; set; }
+
     [JsonIgnore]
     public bool EsIntro => SkipType == "op" || SkipType == "mixed-op";
 

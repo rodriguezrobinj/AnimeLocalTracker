@@ -327,8 +327,10 @@ public partial class GaleriaViewModel : ObservableObject,
         IDialogService dialogService, 
         IHttpClientFactory httpClientFactory,
         IImageCacheService imageCacheService,
-        IFileScannerService? fileScannerService = null)
+        IFileScannerService? fileScannerService = null,
+        MinijuegosViewModel? minijuegos = null)
     {
+        _minijuegos = minijuegos;
         _animeTrackingService = animeTrackingService;
         _databaseService = databaseService;
         _authService = authService;

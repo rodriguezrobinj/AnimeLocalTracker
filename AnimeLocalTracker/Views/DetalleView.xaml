@@ -7,6 +7,56 @@
              Background="#121212">
     <UserControl.Resources>
 
+    <!-- ══ Deslizador de la música (progreso de la canción y volumen): pista fina y bolita pequeña, sin el halo de Material Design
+         al pasar el ratón o pulsar ni marco de foco. Misma estructura que el deslizador del editor de seguimiento. ══ -->
+    <Style x:Key="MusicaSlider" TargetType="Slider">
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Height" Value="16"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="IsMoveToPointEnabled" Value="True"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Slider">
+                    <!-- El fondo transparente mantiene toda la altura clicable (la pista visible mide solo 3 px) -->
+                    <Grid Background="Transparent" Height="16" VerticalAlignment="Center">
+                        <Track x:Name="PART_Track" Height="16" VerticalAlignment="Center">
+                            <Track.DecreaseRepeatButton>
+                                <RepeatButton Command="{x:Static Slider.DecreaseLarge}" OverridesDefaultStyle="True" Focusable="False" IsTabStop="False"
+                                              Height="3" VerticalAlignment="Center">
+                                    <RepeatButton.Template>
+                                        <ControlTemplate TargetType="RepeatButton">
+                                            <Border Background="#C084FC" Height="3" CornerRadius="1.5,0,0,1.5"/>
+                                        </ControlTemplate>
+                                    </RepeatButton.Template>
+                                </RepeatButton>
+                            </Track.DecreaseRepeatButton>
+                            <Track.IncreaseRepeatButton>
+                                <RepeatButton Command="{x:Static Slider.IncreaseLarge}" OverridesDefaultStyle="True" Focusable="False" IsTabStop="False"
+                                              Height="3" VerticalAlignment="Center">
+                                    <RepeatButton.Template>
+                                        <ControlTemplate TargetType="RepeatButton">
+                                            <Border Background="#2D3748" Height="3" CornerRadius="0,1.5,1.5,0"/>
+                                        </ControlTemplate>
+                                    </RepeatButton.Template>
+                                </RepeatButton>
+                            </Track.IncreaseRepeatButton>
+                            <Track.Thumb>
+                                <Thumb OverridesDefaultStyle="True" Focusable="False" Width="10" Height="10" VerticalAlignment="Center">
+                                    <Thumb.Template>
+                                        <ControlTemplate TargetType="Thumb">
+                                            <Ellipse Width="10" Height="10" Fill="#C084FC"/>
+                                        </ControlTemplate>
+                                    </Thumb.Template>
+                                </Thumb>
+                            </Track.Thumb>
+                        </Track>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- ══ Barra de acciones de la cabecera de episodios: botones neutros y menús desplegables ══ -->
     <Style x:Key="DetToolBtn" TargetType="ButtonBase">
         <Setter Property="Height" Value="34"/>
@@ -675,221 +725,6 @@
                             </materialDesign:PackIcon>
                         </Button>
                     </StackPanel>
-
-                    <!-- PANEL OPENINGS & ENDINGS (AnimeThemes.moe) -->
-                    <Border Style="{StaticResource AppCard}" CornerRadius="12" Padding="16,12" Margin="0,0,0,12"
-                            Visibility="{Binding MostrandoPanelMusica, Converter={StaticResource BoolToVis}}">
-                        <StackPanel>
-                            <Grid Margin="0,0,0,10">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0">
-                                    <TextBlock Text="{Binding [Det_MusicaPanelTitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontWeight="Bold" FontSize="14" Foreground="White"/>
-                                    <TextBlock Text="{Binding [Det_MusicaPanelSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="11" Foreground="#94A3B8" TextWrapping="Wrap" Margin="0,2,0,0"/>
-                                </StackPanel>
-                                <!-- Volumen de la música (dura toda la sesión) -->
-                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top" Margin="8,4,8,0">
-                                    <materialDesign:PackIcon Kind="VolumeHigh" Width="16" Height="16" Foreground="#94A3B8" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                    <Slider Minimum="0" Maximum="1" Value="{Binding VolumenMusica, Mode=TwoWay}" Width="90" VerticalAlignment="Center"
-                                            IsMoveToPointEnabled="True" SmallChange="0.05" LargeChange="0.2" Foreground="#C084FC"
-                                            ToolTip="{Binding [Det_MusicaVolumen], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                            AutomationProperties.Name="{Binding [Det_MusicaVolumen], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
-                                </StackPanel>
-                                <!-- Reproducción continua: al terminar un tema pasa al siguiente que se pueda escuchar -->
-                                <Button Grid.Column="2" Command="{Binding AlternarReproduccionContinuaMusicaCommand}" Style="{StaticResource MaterialDesignToolButton}"
-                                        Width="28" Height="28" VerticalAlignment="Top" Cursor="Hand"
-                                        ToolTip="{Binding [Det_MusicaContinuaTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                        AutomationProperties.Name="{Binding [Det_MusicaContinua], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
-                                    <materialDesign:PackIcon Kind="PlaylistPlay" Width="18" Height="18">
-                                        <materialDesign:PackIcon.Style>
-                                            <Style TargetType="materialDesign:PackIcon">
-                                                <Setter Property="Foreground" Value="#64748B"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding ReproduccionContinuaMusica}" Value="True">
-                                                        <Setter Property="Foreground" Value="#C084FC"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </materialDesign:PackIcon.Style>
-                                    </materialDesign:PackIcon>
-                                </Button>
-                                <Button Grid.Column="3" Command="{Binding ToggleMusicaCommand}" Style="{StaticResource MaterialDesignToolButton}" Width="28" Height="28" VerticalAlignment="Top"
-                                        AutomationProperties.Name="{Binding [Det_MusicaCerrarPanel], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
-                                    <materialDesign:PackIcon Kind="Close" Width="16" Height="16" Foreground="#94A3B8"/>
-                                </Button>
-                            </Grid>
-
-                            <ItemsControl ItemsSource="{Binding TemasMusicales}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Border Background="#161B22" BorderBrush="#262D38" BorderThickness="1" CornerRadius="8" Padding="10,8" Margin="0,0,0,6">
-                                            <Grid>
-                                                <Grid.RowDefinitions>
-                                                    <RowDefinition Height="Auto"/>
-                                                    <RowDefinition Height="Auto"/>
-                                                </Grid.RowDefinitions>
-
-                                                <Grid Grid.Row="0">
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="Auto"/>
-                                                        <ColumnDefinition Width="*"/>
-                                                        <ColumnDefinition Width="Auto"/>
-                                                        <ColumnDefinition Width="Auto"/>
-                                                    </Grid.ColumnDefinitions>
-
-                                                    <Border Grid.Column="0" Background="#2D1B4E" CornerRadius="6" Padding="6,3" Margin="0,0,10,0" VerticalAlignment="Center">
-                                                        <TextBlock Text="{Binding Slug}" FontSize="10" FontWeight="Bold" Foreground="#C084FC"/>
-                                                    </Border>
-
-                                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                        <TextBlock Text="{Binding TituloCancion}" FontWeight="SemiBold" FontSize="12.5" Foreground="White" TextTrimming="CharacterEllipsis"/>
-                                                        <StackPanel Orientation="Horizontal">
-                                                            <TextBlock Text="{Binding Artistas}" FontSize="11" Foreground="#9CA3AF" TextTrimming="CharacterEllipsis" MaxWidth="260"/>
-                                                            <!-- Solo escuchable: aún no está guardado en la carpeta de música -->
-                                                            <Border Background="#29F59E0B" CornerRadius="6" Padding="6,1" Margin="8,0,0,0" VerticalAlignment="Center"
-                                                                    Visibility="{Binding EsSoloVistaPrevia, Converter={StaticResource BoolToVis}}">
-                                                                <TextBlock Text="{Binding [Det_MusicaEsVistaPrevia], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                                                           FontSize="10" FontWeight="SemiBold" Foreground="#F59E0B"/>
-                                                            </Border>
-                                                        </StackPanel>
-                                                    </StackPanel>
-
-                                                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,10,0">
-                                                        <!-- Duración del archivo, leída antes de reproducirlo (solo si ya hay archivo: guardado o vista previa) -->
-                                                        <StackPanel Orientation="Horizontal" Margin="0,0,10,0" VerticalAlignment="Center"
-                                                                    Visibility="{Binding TieneDuracionArchivo, Converter={StaticResource BoolToVis}}"
-                                                                    ToolTip="{Binding [Det_MusicaDuracion], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                                                    AutomationProperties.Name="{Binding DuracionArchivoTexto}">
-                                                            <materialDesign:PackIcon Kind="ClockOutline" Width="12" Height="12" Foreground="#94A3B8" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                                                            <TextBlock Text="{Binding DuracionArchivoTexto}" FontSize="10.5" Foreground="#94A3B8" VerticalAlignment="Center"/>
-                                                        </StackPanel>
-                                                        <TextBlock Text="{Binding RangoTexto}" FontSize="10.5" Foreground="#94A3B8" VerticalAlignment="Center"/>
-                                                    </StackPanel>
-
-                                                    <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
-
-                                                        <!-- Escuchar antes de descargar -->
-                                                        <Button Command="{Binding DataContext.PrevisualizarTemaCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}"
-                                                                Style="{StaticResource MaterialDesignToolButton}" Width="30" Height="30" Cursor="Hand"
-                                                                Visibility="{Binding PuedePrevisualizar, Converter={StaticResource BoolToVis}}"
-                                                                ToolTip="{Binding [Det_MusicaPrevisualizar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                                                AutomationProperties.Name="{Binding [Det_MusicaPrevisualizar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
-                                                            <materialDesign:PackIcon Kind="Headphones" Width="18" Height="18" Foreground="#C084FC"/>
-                                                        </Button>
-
-                                                        <!-- Preparando la vista previa: avance real -->
-                                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,4,0"
-                                                                    Visibility="{Binding PreparandoVistaPrevia, Converter={StaticResource BoolToVis}}"
-                                                                    AutomationProperties.Name="{Binding [Det_MusicaPreparando], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                                                    ToolTip="{Binding [Det_MusicaPreparando], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
-                                                            <TextBlock Text="{Binding ProgresoPreparacionPorcentaje, StringFormat={}{0:0} %}" FontSize="10.5" Foreground="#94A3B8" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                                            <ProgressBar Style="{StaticResource MaterialDesignCircularProgressBar}" Minimum="0" Maximum="100"
-                                                                         Value="{Binding ProgresoPreparacionPorcentaje, Mode=OneWay}" Width="18" Height="18" Foreground="#C084FC"/>
-                                                        </StackPanel>
-
-                                                        <!-- Guardar (si hay vista previa) / descargar mp3 -->
-                                                        <Button Command="{Binding DataContext.DescargarTemaCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}"
-                                                                Width="30" Height="30" Cursor="Hand"
-                                                                Visibility="{Binding Descargado, Converter={StaticResource InverseBoolToVis}}">
-                                                            <Button.Style>
-                                                                <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignToolButton}">
-                                                                    <Setter Property="ToolTip" Value="{Binding [Det_MusicaDescargar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
-                                                                    <Setter Property="AutomationProperties.Name" Value="{Binding [Det_MusicaDescargar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
-                                                                    <Style.Triggers>
-                                                                        <DataTrigger Binding="{Binding EsSoloVistaPrevia}" Value="True">
-                                                                            <Setter Property="ToolTip" Value="{Binding [Det_MusicaGuardar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
-                                                                            <Setter Property="AutomationProperties.Name" Value="{Binding [Det_MusicaGuardar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
-                                                                        </DataTrigger>
-                                                                    </Style.Triggers>
-                                                                </Style>
-                                                            </Button.Style>
-                                                            <Grid>
-                                                                <materialDesign:PackIcon Width="18" Height="18" Foreground="#60A5FA"
-                                                                                          Visibility="{Binding Descargando, Converter={StaticResource InverseBoolToVis}}">
-                                                                    <materialDesign:PackIcon.Style>
-                                                                        <Style TargetType="materialDesign:PackIcon">
-                                                                            <Setter Property="Kind" Value="DownloadOutline"/>
-                                                                            <Style.Triggers>
-                                                                                <DataTrigger Binding="{Binding EsSoloVistaPrevia}" Value="True">
-                                                                                    <Setter Property="Kind" Value="ContentSaveOutline"/>
-                                                                                </DataTrigger>
-                                                                            </Style.Triggers>
-                                                                        </Style>
-                                                                    </materialDesign:PackIcon.Style>
-                                                                </materialDesign:PackIcon>
-                                                                <ProgressBar Style="{StaticResource MaterialDesignCircularProgressBar}" Minimum="0" Maximum="100"
-                                                                             Value="{Binding ProgresoDescargaPorcentaje, Mode=OneWay}" Width="18" Height="18" Foreground="#60A5FA"
-                                                                             Visibility="{Binding Descargando, Converter={StaticResource BoolToVis}}"/>
-                                                            </Grid>
-                                                        </Button>
-
-                                                        <!-- Play / pausa (reanuda donde se dejó) -->
-                                                        <Button Command="{Binding DataContext.ReproducirTemaCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}"
-                                                                Width="30" Height="30" Cursor="Hand"
-                                                                Visibility="{Binding PuedeReproducir, Converter={StaticResource BoolToVis}}">
-                                                            <Button.Style>
-                                                                <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignToolButton}">
-                                                                    <Setter Property="ToolTip" Value="{Binding [Det_MusicaReproducir], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
-                                                                    <Setter Property="AutomationProperties.Name" Value="{Binding [Det_MusicaReproducir], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
-                                                                    <Style.Triggers>
-                                                                        <DataTrigger Binding="{Binding Reproduciendo}" Value="True">
-                                                                            <Setter Property="ToolTip" Value="{Binding [Det_MusicaPausar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
-                                                                            <Setter Property="AutomationProperties.Name" Value="{Binding [Det_MusicaPausar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
-                                                                        </DataTrigger>
-                                                                    </Style.Triggers>
-                                                                </Style>
-                                                            </Button.Style>
-                                                            <materialDesign:PackIcon Width="18" Height="18" Foreground="#4ADE80">
-                                                                <materialDesign:PackIcon.Style>
-                                                                    <Style TargetType="materialDesign:PackIcon">
-                                                                        <Setter Property="Kind" Value="PlayCircleOutline"/>
-                                                                        <Style.Triggers>
-                                                                            <DataTrigger Binding="{Binding Reproduciendo}" Value="True">
-                                                                                <Setter Property="Kind" Value="PauseCircleOutline"/>
-                                                                            </DataTrigger>
-                                                                        </Style.Triggers>
-                                                                    </Style>
-                                                                </materialDesign:PackIcon.Style>
-                                                            </materialDesign:PackIcon>
-                                                        </Button>
-
-                                                        <Button Command="{Binding DataContext.EliminarTemaCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}"
-                                                                Style="{StaticResource MaterialDesignToolButton}" Width="30" Height="30" Cursor="Hand"
-                                                                Visibility="{Binding Descargado, Converter={StaticResource BoolToVis}}"
-                                                                ToolTip="{Binding [Det_MusicaEliminar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                                                AutomationProperties.Name="{Binding [Det_MusicaEliminar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
-                                                            <materialDesign:PackIcon Kind="TrashCanOutline" Width="16" Height="16" Foreground="#F87171"/>
-                                                        </Button>
-                                                    </StackPanel>
-                                                </Grid>
-
-                                                <!-- Barra para moverse por el audio (solo en la pista cargada) -->
-                                                <Grid Grid.Row="1" Margin="0,6,0,0" Visibility="{Binding EsPistaActual, Converter={StaticResource BoolToVis}}">
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="Auto"/>
-                                                        <ColumnDefinition Width="*"/>
-                                                        <ColumnDefinition Width="Auto"/>
-                                                    </Grid.ColumnDefinitions>
-                                                    <TextBlock Grid.Column="0" Text="{Binding PosicionTexto}" FontSize="10.5" Foreground="#94A3B8" VerticalAlignment="Center" MinWidth="34"/>
-                                                    <Slider Grid.Column="1" Minimum="0" Maximum="{Binding DuracionSegundos}" Value="{Binding PosicionSegundos, Mode=OneWay}"
-                                                            IsMoveToPointEnabled="True" Foreground="#C084FC" Margin="6,0" VerticalAlignment="Center"
-                                                            SmallChange="2" LargeChange="10"
-                                                            ValueChanged="BarraTema_ValueChanged"
-                                                            Thumb.DragStarted="BarraTema_DragStarted" Thumb.DragCompleted="BarraTema_DragCompleted"
-                                                            AutomationProperties.Name="{Binding [Det_MusicaBarra], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
-                                                    <TextBlock Grid.Column="2" Text="{Binding DuracionTexto}" FontSize="10.5" Foreground="#94A3B8" VerticalAlignment="Center" MinWidth="34" TextAlignment="Right"/>
-                                                </Grid>
-                                            </Grid>
-                                        </Border>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </StackPanel>
-                    </Border>
 
                     <!-- DIVISOR ELEGANTE -->
                     <Border Height="1" Background="#262D38" Margin="0,4,0,12"/>
@@ -1807,6 +1642,283 @@
                         </Button>
                     </Grid>
                 </StackPanel>
+            </materialDesign:Card>
+        </Grid>
+
+        <!-- PARTE 3b: VENTANA FLOTANTE DE OPENINGS & ENDINGS (AnimeThemes.moe), como el editor de seguimiento: no empuja los episodios.
+             Clic fuera de la tarjeta o Escape la cierran; la música que suena sigue sonando (se controla al reabrirla). -->
+        <Grid x:Name="FondoMusica" Visibility="{Binding MostrandoPanelMusica, Converter={StaticResource BoolToVis}}"
+              Background="#99000000" Panel.ZIndex="95" MouseLeftButtonDown="FondoMusica_MouseLeftButtonDown">
+            <materialDesign:Card x:Name="PanelMusicaCard" Width="700" MaxWidth="900" Margin="28" VerticalAlignment="Center" HorizontalAlignment="Center"
+                                 UniformCornerRadius="16" Background="#1A1F26" BorderBrush="#2D3748" BorderThickness="1"
+                                 materialDesign:ElevationAssist.Elevation="Dp16" Padding="20,16" Focusable="True" FocusVisualStyle="{x:Null}">
+                <materialDesign:Card.InputBindings>
+                    <KeyBinding Key="Escape" Command="{Binding ToggleMusicaCommand}"/>
+                </materialDesign:Card.InputBindings>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+            <Grid Grid.Row="0" Margin="0,0,0,10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="{Binding [Det_MusicaPanelTitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontWeight="Bold" FontSize="14" Foreground="White"/>
+                    <TextBlock Text="{Binding [Det_MusicaPanelSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="11" Foreground="#94A3B8" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                    <!-- Enlaces externos (AniPlaylist: Spotify, Apple Music y Deezer); cada fuente es un proveedor registrado en DI -->
+                    <ItemsControl ItemsSource="{Binding EnlacesMusica}" Margin="0,8,0,0" Focusable="False">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Button Command="{Binding DataContext.AbrirEnlaceMusicaCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}" Style="{StaticResource DetChipButton}" Margin="0,0,8,0" Cursor="Hand"
+                                        ToolTip="{Binding Descripcion}">
+                                    <AutomationProperties.Name>
+                                        <MultiBinding StringFormat="{}{0} {1}">
+                                            <Binding Path="[Det_MusicaVerEn]" Source="{x:Static loc:LocalizationService.Instance}" Mode="OneWay"/>
+                                            <Binding Path="Nombre" Mode="OneWay"/>
+                                        </MultiBinding>
+                                    </AutomationProperties.Name>
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <materialDesign:PackIcon Kind="OpenInNew" Width="13" Height="13" Foreground="#C084FC" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                        <TextBlock FontSize="11" Foreground="#D8B4FE" FontWeight="SemiBold" VerticalAlignment="Center">
+                                            <Run Text="{Binding [Det_MusicaVerEn], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                            <Run Text="{Binding Nombre, Mode=OneWay}"/>
+                                        </TextBlock>
+                                    </StackPanel>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+                <!-- Volumen de la música (dura toda la sesión) -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top" Margin="8,4,8,0">
+                    <materialDesign:PackIcon Kind="VolumeHigh" Width="16" Height="16" Foreground="#94A3B8" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <Slider Style="{StaticResource MusicaSlider}" Minimum="0" Maximum="1" Value="{Binding VolumenMusica, Mode=TwoWay}" Width="90" VerticalAlignment="Center"
+                            SmallChange="0.05" LargeChange="0.2" Foreground="#C084FC"
+                            ToolTip="{Binding [Det_MusicaVolumen], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                            AutomationProperties.Name="{Binding [Det_MusicaVolumen], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                </StackPanel>
+                <!-- Reproducción continua: al terminar un tema pasa al siguiente que se pueda escuchar -->
+                <Button Grid.Column="2" Command="{Binding AlternarReproduccionContinuaMusicaCommand}" Style="{StaticResource MaterialDesignToolButton}"
+                        Width="28" Height="28" VerticalAlignment="Top" Cursor="Hand"
+                        ToolTip="{Binding [Det_MusicaContinuaTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                        AutomationProperties.Name="{Binding [Det_MusicaContinua], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                    <materialDesign:PackIcon Kind="PlaylistPlay" Width="18" Height="18">
+                        <materialDesign:PackIcon.Style>
+                            <Style TargetType="materialDesign:PackIcon">
+                                <Setter Property="Foreground" Value="#64748B"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ReproduccionContinuaMusica}" Value="True">
+                                        <Setter Property="Foreground" Value="#C084FC"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </materialDesign:PackIcon.Style>
+                    </materialDesign:PackIcon>
+                </Button>
+                <Button Grid.Column="3" Command="{Binding ToggleMusicaCommand}" Style="{StaticResource MaterialDesignToolButton}" Width="28" Height="28" VerticalAlignment="Top"
+                        AutomationProperties.Name="{Binding [Det_MusicaCerrarPanel], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                    <materialDesign:PackIcon Kind="Close" Width="16" Height="16" Foreground="#94A3B8"/>
+                </Button>
+            </Grid>
+
+
+                    <!-- Filtro Todos/Openings/Endings: solo aparece si hay de los dos tipos (con muchos temas, como One Piece,
+                         separar cuáles son openings y cuáles endings evita una lista larga difícil de recorrer). -->
+                    <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,10"
+                                Visibility="{Binding MostrarFiltroTemasMusicales, Converter={StaticResource BoolToVis}}">
+                        <RadioButton Content="{Binding [Filtro_Todos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Margin="0,0,6,0"
+                                     IsChecked="{Binding EsFiltroTemasTodos, Mode=OneWay}" GroupName="FiltroTemasMusicales"
+                                     Command="{Binding CambiarFiltroTemasCommand}" CommandParameter="Todos"
+                                     Style="{StaticResource MaterialDesignTabRadioButton}" Height="28" Padding="12,0" FontSize="11.5" FontWeight="SemiBold"/>
+                        <RadioButton Content="{Binding [Det_MusicaFiltroOpenings], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Margin="0,0,6,0"
+                                     IsChecked="{Binding EsFiltroTemasOpenings, Mode=OneWay}" GroupName="FiltroTemasMusicales"
+                                     Command="{Binding CambiarFiltroTemasCommand}" CommandParameter="Openings"
+                                     Style="{StaticResource MaterialDesignTabRadioButton}" Height="28" Padding="12,0" FontSize="11.5" FontWeight="SemiBold"/>
+                        <RadioButton Content="{Binding [Det_MusicaFiltroEndings], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                     IsChecked="{Binding EsFiltroTemasEndings, Mode=OneWay}" GroupName="FiltroTemasMusicales"
+                                     Command="{Binding CambiarFiltroTemasCommand}" CommandParameter="Endings"
+                                     Style="{StaticResource MaterialDesignTabRadioButton}" Height="28" Padding="12,0" FontSize="11.5" FontWeight="SemiBold"/>
+                    </StackPanel>
+
+                    <!-- La lista se desplaza dentro de la tarjeta si hay muchos temas -->
+                    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,6,0">
+                <ItemsControl ItemsSource="{Binding TemasMusicalesVisibles}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Background="#161B22" BorderBrush="#262D38" BorderThickness="1" CornerRadius="8" Padding="10,8" Margin="0,0,0,6">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <Grid Grid.Row="0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <Border Grid.Column="0" Background="#2D1B4E" CornerRadius="6" Padding="6,3" Margin="0,0,10,0" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Slug}" FontSize="10" FontWeight="Bold" Foreground="#C084FC"/>
+                                        </Border>
+
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding TituloCancion}" FontWeight="SemiBold" FontSize="12.5" Foreground="White" TextTrimming="CharacterEllipsis"/>
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="{Binding Artistas}" FontSize="11" Foreground="#9CA3AF" TextTrimming="CharacterEllipsis" MaxWidth="260"/>
+                                                <!-- Solo escuchable: aún no está guardado en la carpeta de música -->
+                                                <Border Background="#29F59E0B" CornerRadius="6" Padding="6,1" Margin="8,0,0,0" VerticalAlignment="Center"
+                                                        Visibility="{Binding EsSoloVistaPrevia, Converter={StaticResource BoolToVis}}">
+                                                    <TextBlock Text="{Binding [Det_MusicaEsVistaPrevia], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                               FontSize="10" FontWeight="SemiBold" Foreground="#F59E0B"/>
+                                                </Border>
+                                            </StackPanel>
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,10,0">
+                                            <!-- Duración del archivo, leída antes de reproducirlo (solo si ya hay archivo: guardado o vista previa) -->
+                                            <StackPanel Orientation="Horizontal" Margin="0,0,10,0" VerticalAlignment="Center"
+                                                        Visibility="{Binding TieneDuracionArchivo, Converter={StaticResource BoolToVis}}"
+                                                        ToolTip="{Binding [Det_MusicaDuracion], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                        AutomationProperties.Name="{Binding DuracionArchivoTexto}">
+                                                <materialDesign:PackIcon Kind="ClockOutline" Width="12" Height="12" Foreground="#94A3B8" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                                <TextBlock Text="{Binding DuracionArchivoTexto}" FontSize="10.5" Foreground="#94A3B8" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                            <TextBlock Text="{Binding RangoTexto}" FontSize="10.5" Foreground="#94A3B8" VerticalAlignment="Center"/>
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+
+                                            <!-- Escuchar antes de descargar -->
+                                            <Button Command="{Binding DataContext.PrevisualizarTemaCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}"
+                                                    Style="{StaticResource MaterialDesignToolButton}" Width="30" Height="30" Cursor="Hand"
+                                                    Visibility="{Binding PuedePrevisualizar, Converter={StaticResource BoolToVis}}"
+                                                    ToolTip="{Binding [Det_MusicaPrevisualizar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                    AutomationProperties.Name="{Binding [Det_MusicaPrevisualizar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                                <materialDesign:PackIcon Kind="Headphones" Width="18" Height="18" Foreground="#C084FC"/>
+                                            </Button>
+
+                                            <!-- Preparando la vista previa: avance real -->
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,4,0"
+                                                        Visibility="{Binding PreparandoVistaPrevia, Converter={StaticResource BoolToVis}}"
+                                                        AutomationProperties.Name="{Binding [Det_MusicaPreparando], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                        ToolTip="{Binding [Det_MusicaPreparando], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                                <TextBlock Text="{Binding ProgresoPreparacionPorcentaje, StringFormat={}{0:0} %}" FontSize="10.5" Foreground="#94A3B8" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                                <ProgressBar Style="{StaticResource MaterialDesignCircularProgressBar}" Minimum="0" Maximum="100"
+                                                             Value="{Binding ProgresoPreparacionPorcentaje, Mode=OneWay}" Width="18" Height="18" Foreground="#C084FC"/>
+                                            </StackPanel>
+
+                                            <!-- Guardar (si hay vista previa) / descargar mp3 -->
+                                            <Button Command="{Binding DataContext.DescargarTemaCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}"
+                                                    Width="30" Height="30" Cursor="Hand"
+                                                    Visibility="{Binding Descargado, Converter={StaticResource InverseBoolToVis}}">
+                                                <Button.Style>
+                                                    <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignToolButton}">
+                                                        <Setter Property="ToolTip" Value="{Binding [Det_MusicaDescargar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                                        <Setter Property="AutomationProperties.Name" Value="{Binding [Det_MusicaDescargar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding EsSoloVistaPrevia}" Value="True">
+                                                                <Setter Property="ToolTip" Value="{Binding [Det_MusicaGuardar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                                                <Setter Property="AutomationProperties.Name" Value="{Binding [Det_MusicaGuardar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
+                                                <Grid>
+                                                    <materialDesign:PackIcon Width="18" Height="18" Foreground="#60A5FA"
+                                                                              Visibility="{Binding Descargando, Converter={StaticResource InverseBoolToVis}}">
+                                                        <materialDesign:PackIcon.Style>
+                                                            <Style TargetType="materialDesign:PackIcon">
+                                                                <Setter Property="Kind" Value="DownloadOutline"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding EsSoloVistaPrevia}" Value="True">
+                                                                        <Setter Property="Kind" Value="ContentSaveOutline"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </materialDesign:PackIcon.Style>
+                                                    </materialDesign:PackIcon>
+                                                    <ProgressBar Style="{StaticResource MaterialDesignCircularProgressBar}" Minimum="0" Maximum="100"
+                                                                 Value="{Binding ProgresoDescargaPorcentaje, Mode=OneWay}" Width="18" Height="18" Foreground="#60A5FA"
+                                                                 Visibility="{Binding Descargando, Converter={StaticResource BoolToVis}}"/>
+                                                </Grid>
+                                            </Button>
+
+                                            <!-- Play / pausa (reanuda donde se dejó) -->
+                                            <Button Command="{Binding DataContext.ReproducirTemaCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}"
+                                                    Width="30" Height="30" Cursor="Hand"
+                                                    Visibility="{Binding PuedeReproducir, Converter={StaticResource BoolToVis}}">
+                                                <Button.Style>
+                                                    <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignToolButton}">
+                                                        <Setter Property="ToolTip" Value="{Binding [Det_MusicaReproducir], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                                        <Setter Property="AutomationProperties.Name" Value="{Binding [Det_MusicaReproducir], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Reproduciendo}" Value="True">
+                                                                <Setter Property="ToolTip" Value="{Binding [Det_MusicaPausar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                                                <Setter Property="AutomationProperties.Name" Value="{Binding [Det_MusicaPausar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
+                                                <materialDesign:PackIcon Width="18" Height="18" Foreground="#4ADE80">
+                                                    <materialDesign:PackIcon.Style>
+                                                        <Style TargetType="materialDesign:PackIcon">
+                                                            <Setter Property="Kind" Value="PlayCircleOutline"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding Reproduciendo}" Value="True">
+                                                                    <Setter Property="Kind" Value="PauseCircleOutline"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </materialDesign:PackIcon.Style>
+                                                </materialDesign:PackIcon>
+                                            </Button>
+
+                                            <Button Command="{Binding DataContext.EliminarTemaCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}"
+                                                    Style="{StaticResource MaterialDesignToolButton}" Width="30" Height="30" Cursor="Hand"
+                                                    Visibility="{Binding Descargado, Converter={StaticResource BoolToVis}}"
+                                                    ToolTip="{Binding [Det_MusicaEliminar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                    AutomationProperties.Name="{Binding [Det_MusicaEliminar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                                <materialDesign:PackIcon Kind="TrashCanOutline" Width="16" Height="16" Foreground="#F87171"/>
+                                            </Button>
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <!-- Barra para moverse por el audio (solo en la pista cargada) -->
+                                    <Grid Grid.Row="1" Margin="0,6,0,0" Visibility="{Binding EsPistaActual, Converter={StaticResource BoolToVis}}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{Binding PosicionTexto}" FontSize="10.5" Foreground="#94A3B8" VerticalAlignment="Center" MinWidth="34"/>
+                                        <Slider Style="{StaticResource MusicaSlider}" Grid.Column="1" Minimum="0" Maximum="{Binding DuracionSegundos}" Value="{Binding PosicionSegundos, Mode=OneWay}"
+                                                Foreground="#C084FC" Margin="6,0" VerticalAlignment="Center"
+                                                SmallChange="2" LargeChange="10"
+                                                ValueChanged="BarraTema_ValueChanged"
+                                                Thumb.DragStarted="BarraTema_DragStarted" Thumb.DragCompleted="BarraTema_DragCompleted"
+                                                AutomationProperties.Name="{Binding [Det_MusicaBarra], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                        <TextBlock Grid.Column="2" Text="{Binding DuracionTexto}" FontSize="10.5" Foreground="#94A3B8" VerticalAlignment="Center" MinWidth="34" TextAlignment="Right"/>
+                                    </Grid>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                    </ScrollViewer>
+                </Grid>
             </materialDesign:Card>
         </Grid>
 

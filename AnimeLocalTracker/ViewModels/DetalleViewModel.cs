@@ -11,6 +11,7 @@ using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using AnimeLocalTracker.Models;
 using AnimeLocalTracker.Services;
+using AnimeLocalTracker.Services.EnlacesMusica;
 using AnimeLocalTracker.Services.Native;
 using AnimeLocalTracker.Services.Python;
 using AnimeLocalTracker.Messages;
@@ -186,8 +187,10 @@ public partial class DetalleViewModel : ObservableObject,
         IAudioDurationService? audioDuration = null,
         INyaaSourceService? nyaaSourceService = null,
         ISelectorTorrentService? selectorTorrentService = null,
-        ISettingsService? settingsService = null)
+        ISettingsService? settingsService = null,
+        IEnlacesMusicaService? enlacesMusica = null)
     {
+        _enlacesMusica = enlacesMusica;
         _proximaEmision = proximaEmision;
         _datosExtra = datosExtra;
         _monitorEmision = monitorEmision;
@@ -408,13 +411,10 @@ public partial class DetalleViewModel : ObservableObject,
             encontrados = await _fileScannerService.EscanearEpisodiosAsync(anime.RutaCarpeta);
         }
 
-        int maxEpisodio = 0;
-        if (encontrados.Count > 0)
-            maxEpisodio = encontrados.Max(e => e.NumeroEpisodio);
-        if (anime.TotalEpisodios > maxEpisodio)
-            maxEpisodio = anime.TotalEpisodios;
-        if (anime.EpisodiosVistos > maxEpisodio)
-            maxEpisodio = anime.EpisodiosVistos;
+        // El total oficial de AniList manda cuando se conoce, con un pequeño margen para no ocultar un preestreno o una
+        // filtración real (ver CalcularMaxEpisodio); un archivo local con un número muy por encima de eso
+        // ("Episodio 3000.mp4") no debe inflar la lista sin sentido.
+        int maxEpisodio = Core.EpisodiosOrganizador.CalcularMaxEpisodio(anime.TotalEpisodios, encontrados, anime.EpisodiosVistos);
 
         // Límite de seguridad para prevenir asignaciones anómalas de memoria (máx 3000)
         const int LimiteSeguridadEpisodios = 3000;
@@ -507,6 +507,7 @@ public partial class DetalleViewModel : ObservableObject,
         _ = CalcularEspacioEnDiscoAsync(ctFicha);
         _ = CargarDatosExtraAsync(ctFicha);
         _ = CargarPreferenciasEmisionAsync(ctFicha);
+        CargarEnlacesMusica(anime);
         _ = CargarTemasMusicalesAsync(ctFicha);
     }
 

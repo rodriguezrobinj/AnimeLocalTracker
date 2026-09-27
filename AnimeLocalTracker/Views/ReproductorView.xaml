@@ -32,7 +32,7 @@
             </Setter>
         </Style>
 
-        <!-- Estilo para la parte reproducida (Blanco sólido conectado sin fisuras con el centro del Thumb) -->
+        <!-- Parte reproducida: solo captura el clic. La línea blanca (con sus tramos de color) la dibuja MarcadoresLineaTiempo. -->
         <Style x:Key="TimelinePlayedRepeatButtonStyle" TargetType="{x:Type RepeatButton}">
             <Setter Property="OverridesDefaultStyle" Value="true" />
             <Setter Property="IsTabStop" Value="false" />
@@ -40,15 +40,7 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="{x:Type RepeatButton}">
-                        <Border x:Name="PlayedTrackBorder" Height="3" CornerRadius="1.5,0,0,1.5"
-                                Margin="0,0,-10,0"
-                                Background="White" VerticalAlignment="Center" />
-                        <ControlTemplate.Triggers>
-                            <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Slider}}" Value="True">
-                                <Setter TargetName="PlayedTrackBorder" Property="Height" Value="5" />
-                                <Setter TargetName="PlayedTrackBorder" Property="CornerRadius" Value="2.5,0,0,2.5" />
-                            </DataTrigger>
-                        </ControlTemplate.Triggers>
+                        <Rectangle Fill="Transparent" />
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
@@ -82,7 +74,7 @@
                         <Grid Width="20" Height="20" Background="Transparent">
                             <Ellipse x:Name="ThumbEllipse"
                                      Width="10" Height="10"
-                                     Fill="White"
+                                     Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type Slider}}}"
                                      HorizontalAlignment="Center"
                                      VerticalAlignment="Center"
                                      RenderTransformOrigin="0.5,0.5">
@@ -142,6 +134,7 @@
             <Setter Property="FocusVisualStyle" Value="{StaticResource PlayerFocusVisual}" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Height" Value="24" />
+            <Setter Property="Foreground" Value="White" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="{x:Type Slider}">
@@ -149,6 +142,14 @@
                             <!-- Pista de fondo translúcida (tiempo no reproducido) -->
                             <Border x:Name="BackgroundTrack" Height="3" CornerRadius="1.5"
                                     Background="#55FFFFFF" VerticalAlignment="Center" />
+
+                            <!-- La línea de progreso: parte reproducida en blanco y tramos de opening / ending / resumen en color (la parte
+                                 reproducida de un tramo y la bolita toman su color). Crece con el cursor igual que la pista de fondo. -->
+                            <ctl:MarcadoresLineaTiempo x:Name="Marcadores"
+                                                       Segmentos="{Binding SegmentosLineaTiempo}"
+                                                       Duracion="{Binding Maximum, RelativeSource={RelativeSource TemplatedParent}}"
+                                                       Valor="{Binding Value, RelativeSource={RelativeSource TemplatedParent}}"
+                                                       Height="20" VerticalAlignment="Center" />
 
                             <!-- Track con el botón izquierdo que representa el progreso reproducido en blanco -->
                             <Track x:Name="PART_Track">
@@ -170,6 +171,7 @@
                                     <BeginStoryboard>
                                         <Storyboard>
                                             <DoubleAnimation Storyboard.TargetName="BackgroundTrack" Storyboard.TargetProperty="Height" To="5" Duration="0:0:0.12"/>
+                                            <DoubleAnimation Storyboard.TargetName="Marcadores" Storyboard.TargetProperty="Grosor" To="5" Duration="0:0:0.12"/>
                                         </Storyboard>
                                     </BeginStoryboard>
                                 </Trigger.EnterActions>
@@ -177,6 +179,7 @@
                                     <BeginStoryboard>
                                         <Storyboard>
                                             <DoubleAnimation Storyboard.TargetName="BackgroundTrack" Storyboard.TargetProperty="Height" To="3" Duration="0:0:0.12"/>
+                                            <DoubleAnimation Storyboard.TargetName="Marcadores" Storyboard.TargetProperty="Grosor" To="3" Duration="0:0:0.12"/>
                                         </Storyboard>
                                     </BeginStoryboard>
                                 </Trigger.ExitActions>
@@ -240,12 +243,17 @@
             <Grid>
                 <!-- Bindings vía ElementName: FlyleafHost sobrescribe el DataContext de su contenido -->
 
-                <!-- Subtítulos. Un solo elemento (SubtitleTextView) que dibuja el texto con el estilo elegido en
+                <!-- Subtítulos. Dos elementos (SubtitleTextView) que dibujan el texto con el estilo elegido en
                      Configuración → Reproducción (tipografía, tamaño, color, contorno, caja).
-                     Está en la raíz del contenido del FlyleafHost (no se desvanece con los controles), así que
+                     Están en la raíz del contenido del FlyleafHost (no se desvanecen con los controles), así que
                      su texto y su estilo los empuja el code-behind (EnlazarSubtitulos), no un Binding: en esa raíz
                      los bindings se quedan congelados y los subtítulos nunca aparecían (ver memoria del proyecto).
-                     MaxHeight amplio: con letra grande y dos líneas el bloque supera los 150 px y se encogía. -->
+                     MaxHeight amplio: con letra grande y dos líneas el bloque supera los 150 px y se encogía.
+                     La de abajo es la de siempre; la de arriba solo se llena cuando dos líneas se solapan en el
+                     tiempo (dos personajes hablando a la vez) — así ninguna tapa a la otra. -->
+                <Viewbox VerticalAlignment="Top" Margin="40,25,40,40" StretchDirection="DownOnly" MaxHeight="320" IsHitTestVisible="False">
+                    <ctl:SubtitleTextView x:Name="SubtitulosVistaArriba" MaxWidth="1200"/>
+                </Viewbox>
                 <Viewbox VerticalAlignment="Bottom" Margin="40,40,40,25" StretchDirection="DownOnly" MaxHeight="320" IsHitTestVisible="False">
                     <ctl:SubtitleTextView x:Name="SubtitulosVista" MaxWidth="1200"/>
                 </Viewbox>

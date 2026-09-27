@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using AnimeLocalTracker.Models;
 using AnimeLocalTracker.Services;
+using AnimeLocalTracker.Services.EnlacesMusica;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -25,6 +26,7 @@ public partial class DetalleViewModel
     private readonly IAnimeThemesDownloadService? _animeThemesDownload;
     private readonly IAudioTrackPlayer? _audioTrackPlayerInyectado;
     private readonly IAudioDurationService? _audioDuration;
+    private readonly IEnlacesMusicaService? _enlacesMusica;
     private ControlReproduccionTemas? _controlMusica;
     private CancellationTokenSource _ctsMusica = new();
     private CancellationTokenSource? _ctsGuardadoAjustesMusica;
@@ -40,8 +42,25 @@ public partial class DetalleViewModel
 
     public ObservableCollection<TemaAnimeItem> TemasMusicales { get; } = [];
 
+    /// <summary>Lo que realmente ve la lista: todos los temas, o solo openings/endings según <see cref="FiltroTemasMusicales"/>.
+    /// Un anime con muchos temas (One Piece: 34 openings + 39 endings) es difícil de recorrer en una sola lista larga.</summary>
+    public ObservableCollection<TemaAnimeItem> TemasMusicalesVisibles { get; } = [];
+
     [ObservableProperty] private bool _cargandoTemasMusicales;
     [ObservableProperty] private bool _mostrandoPanelMusica;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(EsFiltroTemasTodos))]
+    [NotifyPropertyChangedFor(nameof(EsFiltroTemasOpenings))]
+    [NotifyPropertyChangedFor(nameof(EsFiltroTemasEndings))]
+    private string _filtroTemasMusicales = "Todos";
+
+    public bool EsFiltroTemasTodos => FiltroTemasMusicales == "Todos";
+    public bool EsFiltroTemasOpenings => FiltroTemasMusicales == "Openings";
+    public bool EsFiltroTemasEndings => FiltroTemasMusicales == "Endings";
+
+    /// <summary>Los chips de filtro solo aportan si hay de los dos tipos: con uno solo no hay nada que distinguir.</summary>
+    public bool MostrarFiltroTemasMusicales => TemasMusicales.Any(t => t.Tipo == "OP") && TemasMusicales.Any(t => t.Tipo == "ED");
 
     /// <summary>Volumen de la música de la ficha, de 0 a 1.</summary>
     [ObservableProperty] private double _volumenMusica = _volumenMusicaSesion;
@@ -50,6 +69,36 @@ public partial class DetalleViewModel
     [ObservableProperty] private bool _reproduccionContinuaMusica = true;
 
     public bool TieneTemasMusicales => TemasMusicales.Count > 0;
+
+    /// <summary>Enlaces externos del anime (p. ej. AniPlaylist con Spotify, Apple Music y Deezer). Salen de los proveedores registrados.</summary>
+    public ObservableCollection<EnlaceMusicaItem> EnlacesMusica { get; } = [];
+
+    public bool TieneEnlacesMusica => EnlacesMusica.Count > 0;
+
+    private void CargarEnlacesMusica(AnimeItem anime)
+    {
+        EnlacesMusica.Clear();
+        if (_enlacesMusica != null)
+        {
+            foreach (var enlace in _enlacesMusica.ObtenerEnlaces(anime))
+                EnlacesMusica.Add(new EnlaceMusicaItem(enlace));
+        }
+        OnPropertyChanged(nameof(TieneEnlacesMusica));
+    }
+
+    [RelayCommand]
+    private void AbrirEnlaceMusica(EnlaceMusicaItem? item)
+    {
+        if (item == null || _enlacesMusica == null) return;
+
+        if (!_enlacesMusica.Abrir(item.Enlace))
+        {
+            _dialogService.MostrarToast(
+                LocalizationService.T("Det_MusicaEnlaceErrorTitulo"),
+                string.Format(LocalizationService.T("Det_MusicaEnlaceErrorMsjFormato"), item.Nombre),
+                "AlertCircleOutline", "#EF4444");
+        }
+    }
 
     /// <summary>Controlador de reproducción (se crea al primer uso: abrir una ficha no debe crear un reproductor).</summary>
     internal ControlReproduccionTemas ControlMusica => _controlMusica ??= CrearControlMusica();
@@ -159,6 +208,29 @@ public partial class DetalleViewModel
     [RelayCommand]
     private void AlternarReproduccionContinuaMusica() => ReproduccionContinuaMusica = !ReproduccionContinuaMusica;
 
+    [RelayCommand]
+    private void CambiarFiltroTemas(string filtro) => FiltroTemasMusicales = filtro;
+
+    partial void OnFiltroTemasMusicalesChanged(string value) => AplicarFiltroTemas();
+
+    /// <summary>Reconstruye <see cref="TemasMusicalesVisibles"/> a partir de <see cref="TemasMusicales"/> y el filtro actual.
+    /// La reproducción (continua, "siguiente que se pueda escuchar"…) sigue recorriendo TODOS los temas, filtrados o no:
+    /// el filtro es solo para mirar la lista, nunca cambia qué suena.</summary>
+    private void AplicarFiltroTemas()
+    {
+        TemasMusicalesVisibles.Clear();
+        foreach (var tema in TemasMusicales)
+        {
+            bool visible = FiltroTemasMusicales switch
+            {
+                "Openings" => tema.Tipo == "OP",
+                "Endings" => tema.Tipo == "ED",
+                _ => true
+            };
+            if (visible) TemasMusicalesVisibles.Add(tema);
+        }
+    }
+
     internal async Task CargarTemasMusicalesAsync(CancellationToken cancellationToken = default)
     {
         var servicio = _animeThemesService;
@@ -182,6 +254,8 @@ public partial class DetalleViewModel
                 TemasMusicales.Add(item);
             }
             OnPropertyChanged(nameof(TieneTemasMusicales));
+            OnPropertyChanged(nameof(MostrarFiltroTemasMusicales));
+            AplicarFiltroTemas();
             CargaDuracionesTarea = LeerDuracionesAsync(TemasMusicales.ToList(), anime.AniListId, _ctsMusica.Token);
         }
         catch (Exception ex)
@@ -408,8 +482,13 @@ public partial class DetalleViewModel
 
         _controlMusica?.Detener();
         TemasMusicales.Clear();
+        TemasMusicalesVisibles.Clear();
+        FiltroTemasMusicales = "Todos"; // el filtro de una ficha no debe seguir aplicado en la siguiente
+        EnlacesMusica.Clear();
+        OnPropertyChanged(nameof(TieneEnlacesMusica));
         MostrandoPanelMusica = false;
         OnPropertyChanged(nameof(TieneTemasMusicales));
+        OnPropertyChanged(nameof(MostrarFiltroTemasMusicales));
     }
 
     /// <summary>Corta el sonido sin tocar la lista (al salir de la ficha hacia otra pestaña).</summary>

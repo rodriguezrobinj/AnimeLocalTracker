@@ -50,6 +50,20 @@ public interface IDatabaseService
     Task<List<PartidaMinijuego>> ObtenerPartidasMinijuegoAsync();
     Task GuardarPartidaMinijuegoAsync(PartidaMinijuego partida);
 
+    // === SKIP: análisis guardado de cada episodio (dónde están su opening/ending/resumen) ===
+    Task<AnalisisSkipEpisodio?> ObtenerAnalisisSkipAsync(int animeId, int episodio);
+    Task<List<SegmentoSkipGuardado>> ObtenerSegmentosSkipAsync(int animeId, int episodio);
+    /// <summary>Guarda el análisis de un episodio con sus tramos, reemplazando el anterior de ese mismo episodio.</summary>
+    Task GuardarAnalisisSkipAsync(AnalisisSkipEpisodio analisis, IReadOnlyList<SegmentoSkipGuardado> segmentos);
+
+    // === PERSONAJES: copia local de los personajes de AniList por anime ("Adivina el personaje" sin conexión) ===
+    /// <summary>Personajes guardados de los animes indicados (ids de AniList).</summary>
+    Task<List<PersonajeAnime>> ObtenerPersonajesAsync(IReadOnlyCollection<int> animeIds);
+    /// <summary>Cuándo se consultaron a AniList los personajes de cada uno de los animes indicados (solo los ya consultados).</summary>
+    Task<List<PersonajesAnimeSync>> ObtenerMarcasPersonajesAsync(IReadOnlyCollection<int> animeIds);
+    /// <summary>Reemplaza los personajes de cada anime por los recibidos y anota la fecha de consulta (aunque no tenga ninguno).</summary>
+    Task GuardarPersonajesAsync(IReadOnlyDictionary<int, List<PersonajeAnime>> personajesPorAnime);
+
     // === PRÓXIMA EMISIÓN: copia local del próximo episodio de animes en emisión (cuenta atrás sin red) ===
     Task<ProximaEmisionLocal?> ObtenerProximaEmisionAsync(int aniListId);
     Task GuardarProximaEmisionAsync(ProximaEmisionLocal proxima);

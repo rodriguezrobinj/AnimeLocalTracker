@@ -8,6 +8,24 @@ Actions + Velopack); las notas curadas de cada release se mantienen aquí.
 ## [No publicado]
 
 ### Añadido
+- Subtítulos que se solapan en el tiempo (dos personajes hablando a la vez) ahora se ven los dos, uno arriba y otro
+  abajo del video, en vez de que uno tape al otro. La app extrae la pista completa de subtítulos (incrustada o en un
+  archivo aparte) al abrir el episodio y decide por su cuenta qué va arriba y qué abajo; si la pista no se puede leer
+  por algún motivo se sigue mostrando el subtítulo de siempre abajo, así nunca desaparecen por culpa de esta mejora.
+- Filtro Todos/Openings/Endings en la ventana de música de la Ficha: con animes de muchos temas (One Piece: 34 openings +
+  39 endings) evita una sola lista larguísima donde cuesta distinguir cuáles son openings y cuáles endings. Solo aparece
+  cuando el anime tiene de los dos tipos; el filtro es solo de vista, nunca cambia qué suena ni la reproducción continua.
+- La lista de capítulos de la Ficha ya no se queda atrás cuando otra pestaña (Actualizaciones) muestra un episodio recién
+  emitido: en cuanto la cuenta atrás del próximo episodio detecta que ya salió, se añade su fila (sin descargar) y se
+  actualiza el contador, sin tener que pulsar «Actualizar». Reutiliza el mismo dato que ya consulta la cuenta atrás, así
+  que no añade ninguna llamada nueva a AniList.
+- Marcadores de opening y ending en la barra de progreso del reproductor: franjas de color del mismo grosor que la barra (azul
+  para el opening, ámbar para el ending) que crecen igual al pasar el cursor; la parte ya reproducida y la bolita toman el color del
+  tramo en el que estás. Para ubicarlos la app usa primero el audio oficial de AnimeThemes: baja
+  sola el audio de los temas del anime (unos 3 MB cada uno, en una caché con tope de 400 MB) y lo busca dentro del episodio,
+  probando todos los temas y aceptando solo coincidencias claras. AniSkip queda como respaldo y solo se consulta si el audio no
+  encontró el opening o el ending. El resultado se guarda por episodio (migración v13): la segunda vez los marcadores y el botón
+  «Saltar intro» salen al instante y sin conexión. Los tramos aparecen en cuanto el audio los encuentra, sin esperar al resto.
 - Ficha del anime, tres mejoras:
   - **Espacio en disco:** una etiqueta con lo que ocupa el anime en tu equipo y, en el menú ⋯, «Liberar espacio», que
     borra (con confirmación) los archivos de los episodios que ya viste. Siguen marcados como vistos en el historial.
@@ -71,6 +89,17 @@ Actions + Velopack); las notas curadas de cada release se mantienen aquí.
   pantalla (Narrator).
 
 ### Corregido
+- La lista de capítulos de la Ficha podía quedarse atascada en el episodio anterior aunque ya hubiera salido uno nuevo:
+  si AniList todavía no tenía programada la fecha del episodio siguiente (algo habitual justo después de una emisión,
+  antes de que confirme el próximo horario), la app se quedaba sin ninguna referencia de "qué es lo último que salió" y
+  la corrección automática de la lista (ver «Añadido») no se disparaba. Ahora, cuando pasa esto, se pregunta además por
+  el último episodio que SÍ consta como emitido en el calendario de AniList, así la lista se sigue poniendo al día sin
+  esperar a que AniList programe el episodio siguiente.
+- La lista de capítulos de la Ficha ya no se agranda sin sentido por un video local mal nombrado (p. ej. «Episodio
+  3000.mp4» en una carpeta con 12 episodios reales): el total oficial de AniList manda cuando se conoce, y un número de
+  archivo muy por encima de ese total simplemente no recibe fila (el archivo sigue en el disco, solo no aparece listado).
+  Un episodio real solo un poco por delante (preestreno o filtración de 1-2 días, o algún especial numerado justo
+  después del final) sí se sigue mostrando: el límite deja un margen razonable antes de tratar el número como ruido.
 - El flujo de firma de código de las releases tenía cuatro errores que habrían impedido firmar aunque hubiera
   certificado: la plantilla de `signtool` usaba `$file` en vez del marcador `{{file}}` que sustituye `vpk`, no
   había sello de tiempo (las firmas dejarían de ser válidas al caducar el certificado), el paso de verificación

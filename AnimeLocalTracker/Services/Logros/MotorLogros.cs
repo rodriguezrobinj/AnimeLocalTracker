@@ -89,6 +89,7 @@ public static class MotorLogros
             ["mini_perfectas"] = partidas.Count(RecordsMinijuego.EsPerfecta),
             ["mini_racha"] = partidas.Count > 0 ? partidas.Max(p => p.RachaMaxima) : 0,
             ["mini_oped"] = partidas.Where(p => p.JuegoId == JuegosMinijuego.AdivinaOpEd).Sum(p => p.Aciertos),
+            ["mini_personajes"] = partidas.Where(p => p.JuegoId == JuegosMinijuego.AdivinaPersonaje).Sum(p => p.Aciertos),
         };
     }
 

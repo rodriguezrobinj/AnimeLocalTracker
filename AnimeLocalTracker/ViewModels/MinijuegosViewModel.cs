@@ -12,6 +12,7 @@ public sealed partial class MinijuegosViewModel : ObservableObject
 {
     public AdivinaAnimeViewModel AdivinaAnime { get; }
     public AdivinaOpEdViewModel AdivinaOpEd { get; }
+    public AdivinaPersonajeViewModel AdivinaPersonaje { get; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(EnMenu))]
@@ -19,10 +20,11 @@ public sealed partial class MinijuegosViewModel : ObservableObject
 
     public bool EnMenu => JuegoActivo == null;
 
-    public MinijuegosViewModel(AdivinaAnimeViewModel adivinaAnime, AdivinaOpEdViewModel adivinaOpEd)
+    public MinijuegosViewModel(AdivinaAnimeViewModel adivinaAnime, AdivinaOpEdViewModel adivinaOpEd, AdivinaPersonajeViewModel adivinaPersonaje)
     {
         AdivinaAnime = adivinaAnime;
         AdivinaOpEd = adivinaOpEd;
+        AdivinaPersonaje = adivinaPersonaje;
     }
 
     /// <summary>
@@ -37,7 +39,7 @@ public sealed partial class MinijuegosViewModel : ObservableObject
             return;
         }
 
-        await Task.WhenAll(AdivinaAnime.RefrescarRecordsAsync(), AdivinaOpEd.RefrescarRecordsAsync());
+        await Task.WhenAll(AdivinaAnime.RefrescarRecordsAsync(), AdivinaOpEd.RefrescarRecordsAsync(), AdivinaPersonaje.RefrescarRecordsAsync());
     }
 
     [RelayCommand]
@@ -47,9 +49,15 @@ public sealed partial class MinijuegosViewModel : ObservableObject
     private Task AbrirAdivinaOpEdAsync() => AbrirAsync(AdivinaOpEd);
 
     [RelayCommand]
+    private Task AbrirAdivinaPersonajeAsync() => AbrirAsync(AdivinaPersonaje);
+
+    /// <summary>Corta lo que esté sonando o preparándose en el juego abierto (al salir de la sección), sin cerrarlo.</summary>
+    public void DetenerJuegoActivo() => JuegoActivo?.Detener();
+
+    [RelayCommand]
     private void VolverAlMenu()
     {
-        JuegoActivo?.Detener();
+        DetenerJuegoActivo();
         JuegoActivo = null;
     }
 

@@ -70,7 +70,10 @@ namespace AnimeLocalTracker.Views
 
         private void VmSubtitulos_PropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName == nameof(ReproductorViewModel.EstiloSubtitulos))
+            if (e.PropertyName is nameof(ReproductorViewModel.EstiloSubtitulos)
+                or nameof(ReproductorViewModel.SubtitulosDobleLineaActivo)
+                or nameof(ReproductorViewModel.SubtituloLineaAbajo)
+                or nameof(ReproductorViewModel.SubtituloLineaArriba))
             {
                 if (Dispatcher.CheckAccess()) ActualizarTextoSubtitulos();
                 else Dispatcher.InvokeAsync(ActualizarTextoSubtitulos);
@@ -104,8 +107,23 @@ namespace AnimeLocalTracker.Views
 
         private void ActualizarTextoSubtitulos()
         {
-            SubtitulosVista.Texto = (_subtitulosPlayer as FlyleafLib.MediaPlayer.Subtitles)?.SubsText ?? string.Empty;
+            // Con la pista completa ya extraída (ver ReproductorViewModel.CargarCuesSubtitulosSiCorresponde) se
+            // confía en las dos líneas resueltas por la app, que sí distinguen cuándo hay dos hablando a la vez.
+            // Si todavía no terminó de extraerse (o falló), se sigue mostrando el texto único de Flyleaf abajo,
+            // igual que siempre: los subtítulos nunca desaparecen por culpa de esta mejora.
+            if (_vmSubtitulos?.SubtitulosDobleLineaActivo == true)
+            {
+                SubtitulosVista.Texto = _vmSubtitulos.SubtituloLineaAbajo;
+                SubtitulosVistaArriba.Texto = _vmSubtitulos.SubtituloLineaArriba;
+            }
+            else
+            {
+                SubtitulosVista.Texto = (_subtitulosPlayer as FlyleafLib.MediaPlayer.Subtitles)?.SubsText ?? string.Empty;
+                SubtitulosVistaArriba.Texto = string.Empty;
+            }
+
             SubtitulosVista.Estilo = _vmSubtitulos?.EstiloSubtitulos;
+            SubtitulosVistaArriba.Estilo = _vmSubtitulos?.EstiloSubtitulos;
         }
 
         /// <summary>Se suscribe a los cambios del toast de IDialogService (y se desuscribe del anterior).</summary>

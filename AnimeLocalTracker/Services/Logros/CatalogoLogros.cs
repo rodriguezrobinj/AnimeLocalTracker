@@ -47,6 +47,7 @@ public static class CatalogoLogros
         new("mini_perfectas", CategoriaLogro.Minijuegos, "StarCircle", "#F472B6", new double[] { 1, 3, 7, 15, 30 }),
         new("mini_racha", CategoriaLogro.Minijuegos, "LightningBolt", "#FB923C", new double[] { 3, 5, 7, 9, 10 }),
         new("mini_oped", CategoriaLogro.Minijuegos, "MusicNote", "#A78BFA", new double[] { 10, 40, 100, 250, 500 }),
+        new("mini_personajes", CategoriaLogro.Minijuegos, "AccountStar", "#34D399", new double[] { 10, 40, 100, 250, 500 }),
 
         // ── Secretos: nombre y descripción ocultos hasta conseguir el primer nivel ──
         new("insomnio", CategoriaLogro.Secretos, "BedClock", "#818CF8", new double[] { 3, 6 }, Secreto: true),

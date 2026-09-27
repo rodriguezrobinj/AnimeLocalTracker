@@ -33,6 +33,13 @@ public interface IAnimeTrackingService
     /// </summary>
     Task<(bool Exito, AniListNextAiringEpisode? Proximo)> ObtenerProximaEmisionAsync(int mediaId);
     /// <summary>
+    /// Último episodio que YA se emitió según el calendario de AniList (no el "próximo"): red de seguridad para cuando
+    /// <see cref="ObtenerProximaEmisionAsync"/> devuelve Proximo=null estando el anime en emisión — AniList todavía no
+    /// programó la fecha del episodio siguiente, pero el anterior ya salió y no debe perderse de vista. Exito=false si
+    /// la consulta falló; con Exito=true y Ultimo=null, AniList no tiene ningún episodio registrado como emitido.
+    /// </summary>
+    Task<(bool Exito, AniListNextAiringEpisode? Ultimo)> ObtenerUltimoEpisodioEmitidoAsync(int mediaId);
+    /// <summary>
     /// Datos para las etiquetas de la ficha (nota media, formato, duración, estudio, fuente, tráiler). Exito=false si la
     /// consulta falló. Sin caché en memoria: la usa la caché local semanal.
     /// </summary>

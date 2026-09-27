@@ -90,8 +90,33 @@ public class DatabaseService : IDatabaseService, IDisposable
         (8, "copia local de la próxima emisión (cuenta atrás)", CrearTablaProximaEmisionAsync),
         (9, "preferencias de emisión (avisos/descarga automática) y datos extra de AniList", CrearTablasPreferenciasYDatosExtraAsync),
         (10, "eliminar índices duplicados creados por [Indexed] (DB-01)", EliminarIndicesRedundantesAsync),
-        (11, "partidas de minijuegos (récords y logros) + índice (JuegoId, Puntos)", CrearTablaPartidasMinijuegoAsync)
+        (11, "partidas de minijuegos (récords y logros) + índice (JuegoId, Puntos)", CrearTablaPartidasMinijuegoAsync),
+        (12, "personajes de AniList por anime (Adivina el personaje) + índice único (AnimeId, PersonajeId)", CrearTablasPersonajesAsync),
+        (13, "análisis guardados de OP/ED por episodio (marcadores y saltos) + índices", CrearTablasSkipAsync)
     };
+
+    /// <summary>
+    /// v13: tramos de opening/ending/resumen ya ubicados en cada episodio, para no volver a detectarlos ni consultar la nube. Los índices
+    /// se crean aquí de forma explícita (los [Indexed] solo aplican a bases nuevas).
+    /// </summary>
+    private static async Task CrearTablasSkipAsync(SQLiteAsyncConnection conexion)
+    {
+        await conexion.CreateTableAsync<AnalisisSkipEpisodio>();
+        await conexion.CreateTableAsync<SegmentoSkipGuardado>();
+        await conexion.ExecuteAsync("CREATE UNIQUE INDEX IF NOT EXISTS IX_AnalisisSkip_Episodio ON AnalisisSkipEpisodio(AnimeId, Episodio);");
+        await conexion.ExecuteAsync("CREATE INDEX IF NOT EXISTS IX_SegmentoSkip_Episodio ON SegmentoSkipGuardado(AnimeId, Episodio);");
+    }
+
+    /// <summary>
+    /// v12: personajes de cada anime y marca de cuándo se consultaron. El índice único (AnimeId, PersonajeId) sirve a la vez
+    /// para buscar por anime y para que un personaje repetido en la respuesta de AniList no se guarde dos veces.
+    /// </summary>
+    private static async Task CrearTablasPersonajesAsync(SQLiteAsyncConnection conexion)
+    {
+        await conexion.CreateTableAsync<PersonajeAnime>();
+        await conexion.CreateTableAsync<PersonajesAnimeSync>();
+        await conexion.ExecuteAsync("CREATE UNIQUE INDEX IF NOT EXISTS IX_PersonajeAnime_Unico ON PersonajeAnime(AnimeId, PersonajeId);");
+    }
 
     /// <summary>
     /// v11: partidas de minijuegos terminadas. El índice (JuegoId, Puntos) se crea aquí de forma explícita (no con
@@ -768,6 +793,10 @@ public class DatabaseService : IDatabaseService, IDisposable
             db.Execute("DELETE FROM PreferenciaEmision;");
             db.Execute("DELETE FROM DatosExtraAnime;");
             db.Execute("DELETE FROM PartidaMinijuego;");
+            db.Execute("DELETE FROM PersonajeAnime;");
+            db.Execute("DELETE FROM PersonajesAnimeSync;");
+            db.Execute("DELETE FROM AnalisisSkipEpisodio;");
+            db.Execute("DELETE FROM SegmentoSkipGuardado;");
         });
     }
 
@@ -837,6 +866,88 @@ public class DatabaseService : IDatabaseService, IDisposable
     {
         if (partida == null || string.IsNullOrWhiteSpace(partida.JuegoId)) return;
         await _conexion.InsertAsync(partida);
+    }
+
+    public async Task<AnalisisSkipEpisodio?> ObtenerAnalisisSkipAsync(int animeId, int episodio)
+    {
+        return await _conexion.Table<AnalisisSkipEpisodio>().Where(a => a.AnimeId == animeId && a.Episodio == episodio).FirstOrDefaultAsync();
+    }
+
+    public async Task<List<SegmentoSkipGuardado>> ObtenerSegmentosSkipAsync(int animeId, int episodio)
+    {
+        return await _conexion.Table<SegmentoSkipGuardado>().Where(s => s.AnimeId == animeId && s.Episodio == episodio).ToListAsync();
+    }
+
+    public async Task GuardarAnalisisSkipAsync(AnalisisSkipEpisodio analisis, IReadOnlyList<SegmentoSkipGuardado> segmentos)
+    {
+        if (analisis == null || analisis.AnimeId <= 0 || analisis.Episodio <= 0) return;
+
+        await _conexion.RunInTransactionAsync(db =>
+        {
+            // El análisis nuevo reemplaza al anterior del mismo episodio (tramos incluidos).
+            db.Execute("DELETE FROM SegmentoSkipGuardado WHERE AnimeId = ? AND Episodio = ?;", analisis.AnimeId, analisis.Episodio);
+            db.Execute("DELETE FROM AnalisisSkipEpisodio WHERE AnimeId = ? AND Episodio = ?;", analisis.AnimeId, analisis.Episodio);
+
+            analisis.Id = 0;
+            db.Insert(analisis);
+            foreach (var s in segmentos ?? Array.Empty<SegmentoSkipGuardado>())
+            {
+                s.Id = 0;
+                s.AnimeId = analisis.AnimeId;
+                s.Episodio = analisis.Episodio;
+                db.Insert(s);
+            }
+        });
+    }
+
+    public async Task<List<PersonajeAnime>> ObtenerPersonajesAsync(IReadOnlyCollection<int> animeIds)
+    {
+        if (animeIds == null || animeIds.Count == 0) return new List<PersonajeAnime>();
+
+        var resultado = new List<PersonajeAnime>();
+        // Lotes de 500: SQLite limita las variables de una consulta (los ids son enteros, no hay riesgo de inyección).
+        foreach (var lote in animeIds.Distinct().Chunk(500))
+        {
+            string ids = string.Join(",", lote);
+            resultado.AddRange(await _conexion.QueryAsync<PersonajeAnime>($"SELECT * FROM PersonajeAnime WHERE AnimeId IN ({ids});"));
+        }
+        return resultado;
+    }
+
+    public async Task<List<PersonajesAnimeSync>> ObtenerMarcasPersonajesAsync(IReadOnlyCollection<int> animeIds)
+    {
+        if (animeIds == null || animeIds.Count == 0) return new List<PersonajesAnimeSync>();
+
+        var resultado = new List<PersonajesAnimeSync>();
+        foreach (var lote in animeIds.Distinct().Chunk(500))
+        {
+            string ids = string.Join(",", lote);
+            resultado.AddRange(await _conexion.QueryAsync<PersonajesAnimeSync>($"SELECT * FROM PersonajesAnimeSync WHERE AnimeId IN ({ids});"));
+        }
+        return resultado;
+    }
+
+    public async Task GuardarPersonajesAsync(IReadOnlyDictionary<int, List<PersonajeAnime>> personajesPorAnime)
+    {
+        if (personajesPorAnime == null || personajesPorAnime.Count == 0) return;
+
+        var ahora = DateTime.UtcNow;
+        await _conexion.RunInTransactionAsync(db =>
+        {
+            foreach (var (animeId, personajes) in personajesPorAnime)
+            {
+                // AniList es la fuente de verdad: se reemplazan los personajes guardados de ese anime.
+                db.Execute("DELETE FROM PersonajeAnime WHERE AnimeId = ?;", animeId);
+                foreach (var p in personajes)
+                {
+                    db.Execute(
+                        "INSERT OR IGNORE INTO PersonajeAnime (AnimeId, PersonajeId, Nombre, NombreNativo, Alternativos, ImagenUrl, Genero, Edad, Rol, Favoritos) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
+                        animeId, p.PersonajeId, p.Nombre, p.NombreNativo, p.Alternativos, p.ImagenUrl, p.Genero, p.Edad, p.Rol, p.Favoritos);
+                }
+
+                db.Execute("INSERT OR REPLACE INTO PersonajesAnimeSync (AnimeId, FechaUtc) VALUES (?, ?);", animeId, ahora);
+            }
+        });
     }
 
     public async Task<PreferenciaEmision?> ObtenerPreferenciaEmisionAsync(int aniListId)

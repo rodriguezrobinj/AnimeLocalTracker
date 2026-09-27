@@ -24,6 +24,10 @@ public static class AppDataPaths
     public static string MusicDir { get; } = Path.Combine(DataRoot, "Music");
     /// <summary>Vistas previas (temporales) de openings/endings aún no guardados; se vacía al arrancar la app.</summary>
     public static string MusicPreviewsDir { get; } = Path.Combine(DataRoot, "MusicPreviews");
+    /// <summary>Imágenes de personajes de AniList para "Adivina el personaje" (una por personaje, se descargan al jugar).</summary>
+    public static string CharactersDir { get; } = Path.Combine(DataRoot, "Characters");
+    /// <summary>Audio de referencia (.ogg de AnimeThemes) para ubicar openings/endings dentro de los episodios; caché con tope de tamaño.</summary>
+    public static string SkipReferencesDir { get; } = Path.Combine(DataRoot, "SkipReferences");
     public static string PluginsFolder { get; } = Path.Combine(DataRoot, "Plugins");
     public static string TorrentsCacheDir { get; } = Path.Combine(DataRoot, "TorrentsCache");
     public static string BibliotecaDb { get; } = Path.Combine(DataRoot, "biblioteca.db");

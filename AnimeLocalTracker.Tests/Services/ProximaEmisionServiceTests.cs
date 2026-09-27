@@ -171,8 +171,65 @@ public class ProximaEmisionServiceTests : IDisposable
     {
         _db.Setup(d => d.ObtenerProximaEmisionAsync(5)).ReturnsAsync((ProximaEmisionLocal?)null);
         _tracking.Setup(t => t.ObtenerProximaEmisionAsync(5)).ReturnsAsync((true, (AniListNextAiringEpisode?)null));
+        _tracking.Setup(t => t.ObtenerUltimoEpisodioEmitidoAsync(5)).ReturnsAsync((true, (AniListNextAiringEpisode?)null));
 
         (await CrearSut().ObtenerAsync(5, "RELEASING")).Should().BeNull();
+    }
+
+    // ── Respaldo: AniList aún no programó el próximo episodio, pero el anterior ya salió ──
+
+    [Fact]
+    public async Task SinProximoProgramado_PeroConUltimoEmitido_UsaEseComoReferencia()
+    {
+        // AniList todavía no confirmó la fecha del episodio 13, pero el 12 ya salió hace 2 días.
+        long airingAt12 = DateTimeOffset.UtcNow.AddDays(-2).ToUnixTimeSeconds();
+        _db.Setup(d => d.ObtenerProximaEmisionAsync(5)).ReturnsAsync((ProximaEmisionLocal?)null);
+        _tracking.Setup(t => t.ObtenerProximaEmisionAsync(5)).ReturnsAsync((true, (AniListNextAiringEpisode?)null));
+        _tracking.Setup(t => t.ObtenerUltimoEpisodioEmitidoAsync(5))
+            .ReturnsAsync((true, new AniListNextAiringEpisode { Episode = 12, AiringAt = airingAt12 }));
+
+        var resultado = await CrearSut().ObtenerAsync(5, "RELEASING");
+
+        resultado.Should().NotBeNull();
+        resultado!.Episodio.Should().Be(12);
+        _db.Verify(d => d.GuardarProximaEmisionAsync(It.Is<ProximaEmisionLocal>(p => p.Episodio == 12 && p.EmisionUnixUtc == airingAt12)), Times.Once);
+    }
+
+    [Fact]
+    public async Task SinProximoProgramado_NoConsultaElRespaldo_SiElAnimeNoEstaEnEmision()
+    {
+        // NOT_YET_RELEASED: aún no puede haber "último emitido" que consultar.
+        _db.Setup(d => d.ObtenerProximaEmisionAsync(5)).ReturnsAsync((ProximaEmisionLocal?)null);
+        _tracking.Setup(t => t.ObtenerProximaEmisionAsync(5)).ReturnsAsync((true, (AniListNextAiringEpisode?)null));
+
+        (await CrearSut().ObtenerAsync(5, "NOT_YET_RELEASED")).Should().BeNull();
+
+        _tracking.Verify(t => t.ObtenerUltimoEpisodioEmitidoAsync(It.IsAny<int>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SinProximoProgramado_SiElRespaldoTambienFalla_SeGuardaComoSinProgramacion()
+    {
+        _db.Setup(d => d.ObtenerProximaEmisionAsync(5)).ReturnsAsync((ProximaEmisionLocal?)null);
+        _tracking.Setup(t => t.ObtenerProximaEmisionAsync(5)).ReturnsAsync((true, (AniListNextAiringEpisode?)null));
+        _tracking.Setup(t => t.ObtenerUltimoEpisodioEmitidoAsync(5)).ReturnsAsync((false, (AniListNextAiringEpisode?)null));
+
+        (await CrearSut().ObtenerAsync(5, "RELEASING")).Should().BeNull();
+
+        _db.Verify(d => d.GuardarProximaEmisionAsync(It.Is<ProximaEmisionLocal>(p => p.Episodio == 0 && p.EmisionUnixUtc == 0)), Times.Once);
+    }
+
+    [Fact]
+    public async Task ConProximoYaProgramado_NoConsultaElRespaldo()
+    {
+        long unix = DateTimeOffset.UtcNow.AddDays(3).ToUnixTimeSeconds();
+        _db.Setup(d => d.ObtenerProximaEmisionAsync(5)).ReturnsAsync((ProximaEmisionLocal?)null);
+        _tracking.Setup(t => t.ObtenerProximaEmisionAsync(5)).ReturnsAsync((true, new AniListNextAiringEpisode { Episode = 13, AiringAt = unix }));
+
+        var resultado = await CrearSut().ObtenerAsync(5, "RELEASING");
+
+        resultado!.Episodio.Should().Be(13);
+        _tracking.Verify(t => t.ObtenerUltimoEpisodioEmitidoAsync(It.IsAny<int>()), Times.Never);
     }
 
     [Theory]

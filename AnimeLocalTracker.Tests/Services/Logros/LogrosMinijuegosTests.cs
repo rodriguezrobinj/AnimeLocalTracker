@@ -16,7 +16,7 @@ namespace AnimeLocalTracker.Tests.Services.Logros;
 public class LogrosMinijuegosTests
 {
     private static readonly string[] IdsMinijuegos =
-        ["mini_partidas", "mini_aciertos", "mini_puntuacion", "mini_perfectas", "mini_racha", "mini_oped"];
+        ["mini_partidas", "mini_aciertos", "mini_puntuacion", "mini_perfectas", "mini_racha", "mini_oped", "mini_personajes"];
 
     private static PartidaMinijuego Partida(int puntos, int aciertos, int rondas = 10, int racha = 0, string juego = JuegosMinijuego.AdivinaAnime) => new()
     {
@@ -27,7 +27,7 @@ public class LogrosMinijuegosTests
         MotorLogros.CalcularMetricas(new List<AnimeItem>(), new List<RegistroEpisodio>(), partidas);
 
     [Fact]
-    public void Catalogo_DeberiaTenerLasSeisFamiliasDeMinijuegosConCincoNivelesCadaUna()
+    public void Catalogo_DeberiaTenerLasSieteFamiliasDeMinijuegosConCincoNivelesCadaUna()
     {
         var familias = CatalogoLogros.Todos.Where(l => l.Categoria == CategoriaLogro.Minijuegos).ToList();
 
@@ -50,14 +50,16 @@ public class LogrosMinijuegosTests
             Partida(300, 4, racha: 2),
             Partida(1000, 10, racha: 10),
             Partida(800, 8, racha: 5, juego: JuegosMinijuego.AdivinaOpEd),
-            Partida(200, 3, rondas: 3, racha: 3, juego: JuegosMinijuego.AdivinaOpEd));
+            Partida(200, 3, rondas: 3, racha: 3, juego: JuegosMinijuego.AdivinaOpEd),
+            Partida(500, 7, racha: 4, juego: JuegosMinijuego.AdivinaPersonaje));
 
-        m["mini_partidas"].Should().Be(4);
-        m["mini_aciertos"].Should().Be(25);
+        m["mini_partidas"].Should().Be(5);
+        m["mini_aciertos"].Should().Be(32);
         m["mini_puntuacion"].Should().Be(1000);
         m["mini_racha"].Should().Be(10);
         m["mini_perfectas"].Should().Be(1, "la de 3 rondas acertadas es demasiado corta para contar");
         m["mini_oped"].Should().Be(11, "solo los aciertos de Adivina el OP/ED");
+        m["mini_personajes"].Should().Be(7, "solo los aciertos de Adivina el personaje");
     }
 
     [Fact]
