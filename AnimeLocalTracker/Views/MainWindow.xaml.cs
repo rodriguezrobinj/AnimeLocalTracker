@@ -14,24 +14,19 @@ public partial class MainWindow : Window, IVentanaPrincipal
 
     private System.Windows.Shell.WindowChrome? _chromeCache;
 
-    // PIP-01: estado a restaurar al salir del modo Picture-in-Picture.
-    private WindowState _estadoPrevioPiP;
-    private Rect _restoreBoundsPiP;
-    private ResizeMode _resizeModePrevioPiP;
-    private bool _fullscreenPrevioPiP;
-    private double _minWidthPrevioPiP;
-    private double _minHeightPrevioPiP;
+    // Mini reproductor: ventana flotante propia (ver EntrarModoPiP). Se recuerda dónde la dejó el usuario durante la sesión.
+    private MiniReproductorWindow? _ventanaMini;
+    private static Rect? _ultimoRectMini;
 
-    private const double AnchoPiP = 420;
-    private const double AltoPiP = 236;
-    private const double MargenPiP = 16;
-    private const double MinAnchoPiP = 240;
-    private const double MinAltoPiP = 135;
+    private const double AnchoMini = 420;
+    private const double AltoMini = 236; // 16:9; al abrirse se ajusta a la proporción real del episodio
+    private const double MargenMini = 16;
 
     public MainWindow(MainViewModel viewModel)
     {
         InitializeComponent();
         DataContext = viewModel;
+        IsVisibleChanged += MainWindow_IsVisibleChanged;
 
         // UX-05: al abrir un diálogo modal, el foco se mueve al botón Aceptar para que
         // el teclado (Enter/Esc) funcione de inmediato y no quede en la página subyacente.
@@ -144,6 +139,7 @@ public partial class MainWindow : Window, IVentanaPrincipal
                 AppLogger.Warn("MainWindow", $"No se pudo silenciar el reproductor en modo pánico: {ex.Message}");
             }
 
+            _ventanaMini?.Hide(); // el mini reproductor también desaparece: es un modo discreto
             App.ServiceProvider.GetService<ISystemTrayService>()?.IniciarEnBandeja();
             AppLogger.Info("MainWindow", "Modo discreto activado (tecla de pánico).");
         });
@@ -158,7 +154,7 @@ public partial class MainWindow : Window, IVentanaPrincipal
         }
 
         // WM_GETMINMAXINFO = 0x0024
-        if (msg == 0x0024 && !IsFullScreen && !EsModoPiP)
+        if (msg == 0x0024 && !IsFullScreen)
         {
             var mmi = Marshal.PtrToStructure<MINMAXINFO>(lParam);
             IntPtr monitor = MonitorFromWindow(hwnd, 2); // MONITOR_DEFAULTTONEAREST
@@ -224,9 +220,6 @@ public partial class MainWindow : Window, IVentanaPrincipal
 
     private void EntrarPantallaCompleta()
     {
-        // Pantalla completa y PiP son excluyentes.
-        if (EsModoPiP) SalirModoPiP();
-
         IsFullScreen = true; // Desactiva WM_GETMINMAXINFO → permite cubrir toda la pantalla
 
         // 1. Guardar y quitar WindowChrome (es el que impide cubrir la barra de tareas)
@@ -270,109 +263,80 @@ public partial class MainWindow : Window, IVentanaPrincipal
     }
 
     // ═══════════════════════════════════════════════════════════════
-    //  PIP-01: Picture-in-Picture — recuadro compacto, siempre encima,
-    //  anclado a la esquina inferior derecha del área de trabajo.
+    //  Mini reproductor: el video pasa a una ventana flotante propia,
+    //  siempre encima y SIN dueño. Antes se encogía la ventana principal
+    //  entera: no se podía navegar por la app y, al minimizarla, el
+    //  video desaparecía con ella.
     // ═══════════════════════════════════════════════════════════════
 
     public void EntrarModoPiP()
     {
-        if (EsModoPiP) return;
-        EsModoPiP = true;
+        if (_ventanaMini != null) return;
+        if (DataContext is not MainViewModel { Navigation.ReproductorActivo: { } reproductor }) return;
 
-        // PiP y pantalla completa son excluyentes.
-        _fullscreenPrevioPiP = IsFullScreen;
+        // La app vuelve a su tamaño normal para poder navegar mientras el episodio sigue en la esquina.
         if (IsFullScreen) SalirPantallaCompleta();
 
-        // 1. Guardar estado para restaurar al salir (RestoreBounds sobrevive aunque la
-        //    ventana esté maximizada, a diferencia de Left/Top/Width/Height directos).
-        _estadoPrevioPiP = WindowState;
-        _restoreBoundsPiP = RestoreBounds;
-        _resizeModePrevioPiP = ResizeMode;
-        _minWidthPrevioPiP = MinWidth;
-        _minHeightPrevioPiP = MinHeight;
-
-        // 2. Ocultar la barra de título custom (no cabe y no aplica en un recuadro tan chico)
-        BarraTitulo.Visibility = Visibility.Collapsed;
-
-        // MinWidth/MinHeight de la ventana normal son 800x600 (ver MainWindow.xaml): sin bajarlos
-        // primero, WPF recorta el Width/Height del PiP de vuelta a 800x600 silenciosamente.
-        MinWidth = MinAnchoPiP;
-        MinHeight = MinAltoPiP;
-
-        // 3. Dar un borde de agarre real para poder redimensionar (en modo normal
-        //    ResizeBorderThickness=0 porque el chrome custom no lo necesita).
-        _chromeCache ??= System.Windows.Shell.WindowChrome.GetWindowChrome(this);
-        System.Windows.Shell.WindowChrome.SetWindowChrome(this, new System.Windows.Shell.WindowChrome
-        {
-            CaptionHeight = 0,
-            ResizeBorderThickness = new Thickness(6),
-            CornerRadius = new CornerRadius(8),
-            GlassFrameThickness = new Thickness(0),
-            UseAeroCaptionButtons = false
-        });
-
-        // 4. Encoger, fijar encima de las demás ventanas y anclar a la esquina inferior derecha.
-        WindowState = WindowState.Normal;
-        ResizeMode = ResizeMode.CanResizeWithGrip;
-        Topmost = true;
-
-        AplicarTamanioYPosicionPiP();
-
-        // La transición Maximized→Normal no siempre ha asentado RestoreBounds/el layout nativo
-        // en este mismo tick (se observó Left/Top mal calculados justo tras un arranque en frío);
-        // reaplicar una vez que WPF termina el ciclo de layout actual garantiza la posición final.
-        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, AplicarTamanioYPosicionPiP);
-    }
-
-    private void AplicarTamanioYPosicionPiP()
-    {
-        if (!EsModoPiP) return;
-
+        var mini = new MiniReproductorWindow(reproductor);
         var area = SystemParameters.WorkArea;
-        Width = AnchoPiP;
-        Height = AltoPiP;
-        Left = area.Right - AnchoPiP - MargenPiP;
-        Top = area.Bottom - AltoPiP - MargenPiP;
+        var rect = _ultimoRectMini ?? new Rect(area.Right - AnchoMini - MargenMini, area.Bottom - AltoMini - MargenMini, AnchoMini, AltoMini);
+        mini.Width = Math.Clamp(rect.Width, mini.MinWidth, area.Width);
+        mini.Height = Math.Clamp(rect.Height, mini.MinHeight, area.Height);
+        mini.Left = Math.Clamp(rect.Left, area.Left, Math.Max(area.Left, area.Right - mini.Width));
+        mini.Top = Math.Clamp(rect.Top, area.Top, Math.Max(area.Top, area.Bottom - mini.Height));
+        mini.Closed += (_, _) =>
+        {
+            _ultimoRectMini = new Rect(mini.Left, mini.Top, mini.Width, mini.Height);
+            if (ReferenceEquals(_ventanaMini, mini))
+            {
+                _ventanaMini = null;
+                EsModoPiP = false;
+            }
+        };
+
+        _ventanaMini = mini;
+        EsModoPiP = true;
+        mini.Show();
     }
 
     public void SalirModoPiP()
     {
-        if (!EsModoPiP) return;
+        var mini = _ventanaMini;
+        if (mini == null) return;
+        _ventanaMini = null;
         EsModoPiP = false;
-
-        Topmost = false;
-        ResizeMode = _resizeModePrevioPiP;
-        BarraTitulo.Visibility = Visibility.Visible;
-        MinWidth = _minWidthPrevioPiP;
-        MinHeight = _minHeightPrevioPiP;
-
-        if (_chromeCache != null)
-        {
-            System.Windows.Shell.WindowChrome.SetWindowChrome(this, _chromeCache);
-        }
-
-        WindowState = _estadoPrevioPiP;
-        if (_estadoPrevioPiP == WindowState.Normal)
-        {
-            Left = _restoreBoundsPiP.Left;
-            Top = _restoreBoundsPiP.Top;
-            Width = _restoreBoundsPiP.Width;
-            Height = _restoreBoundsPiP.Height;
-        }
-        else if (_estadoPrevioPiP == WindowState.Maximized)
-        {
-            // Igual que SalirPantallaCompleta: forzar el ciclo Normal→Maximized para que el
-            // hook WM_GETMINMAXINFO vuelva a limitar al área de trabajo (sin tapar la taskbar).
-            WindowState = WindowState.Normal;
-            WindowState = WindowState.Maximized;
-        }
-
-        if (_fullscreenPrevioPiP)
-        {
-            _fullscreenPrevioPiP = false;
-            EntrarPantallaCompleta();
-        }
+        mini.CerrarDesdeCodigo();
     }
+
+    /// <summary>Al volver del mini reproductor al formato habitual: la ventana principal se restaura (si estaba minimizada
+    /// o en la bandeja) y pasa al frente con el episodio.</summary>
+    public void MostrarYActivar()
+    {
+        if (!IsVisible) Show();
+        if (WindowState == WindowState.Minimized)
+        {
+            // SW_RESTORE vuelve al estado de antes de minimizar (maximizada si lo estaba), cosa que WindowState=Normal no hace.
+            ShowWindow(new System.Windows.Interop.WindowInteropHelper(this).Handle, 9);
+        }
+        Activate();
+        Enfocar();
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        // Sin dueño, la ventana del mini mantendría viva la app al cerrar la principal.
+        SalirModoPiP();
+        base.OnClosed(e);
+    }
+
+    /// <summary>Si la ventana principal se oculta a la bandeja por la tecla de pánico, el mini se oculta con ella; vuelve al restaurarla.</summary>
+    private void MainWindow_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
+    {
+        if (_ventanaMini != null && IsVisible && !_ventanaMini.IsVisible) _ventanaMini.Show();
+    }
+
+    [DllImport("user32.dll")]
+    private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
     private void Window_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {

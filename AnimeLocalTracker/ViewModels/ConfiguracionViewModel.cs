@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Linq;
 using System.IO;
 using System.Threading.Tasks;
 using AnimeLocalTracker.Messages;
@@ -210,6 +211,7 @@ public partial class ConfiguracionViewModel : ObservableObject
         OnPropertyChanged(nameof(TotalAnimesTexto));
         foreach (var color in ColoresSubtitulos) color.Refrescar();
         foreach (var plugin in PluginsDetalle) plugin.RefrescarTextos();
+        if (SeccionActiva == SeccionConfiguracion.Reproduccion) ActualizarRendimientoVideo();
         // LOC-08: avisa a los ViewModels con colecciones/texto compuesto en código (Galería,
         // Agregar Anime, Acerca de) para que se regeneren en el nuevo idioma.
         WeakReferenceMessenger.Default.Send(new IdiomaCambiadoMensaje());
@@ -229,6 +231,66 @@ public partial class ConfiguracionViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(EsSeccionPlugins))]
     [NotifyPropertyChangedFor(nameof(MostrarBarraGuardar))]
     private SeccionConfiguracion _seccionActiva = SeccionConfiguracion.Biblioteca;
+
+    partial void OnSeccionActivaChanged(SeccionConfiguracion value)
+    {
+        // La lista de tarjetas y el informe del último video se leen al entrar (arrancar el motor de video solo si hace falta).
+        if (value == SeccionConfiguracion.Reproduccion) ActualizarRendimientoVideo();
+    }
+
+    // === RENDIMIENTO DE VIDEO (Reproducción) ===
+
+    /// <summary>Opción del desplegable de tarjeta gráfica: Valor "" = la que elija Windows.</summary>
+    public sealed record OpcionTarjetaGrafica(string Valor, string Nombre)
+    {
+        /// <summary>Lo que leen los lectores de pantalla en el desplegable (si no, leían el nombre interno del tipo).</summary>
+        public override string ToString() => Nombre;
+    }
+
+    [ObservableProperty] private string _modoSaltosVideo = ModosRendimientoVideo.Automatico;
+    [ObservableProperty] private bool _aceleracionHardwareVideo = true;
+    [ObservableProperty] private string _tarjetaGraficaVideo = string.Empty;
+    [ObservableProperty] private string _escaladoInteligenteVideo = ModosRendimientoVideo.Automatico;
+    [ObservableProperty] private string _diagnosticoEquipoTexto = string.Empty;
+    [ObservableProperty] private string _diagnosticoUltimoVideoTexto = string.Empty;
+
+    public System.Collections.ObjectModel.ObservableCollection<OpcionTarjetaGrafica> TarjetasGraficas { get; } = new();
+
+    /// <summary>Rehace el desplegable de tarjetas y los textos de diagnóstico (al entrar en la sección y al cambiar de idioma).</summary>
+    internal void ActualizarRendimientoVideo()
+    {
+        var tarjetas = MotorVideo.ListarTarjetas();
+        string elegida = TarjetaGraficaVideo;
+
+        TarjetasGraficas.Clear();
+        TarjetasGraficas.Add(new OpcionTarjetaGrafica(string.Empty, LocalizationService.T("Cfg_TarjetaAutomatica")));
+        foreach (var t in tarjetas)
+            TarjetasGraficas.Add(new OpcionTarjetaGrafica(t.Nombre, t.MemoriaMb >= 1024 ? $"{t.Nombre} · {t.MemoriaMb / 1024.0:0.#} GB" : t.Nombre));
+        // Una tarjeta guardada que ahora no está (gráfica externa desconectada): se conserva la elección en vez de perderla en silencio.
+        if (!string.IsNullOrEmpty(elegida) && !tarjetas.Any(t => string.Equals(t.Nombre, elegida, StringComparison.OrdinalIgnoreCase)))
+            TarjetasGraficas.Add(new OpcionTarjetaGrafica(elegida, string.Format(LocalizationService.T("Cfg_TarjetaNoConectadaFormato"), elegida)));
+        TarjetaGraficaVideo = string.Empty;
+        TarjetaGraficaVideo = elegida; // vuelve a seleccionar en el desplegable ya rellenado
+
+        DiagnosticoEquipoTexto = string.Format(LocalizationService.T("Cfg_DiagEquipoFormato"),
+            tarjetas.Count > 0 ? string.Join(" + ", tarjetas.Select(t => t.Nombre)) : "?", Environment.ProcessorCount);
+        DiagnosticoUltimoVideoTexto = DescribirUltimoVideo(MotorVideo.UltimoInforme);
+    }
+
+    internal static string DescribirUltimoVideo(InformeVideo? informe)
+    {
+        if (informe == null) return LocalizationService.T("Cfg_DiagSinVideo");
+        return string.Format(LocalizationService.T("Cfg_DiagVideoFormato"),
+            informe.Codec.ToUpperInvariant(),
+            LocalizationService.T(informe.PorHardware ? "Cfg_DiagPorTarjeta" : "Cfg_DiagPorProcesador"),
+            LocalizationService.T(informe.Saltos switch
+            {
+                EstrategiaSaltos.Exactos => "Cfg_DiagSaltosExactos",
+                EstrategiaSaltos.Rapidos => "Cfg_DiagSaltosRapidos",
+                _ => "Cfg_DiagSaltosEquilibrados"
+            }),
+            LocalizationService.T(informe.Escalado ? "Cfg_DiagEscaladoSi" : "Cfg_DiagEscaladoNo"));
+    }
 
     public bool EsSeccionBiblioteca => SeccionActiva == SeccionConfiguracion.Biblioteca;
     public bool EsSeccionReproduccion => SeccionActiva == SeccionConfiguracion.Reproduccion;
@@ -293,6 +355,10 @@ public partial class ConfiguracionViewModel : ObservableObject
         NotificarConBandejaSiempre = config.NotificarConBandejaSiempre;
         Idioma = config.Idioma == "en" ? "en" : "es";
         VelocidadReproduccionDefecto = config.VelocidadReproduccionDefecto is >= 0.5 and <= 2.0 ? config.VelocidadReproduccionDefecto : 1.0;
+        ModoSaltosVideo = config.ModoSaltosVideo is ModosRendimientoVideo.Exactos or ModosRendimientoVideo.Rapidos ? config.ModoSaltosVideo : ModosRendimientoVideo.Automatico;
+        AceleracionHardwareVideo = config.AceleracionHardwareVideo;
+        TarjetaGraficaVideo = config.TarjetaGraficaVideo ?? string.Empty;
+        EscaladoInteligenteVideo = config.EscaladoInteligenteVideo is ModosRendimientoVideo.Activado or ModosRendimientoVideo.Desactivado ? config.EscaladoInteligenteVideo : ModosRendimientoVideo.Automatico;
         // El registro de Windows es la fuente de verdad (no AppSettings): así se refleja si el
         // usuario lo desactivó desde el Administrador de tareas en vez de desde esta pantalla.
         IniciarConWindows = _startupService?.EstaHabilitado() ?? false;
@@ -510,6 +576,10 @@ public partial class ConfiguracionViewModel : ObservableObject
             config.NotificarConBandejaSiempre = NotificarConBandejaSiempre;
             config.Idioma = Idioma == "en" ? "en" : "es";
             config.VelocidadReproduccionDefecto = VelocidadReproduccionDefecto is >= 0.5 and <= 2.0 ? VelocidadReproduccionDefecto : 1.0;
+            config.ModoSaltosVideo = string.IsNullOrEmpty(ModoSaltosVideo) ? ModosRendimientoVideo.Automatico : ModoSaltosVideo;
+            config.AceleracionHardwareVideo = AceleracionHardwareVideo;
+            config.TarjetaGraficaVideo = string.IsNullOrWhiteSpace(TarjetaGraficaVideo) ? null : TarjetaGraficaVideo;
+            config.EscaladoInteligenteVideo = string.IsNullOrEmpty(EscaladoInteligenteVideo) ? ModosRendimientoVideo.Automatico : EscaladoInteligenteVideo;
             config.TeclaPanicoActiva = TeclaPanicoActiva;
             config.TeclaPanico = TeclaPanico == "Escape" ? "Escape" : "F12";
             config.Atajos = new Dictionary<string, string>(Atajos);

@@ -247,29 +247,37 @@ public partial class DetalleViewModel : ObservableObject,
             var dispatcher = System.Windows.Application.Current?.Dispatcher;
             if (dispatcher != null && !dispatcher.HasShutdownStarted)
             {
-                _ = dispatcher.InvokeAsync(() =>
-                {
-                    episodio.Visto = message.VistoLocal;
-                    episodio.ProgresoSegundos = message.ProgresoSegundos;
-                    if (message.TotalSegundos > 0)
-                    {
-                        episodio.TotalSegundos = message.TotalSegundos;
-                    }
-                    AnimeSeleccionado.EpisodiosVistos = _todosLosEpisodios.Count(e => e.Visto);
-                    AplicarFiltrosYOrdenamiento();
-                });
+                _ = dispatcher.InvokeAsync(() => AplicarEpisodioActualizado(episodio, message));
             }
             else
             {
-                episodio.Visto = message.VistoLocal;
-                episodio.ProgresoSegundos = message.ProgresoSegundos;
-                if (message.TotalSegundos > 0)
-                {
-                    episodio.TotalSegundos = message.TotalSegundos;
-                }
-                AnimeSeleccionado.EpisodiosVistos = _todosLosEpisodios.Count(e => e.Visto);
+                AplicarEpisodioActualizado(episodio, message);
             }
         }
+    }
+
+    /// <summary>
+    /// El reproductor avisa del progreso cada 3 s mientras se ve un episodio. Antes cada aviso rehacía la lista entera de la
+    /// ficha (que sigue abierta detrás del video): en One Piece, 1180 filas cada 3 s en el hilo de la interfaz, y la lista volvía
+    /// arriba. La fila ya se actualiza sola (es observable); la lista solo se rehace si cambió "visto" y el filtro depende de eso.
+    /// </summary>
+    internal void AplicarEpisodioActualizado(EpisodioItem episodio, EpisodioActualizadoMensaje message)
+    {
+        bool cambioVisto = episodio.Visto != message.VistoLocal;
+        episodio.Visto = message.VistoLocal;
+        episodio.ProgresoSegundos = message.ProgresoSegundos;
+        if (message.TotalSegundos > 0)
+        {
+            episodio.TotalSegundos = message.TotalSegundos;
+        }
+
+        if (cambioVisto)
+        {
+            if (AnimeSeleccionado != null) AnimeSeleccionado.EpisodiosVistos = _todosLosEpisodios.Count(e => e.Visto);
+            if (FiltroEpisodios is "Vistos" or "No Vistos") AplicarFiltrosYOrdenamiento();
+        }
+
+        TieneCapituloEnProgreso = _todosLosEpisodios.Any(e => e.TieneProgresoGuardado);
     }
 
     public void Receive(DescargaProgresoMensaje message)
@@ -962,18 +970,9 @@ public partial class DetalleViewModel : ObservableObject,
         if (episodio == null || AnimeSeleccionado == null) return;
         
         episodio.Favorito = !episodio.Favorito;
-        
-        var registro = new RegistroEpisodio
-        {
-            AniListId = AnimeSeleccionado.AniListId,
-            NumeroEpisodio = episodio.NumeroEpisodio,
-            RutaArchivo = episodio.RutaCompleta,
-            VistoLocal = episodio.Visto,
-            FavoritoLocal = episodio.Favorito,
-            SincronizadoEnNube = false 
-        };
-        
-        await _databaseService.GuardarRegistroEpisodioAsync(registro);
+
+        // Solo la marca de favorito: guardar un registro entero ponía a cero el progreso del episodio.
+        await _databaseService.GuardarFavoritoEpisodioAsync(AnimeSeleccionado.AniListId, episodio.NumeroEpisodio, episodio.Favorito, episodio.RutaCompleta);
         
         if (FiltroEpisodios == "Favoritos")
         {

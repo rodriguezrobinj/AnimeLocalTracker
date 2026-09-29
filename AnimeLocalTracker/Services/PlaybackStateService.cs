@@ -94,19 +94,9 @@ public class PlaybackStateService : IPlaybackStateService
             {
                 registro.RutaArchivo = datos.RutaVideo;
             }
-            // Si el usuario reanuda un capítulo "visto" pero lo deja a medias, le quitamos
-            // la marca de "visto" para que se vea la barra de progreso — PERO nunca si el
-            // reproductor ya determinó en ESTA sesión que se completó (datos.FueMarcadoComoVisto).
-            // Sin este chequeo, el guardado periódico (cada 3s) o el guardado al cambiar de
-            // episodio podían revertir a "no visto" un episodio recién marcado: su propio
-            // umbral (95% por defecto) es más estricto que el del reproductor (90% por
-            // defecto), así que en la ventana 90-95% este guardado deshacía el marcado que
-            // RealizarAutoTrackingAsync acababa de confirmar — el síntoma exacto al ver
-            // capítulos seguidos sin volver a la ficha del anime.
-            if (!datos.FueMarcadoComoVisto && progresoAGuardar > 0 && (durSec <= 0 || progresoAGuardar < durSec * UmbralVisto))
-            {
-                registro.VistoLocal = false;
-            }
+            // Volver a ver un episodio ya visto NUNCA le quita la marca: solo se guarda por dónde ibas para poder reanudarlo.
+            // (Antes, ver unos minutos de un episodio visto lo desmarcaba: la ficha pasaba de "20 de 20 vistos" a 19 y bajaban
+            // los contadores, las estadísticas y los logros. Decisión del usuario, 2026-09-29.)
             await _databaseService.GuardarRegistroEpisodioAsync(registro);
         }
         else if (progresoAGuardar > 0)
@@ -124,7 +114,7 @@ public class PlaybackStateService : IPlaybackStateService
             await _databaseService.GuardarRegistroEpisodioAsync(registro);
         }
 
-        return new ResultadoGuardadoProgreso(progresoAGuardar, durSec);
+        return new ResultadoGuardadoProgreso(progresoAGuardar, durSec, registro?.VistoLocal ?? datos.FueMarcadoComoVisto);
     }
 
     public async Task<bool> MarcarComoVistoYSincronizarAsync(int animeId, int episodio, string rutaVideo, double duracionSegundos, bool registrarReproduccion = true)

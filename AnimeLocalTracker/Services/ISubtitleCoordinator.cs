@@ -18,4 +18,10 @@ public interface ISubtitleCoordinator
 
     /// <summary>Habilita subtítulos y reabre el Player con el stream elegido.</summary>
     void SeleccionarPista(Player? player, object stream);
+
+    /// <summary>
+    /// Pista a activar cuando el archivo trae subtítulos pero ninguno viene marcado por defecto (Flyleaf entonces no muestra
+    /// nada). Null si ya hay una activa o no hay pistas de texto.
+    /// </summary>
+    object? PistaPorDefecto(Player? player, string idiomaPreferido);
 }

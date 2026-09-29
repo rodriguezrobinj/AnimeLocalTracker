@@ -247,6 +247,8 @@ public partial class App : Application
         // Fase 3 del refactor: coalescing de seek — sí tiene estado por sesión de reproducción
         // (Transient, igual que EpisodeNavigator).
         services.AddTransient<IPlaybackSeekCoordinator, PlaybackSeekCoordinator>();
+        // Caché de fotogramas clave de los últimos episodios abiertos: compartida entre reproductores (volver a abrir es instantáneo).
+        services.AddSingleton<IFotogramasClaveService, FotogramasClaveService>();
 
         // 4. Integración del Ecosistema de Automatización Python (Zero-Setup & Clean Architecture)
         services.AddSingleton<IPythonBridgeService, PythonBridgeService>();

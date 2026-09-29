@@ -180,4 +180,54 @@ public class PipNavigationTests : IDisposable
         repVm.EsModoMini.Should().BeTrue();
         mainVm.Navigation.VistaActual.Should().BeSameAs(mockDescargasVm);
     }
+
+    // ── Mini reproductor en su propia ventana ──
+
+    [Fact]
+    public void EnModoMini_LaVentanaPrincipalNoDibujaElReproductor_YAlRestaurarVuelveADibujarlo()
+    {
+        var mainVm = CreateMainVm();
+        using var repVm = CreateReproductorVm();
+        mainVm.Navigation.ReproductorActivo = repVm;
+        mainVm.Navigation.ReproductorEnVentanaPrincipal.Should().BeSameAs(repVm);
+        var avisos = new List<string?>();
+        mainVm.Navigation.PropertyChanged += (_, e) => avisos.Add(e.PropertyName);
+
+        repVm.MinimizarAMiniCommand.Execute(null);
+        mainVm.Navigation.ReproductorEnVentanaPrincipal.Should().BeNull("el video pasa a la ventana flotante y la app queda libre");
+        mainVm.Navigation.ReproductorActivo.Should().BeSameAs(repVm, "el episodio sigue activo");
+
+        repVm.RestaurarFormatoHabitualCommand.Execute(null);
+        mainVm.Navigation.ReproductorEnVentanaPrincipal.Should().BeSameAs(repVm);
+        avisos.Should().Contain(nameof(INavigationService.ReproductorEnVentanaPrincipal));
+    }
+
+    [Fact]
+    public void NavegarConElMiniAbierto_YCerrarlo_SeQuedaEnLaVistaAdondeFueElUsuario()
+    {
+        var mainVm = CreateMainVm();
+        using var repVm = CreateReproductorVm();
+        mainVm.Navigation.ReproductorActivo = repVm;
+        var descargasVm = new DescargasViewModel(_downloadMock.Object);
+        _spMock.Setup(sp => sp.GetService(typeof(DescargasViewModel))).Returns(descargasVm);
+
+        mainVm.NavegarDescargasCommand.Execute(null); // el episodio pasa al mini y el usuario sigue por Descargas
+        CommunityToolkit.Mvvm.Messaging.IMessengerExtensions.Send(CommunityToolkit.Mvvm.Messaging.WeakReferenceMessenger.Default, new NavegarMensaje_VolverDelReproductor());
+
+        mainVm.Navigation.ReproductorActivo.Should().BeNull();
+        mainVm.Navigation.VistaActual.Should().BeSameAs(descargasVm, "antes lo devolvía a la ficha desde la que abrió el episodio");
+    }
+
+    [Fact]
+    public void RestaurarDesdeElMini_TraeLaVentanaPrincipalAlFrente()
+    {
+        var ventana = new Mock<IVentanaPrincipal>();
+        using var repVm = new ReproductorViewModel(_dbMock.Object, _trackingMock.Object, _authMock.Object, ventanaPrincipal: ventana.Object);
+        repVm.MinimizarAMiniCommand.Execute(null);
+
+        repVm.RestaurarFormatoHabitualCommand.Execute(null);
+
+        ventana.Verify(v => v.SalirModoPiP(), Times.Once);
+        ventana.Verify(v => v.MostrarYActivar(), Times.Once, "si la app estaba minimizada, al restaurar se tiene que ver el episodio");
+    }
 }

@@ -425,14 +425,15 @@
                                 Content="{Binding Navigation.VistaActual}" />
 
                 <!-- REPRODUCTOR IN-APP (EMBEBIDO DENTRO DE LA APLICACIÓN) -->
-                <!-- Ocupa toda la ventana en formato habitual, o se reduce a la esquina en formato mini -->
+                <!-- Ocupa toda la ventana en formato habitual. En formato mini el video pasa a su propia ventana flotante
+                     (MiniReproductorWindow) y aquí no se dibuja nada: la app queda libre para navegar. -->
                 <Border Grid.Column="0" Grid.ColumnSpan="2" Panel.ZIndex="50" ClipToBounds="True">
                     <Border.Style>
                         <Style TargetType="Border">
                             <Setter Property="Visibility" Value="Collapsed" />
                             <Style.Triggers>
                                 <!-- Visible cuando hay un ReproductorActivo -->
-                                <DataTrigger Binding="{Binding Navigation.ReproductorActivo, Converter={StaticResource NullToCollapsed}}" Value="Visible">
+                                <DataTrigger Binding="{Binding Navigation.ReproductorEnVentanaPrincipal, Converter={StaticResource NullToCollapsed}}" Value="Visible">
                                     <Setter Property="Visibility" Value="Visible" />
                                     <Setter Property="HorizontalAlignment" Value="Stretch" />
                                     <Setter Property="VerticalAlignment" Value="Stretch" />
@@ -441,19 +442,11 @@
                                     <Setter Property="BorderThickness" Value="0" />
                                     <Setter Property="Background" Value="Black" />
                                 </DataTrigger>
-                                <!-- PIP-01: en modo mini/PiP la VENTANA (no este Border) ya es el recuadro
-                                     compacto anclado a la esquina de la pantalla (ver MainWindow.EntrarModoPiP);
-                                     aquí solo hacen falta esquinas redondeadas y fondo transparente para que
-                                     el vídeo se vea bien en un recuadro chico. -->
-                                <DataTrigger Binding="{Binding Navigation.ReproductorActivo.EsModoMini}" Value="True">
-                                    <Setter Property="CornerRadius" Value="8" />
-                                    <Setter Property="Background" Value="Transparent" />
-                                </DataTrigger>
                             </Style.Triggers>
                         </Style>
                     </Border.Style>
 
-                    <ContentControl Content="{Binding Navigation.ReproductorActivo}" />
+                    <ContentControl Content="{Binding Navigation.ReproductorEnVentanaPrincipal}" />
                 </Border>
 
 

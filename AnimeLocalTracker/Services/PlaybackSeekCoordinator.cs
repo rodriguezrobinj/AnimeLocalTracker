@@ -18,6 +18,7 @@ public class PlaybackSeekCoordinator : IPlaybackSeekCoordinator
 
     private DateTime _settleHastaUtc = DateTime.MinValue;
     private double _seekPendiente = -1;
+    private bool _seekPendientePreciso;
     private DateTime _ultimoSeekAplicadoUtc = DateTime.MinValue;
     private CancellationTokenSource? _seekDebounceCts;
     private double _seekPendienteAlAbrir = -1;
@@ -27,18 +28,19 @@ public class PlaybackSeekCoordinator : IPlaybackSeekCoordinator
 
     public void IniciarVentanaDeSettle() => _settleHastaUtc = DateTime.UtcNow + VentanaSettleSeek;
 
-    public void SolicitarSeek(Player? player, double segundos, Func<bool> haCompletadoOpen)
+    public void SolicitarSeek(Player? player, double segundos, Func<bool> haCompletadoOpen, bool preciso = false)
     {
         if (player == null || player.IsDisposed) return;
 
         var transcurrido = DateTime.UtcNow - _ultimoSeekAplicadoUtc;
         if (transcurrido >= IntervaloMinimoSeek)
         {
-            AplicarSeekNativo(player, segundos, haCompletadoOpen);
+            AplicarSeekNativo(player, segundos, haCompletadoOpen, preciso);
             return;
         }
 
         _seekPendiente = segundos;
+        _seekPendientePreciso = preciso;
 
         _seekDebounceCts?.Cancel();
         _seekDebounceCts?.Dispose();
@@ -55,7 +57,7 @@ public class PlaybackSeekCoordinator : IPlaybackSeekCoordinator
                 double objetivo = Interlocked.Exchange(ref _seekPendiente, -1);
                 if (objetivo >= 0 && !ct.IsCancellationRequested)
                 {
-                    AplicarSeekNativo(player, objetivo, haCompletadoOpen);
+                    AplicarSeekNativo(player, objetivo, haCompletadoOpen, _seekPendientePreciso);
                 }
             }
             catch (OperationCanceledException) { }
@@ -66,7 +68,7 @@ public class PlaybackSeekCoordinator : IPlaybackSeekCoordinator
         }, ct);
     }
 
-    private void AplicarSeekNativo(Player player, double segundos, Func<bool> haCompletadoOpen)
+    private void AplicarSeekNativo(Player player, double segundos, Func<bool> haCompletadoOpen, bool preciso)
     {
         if (player.IsDisposed) return;
 
@@ -82,7 +84,8 @@ public class PlaybackSeekCoordinator : IPlaybackSeekCoordinator
         _ultimoSeekAplicadoUtc = DateTime.UtcNow;
         try
         {
-            player.CurTime = TimeSpan.FromSeconds(segundos).Ticks;
+            if (preciso) player.SeekAccurate((int)Math.Round(segundos * 1000));
+            else player.CurTime = TimeSpan.FromSeconds(segundos).Ticks;
         }
         catch (Exception ex)
         {

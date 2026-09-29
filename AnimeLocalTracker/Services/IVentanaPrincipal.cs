@@ -9,19 +9,20 @@ public interface IVentanaPrincipal
 {
     bool IsFullScreen { get; }
 
-    /// <summary>PIP-01: true mientras la ventana está en modo Picture-in-Picture (recuadro
-    /// compacto, siempre encima, sin bordes).</summary>
+    /// <summary>True mientras el episodio se ve en el mini reproductor (su propia ventana flotante).</summary>
     bool EsModoPiP { get; }
 
     void TogglePantallaCompleta();
 
-    /// <summary>Encoge la ventana principal a un recuadro compacto anclado a una esquina de la
-    /// pantalla, la fija por encima de las demás ventanas (Topmost) y quita el chrome de la app.</summary>
+    /// <summary>Pasa el episodio a una ventana flotante propia (siempre encima, sin dueño: sigue visible aunque la ventana
+    /// principal se minimice) y deja la ventana principal libre para navegar.</summary>
     void EntrarModoPiP();
 
-    /// <summary>Restaura la ventana principal al tamaño/posición/estado que tenía antes de
-    /// EntrarModoPiP().</summary>
+    /// <summary>Cierra la ventana del mini reproductor.</summary>
     void SalirModoPiP();
+
+    /// <summary>Restaura la ventana principal (si está minimizada u oculta) y la pasa al frente.</summary>
+    void MostrarYActivar();
 
     void Enfocar();
 }

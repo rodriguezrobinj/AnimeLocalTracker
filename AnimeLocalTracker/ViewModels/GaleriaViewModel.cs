@@ -415,6 +415,10 @@ public partial class GaleriaViewModel : ObservableObject,
 
     public void Receive(EpisodioActualizadoMensaje message)
     {
+        // La tarjeta solo muestra cuántos episodios están vistos: el progreso de cada 3 s del reproductor no lo cambia, y antes
+        // cada aviso releía de la base de datos todos los episodios del anime (1180 en One Piece) para contarlos otra vez.
+        if (message.SoloProgreso) return;
+
         try
         {
             var anime = BibliotecaLocales.FirstOrDefault(a => a.AniListId == message.AnimeId);

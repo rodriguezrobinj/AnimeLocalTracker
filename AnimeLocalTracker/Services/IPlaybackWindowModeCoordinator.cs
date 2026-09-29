@@ -20,4 +20,13 @@ public interface IPlaybackWindowModeCoordinator
 
     void EntrarModoMini();
     void SalirModoMini();
+
+    /// <summary>Trae la ventana principal al frente (al volver del mini reproductor al formato habitual).</summary>
+    void MostrarVentanaPrincipal();
+
+    /// <summary>True si la ventana principal está a pantalla completa (false sin ventana, p. ej. en pruebas).</summary>
+    bool EstaEnPantallaCompleta { get; }
+
+    /// <summary>Vuelve al tamaño normal si estaba a pantalla completa (no hace nada si no lo estaba).</summary>
+    void SalirDePantallaCompleta();
 }

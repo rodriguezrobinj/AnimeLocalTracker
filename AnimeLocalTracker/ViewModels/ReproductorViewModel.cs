@@ -32,6 +32,10 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     private readonly ISubtitleCuesExtractorService _subtitleCuesExtractor;
     private readonly IPlaybackVolumeCoordinator _volumeCoordinator;
     private readonly IPlaybackSeekCoordinator _seekCoordinator;
+    private readonly IFotogramasClaveService _fotogramasClaveService;
+
+    /// <summary>Fotogramas clave del episodio abierto (null hasta leerlos, ~1 s tras abrir): ver <see cref="Saltar"/>.</summary>
+    private IReadOnlyList<double>? _fotogramasClave;
     private readonly ISystemMediaControlsService? _smtc;
     private readonly IScreenSaverPreventionService? _screenSaverPrevention;
     private CancellationTokenSource? _skipCts;
@@ -99,6 +103,22 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
     // === Cuenta atrás de auto-play al siguiente episodio (AccionFinEpisodioValores.AutoPlayCuentaAtras) ===
     [ObservableProperty] private bool _mostrarCuentaAtrasSiguiente;
+
+    /// <summary>"Te saltas el episodio 4 (no está descargado)" si el siguiente/anterior con archivo no es el consecutivo; vacío si lo es.</summary>
+    [ObservableProperty] private string _avisoSaltoSiguiente = string.Empty;
+    [ObservableProperty] private string _avisoSaltoAnterior = string.Empty;
+
+    private EpisodioItem? _itemReproduciendose;
+
+    /// <summary>Solo para la marca de favorito del episodio (el progreso y el visto van por PlaybackStateService).</summary>
+    private readonly IDatabaseService _databaseService;
+
+    /// <summary>El episodio que se está viendo está marcado como favorito (botón de arriba; el mismo marcador que en la ficha).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(TooltipFavoritoEpisodio))]
+    private bool _episodioEsFavorito;
+
+    public string TooltipFavoritoEpisodio => LocalizationService.T(EpisodioEsFavorito ? "Player_QuitarFavorito" : "Player_MarcarFavorito");
     [ObservableProperty] private int _segundosCuentaAtrasSiguiente;
     [ObservableProperty] private string _tituloSiguienteEnCuentaAtras = string.Empty;
 
@@ -130,6 +150,48 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     private bool _autoPlayEjecutado = false;
     private double _posicionInicioSegundos = 0;
     private volatile bool _haCompletadoOpen = false;
+
+    /// <summary>
+    /// El fin del episodio (guardar, marcar visto, acción configurada) se procesa UNA vez por llegada al final. Antes, con el
+    /// video parado al final (sin siguiente episodio, "permanecer pausado" o cuenta atrás cancelada), el bucle lo repetía cada
+    /// segundo: guardaba progreso 0 en la base de datos y avisaba a la Ficha/Galería sin parar.
+    /// </summary>
+    private bool _finDeEpisodioProcesado;
+
+    private readonly Stopwatch _relojArranque = new();
+    private bool _arranqueRegistrado;
+
+    /// <summary>Cuenta cada apertura: una consulta de reanudación que termina tarde no debe pisar los datos de un episodio más nuevo
+    /// (pasa al pulsar "siguiente" varias veces seguidas).</summary>
+    private int _versionCarga;
+
+    /// <summary>Consulta del punto guardado del episodio que se está abriendo (va en paralelo con la apertura del archivo).</summary>
+    private Task _tareaReanudacion = Task.CompletedTask;
+
+    /// <summary>
+    /// Hay (o aún puede haber) un salto al punto guardado sin aplicar. Mientras tanto la barra y el reloj NO se actualizan con la
+    /// posición real (que es 0:00): antes se veía un instante el segundo 0 antes de saltar a donde se había dejado.
+    /// </summary>
+    private volatile bool _reanudacionPendiente;
+
+    private readonly Stopwatch _relojCambio = new();
+
+    /// <summary>Reintentos de apertura del episodio actual (uno como mucho: un archivo de verdad dañado no se reintenta sin fin).</summary>
+    private int _reintentosApertura;
+
+    /// <summary>Tiempo máximo esperando a que Flyleaf termine de abrir antes de reintentar (antes se quedaba cargando sin fin y había que
+    /// salir y volver a entrar varias veces).</summary>
+    internal TimeSpan TiempoMaximoApertura { get; set; } = TimeSpan.FromSeconds(8);
+
+    /// <summary>Se está cambiando de pista de audio: el OpenCompleted que llegue no es el de un episodio nuevo.</summary>
+    private bool _cambiandoPistaAudio;
+
+    /// <summary>Ya se vio el primer fotograma (o se dejó de esperar): desde ahí se puede saltar al punto guardado sin romper el arranque del
+    /// decodificador. Con el sondeo rápido del arranque, el bucle llegaba a saltar a los ~100 ms, antes de que hubiera imagen.</summary>
+    private volatile bool _imagenLista;
+
+    /// <summary>La pista de subtítulos por defecto solo se elige sola una vez por episodio (después manda lo que elija el usuario).</summary>
+    private bool _pistaSubtitulosElegida;
 
     private List<AniSkipResult> _skipTimes = new();
     public List<AniSkipResult> SkipTimes => _skipTimes;
@@ -204,7 +266,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     {
         if (episodio == null || string.IsNullOrWhiteSpace(episodio.RutaCompleta)) return;
         CajonEpisodiosAbierto = false;
-        CargarVideo(episodio.RutaCompleta, _animeId, TituloAnime, episodio.NumeroEpisodio, _episodeNavigator.EpisodiosDisponibles.ToList(), _rutaPortada);
+        CargarVideo(episodio.RutaCompleta, _animeId, TituloAnime, episodio.NumeroEpisodio, null, _rutaPortada); // misma lista: no se rehace el cajón
     }
 
     private string _fullscreenIcon = "Fullscreen";
@@ -333,23 +395,207 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         }
     }
 
-    private static readonly List<Filter> FiltrosModoNoche = new()
-    {
-        new Filter { Id = "modonoche", Name = "acompressor", Args = "threshold=0.089:ratio=9:attack=200:release=1000:makeup=2" }
-    };
+    private const string ArgumentosModoNoche = "threshold=0.089:ratio=9:attack=200:release=1000:makeup=2";
 
-    private void AplicarModoNocheAlPlayer(bool activo)
+    private void AplicarModoNocheAlPlayer(bool activo) => AplicarFiltrosAudio();
+
+    /// <summary>Cadena de filtros de audio actual (ecualizador y Modo Noche) en el formato de Flyleaf.</summary>
+    private List<Filter> ConstruirFiltrosAudio() =>
+        Core.EcualizadorAudio.ConstruirFiltros(EcualizadorActivo, BandasEcualizador.Select(b => b.Ganancia).ToList(), ModoNocheActivo, ArgumentosModoNoche)
+            .Select(f => new Filter { Id = f.Id, Name = f.Nombre, Args = f.Argumentos })
+            .ToList();
+
+    /// <summary>Reconstruye la cadena de filtros (al encender/apagar el ecualizador o el Modo Noche; un corte de milisegundos).</summary>
+    private void AplicarFiltrosAudio()
     {
         if (Player?.Config?.Audio == null) return;
         try
         {
-            Player.Config.Audio.Filters = activo ? FiltrosModoNoche : new List<Filter>();
-            Player.Config.Audio.ReloadFilters();
+            Player.Config.Audio.Filters = ConstruirFiltrosAudio();
+            int resultado = Player.Config.Audio.ReloadFilters();
+            if (resultado < 0) AppLogger.Warn("ReproductorViewModel", $"Flyleaf no pudo montar los filtros de audio ({resultado}).");
         }
         catch (Exception ex)
         {
-            AppLogger.Debug("ReproductorViewModel", $"Error aplicando Modo Noche: {ex.Message}");
+            AppLogger.Debug("ReproductorViewModel", $"Error aplicando los filtros de audio: {ex.Message}");
         }
+    }
+
+    // ── Ecualizador ──
+
+    public sealed partial class BandaEcualizador : ObservableObject
+    {
+        public BandaEcualizador(int indice, int frecuencia, double ganancia)
+        {
+            Indice = indice;
+            Etiqueta = Core.EcualizadorAudio.EtiquetaFrecuencia(frecuencia);
+            _ganancia = ganancia;
+        }
+
+        public int Indice { get; }
+        public string Etiqueta { get; }
+
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(TextoGanancia))]
+        private double _ganancia;
+
+        public string TextoGanancia => Ganancia > 0 ? $"+{Ganancia:0}" : $"{Ganancia:0}";
+    }
+
+    /// <summary>Un ajuste predefinido tal como se ve en el menú (EsActual resalta el que está puesto).</summary>
+    public sealed partial class OpcionPresetEcualizador : ObservableObject
+    {
+        public OpcionPresetEcualizador(string clave, string nombre)
+        {
+            Clave = clave;
+            Nombre = nombre;
+        }
+
+        public string Clave { get; }
+        public string Nombre { get; }
+
+        [ObservableProperty] private bool _esActual;
+    }
+
+    public System.Collections.ObjectModel.ObservableCollection<BandaEcualizador> BandasEcualizador { get; } = new();
+
+    public IReadOnlyList<OpcionPresetEcualizador> PresetsEcualizador { get; private set; } = Array.Empty<OpcionPresetEcualizador>();
+
+    [ObservableProperty] private bool _ecualizadorActivo;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(NombrePresetEcualizador))]
+    private string _presetEcualizador = Core.EcualizadorAudio.PresetPlano;
+
+    /// <summary>"Voces claras", "Personalizado"…</summary>
+    public string NombrePresetEcualizador => LocalizationService.T("Eq_Preset_" + PresetEcualizador);
+
+    partial void OnPresetEcualizadorChanged(string value)
+    {
+        foreach (var opcion in PresetsEcualizador) opcion.EsActual = opcion.Clave == value;
+    }
+
+    private bool _aplicandoPreset;
+    private CancellationTokenSource? _guardadoEcualizadorCts;
+
+    private void CargarEcualizador(AppSettings? config)
+    {
+        var ganancias = Core.EcualizadorAudio.Normalizar(config?.EcualizadorGanancias);
+        foreach (var banda in BandasEcualizador) banda.PropertyChanged -= Banda_PropertyChanged;
+        BandasEcualizador.Clear();
+        for (int i = 0; i < ganancias.Length; i++)
+        {
+            var banda = new BandaEcualizador(i, Core.EcualizadorAudio.Frecuencias[i], ganancias[i]);
+            banda.PropertyChanged += Banda_PropertyChanged;
+            BandasEcualizador.Add(banda);
+        }
+        string preset = Core.EcualizadorAudio.PresetDe(ganancias);
+        PresetsEcualizador = Core.EcualizadorAudio.Presets
+            .Select(p => new OpcionPresetEcualizador(p.Clave, LocalizationService.T("Eq_Preset_" + p.Clave)) { EsActual = p.Clave == preset })
+            .ToList();
+
+        _cargandoEcualizador = true; // lo que se lee de los ajustes no se vuelve a guardar
+        try
+        {
+            EcualizadorActivo = config?.EcualizadorActivo ?? false;
+            PresetEcualizador = preset;
+        }
+        finally
+        {
+            _cargandoEcualizador = false;
+        }
+    }
+
+    private bool _cargandoEcualizador;
+
+    partial void OnEcualizadorActivoChanged(bool value)
+    {
+        if (_cargandoEcualizador) return; // aún no hay Player: CreateOptimizedPlayer ya monta los filtros guardados
+        AplicarFiltrosAudio();
+        GuardarEcualizadorEnDiferido();
+    }
+
+    /// <summary>Mover una banda: solo se le manda la ganancia nueva a su filtro (sin reconstruir la cadena, sin cortes).</summary>
+    private void Banda_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(BandaEcualizador.Ganancia) || sender is not BandaEcualizador banda) return;
+
+        if (!_aplicandoPreset)
+        {
+            PresetEcualizador = Core.EcualizadorAudio.PresetDe(BandasEcualizador.Select(b => b.Ganancia).ToList());
+            if (!EcualizadorActivo) EcualizadorActivo = true; // mover una banda con el ecualizador apagado lo enciende (ya monta la cadena y guarda)
+            else
+            {
+                ActualizarFiltroBanda(banda);
+                GuardarEcualizadorEnDiferido();
+            }
+        }
+    }
+
+    private void ActualizarFiltroBanda(BandaEcualizador banda)
+    {
+        if (!EcualizadorActivo || Player?.Config?.Audio == null) return;
+        try
+        {
+            var audio = Player.Config.Audio;
+            int r1 = audio.UpdateFilter(Core.EcualizadorAudio.IdBanda(banda.Indice), "g", Core.EcualizadorAudio.TextoGanancia(banda.Ganancia));
+            double pre = Core.EcualizadorAudio.Preamplificacion(BandasEcualizador.Select(b => b.Ganancia).ToList());
+            int r2 = audio.UpdateFilter(Core.EcualizadorAudio.IdPreamplificador, "volume", Core.EcualizadorAudio.TextoVolumen(pre));
+            if (r1 < 0 || r2 < 0) AplicarFiltrosAudio(); // si el filtro no admite el cambio en vivo, se monta la cadena de nuevo
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("ReproductorViewModel", $"Error cambiando una banda del ecualizador: {ex.Message}");
+        }
+    }
+
+    [RelayCommand]
+    private void AplicarPresetEcualizador(string? clave)
+    {
+        var preset = Core.EcualizadorAudio.Presets.FirstOrDefault(p => p.Clave == clave);
+        if (preset == null) return;
+
+        _aplicandoPreset = true;
+        try
+        {
+            for (int i = 0; i < BandasEcualizador.Count; i++) BandasEcualizador[i].Ganancia = preset.Ganancias[i];
+        }
+        finally
+        {
+            _aplicandoPreset = false;
+        }
+        PresetEcualizador = preset.Clave;
+        if (!EcualizadorActivo) EcualizadorActivo = true; // elegir un ajuste enciende el ecualizador (ya reconstruye la cadena)
+        else AplicarFiltrosAudio();
+        GuardarEcualizadorEnDiferido();
+    }
+
+    [RelayCommand]
+    private void RestablecerEcualizador() => AplicarPresetEcualizador(Core.EcualizadorAudio.PresetPlano);
+
+    /// <summary>Se guarda en los ajustes medio segundo después del último cambio (arrastrar un deslizador genera decenas).</summary>
+    private void GuardarEcualizadorEnDiferido()
+    {
+        if (_settingsService == null) return;
+        _guardadoEcualizadorCts?.Cancel();
+        var cts = new CancellationTokenSource();
+        _guardadoEcualizadorCts = cts;
+        var ganancias = BandasEcualizador.Select(b => b.Ganancia).ToList();
+        bool activo = EcualizadorActivo;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(500, cts.Token);
+                var config = _settingsService.ObtenerConfiguracion();
+                if (config == null) return;
+                config.EcualizadorActivo = activo;
+                config.EcualizadorGanancias = ganancias;
+                await _settingsService.GuardarConfiguracionAsync(config);
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex) { AppLogger.Debug("ReproductorViewModel", $"No se pudo guardar el ecualizador: {ex.Message}"); }
+        });
     }
 
     private void GuardarModoNochePreferencia(bool activo)
@@ -403,8 +649,10 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         ISubtitleCoordinator? subtitleCoordinator = null,
         ISubtitleCuesExtractorService? subtitleCuesExtractorService = null,
         IPlaybackVolumeCoordinator? volumeCoordinator = null,
-        IPlaybackSeekCoordinator? seekCoordinator = null)
+        IPlaybackSeekCoordinator? seekCoordinator = null,
+        IFotogramasClaveService? fotogramasClaveService = null)
     {
+        _databaseService = databaseService;
         _settingsService = settingsService;
         _logrosService = logrosService;
         DialogService = dialogService;
@@ -420,6 +668,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         _subtitleCuesExtractor = subtitleCuesExtractorService ?? new SubtitleCuesExtractorService();
         _volumeCoordinator = volumeCoordinator ?? new PlaybackVolumeCoordinator();
         _seekCoordinator = seekCoordinator ?? new PlaybackSeekCoordinator();
+        _fotogramasClaveService = fotogramasClaveService ?? new FotogramasClaveService();
 
         // SMT-01: SMTC es un singleton (un único HWND); esta instancia se suscribe a sus
         // botones mientras controla la reproducción y se desuscribe en Dispose(). Al ser
@@ -446,9 +695,12 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                 _subtitulosHabilitados = config.SubtitulosPorDefecto;
                 _subtitulosIcon = config.SubtitulosPorDefecto ? "Subtitles" : "SubtitlesOutline";
                 _modoNocheActivo = config.ModoNocheActivo;
+                CargarEcualizador(config);
                 _estiloSubtitulos = (config.EstiloSubtitulos ?? new EstiloSubtitulos()).Normalizar();
             }
         }
+
+        if (BandasEcualizador.Count == 0) CargarEcualizador(null); // sin ajustes: ecualizador plano y apagado
     }
 
     /// <summary>
@@ -500,12 +752,10 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         VolumenIcon = _volumeCoordinator.CalcularIcono(Volumen, IsMuted);
     }
 
-    private static readonly object _engineLock = new();
-    private static bool _engineIniciado = false;
 
     // En entornos de pruebas (headless) Flyleaf puede dejar su hilo maestro bloqueado y
     // cualquier construcción posterior de Config() se cuelga en Dispatcher.Invoke síncrono.
-    private static bool EsEntornoPruebas()
+    internal static bool EsEntornoPruebas()
     {
         try
         {
@@ -564,25 +814,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
         try
         {
-            lock (_engineLock)
-            {
-                if (!_engineIniciado)
-                {
-                    try
-                    {
-                        Engine.Start(new EngineConfig()
-                        {
-                            FFmpegPath = ":FFmpeg",
-                            UIRefresh = true
-                        });
-                        _engineIniciado = true;
-                    }
-                    catch (Exception initEx)
-                    {
-                        AppLogger.Debug("ReproductorViewModel", $"No se pudo iniciar motor Flyleaf: {initEx.Message}");
-                    }
-                }
-            }
+            MotorVideo.AsegurarIniciado();
 
             var config = new Config();
             
@@ -595,12 +827,16 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                 // El hilo de reproducción es el que alimenta el audio: con la ventana sin foco y
                 // otras apps compitiendo por CPU, en prioridad Normal el sonido se entrecorta.
                 config.Player.ThreadPriority = ThreadPriority.Highest;
+                // Contador de fotogramas mostrados: con él se sabe cuándo aparece la imagen de verdad (ver VigilarArranqueAsync).
+                config.Player.Stats = true;
             }
 
             // 2. Decoder multi-hilos para decodificación suave de AV1 y HEVC 10-bit
             if (config.Decoder != null)
             {
-                config.Decoder.VideoThreads = Math.Max(2, Environment.ProcessorCount / 2);
+                // Todos los hilos: el AV1 va por software en gráficas sin soporte (Intel HD 620) y un salto preciso decodifica hasta
+                // ~10 s de video; con 4 hilos en vez de 2 se decodifica un ~15 % más rápido (medido con ffmpeg: 231 → 267 fps).
+                config.Decoder.VideoThreads = Math.Max(2, Environment.ProcessorCount);
             }
 
             // 2b. Decodificación por GPU (Direct3D) explícita: es el valor por defecto de FlyleafLib,
@@ -610,7 +846,12 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             // pero funcional) — se registra cuál de las dos se usó en OpenCompleted, más abajo.
             if (config.Video != null)
             {
-                config.Video.VideoAcceleration = true;
+                var ajustes = _settingsService?.ObtenerConfiguracion();
+                config.Video.VideoAcceleration = ajustes?.AceleracionHardwareVideo ?? true;
+
+                // Tarjeta gráfica elegida en Configuración (portátiles con integrada + dedicada: Windows suele dar la integrada).
+                string? patronTarjeta = MotorVideo.PatronTarjeta(ajustes?.TarjetaGraficaVideo);
+                if (patronTarjeta != null) config.Video.GPUAdapter = patronTarjeta;
             }
 
             // 3. Buffer de Demuxer en RAM (30 segundos precargados en memoria para reproducción sin tirones)
@@ -626,10 +867,10 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                 config.Subtitles.Enabled = SubtitulosHabilitados;
             }
 
-            // 5. Modo Noche (compresor de rango dinámico), si el usuario lo dejó activo la vez anterior
-            if (config.Audio != null && ModoNocheActivo)
+            // 5. Filtros de audio guardados: ecualizador y Modo Noche (compresor de rango dinámico)
+            if (config.Audio != null && (ModoNocheActivo || EcualizadorActivo))
             {
-                config.Audio.Filters = FiltrosModoNoche;
+                config.Audio.Filters = ConstruirFiltrosAudio();
             }
 
             var player = new Player(config);
@@ -643,20 +884,36 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
             player.OpenCompleted += (s, e) =>
             {
+                // Cambiar de pista de subtítulos también dispara OpenCompleted: solo hay que extraer la pista nueva. Antes se
+                // reevaluaba "subtítulos por defecto" y, con esa opción apagada, se apagaba en el acto la pista que el usuario
+                // acababa de elegir en el menú.
+                if (e.IsSubtitles)
+                {
+                    if (!e.Success) AppLogger.Warn("ReproductorViewModel", $"No se pudo abrir la pista de subtítulos: {e.Error}");
+                    CargarCuesSubtitulosSiCorresponde();
+                    return;
+                }
+
+                if (_cambiandoPistaAudio)
+                {
+                    // Cambio de pista de audio desde el menú: el video sigue donde estaba; solo se restaura volumen/silencio.
+                    _cambiandoPistaAudio = false;
+                    if (!e.Success) AppLogger.Warn("ReproductorViewModel", $"No se pudo abrir la pista de audio: {e.Error}");
+                    try { if (player.Audio != null) { player.Audio.Volume = Volumen; player.Audio.Mute = IsMuted; } } catch { }
+                    return;
+                }
+
+                if (!e.Success)
+                {
+                    if (ReintentarAperturaSiCorresponde(e.Error)) return;
+                    NotificarFalloAlAbrir(e.Error);
+                    return;
+                }
+
                 _haCompletadoOpen = true;
+                AppLogger.Debug("ReproductorViewModel", $"[Arranque] OpenCompleted a los {_relojArranque.ElapsedMilliseconds} ms (estado {player.Status}).");
                 EvaluarSubtitulosPorDefecto();
                 CargarCuesSubtitulosSiCorresponde();
-
-                // Diagnóstico: qué decodificador se negoció de verdad para este archivo. El soporte de
-                // AV1/HEVC 10-bit por GPU varía mucho entre tarjetas — sin este log, una caída
-                // silenciosa a software (más lenta, más CPU) se confundiría con "el reproductor va lento"
-                // sin pista de la causa real.
-                try
-                {
-                    bool porHardware = player.VideoDecoder?.VideoAccelerated ?? false;
-                    AppLogger.Debug("ReproductorViewModel", $"Decodificación de video: {(porHardware ? "hardware (GPU)" : "software (CPU)")}");
-                }
-                catch { }
 
                 try
                 {
@@ -674,11 +931,16 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                 {
                     try
                     {
+                        // Sigue en silencio hasta que se vea la imagen (y, al reanudar, hasta que el salto al punto guardado se
+                        // asiente): lo quita VigilarArranqueAsync.
                         player.Audio.Volume = Volumen;
-                        player.Audio.Mute = IsMuted;
+                        player.Audio.Mute = true;
                     }
                     catch { }
                 }
+
+                ActualizarPistasAudio(aplicarPreferencia: true);
+                _ = VigilarArranqueAsync(player, _trackingCts?.Token ?? CancellationToken.None);
 
                 // IMPORTANTE: NO seekear aquí (ni el diferido-al-abrir del coordinador ni la
                 // reanudación). En este punto el decoder de video aún está creando su contexto de
@@ -771,7 +1033,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     public void Rewind10()
     {
         double newSeconds = Math.Max(0, CurrentSeconds - PasosSaltoSegundos);
-        Seek(newSeconds);
+        Saltar(newSeconds, TipoSalto.Atras);
     }
 
     [RelayCommand]
@@ -779,7 +1041,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     {
         double max = TotalSeconds > 0 ? TotalSeconds : double.MaxValue;
         double newSeconds = Math.Min(max, CurrentSeconds + PasosSaltoSegundos);
-        Seek(newSeconds);
+        Saltar(newSeconds, TipoSalto.Adelante);
     }
 
     // === Scrubbing de la línea de tiempo ===
@@ -787,9 +1049,46 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
     private void ActualizarTextosTiempo(double posicionSegundos)
     {
-        var t = TimeSpan.FromSeconds(posicionSegundos);
-        TiempoActualTexto = t.ToString(t.Hours > 0 ? @"hh\:mm\:ss" : @"mm\:ss");
+        TiempoActualTexto = FormatearTiempo(posicionSegundos, TotalSeconds);
         TiempoCombinadoTexto = $"{TiempoActualTexto} / {TiempoTotalTexto}";
+    }
+
+    /// <summary>Fija la duración del episodio (barra y texto) y rehace los marcadores con ella.</summary>
+    private void EstablecerDuracion(double duracionSegundos)
+    {
+        TotalSeconds = duracionSegundos;
+        TiempoTotalTexto = duracionSegundos > 0 ? FormatearTiempo(duracionSegundos, duracionSegundos) : "00:00";
+        TiempoActualTexto = FormatearTiempo(CurrentSeconds, duracionSegundos);
+        TiempoCombinadoTexto = $"{TiempoActualTexto} / {TiempoTotalTexto}";
+
+        // Los tramos pudieron llegar antes que la duración (el análisis guardado responde al instante): se recortan con la real.
+        if (_skipTimes.Count > 0) SegmentosLineaTiempo = SegmentoLineaTiempo.Crear(_skipTimes, duracionSegundos);
+    }
+
+    /// <summary>
+    /// "mm:ss", o "h:mm:ss" si el episodio dura una hora o más — el mismo formato para la posición y la duración (antes la
+    /// posición pasaba a "hh:mm:ss" solo al cruzar la hora y quedaba "59:59 / 01:20:00"). Los segundos se truncan, como en
+    /// cualquier reproductor: el final se ajusta a la duración exacta al terminar (ver <see cref="AjustarPosicionAlFinal"/>).
+    /// </summary>
+    internal static string FormatearTiempo(double segundos, double duracionReferencia)
+    {
+        var t = TimeSpan.FromSeconds(Math.Max(0, segundos));
+        bool conHoras = duracionReferencia >= 3600 || t.TotalHours >= 1;
+        return conHoras
+            ? $"{(int)t.TotalHours}:{t.Minutes:00}:{t.Seconds:00}"
+            : $"{(int)t.TotalMinutes:00}:{t.Seconds:00}";
+    }
+
+    /// <summary>
+    /// Al terminar el episodio la barra queda llena y el tiempo igual a la duración. Antes se quedaba en la última lectura del
+    /// sondeo (hasta medio segundo antes del final): "23:59 / 24:00" y la bolita sin llegar al borde.
+    /// </summary>
+    internal void AjustarPosicionAlFinal()
+    {
+        if (TotalSeconds <= 0 || IsDraggingSlider) return;
+        CurrentSeconds = TotalSeconds;
+        _lastNotifiedSeconds = TotalSeconds;
+        ActualizarTextosTiempo(TotalSeconds);
     }
 
     private static double AcotarPosicion(double segundos)
@@ -803,17 +1102,32 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     /// o usa los atajos de teclado. Feedback de UI inmediato + seek nativo coalescido (último-gana).
     /// </summary>
     [RelayCommand]
-    public void Seek(double seconds)
+    public void Seek(double seconds) => Saltar(seconds, TipoSalto.Libre);
+
+    /// <summary>
+    /// Salto puntual (flechas, ±N s, saltar opening, clic en la barra). Si hay un fotograma clave cerca del destino se salta a él con el
+    /// salto rápido (instantáneo); si no, salto preciso. En AV1 el preciso decodifica hasta ~10 s de video (0,7-1 s de espera en un
+    /// i5-7300U) y el rápido a secas caía hasta 10 s antes de lo pedido (o no avanzaba); con esto ~9 de cada 10 saltos con las flechas
+    /// son instantáneos, con ~1,5 s de diferencia media. Mientras la lista de fotogramas clave no está (~1 s tras abrir), son precisos.
+    /// </summary>
+    internal void Saltar(double seconds, TipoSalto tipo)
     {
         seconds = AcotarPosicion(seconds);
+        var (destino, preciso) = _estrategiaSaltos switch
+        {
+            EstrategiaSaltos.Exactos => (seconds, true),
+            EstrategiaSaltos.Rapidos => FotogramasClaveService.ElegirDestinoRapido(_fotogramasClave, seconds, tipo, CurrentSeconds),
+            _ => FotogramasClaveService.ElegirDestino(_fotogramasClave, seconds, tipo, CurrentSeconds)
+        };
+        if (TotalSeconds > 0 && destino > TotalSeconds) (destino, preciso) = (seconds, true);
 
         // Actualizar UI inmediatamente para feedback instantáneo
         _seekCoordinator.IniciarVentanaDeSettle();
-        _lastNotifiedSeconds = seconds;
-        CurrentSeconds = seconds;
-        ActualizarTextosTiempo(seconds);
+        _lastNotifiedSeconds = destino;
+        CurrentSeconds = destino;
+        ActualizarTextosTiempo(destino);
 
-        _seekCoordinator.SolicitarSeek(Player, seconds, () => _haCompletadoOpen);
+        _seekCoordinator.SolicitarSeek(Player, destino, () => _haCompletadoOpen, preciso);
     }
 
     /// <summary>
@@ -891,9 +1205,8 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
-    /// PIP-01: además de conmutar el flag que muestra los controles compactos, encoge la
-    /// VENTANA de verdad (Topmost, sin chrome, anclada a la esquina) vía IVentanaPrincipal —
-    /// así el video sigue visible por encima de otras apps, no solo de otras pestañas de esta.
+    /// Mini reproductor: el episodio pasa a una ventana flotante propia (siempre encima, visible aunque la app esté minimizada)
+    /// y la ventana principal queda libre para navegar. EsModoMini hace que la vista muestre sus controles compactos.
     /// </summary>
     [RelayCommand]
     public void MinimizarAMini()
@@ -905,8 +1218,9 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     [RelayCommand]
     public void RestaurarFormatoHabitual()
     {
-        EsModoMini = false;
-        _windowModeCoordinator.SalirModoMini();
+        EsModoMini = false; // la ventana principal vuelve a dibujar el reproductor…
+        _windowModeCoordinator.SalirModoMini(); // …y se cierra la flotante
+        _windowModeCoordinator.MostrarVentanaPrincipal();
     }
 
 
@@ -918,6 +1232,82 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         SubtitulosHabilitados = true;
         SubtitulosIcon = "Subtitles";
         _subtitleCoordinator.SeleccionarPista(Player, stream);
+    }
+
+    // ── Pistas de audio (solo con más de una: doblaje + original, comentarios…) ──
+
+    public System.Collections.ObjectModel.ObservableCollection<OpcionPistaAudio> PistasAudio { get; } = new();
+
+    [ObservableProperty] private bool _hayVariasPistasAudio;
+
+    [RelayCommand]
+    private void SeleccionarPistaAudio(OpcionPistaAudio? opcion)
+    {
+        if (opcion == null || opcion.EsActual) return;
+        CambiarPistaAudio(opcion, recordar: true);
+    }
+
+    /// <summary>Rehace el menú de audio con las pistas del archivo; con <paramref name="aplicarPreferencia"/> pone sola la del idioma
+    /// que el usuario eligió la última vez.</summary>
+    private void ActualizarPistasAudio(bool aplicarPreferencia)
+    {
+        var audio = Player?.Audio;
+        var streams = audio?.Streams?.ToList() ?? new List<FlyleafLib.MediaFramework.MediaStream.AudioStream>();
+        int actual = audio?.StreamIndex ?? -1;
+        var opciones = streams.Select((st, i) =>
+        {
+            string? idioma = null;
+            try { idioma = st.Language?.TopCulture?.TwoLetterISOLanguageName; } catch { }
+            if (idioma is "iv") idioma = null; // cultura invariante = sin idioma
+            return new OpcionPistaAudio(st, OpcionPistaAudio.ConstruirNombre(idioma, st.Title, i + 1), idioma, st.StreamIndex == actual);
+        }).ToList();
+
+        EnHiloDeInterfaz(() =>
+        {
+            PistasAudio.Clear();
+            foreach (var o in opciones) PistasAudio.Add(o);
+            HayVariasPistasAudio = opciones.Count > 1;
+        });
+
+        if (!aplicarPreferencia) return;
+        var preferida = OpcionPistaAudio.ElegirPreferida(opciones, _settingsService?.ObtenerConfiguracion()?.IdiomaAudioPreferido);
+        if (preferida != null && !preferida.EsActual)
+        {
+            AppLogger.Debug("ReproductorViewModel", $"Pista de audio preferida ({preferida.Idioma}) elegida automáticamente.");
+            CambiarPistaAudio(preferida, recordar: false);
+        }
+    }
+
+    private void CambiarPistaAudio(OpcionPistaAudio opcion, bool recordar)
+    {
+        if (Player == null || opcion.Pista is not FlyleafLib.MediaFramework.MediaStream.AudioStream pista) return;
+
+        EnHiloDeInterfaz(() => { foreach (var o in PistasAudio) o.EsActual = ReferenceEquals(o, opcion) || o.Pista == opcion.Pista; });
+
+        if (recordar && !string.IsNullOrWhiteSpace(opcion.Idioma) && _settingsService?.ObtenerConfiguracion() is { } config
+            && !string.Equals(config.IdiomaAudioPreferido, opcion.Idioma, StringComparison.OrdinalIgnoreCase))
+        {
+            config.IdiomaAudioPreferido = opcion.Idioma;
+            _ = _settingsService.GuardarConfiguracionAsync(config);
+        }
+
+        try
+        {
+            _cambiandoPistaAudio = true;
+            Player.OpenAsync(pista);
+        }
+        catch (Exception ex)
+        {
+            _cambiandoPistaAudio = false;
+            AppLogger.Warn("ReproductorViewModel", $"No se pudo cambiar la pista de audio: {ex.Message}");
+        }
+    }
+
+    private static void EnHiloDeInterfaz(Action accion)
+    {
+        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+        if (dispatcher == null || dispatcher.CheckAccess()) accion();
+        else dispatcher.InvokeAsync(accion);
     }
 
     [RelayCommand]
@@ -935,6 +1325,19 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             if (_subtitleCoordinator.DebenHabilitarsePorDefecto(Player, permitirSubtitulos))
             {
                 HabilitarSubtitulos();
+
+                // El archivo trae pistas pero ninguna marcada por defecto: Flyleaf no muestra nada. Se elige una (idioma de la app,
+                // luego inglés) y se abre como si el usuario la hubiera elegido en el menú.
+                if (!_pistaSubtitulosElegida)
+                {
+                    _pistaSubtitulosElegida = true;
+                    var pista = _subtitleCoordinator.PistaPorDefecto(Player, LocalizationService.Cultura.TwoLetterISOLanguageName);
+                    if (pista != null)
+                    {
+                        AppLogger.Debug("ReproductorViewModel", "Ninguna pista de subtítulos venía activa: se elige una automáticamente.");
+                        _subtitleCoordinator.SeleccionarPista(Player, pista);
+                    }
+                }
             }
             else
             {
@@ -975,36 +1378,121 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         var siguiente = ObtenerSiguienteEpisodio();
         _siguienteEpisodioCache = siguiente;
         TieneEpisodioSiguiente = siguiente != null && !string.IsNullOrWhiteSpace(siguiente.RutaCompleta);
+        AvisoSaltoSiguiente = TieneEpisodioSiguiente ? TextoEpisodiosSaltados(_episodio, siguiente!.NumeroEpisodio) : string.Empty;
         EpisodioSiguienteTooltip = TieneEpisodioSiguiente
-            ? $"Siguiente: Episodio {siguiente!.NumeroEpisodio} (N)"
-            : "No hay siguiente episodio";
+            ? ConAviso(string.Format(LocalizationService.T("Player_SiguienteTooltipFormato"), siguiente!.NumeroEpisodio, NombreTecla("SiguienteEpisodio")), AvisoSaltoSiguiente)
+            : LocalizationService.T("Player_SinSiguienteEpisodio");
 
         var anterior = ObtenerAnteriorEpisodio();
         TieneEpisodioAnterior = anterior != null && !string.IsNullOrWhiteSpace(anterior.RutaCompleta);
+        AvisoSaltoAnterior = TieneEpisodioAnterior ? TextoEpisodiosSaltados(_episodio, anterior!.NumeroEpisodio) : string.Empty;
         EpisodioAnteriorTooltip = TieneEpisodioAnterior
-            ? $"Anterior: Episodio {anterior!.NumeroEpisodio} (B)"
-            : "No hay episodio anterior";
+            ? ConAviso(string.Format(LocalizationService.T("Player_AnteriorTooltipFormato"), anterior!.NumeroEpisodio, NombreTecla("AnteriorEpisodio")), AvisoSaltoAnterior)
+            : LocalizationService.T("Player_SinEpisodioAnterior");
+
+        MarcarEpisodioReproduciendose();
 
         _smtc?.ActualizarNavegacionDisponible(TieneEpisodioSiguiente, TieneEpisodioAnterior);
     }
 
     [RelayCommand]
-    public void SiguienteEpisodio()
+    public void SiguienteEpisodio() => IrAEpisodio(ObtenerSiguienteEpisodio(), avisarSalto: true);
+
+    [RelayCommand]
+    public void AnteriorEpisodio() => IrAEpisodio(ObtenerAnteriorEpisodio(), avisarSalto: true);
+
+    /// <summary>
+    /// Abre otro episodio de la misma lista. Si entre medias faltan episodios sin descargar (del 3 al 6), se avisa: antes se
+    /// saltaba en silencio y parecía que el 6 era el que seguía. La cuenta atrás ya lo avisa en pantalla, así que ahí no se repite.
+    /// </summary>
+    private void IrAEpisodio(EpisodioItem? destino, bool avisarSalto)
     {
-        var siguiente = ObtenerSiguienteEpisodio();
-        if (siguiente != null && !string.IsNullOrWhiteSpace(siguiente.RutaCompleta))
+        if (destino == null || string.IsNullOrWhiteSpace(destino.RutaCompleta)) return;
+
+        string aviso = TextoEpisodiosSaltados(_episodio, destino.NumeroEpisodio);
+        if (avisarSalto && aviso.Length > 0)
         {
-            CargarVideo(siguiente.RutaCompleta, _animeId, TituloAnime, siguiente.NumeroEpisodio, _episodeNavigator.EpisodiosDisponibles.ToList(), _rutaPortada);
+            AvisarEnReproductor(
+                string.Format(LocalizationService.T("Player_SaltoTitulo"), destino.NumeroEpisodio), aviso, "AlertOutline", "#F59E0B");
+        }
+
+        // Misma lista (null): antes se pasaba una copia y el cajón rehacía todas sus filas (1180 en One Piece) en cada cambio.
+        CargarVideo(destino.RutaCompleta, _animeId, TituloAnime, destino.NumeroEpisodio, null, _rutaPortada);
+    }
+
+    /// <summary>"Te saltas el episodio 4 (no está descargado)" / "Te saltas los episodios 4–6 (3 sin descargar)"; vacío si son consecutivos.</summary>
+    internal static string TextoEpisodiosSaltados(int actual, int destino)
+    {
+        var faltan = EpisodeNavigator.EpisodiosIntermedios(actual, destino);
+        return faltan.Count switch
+        {
+            0 => string.Empty,
+            1 => string.Format(LocalizationService.T("Player_SaltoUnEpisodio"), faltan[0]),
+            _ => string.Format(LocalizationService.T("Player_SaltoVariosEpisodios"), faltan[0], faltan[^1], faltan.Count),
+        };
+    }
+
+    private static string ConAviso(string texto, string aviso) => aviso.Length == 0 ? texto : $"{texto}\n⚠ {aviso}";
+
+    /// <summary>Marca en el cajón de episodios la fila del episodio que está sonando (y desmarca la anterior).</summary>
+    private void MarcarEpisodioReproduciendose()
+    {
+        var actual = _episodeNavigator.EpisodiosDisponibles.FirstOrDefault(e => e.NumeroEpisodio == _episodio);
+        if (ReferenceEquals(actual, _itemReproduciendose)) return;
+        if (_itemReproduciendose != null) _itemReproduciendose.EsReproduciendose = false;
+        _itemReproduciendose = actual;
+        if (actual != null) actual.EsReproduciendose = true;
+    }
+
+    public EpisodioItem? EpisodioReproduciendose => _itemReproduciendose;
+
+    /// <summary>
+    /// Con la lista de la ficha, el favorito sale de su fila; si se abrió sin lista (desde Historial o Actualizaciones) se lee de la
+    /// base de datos. Si mientras tanto se cambió de episodio, la respuesta vieja se descarta.
+    /// </summary>
+    private async Task CargarFavoritoAsync(int version)
+    {
+        if (_itemReproduciendose != null)
+        {
+            EpisodioEsFavorito = _itemReproduciendose.Favorito;
+            return;
+        }
+
+        EpisodioEsFavorito = false;
+        try
+        {
+            var registros = await _databaseService.ObtenerRegistrosPorAnimeAsync(_animeId);
+            if (version != _versionCarga) return;
+            EpisodioEsFavorito = registros?.FirstOrDefault(r => r.NumeroEpisodio == _episodio)?.FavoritoLocal == true;
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("ReproductorViewModel", $"No se pudo leer el favorito del episodio: {ex.Message}");
         }
     }
 
+    /// <summary>
+    /// Marca o desmarca como favorito el episodio que se está viendo. Solo cambia esa marca (no el progreso), y la fila de la ficha
+    /// y del cajón se actualizan a la vez porque son el mismo EpisodioItem.
+    /// </summary>
     [RelayCommand]
-    public void AnteriorEpisodio()
+    private async Task AlternarFavoritoEpisodioAsync()
     {
-        var anterior = ObtenerAnteriorEpisodio();
-        if (anterior != null && !string.IsNullOrWhiteSpace(anterior.RutaCompleta))
+        if (_animeId <= 0) return;
+
+        bool favorito = !EpisodioEsFavorito;
+        EpisodioEsFavorito = favorito;
+        if (_itemReproduciendose != null) _itemReproduciendose.Favorito = favorito;
+
+        try
         {
-            CargarVideo(anterior.RutaCompleta, _animeId, TituloAnime, anterior.NumeroEpisodio, _episodeNavigator.EpisodiosDisponibles.ToList(), _rutaPortada);
+            await _databaseService.GuardarFavoritoEpisodioAsync(_animeId, _episodio, favorito, _rutaVideo);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn("ReproductorViewModel", $"No se pudo guardar el favorito del episodio {_episodio}: {ex.Message}");
+            EpisodioEsFavorito = !favorito;
+            if (_itemReproduciendose != null) _itemReproduciendose.Favorito = !favorito;
         }
     }
 
@@ -1024,31 +1512,33 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     /// </summary>
     private EpisodioItem? _siguienteEpisodioCache;
 
-    public async Task VerificarProgresoPrevioAsync(int animeId, int episodio)
+    public Task VerificarProgresoPrevioAsync(int animeId, int episodio) => VerificarProgresoPrevioAsync(animeId, episodio, _versionCarga);
+
+    private async Task VerificarProgresoPrevioAsync(int animeId, int episodio, int version)
     {
         try
         {
             var previo = await _playbackState.ObtenerPosicionParaReanudarAsync(animeId, episodio, _rutaVideo);
-            if (previo.HasValue)
+            if (version != _versionCarga) return; // ya se abrió otro episodio: estos datos no son suyos
+
+            if (previo.HasValue && previo.Value.Posicion > 5)
             {
                 var (posicion, duracion) = previo.Value;
                 _resumingPositionSeconds = posicion;
+                _posicionInicioSegundos = posicion;
+                if (duracion > 0) EstablecerDuracion(duracion);
                 CurrentSeconds = posicion;
-                var tCur = TimeSpan.FromSeconds(posicion);
-                TiempoActualTexto = tCur.ToString(tCur.Hours > 0 ? @"hh\:mm\:ss" : @"mm\:ss");
-                if (duracion > 0)
-                {
-                    TotalSeconds = duracion;
-                    var tDur = TimeSpan.FromSeconds(duracion);
-                    TiempoTotalTexto = tDur.ToString(tDur.Hours > 0 ? @"hh\:mm\:ss" : @"mm\:ss");
-                }
-                TiempoCombinadoTexto = $"{TiempoActualTexto} / {TiempoTotalTexto}";
+                _lastNotifiedSeconds = posicion;
+                ActualizarTextosTiempo(posicion);
+                return;
             }
         }
         catch (Exception ex)
         {
             AppLogger.Debug("ReproductorViewModel", $"Error comprobando progreso previo: {ex.Message}");
         }
+
+        if (version == _versionCarga) _reanudacionPendiente = false; // sin punto guardado: la barra ya puede seguir al video
     }
 
     public async Task CargarSkipTimesAsync(int animeId, int episodio, CancellationToken ct = default)
@@ -1124,6 +1614,8 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
     public async Task CargarVideoAsync(string rutaVideo, int animeId, string tituloAnime, int episodio, List<EpisodioItem>? listaEpisodios = null, string? rutaPortada = null)
     {
+        int version = ++_versionCarga;
+        _relojCambio.Restart();
         _ = GuardarProgresoActualAsync();
 
         CancellationToken skipCtToken = CancelarTrabajoPendienteDelEpisodioAnterior();
@@ -1131,35 +1623,50 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         AsignarMetadatosDeEpisodio(rutaVideo, animeId, episodio, tituloAnime, rutaPortada);
         EstablecerListaDeEpisodiosSiCorresponde(listaEpisodios);
         ActualizarEstadosNavegacionEpisodios();
+        _ = CargarFavoritoAsync(version);
 
         // Cancelar rastreo previo
         _trackingCts?.Cancel();
         _trackingCts?.Dispose();
         _trackingCts = new CancellationTokenSource();
 
-        // 1. Asegurar que Player existe antes de configurar el nuevo archivo
+        // 1. Asegurar que Player existe antes de configurar el nuevo archivo. No se detiene antes el video anterior: la apertura de
+        //    Flyleaf ya lo reinicia en su propio hilo, y el Stop() previo repetía ese trabajo en el de la interfaz (~200 ms bloqueada
+        //    en cada cambio de episodio). El audio viejo se silencia justo antes de abrir y la tapa cubre la última imagen.
         AsegurarPlayerInicializado();
-        DetenerPlayerSiEstabaActivo();
 
-        // 2. Obtener progreso previo ANTES de abrir/reproducir para que comience de inmediato donde se dejó
-        await VerificarProgresoPrevioAsync(animeId, episodio);
-        _posicionInicioSegundos = _resumingPositionSeconds;
-
-        // Cubrir el video hasta que el seek de reanudación diferido se aplique de verdad
-        // (evita el "flash" del episodio arrancando en 0:00 antes de saltar al punto guardado).
-        OcultarVideoInicio = _posicionInicioSegundos > 5;
+        // 2. El video queda tapado desde ya: se destapa con el primer fotograma o, si hay que reanudar, cuando el salto al punto
+        //    guardado se asienta (VigilarArranqueAsync). Antes se destapaba en el primer instante de reproducción y se veía el 0:00.
+        OcultarVideoInicio = true;
         _ocultarVideoDesdeUtc = DateTime.UtcNow;
+        _reanudacionPendiente = true;
 
-        // 3. Cargar marcas de skip de AniSkip en segundo plano
+        // 3. El punto guardado se busca EN PARALELO con la apertura (antes la apertura esperaba a la base de datos: en animes largos
+        //    se leían todos sus episodios antes de empezar a abrir el archivo). El salto se aplica con la imagen ya lista.
+        _tareaReanudacion = VerificarProgresoPrevioAsync(animeId, episodio, version);
+
+        // 4. Cargar marcas de skip de AniSkip en segundo plano
         _ = CargarSkipTimesAsync(animeId, episodio, skipCtToken);
 
-        // 4. Sincronizar ícono de fullscreen con el estado actual de la ventana
+        // 5. Sincronizar ícono de fullscreen con el estado actual de la ventana
         string? iconoFullscreen = _windowModeCoordinator.IconoPantallaCompletaActual();
         if (iconoFullscreen != null) FullscreenIcon = iconoFullscreen;
 
         if (Player != null)
         {
+            _relojArranque.Restart();
+            _arranqueRegistrado = false;
+            _cambiandoPistaAudio = false;
+            _imagenLista = false;
+
+            // El audio arrancaba antes que la imagen (el decodificador de video tarda ~0,5-0,8 s en mostrar el primer fotograma y, al
+            // reanudar, además sonaba el principio del episodio antes del salto). Se abre en silencio y VigilarArranqueAsync lo quita
+            // cuando la imagen ya está en pantalla.
+            try { if (Player.Audio != null) Player.Audio.Mute = true; } catch { }
+            AppLogger.Debug("ReproductorViewModel", $"[Cambio] Episodio {episodio}: listo para abrir a los {_relojCambio.ElapsedMilliseconds} ms.");
             Player.OpenAsync(rutaVideo);
+            _ = VigilarAperturaAsync(rutaVideo, _trackingCts.Token);
+            _ = CargarFotogramasClaveAsync(rutaVideo, _trackingCts.Token);
 
             // Velocidad de reproducción por defecto configurable
             try
@@ -1171,6 +1678,9 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         }
 
         _ = RastrearProgresoAsync(_trackingCts.Token);
+
+        // Quien espera a este método (navegación, pruebas) lo ve terminado con la posición guardada ya en la barra.
+        await _tareaReanudacion;
     }
 
     /// <summary>
@@ -1240,6 +1750,17 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         _resumingPositionSeconds = 0;
         _posicionInicioSegundos = 0;
         _haCompletadoOpen = false;
+        _finDeEpisodioProcesado = false;
+        _pistaSubtitulosElegida = false;
+        _reintentosApertura = 0;
+        _estrategiaSaltos = EstrategiaSaltos.Equilibrados;
+
+        // La barra del episodio nuevo empieza en cero y sin duración hasta conocer la real. Antes seguía mostrando la del
+        // anterior (p. ej. "23:59 / 24:00" con la barra llena) y los marcadores del nuevo se recortaban con esa duración vieja:
+        // un ending que empezara después del final del episodio anterior desaparecía de la barra.
+        CurrentSeconds = 0;
+        EstablecerDuracion(0);
+        ActualizarTextosTiempo(0);
     }
 
     private void EstablecerListaDeEpisodiosSiCorresponde(List<EpisodioItem>? listaEpisodios)
@@ -1250,25 +1771,251 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(EpisodiosDelCajon));
     }
 
-    private void DetenerPlayerSiEstabaActivo()
-    {
-        if (Player == null || Player.Status == Status.Stopped) return;
 
+    /// <summary>
+    /// Arranque sin audio adelantado: espera al primer fotograma en pantalla, hace el salto de reanudación en ese momento (con el
+    /// decodificador ya listo, sin esperar al siguiente tick del bucle) y solo entonces devuelve el sonido. Medido en un AV1 1080p:
+    /// la imagen aparecía ~0,75 s después que el audio, y al reanudar sonaba el principio del episodio antes de saltar.
+    /// </summary>
+    private async Task VigilarArranqueAsync(Player player, CancellationToken ct)
+    {
+        var reloj = Stopwatch.StartNew();
         try
         {
-            Player.Stop();
+            while (!ct.IsCancellationRequested && !player.IsDisposed && reloj.ElapsedMilliseconds < 3000 && FotogramasMostrados(player) == 0)
+                await Task.Delay(10, ct);
+            AppLogger.Debug("ReproductorViewModel", $"[Arranque] Primer fotograma a los {_relojArranque.ElapsedMilliseconds} ms.");
+
+            // La consulta del punto guardado suele terminar mucho antes (milisegundos); si la base de datos va lenta, se espera un poco.
+            try { await _tareaReanudacion.WaitAsync(TimeSpan.FromSeconds(2), ct); } catch (TimeoutException) { }
+            // _imagenLista se activa en el finally: así el bucle de progreso solo aplica la reanudación como respaldo si este vigilante
+            // falla, y nunca se adelanta a él (se destaparía el video sin esperar a que el salto se asiente).
+
+            double duracion = TimeSpan.FromTicks(player.Duration).TotalSeconds;
+            if (_posicionInicioSegundos > 5 && duracion > 0 && !ct.IsCancellationRequested)
+            {
+                double objetivo = Math.Min(_posicionInicioSegundos, Math.Max(0, duracion - 1.0));
+                uint fotogramasAntes = FotogramasMostrados(player);
+                await EnHiloDeInterfazAsync(() => AplicarSeekDeArranqueDiferidoSiCorresponde(duracion));
+
+                // El salto rápido cae en el fotograma clave anterior (hasta ~10 s antes): se da por asentado cuando la posición está
+                // cerca y ya se pintó un fotograma nuevo.
+                var espera = Stopwatch.StartNew();
+                while (!ct.IsCancellationRequested && !player.IsDisposed && espera.ElapsedMilliseconds < 2500)
+                {
+                    double actual = TimeSpan.FromTicks(player.CurTime).TotalSeconds;
+                    if (Math.Abs(actual - objetivo) < 15 && FotogramasMostrados(player) > fotogramasAntes + 1) break;
+                    await Task.Delay(15, ct);
+                }
+                AppLogger.Debug("ReproductorViewModel", $"[Arranque] Reanudación asentada a los {_relojArranque.ElapsedMilliseconds} ms.");
+            }
+
+            // Imagen lista y, si tocaba, ya en el punto guardado: se destapa el video.
+            if (!ct.IsCancellationRequested)
+            {
+                bool reanudo = _resumingPositionSeconds > 5;
+                await EnHiloDeInterfazAsync(() =>
+                {
+                    if (ct.IsCancellationRequested) return;
+                    _reanudacionPendiente = false;
+                    if (reanudo)
+                    {
+                        // El salto rápido cae en el fotograma clave anterior al punto guardado (unos segundos antes): la barra muestra
+                        // desde ya la posición real, en vez de marcar 05:00 y retroceder a 04:59 al destapar.
+                        double real = TimeSpan.FromTicks(player.CurTime).TotalSeconds;
+                        if (real > 0) { CurrentSeconds = real; _lastNotifiedSeconds = real; ActualizarTextosTiempo(real); }
+                    }
+                    OcultarVideoInicio = false;
+                });
+                AppLogger.Debug("ReproductorViewModel", $"[Cambio] Episodio {_episodio}: imagen visible a los {_relojCambio.ElapsedMilliseconds} ms desde que se pidió.");
+            }
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("ReproductorViewModel", $"Error vigilando el arranque: {ex.Message}");
+        }
+        finally
+        {
+            _imagenLista = true; // aunque se haya cancelado o agotado la espera: el bucle no debe quedarse sin aplicar la reanudación
+            AplicarRendimientoSegunEquipo(player);
+            try { if (!player.IsDisposed && player.Audio != null && !_cambiandoPistaAudio) player.Audio.Mute = IsMuted; } catch { }
+        }
+    }
+
+    private async Task CargarFotogramasClaveAsync(string ruta, CancellationToken ct)
+    {
+        _fotogramasClave = null;
+        try
+        {
+            var lista = await _fotogramasClaveService.ObtenerAsync(ruta, ct);
+            if (ct.IsCancellationRequested || !string.Equals(ruta, _rutaVideo, StringComparison.OrdinalIgnoreCase)) return;
+            _fotogramasClave = lista;
+            AppLogger.Debug("ReproductorViewModel", lista == null
+                ? "Sin lista de fotogramas clave: los saltos serán precisos."
+                : $"{lista.Count} fotogramas clave leídos (saltos instantáneos cuando hay uno cerca del destino).");
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("ReproductorViewModel", $"No se pudieron leer los fotogramas clave: {ex.Message}");
+        }
+    }
+
+    /// <summary>Cómo se resuelven los saltos en este video (ver <see cref="MotorVideo.ElegirEstrategiaSaltos"/>). Hasta conocer el
+    /// decodificador real se usa la equilibrada.</summary>
+    private EstrategiaSaltos _estrategiaSaltos = EstrategiaSaltos.Equilibrados;
+
+    /// <summary>
+    /// Con la imagen ya en pantalla se sabe qué decodificador se usa DE VERDAD: Flyleaf pide la tarjeta gráfica y, si el formato no
+    /// está soportado (AV1 en una Intel HD 620), cae en silencio a software (libdav1d). Leído al abrir decía "hardware" siempre. Con ese
+    /// dato se eligen los saltos y el escalado inteligente del modo automático, y se deja el informe para Configuración.
+    /// </summary>
+    private void AplicarRendimientoSegunEquipo(Player player)
+    {
+        try
+        {
+            var ajustes = _settingsService?.ObtenerConfiguracion();
+            bool porHardware = player.VideoDecoder?.VideoAccelerated ?? false;
+            string codec = player.Video?.Codec ?? "?";
+            var tarjeta = player.Renderer?.GPUAdapter;
+
+            _estrategiaSaltos = MotorVideo.ElegirEstrategiaSaltos(ajustes?.ModoSaltosVideo, porHardware, Environment.ProcessorCount);
+
+            bool escalado = tarjeta != null && MotorVideo.UsarEscaladoInteligente(ajustes?.EscaladoInteligenteVideo, tarjeta.Vendor, (long)((ulong)tarjeta.VideoMemory / (1024 * 1024)));
+            if (player.Config.Video.SuperResolution != escalado) player.Config.Video.SuperResolution = escalado;
+
+            AppLogger.Info("ReproductorViewModel", $"Video: {codec} por {(porHardware ? "tarjeta gráfica" : "procesador")} · tarjeta {tarjeta?.Description ?? "?"} · " +
+                $"{Environment.ProcessorCount} hilos · saltos {_estrategiaSaltos} · escalado {(escalado ? "sí" : "no")}.");
+            MotorVideo.PublicarInforme(new InformeVideo(codec, porHardware, tarjeta?.Description, _estrategiaSaltos, escalado, DateTime.UtcNow));
         }
         catch (Exception ex)
         {
-            AppLogger.Debug("ReproductorViewModel", $"Player stop antes de cambiar archivo: {ex.Message}");
+            AppLogger.Debug("ReproductorViewModel", $"No se pudo evaluar el rendimiento del video: {ex.Message}");
         }
+    }
+
+    // Contadores internos de Flyleaf que suben con CADA fotograma presentado (reproduciendo y en pausa/salto). El público
+    // Video.FramesDisplayed solo se refresca una vez por segundo: esperar a él retrasaba hasta 1 s el destape del video.
+    private static readonly System.Reflection.FieldInfo? CampoFotogramasReproducidos =
+        typeof(Player).GetField("framesDisplayed", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+    private static readonly System.Reflection.FieldInfo? CampoFotogramasMostradosEnPausa =
+        typeof(Player).GetField("showFrameCount", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+
+    private static uint FotogramasMostrados(Player player)
+    {
+        try
+        {
+            if (CampoFotogramasReproducidos != null && CampoFotogramasMostradosEnPausa != null)
+                return (uint)CampoFotogramasReproducidos.GetValue(player)! + (uint)CampoFotogramasMostradosEnPausa.GetValue(player)!;
+            return player.Video?.FramesDisplayed ?? 0; // si una versión nueva de Flyleaf cambia los nombres: el contador público
+        }
+        catch { return 0; }
+    }
+
+    private static Task EnHiloDeInterfazAsync(Action accion)
+    {
+        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+        if (dispatcher == null || dispatcher.CheckAccess())
+        {
+            accion();
+            return Task.CompletedTask;
+        }
+        return dispatcher.InvokeAsync(accion).Task;
+    }
+
+    /// <summary>
+    /// Si Flyleaf no termina de abrir en <see cref="TiempoMaximoApertura"/> (a veces se quedaba cargando sin fin, sobre todo al reanudar),
+    /// se reintenta una vez; si tampoco, se avisa en vez de dejar el spinner para siempre.
+    /// </summary>
+    private async Task VigilarAperturaAsync(string ruta, CancellationToken ct)
+    {
+        try
+        {
+            for (int intento = 0; intento < 2; intento++)
+            {
+                await Task.Delay(TiempoMaximoApertura, ct);
+                if (ct.IsCancellationRequested || _haCompletadoOpen || !string.Equals(ruta, _rutaVideo, StringComparison.OrdinalIgnoreCase)) return;
+
+                if (intento == 0 && ReintentarAperturaSiCorresponde($"sin respuesta tras {TiempoMaximoApertura.TotalSeconds:F0} s")) continue;
+
+                NotificarFalloAlAbrir(LocalizationService.T("Player_ErrorAbrirTiempo"));
+                return;
+            }
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    /// <summary>Un reintento por episodio: el archivo existe pero Flyleaf no lo abrió (o se quedó abriendo). True si se reintentó.</summary>
+    private bool ReintentarAperturaSiCorresponde(string? error)
+    {
+        string ruta = _rutaVideo;
+        var player = Player;
+        if (_reintentosApertura >= 1 || player == null || player.IsDisposed || !System.IO.File.Exists(ruta)) return false;
+
+        _reintentosApertura++;
+        AppLogger.Warn("ReproductorViewModel", $"El episodio no se abrió ({error}); se reintenta una vez.");
+        var ct = _trackingCts?.Token ?? CancellationToken.None;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(400, ct);
+                if (ct.IsCancellationRequested || player.IsDisposed || !string.Equals(ruta, _rutaVideo, StringComparison.OrdinalIgnoreCase)) return;
+                try { player.Stop(); } catch { }
+                _cambiandoPistaAudio = false;
+                player.OpenAsync(ruta);
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex) { AppLogger.Warn("ReproductorViewModel", $"Falló el reintento de apertura: {ex.Message}"); }
+        }, ct);
+        return true;
+    }
+
+    /// <summary>True si, estando al final (cuenta atrás en curso), el usuario retrocedió o volvió a dar a reproducir.</summary>
+    private bool UsuarioVolvioAReproducir()
+    {
+        try { return Player != null && !Player.IsDisposed && Player.Status == Status.Playing; }
+        catch { return false; }
+    }
+
+    /// <summary>Si el archivo no se puede abrir (borrado, movido, dañado o formato no soportado) antes solo se veía la pantalla
+    /// negra sin ningún aviso. Ahora se explica y se registra el motivo.</summary>
+    private void NotificarFalloAlAbrir(string? error)
+    {
+        AppLogger.Error("ReproductorViewModel", $"No se pudo abrir '{_rutaVideo}': {error}");
+        OcultarVideoInicio = false;
+        try { if (Player?.Audio != null) Player.Audio.Mute = IsMuted; } catch { }
+        PlayPauseIcon = "Play";
+        string mensaje = System.IO.File.Exists(_rutaVideo)
+            ? string.Format(LocalizationService.T("Player_ErrorAbrirMsj"), string.IsNullOrWhiteSpace(error) ? "?" : error)
+            : LocalizationService.T("Player_ErrorAbrirNoExiste");
+        AvisarEnReproductor(
+            LocalizationService.T("Player_ErrorAbrirTitulo"), mensaje, "AlertCircleOutline", "#EF4444");
+    }
+
+    /// <summary>
+    /// Aviso encima del video. Se marca como del reproductor para que la vista lo muestre: los avisos de fuera (una descarga que
+    /// termina, un episodio nuevo en emisión…) ya no se cuelan en mitad del episodio.
+    /// </summary>
+    private void AvisarEnReproductor(string titulo, string mensaje, string icono, string color)
+    {
+        if (DialogService != null) DialogService.MostrarToastReproductor(titulo, mensaje, icono, color);
+        else _ = WeakReferenceMessenger.Default.Send(new Messages.MostrarDialogoRequestMessage(titulo, mensaje, false, icono, color));
+    }
+
+    /// <summary>Nombre corto de la tecla configurada para mostrarlo en tooltips ("N", "Espacio"…).</summary>
+    private string NombreTecla(string accion)
+    {
+        var tecla = ObtenerTeclaPara(accion);
+        return tecla == System.Windows.Input.Key.None ? "—" : tecla.ToString();
     }
 
     /// <summary>Tecla configurada para una acción del reproductor (con fallback).</summary>
     public System.Windows.Input.Key ObtenerTeclaPara(string accion)
     {
         var config = _settingsService?.ObtenerConfiguracion();
-        string nombre = config?.ObtenerTecla(accion, accion switch
+        string porDefecto = accion switch
         {
             "PlayPausa" => "Space",
             "PantallaCompleta" => "F11",
@@ -1287,7 +2034,9 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             "Cerrar" => "Escape",
             "CapturarFrame" => "C",
             _ => string.Empty
-        }) ?? string.Empty;
+        };
+        // Sin configuración cargada también valen las teclas de siempre (antes quedaban todas sin asignar).
+        string nombre = config?.ObtenerTecla(accion, porDefecto) ?? porDefecto;
 
         return Enum.TryParse<System.Windows.Input.Key>(nombre, true, out var tecla)
             ? tecla
@@ -1306,13 +2055,13 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
         if (ruta == null)
         {
-            _ = WeakReferenceMessenger.Default.Send(new Messages.MostrarDialogoRequestMessage(
-                LocalizationService.T("Player_CapturaTitulo"), LocalizationService.T("Player_CapturaErrorMsj"), false, "AlertCircleOutline", "#EF4444"));
+            AvisarEnReproductor(
+                LocalizationService.T("Player_CapturaTitulo"), LocalizationService.T("Player_CapturaErrorMsj"), "AlertCircleOutline", "#EF4444");
             return;
         }
 
-        _ = WeakReferenceMessenger.Default.Send(new Messages.MostrarDialogoRequestMessage(
-            LocalizationService.T("Player_CapturaTitulo"), string.Format(LocalizationService.T("Player_CapturaListaFormato"), ruta), false, "CameraOutline", "#4CAF50"));
+        AvisarEnReproductor(
+            LocalizationService.T("Player_CapturaTitulo"), string.Format(LocalizationService.T("Player_CapturaListaFormato"), ruta), "CameraOutline", "#4CAF50");
     }
 
     public async Task GuardarProgresoActualAsync(bool forzarProgresoCero = false)
@@ -1361,8 +2110,10 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             });
 
             // Notificar a DetalleViewModel para actualizar la barra de progreso en vivo
+            // El "visto" que se avisa es el que quedó guardado: al volver a ver un episodio ya visto sigue visto (antes se
+            // avisaba "no visto" cada 3 s y la Ficha lo desmarcaba en pantalla).
             WeakReferenceMessenger.Default.Send(new Messages.EpisodioActualizadoMensaje(
-                animeId, episodio, fueMarcadoComoVisto, resultado.ProgresoSegundos, resultado.TotalSegundos));
+                animeId, episodio, fueMarcadoComoVisto || resultado.VistoLocal, resultado.ProgresoSegundos, resultado.TotalSegundos, SoloProgreso: true));
         }
         catch (Exception ex)
         {
@@ -1380,7 +2131,11 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
         try
         {
-            await _logrosService.EvaluarAsync();
+            // Un logro desbloqueado por el episodio que acabas de terminar sí se avisa encima del video (como el auto-tracking).
+            using (DialogService?.AvisosComoDelReproductor())
+            {
+                await _logrosService.EvaluarAsync();
+            }
         }
         catch (Exception ex)
         {
@@ -1399,10 +2154,10 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             if (!ok) return;
 
             // Notificación flotante sutil (Toast)
-            _ = WeakReferenceMessenger.Default.Send(new Messages.MostrarDialogoRequestMessage(
+            AvisarEnReproductor(
                 "Auto-Tracking",
                 string.Format(LocalizationService.T("Player_EpisodioMarcadoVistoMsj"), _episodio),
-                false, "CheckCircle", "#4CAF50"));
+                "CheckCircle", "#4CAF50");
 
             // Avisar a la vista de detalles para que actualice la lista automáticamente
             WeakReferenceMessenger.Default.Send(new Messages.EpisodioActualizadoMensaje(_animeId, _episodio, true, 0, TotalSeconds));
@@ -1432,9 +2187,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
         if (AccionFinEpisodio == AccionFinEpisodioValores.PausarYSalirFicha)
         {
-            _ = GuardarProgresoActualAsync();
-            Dispose();
-            WeakReferenceMessenger.Default.Send(new NavegarMensaje_VolverDelReproductor());
+            SalirDelReproductor("fin del episodio (Pausar y volver a la ficha)");
             return;
         }
 
@@ -1442,16 +2195,17 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         {
             var siguienteInmediato = ObtenerSiguienteEpisodio();
             string msg = siguienteInmediato != null
-                ? string.Format(LocalizationService.T("Player_SiguienteEpisodioFormato"), siguienteInmediato.NumeroEpisodio)
+                ? ConAviso(string.Format(LocalizationService.T("Player_SiguienteEpisodioFormato"), siguienteInmediato.NumeroEpisodio),
+                    TextoEpisodiosSaltados(_episodio, siguienteInmediato.NumeroEpisodio))
                 : LocalizationService.T("Player_SiguienteEpisodioGenerico");
 
-            _ = WeakReferenceMessenger.Default.Send(new Messages.MostrarDialogoRequestMessage(
-                "Auto-Play", msg, false, "FastForward", "#4CAF50"));
+            AvisarEnReproductor(
+                "Auto-Play", msg, "FastForward", "#4CAF50");
 
             await Task.Delay(1500, ct);
-            if (!ct.IsCancellationRequested)
+            if (!ct.IsCancellationRequested && !UsuarioVolvioAReproducir())
             {
-                SiguienteEpisodio();
+                IrAEpisodio(ObtenerSiguienteEpisodio(), avisarSalto: false);
             }
             return;
         }
@@ -1470,6 +2224,13 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             {
                 await Task.Delay(1000, ct);
                 if (!MostrarCuentaAtrasSiguiente) return; // el usuario canceló (CancelarAutoPlayCommand)
+                if (UsuarioVolvioAReproducir())
+                {
+                    // Retrocedió para ver otra vez la escena poscréditos (o dio a reproducir): antes la cuenta atrás seguía y a
+                    // los pocos segundos lo sacaba al siguiente episodio igualmente.
+                    MostrarCuentaAtrasSiguiente = false;
+                    return;
+                }
                 SegundosCuentaAtrasSiguiente = i - 1;
             }
         }
@@ -1479,7 +2240,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         }
 
         MostrarCuentaAtrasSiguiente = false;
-        SiguienteEpisodio();
+        IrAEpisodio(ObtenerSiguienteEpisodio(), avisarSalto: false); // la cuenta atrás ya mostraba el aviso de salto
     }
 
     private async Task RastrearProgresoAsync(CancellationToken ct)
@@ -1494,14 +2255,20 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                 if (OcultarVideoInicio && DateTime.UtcNow - _ocultarVideoDesdeUtc > MaxOcultarVideoInicio)
                 {
                     OcultarVideoInicio = false;
+                    _reanudacionPendiente = false;
                 }
 
                 if (Player.Status == Status.Playing)
                 {
+                    if (!_arranqueRegistrado)
+                    {
+                        _arranqueRegistrado = true;
+                        AppLogger.Debug("ReproductorViewModel", $"[Arranque] Primer tick reproduciendo a los {_relojArranque.ElapsedMilliseconds} ms (duración {TimeSpan.FromTicks(Player.Duration).TotalSeconds:F1} s, fotogramas {Player.Video?.FramesDisplayed}).");
+                    }
                     double curSeconds = TimeSpan.FromTicks(Player.CurTime).TotalSeconds;
                     double durSeconds = TimeSpan.FromTicks(Player.Duration).TotalSeconds;
 
-                    AplicarSeekDeArranqueDiferidoSiCorresponde(durSeconds);
+                    if (_imagenLista) AplicarSeekDeArranqueDiferidoSiCorresponde(durSeconds);
 
                     if (!IsDraggingSlider)
                     {
@@ -1531,22 +2298,29 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                         _episodeNavigator.ConsiderarPrecarga(porcentaje, _siguienteEpisodioCache?.RutaCompleta);
                     }
 
-                    // Auto-Tracking al umbral configurado (FUN-003: antes fijo en 90%)
+                    // Auto-Tracking al umbral configurado (FUN-003: antes fijo en 90%). NO se espera: sincroniza con AniList, y con
+                    // AniList lento (esperas de 30-60 s en los logs) la barra, el botón de saltar el ending y los subtítulos se
+                    // quedaban congelados todo ese rato. La marca local se guarda primero, al instante.
                     if (porcentaje >= UmbralMarcadoVistoActual && !_fueMarcadoComoVisto)
                     {
-                        await RealizarAutoTrackingAsync();
+                        _ = RealizarAutoTrackingAsync();
                     }
+
+                    _finDeEpisodioProcesado = false; // volvió a reproducir: un nuevo final se vuelve a procesar
 
                     ProcesarDeteccionDeSkip(curSeconds);
                     ActualizarLineasSubtitulosSolapados(curSeconds);
                 }
-                else if (Player?.Status == Status.Ended && _haCompletadoOpen)
+                else if (Player?.Status == Status.Ended && _haCompletadoOpen && !_finDeEpisodioProcesado)
                 {
+                    _finDeEpisodioProcesado = true;
+                    AjustarPosicionAlFinal();
                     await ManejarFinDeEpisodioAsync(ct);
                 }
 
                 // Sondeo adaptativo: 250ms mientras reproduce, 1000ms cuando está en pausa/detenido
-                int delayMs = (Player?.Status == Status.Playing) ? 250 : 1000;
+                // Mientras abre, cada 100 ms: antes el primer tick "reproduciendo" llegaba al segundo de abrir.
+                int delayMs = Player?.Status == Status.Playing ? 250 : (_haCompletadoOpen ? 1000 : 100);
                 await Task.Delay(delayMs, ct);
             }
             catch (OperationCanceledException)
@@ -1585,6 +2359,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         }
 
         _posicionInicioSegundos = 0;
+        _reanudacionPendiente = false; // la ventana de "settle" protege ahora la barra hasta que el salto se asiente
 
         // Antes de disparar el seek nativo: congelar el repintado para que la
         // barra no "rebote" a la posición vieja mientras el seek se procesa.
@@ -1592,17 +2367,19 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         _lastNotifiedSeconds = posToSeek;
         CurrentSeconds = posToSeek;
 
+        AppLogger.Debug("ReproductorViewModel", $"[Arranque] Seek de {(esReanudacion ? "reanudación" : "arranque")} a {posToSeek:F1} s a los {_relojArranque.ElapsedMilliseconds} ms (fotogramas mostrados: {Player?.Video?.FramesDisplayed}).");
+        // Reanudación con salto rápido: cae en el fotograma clave anterior (unos segundos antes, que dan contexto) y tarda ~1 s; el preciso
+        // tardaba ~2 s con la imagen tapada.
         _seekCoordinator.SolicitarSeek(Player, posToSeek, () => _haCompletadoOpen);
 
         if (esReanudacion)
         {
-            var tPos = TimeSpan.FromSeconds(posToSeek);
-            string tiempoFormateado = tPos.ToString(tPos.Hours > 0 ? @"hh\:mm\:ss" : @"mm\:ss");
+            string tiempoFormateado = FormatearTiempo(posToSeek, durSeconds);
 
-            _ = WeakReferenceMessenger.Default.Send(new Messages.MostrarDialogoRequestMessage(
+            AvisarEnReproductor(
                 LocalizationService.T("Player_ReanudarReproduccionTitulo"),
                 string.Format(LocalizationService.T("Player_ContinuandoDesdeFormato"), tiempoFormateado),
-                false, "PlaySpeed", "#2196F3"));
+                "PlaySpeed", "#2196F3");
         }
     }
 
@@ -1613,25 +2390,20 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         // Cachear la duración (no cambia durante la reproducción; independiente del settle)
         if (!_durationCached && durSeconds > 0)
         {
-            TotalSeconds = durSeconds;
-            TimeSpan tDur = TimeSpan.FromSeconds(durSeconds);
-            TiempoTotalTexto = tDur.ToString(tDur.Hours > 0 ? @"hh\:mm\:ss" : @"mm\:ss");
+            EstablecerDuracion(durSeconds);
             _durationCached = true;
-            TiempoCombinadoTexto = $"{TiempoActualTexto} / {TiempoTotalTexto}";
         }
+
+        // Con el salto al punto guardado aún pendiente, el reproductor va por el 0:00: la barra se queda donde se dejó el episodio.
+        if (_reanudacionPendiente) return;
 
         // Durante la ventana de settle tras un seek, el reproductor aún reporta la
         // posición vieja: no repintar para que la barra no "rebote" hacia atrás.
         bool enSettleSeek = _seekCoordinator.EnVentanaDeSettle;
 
-        // El seek de reanudación ya se asentó: revelar el video en el punto correcto.
-        if (!enSettleSeek && OcultarVideoInicio)
-        {
-            OcultarVideoInicio = false;
-        }
-
-        // Solo notificar si el cambio es significativo (> 0.3s)
-        if (!enSettleSeek && Math.Abs(curSeconds - _lastNotifiedSeconds) >= 0.3)
+        // Solo notificar si el cambio es significativo. Con el sondeo cada 250 ms, el umbral viejo de 0,3 s dejaba pasar un tick
+        // de cada dos: la barra y el reloj se movían a saltos de medio segundo y el segundo mostrado iba hasta 0,5 s tarde.
+        if (!enSettleSeek && Math.Abs(curSeconds - _lastNotifiedSeconds) >= 0.2)
         {
             CurrentSeconds = curSeconds;
             _lastNotifiedSeconds = curSeconds;
@@ -1674,20 +2446,20 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             // (igual que el manual) para no disparar Ended prematuramente.
             double destino = skip.Interval.EndTime + 0.2;
             if (TotalSeconds > 0 && destino > TotalSeconds) destino = TotalSeconds;
-            Seek(destino);
+            Saltar(destino, TipoSalto.SaltarTramo);
             MostrarSkipButton = false;
             MostrarSkipIntro = false;
             _currentActiveSkip = null;
 
-            _ = WeakReferenceMessenger.Default.Send(new Messages.MostrarDialogoRequestMessage(
+            AvisarEnReproductor(
                 "AniSkip",
                 string.Format(LocalizationService.T("Player_SkipAutoFormato"), skip.TextoBoton),
-                false, skip.IconoBoton, "#2196F3"));
+                skip.IconoBoton, "#2196F3");
         }
         else if (!AutoSkipIntroOutro)
         {
             _currentActiveSkip = skip;
-            SkipButtonTexto = $"{skip.TextoBoton} (S)";
+            SkipButtonTexto = $"{skip.TextoBoton} ({NombreTecla("SaltarIntro")})";
             SkipButtonIcon = skip.IconoBoton;
             MostrarSkipButton = true;
             MostrarSkipIntro = true;
@@ -1708,7 +2480,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         bool llegoAlFinalReal = TotalSeconds > 0 && CurrentSeconds >= TotalSeconds * UmbralMarcadoVistoActual;
         if (!_fueMarcadoComoVisto && llegoAlFinalReal)
         {
-            await RealizarAutoTrackingAsync();
+            _ = RealizarAutoTrackingAsync(); // sin esperar a AniList: la cuenta atrás al siguiente episodio arranca ya
         }
 
         // Acción configurable al terminar el episodio (Configuración → Reproducción)
@@ -1734,7 +2506,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         {
             double destino = skipActivo.Interval.EndTime + 0.2;
             if (TotalSeconds > 0 && destino > TotalSeconds) destino = TotalSeconds;
-            Seek(destino);
+            Saltar(destino, TipoSalto.SaltarTramo);
         }
 
         MostrarSkipButton = false;
@@ -1743,13 +2515,36 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     }
 
     [RelayCommand]
-    public void Cerrar()
+    public void Cerrar() => SalirDelReproductor("botón o tecla Cerrar");
+
+    /// <summary>
+    /// Tecla de cerrar (Esc por defecto): a pantalla completa, primero vuelve al tamaño normal (como en cualquier reproductor);
+    /// solo cierra si ya estaba en ventana. Antes cerraba el episodio de golpe y dejaba la Ficha a pantalla completa.
+    /// </summary>
+    public void TeclaCerrar()
     {
+        if (!EsModoMini && _windowModeCoordinator.EstaEnPantallaCompleta)
+        {
+            ToggleFullscreen();
+            return;
+        }
+        Cerrar();
+    }
+
+    /// <summary>
+    /// Única salida del reproductor: guarda, deja la ventana en su tamaño normal (sin PiP ni pantalla completa) y vuelve a la
+    /// vista anterior. Registra el motivo en el log: si alguna vez "vuelve solo a la ficha", el log dirá qué lo pidió.
+    /// </summary>
+    private void SalirDelReproductor(string motivo)
+    {
+        AppLogger.Info("ReproductorViewModel", $"Saliendo del reproductor (episodio {_episodio}, {TimeSpan.FromSeconds(CurrentSeconds):mm\\:ss}): {motivo}.");
+        try { AppLogger.Debug("ReproductorViewModel", $"[Arranque] Al salir: CurTime={TimeSpan.FromTicks(Player?.CurTime ?? 0).TotalSeconds:F1} s, estado {Player?.Status}, fotogramas {Player?.Video?.FramesDisplayed}, audio {Player?.Audio?.FramesDisplayed}, spec={Player?.VideoDecoder?.CurCodecSpec.Name} hw={Player?.VideoDecoder?.CurCodecSpec.IsHW} accel={Player?.VideoDecoder?.VideoAccelerated} pixfmt={Player?.Video?.PixelFormat} codec={Player?.Video?.Codec}."); } catch { }
         EsModoMini = false;
         _windowModeCoordinator.SalirModoMini();
+        _windowModeCoordinator.SalirDePantallaCompleta();
         _ = GuardarProgresoActualAsync();
         Dispose();
-        
+
         // Navegar a la vista anterior (detalle del anime), no a la galería
         WeakReferenceMessenger.Default.Send(new NavegarMensaje_VolverDelReproductor());
 
@@ -1786,6 +2581,12 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         }
 
         _ = GuardarProgresoActualAsync();
+
+        if (_itemReproduciendose != null)
+        {
+            _itemReproduciendose.EsReproduciendose = false; // los EpisodioItem son los de la ficha: no dejarlos marcados al salir
+            _itemReproduciendose = null;
+        }
 
         _seekCoordinator.Dispose();
 

@@ -13,6 +13,10 @@ public interface INavigationService : System.ComponentModel.INotifyPropertyChang
     ObservableObject VistaActual { get; }
     ReproductorViewModel? ReproductorActivo { get; }
 
+    /// <summary>El reproductor que se dibuja DENTRO de la ventana principal: el activo en su formato habitual. En modo mini vive en
+    /// su propia ventana flotante (ver MainWindow.EntrarModoPiP) y la ventana principal queda libre para navegar.</summary>
+    ReproductorViewModel? ReproductorEnVentanaPrincipal { get; }
+
     bool EsGaleriaActiva { get; }
     bool EsAgregarAnimeActivo { get; }
     bool EsCalendarioActivo { get; }
@@ -71,7 +75,21 @@ public sealed partial class NavigationService : ObservableObject, INavigationSer
     private ObservableObject _vistaActual = null!;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ReproductorEnVentanaPrincipal))]
     private ReproductorViewModel? _reproductorActivo;
+
+    public ReproductorViewModel? ReproductorEnVentanaPrincipal => ReproductorActivo is { EsModoMini: false } reproductor ? reproductor : null;
+
+    partial void OnReproductorActivoChanged(ReproductorViewModel? oldValue, ReproductorViewModel? newValue)
+    {
+        if (oldValue != null) oldValue.PropertyChanged -= ReproductorActivo_PropertyChanged;
+        if (newValue != null) newValue.PropertyChanged += ReproductorActivo_PropertyChanged;
+    }
+
+    private void ReproductorActivo_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(ReproductorViewModel.EsModoMini)) OnPropertyChanged(nameof(ReproductorEnVentanaPrincipal));
+    }
 
     public bool EsGaleriaActiva => VistaActual is GaleriaViewModel || VistaActual is DetalleViewModel;
     public bool EsAgregarAnimeActivo => VistaActual is AgregarAnimeViewModel;
@@ -343,17 +361,20 @@ public sealed partial class NavigationService : ObservableObject, INavigationSer
             VistaActual = _vistaAnteriorAlReproductor;
             _vistaAnteriorAlReproductor = null;
         }
-        else
+        else if (VistaActual == null)
         {
             VistaActual = ObtenerGaleria();
         }
+        // Si no había vista anterior es que el usuario se movió por la app con el mini reproductor abierto: al cerrarlo se queda
+        // donde está (antes lo devolvía a la ficha desde la que abrió el episodio).
     }
 
     partial void OnVistaActualChanged(ObservableObject? oldValue, ObservableObject newValue)
     {
-        if (ReproductorActivo != null && !ReproductorActivo.EsModoMini)
-        {
-            ReproductorActivo.EsModoMini = true;
-        }
+        if (ReproductorActivo == null) return;
+
+        // Navegar con el reproductor abierto: el episodio sigue en el mini reproductor (su propia ventana) y la app queda libre.
+        _vistaAnteriorAlReproductor = null;
+        if (!ReproductorActivo.EsModoMini) ReproductorActivo.MinimizarAMini();
     }
 }

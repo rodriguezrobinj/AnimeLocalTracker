@@ -140,7 +140,9 @@
                     <ControlTemplate TargetType="{x:Type Slider}">
                         <Grid x:Name="SliderGrid" VerticalAlignment="Center" Background="Transparent">
                             <!-- Pista de fondo translúcida (tiempo no reproducido) -->
-                            <Border x:Name="BackgroundTrack" Height="3" CornerRadius="1.5"
+                            <!-- Margen 10 = media bolita: la pista empieza donde está la bolita en el segundo 0 y acaba donde queda al final
+                                 (antes sobraban 10 px a cada lado y la barra nunca se veía ni vacía al empezar ni llena al terminar). -->
+                            <Border x:Name="BackgroundTrack" Height="3" CornerRadius="1.5" Margin="10,0"
                                     Background="#55FFFFFF" VerticalAlignment="Center" />
 
                             <!-- La línea de progreso: parte reproducida en blanco y tramos de opening / ending / resumen en color (la parte
@@ -192,7 +194,7 @@
 
         <!-- ListBoxItem transparente para el cajón de episodios (ui-wpf-vistas.md #2): sin
              plantilla de selección MaterialDesign, el resaltado del episodio actual lo pinta
-             el propio DataTemplate vía EpisodioActualBrush. -->
+             el propio DataTemplate con EpisodioItem.EsReproduciendose. -->
         <Style x:Key="CajonEpisodioItemStyle" TargetType="ListBoxItem">
             <Setter Property="Padding" Value="0"/>
             <Setter Property="Focusable" Value="False"/>
@@ -201,6 +203,63 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="ListBoxItem">
                         <ContentPresenter/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Botón de la barra que abre un menú: con el menú abierto (Tag="activo", lo pone el code-behind) se pinta
+             en azul, así se ve a qué botón pertenece el menú que está desplegado. -->
+        <Style x:Key="PlayerMenuToolButton" TargetType="Button" BasedOn="{StaticResource MaterialDesignToolButton}">
+            <Setter Property="Foreground" Value="White"/>
+            <Style.Triggers>
+                <Trigger Property="Tag" Value="activo">
+                    <Setter Property="Foreground" Value="#60A5FA"/>
+                    <Setter Property="Background" Value="#2960A5FA"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Flecha bajo cada menú flotante que apunta al botón que lo abrió (su posición la calcula el code-behind). -->
+        <Style x:Key="FlechaMenu" TargetType="Path">
+            <Setter Property="Data" Value="M0,0 L16,0 L8,8 Z"/>
+            <Setter Property="Fill" Value="#F2141414"/>
+            <Setter Property="Width" Value="16"/>
+            <Setter Property="Height" Value="8"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="Margin" Value="12,0,0,0"/>
+            <Setter Property="IsHitTestVisible" Value="False"/>
+        </Style>
+
+        <!-- Chip de ajuste predefinido del ecualizador (resaltado el que está puesto). -->
+        <Style x:Key="ChipPresetEcualizador" TargetType="Button">
+            <Setter Property="Foreground" Value="#E2E8F0"/>
+            <Setter Property="Background" Value="#1E293B"/>
+            <Setter Property="BorderBrush" Value="#2D3748"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="10,4"/>
+            <Setter Property="Margin" Value="0,0,6,6"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Focusable" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Fondo" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="12">
+                            <ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Fondo" Property="BorderBrush" Value="#60A5FA"/>
+                            </Trigger>
+                            <DataTrigger Binding="{Binding EsActual}" Value="True">
+                                <Setter TargetName="Fondo" Property="Background" Value="#2563EB"/>
+                                <Setter TargetName="Fondo" Property="BorderBrush" Value="#60A5FA"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </DataTrigger>
+                        </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
@@ -258,23 +317,19 @@
                     <ctl:SubtitleTextView x:Name="SubtitulosVista" MaxWidth="1200"/>
                 </Viewbox>
 
-                <!-- Controles Overlays -->
-                <Grid x:Name="OverlayControls" Background="Transparent" DataContext="{x:Null}">
-
-                <!-- Cubre el frame de video mientras se aplica el seek de reanudación diferido,
-                     para que el episodio no se vea arrancar en 0:00 antes de saltar al punto guardado.
-                     Va DENTRO de OverlayControls (no directo en el Content del FlyleafHost) porque
-                     solo aquí el DataContext se resincroniza por código (ver DataContextChanged en
-                     el code-behind); en el Content raíz del host, un Binding normal se queda "pegado"
-                     al último valor sin refrescar cuando cambia (FlyleafHost gestiona ese DataContext
-                     aparte y no siempre repropaga PropertyChanged de descendientes). -->
-                <Grid Background="Black" IsHitTestVisible="False"
-                      Visibility="{Binding OcultarVideoInicio, Converter={StaticResource BoolToVis}}">
+                <!-- Tapa el video mientras abre y, al reanudar, hasta que el salto al punto guardado se asienta: sin ella se veía
+                     un instante el 0:00. Va FUERA de OverlayControls porque esos controles se desvanecen tras 3 s sin mover el
+                     ratón (al pasar solo al siguiente episodio la tapa quedaba invisible), y en esta raíz un Binding se queda pegado:
+                     su visibilidad la pone el code-behind (ActualizarTapaVideo), igual que los subtítulos y los avisos. -->
+                <Grid x:Name="TapaVideo" Background="Black" IsHitTestVisible="False" Visibility="Collapsed">
                     <ProgressBar Style="{StaticResource MaterialDesignCircularProgressBar}"
                                  IsIndeterminate="True" Width="44" Height="44"
                                  Value="0" Foreground="#60A5FA"
                                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Grid>
+
+                <!-- Controles Overlays -->
+                <Grid x:Name="OverlayControls" Background="Transparent" DataContext="{x:Null}" Focusable="True" FocusVisualStyle="{x:Null}">
 
                 <!-- Gradiente Superior -->
                 <Grid VerticalAlignment="Top" Height="120"
@@ -289,6 +344,7 @@
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <!-- Back Arrow -->
                         <Button Grid.Column="0" Command="{Binding CerrarCommand}" Focusable="True"
@@ -299,9 +355,29 @@
                         </Button>
                         <!-- Titulos Netflix Style -->
                         <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,-3,0,0">
-                            <TextBlock Text="{Binding TituloAnime}" FontWeight="Bold" FontSize="22" Foreground="White"/>
-                            <TextBlock Text="{Binding TituloEpisodio}" FontSize="16" Foreground="#CCCCCC"/>
+                            <TextBlock Text="{Binding TituloAnime}" FontWeight="Bold" FontSize="22" Foreground="White" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Text="{Binding TituloEpisodio}" FontSize="16" Foreground="#CCCCCC" TextTrimming="CharacterEllipsis"/>
                         </StackPanel>
+                        <!-- Favorito del episodio que se está viendo, en la esquina superior derecha: el mismo marcador que en la ficha -->
+                        <Button Grid.Column="2" Command="{Binding AlternarFavoritoEpisodioCommand}" Focusable="True"
+                                FocusVisualStyle="{StaticResource PlayerFocusVisual}"
+                                Style="{StaticResource MaterialDesignToolButton}" Width="44" Height="44" Margin="16,0,0,0" VerticalAlignment="Top"
+                                ToolTip="{Binding TooltipFavoritoEpisodio}" AutomationProperties.Name="{Binding TooltipFavoritoEpisodio}">
+                            <materialDesign:PackIcon Width="28" Height="28">
+                                <materialDesign:PackIcon.Style>
+                                    <Style TargetType="materialDesign:PackIcon">
+                                        <Setter Property="Kind" Value="BookmarkOutline"/>
+                                        <Setter Property="Foreground" Value="White"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding EpisodioEsFavorito}" Value="True">
+                                                <Setter Property="Kind" Value="Bookmark"/>
+                                                <Setter Property="Foreground" Value="#60A5FA"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </materialDesign:PackIcon.Style>
+                            </materialDesign:PackIcon>
+                        </Button>
                     </Grid>
                 </Grid>
 
@@ -343,7 +419,21 @@
                         <!-- Barra de progreso interactiva con Bolita Scrubber -->
                         <Grid Grid.Row="1" Margin="0,0,0,15">
                             <Grid x:Name="ProgressBarArea" Cursor="Hand" Background="Transparent"
-                                  PreviewMouseLeftButtonDown="ProgressBarArea_PreviewMouseLeftButtonDown">
+                                  PreviewMouseLeftButtonDown="ProgressBarArea_PreviewMouseLeftButtonDown"
+                                  MouseMove="ProgressBarArea_MouseMove" MouseLeave="ProgressBarArea_MouseLeave">
+                                <!-- Tiempo del punto bajo el ratón (y del tramo: opening/ending/resumen). Lo posiciona el code-behind. -->
+                                <Canvas IsHitTestVisible="False" ClipToBounds="False" Panel.ZIndex="10">
+                                    <Border x:Name="VistaPreviaTiempo" Visibility="Collapsed" Canvas.Top="-34"
+                                            Background="#E6141414" CornerRadius="6" Padding="8,3">
+                                        <Border.Effect>
+                                            <DropShadowEffect Color="Black" BlurRadius="8" ShadowDepth="1" Opacity="0.5"/>
+                                        </Border.Effect>
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock x:Name="VistaPreviaTiempoTexto" Foreground="White" FontSize="12.5" FontWeight="Bold"/>
+                                            <TextBlock x:Name="VistaPreviaTramoTexto" FontSize="12" FontWeight="SemiBold" Margin="6,0,0,0" Visibility="Collapsed"/>
+                                        </StackPanel>
+                                    </Border>
+                                </Canvas>
                                 <Slider x:Name="SliderTiempo" Minimum="0" Maximum="{Binding TotalSeconds}" Value="{Binding CurrentSeconds, Mode=TwoWay}"
                                         Style="{StaticResource TimelineSliderStyle}"
                                         AutomationProperties.Name="{Binding [Player_ProgresoEpisodio], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
@@ -371,11 +461,11 @@
                                 <ColumnDefinition Width="Auto"/> <!-- 5: Volumen -->
                                 <ColumnDefinition Width="Auto"/> <!-- 6: Tiempo -->
                                 <ColumnDefinition Width="*"/>    <!-- 7: Espacio -->
-                                <ColumnDefinition Width="Auto"/> <!-- 8: Subtítulos -->
+                                <ColumnDefinition Width="Auto"/> <!-- 8: Audio + Subtítulos + Ecualizador -->
                                 <ColumnDefinition Width="Auto"/> <!-- 9: Más opciones (Captura + Modo Noche) -->
                                 <ColumnDefinition Width="Auto"/> <!-- 10: PiP -->
-                                <ColumnDefinition Width="Auto"/> <!-- 11: Fullscreen -->
-                                <ColumnDefinition Width="Auto"/> <!-- 12: Cajón de episodios -->
+                                <ColumnDefinition Width="Auto"/> <!-- 11: Cajón de episodios -->
+                                <ColumnDefinition Width="Auto"/> <!-- 12: Pantalla completa (siempre el último) -->
                             </Grid.ColumnDefinitions>
 
                             <!-- Episodio Anterior -->
@@ -426,7 +516,8 @@
                             </Button>
 
                             <!-- Contenedor Volumen Animado -->
-                            <StackPanel Grid.Column="5" Orientation="Horizontal" x:Name="VolumePanel" Background="Transparent" Margin="0,0,10,0">
+                            <StackPanel Grid.Column="5" Orientation="Horizontal" x:Name="VolumePanel" Background="Transparent" Margin="0,0,10,0"
+                                        MouseLeave="VolumePanel_MouseLeave">
                                 <Button Command="{Binding ToggleMuteCommand}" Focusable="True" FocusVisualStyle="{StaticResource PlayerFocusVisual}" Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" AutomationProperties.Name="{Binding [Player_SilenciarToggle], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
                                     <materialDesign:PackIcon Kind="{Binding VolumenIcon}" Width="24" Height="24" />
                                 </Button>
@@ -552,29 +643,91 @@
                             <TextBlock Grid.Column="6" Text="{Binding TiempoCombinadoTexto}"
                                        Foreground="White" VerticalAlignment="Center" FontSize="13" FontWeight="Bold" Margin="5,0,0,0" Opacity="0.9"/>
 
-                            <!-- Subtítulos (Menú Manual) -->
-                            <Button x:Name="SubtitlesButton" Grid.Column="8" Focusable="True"
+                            <!-- Audio (solo si el archivo trae más de una pista) + Subtítulos (menús manuales) -->
+                            <StackPanel Grid.Column="8" Orientation="Horizontal">
+                            <Button x:Name="AudioButton" Focusable="True"
+                                    FocusVisualStyle="{StaticResource PlayerFocusVisual}"
+                                    Visibility="{Binding HayVariasPistasAudio, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                    ToolTip="{Binding [Player_MenuAudio], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                    AutomationProperties.Name="{Binding [Player_MenuAudio], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                    PreviewMouseLeftButtonDown="AudioButton_PreviewMouseLeftButtonDown"
+                                    Click="AudioButton_Click"
+                                    Style="{StaticResource PlayerMenuToolButton}" Width="40" Height="40" Margin="0,0,5,0">
+                                <materialDesign:PackIcon Kind="Translate" Width="24" Height="24" />
+                            </Button>
+
+                            <Button x:Name="SubtitlesButton" Focusable="True"
                                     FocusVisualStyle="{StaticResource PlayerFocusVisual}"
                                     ToolTip="{Binding [Player_Subtitulos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
                                     AutomationProperties.Name="{Binding [Player_MenuSubtitulos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
                                     PreviewMouseLeftButtonDown="SubtitlesButton_PreviewMouseLeftButtonDown"
                                     Click="SubtitlesButton_Click"
-                                    Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,5,0">
+                                    Style="{StaticResource PlayerMenuToolButton}" Width="40" Height="40" Margin="0,0,5,0">
                                 <materialDesign:PackIcon Kind="{Binding SubtitulosIcon}" Width="26" Height="26" />
                             </Button>
+
+                            <!-- Ecualizador: botón propio (antes escondido en Más opciones). El punto azul indica que está encendido. -->
+                            <Button x:Name="EqualizerButton" Focusable="True"
+                                    FocusVisualStyle="{StaticResource PlayerFocusVisual}"
+                                    ToolTip="{Binding [Eq_Titulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                    AutomationProperties.Name="{Binding [Eq_Titulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                    PreviewMouseLeftButtonDown="EqualizerButton_PreviewMouseLeftButtonDown"
+                                    Click="EqualizerButton_Click"
+                                    Style="{StaticResource PlayerMenuToolButton}" Width="40" Height="40" Margin="0,0,5,0">
+                                <Grid>
+                                    <materialDesign:PackIcon Kind="Equalizer" Width="24" Height="24"/>
+                                    <Ellipse Width="7" Height="7" Fill="#60A5FA" Stroke="#141414" StrokeThickness="1"
+                                             HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-2,-3,0"
+                                             Visibility="{Binding EcualizadorActivo, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                                </Grid>
+                            </Button>
+                            </StackPanel>
+
+                            <!-- Menú de pistas de audio: mismo patrón manual que el de subtítulos (StaysOpen=True, cierre a mano). -->
+                            <Popup x:Name="AudioPopup" IsOpen="False" StaysOpen="True"
+                                   PlacementTarget="{Binding Source={x:Reference AudioButton}}" Placement="Top"
+                                   VerticalOffset="-4" Opened="Menu_Opened" Closed="Menu_Closed" PopupAnimation="Fade" AllowsTransparency="True">
+                                <StackPanel>
+                                <Border Background="#F2141414" BorderThickness="0" CornerRadius="8" Padding="10" MinWidth="200">
+                                    <Border.Effect>
+                                        <DropShadowEffect Color="Black" BlurRadius="15" ShadowDepth="5" Opacity="0.5"/>
+                                    </Border.Effect>
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding [Player_Audio], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Foreground="#94A3B8" FontSize="12" FontWeight="Bold" Margin="15,0,0,10" />
+                                        <ItemsControl ItemsSource="{Binding PistasAudio}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Button Command="{Binding DataContext.SeleccionarPistaAudioCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                            CommandParameter="{Binding}" Click="AudioMenuItem_Click" Style="{StaticResource MenuItemButton}"
+                                                            AutomationProperties.Name="{Binding Nombre}">
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <materialDesign:PackIcon Kind="Check" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"
+                                                                                     Visibility="{Binding EsActual, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                                                            <TextBlock Text="{Binding Nombre}" VerticalAlignment="Center"/>
+                                                        </StackPanel>
+                                                    </Button>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </Border>
+                                <Path x:Name="AudioPopupFlecha" Style="{StaticResource FlechaMenu}"/>
+                            </StackPanel>
+                            </Popup>
 
                             <!-- StaysOpen=True: con False, el popup se cierra por captura del mouse y el
                              mismo clic lo volvía a abrir (toggle imposible). El cierre es manual. -->
                             <Popup x:Name="SubtitlesPopup" IsOpen="False" StaysOpen="True"
                                    PlacementTarget="{Binding Source={x:Reference SubtitlesButton}}" Placement="Top"
-                                   VerticalOffset="-35" HorizontalOffset="10" PopupAnimation="Fade" AllowsTransparency="True">
+                                   VerticalOffset="-4" Opened="Menu_Opened" Closed="Menu_Closed" PopupAnimation="Fade" AllowsTransparency="True">
+                                <StackPanel>
                                 <Border Background="#F2141414" BorderThickness="0" CornerRadius="8" Padding="10" MinWidth="200">
                                     <Border.Effect>
                                         <DropShadowEffect Color="Black" BlurRadius="15" ShadowDepth="5" Opacity="0.5"/>
                                     </Border.Effect>
                                     
                                     <StackPanel>
-                                        <TextBlock Text="{Binding [Player_Subtitulos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Foreground="Gray" FontSize="12" FontWeight="Bold" Margin="15,0,0,10" />
+                                        <TextBlock Text="{Binding [Player_Subtitulos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Foreground="#94A3B8" FontSize="12" FontWeight="Bold" Margin="15,0,0,10" />
 
                                         <!-- Apagar -->
                                         <Button Content="{Binding [Player_ApagarSubtitulos], Source={x:Static loc:LocalizationService.Instance}}" Command="{Binding TurnOffSubtitlesCommand}" Click="SubtitleMenuItem_Click" Style="{StaticResource MenuItemButton}"/>
@@ -596,6 +749,8 @@
                                         </ItemsControl>
                                     </StackPanel>
                                 </Border>
+                                <Path x:Name="SubtitlesPopupFlecha" Style="{StaticResource FlechaMenu}"/>
+                            </StackPanel>
                             </Popup>
 
                             <!-- Más opciones: agrupa Captura y Modo Noche (las dos acciones que menos se
@@ -607,13 +762,14 @@
                                     AutomationProperties.Name="{Binding [Player_MasOpciones], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
                                     PreviewMouseLeftButtonDown="MoreOptionsButton_PreviewMouseLeftButtonDown"
                                     Click="MoreOptionsButton_Click"
-                                    Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,4,0">
+                                    Style="{StaticResource PlayerMenuToolButton}" Width="40" Height="40" Margin="0,0,4,0">
                                 <materialDesign:PackIcon Kind="DotsVertical" Width="24" Height="24" />
                             </Button>
 
                             <Popup x:Name="MoreOptionsPopup" IsOpen="False" StaysOpen="True"
                                    PlacementTarget="{Binding Source={x:Reference MoreOptionsButton}}" Placement="Top"
-                                   VerticalOffset="-35" HorizontalOffset="10" PopupAnimation="Fade" AllowsTransparency="True">
+                                   VerticalOffset="-4" Opened="Menu_Opened" Closed="Menu_Closed" PopupAnimation="Fade" AllowsTransparency="True">
+                                <StackPanel>
                                 <Border Background="#F2141414" BorderThickness="0" CornerRadius="8" Padding="10" MinWidth="200">
                                     <Border.Effect>
                                         <DropShadowEffect Color="Black" BlurRadius="15" ShadowDepth="5" Opacity="0.5"/>
@@ -648,8 +804,118 @@
                                                                           Visibility="{Binding ModoNocheActivo, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                                             </StackPanel>
                                         </Button>
+
                                     </StackPanel>
                                 </Border>
+                                <Path x:Name="MoreOptionsPopupFlecha" Style="{StaticResource FlechaMenu}"/>
+                            </StackPanel>
+                            </Popup>
+
+                            <!-- ECUALIZADOR de 10 bandas (su propio botón en la barra). Mover un deslizador cambia solo esa banda en vivo,
+                                 sin cortes; elegir un ajuste o mover una banda lo enciende. Se guarda solo (Configuración no hace falta). -->
+                            <Popup x:Name="EqualizerPopup" IsOpen="False" StaysOpen="True"
+                                   PlacementTarget="{Binding Source={x:Reference EqualizerButton}}" Placement="Top"
+                                   VerticalOffset="-4" Opened="Menu_Opened" Closed="Menu_Closed" PopupAnimation="Fade" AllowsTransparency="True">
+                                <StackPanel>
+                                    <Border Background="#F2141414" BorderThickness="0" CornerRadius="8" Padding="16,12,16,14" Width="580">
+                                        <Border.Effect>
+                                            <DropShadowEffect Color="Black" BlurRadius="15" ShadowDepth="5" Opacity="0.5"/>
+                                        </Border.Effect>
+                                        <StackPanel>
+                                            <Grid Margin="0,0,0,10">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <materialDesign:PackIcon Kind="Equalizer" Width="18" Height="18" Foreground="#60A5FA" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                                    <TextBlock Text="{Binding [Eq_Titulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                               Foreground="White" FontSize="14" FontWeight="Bold" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="{Binding NombrePresetEcualizador}" Foreground="#94A3B8" FontSize="12" Margin="10,1,0,0" VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                                <ToggleButton Grid.Column="1" IsChecked="{Binding EcualizadorActivo, Mode=TwoWay}" Cursor="Hand"
+                                                              Style="{StaticResource MaterialDesignSwitchToggleButton}"
+                                                              ToolTip="{Binding [Eq_Activar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                              AutomationProperties.Name="{Binding [Eq_Activar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                            </Grid>
+
+                                            <TextBlock Text="{Binding [Eq_Ajustes], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                       Foreground="#94A3B8" FontSize="11" FontWeight="Bold" Margin="0,0,0,6"/>
+                                            <ItemsControl ItemsSource="{Binding PresetsEcualizador}" Margin="0,0,0,6">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Button Content="{Binding Nombre}" Style="{StaticResource ChipPresetEcualizador}"
+                                                                AutomationProperties.Name="{Binding Nombre}"
+                                                                Command="{Binding DataContext.AplicarPresetEcualizadorCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                                CommandParameter="{Binding Clave}"/>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <!-- Escala en dB a la izquierda de los deslizadores -->
+                                                <Grid Width="30" Height="130" Margin="0,18,4,0" VerticalAlignment="Top">
+                                                    <TextBlock Text="+12" Foreground="#94A3B8" FontSize="10" VerticalAlignment="Top" HorizontalAlignment="Right"/>
+                                                    <TextBlock Text="0" Foreground="#94A3B8" FontSize="10" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+                                                    <TextBlock Text="-12" Foreground="#94A3B8" FontSize="10" VerticalAlignment="Bottom" HorizontalAlignment="Right"/>
+                                                </Grid>
+                                                <ItemsControl Grid.Column="1" ItemsSource="{Binding BandasEcualizador}">
+                                                    <ItemsControl.Style>
+                                                        <Style TargetType="ItemsControl">
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding EcualizadorActivo}" Value="False">
+                                                                    <Setter Property="Opacity" Value="0.55"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </ItemsControl.Style>
+                                                    <ItemsControl.ItemsPanel>
+                                                        <ItemsPanelTemplate><UniformGrid Rows="1"/></ItemsPanelTemplate>
+                                                    </ItemsControl.ItemsPanel>
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <StackPanel HorizontalAlignment="Center">
+                                                                <TextBlock Text="{Binding TextoGanancia}" Foreground="White" FontSize="11" FontWeight="SemiBold"
+                                                                           HorizontalAlignment="Center" Margin="0,0,0,4"/>
+                                                                <Slider Orientation="Vertical" Height="130" Minimum="-12" Maximum="12" SmallChange="1" LargeChange="3"
+                                                                        TickFrequency="1" IsSnapToTickEnabled="True" Foreground="#60A5FA" Cursor="Hand"
+                                                                        HorizontalAlignment="Center"
+                                                                        Value="{Binding Ganancia, Mode=TwoWay}"
+                                                                        ToolTip="{Binding TextoGanancia}"
+                                                                        AutomationProperties.Name="{Binding Etiqueta, StringFormat={}{0} Hz}"/>
+                                                                <TextBlock Text="{Binding Etiqueta}" Foreground="#94A3B8" FontSize="11" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                                                            </StackPanel>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </Grid>
+
+                                            <Grid Margin="0,10,0,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="{Binding [Eq_Pista], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                           Foreground="#94A3B8" FontSize="11" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                                <Button Grid.Column="1" Command="{Binding RestablecerEcualizadorCommand}" Style="{StaticResource MenuItemButton}" Padding="10,6"
+                                                        AutomationProperties.Name="{Binding [Eq_Restablecer], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <materialDesign:PackIcon Kind="Restore" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                                        <TextBlock Text="{Binding [Eq_Restablecer], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="12" VerticalAlignment="Center"/>
+                                                    </StackPanel>
+                                                </Button>
+                                            </Grid>
+                                        </StackPanel>
+                                    </Border>
+                                    <Path x:Name="EqualizerPopupFlecha" Style="{StaticResource FlechaMenu}"/>
+                                </StackPanel>
                             </Popup>
 
                             <!-- Modo Mini Reproductor -->
@@ -662,20 +928,20 @@
                             </Button>
 
                             <!-- Fullscreen con ícono dinámico -->
-                            <Button Grid.Column="11" Command="{Binding ToggleFullscreenCommand}" Focusable="True"
+                            <Button Grid.Column="12" Command="{Binding ToggleFullscreenCommand}" Focusable="True"
                                     FocusVisualStyle="{StaticResource PlayerFocusVisual}"
                                     ToolTip="{Binding [Player_PantallaCompletaTooltip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
                                     AutomationProperties.Name="{Binding [Atajo_PantallaCompleta], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                    Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,4,0">
+                                    Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,0,0">
                                 <materialDesign:PackIcon Kind="{Binding FullscreenIcon}" Width="26" Height="26" />
                             </Button>
 
                             <!-- Cajón lateral de episodios (tecla L) -->
-                            <Button Grid.Column="12" Command="{Binding ToggleCajonEpisodiosCommand}" Focusable="True"
+                            <Button x:Name="CajonButton" Grid.Column="11" Command="{Binding ToggleCajonEpisodiosCommand}" Focusable="True"
                                     FocusVisualStyle="{StaticResource PlayerFocusVisual}"
                                     ToolTip="{Binding [Player_CajonEpisodiosTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
                                     AutomationProperties.Name="{Binding [Player_CajonEpisodiosTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                    Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,0,0">
+                                    Style="{StaticResource PlayerMenuToolButton}" Width="40" Height="40" Margin="0,0,4,0">
                                 <materialDesign:PackIcon Kind="PlaylistPlay" Width="26" Height="26" />
                             </Button>
                         </Grid>
@@ -858,7 +1124,7 @@
                             </Button>
                         </Grid>
 
-                        <ListBox Grid.Row="1" ItemsSource="{Binding EpisodiosDelCajon}" Background="Transparent" BorderThickness="0"
+                        <ListBox x:Name="ListaCajonEpisodios" Grid.Row="1" ItemsSource="{Binding EpisodiosDelCajon}" Background="Transparent" BorderThickness="0"
                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                  VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
                                  VirtualizingPanel.ScrollUnit="Pixel"
@@ -866,16 +1132,11 @@
                                  ItemContainerStyle="{StaticResource CajonEpisodioItemStyle}">
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
-                                    <Border Padding="10,8" Margin="8,2" CornerRadius="8" Cursor="Hand">
-                                        <Border.Background>
-                                            <MultiBinding Converter="{StaticResource EpisodioActualBrush}">
-                                                <Binding Path="NumeroEpisodio"/>
-                                                <Binding Path="DataContext.Episodio" ElementName="RootWindow"/>
-                                            </MultiBinding>
-                                        </Border.Background>
+                                    <Border x:Name="Fila" Padding="10,8" Margin="8,2" CornerRadius="8" Cursor="Hand"
+                                            Background="Transparent" BorderBrush="Transparent" BorderThickness="1">
                                         <Border.InputBindings>
                                             <MouseBinding MouseAction="LeftClick"
-                                                          Command="{Binding DataContext.SaltarAEpisodioCommand, ElementName=RootWindow}"
+                                                          Command="{Binding DataContext.SaltarAEpisodioCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
                                                           CommandParameter="{Binding}"/>
                                         </Border.InputBindings>
                                         <Grid>
@@ -883,15 +1144,51 @@
                                                 <ColumnDefinition Width="Auto"/>
                                                 <ColumnDefinition Width="*"/>
                                             </Grid.ColumnDefinitions>
-                                            <Border Width="72" Height="42" CornerRadius="6" ClipToBounds="True" Background="#1F242C">
-                                                <Image Source="{Binding RutaMiniatura, TargetNullValue={x:Null}}" Stretch="UniformToFill"/>
-                                            </Border>
+                                            <Grid Width="72" Height="42">
+                                                <!-- Recorte redondeado: ClipToBounds recorta en rectángulo y las puntas de la miniatura asomaban
+                                                     fuera del marco redondeado del episodio que se está viendo. -->
+                                                <Grid.Clip>
+                                                    <RectangleGeometry Rect="0,0,72,42" RadiusX="6" RadiusY="6"/>
+                                                </Grid.Clip>
+                                                <Border CornerRadius="6" Background="#1F242C">
+                                                    <Image Source="{Binding RutaMiniatura, TargetNullValue={x:Null}}" Stretch="UniformToFill"/>
+                                                </Border>
+                                                <!-- Encima de la miniatura del que se está viendo: velo + icono de reproducción -->
+                                                <Border x:Name="MarcaMiniatura" CornerRadius="6" Background="#99000000" BorderBrush="#60A5FA" BorderThickness="1.5" Visibility="Collapsed">
+                                                    <materialDesign:PackIcon Kind="Play" Width="22" Height="22" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </Border>
+                                            </Grid>
                                             <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding TituloVisual}" Foreground="White" FontSize="12.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                                <DockPanel>
+                                                    <!-- Favorito: el mismo marcador azul que en la ficha -->
+                                                    <materialDesign:PackIcon DockPanel.Dock="Right" Kind="Bookmark" Foreground="#60A5FA" Width="15" Height="15"
+                                                                             VerticalAlignment="Center" Margin="6,0,4,0"
+                                                                             ToolTip="{Binding [Player_EpisodioFavorito], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                                             Visibility="{Binding Favorito, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                                                    <TextBlock x:Name="TituloFila" Text="{Binding TituloVisual}" Foreground="White" FontSize="12.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                                </DockPanel>
                                                 <TextBlock Text="{Binding BadgeTecnico}" Foreground="#9CA3AF" FontSize="10" Margin="0,2,0,0"/>
+                                                <StackPanel x:Name="EtiquetaReproduciendo" Orientation="Horizontal" Margin="0,3,0,0" Visibility="Collapsed">
+                                                    <materialDesign:PackIcon Kind="VolumeHigh" Width="12" Height="12" Foreground="#60A5FA" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                                    <TextBlock Text="{Binding [Player_Reproduciendo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                               Foreground="#60A5FA" FontSize="10" FontWeight="Bold"/>
+                                                </StackPanel>
                                             </StackPanel>
                                         </Grid>
                                     </Border>
+                                    <DataTemplate.Triggers>
+                                        <Trigger SourceName="Fila" Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Fila" Property="Background" Value="#14FFFFFF"/>
+                                        </Trigger>
+                                        <DataTrigger Binding="{Binding EsReproduciendose}" Value="True">
+                                            <Setter TargetName="Fila" Property="Background" Value="#2960A5FA"/>
+                                            <Setter TargetName="Fila" Property="BorderBrush" Value="#60A5FA"/>
+                                            <Setter TargetName="MarcaMiniatura" Property="Visibility" Value="Visible"/>
+                                            <Setter TargetName="EtiquetaReproduciendo" Property="Visibility" Value="Visible"/>
+                                            <Setter TargetName="TituloFila" Property="FontWeight" Value="Bold"/>
+                                            <Setter TargetName="TituloFila" Property="Foreground" Value="#93C5FD"/>
+                                        </DataTrigger>
+                                    </DataTemplate.Triggers>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                         </ListBox>
@@ -932,6 +1229,17 @@
                         <TextBlock Text="{Binding [Player_SiguienteEpisodioEn], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
                                    Foreground="#9CA3AF" FontSize="11" FontWeight="SemiBold"/>
                         <TextBlock x:Name="CuentaAtrasTitulo" Foreground="White" FontSize="14" FontWeight="Bold" Margin="0,2,0,10" TextTrimming="CharacterEllipsis"/>
+                        <!-- "Te saltas el episodio 4 (no está descargado)": el siguiente con archivo no es el que sigue -->
+                        <Border x:Name="CuentaAtrasAviso" Background="#29F59E0B" CornerRadius="6" Padding="8,6" Margin="0,-2,0,10" Visibility="Collapsed">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <materialDesign:PackIcon Kind="AlertOutline" Foreground="#F59E0B" Width="15" Height="15" VerticalAlignment="Top" Margin="0,1,6,0"/>
+                                <TextBlock x:Name="CuentaAtrasAvisoTexto" Grid.Column="1" Foreground="#F59E0B" FontSize="12" TextWrapping="Wrap"/>
+                            </Grid>
+                        </Border>
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>

@@ -39,7 +39,23 @@ public class PlaybackWindowModeCoordinator : IPlaybackWindowModeCoordinator
         }
     }
 
+    public bool EstaEnPantallaCompleta
+    {
+        get
+        {
+            try { return _ventanaPrincipal?.IsFullScreen ?? false; }
+            catch { return false; }
+        }
+    }
+
+    public void SalirDePantallaCompleta()
+    {
+        if (EstaEnPantallaCompleta) _ventanaPrincipal!.TogglePantallaCompleta();
+    }
+
     public void EntrarModoMini() => _ventanaPrincipal?.EntrarModoPiP();
 
     public void SalirModoMini() => _ventanaPrincipal?.SalirModoPiP();
+
+    public void MostrarVentanaPrincipal() => _ventanaPrincipal?.MostrarYActivar();
 }

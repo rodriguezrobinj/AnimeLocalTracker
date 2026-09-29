@@ -32,7 +32,7 @@ public class ReproductorToastTests
             var dialogo = new DialogService();
             var vista = new ReproductorView { DataContext = CrearVm(dialogo) };
 
-            dialogo.MostrarToast("Reanudar Reproducción", "Continuando desde 10:26", "PlaySpeed", "#2196F3");
+            dialogo.MostrarToastReproductor("Reanudar Reproducción", "Continuando desde 10:26", "PlaySpeed", "#2196F3");
 
             ((TextBlock)vista.FindName("ToastRepTitulo")).Text.Should().Be("Reanudar Reproducción");
             ((TextBlock)vista.FindName("ToastRepMensaje")).Text.Should().Be("Continuando desde 10:26");
@@ -48,7 +48,7 @@ public class ReproductorToastTests
             var dialogo = new DialogService();
             var vista = new ReproductorView { DataContext = CrearVm(dialogo) };
 
-            var act = () => dialogo.MostrarToast("T", "M", "IconoQueNoExiste", "esto-no-es-un-color");
+            var act = () => dialogo.MostrarToastReproductor("T", "M", "IconoQueNoExiste", "esto-no-es-un-color");
 
             act.Should().NotThrow();
             ((PackIcon)vista.FindName("ToastRepIcono")).Kind.Should().Be(PackIconKind.InformationOutline);
@@ -63,12 +63,48 @@ public class ReproductorToastTests
         {
             var dialogo = new DialogService();
             var vista = new ReproductorView { DataContext = CrearVm(dialogo) };
-            dialogo.MostrarToast("Primero", "M1", "InformationOutline", "#2196F3");
+            dialogo.MostrarToastReproductor("Primero", "M1", "InformationOutline", "#2196F3");
 
             vista.DataContext = null;
-            dialogo.MostrarToast("Segundo", "M2", "InformationOutline", "#2196F3");
+            dialogo.MostrarToastReproductor("Segundo", "M2", "InformationOutline", "#2196F3");
 
             ((TextBlock)vista.FindName("ToastRepTitulo")).Text.Should().Be("Primero", "sin ViewModel la vista ya no se suscribe al servicio");
+        });
+    }
+
+    [Fact]
+    public void UnAvisoDeFuera_ComoUnaDescargaTerminada_NoSeDibujaEncimaDelEpisodio()
+    {
+        _host.Ejecutar(() =>
+        {
+            var dialogo = new DialogService();
+            var vista = new ReproductorView { DataContext = CrearVm(dialogo) };
+            dialogo.MostrarToastReproductor("Auto-Tracking", "Episodio 5 marcado como visto", "CheckCircle", "#4CAF50");
+
+            dialogo.MostrarToast("Descarga completada", "Frieren - Episodio 6", "Download", "#4CAF50");
+
+            ((TextBlock)vista.FindName("ToastRepTitulo")).Text.Should().Be("Auto-Tracking", "el texto de fuera no llega a la vista del reproductor");
+            ((Border)vista.FindName("ToastReproductor")).Opacity.Should().Be(0, "y el aviso del reproductor se retira en vez de quedarse con otro texto");
+        });
+    }
+
+    [Fact]
+    public void LosAvisosLanzadosDentroDelAmbitoDelReproductor_SiSeDibujan()
+    {
+        _host.Ejecutar(() =>
+        {
+            var dialogo = new DialogService();
+            var vista = new ReproductorView { DataContext = CrearVm(dialogo) };
+
+            using (dialogo.AvisosComoDelReproductor())
+            {
+                dialogo.MostrarToast("¡Logro desbloqueado!", "Maratonista — Bronce", "TrophyAward", "#FBBF24"); // lo lanza LogrosService
+            }
+            dialogo.ToastDelReproductor.Should().BeTrue();
+            ((TextBlock)vista.FindName("ToastRepTitulo")).Text.Should().Be("¡Logro desbloqueado!");
+
+            dialogo.MostrarToast("Descarga completada", "Frieren - Episodio 6", "Download", "#4CAF50");
+            dialogo.ToastDelReproductor.Should().BeFalse("fuera del ámbito, el aviso vuelve a ser de la app");
         });
     }
 
