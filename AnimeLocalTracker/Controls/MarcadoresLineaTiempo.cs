@@ -92,6 +92,9 @@ public sealed class MarcadoresLineaTiempo : FrameworkElement
         return margen + Math.Clamp(segundos / duracion, 0, 1) * util;
     }
 
+    /// <summary>Donde empieza la línea: el centro de la bolita en el segundo 0 (la pista de fondo tiene el mismo margen a cada lado).</summary>
+    internal static double InicioLinea(double anchoTotal, double margen) => Math.Min(margen, anchoTotal / 2);
+
     /// <summary>El tramo en el que está la reproducción (inicio incluido, fin excluido), o null si está fuera de todos.</summary>
     internal static SegmentoLineaTiempo? TramoEn(IEnumerable<SegmentoLineaTiempo>? segmentos, double segundos) =>
         segmentos?.FirstOrDefault(s => segundos >= s.Inicio && segundos < s.Fin);
@@ -133,7 +136,11 @@ public sealed class MarcadoresLineaTiempo : FrameworkElement
         if (TemplatedParent is not Control deslizador) return;
 
         var tramo = TramoEn(Segmentos, Valor);
-        deslizador.SetCurrentValue(Control.ForegroundProperty, Pincel(tramo == null ? Blanco : ColorDe(tramo.Tipo)));
+        var color = tramo == null ? Blanco : ColorDe(tramo.Tipo);
+
+        // Se llama con cada movimiento de la barra (4 veces por segundo): solo se cambia el pincel si cambia el color.
+        if (deslizador.Foreground is SolidColorBrush actual && actual.Color == color) return;
+        deslizador.SetCurrentValue(Control.ForegroundProperty, Pincel(color));
     }
 
     protected override void OnInitialized(EventArgs e)
@@ -171,9 +178,11 @@ public sealed class MarcadoresLineaTiempo : FrameworkElement
             }
         }
 
-        // 2) Lo reproducido: blanco desde el borde hasta el centro de la bolita (como la línea de siempre)…
-        if (xActual > 0)
-            drawingContext.DrawRoundedRectangle(Pincel(Blanco), null, new Rect(0, y, xActual, grosor), radio, radio);
+        // 2) Lo reproducido: blanco desde donde está la bolita en el segundo 0 hasta donde está ahora. Antes empezaba en el borde
+        //    del control, 10 px antes: con el video recién empezado ya se veía un trozo blanco ("la barra no empieza en 0").
+        double xInicio = InicioLinea(ActualWidth, MargenLateral);
+        if (xActual - xInicio > 0.5)
+            drawingContext.DrawRoundedRectangle(Pincel(Blanco), null, new Rect(xInicio, y, xActual - xInicio, grosor), radio, radio);
 
         // 3) …y, dentro de cada tramo ya alcanzado, del color del tramo (opaco)
         if (segmentos != null)

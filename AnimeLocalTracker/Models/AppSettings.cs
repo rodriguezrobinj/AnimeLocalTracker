@@ -9,6 +9,24 @@ public class AppSettings
     public string RutaBaseAnimes { get; set; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), "Anime");
     public bool AutoSkipIntroOutro { get; set; } = false;
     public bool SubtitulosPorDefecto { get; set; } = true;
+    /// <summary>Idioma de audio que el usuario eligió la última vez en el reproductor ("ja", "en"…): en archivos con varias
+    /// pistas se pone esa sola. Null = la pista que marque el archivo.</summary>
+    public string? IdiomaAudioPreferido { get; set; }
+
+    // === Rendimiento de video (Configuración → Reproducción) ===
+    /// <summary>Saltos del reproductor: "Automatico" (según el equipo), "Exactos" o "Rapidos". Ver MotorVideo.ElegirEstrategiaSaltos.</summary>
+    public string ModoSaltosVideo { get; set; } = "Automatico";
+    /// <summary>Decodificar con la tarjeta gráfica cuando el formato lo permite (si no, Flyleaf cae solo al procesador).</summary>
+    public bool AceleracionHardwareVideo { get; set; } = true;
+    /// <summary>Nombre de la tarjeta gráfica que usa el reproductor; null = la que elija Windows.</summary>
+    public string? TarjetaGraficaVideo { get; set; }
+    /// <summary>Escalado inteligente (RTX Video Super Resolution / Intel): "Automatico", "Activado" o "Desactivado".</summary>
+    public string EscaladoInteligenteVideo { get; set; } = "Automatico";
+
+    // === Ecualizador del reproductor ===
+    public bool EcualizadorActivo { get; set; }
+    /// <summary>Ganancia (dB, -12..+12) de cada una de las 10 bandas (31 Hz … 16 kHz).</summary>
+    public List<double>? EcualizadorGanancias { get; set; }
     /// <summary>Apariencia de los subtítulos (tipografía, tamaño, color, contorno, caja). Los valores
     /// por defecto conservan el aspecto anterior a que fuera configurable.</summary>
     public EstiloSubtitulos EstiloSubtitulos { get; set; } = new();

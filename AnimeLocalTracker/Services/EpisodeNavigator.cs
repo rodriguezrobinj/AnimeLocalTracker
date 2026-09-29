@@ -47,6 +47,16 @@ public class EpisodeNavigator : IEpisodeNavigator
     }
 
     /// <summary>
+    /// Números de episodio que quedan ENTRE el actual y el destino (sin incluir ninguno de los dos): los que no están
+    /// descargados y el salto se come. Vacío si son consecutivos. Da igual el orden (siguiente o anterior).
+    /// </summary>
+    public static IReadOnlyList<int> EpisodiosIntermedios(int actual, int destino)
+    {
+        int desde = Math.Min(actual, destino), hasta = Math.Max(actual, destino);
+        return hasta - desde <= 1 ? Array.Empty<int>() : Enumerable.Range(desde + 1, hasta - desde - 1).ToList();
+    }
+
+    /// <summary>
     /// ARQ-01: decisión pura (sin Player) de si toca disparar la pre-carga del siguiente episodio en
     /// este instante del sondeo de progreso — al menos 95% visto, hay un siguiente episodio con
     /// archivo, y no es el mismo que ya se precargó (como máximo una vez por episodio).

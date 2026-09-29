@@ -23,6 +23,10 @@ public partial class DialogService : ObservableObject, IDialogService
     [ObservableProperty] private string _toastMensaje = "";
     [ObservableProperty] private string _toastIcono = "InformationOutline";
     [ObservableProperty] private string _toastColor = "#3F51B5";
+    [ObservableProperty] private bool _toastDelReproductor;
+
+    // Viaja con el flujo asíncrono (también a través de los await de otros servicios): ver AvisosComoDelReproductor.
+    private static readonly System.Threading.AsyncLocal<bool> _flujoDelReproductor = new();
 
     public async Task<bool> MostrarDialogoAsync(string titulo, string mensaje, bool esConfirmacion = false, string icono = "InformationOutline", string color = "#3F51B5")
     {
@@ -57,19 +61,38 @@ public partial class DialogService : ObservableObject, IDialogService
         return await _dialogTcs.Task;
     }
 
-    public void MostrarToast(string titulo, string mensaje, string icono = "InformationOutline", string color = "#3F51B5")
+    public void MostrarToast(string titulo, string mensaje, string icono = "InformationOutline", string color = "#3F51B5") =>
+        MostrarToastConOrigen(titulo, mensaje, icono, color, _flujoDelReproductor.Value);
+
+    public void MostrarToastReproductor(string titulo, string mensaje, string icono = "InformationOutline", string color = "#3F51B5") =>
+        MostrarToastConOrigen(titulo, mensaje, icono, color, delReproductor: true);
+
+    public IDisposable AvisosComoDelReproductor()
+    {
+        bool anterior = _flujoDelReproductor.Value;
+        _flujoDelReproductor.Value = true;
+        return new Restaurar(() => _flujoDelReproductor.Value = anterior);
+    }
+
+    private sealed class Restaurar(Action accion) : IDisposable
+    {
+        public void Dispose() => accion();
+    }
+
+    private void MostrarToastConOrigen(string titulo, string mensaje, string icono, string color, bool delReproductor)
     {
         if (System.Windows.Application.Current?.Dispatcher != null && !System.Windows.Application.Current.Dispatcher.CheckAccess())
         {
-            System.Windows.Application.Current.Dispatcher.InvokeAsync(() => MostrarToastInterno(titulo, mensaje, icono, color));
+            System.Windows.Application.Current.Dispatcher.InvokeAsync(() => MostrarToastInterno(titulo, mensaje, icono, color, delReproductor));
             return;
         }
         
-        MostrarToastInterno(titulo, mensaje, icono, color);
+        MostrarToastInterno(titulo, mensaje, icono, color, delReproductor);
     }
 
-    private void MostrarToastInterno(string titulo, string mensaje, string icono, string color)
+    private void MostrarToastInterno(string titulo, string mensaje, string icono, string color, bool delReproductor)
     {
+        ToastDelReproductor = delReproductor;
         ToastTitulo = titulo;
         ToastMensaje = mensaje;
         ToastIcono = icono;

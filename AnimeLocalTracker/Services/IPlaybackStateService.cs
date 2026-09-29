@@ -19,7 +19,8 @@ public class DatosProgresoReproduccion
 /// <summary>
 /// Resultado efectivo del guardado (tras aplicar las reglas de negocio).
 /// </summary>
-public record ResultadoGuardadoProgreso(double ProgresoSegundos, double TotalSegundos);
+/// <param name="VistoLocal">Estado de "visto" que quedó guardado: los avisos a la Ficha/Galería usan este, no una suposición del reproductor.</param>
+public record ResultadoGuardadoProgreso(double ProgresoSegundos, double TotalSegundos, bool VistoLocal = false);
 
 /// <summary>
 /// Responsable único de la persistencia del estado de reproducción:

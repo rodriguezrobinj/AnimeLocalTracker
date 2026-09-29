@@ -1,0 +1,16 @@
+<Window x:Class="AnimeLocalTracker.Views.MiniReproductorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Width="420" Height="236" MinWidth="260" MinHeight="110"
+        WindowStyle="None" ResizeMode="CanResize" Topmost="True" ShowInTaskbar="False"
+        WindowStartupLocation="Manual" Background="Black">
+    <!-- MINI REPRODUCTOR: ventana propia, siempre encima y SIN dueño, para que siga a la vista aunque la ventana principal se
+         minimice y para que la app quede libre para navegar mientras tanto. Dentro va la misma ReproductorView (su plantilla
+         de App.xaml), que en EsModoMini muestra sus controles compactos. El video ocupa la ventana entera (sin marco) y la
+         ventana conserva la proporción del video, así no quedan franjas negras. Los bordes siguen sirviendo para cambiar el
+         tamaño aunque el video (otra ventana nativa de Flyleaf) los cubra: ver ReproductorView.BordeMiniHook. -->
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="0" ResizeBorderThickness="6" GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False"/>
+    </WindowChrome.WindowChrome>
+    <ContentControl Content="{Binding}" Focusable="False"/>
+</Window>

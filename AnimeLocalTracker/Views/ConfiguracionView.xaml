@@ -637,6 +637,57 @@
                                     </ctl:SettingRow>
                                 </StackPanel>
                             </Border>
+                            <TextBlock Text="{Binding [Cfg_GrupoRendimientoVideo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource CfgGroupCaption}" Margin="4,4,0,8"/>
+                            <Border Style="{StaticResource CfgGroup}" Margin="0,0,0,16">
+                                <StackPanel>
+                                    <!-- Diagnóstico: qué tiene este equipo y cómo se reprodujo el último video -->
+                                    <StackPanel Margin="16,12,16,12">
+                                        <StackPanel Orientation="Horizontal">
+                                            <materialDesign:PackIcon Kind="Chip" Width="18" Height="18" Foreground="{DynamicResource Brush.AccentSoft}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                            <TextBlock Text="{Binding DiagnosticoEquipoTexto}" Style="{StaticResource AppText.Body}" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                        <TextBlock Text="{Binding DiagnosticoUltimoVideoTexto}" Style="{StaticResource AppText.Caption}" TextWrapping="Wrap" Margin="26,4,0,0"/>
+                                    </StackPanel>
+                                    <Border Style="{StaticResource CfgDivider}"/>
+
+                                    <ctl:SettingRow Title="{Binding [Cfg_ModoSaltos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                    Description="{Binding [Cfg_ModoSaltosSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                        <ComboBox SelectedValue="{Binding ModoSaltosVideo}" SelectedValuePath="Tag" Height="36" MinWidth="230"
+                                                  AutomationProperties.Name="{Binding [Cfg_ModoSaltos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                            <ComboBoxItem Content="{Binding [Cfg_Opcion_Automatico], Source={x:Static loc:LocalizationService.Instance}}" Tag="Automatico"/>
+                                            <ComboBoxItem Content="{Binding [Cfg_ModoSaltos_Exactos], Source={x:Static loc:LocalizationService.Instance}}" Tag="Exactos"/>
+                                            <ComboBoxItem Content="{Binding [Cfg_ModoSaltos_Rapidos], Source={x:Static loc:LocalizationService.Instance}}" Tag="Rapidos"/>
+                                        </ComboBox>
+                                    </ctl:SettingRow>
+                                    <Border Style="{StaticResource CfgDivider}"/>
+
+                                    <ctl:SettingRow Title="{Binding [Cfg_AceleracionHardware], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                    Description="{Binding [Cfg_AceleracionHardwareSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                        <ToggleButton IsChecked="{Binding AceleracionHardwareVideo}" Style="{StaticResource CfgSwitch}"
+                                                      AutomationProperties.Name="{Binding [Cfg_AceleracionHardware], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                    </ctl:SettingRow>
+                                    <Border Style="{StaticResource CfgDivider}"/>
+
+                                    <ctl:SettingRow Title="{Binding [Cfg_TarjetaGrafica], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                    Description="{Binding [Cfg_TarjetaGraficaSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                        <ComboBox ItemsSource="{Binding TarjetasGraficas}" SelectedValue="{Binding TarjetaGraficaVideo}"
+                                                  SelectedValuePath="Valor" DisplayMemberPath="Nombre" Height="36" MinWidth="230" MaxWidth="320"
+                                                  AutomationProperties.Name="{Binding [Cfg_TarjetaGrafica], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                    </ctl:SettingRow>
+                                    <Border Style="{StaticResource CfgDivider}"/>
+
+                                    <ctl:SettingRow Title="{Binding [Cfg_EscaladoInteligente], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                    Description="{Binding [Cfg_EscaladoInteligenteSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                        <ComboBox SelectedValue="{Binding EscaladoInteligenteVideo}" SelectedValuePath="Tag" Height="36" MinWidth="230"
+                                                  AutomationProperties.Name="{Binding [Cfg_EscaladoInteligente], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                            <ComboBoxItem Content="{Binding [Cfg_Opcion_Automatico], Source={x:Static loc:LocalizationService.Instance}}" Tag="Automatico"/>
+                                            <ComboBoxItem Content="{Binding [Cfg_Opcion_Activado], Source={x:Static loc:LocalizationService.Instance}}" Tag="Activado"/>
+                                            <ComboBoxItem Content="{Binding [Cfg_Opcion_Desactivado], Source={x:Static loc:LocalizationService.Instance}}" Tag="Desactivado"/>
+                                        </ComboBox>
+                                    </ctl:SettingRow>
+                                </StackPanel>
+                            </Border>
+
                             <TextBlock Text="{Binding [Cfg_GrupoEstiloSubtitulos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource CfgGroupCaption}" Margin="4,4,0,8"/>
                             <Border Style="{StaticResource CfgGroup}">
                                 <StackPanel>

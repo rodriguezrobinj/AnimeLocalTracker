@@ -24,6 +24,10 @@ public partial class EpisodioItem : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(TieneProgresoGuardado))]
     private bool _visto;
+
+    /// <summary>Es el episodio que está sonando en el reproductor (lo marca el cajón de episodios).</summary>
+    [ObservableProperty]
+    private bool _esReproduciendose;
     
     [ObservableProperty]
     private bool _favorito;

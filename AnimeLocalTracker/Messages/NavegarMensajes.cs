@@ -22,7 +22,8 @@ public record NavegarMensaje_VolverDelReproductor();
 
 
 // === Mensajes de Estado / Notificaciones ===
-public record EpisodioActualizadoMensaje(int AnimeId, int NumeroEpisodio, bool VistoLocal, double ProgresoSegundos = 0, double TotalSegundos = 0);
+/// <param name="SoloProgreso">True en el guardado periódico del reproductor (cada 3 s): solo cambió la posición, nunca el "visto".</param>
+public record EpisodioActualizadoMensaje(int AnimeId, int NumeroEpisodio, bool VistoLocal, double ProgresoSegundos = 0, double TotalSegundos = 0, bool SoloProgreso = false);
 public record AnimeAñadidoMensaje(AnimeItem NuevoAnime);
 public record UsuarioLogeadoMensaje();
 public record UsuarioDesconectadoMensaje();

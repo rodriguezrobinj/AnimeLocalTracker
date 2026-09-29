@@ -24,7 +24,12 @@ public interface IPlaybackSeekCoordinator : IDisposable
     /// VIGENTE del Player al momento de aplicarse, no un valor capturado cuando se pidió el seek.
     /// No-op si <paramref name="player"/> es null o ya se liberó.
     /// </summary>
-    void SolicitarSeek(Player? player, double segundos, Func<bool> haCompletadoOpen);
+    /// <param name="preciso">
+    /// True para saltos puntuales (flechas, ±10 s, saltar opening, clic en la barra): llega exactamente al segundo pedido. False
+    /// (arrastre en vivo) salta al fotograma clave anterior, que es instantáneo. En los AV1 del usuario hay hasta ~10 s entre
+    /// fotogramas clave: con el salto rápido, "adelantar 10 s" avanzaba 2-5 s o se quedaba en el mismo sitio.
+    /// </param>
+    void SolicitarSeek(Player? player, double segundos, Func<bool> haCompletadoOpen, bool preciso = false);
 
     /// <summary>Entrega y limpia el seek que quedó diferido porque el Player no estaba listo
     /// cuando se pidió. Null si no hay ninguno pendiente.</summary>

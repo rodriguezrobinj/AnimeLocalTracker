@@ -72,7 +72,6 @@
             <conv:LocalizedFormatConverter x:Key="LocalizedFormat" />
             <conv:GeneroTraducidoConverter x:Key="GeneroTraducido" />
             <conv:InverseBoolConverter x:Key="InverseBool" />
-            <conv:EpisodioActualBrushConverter x:Key="EpisodioActualBrush" />
             <conv:DialogoTonoConverter x:Key="DialogoTono" />
 
             <!-- ═══════════════════════════════════════════════════════════════ -->

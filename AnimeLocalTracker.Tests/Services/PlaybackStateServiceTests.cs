@@ -210,11 +210,10 @@ public class PlaybackStateServiceTests
     }
 
     [Fact]
-    public async Task GuardarProgresoAsync_SinFueMarcadoComoVisto_SiDeberiaRevertirVistoLocalAMedias()
+    public async Task GuardarProgresoAsync_AlVolverAVerUnEpisodioVistoAMedias_ConservaLaMarcaYGuardaLaPosicion()
     {
-        // Arrange: caso legítimo — el usuario reanuda un capítulo ya visto y lo deja a medias
-        // (el reproductor NUNCA lo marcó como visto en esta sesión). Debe seguir quitando la
-        // marca para que la barra de progreso se muestre correctamente.
+        // Arrange: el usuario vuelve a ver un capítulo ya visto y lo deja a medias. Antes se le quitaba la marca (la ficha
+        // pasaba de "20 de 20 vistos" a 19); ahora sigue visto y solo se guarda la posición para poder reanudarlo.
         var registro = new RegistroEpisodio
         {
             AniListId = 16498,
@@ -238,6 +237,21 @@ public class PlaybackStateServiceTests
         });
 
         // Assert
-        registro.VistoLocal.Should().BeFalse();
+        registro.VistoLocal.Should().BeTrue();
+        registro.ProgresoSegundos.Should().Be(3000);
+    }
+
+    [Fact]
+    public async Task ObtenerPosicionParaReanudarAsync_UnEpisodioVistoQueSeEstabaVolviendoAVer_SeReanuda()
+    {
+        _dbMock.Setup(d => d.ObtenerRegistrosPorAnimeAsync(16498))
+            .ReturnsAsync(new List<RegistroEpisodio>
+            {
+                new() { AniListId = 16498, NumeroEpisodio = 5, ProgresoSegundos = 3000, TotalSegundos = 6000, VistoLocal = true }
+            });
+
+        var resultado = await CrearSut().ObtenerPosicionParaReanudarAsync(16498, 5);
+
+        resultado!.Value.Posicion.Should().Be(3000);
     }
 }

@@ -659,6 +659,34 @@ public class DatabaseService : IDatabaseService, IDisposable
         }
     }
 
+    /// <summary>
+    /// Marca o desmarca un episodio como favorito sin tocar nada más. Antes la ficha guardaba un registro nuevo con
+    /// GuardarRegistroEpisodioAsync y, como ese registro no traía el progreso, marcar como favorito un episodio a medio
+    /// ver borraba el punto donde se había quedado.
+    /// </summary>
+    public async Task GuardarFavoritoEpisodioAsync(int aniListId, int numeroEpisodio, bool favorito, string? rutaArchivo)
+    {
+        var existente = await _conexion.Table<RegistroEpisodio>()
+            .FirstOrDefaultAsync(r => r.AniListId == aniListId && r.NumeroEpisodio == numeroEpisodio);
+
+        if (existente != null)
+        {
+            existente.FavoritoLocal = favorito;
+            if (string.IsNullOrWhiteSpace(existente.RutaArchivo) && !string.IsNullOrWhiteSpace(rutaArchivo)) existente.RutaArchivo = rutaArchivo;
+            await _conexion.UpdateAsync(existente);
+        }
+        else
+        {
+            await _conexion.InsertAsync(new RegistroEpisodio
+            {
+                AniListId = aniListId,
+                NumeroEpisodio = numeroEpisodio,
+                RutaArchivo = rutaArchivo ?? string.Empty,
+                FavoritoLocal = favorito,
+            });
+        }
+    }
+
     public async Task GuardarRegistrosEpisodioBulkAsync(IEnumerable<RegistroEpisodio> registros)
     {
         if (registros == null) return;

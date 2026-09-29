@@ -2,7 +2,6 @@ using System;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Data;
-using System.Windows.Media;
 
 namespace AnimeLocalTracker.Converters;
 
@@ -86,21 +85,4 @@ public class InverseBoolConverter : IValueConverter
 
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
         => !(value is true);
-}
-
-/// <summary>
-/// values[0]=número de episodio del ítem, values[1]=episodio actualmente reproduciéndose.
-/// Usado en el cajón lateral de episodios para resaltar la fila del episodio en curso.
-/// </summary>
-public class EpisodioActualBrushConverter : IMultiValueConverter
-{
-    public object Convert(object?[] values, Type targetType, object? parameter, CultureInfo culture)
-    {
-        if (values.Length < 2 || values[0] is not int numero || values[1] is not int actual)
-            return Brushes.Transparent;
-        return numero == actual ? new SolidColorBrush(Color.FromArgb(0x33, 0x60, 0xA5, 0xFA)) : Brushes.Transparent;
-    }
-
-    public object[] ConvertBack(object? value, Type[] targetTypes, object? parameter, CultureInfo culture)
-        => throw new NotSupportedException();
 }

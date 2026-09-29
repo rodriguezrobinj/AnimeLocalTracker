@@ -28,6 +28,8 @@ public interface IDatabaseService
     
     // === NUEVOS MÉTODOS PARA EL TRACKING ===
     Task GuardarRegistroEpisodioAsync(RegistroEpisodio registro);
+    /// <summary>Cambia SOLO la marca de favorito de un episodio (crea el registro si no existe): no toca progreso, visto ni historial.</summary>
+    Task GuardarFavoritoEpisodioAsync(int aniListId, int numeroEpisodio, bool favorito, string? rutaArchivo);
     Task GuardarRegistrosEpisodioBulkAsync(IEnumerable<RegistroEpisodio> registros);
     Task<List<RegistroEpisodio>> ObtenerRegistrosPorAnimeAsync(int aniListId);
     Task<List<RegistroEpisodio>> ObtenerTodosLosRegistrosAsync();
