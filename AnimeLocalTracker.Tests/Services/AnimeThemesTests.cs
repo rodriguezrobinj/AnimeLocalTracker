@@ -28,6 +28,13 @@ public class AnimeThemesTests
     [InlineData("28", 27, false)]
     [InlineData("2-4, 7-12", 8, true)]
     [InlineData("2-4, 7-12", 5, false)]
+    // Rangos abiertos: AnimeThemes los usa mientras el anime sigue en emisión (One Piece: "1156-", "1157-1162, 1164-").
+    [InlineData("1-", 5, true)]
+    [InlineData("1-", 1, true)]
+    [InlineData("1156-", 1155, false)]
+    [InlineData("1156-", 1200, true)]
+    [InlineData("1157-1162, 1164-", 1163, false)]
+    [InlineData("1157-1162, 1164-", 1170, true)]
     public void EpisodioEnRango_DeberiaEvaluarLaPertenenciaCorrectamente(string? rango, int episodio, bool esperado)
     {
         AnimeThemeInfo.EpisodioEnRango(rango, episodio).Should().Be(esperado);
@@ -37,7 +44,53 @@ public class AnimeThemesTests
     public void EpisodioEnRango_ConTextoMalformado_NoDeberiaLanzarYDeberiaSerFalse()
     {
         AnimeThemeInfo.EpisodioEnRango("abc-def", 5).Should().BeFalse();
-        AnimeThemeInfo.EpisodioEnRango("1-", 5).Should().BeFalse();
+        AnimeThemeInfo.EpisodioEnRango("-5", 5).Should().BeFalse();
+        AnimeThemeInfo.EpisodioEnRango("1-x", 5).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(null, null)]
+    [InlineData("", null)]
+    [InlineData("13-24", 13)]
+    [InlineData("1157-1162, 1164-", 1157)]
+    [InlineData("28", 28)]
+    [InlineData("20-24, 5", 5)]
+    public void PrimerEpisodio_DeberiaSerElMenorDelRango(string? rango, int? esperado)
+    {
+        new AnimeThemeInfo { Slug = "ED1", Tipo = "ED", RangoEpisodios = rango, AudioUrlOgg = "https://a.animethemes.moe/x.ogg" }
+            .PrimerEpisodio().Should().Be(esperado);
+    }
+
+    [Fact]
+    public void MapearTemas_DeberiaIncluirTamanoNotasYNombreDelAnime()
+    {
+        const string json = """
+            {"anime":{"slug":"one_piece","name":"One Piece","animethemes":[{"slug":"ED20","type":"ED","song":{"title":"Memories"},
+             "animethemeentries":[{"version":1,"episodes":"492","notes":"OP as ED","spoiler":false,
+               "videos":[{"audio":{"link":"https://a.animethemes.moe/OnePiece-ED20.ogg","size":3476867}}]}]}]}}
+            """;
+        var anime = JsonSerializer.Deserialize<AnimeThemesAnimeResponse>(json, JsonOptions)!.Anime;
+
+        var tema = AnimeThemesService.MapearTemas(anime).Should().ContainSingle().Subject;
+
+        tema.TamanoBytes.Should().Be(3476867);
+        tema.Notas.Should().Be("OP as ED");
+        tema.NombreAnime.Should().Be("One Piece");
+    }
+
+    [Fact]
+    public void ClaveEstable_NoDeberiaCambiarCuandoAnimeThemesCierraElRango()
+    {
+        var enEmision = new AnimeThemeInfo { Slug = "OP1", Tipo = "OP", Version = 1, RangoEpisodios = "1-", AudioUrlOgg = "https://a.animethemes.moe/x.ogg" };
+        var terminado = new AnimeThemeInfo { Slug = "OP1", Tipo = "OP", Version = 1, RangoEpisodios = "1-10, 12", AudioUrlOgg = "https://a.animethemes.moe/x.ogg" };
+        var otraVersion = new AnimeThemeInfo { Slug = "OP1", Tipo = "OP", Version = 2, RangoEpisodios = "11", AudioUrlOgg = "https://a.animethemes.moe/x.ogg" };
+
+        enEmision.NombreArchivoLocal().Should().NotBe(terminado.NombreArchivoLocal(), "el nombre del archivo sí incluye el rango");
+        enEmision.ClaveEstable().Should().Be(terminado.ClaveEstable());
+        enEmision.ClaveEstable().Should().NotBe(otraVersion.ClaveEstable());
+
+        AnimeThemesDownloadService.TryParseNombreArchivo("OP_OP1_v1_ep1-.mp3", out var local).Should().BeTrue();
+        local!.ClaveEstable().Should().Be(terminado.ClaveEstable());
     }
 
     [Theory]

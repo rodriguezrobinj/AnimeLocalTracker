@@ -254,7 +254,8 @@ public partial class ConfiguracionViewModel : ObservableObject
         IDialogService dialogService,
         CacheMaintenanceService cacheMaintenanceService,
         IPluginService pluginService,
-        IStartupService? startupService = null)
+        IStartupService? startupService = null,
+        IOrganizadorMusicaService? organizadorMusica = null)
     {
         _settingsService = settingsService;
         _authService = authService;
@@ -263,6 +264,7 @@ public partial class ConfiguracionViewModel : ObservableObject
         _cacheMaintenanceService = cacheMaintenanceService;
         _pluginService = pluginService;
         _startupService = startupService;
+        _organizadorMusica = organizadorMusica;
 
         CargarDatosConfiguracion();
     }
@@ -678,6 +680,58 @@ public partial class ConfiguracionViewModel : ObservableObject
         {
             AppLogger.Error("ConfiguracionViewModel", "Error limpiando caché de imágenes", ex);
             await _dialogService.MostrarDialogoAsync(LocalizationService.T("Dlg_ErrorTitulo"), LocalizationService.T("Cfg_LimpiezaErrorMsj"), false, "AlertCircleOutline", "#EF4444");
+        }
+    }
+
+    private readonly IOrganizadorMusicaService? _organizadorMusica;
+
+    [ObservableProperty] private bool _organizandoMusica;
+
+    /// <summary>"12 / 60" (animes) mientras se organiza la música.</summary>
+    [ObservableProperty] private string _progresoOrganizarMusicaTexto = string.Empty;
+
+    /// <summary>
+    /// Pone nombre legible ("OP1 - We Are!.mp3"), título, artista, anime y portada a los openings/endings que se descargaron
+    /// antes de que la app lo hiciera sola. No vuelve a descargar nada: renombra y copia el audio tal cual con sus etiquetas.
+    /// </summary>
+    [RelayCommand]
+    private async Task OrganizarMusicaAsync()
+    {
+        var organizador = _organizadorMusica;
+        if (organizador == null || OrganizandoMusica) return;
+
+        var pendientes = await Task.Run(organizador.ContarPendientes);
+        if (pendientes.Canciones == 0)
+        {
+            await _dialogService.MostrarDialogoAsync(LocalizationService.T("Cfg_OrganizarMusica"), LocalizationService.T("Cfg_OrganizarMusicaNadaMsj"), false, "CheckCircleOutline", "#4CAF50");
+            return;
+        }
+
+        bool confirmar = await _dialogService.MostrarDialogoAsync(
+            LocalizationService.T("Cfg_OrganizarMusica"),
+            string.Format(LocalizationService.T("Cfg_OrganizarMusicaConfirmMsjFormato"), pendientes.Canciones, pendientes.Animes.Count),
+            true, "FolderMusicOutline", "#2563EB");
+        if (!confirmar) return;
+
+        OrganizandoMusica = true;
+        try
+        {
+            var progreso = new Progress<(int Hechos, int Total)>(p => ProgresoOrganizarMusicaTexto = $"{p.Hechos} / {p.Total}");
+            var r = await Task.Run(() => organizador.OrganizarTodoAsync(pendientes.Animes, progreso, System.Threading.CancellationToken.None));
+
+            string mensaje = string.Format(LocalizationService.T("Cfg_OrganizarMusicaListoMsjFormato"), r.Renombradas, r.Etiquetadas);
+            if (r.SinDatos > 0) mensaje += " " + string.Format(LocalizationService.T("Cfg_OrganizarMusicaSinDatosFormato"), r.SinDatos);
+            await _dialogService.MostrarDialogoAsync(LocalizationService.T("Cfg_OrganizarMusica"), mensaje, false, "CheckCircleOutline", "#4CAF50");
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("ConfiguracionViewModel", "Error organizando la música", ex);
+            await _dialogService.MostrarDialogoAsync(LocalizationService.T("Dlg_ErrorTitulo"), LocalizationService.T("Cfg_OrganizarMusicaErrorMsj"), false, "AlertCircleOutline", "#EF4444");
+        }
+        finally
+        {
+            OrganizandoMusica = false;
+            ProgresoOrganizarMusicaTexto = string.Empty;
         }
     }
 

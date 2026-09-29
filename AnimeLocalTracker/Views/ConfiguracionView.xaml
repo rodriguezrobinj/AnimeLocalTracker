@@ -402,6 +402,25 @@
                                     </ctl:SettingRow>
                                     <Border Style="{StaticResource CfgDivider}"/>
 
+                                    <!-- Openings/endings descargados antes: nombre legible, etiquetas y portada, sin volver a descargarlos -->
+                                    <ctl:SettingRow Title="{Binding [Cfg_OrganizarMusica], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                    Description="{Binding [Cfg_OrganizarMusicaTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                        <Button Command="{Binding OrganizarMusicaCommand}" Style="{StaticResource CfgRowButton}"
+                                                AutomationProperties.Name="{Binding [Cfg_OrganizarMusica], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                            <StackPanel Orientation="Horizontal">
+                                                <materialDesign:PackIcon Kind="FolderMusicOutline" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,7,0"
+                                                                         Visibility="{Binding OrganizandoMusica, Converter={StaticResource InverseBoolToVis}}"/>
+                                                <ProgressBar Style="{StaticResource MaterialDesignCircularProgressBar}" IsIndeterminate="True" Width="14" Height="14" Margin="0,0,7,0"
+                                                             Visibility="{Binding OrganizandoMusica, Converter={StaticResource BoolToVis}}"/>
+                                                <TextBlock Text="{Binding [Cfg_AccionOrganizar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="12"
+                                                           Visibility="{Binding OrganizandoMusica, Converter={StaticResource InverseBoolToVis}}"/>
+                                                <TextBlock Text="{Binding ProgresoOrganizarMusicaTexto}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="12"
+                                                           Visibility="{Binding OrganizandoMusica, Converter={StaticResource BoolToVis}}"/>
+                                            </StackPanel>
+                                        </Button>
+                                    </ctl:SettingRow>
+                                    <Border Style="{StaticResource CfgDivider}"/>
+
                                     <ctl:SettingRow Title="{Binding [Cfg_RowBackup], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
                                                     Description="{Binding [Cfg_RowBackupSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
                                         <Button Command="{Binding ExportarBackupCommand}" Style="{StaticResource CfgRowButton}"

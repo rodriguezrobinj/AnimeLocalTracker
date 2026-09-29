@@ -154,6 +154,7 @@ public sealed partial class NavigationService : ObservableObject, INavigationSer
             _vistaAnteriorADetalleCalendario = VistaActual is CalendarioViewModel ? VistaActual : null;
             VistaActual = detalleVm;
             await detalleVm.InicializarAsync(message.AnimeSeleccionado);
+            if (!string.IsNullOrWhiteSpace(message.ReproducirTemaClave)) await detalleVm.AbrirMusicaYReproducirAsync(message.ReproducirTemaClave);
         }
         catch (Exception ex)
         {

@@ -508,7 +508,7 @@ public partial class DetalleViewModel : ObservableObject,
         _ = CargarDatosExtraAsync(ctFicha);
         _ = CargarPreferenciasEmisionAsync(ctFicha);
         CargarEnlacesMusica(anime);
-        _ = CargarTemasMusicalesAsync(ctFicha);
+        CargaTemasMusicalesTarea = CargarTemasMusicalesAsync(ctFicha);
     }
 
     /// <summary>

@@ -13,6 +13,7 @@ namespace AnimeLocalTracker.ViewModels;
 public partial class MainViewModel : ObservableObject, 
     IRecipient<AbrirBuscadorMensaje>,
     IRecipient<DescargaProgresoMensaje>,
+    IRecipient<DescargaMusicaProgresoMensaje>,
     IRecipient<NuevosEpisodiosMensaje>,
     IRecipient<MostrarDialogoRequestMessage>
 {
@@ -25,6 +26,7 @@ public partial class MainViewModel : ObservableObject,
     private readonly IFileScannerService _fileScannerService;
     private readonly NewEpisodeNotifier _newEpisodeNotifier;
     private readonly ISystemTrayService _systemTrayService;
+    private readonly IAnimeThemesDownloadService? _descargasMusica;
 
     public NavigationService Navigation => (NavigationService)_navigationService;
     public IDialogService DialogService { get; }
@@ -70,8 +72,10 @@ public partial class MainViewModel : ObservableObject,
         IDatabaseService databaseService,
         IFileScannerService fileScannerService,
         NewEpisodeNotifier newEpisodeNotifier,
-        ISystemTrayService systemTrayService)
+        ISystemTrayService systemTrayService,
+        IAnimeThemesDownloadService? descargasMusica = null)
     {
+        _descargasMusica = descargasMusica;
         _navigationService = navigationService;
         _animeTrackingService = animeTrackingService;
         _animeLibraryService = animeLibraryService;
@@ -177,6 +181,12 @@ public partial class MainViewModel : ObservableObject,
         ActualizarConteoDescargas();
     }
 
+    public void Receive(DescargaMusicaProgresoMensaje message)
+    {
+        // Solo cambia el número al empezar o terminar una canción, no en cada avance.
+        if (message.Progreso <= 0 || message.Terminada) ActualizarConteoDescargas();
+    }
+
     public void Receive(NuevosEpisodiosMensaje message)
     {
         if (message.Cantidad <= 0) return;
@@ -194,7 +204,8 @@ public partial class MainViewModel : ObservableObject,
         System.Windows.Application.Current?.Dispatcher.InvokeAsync(() =>
         {
             var activas = _downloadService.ObtenerDescargasActivas();
-            ConteoDescargasActivas = System.Linq.Enumerable.Count(activas, d => d.IsDownloading);
+            int musica = _descargasMusica?.ObtenerDescargasMusicaActivas().Count ?? 0;
+            ConteoDescargasActivas = System.Linq.Enumerable.Count(activas, d => d.IsDownloading) + musica;
             TieneDescargasActivas = ConteoDescargasActivas > 0;
         });
     }

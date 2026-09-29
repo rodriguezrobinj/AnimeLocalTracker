@@ -16,6 +16,24 @@ public partial class DescargaItem : ObservableObject
 
     public string TituloEpisodio => string.Format(LocalizationService.T("Act_EpisodioFormato"), NumeroEpisodio);
 
+    /// <summary>Un opening/ending (AnimeThemes) en vez de un episodio: sin pausa ni prioridad (dura segundos).</summary>
+    public bool EsMusica { get; set; }
+
+    /// <summary>Solo música: tipo|slug|versión del tema.</summary>
+    public string TemaClave { get; set; } = string.Empty;
+
+    /// <summary>Solo música: "OP1 · We Are!".</summary>
+    public string TemaTitulo { get; set; } = string.Empty;
+
+    /// <summary>Segunda línea de la fila: el episodio, o el tema si es música.</summary>
+    public string Subtitulo => EsMusica ? TemaTitulo : TituloEpisodio;
+
+    /// <summary>Solo música: ya bajó y se está convirtiendo a mp3 (los últimos segundos).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(EstadoTexto))]
+    [NotifyPropertyChangedFor(nameof(DetalleTexto))]
+    private bool _convirtiendo;
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ProgresoTexto))]
     [NotifyPropertyChangedFor(nameof(EstaEnEspera))]
@@ -115,6 +133,7 @@ public partial class DescargaItem : ObservableObject
 
     public string EstadoTexto =>
         IsPaused ? LocalizationService.T("Desc_EnPausa")
+        : Convirtiendo ? LocalizationService.T("Desc_EstadoConvirtiendo")
         : EnCola ? LocalizationService.T("Desc_EstadoEnCola")
         : SinConexion ? LocalizationService.T("Desc_EstadoSinConexion")
         : Reintentos > 0 && Progreso <= 0 ? string.Format(LocalizationService.T("Desc_ReintentoFormato"), Reintentos)
@@ -125,7 +144,7 @@ public partial class DescargaItem : ObservableObject
     {
         get
         {
-            if (IsPaused || EnCola) return string.Empty;
+            if (IsPaused || EnCola || Convirtiendo) return string.Empty;
             if (SinConexion) return LocalizationService.T("Desc_DetalleSinConexion");
             var partes = new List<string>(3);
             if (!string.IsNullOrEmpty(VelocidadDescarga)) partes.Add(VelocidadDescarga);

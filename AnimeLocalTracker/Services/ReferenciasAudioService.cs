@@ -71,6 +71,7 @@ public sealed class ReferenciasAudioService : IReferenciasAudioService
             if (catalogo.Count > 0)
             {
                 completa = true;
+                ActualizarRangos(temas, catalogo);
                 foreach (var tema in catalogo.Where(t => t.AplicaAlEpisodio(episodio)))
                 {
                     if (temas.Any(t => MismoTema(t, tema))) continue;
@@ -141,15 +142,22 @@ public sealed class ReferenciasAudioService : IReferenciasAudioService
         }
     }
 
-    private static string Norm(string? rango) => (rango ?? string.Empty).Replace(" ", "");
+    // El rango NO forma parte de la identidad: AnimeThemes lo cambia al terminar la temporada ("1-" → "1-12") y el archivo
+    // guardado con el rango viejo sigue siendo la misma canción (antes se volvía a bajar).
+    private static bool MismoTema(TemaLocalDisponible a, TemaLocalDisponible b) => a.ClaveEstable() == b.ClaveEstable();
 
-    private static bool MismoTema(TemaLocalDisponible a, TemaLocalDisponible b) =>
-        string.Equals(a.Tipo, b.Tipo, StringComparison.OrdinalIgnoreCase) && string.Equals(a.Slug, b.Slug, StringComparison.OrdinalIgnoreCase)
-        && a.Version == b.Version && Norm(a.RangoEpisodios) == Norm(b.RangoEpisodios);
+    private static bool MismoTema(TemaLocalDisponible a, AnimeThemeInfo b) => a.ClaveEstable() == b.ClaveEstable();
 
-    private static bool MismoTema(TemaLocalDisponible a, AnimeThemeInfo b) =>
-        string.Equals(a.Tipo, b.Tipo, StringComparison.OrdinalIgnoreCase) && string.Equals(a.Slug, b.Slug, StringComparison.OrdinalIgnoreCase)
-        && a.Version == b.Version && Norm(a.RangoEpisodios) == Norm(b.RangoEpisodios);
+    /// <summary>El rango leído del nombre de un archivo viejo puede estar desfasado: manda el del catálogo actual.</summary>
+    internal static void ActualizarRangos(List<TemaLocalDisponible> temas, IReadOnlyList<AnimeThemeInfo> catalogo)
+    {
+        for (int i = 0; i < temas.Count; i++)
+        {
+            var actual = catalogo.FirstOrDefault(t => MismoTema(temas[i], t));
+            if (actual != null && actual.RangoEpisodios != temas[i].RangoEpisodios)
+                temas[i] = temas[i] with { RangoEpisodios = actual.RangoEpisodios };
+        }
+    }
 
     /// <summary>Solo https y solo el dominio de AnimeThemes: una URL rara de la API no debe hacer que la app baje de cualquier sitio.</summary>
     internal static bool EsUrlPermitida(string? url) =>
@@ -174,6 +182,7 @@ public sealed class ReferenciasAudioService : IReferenciasAudioService
             respuesta.EnsureSuccessStatusCode();
             if (respuesta.Content.Headers.ContentLength is long declarado && declarado > MaximoBytesAudio) return null;
 
+            long? anunciado = respuesta.Content.Headers.ContentLength;
             await using (var origen = await respuesta.Content.ReadAsStreamAsync(ct))
             await using (var salida = File.Create(temporal))
             {
@@ -185,6 +194,13 @@ public sealed class ReferenciasAudioService : IReferenciasAudioService
                     total += n;
                     if (total > MaximoBytesAudio) return null;
                     await salida.WriteAsync(buffer.AsMemory(0, n), ct);
+                }
+
+                // Un audio recortado (el servidor cerró antes de tiempo) daría una referencia a medias: no se guarda.
+                if (total == 0 || (anunciado is > 0 && total != anunciado.Value))
+                {
+                    AppLogger.Debug("ReferenciasAudioService", $"Referencia '{tema.Slug}' de {aniListId} incompleta ({total} de {anunciado} bytes).");
+                    return null;
                 }
             }
 

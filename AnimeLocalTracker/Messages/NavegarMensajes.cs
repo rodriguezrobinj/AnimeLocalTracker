@@ -5,7 +5,9 @@ namespace AnimeLocalTracker.Messages;
 // === Mensajes de Navegación ===
 public record NavegarMensaje_Galeria();
 public record NavegarMensaje_AgregarAnime();
-public record NavegarMensaje_Detalle(AnimeItem AnimeSeleccionado);
+/// <param name="ReproducirTemaClave">Opcional: al abrir la ficha, abrir el panel de música y reproducir ese opening/ending
+/// (tipo|slug|versión). Lo usa "Reproducir" en el historial de descargas.</param>
+public record NavegarMensaje_Detalle(AnimeItem AnimeSeleccionado, string? ReproducirTemaClave = null);
 public record NavegarMensaje_Calendario();
 public record NavegarMensaje_Descargas();
 public record NavegarMensaje_Configuracion();

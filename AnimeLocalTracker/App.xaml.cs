@@ -170,10 +170,19 @@ public partial class App : Application
             .AddPolicyHandler(GetRetryPolicy());
 
         // Openings/endings vía AnimeThemes.moe: catálogo (JSON) + descarga del audio (.ogg → .mp3).
-        services.AddHttpClient<IAnimeThemesService, AnimeThemesService>()
-            .AddPolicyHandler(GetRetryPolicy());
+        // Política propia (reintentos cortos): la de AniList espera 60 s y este cliente corta a los 20 s.
+        // Respuestas comprimidas (el JSON de un anime largo baja de ~11 KB a ~3 KB) y listas guardadas en disco.
+        services.AddHttpClient<IAnimeThemesService, AnimeThemesService>(http => new AnimeThemesService(http, AppDataPaths.AnimeThemesCatalogDir))
+            .ConfigurePrimaryHttpMessageHandler(() => new System.Net.Http.SocketsHttpHandler
+            {
+                AutomaticDecompression = System.Net.DecompressionMethods.All,
+                PooledConnectionLifetime = TimeSpan.FromMinutes(5)
+            })
+            .AddPolicyHandler(AnimeThemesService.CrearPoliticaReintentos());
         services.AddSingleton<IAnimeThemesDownloadService, AnimeThemesDownloadService>();
         services.AddSingleton<IAudioDurationService, AudioDurationService>();
+        // "Organizar mi música" (Configuración): nombre legible, etiquetas y portada a los mp3 descargados antes.
+        services.AddSingleton<IOrganizadorMusicaService, OrganizadorMusicaService>();
         // Enlaces externos de la sección de música: cada fuente es un IProveedorEnlacesMusica (AniPlaylist de serie).
         services.AddSingleton<AnimeLocalTracker.Services.EnlacesMusica.IProveedorEnlacesMusica, AnimeLocalTracker.Services.EnlacesMusica.AniPlaylistProveedor>();
         services.AddSingleton<AnimeLocalTracker.Services.EnlacesMusica.IEnlacesMusicaService, AnimeLocalTracker.Services.EnlacesMusica.EnlacesMusicaService>();

@@ -67,6 +67,88 @@ public class DetalleMusicaTests
     }
 
     [Fact]
+    public async Task CargarTemasMusicalesAsync_DeberiaPonerAlDiaLosNombresAntesDeMirarQueEstaDescargado()
+    {
+        // Un mp3 guardado con el rango viejo ("1-") se renombra primero; si se mirara antes, saldría como no descargado.
+        var op = new AnimeThemeInfo { Slug = "OP1", Tipo = "OP", RangoEpisodios = "1-12", AudioUrlOgg = "https://a.animethemes.moe/op.ogg" };
+        var temas = new List<AnimeThemeInfo> { op };
+        bool reconciliado = false;
+        _themesService.Setup(s => s.ObtenerTemasAsync(7, It.IsAny<CancellationToken>())).ReturnsAsync(temas);
+        _themesDownload.Setup(d => d.ReconciliarDescargasLocales(7, temas)).Callback(() => reconciliado = true).Returns(1);
+        _themesDownload.Setup(d => d.EstaDescargado(7, op)).Returns(() => reconciliado);
+
+        var sut = await AbrirFichaAsync();
+        await sut.CargarTemasMusicalesAsync();
+
+        sut.TemasMusicales.Single().Descargado.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task CargarTemasMusicalesAsync_SinListaDeAnimeThemes_DeberiaMostrarLosMp3YaGuardadosSoloParaEscuchar()
+    {
+        // Sin conexión y sin lista guardada: los mp3 que ya tienes siguen sonando desde la ficha.
+        _themesService.Setup(s => s.ObtenerTemasAsync(7, It.IsAny<CancellationToken>())).ReturnsAsync(new List<AnimeThemeInfo>());
+        _themesDownload.Setup(d => d.ListarDescargasLocales(7)).Returns(new List<TemaLocalDisponible>
+        {
+            new("ED", "ED1", 1, "1-12", @"C:\Music\7\ED_ED1_v1_ep1-12.mp3"),
+            new("OP", "OP1", 1, null, @"C:\Music\7\OP_OP1_v1_eptodos.mp3")
+        });
+        _themesDownload.Setup(d => d.EstaDescargado(7, It.IsAny<AnimeThemeInfo>())).Returns(true);
+
+        var sut = await AbrirFichaAsync();
+        await sut.CargarTemasMusicalesAsync();
+
+        sut.TemasMusicales.Select(t => t.Slug).Should().Equal("OP1", "ED1");
+        sut.TemasMusicales.Should().OnlyContain(t => t.Descargado && t.PuedeReproducir && !t.PuedeDescargar && !t.PuedePrevisualizar);
+        sut.TemasMusicales.Single(t => t.Slug == "OP1").TituloCancion.Should().Be("OP1", "sin AnimeThemes no se sabe el título");
+        _themesDownload.Verify(d => d.ReconciliarDescargasLocales(It.IsAny<int>(), It.IsAny<IReadOnlyList<AnimeThemeInfo>>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task UnTemaSinEnlace_NoDeberiaIntentarDescargarse()
+    {
+        _themesService.Setup(s => s.ObtenerTemasAsync(7, It.IsAny<CancellationToken>())).ReturnsAsync(new List<AnimeThemeInfo>());
+        _themesDownload.Setup(d => d.ListarDescargasLocales(7)).Returns(new List<TemaLocalDisponible>
+        {
+            new("OP", "OP1", 1, null, @"C:\Music\7\OP_OP1_v1_eptodos.mp3")
+        });
+        _themesDownload.Setup(d => d.EstaDescargado(7, It.IsAny<AnimeThemeInfo>())).Returns(false); // lo borró desde la ficha
+
+        var sut = await AbrirFichaAsync();
+        await sut.CargarTemasMusicalesAsync();
+        await sut.DescargarTemaCommand.ExecuteAsync(sut.TemasMusicales.Single());
+
+        _themesDownload.Verify(d => d.DescargarYConvertirAsync(It.IsAny<int>(), It.IsAny<AnimeThemeInfo>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Never);
+        sut.TemasMusicales.Single().PuedeDescargar.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task CargarTemasMusicalesAsync_ConUnaDescargaAunEnMarcha_DeberiaVolverAMostrarSuAvanceSinAvisarDosVeces()
+    {
+        // Se empezó a descargar, se salió de la ficha y se volvió: la fila nueva se engancha a la misma descarga.
+        var op = new AnimeThemeInfo { Slug = "OP1", Tipo = "OP", AudioUrlOgg = "https://a.animethemes.moe/op.ogg" };
+        var termina = new TaskCompletionSource<string?>();
+        _themesService.Setup(s => s.ObtenerTemasAsync(7, It.IsAny<CancellationToken>())).ReturnsAsync(new List<AnimeThemeInfo> { op });
+        _themesDownload.Setup(d => d.EstaDescargado(7, op)).Returns(false);
+        _themesDownload.Setup(d => d.EstaDescargando(7, op)).Returns(true);
+        _themesDownload.Setup(d => d.DescargarYConvertirAsync(7, op, It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
+            .Returns(termina.Task);
+
+        var sut = await AbrirFichaAsync();
+        await sut.CargarTemasMusicalesAsync();
+        var item = sut.TemasMusicales.Single();
+
+        item.Descargando.Should().BeTrue();
+        termina.SetResult(null);
+        await Task.Delay(50);
+
+        item.Descargando.Should().BeFalse();
+        item.Descargado.Should().BeFalse();
+        _dialogos.Verify(d => d.MostrarToast(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never,
+            "el aviso de fallo ya lo da quien empezó la descarga");
+    }
+
+    [Fact]
     public async Task DescargarTemaAsync_ConExito_DeberiaMarcarComoDescargadoYaLimpiarElIndicadorDeProgreso()
     {
         var op = new AnimeThemeInfo { Slug = "OP1", Tipo = "OP", AudioUrlOgg = "https://a.animethemes.moe/op.ogg" };

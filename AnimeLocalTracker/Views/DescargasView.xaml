@@ -378,6 +378,10 @@
                                                         <Setter Property="Kind" Value="CloudDownloadOutline"/>
                                                         <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}"/>
                                                         <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding EsMusica}" Value="True">
+                                                                <Setter Property="Kind" Value="MusicNote"/>
+                                                                <Setter Property="Foreground" Value="#C084FC"/>
+                                                            </DataTrigger>
                                                             <DataTrigger Binding="{Binding EnCola}" Value="True">
                                                                 <Setter Property="Kind" Value="ClockOutline"/>
                                                                 <Setter Property="Foreground" Value="{DynamicResource Brush.TextTertiary}"/>
@@ -405,11 +409,19 @@
                                                             CornerRadius="6" Padding="7,2" Margin="10,0,0,0" VerticalAlignment="Center">
                                                         <TextBlock Text="{Binding EstadoTexto}" FontSize="10.5" FontWeight="Bold" Foreground="{DynamicResource Brush.AccentSoft}"/>
                                                     </Border>
+                                                    <!-- Opening/ending de AnimeThemes (no es un episodio) -->
+                                                    <Border Background="#2D1B4E" CornerRadius="6" Padding="7,2" Margin="8,0,0,0" VerticalAlignment="Center"
+                                                            Visibility="{Binding EsMusica, Converter={StaticResource BoolToVis}}">
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <materialDesign:PackIcon Kind="MusicNote" Width="11" Height="11" Foreground="#C084FC" VerticalAlignment="Center" Margin="0,0,3,0"/>
+                                                            <TextBlock Text="{Binding [Desc_EtiquetaMusica], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="10.5" FontWeight="Bold" Foreground="#C084FC"/>
+                                                        </StackPanel>
+                                                    </Border>
                                                 </StackPanel>
                                                 <TextBlock Grid.Column="1" Text="{Binding ProgresoTexto}" FontWeight="Bold" FontSize="14" Foreground="{DynamicResource Brush.Accent}" VerticalAlignment="Center"/>
                                             </Grid>
 
-                                            <TextBlock Text="{Binding TituloEpisodio}" Style="{StaticResource AppText.Secondary}" Margin="0,2,0,8"/>
+                                            <TextBlock Text="{Binding Subtitulo}" Style="{StaticResource AppText.Secondary}" Margin="0,2,0,8" TextTrimming="CharacterEllipsis"/>
 
                                             <ProgressBar Value="{Binding Progreso}" Minimum="0" Maximum="100" Height="6"
                                                          Foreground="{DynamicResource Brush.Accent}" Background="{DynamicResource Brush.Surface3}"
@@ -432,8 +444,10 @@
                                             <materialDesign:PackIcon Kind="ArrowCollapseUp" Foreground="{DynamicResource Brush.AccentSoft}" Width="20" Height="20"/>
                                         </Button>
 
+                                        <!-- Una canción dura segundos: sin pausa (solo cancelar) -->
                                         <Button Command="{Binding DataContext.AlternarPausaDescargaCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                 CommandParameter="{Binding}" Style="{StaticResource DescIconBtn}"
+                                                Visibility="{Binding EsMusica, Converter={StaticResource InverseBoolToVis}}"
                                                 ToolTip="{Binding [Desc_PausarReanudarTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
                                                 AutomationProperties.Name="{Binding [Desc_PausarReanudarTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
                                             <materialDesign:PackIcon Foreground="{DynamicResource Brush.Accent}" Width="22" Height="22">
@@ -520,7 +534,17 @@
                                     </Border>
 
                                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                        <TextBlock Text="{Binding AnimeTitulo}" Style="{StaticResource AppText.BodyStrong}" FontWeight="Bold" TextTrimming="CharacterEllipsis"/>
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="{Binding AnimeTitulo}" Style="{StaticResource AppText.BodyStrong}" FontWeight="Bold" TextTrimming="CharacterEllipsis" MaxWidth="520"/>
+                                            <!-- Opening/ending de AnimeThemes (no es un episodio) -->
+                                            <Border Background="#2D1B4E" CornerRadius="6" Padding="7,2" Margin="8,0,0,0" VerticalAlignment="Center"
+                                                    Visibility="{Binding EsMusica, Converter={StaticResource BoolToVis}}">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <materialDesign:PackIcon Kind="MusicNote" Width="11" Height="11" Foreground="#C084FC" VerticalAlignment="Center" Margin="0,0,3,0"/>
+                                                    <TextBlock Text="{Binding [Desc_EtiquetaMusica], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="10.5" FontWeight="Bold" Foreground="#C084FC"/>
+                                                </StackPanel>
+                                            </Border>
+                                        </StackPanel>
                                         <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
                                             <TextBlock Text="{Binding DetalleTexto}" Style="{StaticResource AppText.Secondary}"/>
                                         </StackPanel>
@@ -551,12 +575,17 @@
                                     <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                                         <!-- Reproducir: completada y con el archivo en disco -->
                                         <Button Command="{Binding DataContext.ReproducirCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                CommandParameter="{Binding}"
-                                                ToolTip="{Binding [Desc_Reproducir], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" AutomationProperties.Name="{Binding [Desc_Reproducir], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                                CommandParameter="{Binding}">
                                             <Button.Style>
                                                 <Style TargetType="Button" BasedOn="{StaticResource DescIconBtn}">
                                                     <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Setter Property="ToolTip" Value="{Binding [Desc_Reproducir], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                                    <Setter Property="AutomationProperties.Name" Value="{Binding [Desc_Reproducir], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
                                                     <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding EsMusica}" Value="True">
+                                                            <Setter Property="ToolTip" Value="{Binding [Desc_EscucharEnFicha], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                                            <Setter Property="AutomationProperties.Name" Value="{Binding [Desc_EscucharEnFicha], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                                        </DataTrigger>
                                                         <MultiDataTrigger>
                                                             <MultiDataTrigger.Conditions>
                                                                 <Condition Binding="{Binding Completada}" Value="True"/>

@@ -28,6 +28,8 @@ public static class AppDataPaths
     public static string CharactersDir { get; } = Path.Combine(DataRoot, "Characters");
     /// <summary>Audio de referencia (.ogg de AnimeThemes) para ubicar openings/endings dentro de los episodios; caché con tope de tamaño.</summary>
     public static string SkipReferencesDir { get; } = Path.Combine(DataRoot, "SkipReferences");
+    /// <summary>Lista de openings/endings de AnimeThemes por anime (un JSON pequeño cada uno): la música sale al instante y también sin conexión.</summary>
+    public static string AnimeThemesCatalogDir { get; } = Path.Combine(DataRoot, "AnimeThemesCatalog");
     public static string PluginsFolder { get; } = Path.Combine(DataRoot, "Plugins");
     public static string TorrentsCacheDir { get; } = Path.Combine(DataRoot, "TorrentsCache");
     public static string BibliotecaDb { get; } = Path.Combine(DataRoot, "biblioteca.db");

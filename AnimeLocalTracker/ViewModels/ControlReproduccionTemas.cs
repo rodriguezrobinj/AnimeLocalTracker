@@ -28,6 +28,14 @@ public sealed class ControlReproduccionTemas : IDisposable
     /// <summary>Una pista llegó sola al final (no cuando se pausa o se detiene). Es el momento de pasar a la siguiente.</summary>
     public event EventHandler<TemaAnimeItem>? PistaTerminada;
 
+    /// <summary>Algo empezó a sonar, se pausó o se detuvo (para el indicador "sonando ahora" de la ficha).</summary>
+    public event EventHandler? EstadoCambiado;
+
+    /// <summary>Hay un tema sonando ahora mismo (no en pausa).</summary>
+    public bool Sonando => Actual?.Reproduciendo == true;
+
+    private void AvisarEstado() => EstadoCambiado?.Invoke(this, EventArgs.Empty);
+
     public ControlReproduccionTemas(IAudioTrackPlayer player, bool usarTemporizador = true)
     {
         _player = player;
@@ -78,6 +86,7 @@ public sealed class ControlReproduccionTemas : IDisposable
         _player.Reproducir();
         tema.Reproduciendo = true;
         _temporizador?.Start();
+        AvisarEstado();
     }
 
     public void Pausar()
@@ -88,6 +97,7 @@ public sealed class ControlReproduccionTemas : IDisposable
         Actual.Reproduciendo = false;
         _temporizador?.Stop();
         ActualizarPosicion();
+        AvisarEstado();
     }
 
     private void Reanudar()
@@ -97,6 +107,7 @@ public sealed class ControlReproduccionTemas : IDisposable
         _player.Reproducir();
         Actual.Reproduciendo = true;
         _temporizador?.Start();
+        AvisarEstado();
     }
 
     /// <summary>Salta a un punto de la pista actual (en segundos). Ignora los temas que no son la pista actual.</summary>
@@ -117,6 +128,7 @@ public sealed class ControlReproduccionTemas : IDisposable
         _temporizador?.Stop();
         _posicionPendiente = null;
 
+        bool habia = Actual != null;
         if (Actual != null)
         {
             Actual.Reproduciendo = false;
@@ -126,6 +138,7 @@ public sealed class ControlReproduccionTemas : IDisposable
         }
 
         _player.Cerrar();
+        if (habia) AvisarEstado();
     }
 
     /// <summary>
@@ -204,6 +217,7 @@ public sealed class ControlReproduccionTemas : IDisposable
         _player.Pausar();
         _player.Posicion = TimeSpan.Zero;
         Sincronizar(tema, 0, null);
+        AvisarEstado();
 
         PistaTerminada?.Invoke(this, tema);
     }
