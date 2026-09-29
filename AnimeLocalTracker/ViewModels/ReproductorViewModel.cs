@@ -36,6 +36,15 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     private readonly IScreenSaverPreventionService? _screenSaverPrevention;
     private CancellationTokenSource? _skipCts;
 
+    /// <summary>
+    /// Pre-análisis de marcas del siguiente episodio. Vida propia: NO se cancela al cambiar de episodio (si se abre justo ese, su carga
+    /// se une al análisis en curso); se cancela al programar otro o al cerrar el reproductor.
+    /// </summary>
+    private CancellationTokenSource? _preanalisisCts;
+
+    /// <summary>Espera tras terminar el análisis del episodio actual: no competir con el arranque de la reproducción (lectura de disco).</summary>
+    internal TimeSpan EsperaPreanalisis { get; set; } = TimeSpan.FromSeconds(15);
+
     // FUN-011: serializa los guardados periódicos de progreso (un guardado a la vez).
     private readonly SemaphoreSlim _guardadoLock = new(1, 1);
 
@@ -1060,11 +1069,44 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             {
                 AplicarSkipTimes(results);
             }
+
+            if (!ct.IsCancellationRequested) ProgramarPreanalisisDelSiguiente(animeId, ct);
         }
         catch (OperationCanceledException) { }
         catch (Exception ex)
         {
             AppLogger.Debug("ReproductorViewModel", $"Error cargando skip times de AniSkip: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Con el episodio actual ya analizado, deja listo el siguiente (si tiene archivo local): al pasar de capítulo, las marcas de opening y
+    /// ending salen al instante en vez de tardar unos segundos. Espera un poco antes para no competir con el arranque del video, y si en
+    /// esa espera se cambia de episodio no se hace (ese cambio ya lanza su propio análisis).
+    /// </summary>
+    private void ProgramarPreanalisisDelSiguiente(int animeId, CancellationToken ctEpisodio)
+    {
+        var siguiente = _siguienteEpisodioCache ?? ObtenerSiguienteEpisodio();
+        if (animeId <= 0 || siguiente == null || siguiente.NumeroEpisodio <= 0 || string.IsNullOrWhiteSpace(siguiente.RutaCompleta)) return;
+
+        _preanalisisCts?.Cancel();
+        _preanalisisCts?.Dispose();
+        _preanalisisCts = new CancellationTokenSource();
+        _ = PreanalizarSiguienteAsync(animeId, siguiente.NumeroEpisodio, siguiente.RutaCompleta, ctEpisodio, _preanalisisCts.Token);
+    }
+
+    private async Task PreanalizarSiguienteAsync(int animeId, int episodio, string ruta, CancellationToken ctEpisodio, CancellationToken ct)
+    {
+        try
+        {
+            await Task.Delay(EsperaPreanalisis, ctEpisodio);
+            if (!System.IO.File.Exists(ruta)) return;
+            await _skipCoordinator.PreanalizarAsync(animeId, episodio, ruta, ct);
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("ReproductorViewModel", $"Error pre-analizando el episodio {episodio}: {ex.Message}");
         }
     }
 
@@ -1763,6 +1805,9 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             _skipCts?.Cancel();
             _skipCts?.Dispose();
             _skipCts = null;
+            _preanalisisCts?.Cancel();
+            _preanalisisCts?.Dispose();
+            _preanalisisCts = null;
         }
         catch { }
 

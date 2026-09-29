@@ -23,6 +23,9 @@ public interface IReferenciasAudioService
     /// (salvo cancelación): sin red devuelve lo que ya haya en disco.
     /// </summary>
     Task<ReferenciasEpisodio> ObtenerAsync(int aniListId, int episodio, CancellationToken ct = default);
+
+    /// <summary>Fecha (UTC) del audio de referencia más reciente del anime en disco (Ficha + caché), o null si no hay ninguno.</summary>
+    DateTime? ReferenciaMasNuevaUtc(int aniListId);
 }
 
 /// <summary>
@@ -37,6 +40,8 @@ public sealed class ReferenciasAudioService : IReferenciasAudioService
     internal static readonly TimeSpan TiempoMaximoApi = TimeSpan.FromSeconds(15);
 
     internal const long MaximoBytesAudio = 25L * 1024 * 1024;
+
+    internal const int DescargasSimultaneas = 2;
 
     private readonly IAnimeThemesService _themes;
     private readonly IAnimeThemesDownloadService _descargas;
@@ -72,15 +77,25 @@ public sealed class ReferenciasAudioService : IReferenciasAudioService
             {
                 completa = true;
                 ActualizarRangos(temas, catalogo);
-                foreach (var tema in catalogo.Where(t => t.AplicaAlEpisodio(episodio)))
+
+                // Los que faltan se bajan a la vez (normalmente el opening y el ending del episodio: antes uno detrás de otro).
+                var faltan = catalogo.Where(t => t.AplicaAlEpisodio(episodio) && !temas.Any(l => MismoTema(l, t))).DistinctBy(t => t.ClaveEstable()).ToList();
+                using var turnos = new SemaphoreSlim(DescargasSimultaneas);
+                var rutas = await Task.WhenAll(faltan.Select(async tema =>
                 {
-                    if (temas.Any(t => MismoTema(t, tema))) continue;
+                    await turnos.WaitAsync(ct);
+                    try { return await DescargarAsync(aniListId, tema, ct); }
+                    finally { turnos.Release(); }
+                }));
 
-                    string? ruta = await DescargarAsync(aniListId, tema, ct);
-                    if (ruta == null) { completa = false; continue; }
-
-                    temas.Add(new TemaLocalDisponible(tema.Tipo, tema.Slug, tema.Version, tema.RangoEpisodios, ruta));
+                for (int i = 0; i < faltan.Count; i++)
+                {
+                    var tema = faltan[i];
+                    if (rutas[i] == null) { completa = false; continue; }
+                    temas.Add(new TemaLocalDisponible(tema.Tipo, tema.Slug, tema.Version, tema.RangoEpisodios, rutas[i]!));
                 }
+                var nuevas = rutas.OfType<string>().ToHashSet(StringComparer.OrdinalIgnoreCase);
+                if (nuevas.Count > 0) PodarCache(nuevas);
             }
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -94,6 +109,25 @@ public sealed class ReferenciasAudioService : IReferenciasAudioService
         }
 
         return new ReferenciasEpisodio(temas, completa);
+    }
+
+    public DateTime? ReferenciaMasNuevaUtc(int aniListId)
+    {
+        DateTime? masNueva = null;
+        var rutas = ListarLocalesDeLaFicha(aniListId).Select(t => t.RutaArchivo);
+        string carpeta = CarpetaAnime(aniListId);
+        if (Directory.Exists(carpeta)) rutas = rutas.Concat(Directory.EnumerateFiles(carpeta, "*.ogg"));
+
+        foreach (string ruta in rutas)
+        {
+            try
+            {
+                var fecha = File.GetLastWriteTimeUtc(ruta);
+                if (fecha.Year > 1601 && (masNueva == null || fecha > masNueva)) masNueva = fecha; // 1601 = el archivo ya no existe
+            }
+            catch (Exception) { /* archivo en uso o borrado: no cuenta */ }
+        }
+        return masNueva;
     }
 
     private List<TemaLocalDisponible> ListarLocalesDeLaFicha(int aniListId)
@@ -205,7 +239,6 @@ public sealed class ReferenciasAudioService : IReferenciasAudioService
             }
 
             File.Move(temporal, destino, overwrite: true); // nunca queda un audio a medias en la caché
-            PodarCache(destino);
             return destino;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -224,7 +257,10 @@ public sealed class ReferenciasAudioService : IReferenciasAudioService
     }
 
     /// <summary>Si la caché pasa del tope, borra los archivos menos usados (nunca el recién guardado).</summary>
-    internal void PodarCache(string conservar)
+    internal void PodarCache(string conservar) => PodarCache(new HashSet<string>(StringComparer.OrdinalIgnoreCase) { conservar });
+
+    /// <summary>Si la caché pasa del tope, borra los archivos menos usados (nunca los recién guardados).</summary>
+    internal void PodarCache(IReadOnlySet<string> conservar)
     {
         try
         {
@@ -232,7 +268,7 @@ public sealed class ReferenciasAudioService : IReferenciasAudioService
 
             var archivos = new DirectoryInfo(_carpeta).EnumerateFiles("*.ogg", SearchOption.AllDirectories).ToList();
             long total = archivos.Sum(f => f.Length);
-            foreach (var f in archivos.Where(f => !string.Equals(f.FullName, conservar, StringComparison.OrdinalIgnoreCase)).OrderBy(f => f.LastAccessTimeUtc > f.LastWriteTimeUtc ? f.LastAccessTimeUtc : f.LastWriteTimeUtc))
+            foreach (var f in archivos.Where(f => !conservar.Contains(f.FullName)).OrderBy(f => f.LastAccessTimeUtc > f.LastWriteTimeUtc ? f.LastAccessTimeUtc : f.LastWriteTimeUtc))
             {
                 if (total <= MaximoBytesCache) break;
                 total -= f.Length;
