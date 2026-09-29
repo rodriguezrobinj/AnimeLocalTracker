@@ -51,19 +51,17 @@ public class SkipTimesCoordinatorTests : System.IDisposable
         var opLocal = new TemaLocalDisponible("OP", "OP1", 1, "1-16", @"C:\Music\1\OP_OP1_v1_ep1-16.mp3");
         _themesDownloadMock.Setup(t => t.ListarDescargasLocales(101)).Returns(new List<TemaLocalDisponible> { opLocal });
 
-        var respuesta = new PluginDaemonResponse<SkipTimesCoordinator.AudioReferenceSkipResult>
+        var respuesta = new PluginDaemonResponse<SkipTimesCoordinator.DeteccionTemasResult>
         {
             Success = true,
-            Result = new SkipTimesCoordinator.AudioReferenceSkipResult
+            Result = new SkipTimesCoordinator.DeteccionTemasResult
             {
-                Found = true,
-                EstimatedStart = 90.0,
-                EstimatedEnd = 180.0,
-                Confidence = 0.8
+                Success = true,
+                Matches = [new SkipTimesCoordinator.TemaDetectado { Segment = "op", Start = 90.0, End = 180.0, Confidence = 0.8 }]
             }
         };
         _pythonBridgeMock
-            .Setup(p => p.ExecuteCommandAsync<It.IsAnyType, PluginDaemonResponse<SkipTimesCoordinator.AudioReferenceSkipResult>>(
+            .Setup(p => p.ExecuteCommandAsync<It.IsAnyType, PluginDaemonResponse<SkipTimesCoordinator.DeteccionTemasResult>>(
                 "run-plugin", It.IsAny<It.IsAnyType>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(respuesta);
 
@@ -87,13 +85,21 @@ public class SkipTimesCoordinatorTests : System.IDisposable
         var edLocal = new TemaLocalDisponible("ED", "ED1", 1, null, @"C:\Music\1\ED_ED1_v1_eptodos.mp3");
         _themesDownloadMock.Setup(t => t.ListarDescargasLocales(101)).Returns(new List<TemaLocalDisponible> { opLocal, edLocal });
 
-        var respuesta = new PluginDaemonResponse<SkipTimesCoordinator.AudioReferenceSkipResult>
+        var respuesta = new PluginDaemonResponse<SkipTimesCoordinator.DeteccionTemasResult>
         {
             Success = true,
-            Result = new SkipTimesCoordinator.AudioReferenceSkipResult { Found = true, EstimatedStart = 10, EstimatedEnd = 100, Confidence = 0.9 }
+            Result = new SkipTimesCoordinator.DeteccionTemasResult
+            {
+                Success = true,
+                Matches =
+                [
+                    new SkipTimesCoordinator.TemaDetectado { Segment = "op", Start = 10, End = 100, Confidence = 0.9 },
+                    new SkipTimesCoordinator.TemaDetectado { Segment = "ed", Start = 1300, End = 1390, Confidence = 0.9 }
+                ]
+            }
         };
         _pythonBridgeMock
-            .Setup(p => p.ExecuteCommandAsync<It.IsAnyType, PluginDaemonResponse<SkipTimesCoordinator.AudioReferenceSkipResult>>(
+            .Setup(p => p.ExecuteCommandAsync<It.IsAnyType, PluginDaemonResponse<SkipTimesCoordinator.DeteccionTemasResult>>(
                 "run-plugin", It.IsAny<It.IsAnyType>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(respuesta);
 
@@ -120,10 +126,10 @@ public class SkipTimesCoordinatorTests : System.IDisposable
         var resultado = await sut.CargarSkipTimesAsync(101, 20, 1400, RutaEpisodioFicticia());
 
         resultado.Should().BeEmpty();
-        // OP1 no cubre el episodio 20 por rango, pero se prueba igualmente como último intento (la numeración de los archivos no siempre
-        // coincide con la de AnimeThemes); al no acertar, se cae a AniSkip.
+        // OP1 no cubre el episodio 20 por rango, pero se manda igualmente (con prioridad baja) como último intento (la numeración de los
+        // archivos no siempre coincide con la de AnimeThemes); al no acertar, se cae a AniSkip.
         _pythonBridgeMock.Verify(
-            p => p.ExecuteCommandAsync<It.IsAnyType, PluginDaemonResponse<SkipTimesCoordinator.AudioReferenceSkipResult>>(
+            p => p.ExecuteCommandAsync<It.IsAnyType, PluginDaemonResponse<SkipTimesCoordinator.DeteccionTemasResult>>(
                 It.IsAny<string>(), It.IsAny<It.IsAnyType>(), It.IsAny<CancellationToken>()),
             Times.Once);
         _aniSkipMock.Verify(a => a.ObtenerMalIdDesdeAniListAsync(101, It.IsAny<CancellationToken>()), Times.Once);

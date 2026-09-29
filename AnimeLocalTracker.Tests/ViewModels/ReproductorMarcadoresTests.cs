@@ -124,6 +124,103 @@ public class ReproductorMarcadoresTests
         sut.SegmentosLineaTiempo.Should().HaveCount(2);
     }
 
+    // === Pre-análisis del siguiente episodio ===
+
+    private static List<EpisodioItem> Episodios(params (int Numero, string Ruta)[] episodios) =>
+        episodios.Select(e => new EpisodioItem { NumeroEpisodio = e.Numero, RutaCompleta = e.Ruta }).ToList();
+
+    private static string ArchivoTemporal()
+    {
+        string ruta = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "AnimeTracker_Pre_" + Guid.NewGuid().ToString("N") + ".mkv");
+        System.IO.File.WriteAllBytes(ruta, new byte[16]);
+        return ruta;
+    }
+
+    private void CoordinadorSinTramos() =>
+        _coordinador.Setup(c => c.CargarSkipTimesAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<double>(), It.IsAny<string?>(), It.IsAny<IProgress<IReadOnlyList<AniSkipResult>>?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<AniSkipResult>());
+
+    private async Task EsperarPreanalisis(int episodio, string ruta)
+    {
+        for (int i = 0; i < 200; i++)
+        {
+            if (_coordinador.Invocations.Any(inv => inv.Method.Name == nameof(ISkipTimesCoordinator.PreanalizarAsync)
+                                                   && (int)inv.Arguments[1] == episodio && (string)inv.Arguments[2] == ruta)) return;
+            await Task.Delay(10);
+        }
+    }
+
+    [Fact]
+    public async Task TrasAnalizarElEpisodio_SePreAnalizaElSiguienteConArchivo()
+    {
+        string ep1 = ArchivoTemporal(), ep2 = ArchivoTemporal();
+        try
+        {
+            CoordinadorSinTramos();
+            using var sut = CrearSut();
+            sut.EsperaPreanalisis = TimeSpan.Zero;
+            sut.CargarVideo(ep1, 101, "Frieren", 1, Episodios((1, ep1), (2, ep2), (3, "")));
+
+            await sut.CargarSkipTimesAsync(101, 1);
+            await EsperarPreanalisis(2, ep2);
+
+            _coordinador.Verify(c => c.PreanalizarAsync(101, 2, ep2, It.IsAny<CancellationToken>()), Times.AtLeastOnce());
+        }
+        finally
+        {
+            System.IO.File.Delete(ep1);
+            System.IO.File.Delete(ep2);
+        }
+    }
+
+    [Fact]
+    public async Task EnElUltimoEpisodioConArchivo_NoSePreAnalizaNada()
+    {
+        string ep2 = ArchivoTemporal();
+        try
+        {
+            CoordinadorSinTramos();
+            using var sut = CrearSut();
+            sut.EsperaPreanalisis = TimeSpan.Zero;
+            sut.CargarVideo(ep2, 101, "Frieren", 2, Episodios((1, "C:\\Anime\\Ep01.mkv"), (2, ep2), (3, "")));
+
+            await sut.CargarSkipTimesAsync(101, 2);
+            await Task.Delay(100);
+
+            _coordinador.Verify(c => c.PreanalizarAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        }
+        finally
+        {
+            System.IO.File.Delete(ep2);
+        }
+    }
+
+    [Fact]
+    public async Task SiSeCambiaDeEpisodioDuranteLaEspera_ElPreAnalisisProgramadoNoSeHace()
+    {
+        string ep1 = ArchivoTemporal(), ep2 = ArchivoTemporal();
+        try
+        {
+            CoordinadorSinTramos();
+            using var sut = CrearSut();
+            sut.EsperaPreanalisis = TimeSpan.FromMilliseconds(300);
+            var lista = Episodios((1, ep1), (2, ep2));
+            sut.CargarVideo(ep1, 101, "Frieren", 1, lista); // su análisis (instantáneo aquí) programa el pre-análisis del 2
+            await Task.Delay(50);
+
+            sut.CargarVideo(ep2, 101, "Frieren", 2, lista); // el usuario pasa al 2 antes de que empiece el pre-análisis
+            await Task.Delay(600);
+
+            _coordinador.Verify(c => c.PreanalizarAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never,
+                "el cambio de episodio ya lanza su propio análisis (y el 2 no tiene siguiente)");
+        }
+        finally
+        {
+            System.IO.File.Delete(ep1);
+            System.IO.File.Delete(ep2);
+        }
+    }
+
     [Fact]
     public async Task UnAvisoParcialTardioDeUnEpisodioCancelado_NoPisaLosMarcadoresDelNuevo()
     {

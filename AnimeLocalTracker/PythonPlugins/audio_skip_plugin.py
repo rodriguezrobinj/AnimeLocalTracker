@@ -1,6 +1,9 @@
+import hashlib
 import os
 import subprocess
-import json
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 from typing import Dict, Any, List
 
@@ -88,77 +91,380 @@ def detect_opening(video_paths: List[str]) -> Dict[str, Any]:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-def detect_from_reference(episode_path: str, reference_path: str, search_duration: float = 300.0, search_from_end: bool = False) -> Dict[str, Any]:
-    """
-    Busca dónde aparece un audio de referencia (el OP/ED oficial descargado de AnimeThemes.moe)
-    dentro de una ventana del episodio, mediante la misma correlación cruzada normalizada que
-    detect_opening() usa para comparar dos episodios entre sí — pero aquí la "ventana" es fija
-    y conocida (la referencia completa), así que no depende de tener un segundo episodio local.
-    search_from_end=True busca cerca del final del episodio (para ED); False busca desde el inicio
-    (para OP). La duración real del episodio se calcula aquí mismo con ffprobe: no depende de que
-    el reproductor ya conozca la duración (al llamar esto recién abierto el video, aún no la sabe).
-    """
-    if not os.path.exists(episode_path) or not os.path.exists(reference_path):
-        return {"success": False, "error": "El episodio o el archivo de referencia no existen."}
+# ─────────────────────────────────────────────────────────────────────────────────────────────
+#  Opening/ending con el audio oficial de AnimeThemes (todas las referencias en UNA llamada)
+# ─────────────────────────────────────────────────────────────────────────────────────────────
+#
+# Antes se hacía una llamada por tema, y cada una volvía a decodificar 300 s del episodio (+ ffprobe para los endings) y el
+# tema entero: ~1 s por tema. Con 29 temas descargados (One Piece) un episodio sin coincidencia en su rango tardaba ~30 s y
+# tenía ocupado el motor Python todo ese rato. Ahora el episodio se decodifica una vez (inicio y final a la vez, en paralelo),
+# la huella de cada tema se guarda en disco (la segunda vez no se decodifica) y la comparación usa FFT: ~1-2 ms por tema.
+#
+# Huella = 10 fotogramas/s de [volumen RMS + energía (log) en 7 bandas de frecuencia]. Solo con el volumen, dos cortes de la
+# misma canción (OP1 y OP1 v2) o un tema equivocado daban 0,55-0,68 frente a 0,86-1,0 del correcto; con las bandas los
+# equivocados bajan a ~0,3-0,6 (medido con 25 episodios reales de 9 animes).
 
-    search_offset = 0.0
-    if search_from_end:
-        duracion_total = _get_duration_seconds(episode_path)
-        if duracion_total <= 0:
-            return {"success": False, "error": "No se pudo obtener la duración del episodio (ffprobe)."}
-        search_offset = max(0.0, duracion_total - search_duration)
+_FPS = 10
+_SR = 8000
+_BANDAS_HZ = (0, 150, 300, 600, 1000, 1600, 2400, 4000)
+_PESOS = np.array([0.5] + [0.5 / (len(_BANDAS_HZ) - 1)] * (len(_BANDAS_HZ) - 1))
+_FORMATO_HUELLA = 1
+_MAX_HUELLAS_EN_DISCO = 800
+
+# Coincidencia "completa" con esta confianza o más: no hace falta mirar por trozos.
+_CONFIANZA_SEGURA = 0.8
+# Por trozos (el episodio usa solo una parte del tema, o hay diálogo encima de un tramo): trozos de 10 s cada 5 s; un trozo
+# cuenta si pasa de 0,65 y el tramo encontrado debe durar al menos 30 s (o la mitad del tema) para no penalizarlo.
+_TROZO = 10 * _FPS
+_PASO_TROZO = 5 * _FPS
+_UMBRAL_TROZO = 0.65
+_TRAMO_MINIMO = 30 * _FPS
+# Solo se analizan por trozos los candidatos con cierta similitud completa (los demás no son la canción).
+_MINIMO_PARA_TROZOS = 0.45
+_MAXIMO_CANDIDATOS_TROZOS = 4
+
+
+def detect_themes(episode_path: str, references: List[Dict[str, Any]], min_confidence: float = 0.7,
+                  head_seconds: float = 480.0, tail_seconds: float = 360.0, cache_dir: str = None) -> Dict[str, Any]:
+    """
+    Ubica el opening (al inicio) y el ending (al final) de un episodio comparándolo con los temas oficiales.
+
+    references: [{"path", "kind": "OP"|"ED", "priority": 0 (aplica al episodio según AnimeThemes) | 1 (resto)}].
+    Por cada tramo se prueban grupos en orden y se para en el primero que acierta (así los temas que no aplican ni se
+    decodifican si el que aplica ya coincide):
+      opening → OP que aplican, OP restantes.
+      ending  → ED que aplican, ED restantes y, por último, los OP (primero los que aplican): el episodio 1 y los finales
+                suelen cerrar con el opening; antes ese ending no se detectaba nunca.
+    Devuelve matches con segment "op"/"ed", reference_path, start, end, confidence y mode ("full"/"partial").
+    """
+    t0 = time.monotonic()
+    if not _es_ruta_local(episode_path) or not os.path.isfile(episode_path):
+        return {"success": False, "error": "El episodio no existe."}
+
+    refs = [r for r in (references or []) if isinstance(r, dict) and _es_ruta_local(r.get("path")) and os.path.isfile(r.get("path"))]
+    if not refs:
+        return {"success": True, "matches": [], "evaluated": 0, "seconds": 0.0}
+
+    duracion = _get_duration_seconds(episode_path)
+    if duracion <= 0:
+        return {"success": False, "error": "No se pudo obtener la duración del episodio (ffprobe)."}
 
     try:
-        fps = 10
-        ref_env = _extract_audio_envelope(reference_path, fps=fps)
-        if len(ref_env) < fps * 5:  # menos de 5s de audio de referencia: algo salió mal
-            return {"success": False, "error": "No se pudo extraer el audio de referencia (¿archivo corrupto?)."}
+        inicio, final = _ventanas_episodio(episode_path, duracion, head_seconds, tail_seconds)
+        if inicio is None or final is None:
+            return {"success": False, "error": "No se pudo extraer el audio del episodio."}
 
-        ref_mean = np.mean(ref_env)
-        ref_std = np.std(ref_env)
-        if ref_std < 1e-5:
-            return {"success": False, "error": "El audio de referencia no tiene variación (silencio)."}
-        ref_norm = (ref_env - ref_mean) / ref_std
-        window_size = len(ref_norm)
+        huellas: Dict[str, Any] = {}
+        evaluados = set()
 
-        ep_env = _extract_audio_envelope(episode_path, fps=fps, start=search_offset, duration=search_duration)
-        if len(ep_env) < window_size:
-            return {"success": True, "found": False, "confidence": 0.0}
+        def grupo(kind, priority=None):
+            return [r["path"] for r in refs
+                    if str(r.get("kind", "")).upper() == kind and (priority is None or int(r.get("priority", 1)) == priority)]
 
-        ep_sum = np.convolve(ep_env, np.ones(window_size), mode='valid')
-        ep_sq_sum = np.convolve(ep_env**2, np.ones(window_size), mode='valid')
-        ep_mean = ep_sum / window_size
-        ep_var = (ep_sq_sum / window_size) - ep_mean**2
-        ep_var[ep_var < 0] = 0
-        ep_std = np.sqrt(ep_var)
-        ep_std[ep_std < 1e-5] = 1e-5
+        matches = []
+        op = _buscar_en_grupos(inicio, [grupo("OP", 0), grupo("OP", 1)], huellas, evaluados, cache_dir, min_confidence, None)
+        if op:
+            matches.append(dict(op, segment="op"))
 
-        corr = np.correlate(ep_env, ref_norm, mode='valid')
-        pearson = corr / (window_size * ep_std)
+        excluir = (op["start"], op["end"]) if op else None
+        ed = _buscar_en_grupos(final, [grupo("ED", 0), grupo("ED", 1), grupo("OP", 0), grupo("OP", 1)], huellas, evaluados, cache_dir, min_confidence, excluir)
+        if ed:
+            matches.append(dict(ed, segment="ed"))
 
-        max_idx = int(np.argmax(pearson))
-        best_score = float(pearson[max_idx])
-
-        # Umbral algo más permisivo que el de detect_opening (0.4): aquí se compara contra un
-        # master oficial que puede tener pequeñas diferencias de loudness/masterización frente
-        # al audio del episodio, no el mismo archivo bit a bit como al comparar dos episodios.
-        if best_score < 0.35:
-            return {"success": True, "found": False, "confidence": best_score}
-
-        start_sec = search_offset + (max_idx / fps)
-        end_sec = start_sec + (window_size / fps)
-
-        return {
-            "success": True,
-            "found": True,
-            "estimated_start": start_sec,
-            "estimated_end": end_sec,
-            "confidence": best_score,
-            "source": "audio_reference_match"
-        }
-
+        return {"success": True, "matches": matches, "evaluated": len(evaluados), "duration": duracion,
+                "seconds": round(time.monotonic() - t0, 3)}
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+
+def _es_ruta_local(ruta) -> bool:
+    """Solo archivos locales: ffmpeg también abre URLs y esquemas raros, y aquí nunca hacen falta."""
+    return isinstance(ruta, str) and bool(ruta) and "://" not in ruta and not ruta.startswith("-")
+
+
+def _ventanas_episodio(ruta: str, duracion: float, segundos_inicio: float, segundos_final: float):
+    """(inicio, final) como _Ventana. Las dos extracciones van en paralelo (ffmpeg no depende del GIL); en episodios cortos
+    las ventanas se solapan y se decodifica el archivo entero una sola vez."""
+    largo_inicio = min(segundos_inicio, duracion)
+    comienzo_final = max(0.0, duracion - segundos_final)
+
+    if comienzo_final <= largo_inicio:
+        huella = _huella(_pcm(ruta))
+        if len(huella) == 0:
+            return None, None
+        corte = int(comienzo_final * _FPS)
+        return _Ventana(0.0, huella[:int(largo_inicio * _FPS)]), _Ventana(corte / _FPS, huella[corte:])
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        f_inicio = pool.submit(_pcm, ruta, 0.0, largo_inicio)
+        f_final = pool.submit(_pcm, ruta, comienzo_final, segundos_final)
+        h_inicio, h_final = _huella(f_inicio.result()), _huella(f_final.result())
+    if len(h_inicio) == 0 or len(h_final) == 0:
+        return None, None
+    return _Ventana(0.0, h_inicio), _Ventana(comienzo_final, h_final)
+
+
+def _buscar_en_grupos(ventana, grupos, huellas, evaluados, cache_dir, min_confidence, excluir):
+    for rutas in grupos:
+        pendientes = [r for r in rutas if r not in huellas]
+        if pendientes:
+            with ThreadPoolExecutor(max_workers=min(4, len(pendientes))) as pool:
+                for ruta, h in zip(pendientes, pool.map(lambda r: _huella_referencia(r, cache_dir), pendientes)):
+                    huellas[ruta] = h
+
+        candidatos = [(r, huellas[r]) for r in rutas if huellas.get(r) is not None]
+        evaluados.update(r for r, _ in candidatos)
+        mejor = _mejor_coincidencia(ventana, candidatos, excluir)
+        if mejor and mejor["confidence"] >= min_confidence:
+            return mejor
+    return None
+
+
+def _mejor_coincidencia(ventana, candidatos, excluir):
+    completas = []
+    for ruta, huella in candidatos:
+        c = _coincidencia_completa(ventana, huella)
+        completas.append((c["confidence"] if c else -1.0, ruta, huella, c))
+
+    validas = [c for _, ruta, _, c in completas if c and not _solapa(c, excluir)]
+    mejor = max(validas, key=lambda c: c["confidence"], default=None)
+    if mejor and mejor["confidence"] >= _CONFIANZA_SEGURA:
+        return dict(mejor, reference_path=_ruta_de(completas, mejor))
+
+    # Nadie coincide entero: probar por trozos solo los que se parecen algo (o los temas más largos que la ventana).
+    completas.sort(key=lambda x: x[0], reverse=True)
+    for conf, ruta, huella, c in completas[:_MAXIMO_CANDIDATOS_TROZOS]:
+        if c is not None and conf < _MINIMO_PARA_TROZOS:
+            continue
+        p = _coincidencia_por_trozos(ventana, huella)
+        if p and not _solapa(p, excluir) and (mejor is None or p["confidence"] > mejor["confidence"]):
+            mejor = dict(p, reference_path=ruta)
+
+    if mejor and "reference_path" not in mejor:
+        mejor = dict(mejor, reference_path=_ruta_de(completas, mejor))
+    return mejor
+
+
+def _ruta_de(completas, coincidencia):
+    return next(ruta for _, ruta, _, c in completas if c is coincidencia)
+
+
+def _solapa(c, excluir) -> bool:
+    """Más de la mitad del tramo cae dentro del otro (el ending no puede ser el mismo opening ya encontrado)."""
+    if not excluir:
+        return False
+    comun = min(c["end"], excluir[1]) - max(c["start"], excluir[0])
+    return comun > 0.5 * min(c["end"] - c["start"], excluir[1] - excluir[0])
+
+
+def _coincidencia_completa(ventana, huella):
+    largo = len(huella)
+    if largo > ventana.n:
+        return None
+    curva = ventana.curva(huella)
+    if len(curva) == 0:
+        return None
+    i = int(np.argmax(curva))
+    return {"start": ventana.inicio + i / _FPS, "end": ventana.inicio + (i + largo) / _FPS,
+            "confidence": float(curva[i]), "mode": "full"}
+
+
+def _coincidencia_por_trozos(ventana, huella):
+    """
+    Busca un desfase en el que varios trozos seguidos del tema coinciden a la vez. Sirve cuando el episodio usa solo una parte
+    (ending recortado, opening que arranca a mitad) o hay diálogo encima de un tramo. Un trozo suelto de 10 s puede parecerse
+    por azar (~0,4-0,6 en cualquier sitio); varios seguidos con el mismo desfase, no.
+    """
+    largo = len(huella)
+    if largo < _TROZO or ventana.n < _TROZO:
+        return None
+
+    inicios = list(range(0, largo - _TROZO + 1, _PASO_TROZO))
+    desfase_min = -(largo - _TROZO)
+    tamano = (ventana.n - _TROZO) - desfase_min + 1
+    curvas = np.full((len(inicios), tamano), -1.0)
+    for k, c in enumerate(inicios):
+        curva = ventana.curva(huella[c:c + _TROZO])
+        o0 = -c - desfase_min
+        curvas[k, o0:o0 + len(curva)] = curva
+
+    puntos = np.where(curvas >= _UMBRAL_TROZO, curvas, 0.0).sum(axis=0)
+    o = int(np.argmax(puntos))
+    if puntos[o] <= 0:
+        return None
+    valores = curvas[:, o]
+    ok = valores >= _UMBRAL_TROZO
+
+    # Tramos de trozos buenos seguidos (se tolera un trozo malo en medio: un grito o un efecto tapando la música).
+    tramos, actual, ultimo = [], None, None
+    for k in range(len(inicios)):
+        if ok[k]:
+            if actual is not None and k - ultimo <= 2:
+                actual.append(k)
+            else:
+                actual = [k]
+                tramos.append(actual)
+            ultimo = k
+    tramo = max(tramos, key=lambda t: inicios[t[-1]] - inicios[t[0]])
+
+    a, b = inicios[tramo[0]], inicios[tramo[-1]] + _TROZO
+    confianza = float(np.mean(valores[tramo]))
+    necesario = min(_TRAMO_MINIMO, 0.5 * largo)
+    if b - a < necesario:
+        confianza *= (b - a) / necesario
+    desfase = o + desfase_min
+    return {"start": ventana.inicio + max(0, desfase + a) / _FPS, "end": ventana.inicio + min(ventana.n, desfase + b) / _FPS,
+            "confidence": confianza, "mode": "partial"}
+
+
+class _Ventana:
+    """Huella de un tramo del episodio con lo que se reutiliza entre temas (sumas acumuladas y espectros por tamaño de FFT)."""
+
+    def __init__(self, inicio: float, huella: np.ndarray):
+        self.inicio = inicio
+        self.h = huella.astype(np.float64)
+        self.n = len(huella)
+        ceros = np.zeros((1, self.h.shape[1]))
+        self._suma = np.vstack([ceros, np.cumsum(self.h, axis=0)])
+        self._suma2 = np.vstack([ceros, np.cumsum(self.h * self.h, axis=0)])
+        self._espectros = {}
+
+    def curva(self, segmento: np.ndarray) -> np.ndarray:
+        """Correlación de Pearson del segmento en cada posición de la ventana (media ponderada por columna, -1..1)."""
+        largo = len(segmento)
+        if largo < 2 or largo > self.n:
+            return np.array([])
+
+        seg = segmento.astype(np.float64)
+        desv = seg.std(axis=0)
+        validas = desv > 1e-6
+        if not validas.any():
+            return np.array([])
+        norm = (seg - seg.mean(axis=0)) / np.where(validas, desv, 1.0)
+
+        nfft = 1 << int(np.ceil(np.log2(self.n + largo)))
+        if nfft not in self._espectros:
+            self._espectros[nfft] = np.fft.rfft(self.h, nfft, axis=0)
+        corr = np.fft.irfft(self._espectros[nfft] * np.conj(np.fft.rfft(norm, nfft, axis=0)), nfft, axis=0)[:self.n - largo + 1]
+
+        media = (self._suma[largo:] - self._suma[:-largo]) / largo
+        var = (self._suma2[largo:] - self._suma2[:-largo]) / largo - media * media
+        pearson = corr / (largo * np.sqrt(np.maximum(var, 1e-12)))
+        pesos = np.where(validas, _PESOS, 0.0)
+        return np.clip(pearson @ (pesos / pesos.sum()), -1.0, 1.0)
+
+
+def _pcm(ruta: str, inicio: float = 0.0, duracion: float = None) -> np.ndarray:
+    """Audio mono a 8 kHz en float32 (vacío si ffmpeg falla)."""
+    cmd = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-nostdin", "-max_alloc", "2147483648"]
+    if inicio > 0:
+        cmd += ["-ss", f"{inicio:.3f}"]
+    cmd += ["-i", ruta, "-vn", "-sn", "-dn"]
+    if duracion is not None:
+        cmd += ["-t", f"{duracion:.3f}"]
+    cmd += ["-ac", "1", "-ar", str(_SR), "-f", "f32le", "-"]
+    try:
+        proc = subprocess.run(cmd, capture_output=True)
+    except OSError:
+        return np.array([], dtype=np.float32)
+    if proc.returncode != 0 or len(proc.stdout) == 0:
+        return np.array([], dtype=np.float32)
+    return np.frombuffer(proc.stdout, dtype=np.float32)
+
+
+def _huella(pcm: np.ndarray) -> np.ndarray:
+    """(fotogramas, 8): RMS + log10 de la energía por banda, 10 fotogramas por segundo. Por bloques para no disparar la memoria."""
+    n = _SR // _FPS
+    total = len(pcm) // n
+    if total == 0:
+        return np.zeros((0, len(_BANDAS_HZ)), dtype=np.float32)
+
+    frecuencias = np.fft.rfftfreq(n, 1.0 / _SR)
+    mascaras = [(frecuencias >= a) & (frecuencias < b) for a, b in zip(_BANDAS_HZ[:-1], _BANDAS_HZ[1:])]
+    ventana = np.hanning(n)
+    partes = []
+    for i in range(0, total, 2000):
+        bloque = pcm[i * n:min(total, i + 2000) * n].reshape(-1, n).astype(np.float64)
+        rms = np.sqrt(np.mean(bloque ** 2, axis=1))
+        espectro = np.abs(np.fft.rfft(bloque * ventana, axis=1)) ** 2
+        bandas = np.stack([espectro[:, m].sum(axis=1) for m in mascaras], axis=1)
+        partes.append(np.column_stack([rms, np.log10(bandas + 1e-9)]))
+    return np.vstack(partes).astype(np.float32)
+
+
+def _recortar_silencio(huella: np.ndarray) -> np.ndarray:
+    """Quita el silencio del principio y del final del tema: el tramo detectado empieza y acaba donde suena la música."""
+    if len(huella) == 0:
+        return huella
+    rms = huella[:, 0]
+    sonando = np.where(rms > max(float(rms.max()) * 0.02, 1e-4))[0]
+    return huella[sonando[0]:sonando[-1] + 1] if len(sonando) else huella[:0]
+
+
+def _huella_referencia(ruta: str, cache_dir: str = None):
+    """Huella del tema (sin silencios en los extremos), guardada en disco: la segunda vez no se decodifica. None si no sirve."""
+    try:
+        clave = _clave_huella(ruta)
+    except OSError:
+        return None
+
+    archivo = os.path.join(cache_dir, clave + ".npy") if cache_dir else None
+    if archivo and os.path.isfile(archivo):
+        try:
+            huella = np.load(archivo, allow_pickle=False)
+            if huella.ndim == 2 and huella.shape[1] == len(_BANDAS_HZ):
+                try:
+                    os.utime(archivo)  # orden de uso para la poda
+                except OSError:
+                    pass
+                return huella if len(huella) >= 5 * _FPS else None
+        except (OSError, ValueError):
+            pass
+
+    huella = _recortar_silencio(_huella(_pcm(ruta)))
+    if archivo and len(huella) > 0:
+        _guardar_huella(archivo, huella, cache_dir)
+    return huella if len(huella) >= 5 * _FPS else None  # menos de 5 s: archivo roto o vacío
+
+
+def _clave_huella(ruta: str) -> str:
+    """Por contenido (tamaño + primeros y últimos 64 KB), no por nombre: renombrar el mp3 no obliga a recalcular."""
+    tamano = os.path.getsize(ruta)
+    h = hashlib.sha1(f"{_FORMATO_HUELLA}|{tamano}|".encode("ascii"))
+    with open(ruta, "rb") as f:
+        h.update(f.read(65536))
+        if tamano > 131072:
+            f.seek(-65536, os.SEEK_END)
+            h.update(f.read(65536))
+    return h.hexdigest()
+
+
+def _guardar_huella(archivo: str, huella: np.ndarray, cache_dir: str):
+    try:
+        os.makedirs(cache_dir, exist_ok=True)
+        temporal = f"{archivo}.{os.getpid()}.{threading.get_ident()}.tmp"
+        with open(temporal, "wb") as f:
+            np.save(f, huella, allow_pickle=False)
+        os.replace(temporal, archivo)
+        _podar_huellas(cache_dir)
+    except OSError:
+        pass  # sin caché solo se pierde velocidad
+
+
+def _podar_huellas(cache_dir: str):
+    """Tope de archivos (~30 KB cada uno): al pasarlo se borran los menos usados."""
+    try:
+        entradas = [e for e in os.scandir(cache_dir) if e.is_file() and e.name.endswith(".npy")]
+        if len(entradas) <= _MAX_HUELLAS_EN_DISCO:
+            return
+        entradas.sort(key=lambda e: e.stat().st_mtime)
+        for e in entradas[:len(entradas) - int(_MAX_HUELLAS_EN_DISCO * 0.75)]:
+            try:
+                os.remove(e.path)
+            except OSError:
+                pass
+    except OSError:
+        pass
 
 
 def _get_duration_seconds(video_path: str) -> float:

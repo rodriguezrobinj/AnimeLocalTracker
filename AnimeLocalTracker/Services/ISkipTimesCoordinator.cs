@@ -28,6 +28,12 @@ public interface ISkipTimesCoordinator
         IProgress<IReadOnlyList<AniSkipResult>>? progreso, CancellationToken ct);
 
     /// <summary>
+    /// Deja analizado (y guardado) un episodio que aún no se está viendo, normalmente el siguiente: al abrirlo, las marcas salen al
+    /// instante. Si mientras tanto se abre ese episodio, su carga se une a este análisis en vez de repetirlo.
+    /// </summary>
+    Task<IReadOnlyList<AniSkipResult>> PreanalizarAsync(int animeId, int episodio, string rutaVideoLocal, CancellationToken ct);
+
+    /// <summary>
     /// Devuelve el segmento activo en <paramref name="currentSeconds"/>, o null.
     /// <paramref name="margenFinalSegundos"/> acorta el final del intervalo (p.ej. 0.5s en el bucle de tracking).
     /// </summary>
