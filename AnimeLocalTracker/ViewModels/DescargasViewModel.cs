@@ -17,9 +17,11 @@ namespace AnimeLocalTracker.ViewModels;
 
 /// <summary>
 /// Pestaña Descargas: "Activas" (cola en vivo con prioridad, pausa y cancelación) e "Historial"
-/// (completadas y fallidas persistidas, con reproducir / abrir carpeta / reintentar).
+/// (completadas y fallidas persistidas, con reproducir / abrir carpeta / reintentar). Incluye también los openings/endings
+/// descargados desde la ficha (AnimeThemes): son descargas como las demás, aunque sin pausa ni prioridad (duran segundos).
 /// </summary>
-public partial class DescargasViewModel : ObservableObject, IRecipient<DescargaProgresoMensaje>, IRecipient<DescargaHistorialActualizadoMensaje>
+public partial class DescargasViewModel : ObservableObject, IRecipient<DescargaProgresoMensaje>, IRecipient<DescargaHistorialActualizadoMensaje>,
+    IRecipient<DescargaMusicaProgresoMensaje>
 {
     public const string FiltroTodas = "Todas";
     public const string FiltroCompletadas = "Completadas";
@@ -27,6 +29,8 @@ public partial class DescargasViewModel : ObservableObject, IRecipient<DescargaP
 
     private readonly IDownloadService _downloadService;
     private readonly IDatabaseService? _database;
+    private readonly IAnimeThemesDownloadService? _descargasMusica;
+    private readonly IAnimeThemesService? _catalogoMusica;
     private List<DescargaHistorialItemViewModel> _historial = [];
 
     public ObservableCollection<DescargaItem> ColaDescargas { get; } = [];
@@ -42,8 +46,12 @@ public partial class DescargasViewModel : ObservableObject, IRecipient<DescargaP
     private int _conteoEnCola;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(MostrarPausarTodas))]
     private bool _tieneDescargas;
+
+    /// <summary>Hay alguna descarga de episodio (las de música no se pausan): solo entonces tiene sentido "Pausar todas".</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(MostrarPausarTodas))]
+    private bool _tienePausables;
 
     [ObservableProperty]
     private bool _todasPausadas;
@@ -66,7 +74,7 @@ public partial class DescargasViewModel : ObservableObject, IRecipient<DescargaP
     [ObservableProperty]
     private ObservableCollection<FiltroChip> _filtros = [];
 
-    public bool MostrarPausarTodas => EsPestanaActivas && TieneDescargas;
+    public bool MostrarPausarTodas => EsPestanaActivas && TienePausables;
     public bool EsPestanaActivas => PestanaActual == "Activas";
     public bool EsPestanaHistorial => PestanaActual == "Historial";
 
@@ -103,12 +111,16 @@ public partial class DescargasViewModel : ObservableObject, IRecipient<DescargaP
     [ObservableProperty]
     private bool _sinResultados;
 
-    public DescargasViewModel(IDownloadService downloadService, IDatabaseService? database = null)
+    public DescargasViewModel(IDownloadService downloadService, IDatabaseService? database = null,
+        IAnimeThemesDownloadService? descargasMusica = null, IAnimeThemesService? catalogoMusica = null)
     {
         _downloadService = downloadService;
         _database = database;
+        _descargasMusica = descargasMusica;
+        _catalogoMusica = catalogoMusica;
         WeakReferenceMessenger.Default.Register<DescargaProgresoMensaje>(this);
         WeakReferenceMessenger.Default.Register<DescargaHistorialActualizadoMensaje>(this);
+        WeakReferenceMessenger.Default.Register<DescargaMusicaProgresoMensaje>(this);
 
         CargarDescargas();
         ActualizarChips();
@@ -128,6 +140,11 @@ public partial class DescargasViewModel : ObservableObject, IRecipient<DescargaP
         foreach (var d in _downloadService.ObtenerDescargasActivas())
         {
             ColaDescargas.Add(d);
+        }
+        foreach (var m in _descargasMusica?.ObtenerDescargasMusicaActivas() ?? [])
+        {
+            m.VelocidadDescarga = m.VelocidadBps > 0 ? FormatearVelocidad(m.VelocidadBps) : string.Empty;
+            ColaDescargas.Add(m);
         }
         ActualizarConteo();
     }
@@ -210,7 +227,8 @@ public partial class DescargasViewModel : ObservableObject, IRecipient<DescargaP
         {
             query = query.Where(i =>
                 i.AnimeTitulo.Contains(texto, StringComparison.CurrentCultureIgnoreCase) ||
-                i.TitulosAlternativos.Contains(texto, StringComparison.CurrentCultureIgnoreCase));
+                i.TitulosAlternativos.Contains(texto, StringComparison.CurrentCultureIgnoreCase) ||
+                i.TemaTitulo.Contains(texto, StringComparison.CurrentCultureIgnoreCase));
         }
 
         var salida = new List<object>();
@@ -270,23 +288,7 @@ public partial class DescargasViewModel : ObservableObject, IRecipient<DescargaP
 
             if (message.IsCompleted)
             {
-                // La fila queda un instante al 100 % y se retira; el resultado ya vive en el historial.
-                _ = Task.Run(async () =>
-                {
-                    try
-                    {
-                        await Task.Delay(1500);
-                        EnUi(() =>
-                        {
-                            ColaDescargas.Remove(item);
-                            ActualizarConteo();
-                        });
-                    }
-                    catch (Exception ex)
-                    {
-                        AppLogger.Debug("DescargasViewModel", $"Error al remover descarga completada: {ex.Message}");
-                    }
-                });
+                RetirarTrasCompletar(item);
             }
             else if (!string.IsNullOrEmpty(message.Error))
             {
@@ -319,12 +321,88 @@ public partial class DescargasViewModel : ObservableObject, IRecipient<DescargaP
         }
     }
 
+    /// <summary>La fila queda un instante al 100 % y se retira; el resultado ya vive en el historial.</summary>
+    private void RetirarTrasCompletar(DescargaItem item)
+    {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(1500);
+                EnUi(() =>
+                {
+                    ColaDescargas.Remove(item);
+                    ActualizarConteo();
+                });
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Debug("DescargasViewModel", $"Error al remover descarga completada: {ex.Message}");
+            }
+        });
+    }
+
+    public void Receive(DescargaMusicaProgresoMensaje message)
+    {
+        // Sin Application (tests headless) el mensaje no se procesa, como el de los episodios.
+        Application.Current?.Dispatcher.InvokeAsync(() => AplicarMensajeMusica(message));
+    }
+
+    /// <summary>Una descarga de música (opening/ending) avanzó, terminó, falló o se canceló.</summary>
+    internal void AplicarMensajeMusica(DescargaMusicaProgresoMensaje m)
+    {
+        var item = ColaDescargas.FirstOrDefault(d => d.EsMusica && d.AniListId == m.AniListId && d.TemaClave == m.TemaClave);
+
+        if (m.Terminada)
+        {
+            if (item == null) return;
+            if (m.Completada)
+            {
+                item.Convirtiendo = false;
+                item.Progreso = 100;
+                item.IsCompleted = true;
+                item.RutaArchivo = m.RutaArchivo ?? string.Empty;
+                RetirarTrasCompletar(item);
+            }
+            else
+            {
+                ColaDescargas.Remove(item); // fallida (ya está en el historial) o cancelada
+            }
+            ActualizarConteo();
+            return;
+        }
+
+        if (item == null)
+        {
+            item = new DescargaItem
+            {
+                EsMusica = true,
+                AniListId = m.AniListId,
+                AnimeTitulo = m.AnimeTitulo,
+                TemaClave = m.TemaClave,
+                TemaTitulo = m.TemaTitulo,
+                Fuente = "AnimeThemes",
+                IsDownloading = true
+            };
+            ColaDescargas.Add(item);
+        }
+
+        item.Progreso = m.Progreso;
+        item.Convirtiendo = m.Convirtiendo;
+        item.VelocidadBps = m.VelocidadBps;
+        item.VelocidadDescarga = m.VelocidadBps > 0 ? FormatearVelocidad(m.VelocidadBps) : string.Empty;
+        ActualizarConteo();
+    }
+
     private void ActualizarConteo()
     {
         ConteoActivas = ColaDescargas.Count(d => d.IsDownloading && !d.IsPaused);
         ConteoEnCola = ColaDescargas.Count(d => d.EnCola && !d.IsPaused);
         TieneDescargas = ColaDescargas.Count > 0;
-        TodasPausadas = ColaDescargas.Count > 0 && ColaDescargas.All(d => d.IsPaused);
+        // Las de música no se pausan: "todas en pausa" mira solo los episodios.
+        var pausables = ColaDescargas.Where(d => !d.EsMusica).ToList();
+        TienePausables = pausables.Count > 0;
+        TodasPausadas = pausables.Count > 0 && pausables.All(d => d.IsPaused);
 
         double bps = ColaDescargas.Where(d => !d.IsPaused && !d.EnCola).Sum(d => d.VelocidadBps);
         VelocidadTotalTexto = bps > 0 ? FormatearVelocidad(bps) : "—";
@@ -358,7 +436,8 @@ public partial class DescargasViewModel : ObservableObject, IRecipient<DescargaP
     private void CancelarDescarga(DescargaItem item)
     {
         if (item == null) return;
-        _downloadService.CancelarDescarga(item.AniListId, item.NumeroEpisodio);
+        if (item.EsMusica) _descargasMusica?.CancelarDescargaMusica(item.AniListId, item.TemaClave);
+        else _downloadService.CancelarDescarga(item.AniListId, item.NumeroEpisodio);
         ColaDescargas.Remove(item);
         ActualizarConteo();
     }
@@ -366,7 +445,7 @@ public partial class DescargasViewModel : ObservableObject, IRecipient<DescargaP
     [RelayCommand]
     private void AlternarPausaDescarga(DescargaItem item)
     {
-        if (item == null) return;
+        if (item == null || item.EsMusica) return;
         if (item.IsPaused)
         {
             item.IsPaused = false;
@@ -385,7 +464,7 @@ public partial class DescargasViewModel : ObservableObject, IRecipient<DescargaP
     [RelayCommand]
     private void Priorizar(DescargaItem item)
     {
-        if (item == null || !item.EnCola) return;
+        if (item == null || !item.EnCola || item.EsMusica) return;
         if (!_downloadService.PriorizarDescarga(item.AniListId, item.NumeroEpisodio)) return;
 
         int idx = ColaDescargas.IndexOf(item);
@@ -396,8 +475,8 @@ public partial class DescargasViewModel : ObservableObject, IRecipient<DescargaP
     [RelayCommand]
     private void AlternarPausaTodas()
     {
-        bool pausar = ColaDescargas.Any(d => !d.IsPaused);
-        foreach (var d in ColaDescargas)
+        bool pausar = ColaDescargas.Any(d => !d.EsMusica && !d.IsPaused);
+        foreach (var d in ColaDescargas.Where(d => !d.EsMusica))
         {
             d.IsPaused = pausar;
             if (!pausar) d.EnCola = true;
@@ -412,6 +491,7 @@ public partial class DescargasViewModel : ObservableObject, IRecipient<DescargaP
     private void CancelarTodas()
     {
         _downloadService.CancelarTodas();
+        _descargasMusica?.CancelarTodasMusica();
         ColaDescargas.Clear();
         ActualizarConteo();
     }
@@ -419,10 +499,38 @@ public partial class DescargasViewModel : ObservableObject, IRecipient<DescargaP
     // ── Comandos del historial ──
 
     [RelayCommand]
-    private void Reproducir(DescargaHistorialItemViewModel item)
+    private async Task ReproducirAsync(DescargaHistorialItemViewModel item)
     {
         if (item == null || !item.ArchivoExiste) return;
+
+        if (item.EsMusica)
+        {
+            await ReproducirMusicaAsync(item);
+            return;
+        }
         WeakReferenceMessenger.Default.Send(new NavegarMensaje_Reproductor(item.RutaArchivo, item.AniListId, item.AnimeTitulo, item.NumeroEpisodio));
+    }
+
+    /// <summary>
+    /// Un opening/ending se escucha en su sitio: la ficha del anime, con el panel de música abierto y ese tema sonando. Si el
+    /// anime ya no está en la biblioteca, se abre con el reproductor de música de Windows.
+    /// </summary>
+    private async Task ReproducirMusicaAsync(DescargaHistorialItemViewModel item)
+    {
+        try
+        {
+            var anime = _database == null ? null : await _database.ObtenerAnimePorIdAsync(item.AniListId);
+            if (anime != null)
+            {
+                WeakReferenceMessenger.Default.Send(new NavegarMensaje_Detalle(anime, item.TemaClave));
+                return;
+            }
+            Process.Start(new ProcessStartInfo { FileName = item.RutaArchivo, UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("DescargasViewModel", $"No se pudo reproducir '{item.TemaTitulo}': {ex.Message}");
+        }
     }
 
     [RelayCommand]
@@ -450,6 +558,15 @@ public partial class DescargasViewModel : ObservableObject, IRecipient<DescargaP
     {
         if (item == null || string.IsNullOrWhiteSpace(item.CarpetaDestino)) return;
 
+        if (item.EsMusica)
+        {
+            if (!await ReintentarMusicaAsync(item)) return;
+            await EliminarFilaAsync(item);
+            CargarDescargas();
+            PestanaActual = "Activas";
+            return;
+        }
+
         var titulos = item.TitulosAlternativos.Split(" | ", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         await _downloadService.IniciarDescargaEpisodioAsync(item.AniListId, item.AnimeTitulo, item.CarpetaDestino, item.NumeroEpisodio, titulos);
         await EliminarFilaAsync(item);
@@ -463,6 +580,11 @@ public partial class DescargasViewModel : ObservableObject, IRecipient<DescargaP
         foreach (var item in _historial.Where(i => !i.Completada).ToList())
         {
             if (string.IsNullOrWhiteSpace(item.CarpetaDestino)) continue;
+            if (item.EsMusica)
+            {
+                if (await ReintentarMusicaAsync(item)) await EliminarFilaAsync(item);
+                continue;
+            }
             var titulos = item.TitulosAlternativos.Split(" | ", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
             await _downloadService.IniciarDescargaEpisodioAsync(item.AniListId, item.AnimeTitulo, item.CarpetaDestino, item.NumeroEpisodio, titulos);
             await EliminarFilaAsync(item);
@@ -470,6 +592,35 @@ public partial class DescargasViewModel : ObservableObject, IRecipient<DescargaP
 
         CargarDescargas();
         PestanaActual = "Activas";
+    }
+
+    /// <summary>
+    /// Vuelve a pedir un opening/ending: busca el tema en la lista de AnimeThemes (guardada o de la red) por su clave y lo
+    /// descarga igual que desde la ficha. False si ya no existe o no hay servicio.
+    /// </summary>
+    private async Task<bool> ReintentarMusicaAsync(DescargaHistorialItemViewModel item)
+    {
+        if (_descargasMusica == null || _catalogoMusica == null || string.IsNullOrWhiteSpace(item.TemaClave)) return false;
+
+        try
+        {
+            var catalogo = await _catalogoMusica.ObtenerTemasAsync(item.AniListId);
+            var tema = catalogo.FirstOrDefault(t => t.ClaveEstable() == item.TemaClave && !string.IsNullOrWhiteSpace(t.AudioUrlOgg));
+            if (tema == null)
+            {
+                AppLogger.Debug("DescargasViewModel", $"'{item.TemaTitulo}' ya no está en AnimeThemes (o no hay conexión): no se puede reintentar.");
+                return false;
+            }
+
+            // Se registra al instante (antes de su primera espera), así que CargarDescargas ya la ve en "Activas".
+            _ = _descargasMusica.DescargarYConvertirAsync(item.AniListId, tema, null, System.Threading.CancellationToken.None);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("DescargasViewModel", $"No se pudo reintentar '{item.TemaTitulo}': {ex.Message}");
+            return false;
+        }
     }
 
     [RelayCommand]

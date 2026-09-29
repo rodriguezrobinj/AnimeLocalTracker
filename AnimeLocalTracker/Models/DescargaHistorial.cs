@@ -37,4 +37,15 @@ public class DescargaHistorial
 
     /// <summary>Títulos alternativos (separados por " | ") con los que se buscó el episodio en la fuente.</summary>
     public string TitulosAlternativos { get; set; } = string.Empty;
+
+    /// <summary>Qué se descargó: null/vacío = episodio (filas anteriores a la v15), <see cref="TipoMusica"/> = un opening/ending.</summary>
+    public string? Tipo { get; set; }
+
+    /// <summary>Solo música: tipo|slug|versión del tema (ver AnimeThemeInfo.ClaveEstable), para reintentarlo o reproducirlo.</summary>
+    public string? TemaClave { get; set; }
+
+    /// <summary>Solo música: "OP1 · We Are!", lo que se muestra en lugar del número de episodio.</summary>
+    public string? TemaTitulo { get; set; }
+
+    public const string TipoMusica = "Musica";
 }

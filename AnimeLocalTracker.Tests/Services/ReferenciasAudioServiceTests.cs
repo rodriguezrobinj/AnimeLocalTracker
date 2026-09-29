@@ -100,6 +100,41 @@ public class ReferenciasAudioServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task UnArchivoDeLaFichaConElRangoViejo_NoSeVuelveABajarYUsaElRangoActual()
+    {
+        // Descargado mientras se emitía ("1-"); al terminar, AnimeThemes cerró el rango en "1-12". Es la misma canción.
+        var delaFicha = new TemaLocalDisponible("OP", "OP1", 1, "1-", @"C:\Music\7\OP_OP1_v1_ep1-.mp3");
+        _descargas.Setup(d => d.ListarDescargasLocales(7)).Returns(new List<TemaLocalDisponible> { delaFicha });
+        Catalogo(Tema("OP", "OP1", "1-12"));
+
+        var r = await _sut.ObtenerAsync(7, 5);
+
+        _urls.Should().BeEmpty();
+        var tema = r.Temas.Should().ContainSingle().Subject;
+        tema.RutaArchivo.Should().Be(delaFicha.RutaArchivo);
+        tema.RangoEpisodios.Should().Be("1-12");
+        tema.AplicaAlEpisodio(13).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task UnAudioQueLlegaCortado_NoSeGuardaEnLaCache()
+    {
+        _responder = () =>
+        {
+            var contenido = new StreamContent(new MemoryStream(Ogg));
+            contenido.Headers.ContentLength = Ogg.Length * 10L;
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = contenido };
+        };
+        Catalogo(Tema("OP", "OP1", "1-12"));
+
+        var r = await _sut.ObtenerAsync(7, 5);
+
+        r.Temas.Should().BeEmpty();
+        r.Completa.Should().BeFalse();
+        (Directory.Exists(_carpeta) ? Directory.GetFiles(_carpeta, "*", SearchOption.AllDirectories) : []).Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task ReutilizaLaCacheDeUnaVezAnterior_SinVolverAPedirElAudio()
     {
         Catalogo(Tema("OP", "OP1", "1-12", "https://a.animethemes.moe/op1.ogg"));

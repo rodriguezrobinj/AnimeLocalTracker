@@ -93,8 +93,19 @@ public class DatabaseService : IDatabaseService, IDisposable
         (11, "partidas de minijuegos (récords y logros) + índice (JuegoId, Puntos)", CrearTablaPartidasMinijuegoAsync),
         (12, "personajes de AniList por anime (Adivina el personaje) + índice único (AnimeId, PersonajeId)", CrearTablasPersonajesAsync),
         (13, "análisis guardados de OP/ED por episodio (marcadores y saltos) + índices", CrearTablasSkipAsync),
-        (14, "página de animeav1 ya verificada por anime (descargas sin repetir la búsqueda)", CrearTablaMediaAnimeAv1Async)
+        (14, "página de animeav1 ya verificada por anime (descargas sin repetir la búsqueda)", CrearTablaMediaAnimeAv1Async),
+        (15, "descargas de música (openings/endings) en el historial de descargas", AgregarColumnasMusicaHistorialAsync)
     };
+
+    /// <summary>
+    /// v15: columnas Tipo/TemaClave/TemaTitulo en DescargaHistorial. sqlite-net las añade con ALTER TABLE ADD COLUMN si la
+    /// tabla ya existe; en bases nuevas la v7 ya la creó completa y esto no hace nada. Las filas antiguas quedan con Tipo
+    /// NULL = episodio.
+    /// </summary>
+    private static async Task AgregarColumnasMusicaHistorialAsync(SQLiteAsyncConnection conexion)
+    {
+        await conexion.CreateTableAsync<DescargaHistorial>();
+    }
 
     /// <summary>v14: AniListId → página de animeav1 verificada (clave primaria = AniListId, sin más índices).</summary>
     private static Task CrearTablaMediaAnimeAv1Async(SQLiteAsyncConnection conexion) => conexion.CreateTableAsync<MediaAnimeAv1Verificado>();

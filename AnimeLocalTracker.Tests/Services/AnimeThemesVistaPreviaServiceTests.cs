@@ -37,7 +37,7 @@ public class AnimeThemesVistaPreviaServiceTests : IDisposable
     private AnimeThemesDownloadService CrearSut() => new(_http.Object, _musica, _previas);
 
     private string RutaPrevia(int id = 7) => Path.Combine(_previas, id.ToString(), _tema.NombreArchivoLocal());
-    private string RutaGuardada(int id = 7) => Path.Combine(_musica, id.ToString(), _tema.NombreArchivoLocal());
+    private string RutaGuardada(int id = 7) => Path.Combine(_musica, id.ToString(), _tema.NombreArchivoLegible());
 
     private void CrearArchivo(string ruta, string contenido = "mp3")
     {
@@ -88,6 +88,20 @@ public class AnimeThemesVistaPreviaServiceTests : IDisposable
     public void ObtenerRutaLocalEsperada_DeberiaSeguirUsandoLaCarpetaDeMusica()
     {
         CrearSut().ObtenerRutaLocalEsperada(7, _tema).Should().Be(RutaGuardada());
+    }
+
+    [Fact]
+    public void UnMp3ConElNombreTecnicoAntiguo_SigueContandoComoDescargado()
+    {
+        // Descargado antes de los nombres legibles, y aún sin organizar.
+        string antiguo = Path.Combine(_musica, "7", _tema.NombreArchivoLocal());
+        CrearArchivo(antiguo);
+        var sut = CrearSut();
+
+        sut.EstaDescargado(7, _tema).Should().BeTrue();
+        sut.ObtenerRutaLocalEsperada(7, _tema).Should().Be(antiguo);
+        sut.Eliminar(7, _tema);
+        File.Exists(antiguo).Should().BeFalse();
     }
 
     // === Guardar (mover) ===
