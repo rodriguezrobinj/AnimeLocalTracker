@@ -1448,9 +1448,10 @@ public partial class DetalleViewModel : ObservableObject,
         }
 
         var configuracion = _settingsService?.ObtenerConfiguracion();
-        var candidatos = await _nyaaSourceService.BuscarCandidatosAsync(
+        var candidatos = await _nyaaSourceService.BuscarCandidatosParaElegirAsync(
             titulosCandidatos, episodio.NumeroEpisodio,
-            configuracion?.GrupoFansubPreferidoTorrent, configuracion?.ResolucionPreferidaTorrent);
+            configuracion?.GrupoFansubPreferidoTorrent, configuracion?.ResolucionPreferidaTorrent,
+            AnimeSeleccionado.AniListId);
 
         if (candidatos.Count == 0)
         {

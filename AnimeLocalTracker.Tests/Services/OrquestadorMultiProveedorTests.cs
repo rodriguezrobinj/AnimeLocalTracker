@@ -1,3 +1,4 @@
+using System.Net.Http;
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -95,7 +96,7 @@ public class OrquestadorMultiProveedorTests
     public async Task BuscarUrlEpisodioAsync_ConFallosConsecutivos_DeberiaDegradarAlProveedor()
     {
         // Arrange: cooldown largo para que la degradación persista durante el test
-        var p1 = new ProveedorStub("P1", () => Task.FromResult<string?>(null));
+        var p1 = new ProveedorStub("P1", () => Task.FromException<string?>(new HttpRequestException("caído")));
         var p2 = new ProveedorStub("P2", () => Task.FromResult<string?>("https://p2.com/v.mp4"));
         var orquestador = new OrquestadorMultiProveedor(new IProveedorVideo[] { p1, p2 },
             maxFallosConsecutivos: 2, cooldown: TimeSpan.FromHours(1));
@@ -157,5 +158,40 @@ public class OrquestadorMultiProveedorTests
 
         // Assert: el identificador viaja hasta el proveedor (para el chequeo de MAL ID)
         p1.UltimoAniListId.Should().Be(4408);
+    }
+
+    [Fact]
+    public async Task BuscarUrlEpisodioAsync_EpisodioQueNoEsta_NoDeberiaDegradarAlProveedor()
+    {
+        // "No está" (episodio aún sin publicar) no es un fallo: antes, tras tres episodios inexistentes
+        // el único proveedor quedaba en pausa 5 minutos y las descargas que sí existían fallaban.
+        string? respuesta = null;
+        var p1 = new ProveedorStub("P1", () => Task.FromResult(respuesta));
+        var orquestador = new OrquestadorMultiProveedor(new IProveedorVideo[] { p1 },
+            maxFallosConsecutivos: 2, cooldown: TimeSpan.FromHours(1));
+
+        for (int i = 0; i < 3; i++) await orquestador.BuscarUrlEpisodioAsync(Titulos, 1);
+        respuesta = "https://p1.com/v.mp4";
+        var url = await orquestador.BuscarUrlEpisodioAsync(Titulos, 2);
+
+        url.Should().Be("https://p1.com/v.mp4");
+        p1.Llamadas.Should().Be(4);
+    }
+
+    [Fact]
+    public async Task BuscarUrlEpisodioAsync_TodosEnPausa_DeberiaProbarlosIgual()
+    {
+        int llamadas = 0;
+        var p1 = new ProveedorStub("P1", () => ++llamadas <= 2
+            ? Task.FromException<string?>(new HttpRequestException("caído"))
+            : Task.FromResult<string?>("https://p1.com/v.mp4"));
+        var orquestador = new OrquestadorMultiProveedor(new IProveedorVideo[] { p1 },
+            maxFallosConsecutivos: 2, cooldown: TimeSpan.FromHours(1));
+
+        await orquestador.BuscarUrlEpisodioAsync(Titulos, 1);
+        await orquestador.BuscarUrlEpisodioAsync(Titulos, 1);
+        var url = await orquestador.BuscarUrlEpisodioAsync(Titulos, 1);
+
+        url.Should().Be("https://p1.com/v.mp4", "con todos en pausa no probar ninguno es peor que probar");
     }
 }

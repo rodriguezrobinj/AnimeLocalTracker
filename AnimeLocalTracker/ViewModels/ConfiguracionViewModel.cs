@@ -56,6 +56,52 @@ public partial class ConfiguracionViewModel : ObservableObject
         }
     }
 
+    /// <summary>Escribir también las entradas de depuración en el registro (se aplica al instante).</summary>
+    [ObservableProperty] private bool _registroDetallado;
+    private bool _cargandoRegistro;
+
+    partial void OnRegistroDetalladoChanged(bool value)
+    {
+        if (_cargandoRegistro) return;
+        AppLogger.RegistroDetallado = value;
+        _ = GuardarRegistroDetalladoAsync(value);
+    }
+
+    private async Task GuardarRegistroDetalladoAsync(bool valor)
+    {
+        try
+        {
+            var config = _settingsService.ObtenerConfiguracion();
+            config.RegistroDetallado = valor;
+            await _settingsService.GuardarConfiguracionAsync(config);
+            AppLogger.Info("ConfiguracionViewModel", valor ? "Registro detallado activado." : "Registro detallado desactivado.");
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("ConfiguracionViewModel", "Error guardando el registro detallado", ex);
+        }
+    }
+
+    /// <summary>Abre el visor de registros dentro de la app.</summary>
+    [RelayCommand]
+    private void VerRegistros() => CommunityToolkit.Mvvm.Messaging.WeakReferenceMessenger.Default.Send(new Messages.NavegarMensaje_VisorRegistros());
+
+    /// <summary>Abre la carpeta de registros (sesiones/ y errores.log) para revisarlos o adjuntarlos a un reporte.</summary>
+    [RelayCommand]
+    private void AbrirCarpetaRegistros()
+    {
+        try
+        {
+            AppLogger.Flush(); // que lo último ya esté en el archivo al abrirlo
+            Directory.CreateDirectory(AppLogger.Carpeta);
+            Process.Start(new ProcessStartInfo { FileName = AppLogger.Carpeta, UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("ConfiguracionViewModel", "Error abriendo la carpeta de registros", ex);
+        }
+    }
+
     [RelayCommand]
     private async Task AlternarConfianzaPluginAsync(PluginItemViewModel? plugin)
     {
@@ -373,6 +419,9 @@ public partial class ConfiguracionViewModel : ObservableObject
         _cargandoPlugins = true;
         PluginsHabilitados = config.PluginsHabilitados;
         _cargandoPlugins = false;
+        _cargandoRegistro = true;
+        RegistroDetallado = config.RegistroDetallado;
+        _cargandoRegistro = false;
         CargarPlugins();
     }
 

@@ -1037,6 +1037,39 @@
                                     </ctl:SettingRow>
                                 </StackPanel>
                             </Border>
+
+                            <!-- Registro de diagnóstico: un archivo por sesión + errores.log -->
+                            <TextBlock Text="{Binding [Cfg_GrupoRegistro], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource CfgGroupCaption}"/>
+                            <Border Style="{StaticResource CfgGroup}" Margin="0">
+                                <StackPanel>
+                                    <ctl:SettingRow Title="{Binding [Cfg_RegistroDetallado], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                    Description="{Binding [Cfg_RegistroDetalladoSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                        <ToggleButton IsChecked="{Binding RegistroDetallado}" Style="{StaticResource CfgSwitch}"
+                                                      AutomationProperties.Name="{Binding [Cfg_RegistroDetallado], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                    </ctl:SettingRow>
+                                    <Border Style="{StaticResource CfgDivider}"/>
+
+                                    <ctl:SettingRow Title="{Binding [Cfg_CarpetaRegistros], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                    Description="{Binding [Cfg_CarpetaRegistrosSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <Button Command="{Binding VerRegistrosCommand}" Style="{StaticResource CfgRowButton}" Margin="0,0,8,0"
+                                                    AutomationProperties.Name="{Binding [Cfg_VerRegistros], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <materialDesign:PackIcon Kind="TextBoxSearchOutline" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                                    <TextBlock Text="{Binding [Cfg_VerRegistros], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="12"/>
+                                                </StackPanel>
+                                            </Button>
+                                            <Button Command="{Binding AbrirCarpetaRegistrosCommand}" Style="{StaticResource CfgRowButton}"
+                                                    AutomationProperties.Name="{Binding [Cfg_AbrirCarpetaRegistros], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <materialDesign:PackIcon Kind="FolderOpenOutline" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                                    <TextBlock Text="{Binding [Cfg_AbrirCarpetaRegistros], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="12"/>
+                                                </StackPanel>
+                                            </Button>
+                                        </StackPanel>
+                                    </ctl:SettingRow>
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
                     </ScrollViewer>
 

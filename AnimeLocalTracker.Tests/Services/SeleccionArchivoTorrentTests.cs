@@ -119,4 +119,26 @@ public class SeleccionArchivoTorrentTests
         SeleccionArchivoTorrent.ElegirArchivoDelEpisodio(archivos, numeroEpisodio: 2)
             .Should().Be("[Grupo] Anime - 02 (1080p).mkv");
     }
+
+    [Fact]
+    public void ElegirArchivo_PackSinElEpisodio_NoEligeElMasGrande()
+    {
+        // Antes se tomaba el video más grande: un episodio cualquiera guardado con el número pedido.
+        var archivos = new List<(string, long)>
+        {
+            ("Anime/[Group] Anime - 01 (1080p).mkv", 900_000_000L),
+            ("Anime/[Group] Anime - 02 (1080p).mkv", 800_000_000L),
+        };
+
+        SeleccionArchivoTorrent.ElegirArchivo(archivos, 7).Should().BeNull();
+        SeleccionArchivoTorrent.ElegirArchivo(archivos, 2).Should().Be("Anime/[Group] Anime - 02 (1080p).mkv");
+    }
+
+    [Fact]
+    public void ElegirArchivo_UnSoloVideoConNombreRaro_LoElige()
+    {
+        var archivos = new List<(string, long)> { ("video_final.mkv", 900_000_000L), ("info.nfo", 10L) };
+
+        SeleccionArchivoTorrent.ElegirArchivo(archivos, 5).Should().Be("video_final.mkv");
+    }
 }

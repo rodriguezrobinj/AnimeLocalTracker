@@ -1,14 +1,17 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Net.Http;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using AnimeLocalTracker.Core;
 
 namespace AnimeLocalTracker.Services;
+
+/// <summary>Una parte anterior del anime (PREQUEL en AniList): su MAL ID, cuántos episodios tiene y sus títulos.</summary>
+public readonly record struct PrecuelaAnime(int? MalId, int Episodios, IReadOnlyList<string>? Titulos = null);
 
 /// <summary>
 /// INT-01: contrato tipado del scraping de animeav1.com — todo el parseo de HTML vive
@@ -208,9 +211,83 @@ public static partial class AnimeAv1HtmlParser
         return lista;
     }
 
-    /// <summary>Extrae slugs candidatos de /media/{slug} o slug:"{slug}" (sin "catalogo").</summary>
+    /// <summary>Un resultado del buscador del catálogo: slug de la página y título (null si no se pudo leer).</summary>
+    public readonly record struct ResultadoCatalogo(string Slug, string? Titulo);
+
+    /// <summary>
+    /// Resultados de una búsqueda del catálogo en el orden del sitio (relevancia). Se leen de la lista
+    /// results:[{id,title,synopsis,categoryId,slug,...}] del payload: la página trae además los ~47
+    /// GÉNEROS del filtro (slug:"accion", slug:"isekai"...) que el extractor antiguo tomaba por animes
+    /// y hacía revisar como candidatos (404 seguros que gastaban el presupuesto de la búsqueda). Sin
+    /// esa lista (cambio del sitio) se cae a los enlaces /media/{slug} de la página.
+    /// </summary>
+    public static List<ResultadoCatalogo> ExtraerResultadosCatalogo(string? html)
+    {
+        var lista = new List<ResultadoCatalogo>();
+        if (string.IsNullOrWhiteSpace(html)) return lista;
+        var vistos = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        int inicio = html.IndexOf("results:[", StringComparison.Ordinal);
+        if (inicio >= 0)
+        {
+            foreach (var objeto in ObjetosDelArreglo(html, inicio + "results:".Length))
+            {
+                var slug = SlugCampoRegex().Match(objeto);
+                if (!slug.Success || !vistos.Add(slug.Groups[1].Value)) continue;
+                var titulo = TituloCampoRegex().Match(objeto);
+                lista.Add(new ResultadoCatalogo(slug.Groups[1].Value, titulo.Success ? titulo.Groups[1].Value.Replace("\\\"", "\"") : null));
+            }
+            return lista;
+        }
+
+        foreach (Match m in EnlaceMediaRegex().Matches(html))
+        {
+            string slug = m.Groups[1].Value;
+            if (!slug.Equals("catalogo", StringComparison.OrdinalIgnoreCase) && vistos.Add(slug)) lista.Add(new ResultadoCatalogo(slug, null));
+        }
+        return lista;
+    }
+
+    /// <summary>Cada objeto {...} de primer nivel del arreglo que empieza en <paramref name="inicioArreglo"/> (respetando cadenas).</summary>
+    private static IEnumerable<string> ObjetosDelArreglo(string texto, int inicioArreglo)
+    {
+        int profundidad = 0, inicioObjeto = -1;
+        bool enCadena = false;
+        for (int i = inicioArreglo; i < texto.Length; i++)
+        {
+            char c = texto[i];
+            if (enCadena)
+            {
+                if (c == '\\') i++;
+                else if (c == '"') enCadena = false;
+                continue;
+            }
+            switch (c)
+            {
+                case '"':
+                    enCadena = true;
+                    break;
+                case '[' or '{':
+                    profundidad++;
+                    if (c == '{' && profundidad == 2) inicioObjeto = i;
+                    break;
+                case ']' or '}':
+                    if (c == '}' && profundidad == 2 && inicioObjeto >= 0) yield return texto[inicioObjeto..(i + 1)];
+                    profundidad--;
+                    if (profundidad == 0) yield break;
+                    break;
+            }
+        }
+    }
+
+    /// <summary>Extrae slugs candidatos del catálogo (solo resultados: sin géneros ni "catalogo").</summary>
     public static IEnumerable<string> ExtraerSlugs(string html)
     {
+        if (html != null && html.Contains("results:[", StringComparison.Ordinal))
+        {
+            return ExtraerResultadosCatalogo(html).Select(r => r.Slug);
+        }
+
         var slugs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (Match match in SlugsRegex().Matches(html ?? string.Empty))
         {
@@ -254,6 +331,15 @@ public static partial class AnimeAv1HtmlParser
     [GeneratedRegex(@"(?:/media/|slug:\s*""?)([a-zA-Z0-9_-]+)")]
     private static partial Regex SlugsRegex();
 
+    [GeneratedRegex(@"/media/([a-zA-Z0-9_-]+)")]
+    private static partial Regex EnlaceMediaRegex();
+
+    [GeneratedRegex(@"(?<![\w.])slug:""([a-zA-Z0-9_-]+)""")]
+    private static partial Regex SlugCampoRegex();
+
+    [GeneratedRegex(@"(?<![\w.])title:""((?:[^""\\]|\\.)*)""")]
+    private static partial Regex TituloCampoRegex();
+
     [GeneratedRegex(@"https?://(?:www\.)?mp4upload\.com/(?:embed-)?([a-zA-Z0-9]+)(?:\.html)?")]
     private static partial Regex Mp4UploadRegex();
 
@@ -292,14 +378,22 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
         Func<int, CancellationToken, Task<int?>>? malIdResolver = null,
         Func<List<string>, List<string>, CancellationToken, Task<double?>>? similitudNombres = null,
         Func<int, CancellationToken, Task<List<string>?>>? titulosDesdeAniList = null,
-        IDatabaseService? database = null)
+        IDatabaseService? database = null,
+        Func<int, CancellationToken, Task<IReadOnlyList<PrecuelaAnime>>>? precuelas = null)
     {
         _httpClient = httpClient;
         _malIdResolver = malIdResolver;
         _similitudNombres = similitudNombres;
         _titulosDesdeAniList = titulosDesdeAniList;
         _database = database;
+        _precuelas = precuelas;
     }
+
+    /// <summary>
+    /// Cadena de precuelas directas del anime (la más cercana primero) con su MAL ID y total de
+    /// episodios: permite reconocer la página del sitio que junta varias partes en una. Null = sin datos.
+    /// </summary>
+    private readonly Func<int, CancellationToken, Task<IReadOnlyList<PrecuelaAnime>>>? _precuelas;
 
     /// <summary>Donde se guarda la página verificada de cada anime para que sobreviva al cierre de la app (null en tests).</summary>
     private readonly IDatabaseService? _database;
@@ -382,93 +476,140 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
         // no tenerlos guardados — y el MAL ID esperado: son independientes, se piden a la vez.
         var tareaTitulosExtra = ObtenerTitulosExtraAsync(aniListId, cancellationToken);
         var tareaMalId = ObtenerMalIdEsperadoAsync(aniListId, cancellationToken);
+        var tareaPrecuelas = ObtenerPrecuelasAsync(aniListId, cancellationToken);
         foreach (var t in await tareaTitulosExtra)
         {
             if (!titulosLista.Contains(t, StringComparer.OrdinalIgnoreCase)) titulosLista.Add(t);
         }
 
-        var malIdEsperado = await tareaMalId;
-        var slugs = await ObtenerSlugsCandidatosAsync(titulosLista, malIdEsperado, cancellationToken);
+        var busqueda = new BusquedaEnCurso(titulosLista, numeroEpisodio, aniListId, await tareaMalId, await tareaPrecuelas);
 
-        // Media-first con crawl de relations: cuando un media se prueba, sus
-        // relations (películas/secuelas de la franquicia) se insertan INMEDIATAMENTE
-        // después de él — así dragon-ball-z (rechazado por malId) lleva directo al
-        // movie-14 sin depender del orden/limite del catálogo. Presupuesto total:
-        // MaxMediaProbes peticiones de media.
-        // FUN-018: se sube de 25 a 40 como margen adicional — con los términos ya
-        // ordenados por especificidad, el candidato correcto casi siempre cae dentro
-        // del presupuesto, pero franquicias con muchos títulos alternativos (romaji,
-        // inglés, nativo, sinónimos de AniList) pueden aportar varios candidatos
-        // igual de precisos antes de llegar al bueno.
-        const int MaxMediaProbes = 40;
-        int probes = 0;
-        var probados = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var encolados = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        // Dos tandas: primero los términos más fiables (títulos completos y sus partes principales).
+        // Casi siempre basta con ellos y los términos genéricos (primeras/últimas palabras), que son
+        // los que traen ruido, ni se llegan a buscar.
+        var terminos = GenerarTerminosOrdenados(titulosLista);
+        var primeraTanda = terminos.Where(t => t.Prioridad <= 1).Take(MaxTerminosPrimeraTanda).ToList();
+        var segundaTanda = terminos.Except(primeraTanda).Take(MaxTerminosSegundaTanda).ToList();
 
-        // Precarga: mientras se verifica un candidato ya se piden las páginas de los siguientes,
-        // para no esperar una petición completa por cada uno cuando el bueno no es el primero.
-        var paginas = new Dictionary<string, Task<InfoMedia?>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (tanda, incluirGenerados) in new[] { (primeraTanda, true), (segundaTanda, false) })
+        {
+            if (cancellationToken.IsCancellationRequested) return [];
+            if (tanda.Count == 0 && !incluirGenerados) continue;
+
+            var candidatos = await ObtenerCandidatosAsync(titulosLista, tanda.Select(t => t.Termino).ToList(), incluirGenerados, busqueda.Encolados, cancellationToken);
+            var embeds = await ProbarCandidatosAsync(busqueda, candidatos, cancellationToken);
+            if (embeds.Count > 0) return embeds;
+            if (busqueda.Probes >= MaxMediaProbes) break;
+        }
+
+        AppLogger.Info("AnimeAv1VideoSourceResolver",
+            $"'{titulosLista[0]}' ep {numeroEpisodio}: no está en el sitio ({busqueda.Probes} páginas revisadas).");
+        return [];
+    }
+
+    /// <summary>Estado de una búsqueda completa (presupuesto de páginas compartido entre tandas).</summary>
+    private sealed class BusquedaEnCurso(List<string> titulos, int numeroEpisodio, int? aniListId, int? malIdEsperado, IReadOnlyList<PrecuelaAnime> precuelas)
+    {
+        public List<string> Titulos { get; } = titulos;
+        public int NumeroEpisodio { get; } = numeroEpisodio;
+        public int? AniListId { get; } = aniListId;
+        public int? MalIdEsperado { get; } = malIdEsperado;
+        public IReadOnlyList<PrecuelaAnime> Precuelas { get; } = precuelas;
+        public int Probes { get; set; }
+        public int ProbesSinParecido { get; set; }
+        public HashSet<string> Probados { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public HashSet<string> Encolados { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, Task<InfoMedia?>> Paginas { get; } = new(StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>Página del sitio candidata a ser el anime buscado, con lo que se sabe de ella antes de pedirla.</summary>
+    private sealed record CandidatoMedia(string Slug, bool Plausible);
+
+    /// <summary>
+    /// Media-first con crawl de relations: cuando un media se prueba, sus relations (películas/secuelas
+    /// de la franquicia) se insertan INMEDIATAMENTE después de él — así dragon-ball-z (rechazado por
+    /// malId) lleva directo al movie-14 sin depender del orden del catálogo. Mientras se verifica un
+    /// candidato ya se piden los siguientes (precarga).
+    /// </summary>
+    private async Task<List<AnimeAv1HtmlParser.EmbedServidor>> ProbarCandidatosAsync(
+        BusquedaEnCurso b, List<CandidatoMedia> candidatos, CancellationToken ct)
+    {
         Task<InfoMedia?> PedirMedia(string s)
         {
-            if (!paginas.TryGetValue(s, out var tarea))
+            if (!b.Paginas.TryGetValue(s, out var tarea))
             {
-                tarea = ObtenerInfoMediaAsync(s, cancellationToken);
-                paginas[s] = tarea;
+                tarea = ObtenerInfoMediaAsync(s, ct);
+                b.Paginas[s] = tarea;
             }
             return tarea;
         }
+        bool SeProbara(CandidatoMedia c) => c.Plausible || b.ProbesSinParecido < MaxProbesSinParecido;
         void PrecargarSiguientes(int desde)
         {
             int pedidas = 0;
-            for (int j = desde; j < slugs.Count && pedidas < MediaPrecargados && probes + pedidas < MaxMediaProbes; j++)
+            for (int j = desde; j < candidatos.Count && pedidas < MediaPrecargados && b.Probes + pedidas < MaxMediaProbes; j++)
             {
-                if (probados.Contains(slugs[j])) continue;
-                PedirMedia(slugs[j]);
+                if (b.Probados.Contains(candidatos[j].Slug) || !SeProbara(candidatos[j])) continue;
+                PedirMedia(candidatos[j].Slug);
                 pedidas++;
             }
         }
 
-        for (int i = 0; i < slugs.Count && probes < MaxMediaProbes; i++)
+        for (int i = 0; i < candidatos.Count && b.Probes < MaxMediaProbes; i++)
         {
-            if (cancellationToken.IsCancellationRequested) return [];
-            string slug = slugs[i];
-            if (!probados.Add(slug)) continue;
+            if (ct.IsCancellationRequested) return [];
+            var candidato = candidatos[i];
+            // Las páginas sin ningún parecido con el anime (lo que el catálogo devuelve cuando no
+            // encuentra nada) solo se revisan unas pocas: antes un anime que no está en el sitio
+            // gastaba las 40 páginas del presupuesto en ellas.
+            if (!SeProbara(candidato) || !b.Probados.Add(candidato.Slug)) continue;
 
-            probes++;
+            b.Probes++;
+            if (!candidato.Plausible) b.ProbesSinParecido++;
             PrecargarSiguientes(i + 1);
-            var media = await PedirMedia(slug);
+            var media = await PedirMedia(candidato.Slug);
             if (media == null) continue;
 
             // Crawl inmediato: encolar las relations del media justo detrás de él
             // (el media principal de una franquicia las lista todas)
-            if (probes < MaxMediaProbes)
+            if (b.Probes < MaxMediaProbes)
             {
-                var relations = AnimeAv1HtmlParser.ExtraerRelationsDelMedia(media.Html);
-                int restantes = MaxMediaProbes - probes;
-                var nuevos = new List<string>();
-                foreach (var r in relations.Take(restantes))
+                // Una relation que ya estaba más abajo en la lista (el catálogo también la devolvió) se
+                // adelanta igual: el orden por nombre no sabe que "Dragon Ball Z" lleva a su película 14.
+                var nuevos = AnimeAv1HtmlParser.ExtraerRelationsDelMedia(media.Html)
+                    .Where(r => !b.Probados.Contains(r.Slug))
+                    .Take(MaxMediaProbes - b.Probes)
+                    .Select(r => new CandidatoMedia(r.Slug, Plausible: true))
+                    .ToList();
+                foreach (var r in nuevos)
                 {
-                    if (encolados.Add(r.Slug) && !probados.Contains(r.Slug)) nuevos.Add(r.Slug);
+                    b.Encolados.Add(r.Slug);
+                    int pendiente = candidatos.FindIndex(i + 1, c => c.Slug.Equals(r.Slug, StringComparison.OrdinalIgnoreCase));
+                    if (pendiente >= 0) candidatos.RemoveAt(pendiente);
                 }
                 if (nuevos.Count > 0)
                 {
-                    slugs.InsertRange(i + 1, nuevos);
+                    candidatos.InsertRange(i + 1, nuevos);
                     PrecargarSiguientes(i + 1);
                 }
             }
 
-            if (!await EsMediaCoincidenteAsync(media, malIdEsperado, titulosLista, cancellationToken))
+            int? desfase = await VerificarMediaAsync(media, b.MalIdEsperado, b.Titulos, b.Precuelas, ct);
+            if (!desfase.HasValue) continue;
+
+            int? objetivo = ResolverNumeroEpisodio(media, b.NumeroEpisodio + desfase.Value);
+            if (!objetivo.HasValue)
             {
+                AppLogger.Debug("AnimeAv1VideoSourceResolver", $"Media {media.Slug} es el anime, pero aún no tiene el episodio {b.NumeroEpisodio + desfase.Value}.");
                 continue;
             }
 
-            int? objetivo = ResolverNumeroEpisodio(media, numeroEpisodio);
-            if (!objetivo.HasValue) continue;
-
-            var embeds = await ObtenerEmbedsDeEpisodioAsync(slug, objetivo.Value, malIdEsperado, cancellationToken);
+            // Con desfase la página es la de la parte anterior: su MAL ID es el de esa parte.
+            int? malIdPagina = desfase.Value > 0 ? media.MalId : b.MalIdEsperado;
+            var embeds = await ObtenerEmbedsDeEpisodioAsync(media.Slug, objetivo.Value, malIdPagina, ct);
             if (embeds.Count > 0)
             {
-                if (aniListId.HasValue) await RecordarMediaAsync(aniListId.Value, new MediaVerificado(slug, malIdEsperado ?? media.MalId));
+                if (b.AniListId.HasValue) await RecordarMediaAsync(b.AniListId.Value, new MediaVerificado(media.Slug, desfase.Value > 0 ? media.MalId : b.MalIdEsperado ?? media.MalId));
                 return embeds;
             }
         }
@@ -534,6 +675,23 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
     /// <summary>Búsquedas de catálogo a la vez: bastante más rápido que en serie sin acribillar al sitio.</summary>
     private const int BusquedasCatalogoSimultaneas = 4;
 
+    /// <summary>Presupuesto total de páginas de anime revisadas en una búsqueda completa.</summary>
+    private const int MaxMediaProbes = 40;
+
+    /// <summary>Páginas sin ningún parecido de nombre que se revisan como mucho (por si el sitio usa un nombre muy distinto).</summary>
+    private const int MaxProbesSinParecido = 6;
+
+    /// <summary>Parecido de nombre (sin mirar temporada) por debajo del cual un candidato del catálogo no se parece al anime.</summary>
+    private const double UmbralParecidoCandidato = 0.4;
+
+    /// <summary>Cuánto vale una página de la misma serie pero otra temporada/parte frente a una de la misma parte.</summary>
+    private const double PesoOtraParte = 0.9;
+
+    private const int MaxSlugsDeducidos = 2;
+
+    private const int MaxTerminosPrimeraTanda = 8;
+    private const int MaxTerminosSegundaTanda = 10;
+
     private async Task<List<AnimeAv1HtmlParser.EmbedServidor>> ObtenerEmbedsDeMediaConocidoAsync(
         MediaVerificado conocido, int numeroEpisodio, List<string> titulosLista, int? aniListId, CancellationToken ct)
     {
@@ -557,9 +715,12 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
                 if (!titulos.Contains(t, StringComparer.OrdinalIgnoreCase)) titulos.Add(t);
             }
         }
-        if (!await EsMediaCoincidenteAsync(media, conocido.MalId, titulos, ct)) return [];
+        var precuelas = await ObtenerPrecuelasAsync(aniListId, ct);
+        if (await VerificarMediaAsync(media, conocido.MalId, titulos, [], ct) is null) return [];
 
-        int? objetivo = ResolverNumeroEpisodio(media, numeroEpisodio);
+        // Si la página guardada es la de una parte anterior (el sitio junta las partes), el episodio va desplazado.
+        int desfase = DesfasePorPrecuela(precuelas, conocido.MalId) ?? 0;
+        int? objetivo = ResolverNumeroEpisodio(media, numeroEpisodio + desfase);
         if (!objetivo.HasValue) return [];
         return await ObtenerEmbedsDeEpisodioAsync(conocido.Slug, objetivo.Value, conocido.MalId, ct);
     }
@@ -579,6 +740,38 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
         }
     }
 
+    private async Task<IReadOnlyList<PrecuelaAnime>> ObtenerPrecuelasAsync(int? aniListId, CancellationToken ct)
+    {
+        if (!aniListId.HasValue || _precuelas == null) return [];
+        try
+        {
+            return await _precuelas(aniListId.Value, ct) ?? [];
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("AnimeAv1VideoSourceResolver", $"No se pudieron obtener las precuelas de {aniListId}: {ex.Message}");
+            return [];
+        }
+    }
+
+    /// <summary>
+    /// Episodios que hay que sumar cuando la página del sitio es la de una parte ANTERIOR del anime:
+    /// el sitio junta "2nd Season" y "2nd Season Part 2" en una sola página de 25 episodios, así que el
+    /// episodio 3 de la parte 2 es su episodio 16. Null si ese MAL ID no es de ninguna precuela.
+    /// </summary>
+    internal static int? DesfasePorPrecuela(IReadOnlyList<PrecuelaAnime> precuelas, int? malIdPagina)
+    {
+        if (!malIdPagina.HasValue) return null;
+        int suma = 0;
+        foreach (var precuela in precuelas)
+        {
+            if (precuela.Episodios <= 0) return null; // sin el total de esa parte no se puede calcular
+            suma += precuela.Episodios;
+            if (precuela.MalId == malIdPagina) return suma;
+        }
+        return null;
+    }
+
     /// <summary>Resuelve el MAL ID esperado del anime (si hay AniListId y resolver).</summary>
     public async Task<int?> ObtenerMalIdEsperadoAsync(int? aniListId, CancellationToken ct = default)
     {
@@ -591,76 +784,88 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
     }
 
     /// <summary>
-    /// Recolecta slugs candidatos: generados de los títulos (heurística estricta)
-    /// y descubiertos en el catálogo (heurística relajada si el malId es conocido,
-    /// porque el malId de la página es la verificación autoritativa).
+    /// Candidatos de una tanda: las páginas que devuelve el catálogo para cada término (con su título)
+    /// y, en la primera tanda, los slugs deducidos de los títulos. Se ordenan por parecido con el
+    /// anime, temporada incluida: la página de "Mushoku Tensei III" antes que la de "II", y las de
+    /// otros animes (lo que el catálogo devuelve cuando no encuentra nada) al final.
+    /// </summary>
+    private async Task<List<CandidatoMedia>> ObtenerCandidatosAsync(
+        List<string> titulosLista, List<string> terminos, bool incluirGenerados, HashSet<string> vistos, CancellationToken ct)
+    {
+        using var limite = new SemaphoreSlim(BusquedasCatalogoSimultaneas);
+        var resultados = await Task.WhenAll(terminos.Select(t => BuscarEnCatalogoAsync(t, limite, ct)));
+
+        var brutos = new List<(string Slug, string Nombre, bool Generado)>();
+        for (int i = 0; i < terminos.Count; i++)
+        {
+            int nuevos = 0;
+            foreach (var r in resultados[i])
+            {
+                if (vistos.Add(r.Slug))
+                {
+                    brutos.Add((r.Slug, r.Titulo ?? r.Slug.Replace('-', ' '), false));
+                    nuevos++;
+                }
+            }
+            if (nuevos > 0)
+            {
+                AppLogger.Debug("AnimeAv1VideoSourceResolver", $"Búsqueda de catálogo '{terminos[i]}': {nuevos} páginas nuevas.");
+            }
+        }
+
+        // Los títulos del sitio están en alfabeto latino: comparar con los coreanos o chinos solo mete
+        // ruido ("Re:从零…" hacía que "Re:Monster" pareciera algo).
+        var titulosLatinos = titulosLista.Where(t => FirmaTitulo.EsAlfabetoBuscable(t, incluirJapones: false)).ToList();
+        if (titulosLatinos.Count == 0) titulosLatinos = titulosLista;
+
+        if (incluirGenerados)
+        {
+            // Slug deducido del título, como los escribe el sitio ("Re:Zero … 2nd Season" →
+            // "rezero-…-2nd-season"). Solo de los dos primeros títulos: el catálogo ya encuentra casi
+            // todo, y las antiguas variaciones (-2, -ii, -2nd-season…) eran decenas de 404 seguros.
+            foreach (var titulo in titulosLatinos.Take(MaxSlugsDeducidos))
+            {
+                string slug = SlugDeTitulo(titulo);
+                if (slug.Length >= 3 && vistos.Add(slug)) brutos.Add((slug, slug.Replace('-', ' '), true));
+            }
+        }
+
+        // Orden: la misma temporada/parte primero; luego otra parte de la misma serie (el sitio a veces
+        // las junta en una página); lo que no se parece, al final. Antes se ordenaba primero por "misma
+        // temporada" aunque el parecido fuera mínimo, y "Re:Monster" (33 %) quedaba por delante de
+        // "Re:Zero 2nd Season" (100 %, otra parte): la página correcta caía fuera del presupuesto.
+        return brutos
+            .Select((c, indice) =>
+            {
+                var e = FirmaTitulo.Evaluar(titulosLatinos, [c.Nombre]);
+                // Un slug deducido que el catálogo no devolvió seguramente no existe: detrás de las páginas reales igual de parecidas.
+                double factor = c.Generado ? 0.95 : 1.0;
+                double puntuacion = Math.Max(e.MismaTemporada, e.SinImportarTemporada * PesoOtraParte) * factor;
+                return (c.Slug, puntuacion, Misma: e.MismaTemporada, indice,
+                        Plausible: c.Generado || e.SinImportarTemporada >= UmbralParecidoCandidato);
+            })
+            .OrderByDescending(x => x.puntuacion)
+            .ThenByDescending(x => x.Misma)
+            .ThenBy(x => x.indice)
+            .Select(x => new CandidatoMedia(x.Slug, x.Plausible))
+            .ToList();
+    }
+
+    /// <summary>
+    /// Slugs candidatos (compatibilidad): los deducidos de los títulos y los del catálogo para todos
+    /// los términos, ordenados por parecido con el anime.
     /// </summary>
     public async Task<List<string>> ObtenerSlugsCandidatosAsync(
         List<string> titulosLista, int? malIdEsperado, CancellationToken ct = default)
     {
-        var slugs = new List<string>();
-        var vistos = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var titulo in titulosLista)
-        {
-            foreach (var slug in GenerarVariacionesSlug(titulo))
-            {
-                if (vistos.Add(slug) && EsSlugCompatible(slug, titulosLista)) slugs.Add(slug);
-            }
-        }
-
-        // FUN-018: no todos los términos son igual de fiables. El título completo y el
-        // subtítulo distintivo casi siempre apuntan al anime correcto; las colas de 2-3
-        // palabras genéricas (ej. "Play Fighting Games") matchean animes sin ninguna
-        // relación por palabras sueltas y llenan el catálogo de ruido. Antes se buscaba
-        // título por título (agotando TODOS los términos, incluidos los genéricos, de un
-        // título antes de pasar al siguiente), lo que podía enterrar el candidato correcto
-        // de un título más preciso (ej. el nombre nativo) detrás de decenas de resultados
-        // ruidosos de un término genérico de OTRO título — y el presupuesto de sondeos
-        // (MaxMediaProbes en ObtenerEmbedsEpisodioAsync) se agotaba antes de llegarle.
-        // Se ordenan TODOS los términos de TODOS los títulos por especificidad para que
-        // los más fiables se busquen primero sin importar de qué título vengan.
-        var terminosVistos = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var terminosOrdenados = titulosLista
-            .SelectMany(GenerarTerminosBusquedaConPrioridad)
-            .Where(t => terminosVistos.Add(t.Termino))
-            .OrderBy(t => t.Prioridad);
-
-        // Las búsquedas se lanzan en paralelo (unas pocas a la vez) y sus resultados se
-        // juntan DESPUÉS en el mismo orden de fiabilidad: el orden de los candidatos no cambia.
-        var terminos = terminosOrdenados.Select(t => t.Termino).ToList();
-        using var limite = new SemaphoreSlim(BusquedasCatalogoSimultaneas);
-        var resultados = await Task.WhenAll(terminos.Select(t => BuscarEnCatalogoAsync(t, limite, ct)));
-
-        for (int i = 0; i < terminos.Count; i++)
-        {
-            // Sin gate de heurística aquí: el veredicto (malId exacto o
-            // nombres con rapidfuzz/C#) decide por cada media. La heurística
-            // de slugs rechazaba películas correctas ("movie-N-") cuando el
-            // malId no era comparable.
-            int nuevos = 0;
-            foreach (string discoveredSlug in resultados[i])
-            {
-                if (vistos.Add(discoveredSlug))
-                {
-                    slugs.Add(discoveredSlug);
-                    nuevos++;
-                }
-            }
-            // Diagnóstico: solo se loguea cuando un término aporta slugs nuevos
-            // (los 0s por variante inundaban el log: ~40 líneas por anime).
-            if (nuevos > 0)
-            {
-                AppLogger.Debug("AnimeAv1VideoSourceResolver",
-                    $"Búsqueda de catálogo '{terminos[i]}': {nuevos} slugs nuevos ({slugs.Count} totales).");
-            }
-        }
-
-        return slugs;
+        var terminos = GenerarTerminosOrdenados(titulosLista).Select(t => t.Termino).ToList();
+        var candidatos = await ObtenerCandidatosAsync(titulosLista, terminos, incluirGenerados: true,
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase), ct);
+        return candidatos.Select(c => c.Slug).ToList();
     }
 
-    /// <summary>Slugs que devuelve el catálogo para un término (vacío si falla: nunca lanza).</summary>
-    private async Task<List<string>> BuscarEnCatalogoAsync(string termino, SemaphoreSlim limite, CancellationToken ct)
+    /// <summary>Resultados del catálogo para un término (vacío si falla: nunca lanza).</summary>
+    private async Task<List<AnimeAv1HtmlParser.ResultadoCatalogo>> BuscarEnCatalogoAsync(string termino, SemaphoreSlim limite, CancellationToken ct)
     {
         bool dentro = false;
         try
@@ -668,19 +873,12 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
             await limite.WaitAsync(ct);
             dentro = true;
 
-            string searchUrl = $"https://animeav1.com/catalogo?search={Uri.EscapeDataString(termino)}";
-            using var req = new HttpRequestMessage(HttpMethod.Get, searchUrl);
-            req.Headers.Add("User-Agent", UserAgent);
-
-            using var res = await _httpClient.SendAsync(req, ct);
-            if (!res.IsSuccessStatusCode) return [];
-
-            var html = await res.Content.ReadAsStringAsync(ct);
-            return AnimeAv1HtmlParser.ExtraerSlugs(html).ToList();
+            var html = await ObtenerHtmlAsync($"https://animeav1.com/catalogo?search={Uri.EscapeDataString(termino)}", ct);
+            return html == null ? [] : AnimeAv1HtmlParser.ExtraerResultadosCatalogo(html);
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[AnimeAv1VideoSourceResolver] Error en búsqueda de catálogo para '{termino}': {ex.Message}");
+            AppLogger.Debug("AnimeAv1VideoSourceResolver", $"Error en búsqueda de catálogo para '{termino}': {ex.Message}");
             return [];
         }
         finally
@@ -689,23 +887,88 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
         }
     }
 
+    /// <summary>
+    /// Descarga una página del sitio. Un fallo pasajero (el sitio tarda, 5xx, 429, conexión cortada) se
+    /// reintenta una vez: sin esto, un tropiezo justo en la página correcta daba el episodio por
+    /// inexistente. Un 404 no se reintenta. Null si no se pudo.
+    /// </summary>
+    private async Task<string?> ObtenerHtmlAsync(string url, CancellationToken ct, string? referer = null)
+    {
+        for (int intento = 1; ; intento++)
+        {
+            try
+            {
+                using var req = new HttpRequestMessage(HttpMethod.Get, url);
+                req.Headers.Add("User-Agent", UserAgent);
+                if (referer != null) req.Headers.Add("Referer", referer);
+
+                using var res = await _httpClient.SendAsync(req, ct);
+                if (res.IsSuccessStatusCode) return await res.Content.ReadAsStringAsync(ct);
+
+                int codigo = (int)res.StatusCode;
+                bool pasajero = codigo is 408 or 429 or >= 500;
+                if (!pasajero || intento >= IntentosPagina) return null;
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                return null;
+            }
+            catch (SinConexionException)
+            {
+                return null; // sin internet: repetir no sirve (la descarga ya espera a que vuelva la red)
+            }
+            catch (Exception ex) when (intento < IntentosPagina && ex is HttpRequestException or TaskCanceledException or System.IO.IOException)
+            {
+                AppLogger.Debug("AnimeAv1VideoSourceResolver", $"Fallo pasajero en {url}: {ex.Message}. Reintentando.");
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Debug("AnimeAv1VideoSourceResolver", $"Error obteniendo {url}: {ex.Message}");
+                return null;
+            }
+
+            try { await Task.Delay(EsperaReintentoPagina, ct); }
+            catch (OperationCanceledException) { return null; }
+        }
+    }
+
+    private const int IntentosPagina = 2;
+    private static readonly TimeSpan EsperaReintentoPagina = TimeSpan.FromMilliseconds(700);
+
     private readonly record struct TerminoConPrioridad(string Termino, int Prioridad);
 
     /// <summary>
-    /// Igual que <see cref="GenerarTerminosBusqueda"/> pero etiqueta cada término con su
-    /// especificidad (0 = más fiable, mayor = más genérico/propenso a falsos positivos),
-    /// para poder ordenar la búsqueda entre TODOS los títulos por fiabilidad.
+    /// Términos de TODOS los títulos ordenados por especificidad (FUN-018): el título completo y sus
+    /// partes principales primero, sin importar de qué título vengan; las colas genéricas de 2-3
+    /// palabras (propensas a traer animes sin relación) al final.
+    /// </summary>
+    private static List<TerminoConPrioridad> GenerarTerminosOrdenados(IEnumerable<string> titulos)
+    {
+        var vistos = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        return titulos
+            .SelectMany(GenerarTerminosBusquedaConPrioridad)
+            .Where(t => vistos.Add(t.Termino))
+            .OrderBy(t => t.Prioridad)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Términos de búsqueda de un título, etiquetados con su especificidad (0 = más fiable, mayor =
+    /// más genérico). Solo títulos en alfabeto latino: el buscador del sitio no entiende japonés,
+    /// tailandés ni ruso (devuelve su listado por defecto, que solo añade candidatos basura). Las
+    /// partes se separan por ':' o " - " pero NO por un guion pegado: "Kusunoki-tei" daba el término
+    /// "tei" y "Kaitaku-ki" el término "ki", que traían decenas de animes sin relación.
     /// </summary>
     private static List<TerminoConPrioridad> GenerarTerminosBusquedaConPrioridad(string titulo)
     {
         var resultado = new List<TerminoConPrioridad>();
-        if (string.IsNullOrWhiteSpace(titulo)) return resultado;
+        if (!FirmaTitulo.EsAlfabetoBuscable(titulo, incluirJapones: false)) return resultado;
 
         void Agregar(string termino, int prioridad)
         {
-            termino = termino.Trim();
-            if (!string.IsNullOrWhiteSpace(termino) &&
-                !resultado.Any(r => r.Termino.Equals(termino, StringComparison.OrdinalIgnoreCase)))
+            termino = AnioEntreParentesisRegex().Replace(termino, " ").Trim().Trim('-', '–', ':', '~', '(', ')', '"', ' ');
+            if (termino.Count(char.IsLetterOrDigit) < 4) return;
+            if (!resultado.Any(r => r.Termino.Equals(termino, StringComparison.OrdinalIgnoreCase)))
             {
                 resultado.Add(new TerminoConPrioridad(termino, prioridad));
             }
@@ -714,26 +977,32 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
         // 0: título completo — el más fiable
         Agregar(titulo, 0);
 
-        var partes = titulo.Split([':', '-', '–', '~', '('], StringSplitOptions.RemoveEmptyEntries);
+        var partes = SeparadorPartesRegex().Split(titulo).Where(p => !string.IsNullOrWhiteSpace(p)).ToArray();
         if (partes.Length > 1)
         {
-            // 1: subtítulo tras ':' — suele ser lo más distintivo de la franquicia
+            // 1: subtítulo tras ':' — suele ser lo más distintivo de la franquicia ("Battle of Gods")
             Agregar(partes[1], 1);
             // 1: parte principal antes de ':'
             Agregar(partes[0], 1);
+        }
+
+        // 1: sin el marcador de temporada — el sitio puede escribirla distinto ("II" frente a "2nd Season")
+        if (FirmaTitulo.Interpretar(titulo).FirstOrDefault() is { Explicita: true, Base: var baseSinTemporada })
+        {
+            Agregar(baseSinTemporada, 1);
         }
 
         var palabras = titulo.Split([' '], StringSplitOptions.RemoveEmptyEntries)
                              .Where(p => p.Length > 2)
                              .ToList();
 
-        if (palabras.Count > 0)
+        if (palabras.Count >= 2)
         {
             // 2: primeras 2-3 palabras
             Agregar(string.Join(" ", palabras.Take(3)), 2);
         }
 
-        if (palabras.Count >= 3)
+        if (palabras.Count >= 4)
         {
             // 3: últimas 2-3 palabras — la más genérica y propensa a falsos positivos
             Agregar(string.Join(" ", palabras.TakeLast(3)), 3);
@@ -742,38 +1011,32 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
         return resultado;
     }
 
+    [GeneratedRegex(@"[:–~(]|\s-\s")]
+    private static partial Regex SeparadorPartesRegex();
+
+    // "(2021)" / "(2021" (el año que AniList añade a algunos títulos no está en los del sitio)
+    [GeneratedRegex(@"\(\s*\d{4}\s*\)?")]
+    private static partial Regex AnioEntreParentesisRegex();
     /// <summary>Info del media del sitio (malId, títulos, episodios reales, HTML crudo para relations).</summary>
     public sealed record InfoMedia(string Slug, int? MalId, string? Titulo, List<string> Alternativos, List<(int Id, int Numero)> Episodios, string Html);
 
     /// <summary>Descarga la página del media y parsea su información.</summary>
     public async Task<InfoMedia?> ObtenerInfoMediaAsync(string slug, CancellationToken ct = default)
     {
-        try
-        {
-            string mediaUrl = $"https://animeav1.com/media/{slug}";
-            if (!EsDominioPermitido(mediaUrl, "animeav1.com")) return null;
+        string mediaUrl = $"https://animeav1.com/media/{slug}";
+        if (!EsDominioPermitido(mediaUrl, "animeav1.com")) return null;
 
-            using var req = new HttpRequestMessage(HttpMethod.Get, mediaUrl);
-            req.Headers.Add("User-Agent", UserAgent);
+        var html = await ObtenerHtmlAsync(mediaUrl, ct);
+        if (html == null) return null;
 
-            using var res = await _httpClient.SendAsync(req, ct);
-            if (!res.IsSuccessStatusCode) return null;
-
-            var html = await res.Content.ReadAsStringAsync(ct);
-            var titulos = AnimeAv1HtmlParser.ExtraerTitulosDelMedia(html);
-            return new InfoMedia(
-                slug,
-                AnimeAv1HtmlParser.ExtraerMalIdDelMedia(html),
-                titulos?.Principal,
-                titulos?.Alternativos ?? new List<string>(),
-                AnimeAv1HtmlParser.ExtraerEpisodiosDelMedia(html),
-                html);
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"[AnimeAv1VideoSourceResolver] Error obteniendo media {slug}: {ex.Message}");
-            return null;
-        }
+        var titulos = AnimeAv1HtmlParser.ExtraerTitulosDelMedia(html);
+        return new InfoMedia(
+            slug,
+            AnimeAv1HtmlParser.ExtraerMalIdDelMedia(html),
+            titulos?.Principal,
+            titulos?.Alternativos ?? new List<string>(),
+            AnimeAv1HtmlParser.ExtraerEpisodiosDelMedia(html),
+            html);
     }
 
     /// <summary>Embeds de una página de episodio con verificación de malId.</summary>
@@ -783,81 +1046,85 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
         return await ObtenerEmbedsDePaginaAsync($"https://animeav1.com/media/{slug}/{numero}", malIdEsperado, ct);
     }
 
+    /// <summary>Umbral del parecido de nombres (0..1) para aceptar una página sin MAL ID comparable.</summary>
+    private const double UmbralNombreMedia = 0.75;
+
     /// <summary>
-    /// Veredicto de identidad en cascada (el sistema riguroso):
-    /// 1. MAL ID exacto (ambos conocidos) → coinciden = acepta, difieren = rechaza.
-    /// 2. MAL ID no comparable → coincidencia de NOMBRES: rapidfuzz del daemon
-    ///    (Python) sobre título + aka, con fallback C# (TituloSimilaridad).
+    /// Veredicto de identidad en cascada (el sistema riguroso). Devuelve cuántos episodios hay que
+    /// sumar al número pedido (0 casi siempre) o null si la página NO es este anime:
+    /// 1. MAL ID exacto (ambos conocidos) → acepta.
+    /// 2. MAL ID de una precuela directa → la página junta varias partes: acepta con desfase.
+    /// 3. MAL ID distinto → rechaza.
+    /// 4. Sin MAL ID comparable → NOMBRES: se rechaza si es la misma serie pero OTRA temporada/parte
+    ///    (rapidfuzz no distingue "Mushoku Tensei II" de "III": 98 %); si no, acepta con el mejor
+    ///    parecido entre rapidfuzz (daemon Python), el C# de siempre y el de nombres sin temporada.
     /// </summary>
-    private async Task<bool> EsMediaCoincidenteAsync(
-        InfoMedia media, int? malIdEsperado, List<string> titulosLista, CancellationToken ct)
+    private async Task<int?> VerificarMediaAsync(
+        InfoMedia media, int? malIdEsperado, List<string> titulosLista, IReadOnlyList<PrecuelaAnime> precuelas, CancellationToken ct)
     {
+        if (malIdEsperado.HasValue && media.MalId == malIdEsperado) return 0;
+
+        if (DesfasePorPrecuela(precuelas, media.MalId) is int desfase)
+        {
+            AppLogger.Info("AnimeAv1VideoSourceResolver",
+                $"Media {media.Slug} es una parte anterior (malId {media.MalId}) que el sitio junta con esta: episodios desplazados {desfase}.");
+            return desfase;
+        }
+
         if (malIdEsperado.HasValue && media.MalId.HasValue)
         {
-            if (media.MalId.Value == malIdEsperado.Value) return true;
-
-            AppLogger.Warn("AnimeAv1VideoSourceResolver",
+            AppLogger.Debug("AnimeAv1VideoSourceResolver",
                 $"Media {media.Slug} rechazado: malId {media.MalId} != esperado {malIdEsperado} (anime con nombre parecido).");
-            return false;
+            return null;
         }
 
         // Sin malId comparable → nombres (título + aka del sitio vs títulos de la app)
         var nombresMedia = new List<string>();
         if (!string.IsNullOrWhiteSpace(media.Titulo)) nombresMedia.Add(media.Titulo);
         nombresMedia.AddRange(media.Alternativos);
-        if (nombresMedia.Count == 0) return false;
+        if (nombresMedia.Count == 0) return null;
 
-        double score;
-        string fuente;
-        if (_similitudNombres != null)
-        {
-            try
-            {
-                var s = await _similitudNombres(titulosLista, nombresMedia, ct);
-                if (s.HasValue)
-                {
-                    score = s.Value;
-                    fuente = "rapidfuzz (Python)";
-                    if (score < 0.75)
-                    {
-                        AppLogger.Warn("AnimeAv1VideoSourceResolver",
-                            $"Media {media.Slug} rechazado por nombre: {score:P0} < 75% ({fuente}).");
-                        return false;
-                    }
-                    AppLogger.Info("AnimeAv1VideoSourceResolver",
-                        $"Media {media.Slug} aceptado por nombre: {score:P0} ({fuente}).");
-                    return true;
-                }
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Debug("AnimeAv1VideoSourceResolver", $"Fallo rapidfuzz para {media.Slug}: {ex.Message}");
-            }
-        }
-
-        double mejor = titulosLista.Max(t => Core.TituloSimilaridad.MejorSimilitud(t, nombresMedia));
-        fuente = "fallback C#";
-        if (mejor < 0.70)
+        var identidad = FirmaTitulo.Evaluar(titulosLista, nombresMedia);
+        if (identidad.ConflictoTemporada())
         {
             AppLogger.Warn("AnimeAv1VideoSourceResolver",
-                $"Media {media.Slug} rechazado por nombre: {mejor:P0} < 70% ({fuente}).");
-            return false;
+                $"Media {media.Slug} rechazado: es la misma serie pero otra temporada/parte ('{media.Titulo}').");
+            return null;
         }
-        AppLogger.Info("AnimeAv1VideoSourceResolver",
-            $"Media {media.Slug} aceptado por nombre: {mejor:P0} ({fuente}).");
-        return true;
+
+        double? rapidfuzz = null;
+        if (_similitudNombres != null)
+        {
+            try { rapidfuzz = await _similitudNombres(titulosLista, nombresMedia, ct); }
+            catch (Exception ex) { AppLogger.Debug("AnimeAv1VideoSourceResolver", $"Fallo rapidfuzz para {media.Slug}: {ex.Message}"); }
+        }
+        double csharp = titulosLista.Max(t => TituloSimilaridad.MejorSimilitud(t, nombresMedia));
+        double mejor = new[] { rapidfuzz ?? 0, csharp, identidad.MismaTemporada }.Max();
+        string detalle = $"rapidfuzz {(rapidfuzz.HasValue ? rapidfuzz.Value.ToString("P0") : "n/d")}, C# {csharp:P0}, con temporada {identidad.MismaTemporada:P0}";
+
+        if (mejor < UmbralNombreMedia)
+        {
+            AppLogger.Debug("AnimeAv1VideoSourceResolver", $"Media {media.Slug} rechazado por nombre ({detalle}).");
+            return null;
+        }
+        AppLogger.Info("AnimeAv1VideoSourceResolver", $"Media {media.Slug} aceptado por nombre ({detalle}).");
+        return 0;
     }
 
     /// <summary>
-    /// Número de episodio real del sitio: coincidencia exacta; para películas/
-    /// especiales (1 solo episodio en el sitio) se usa ese número aunque la app
-    /// lo registre como episodio 1.
+    /// Número de episodio real del sitio. Coincidencia exacta; si no, y la lista del sitio NO empieza en
+    /// 1, el episodio N es el N-ésimo de la lista: el sitio numera algunas entregas por su posición en la
+    /// franquicia (la película "Dragon Ball Z: Kami to Kami" es su episodio 14) o sigue la numeración de
+    /// la parte anterior (13–24). Si la lista empieza en 1 no se adivina nada: en una serie recién
+    /// estrenada con solo el episodio 1 publicado, pedir el 2 descargaba el 1 guardado como "Episodio 02".
     /// </summary>
-    private static int? ResolverNumeroEpisodio(InfoMedia media, int numeroSolicitado)
+    internal static int? ResolverNumeroEpisodio(InfoMedia media, int numeroSolicitado)
     {
         if (media.Episodios.Count == 0) return null;
         if (media.Episodios.Any(e => e.Numero == numeroSolicitado)) return numeroSolicitado;
-        if (media.Episodios.Count == 1) return media.Episodios[0].Numero;
+
+        var numeros = media.Episodios.Select(e => e.Numero).Distinct().OrderBy(n => n).ToList();
+        if (numeros[0] > 1 && numeroSolicitado >= 1 && numeroSolicitado <= numeros.Count) return numeros[numeroSolicitado - 1];
         return null;
     }
 
@@ -868,37 +1135,24 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
     /// </summary>
     private async Task<List<AnimeAv1HtmlParser.EmbedServidor>> ObtenerEmbedsDePaginaAsync(string pageUrl, int? malIdEsperado, CancellationToken cancellationToken)
     {
-        try
+        if (!EsDominioPermitido(pageUrl, "animeav1.com")) return [];
+
+        var html = await ObtenerHtmlAsync(pageUrl, cancellationToken);
+        if (html == null) return [];
+
+        // Anti-confusión: si la página declara un malId distinto del esperado,
+        // es OTRO anime con nombre parecido → rechazar (siguiente slug).
+        var malIdPagina = AnimeAv1HtmlParser.ExtraerMalIdDelMedia(html);
+        if (malIdEsperado.HasValue && malIdPagina.HasValue && malIdPagina.Value != malIdEsperado.Value)
         {
-            if (!EsDominioPermitido(pageUrl, "animeav1.com")) return [];
-
-            using var req = new HttpRequestMessage(HttpMethod.Get, pageUrl);
-            req.Headers.Add("User-Agent", UserAgent);
-
-            using var res = await _httpClient.SendAsync(req, cancellationToken);
-            if (!res.IsSuccessStatusCode) return [];
-
-            var html = await res.Content.ReadAsStringAsync(cancellationToken);
-
-            // Anti-confusión: si la página declara un malId distinto del esperado,
-            // es OTRO anime con nombre parecido → rechazar (siguiente slug).
-            var malIdPagina = AnimeAv1HtmlParser.ExtraerMalIdDelMedia(html);
-            if (malIdEsperado.HasValue && malIdPagina.HasValue && malIdPagina.Value != malIdEsperado.Value)
-            {
-                AppLogger.Warn("AnimeAv1VideoSourceResolver",
-                    $"Página {pageUrl} rechazada: malId {malIdPagina} != esperado {malIdEsperado} (anime con nombre parecido).");
-                return [];
-            }
-
-            return AnimeAv1HtmlParser.ExtraerEmbeds(html)
-                .Where(e => Core.UrlSeguridad.EsUrlEmbedPermitida(e.Url))
-                .ToList();
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"[AnimeAv1VideoSourceResolver] Error obteniendo embeds de {pageUrl}: {ex.Message}");
+            AppLogger.Warn("AnimeAv1VideoSourceResolver",
+                $"Página {pageUrl} rechazada: malId {malIdPagina} != esperado {malIdEsperado} (anime con nombre parecido).");
             return [];
         }
+
+        return AnimeAv1HtmlParser.ExtraerEmbeds(html)
+            .Where(e => Core.UrlSeguridad.EsUrlEmbedPermitida(e.Url))
+            .ToList();
     }
 
     private static bool EsDominioPermitido(string url, string dominioEsperado)
@@ -914,31 +1168,18 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
     {
         if (EsDominioPermitido(pageUrl, "animeav1.com"))
         {
-            try
+            var html = await ObtenerHtmlAsync(pageUrl, cancellationToken);
+            if (html == null) return null;
+
+            // INT-01: parseo delegado al contrato tipado (testeable con fixtures)
+            var mp4UploadId = AnimeAv1HtmlParser.ExtraerMp4UploadId(html);
+            if (!string.IsNullOrEmpty(mp4UploadId))
             {
-                using var req = new HttpRequestMessage(HttpMethod.Get, pageUrl);
-                req.Headers.Add("User-Agent", UserAgent);
-
-                using var res = await _httpClient.SendAsync(req, cancellationToken);
-                if (!res.IsSuccessStatusCode) return null;
-
-                var html = await res.Content.ReadAsStringAsync(cancellationToken);
-
-                // INT-01: parseo delegado al contrato tipado (testeable con fixtures)
-                var mp4UploadId = AnimeAv1HtmlParser.ExtraerMp4UploadId(html);
-                if (!string.IsNullOrEmpty(mp4UploadId))
+                var directMp4 = await ExtractFromMp4UploadAsync($"https://www.mp4upload.com/embed-{mp4UploadId}.html", cancellationToken);
+                if (!string.IsNullOrEmpty(directMp4))
                 {
-                    var directMp4 = await ExtractFromMp4UploadAsync($"https://www.mp4upload.com/embed-{mp4UploadId}.html", cancellationToken);
-                    if (!string.IsNullOrEmpty(directMp4))
-                    {
-                        return directMp4;
-                    }
+                    return directMp4;
                 }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Error fetching animeav1 page: {ex.Message}");
-                return null;
             }
         }
         else if (EsDominioPermitido(pageUrl, "mp4upload.com"))
@@ -952,178 +1193,31 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
     private async Task<string?> ExtractFromMp4UploadAsync(string embedUrl, CancellationToken cancellationToken)
     {
         if (!EsDominioPermitido(embedUrl, "mp4upload.com")) return null;
-        try
-        {
-            using var req = new HttpRequestMessage(HttpMethod.Get, embedUrl);
-            req.Headers.Add("User-Agent", UserAgent);
-            req.Headers.Add("Referer", "https://animeav1.com/");
 
-            using var res = await _httpClient.SendAsync(req, cancellationToken);
-            if (!res.IsSuccessStatusCode) return null;
+        var html = await ObtenerHtmlAsync(embedUrl, cancellationToken, referer: "https://animeav1.com/");
+        if (html == null) return null;
 
-            var html = await res.Content.ReadAsStringAsync(cancellationToken);
-
-            // INT-01: parseo delegado al contrato tipado (testeable con fixtures).
-            // Hardening: la URL extraída del HTML de terceros solo se acepta si es
-            // https y pertenece a mp4upload.com (un proveedor comprometido no puede
-            // redirigir la descarga a un servidor arbitrario).
-            var url = AnimeAv1HtmlParser.ExtraerVideoDirecto(html);
-            return Core.UrlSeguridad.EsUrlVideoPermitida(url) ? url : null;
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"MP4Upload extraction error: {ex.Message}");
-        }
-
-        return null;
+        // INT-01: parseo delegado al contrato tipado (testeable con fixtures).
+        // Hardening: la URL extraída del HTML de terceros solo se acepta si es
+        // https y pertenece a mp4upload.com (un proveedor comprometido no puede
+        // redirigir la descarga a un servidor arbitrario).
+        var url = AnimeAv1HtmlParser.ExtraerVideoDirecto(html);
+        return Core.UrlSeguridad.EsUrlVideoPermitida(url) ? url : null;
     }
 
-    private static bool EsSlugCompatible(string slug, IEnumerable<string> titulos)
+    /// <summary>Slug al estilo del sitio: minúsculas sin tildes ni signos, espacios a guiones ("Re:Zero 2nd Season" → "rezero-2nd-season").</summary>
+    internal static string SlugDeTitulo(string titulo)
     {
-        string s = slug.ToLower();
-
-        foreach (var tit in titulos)
+        var sb = new System.Text.StringBuilder();
+        foreach (char c in titulo.Normalize(System.Text.NormalizationForm.FormD).ToLowerInvariant())
         {
-            string t = tit.ToLower();
-
-            // 1. Validar temporadas
-            bool tEsTemp2 = t.Contains(" 2nd season") || t.Contains(" season 2") || t.Contains(" 2da temporada") || t.Contains(" 2ª temporada") || t.Contains(" ii") || t.EndsWith(" 2") || t.Contains(" 2:") || t.Contains("part 2") || t.Contains("part ii");
-            bool tEsTemp3 = t.Contains(" 3rd season") || t.Contains(" season 3") || t.Contains(" 3ra temporada") || t.Contains(" 3ª temporada") || t.Contains(" iii") || t.EndsWith(" 3") || t.Contains(" 3:") || t.Contains("part 3") || t.Contains("part iii");
-            bool tEsTemp4 = t.Contains(" 4th season") || t.Contains(" season 4") || t.Contains(" iv") || t.EndsWith(" 4") || t.Contains(" 4:");
-            bool tEsPelicula = t.Contains("movie") || t.Contains("pelicula") || t.Contains("película") || t.Contains("film") || t.Contains("gekijouban") || t.Contains("zankyou-hen") || t.Contains("zankyou");
-
-            bool sEsTemp2 = s.Contains("-2nd-season") || s.Contains("-season-2") || s.Contains("-ii") || s.EndsWith("-2") || s.Contains("-2-") || s.Contains("-part-2");
-            bool sEsTemp3 = s.Contains("-3rd-season") || s.Contains("-season-3") || s.Contains("-iii") || s.EndsWith("-3") || s.Contains("-3-") || s.Contains("-part-3");
-            bool sEsTemp4 = s.Contains("-4th-season") || s.Contains("-season-4") || s.Contains("-iv") || s.EndsWith("-4") || s.Contains("-4-");
-            bool sEsPelicula = s.Contains("-movie") || s.Contains("-pelicula") || s.Contains("-film") || s.Contains("-gekijouban") || s.Contains("zankyou");
-
-            // Si el título es temporada 2, el slug NO puede ser temporada 1 ni temporada 3
-            if (tEsTemp2 && !sEsTemp2) continue;
-            if (tEsTemp3 && !sEsTemp3) continue;
-            if (tEsTemp4 && !sEsTemp4) continue;
-            if (tEsPelicula && !sEsPelicula) continue;
-
-            // Si el título es temporada 1 pura (sin temporada ni película), el slug NO debe ser temporada 2/3/película
-            bool tEsTemp1Pura = !tEsTemp2 && !tEsTemp3 && !tEsTemp4 && !tEsPelicula;
-            if (tEsTemp1Pura && (sEsTemp2 || sEsTemp3 || sEsTemp4 || sEsPelicula)) continue;
-
-            // 2. Validar subtítulos distintivos (ej: ": Zankyou-hen", ": Yuukaku-hen", ": Mugen Ressha-hen")
-            var partesSub = tit.Split([':', '–'], StringSplitOptions.RemoveEmptyEntries);
-            if (partesSub.Length > 1)
-            {
-                string subtitulo = partesSub[1].Trim().ToLower();
-                var palabrasSub = subtitulo.Split([' ', '-', '!', '?', '.', ',', '(', ')'], StringSplitOptions.RemoveEmptyEntries)
-                                           .Where(w => w.Length > 3 && !w.Equals("season", StringComparison.OrdinalIgnoreCase) && !w.Equals("hen", StringComparison.OrdinalIgnoreCase))
-                                           .ToList();
-
-                if (palabrasSub.Count > 0)
-                {
-                    // Si el título original tiene palabras clave en su subtítulo (ej: "zankyou"), al menos una debe estar en el slug
-                    bool contienePalabraSub = palabrasSub.Any(w => s.Contains(w));
-                    if (!contienePalabraSub) continue;
-                }
-            }
-
-            return true;
+            if (c is >= 'a' and <= 'z' or >= '0' and <= '9') sb.Append(c);
+            else if (c is ' ' or '-' or '_') sb.Append('-');
         }
-
-        return false;
+        return Regex.Replace(sb.ToString(), "-{2,}", "-").Trim('-');
     }
 
-    private static List<string> GenerarVariacionesSlug(string titulo)
-    {
-        var list = new List<string>();
-        if (string.IsNullOrWhiteSpace(titulo)) return list;
-
-        string BaseSlug(string input)
-        {
-            string clean = Regex.Replace(input.ToLower(), @"[^\w\s-]", " ");
-            clean = Regex.Replace(clean, @"\s+", "-").Trim('-');
-            return clean;
-        }
-
-        string rawSlug = BaseSlug(titulo);
-        if (!string.IsNullOrEmpty(rawSlug)) list.Add(rawSlug);
-
-        // Variaciones de temporadas y números romanos
-        (string, string)[] conversiones = [
-            (" 2nd season", "-2nd-season"), (" 2nd season", "-2"), (" 2nd season", "-ii"),
-            (" 3rd season", "-3rd-season"), (" 3rd season", "-3"), (" 3rd season", "-iii"),
-            (" 4th season", "-4th-season"), (" 4th season", "-4"), (" 4th season", "-iv"),
-            (" ii", "-ii"), (" ii", "-2"), (" ii", "-2nd-season"),
-            (" iii", "-iii"), (" iii", "-3"), (" iii", "-3rd-season"),
-            (" 2", "-2"), (" 2", "-ii"), (" 2", "-2nd-season"),
-            (" 3", "-3"), (" 3", "-iii"), (" 3", "-3rd-season"),
-            (" season 2", "-2"), (" season 2", "-2nd-season"),
-            (" season 3", "-3"), (" season 3", "-3rd-season")
-        ];
-
-        string tLower = titulo.ToLower();
-        foreach (var (patron, sufijo) in conversiones)
-        {
-            if (tLower.Contains(patron))
-            {
-                string baseName = BaseSlug(tLower.Replace(patron, ""));
-                string candidate = $"{baseName}{sufijo}";
-                if (!list.Contains(candidate)) list.Add(candidate);
-            }
-        }
-
-        return list;
-    }
-
-    /// <summary>Términos de búsqueda para el catálogo (público para testeo).</summary>
+    /// <summary>Términos de búsqueda de un título para el catálogo, del más fiable al más genérico (público para testeo).</summary>
     public static List<string> GenerarTerminosBusqueda(string titulo)
-    {
-        var terminos = new List<string>();
-        if (string.IsNullOrWhiteSpace(titulo)) return terminos;
-
-        // 1. Título completo limpio
-        terminos.Add(titulo.Trim());
-
-        // 2. Parte antes de dos puntos / subtítulo + EL SUBTÍTULO TRAS ':' — a menudo
-        //    lo más distintivo ("Battle of Gods" frente a cientos de "Dragon Ball Z"
-        //    que el catálogo pagina y deja fuera la película buscada)
-        var partes = titulo.Split([':', '-', '–', '~', '('], StringSplitOptions.RemoveEmptyEntries);
-        if (partes.Length > 1)
-        {
-            string mainPart = partes[0].Trim();
-            if (!string.IsNullOrWhiteSpace(mainPart) && !terminos.Contains(mainPart, StringComparer.OrdinalIgnoreCase))
-            {
-                terminos.Add(mainPart);
-            }
-
-            string subPart = partes[1].Trim();
-            if (!string.IsNullOrWhiteSpace(subPart) && !terminos.Contains(subPart, StringComparer.OrdinalIgnoreCase))
-            {
-                terminos.Add(subPart);
-            }
-        }
-
-        var palabras = titulo.Split([' '], StringSplitOptions.RemoveEmptyEntries)
-                             .Where(p => p.Length > 2)
-                             .ToList();
-
-        // 3. Primeras 2-3 palabras significativas
-        if (palabras.Count > 0)
-        {
-            string shortTerm = string.Join(" ", palabras.Take(3));
-            if (!terminos.Contains(shortTerm, StringComparer.OrdinalIgnoreCase))
-            {
-                terminos.Add(shortTerm);
-            }
-        }
-
-        // 4. Últimas 2-3 palabras significativas (cola del título — colas distintivas)
-        if (palabras.Count >= 3)
-        {
-            string tailTerm = string.Join(" ", palabras.TakeLast(3));
-            if (!terminos.Contains(tailTerm, StringComparer.OrdinalIgnoreCase))
-            {
-                terminos.Add(tailTerm);
-            }
-        }
-
-        return terminos;
-    }
+        => GenerarTerminosBusquedaConPrioridad(titulo).OrderBy(t => t.Prioridad).Select(t => t.Termino).ToList();
 }

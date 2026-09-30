@@ -1,0 +1,357 @@
+<UserControl x:Class="AnimeLocalTracker.Views.VisorRegistrosView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+             xmlns:loc="clr-namespace:AnimeLocalTracker.Services"
+             xmlns:vm="clr-namespace:AnimeLocalTracker.ViewModels"
+             TextElement.Foreground="{DynamicResource MaterialDesignBody}"
+             Background="Transparent"
+             Loaded="Vista_Loaded" Unloaded="Vista_Unloaded">
+
+    <UserControl.Resources>
+        <!-- Chip de nivel (activable): activo = borde y texto del color del nivel (Tag) -->
+        <Style x:Key="RegChipNivel" TargetType="ToggleButton">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Foreground" Value="{DynamicResource Brush.TextTertiary}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="Raiz" Background="#14181E" BorderBrush="#262D38" BorderThickness="1"
+                                CornerRadius="16" Padding="12,5" Margin="0,0,8,0">
+                            <ContentPresenter x:Name="Texto" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                              TextElement.FontSize="12" TextElement.FontWeight="SemiBold"
+                                              TextElement.Foreground="#9CA3AF"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Raiz" Property="Background" Value="#1B222C"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Raiz" Property="Background" Value="#1E293B"/>
+                                <Setter TargetName="Raiz" Property="BorderBrush" Value="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"/>
+                                <Setter TargetName="Texto" Property="TextElement.Foreground" Value="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Acción rápida con aspecto de chip (Solo avisos y errores / Limpiar filtros) -->
+        <Style x:Key="RegChipAccion" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Raiz" Background="Transparent" BorderBrush="#262D38" BorderThickness="1"
+                                CornerRadius="16" Padding="12,5" Margin="0,0,8,0">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                                              TextElement.FontSize="12" TextElement.FontWeight="SemiBold"
+                                              TextElement.Foreground="#93C5FD"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Raiz" Property="Background" Value="#1B222C"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid MaxWidth="1400">
+        <Grid.Style>
+            <Style TargetType="Grid">
+                <Setter Property="Margin" Value="95,60,30,30"/>
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding Topmost, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                        <Setter Property="Margin" Value="95,30,30,30"/>
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+        </Grid.Style>
+
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- ═══ FILA 0: ENCABEZADO ═══ -->
+        <Grid Grid.Row="0" Margin="0,0,0,18">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <Button Grid.Column="0" Command="{Binding VolverCommand}" Style="{StaticResource MaterialDesignIconButton}"
+                    Width="40" Height="40" Margin="0,0,10,0" VerticalAlignment="Center" Cursor="Hand"
+                    ToolTip="{Binding [Reg_Volver], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                    AutomationProperties.Name="{Binding [Reg_Volver], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                <materialDesign:PackIcon Kind="ArrowLeft" Width="22" Height="22" Foreground="#E2E8F0"/>
+            </Button>
+
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                <Border Background="#1E293B" CornerRadius="12" Width="48" Height="48" Margin="0,0,14,0" VerticalAlignment="Center">
+                    <materialDesign:PackIcon Kind="TextBoxSearchOutline" Foreground="#60A5FA" Width="26" Height="26" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="{Binding [Reg_Titulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.PageTitle}"/>
+                    <TextBlock Text="{Binding [Reg_Subtitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="12" Foreground="#9CA3AF" Margin="0,3,0,0"/>
+                </StackPanel>
+            </StackPanel>
+
+            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                <Button Command="{Binding ActualizarCommand}" Style="{StaticResource AppOutlinedButton}" Height="36" Padding="12,0" Margin="0,0,8,0" Cursor="Hand"
+                        ToolTip="{Binding [Reg_ActualizarTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                        AutomationProperties.Name="{Binding [Reg_Actualizar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon Kind="Refresh" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <TextBlock Text="{Binding [Reg_Actualizar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+                <Button Command="{Binding CopiarVisiblesCommand}" Style="{StaticResource AppOutlinedButton}" Height="36" Padding="12,0" Margin="0,0,8,0" Cursor="Hand"
+                        ToolTip="{Binding [Reg_CopiarTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                        AutomationProperties.Name="{Binding [Reg_Copiar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon Kind="ContentCopy" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <TextBlock Text="{Binding [Reg_Copiar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+                <Button Command="{Binding AbrirCarpetaCommand}" Style="{StaticResource AppOutlinedButton}" Height="36" Padding="12,0" Cursor="Hand"
+                        ToolTip="{Binding [Cfg_CarpetaRegistrosSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                        AutomationProperties.Name="{Binding [Cfg_AbrirCarpetaRegistros], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon Kind="FolderOpenOutline" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <TextBlock Text="{Binding [Cfg_AbrirCarpetaRegistros], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Grid>
+
+        <!-- ═══ FILA 1: ARCHIVO + FUENTE + BÚSQUEDA ═══ -->
+        <DockPanel Grid.Row="1" LastChildFill="True" Margin="0,0,0,12">
+            <ComboBox DockPanel.Dock="Left" Width="330" Height="38" Margin="0,0,10,0" VerticalAlignment="Center"
+                      ItemsSource="{Binding Archivos}" SelectedItem="{Binding ArchivoSeleccionado}" DisplayMemberPath="Etiqueta"
+                      materialDesign:HintAssist.Hint="{Binding [Reg_Archivo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                      ToolTip="{Binding [Reg_Archivo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                      AutomationProperties.Name="{Binding [Reg_Archivo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+            <ComboBox DockPanel.Dock="Left" Width="230" Height="38" Margin="0,0,10,0" VerticalAlignment="Center"
+                      ItemsSource="{Binding Fuentes}" SelectedItem="{Binding FuenteSeleccionada}"
+                      ToolTip="{Binding [Reg_Fuente], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                      AutomationProperties.Name="{Binding [Reg_Fuente], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+            <Border Height="38" VerticalAlignment="Center" Background="#14181E" BorderBrush="#262D38" BorderThickness="1" CornerRadius="19" Padding="12,0">
+                <Grid VerticalAlignment="Center">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <materialDesign:PackIcon Grid.Column="0" Kind="Magnify" Foreground="#94A3B8" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <TextBox Grid.Column="1" Text="{Binding TextoBusqueda, UpdateSourceTrigger=PropertyChanged}"
+                             Background="Transparent" BorderThickness="0" Foreground="#E2E8F0" FontSize="12.5"
+                             VerticalAlignment="Center" CaretBrush="#60A5FA"
+                             materialDesign:HintAssist.Hint="{Binding [Reg_Buscar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                             materialDesign:TextFieldAssist.DecorationVisibility="Hidden"
+                             AutomationProperties.Name="{Binding [Reg_Buscar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                    <Button Grid.Column="2" Command="{Binding LimpiarFiltrosCommand}" Style="{StaticResource MaterialDesignIconButton}"
+                            Width="22" Height="22" Padding="0" Cursor="Hand"
+                            Visibility="{Binding TieneBusqueda, Converter={StaticResource BoolToVis}}"
+                            ToolTip="{Binding [Reg_LimpiarFiltros], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                            AutomationProperties.Name="{Binding [Reg_LimpiarFiltros], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                        <materialDesign:PackIcon Kind="CloseCircle" Foreground="#9CA3AF" Width="14" Height="14"/>
+                    </Button>
+                </Grid>
+            </Border>
+        </DockPanel>
+
+        <!-- ═══ FILA 2: NIVELES + ACCIONES RÁPIDAS + RESUMEN ═══ -->
+        <DockPanel Grid.Row="2" LastChildFill="True" Margin="0,0,0,10">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
+                <!-- Indicador de sesión en vivo -->
+                <Border Background="#123A2E" CornerRadius="10" Padding="8,3" Margin="0,0,10,0" VerticalAlignment="Center"
+                        Visibility="{Binding EsSesionActual, Converter={StaticResource BoolToVis}}"
+                        ToolTip="{Binding [Reg_EnVivoTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                    <StackPanel Orientation="Horizontal">
+                        <Ellipse Width="7" Height="7" Fill="{DynamicResource Brush.Success}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <TextBlock Text="{Binding [Reg_EnVivo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource Brush.Success}"/>
+                    </StackPanel>
+                </Border>
+                <TextBlock Text="{Binding TextoResumen}" FontSize="12" Foreground="#94A3B8" VerticalAlignment="Center"/>
+            </StackPanel>
+
+            <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <ToggleButton IsChecked="{Binding MostrarErrores}" Style="{StaticResource RegChipNivel}" Tag="{DynamicResource Brush.Danger}"
+                              AutomationProperties.Name="{Binding [Reg_Errores], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                    <TextBlock><Run Text="{Binding NumErrores, Mode=OneWay}"/><Run Text=" "/><Run Text="{Binding [Reg_Errores], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/></TextBlock>
+                </ToggleButton>
+                <ToggleButton IsChecked="{Binding MostrarAvisos}" Style="{StaticResource RegChipNivel}" Tag="{DynamicResource Brush.Warning}"
+                              AutomationProperties.Name="{Binding [Reg_Avisos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                    <TextBlock><Run Text="{Binding NumAvisos, Mode=OneWay}"/><Run Text=" "/><Run Text="{Binding [Reg_Avisos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/></TextBlock>
+                </ToggleButton>
+                <ToggleButton IsChecked="{Binding MostrarInfo}" Style="{StaticResource RegChipNivel}" Tag="{DynamicResource Brush.Accent}"
+                              AutomationProperties.Name="{Binding [Reg_Info], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                    <TextBlock><Run Text="{Binding NumInfo, Mode=OneWay}"/><Run Text=" "/><Run Text="{Binding [Reg_Info], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/></TextBlock>
+                </ToggleButton>
+                <ToggleButton IsChecked="{Binding MostrarDebug}" Style="{StaticResource RegChipNivel}" Tag="{DynamicResource Brush.TextTertiary}"
+                              ToolTip="{Binding [Reg_DepuracionTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                              AutomationProperties.Name="{Binding [Reg_Depuracion], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                    <TextBlock><Run Text="{Binding NumDebug, Mode=OneWay}"/><Run Text=" "/><Run Text="{Binding [Reg_Depuracion], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/></TextBlock>
+                </ToggleButton>
+                <Button Command="{Binding SoloProblemasCommand}" Style="{StaticResource RegChipAccion}"
+                        Content="{Binding [Reg_SoloProblemas], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                        AutomationProperties.Name="{Binding [Reg_SoloProblemas], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                <Button Command="{Binding LimpiarFiltrosCommand}" Style="{StaticResource RegChipAccion}"
+                        Content="{Binding [Reg_LimpiarFiltros], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                        AutomationProperties.Name="{Binding [Reg_LimpiarFiltros], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+            </WrapPanel>
+        </DockPanel>
+
+        <!-- ═══ FILA 3: LISTA / CARGANDO / VACÍO ═══ -->
+        <Border Grid.Row="3" Background="{DynamicResource Brush.Surface1}" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1" CornerRadius="14" Padding="4,6">
+            <Grid>
+                <ProgressBar Style="{StaticResource MaterialDesignCircularProgressBar}" IsIndeterminate="True" Width="44" Height="44"
+                             Value="0" Foreground="#60A5FA" HorizontalAlignment="Center" VerticalAlignment="Center"
+                             Visibility="{Binding EstaCargando, Converter={StaticResource BoolToVis}}"/>
+
+                <!-- Archivo vacío -->
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,40"
+                            Visibility="{Binding ArchivoVacio, Converter={StaticResource BoolToVis}}">
+                    <Border Background="#1E293B" CornerRadius="36" Width="72" Height="72" Margin="0,0,0,16" HorizontalAlignment="Center">
+                        <materialDesign:PackIcon Kind="TextBoxOutline" Foreground="#94A3B8" Width="36" Height="36" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <TextBlock Text="{Binding [Reg_VacioTitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppEmptyTitle}"/>
+                    <TextBlock Text="{Binding [Reg_VacioTexto], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppEmptyText}" Margin="0,6,0,0" MaxWidth="440"/>
+                </StackPanel>
+
+                <!-- Filtros sin resultados -->
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,40"
+                            Visibility="{Binding SinResultados, Converter={StaticResource BoolToVis}}">
+                    <materialDesign:PackIcon Kind="MagnifyClose" Foreground="#94A3B8" Width="48" Height="48" HorizontalAlignment="Center" Margin="0,0,0,12"/>
+                    <TextBlock Text="{Binding [Reg_SinResultados], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppEmptyText}" FontSize="15" HorizontalAlignment="Center"/>
+                    <Button Command="{Binding LimpiarFiltrosCommand}" Style="{StaticResource AppOutlinedButton}" Height="36" Padding="16,0" Margin="0,14,0,0" HorizontalAlignment="Center" Cursor="Hand"
+                            Content="{Binding [Reg_LimpiarFiltros], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                            AutomationProperties.Name="{Binding [Reg_LimpiarFiltros], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                </StackPanel>
+
+                <!-- Entradas (virtualizadas: una sesión puede tener decenas de miles) -->
+                <ListBox ItemsSource="{Binding EntradasVisibles}"
+                         Background="Transparent" BorderThickness="0" Padding="0,0,6,0"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         VirtualizingPanel.IsVirtualizing="True"
+                         VirtualizingPanel.VirtualizationMode="Recycling"
+                         VirtualizingPanel.ScrollUnit="Pixel"
+                         ScrollViewer.CanContentScroll="True"
+                         Visibility="{Binding TieneEntradas, Converter={StaticResource BoolToVis}}">
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="Background" Value="Transparent"/>
+                            <Setter Property="BorderThickness" Value="0"/>
+                            <Setter Property="Padding" Value="0"/>
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListBoxItem">
+                                        <ContentPresenter/>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate DataType="{x:Type vm:EntradaRegistroItem}">
+                            <Grid>
+                                <!-- Cabecera de sesión: separador -->
+                                <Border Visibility="{Binding EsCabecera, Converter={StaticResource BoolToVis}}"
+                                        Background="#1E293B" CornerRadius="8" Padding="12,6" Margin="6,6,6,6">
+                                    <TextBlock Text="{Binding Mensaje}" FontSize="11.5" FontWeight="SemiBold" Foreground="#93C5FD" TextWrapping="Wrap"/>
+                                </Border>
+
+                                <!-- Entrada normal -->
+                                <Border x:Name="Fila" Visibility="{Binding EsCabecera, Converter={StaticResource InverseBoolToVis}}"
+                                        BorderBrush="{DynamicResource Brush.Border}" BorderThickness="0,0,0,1" Padding="8,6" Background="Transparent">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="104"/>
+                                            <ColumnDefinition Width="62"/>
+                                            <ColumnDefinition Width="170"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <TextBlock Grid.Column="0" Text="{Binding HoraTexto}" FontFamily="Consolas" FontSize="12" Foreground="#94A3B8" VerticalAlignment="Top" Margin="0,2,0,0"/>
+
+                                        <!-- Nivel: fondo tenue + texto del color del nivel -->
+                                        <Grid Grid.Column="1" HorizontalAlignment="Left" VerticalAlignment="Top">
+                                            <Border x:Name="FondoNivel" CornerRadius="6" Opacity="0.16" Background="{DynamicResource Brush.TextTertiary}"/>
+                                            <TextBlock x:Name="TextoNivel" Text="{Binding Nivel}" FontSize="10.5" FontWeight="Bold" Margin="7,2" Foreground="{DynamicResource Brush.TextTertiary}"/>
+                                        </Grid>
+
+                                        <TextBlock Grid.Column="2" Text="{Binding Fuente}" FontSize="12" FontWeight="SemiBold" Foreground="#93C5FD"
+                                                   TextTrimming="CharacterEllipsis" ToolTip="{Binding Fuente}" VerticalAlignment="Top" Margin="6,2,10,0"/>
+
+                                        <StackPanel Grid.Column="3">
+                                            <TextBlock x:Name="TextoMensaje" Text="{Binding Mensaje}" FontSize="12.5" Foreground="#E2E8F0" TextWrapping="Wrap"/>
+                                            <Button Command="{Binding DataContext.AlternarDetalleCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}" Cursor="Hand" HorizontalAlignment="Left" Margin="0,4,0,0"
+                                                    Background="Transparent" BorderThickness="0" Padding="0" Height="Auto" MinHeight="0"
+                                                    Visibility="{Binding TieneDetalle, Converter={StaticResource BoolToVis}}"
+                                                    AutomationProperties.Name="{Binding [Reg_Traza], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <materialDesign:PackIcon x:Name="IconoTraza" Kind="ChevronRight" Width="14" Height="14" Foreground="#93C5FD" VerticalAlignment="Center"/>
+                                                    <TextBlock FontSize="11.5" Foreground="#93C5FD" VerticalAlignment="Center" Margin="2,0,0,0">
+                                                        <Run Text="{Binding [Reg_Traza], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/><Run Text=" ("/><Run Text="{Binding LineasDetalle, Mode=OneWay}"/><Run Text=")"/>
+                                                    </TextBlock>
+                                                </StackPanel>
+                                            </Button>
+                                            <!-- Traza: seleccionable para copiar un trozo -->
+                                            <TextBox Text="{Binding Detalle, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap"
+                                                     FontFamily="Consolas" FontSize="11.5" Foreground="#E2E8F0" Background="#1E293B"
+                                                     BorderThickness="0" Padding="8,6" Margin="0,4,0,0"
+                                                     materialDesign:TextFieldAssist.DecorationVisibility="Hidden"
+                                                     Visibility="{Binding Expandido, Converter={StaticResource BoolToVis}}"/>
+                                        </StackPanel>
+
+                                        <Button Grid.Column="4" Command="{Binding DataContext.CopiarEntradaCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}" Style="{StaticResource MaterialDesignIconButton}"
+                                                Width="26" Height="26" Padding="0" Margin="6,0,0,0" VerticalAlignment="Top" Cursor="Hand"
+                                                ToolTip="{Binding [Reg_CopiarEntrada], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                AutomationProperties.Name="{Binding [Reg_CopiarEntrada], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                            <materialDesign:PackIcon Kind="ContentCopy" Width="14" Height="14" Foreground="#94A3B8"/>
+                                        </Button>
+                                    </Grid>
+                                </Border>
+                            </Grid>
+                            <DataTemplate.Triggers>
+                                <DataTrigger Binding="{Binding Nivel}" Value="ERROR">
+                                    <Setter TargetName="FondoNivel" Property="Background" Value="{DynamicResource Brush.Danger}"/>
+                                    <Setter TargetName="TextoNivel" Property="Foreground" Value="{DynamicResource Brush.Danger}"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Nivel}" Value="WARN">
+                                    <Setter TargetName="FondoNivel" Property="Background" Value="{DynamicResource Brush.Warning}"/>
+                                    <Setter TargetName="TextoNivel" Property="Foreground" Value="{DynamicResource Brush.Warning}"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Nivel}" Value="INFO">
+                                    <Setter TargetName="FondoNivel" Property="Background" Value="{DynamicResource Brush.Accent}"/>
+                                    <Setter TargetName="TextoNivel" Property="Foreground" Value="{DynamicResource Brush.Accent}"/>
+                                </DataTrigger>
+                                <!-- DEBUG escrita como contexto de un aviso/error: más tenue -->
+                                <DataTrigger Binding="{Binding EsContexto}" Value="True">
+                                    <Setter TargetName="TextoMensaje" Property="Foreground" Value="#94A3B8"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Expandido}" Value="True">
+                                    <Setter TargetName="IconoTraza" Property="Kind" Value="ChevronDown"/>
+                                </DataTrigger>
+                            </DataTemplate.Triggers>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

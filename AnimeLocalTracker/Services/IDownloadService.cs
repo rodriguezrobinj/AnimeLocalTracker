@@ -35,6 +35,12 @@ public interface IDownloadService
     /// <summary>Vuelve a poner en la cola lo que quedó pendiente al cerrar la app. Devuelve cuántas descargas restauró.</summary>
     int RestaurarColaPendiente();
 
+    /// <summary>
+    /// Borra las carpetas temporales de torrents que no pertenecen a ninguna descarga de la cola (restos de
+    /// torrents interrumpidos o sembrados al cerrar). Llamar DESPUÉS de <see cref="RestaurarColaPendiente"/>.
+    /// </summary>
+    void LimpiarTemporalesTorrentHuerfanos();
+
     /// <summary>Adelanta una descarga en cola al primer puesto. False si no estaba esperando un slot.</summary>
     bool PriorizarDescarga(int aniListId, int numeroEpisodio);
 

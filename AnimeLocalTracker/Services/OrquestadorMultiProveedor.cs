@@ -40,7 +40,7 @@ public class OrquestadorMultiProveedor : IVideoSourceResolver
     public async Task<string?> BuscarUrlEpisodioAsync(IEnumerable<string> titulos, int numeroEpisodio, int? aniListId = null, string? audioPreferido = null, string? servidorPreferido = null, CancellationToken cancellationToken = default)
     {
         var titulosLista = titulos.ToList();
-        foreach (var estado in _proveedores.Where(EstaSaludable))
+        foreach (var estado in ProveedoresAProbar())
         {
             if (cancellationToken.IsCancellationRequested) return null;
 
@@ -52,7 +52,9 @@ public class OrquestadorMultiProveedor : IVideoSourceResolver
                     RegistrarExito(estado);
                     return url;
                 }
-                RegistrarFallo(estado, "sin resultado");
+                // "No está" (episodio aún no publicado, anime que el sitio no tiene) no es un fallo del
+                // proveedor: contarlo como tal dejaba a AnimeAV1 —el único— en pausa 5 minutos tras tres
+                // episodios inexistentes, y las descargas que sí existían fallaban al instante.
             }
             catch (Exception ex)
             {
@@ -64,7 +66,7 @@ public class OrquestadorMultiProveedor : IVideoSourceResolver
 
     public async Task<string?> GetVideoUrlAsync(string pageUrl, CancellationToken cancellationToken = default)
     {
-        foreach (var estado in _proveedores.Where(EstaSaludable))
+        foreach (var estado in ProveedoresAProbar())
         {
             try
             {
@@ -77,6 +79,13 @@ public class OrquestadorMultiProveedor : IVideoSourceResolver
             }
         }
         return null;
+    }
+
+    /// <summary>Los proveedores sanos; si todos están en pausa, se prueban igual (no probar ninguno es peor).</summary>
+    private IEnumerable<EstadoProveedor> ProveedoresAProbar()
+    {
+        var sanos = _proveedores.Where(EstaSaludable).ToList();
+        return sanos.Count > 0 ? sanos : _proveedores;
     }
 
     private bool EstaSaludable(EstadoProveedor e)

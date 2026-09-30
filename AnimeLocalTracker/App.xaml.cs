@@ -46,6 +46,7 @@ public partial class App : Application
         this.DispatcherUnhandledException += (s, args) =>
         {
             AppLogger.Error("App", "UI Thread Exception", args.Exception);
+            AppLogger.Flush(); // el diálogo puede acabar en cierre: que el error ya esté en disco
             // SEC-12: no exponer mensajes internos (rutas, versiones, drivers) en la UI;
             // el detalle completo queda en el log de la aplicación.
             MessageBox.Show("Ocurrió un error inesperado.\nEl detalle técnico se ha guardado en el registro de la aplicación.",
@@ -64,6 +65,9 @@ public partial class App : Application
             {
                 AppLogger.Error("App", $"Domain Unhandled Exception: {args.ExceptionObject}");
             }
+            // El proceso muere justo después (y en ese caso ProcessExit no llega): sin esto el error que
+            // tumbó la app se quedaba en la cola de memoria y nunca llegaba al registro.
+            AppLogger.Flush();
         };
         
         // 3. Excepciones de Tasks async no observadas
@@ -159,7 +163,12 @@ public partial class App : Application
         // Descargas por torrent (Nyaa.si + MonoTorrent, Fase MVP): último recurso opt-in
         // cuando ninguna fuente HTTP encuentra el episodio — ver AppSettings.BusquedaTorrentHabilitada.
         services.AddSingleton<INyaaSourceService>(sp =>
-            new NyaaSourceService(sp.GetRequiredService<IHttpClientFactory>().CreateClient("Scraper")));
+        {
+            var db = sp.GetRequiredService<IDatabaseService>();
+            // Partes anteriores del anime: los releases con numeración continua ("2nd Season - 14").
+            return new NyaaSourceService(sp.GetRequiredService<IHttpClientFactory>().CreateClient("Scraper"),
+                (id, _) => PrecuelasAnime.ObtenerAsync(db, id));
+        });
         services.AddSingleton<ITorrentDownloadService>(sp =>
             new TorrentDownloadService(sp.GetRequiredService<IHttpClientFactory>().CreateClient("Downloader")));
 
@@ -283,11 +292,28 @@ public partial class App : Application
             var aniSkip = sp.GetRequiredService<IAniSkipService>();
             var bridge = sp.GetRequiredService<IPythonBridgeService>();
             var tracking = sp.GetRequiredService<IAnimeTrackingService>();
+            var db = sp.GetRequiredService<IDatabaseService>();
 
             return new AnimeAv1VideoSourceResolver(
                 http,
-                (id, ct) => aniSkip.ObtenerMalIdDesdeAniListAsync(id, ct),
-                // Veredicto de nombres con rapidfuzz (daemon Python) sobre título+aka
+                // MAL ID: primero el de la biblioteca (sin red, funciona aunque AniList no responda);
+                // sin él, la verificación caía a comparar nombres, mucho menos segura.
+                async (id, ct) =>
+                {
+                    try
+                    {
+                        if (await db.ObtenerAnimePorIdAsync(id) is { MalId: > 0 } local) return local.MalId;
+                    }
+                    catch (Exception ex)
+                    {
+                        AppLogger.Debug("App", $"No se pudo leer el MAL ID local de {id}: {ex.Message}");
+                    }
+                    return await aniSkip.ObtenerMalIdDesdeAniListAsync(id, ct);
+                },
+                // Veredicto de nombres con rapidfuzz (daemon Python) sobre título+aka. En minúsculas
+                // (rapidfuzz distingue mayúsculas: "BLACK TORCH" frente a "Black Torch" daba 27 %) y con
+                // umbral 0 para que devuelva SIEMPRE su puntuación: con umbral, un rechazo llegaba como
+                // "sin respuesta" y la app decidía con otro criterio más permisivo.
                 async (titles, candidates, ct) =>
                 {
                     try
@@ -295,7 +321,12 @@ public partial class App : Application
                         if (!await bridge.IsAvailableAsync()) return null;
                         var r = await bridge.ExecuteCommandAsync<object, MatchMediaResult>(
                             "match-media",
-                            new { titles, candidates, threshold = 75.0 },
+                            new
+                            {
+                                titles = titles.Select(t => t.ToLowerInvariant()).ToList(),
+                                candidates = candidates.Select(c => c.ToLowerInvariant()).ToList(),
+                                threshold = 0.0
+                            },
                             ct);
                         return r?.Success == true ? r.Score / 100.0 : null;
                     }
@@ -327,7 +358,10 @@ public partial class App : Application
                     }
                 },
                 // Página verificada de cada anime: el primer episodio tras reiniciar la app no repite la búsqueda
-                sp.GetRequiredService<IDatabaseService>());
+                db,
+                // Partes anteriores (relaciones de AniList ya guardadas): el sitio junta a veces
+                // "2nd Season" y "2nd Season Part 2" en una sola página y hay que desplazar el episodio.
+                (id, _) => PrecuelasAnime.ObtenerAsync(db, id));
         });
         services.AddSingleton<ProveedorVideoAnimeAv1>();
         services.AddSingleton<IVideoSourceResolver>(sp =>
@@ -362,6 +396,8 @@ public partial class App : Application
         // Estadísticas personales
         services.AddSingleton<EstadisticasViewModel>();
         services.AddSingleton<LogrosViewModel>();
+        // Visor de registros: singleton para conservar archivo y filtros elegidos entre visitas.
+        services.AddSingleton<VisorRegistrosViewModel>();
 
         // Minijuegos (singleton: una partida en curso sobrevive al cambiar de pestaña)
         services.AddSingleton<AnimeLocalTracker.Services.Minijuegos.IClipPlayer, AnimeLocalTracker.Services.Minijuegos.ClipPlayer>();
@@ -421,6 +457,8 @@ public partial class App : Application
             {
                 settingsService = ServiceProvider.GetRequiredService<ISettingsService>();
                 LocalizationService.Instance.Idioma = settingsService.ObtenerConfiguracion()?.Idioma ?? "es";
+                // Registro detallado (entradas DEBUG en disco): ajuste del usuario o variable de entorno.
+                if (settingsService.ObtenerConfiguracion()?.RegistroDetallado == true) AppLogger.RegistroDetallado = true;
             }
             catch { }
 
@@ -470,8 +508,12 @@ public partial class App : Application
             // Descargas que quedaron pendientes al cerrar la app: vuelven a la cola (las pausadas, en pausa).
             _ = Task.Run(() =>
             {
-                try { ServiceProvider.GetRequiredService<IDownloadService>().RestaurarColaPendiente(); }
+                var descargas = ServiceProvider.GetRequiredService<IDownloadService>();
+                try { descargas.RestaurarColaPendiente(); }
                 catch (Exception ex) { AppLogger.Warn("App", $"No se pudo restaurar la cola de descargas: {ex.Message}"); }
+                // Después de restaurar (la cola dice qué carpetas siguen en uso): restos de torrents abandonados.
+                try { descargas.LimpiarTemporalesTorrentHuerfanos(); }
+                catch (Exception ex) { AppLogger.Warn("App", $"No se pudieron limpiar los torrents abandonados: {ex.Message}"); }
             });
 
             // Verificación de actualizaciones automáticas en segundo plano (4 h), salvo que

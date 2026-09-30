@@ -488,10 +488,10 @@ public class ProveedorVideoAnimeAv1Tests
     }
 
     [Fact]
-    public async Task BuscarUrlEpisodioAsync_TituloNativoJapones_DeberiaBuscarYResolver()
+    public async Task BuscarUrlEpisodioAsync_TituloNativoJapones_NoSeBuscaYResuelveConElLatino()
     {
-        // Arrange: el título principal no matchea el catálogo pero el nativo (aka
-        // ja-jp del sitio) sí — solo se pasa el japonés
+        // Arrange: el buscador del sitio no entiende japonés (devuelve su listado por defecto,
+        // comprobado en vivo): buscar con él solo añadía candidatos basura. Se busca con el latino.
         var busquedas = new List<string>();
         var (proveedor, _) = Crear(req =>
         {
@@ -508,10 +508,10 @@ public class ProveedorVideoAnimeAv1Tests
         }, malIdResolver: (_, _) => Task.FromResult<int?>(14837));
 
         // Act
-        var url = await proveedor.BuscarUrlEpisodioAsync(TituloNativoPelicula, 1, aniListId: 1328);
+        var url = await proveedor.BuscarUrlEpisodioAsync(TituloNativoPelicula.Concat(TitulosPelicula), 1, aniListId: 1328);
 
-        // Assert: se buscó con el título japonés y la película se resolvió
-        busquedas.Should().Contain(b => Uri.UnescapeDataString(b).Contains("ドラゴンボールZ"));
+        // Assert: ninguna búsqueda con el japonés y la película se resolvió igual
+        busquedas.Should().NotContain(b => Uri.UnescapeDataString(b).Contains("ドラゴンボールZ"));
         url.Should().Be("https://cdn.mp4upload.com/r0xdfbvme2yy/720p/video.mp4");
     }
 

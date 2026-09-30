@@ -27,6 +27,7 @@ public interface INavigationService : System.ComponentModel.INotifyPropertyChang
     bool EsHistorialActivo { get; }
     bool EsLogrosActivo { get; }
     bool EsActualizacionesActivo { get; }
+    bool EsVisorRegistrosActivo { get; }
 
     GaleriaViewModel ObtenerGaleria();
     AgregarAnimeViewModel ObtenerAgregarAnime();
@@ -38,6 +39,7 @@ public interface INavigationService : System.ComponentModel.INotifyPropertyChang
     HistorialViewModel ObtenerHistorial();
     LogrosViewModel ObtenerLogros();
     ActualizacionesViewModel ObtenerActualizaciones();
+    VisorRegistrosViewModel ObtenerVisorRegistros();
     DetalleViewModel CrearDetalle();
     ReproductorViewModel CrearReproductor();
 }
@@ -49,6 +51,7 @@ public sealed partial class NavigationService : ObservableObject, INavigationSer
     IRecipient<NavegarMensaje_Calendario>,
     IRecipient<NavegarMensaje_Descargas>,
     IRecipient<NavegarMensaje_Configuracion>,
+    IRecipient<NavegarMensaje_VisorRegistros>,
     IRecipient<NavegarMensaje_AcercaDe>,
     IRecipient<NavegarMensaje_Estadisticas>,
     IRecipient<NavegarMensaje_Historial>,
@@ -72,6 +75,7 @@ public sealed partial class NavigationService : ObservableObject, INavigationSer
     [NotifyPropertyChangedFor(nameof(EsHistorialActivo))]
     [NotifyPropertyChangedFor(nameof(EsLogrosActivo))]
     [NotifyPropertyChangedFor(nameof(EsActualizacionesActivo))]
+    [NotifyPropertyChangedFor(nameof(EsVisorRegistrosActivo))]
     private ObservableObject _vistaActual = null!;
 
     [ObservableProperty]
@@ -95,12 +99,14 @@ public sealed partial class NavigationService : ObservableObject, INavigationSer
     public bool EsAgregarAnimeActivo => VistaActual is AgregarAnimeViewModel;
     public bool EsCalendarioActivo => VistaActual is CalendarioViewModel;
     public bool EsDescargasActivas => VistaActual is DescargasViewModel;
-    public bool EsConfiguracionActiva => VistaActual is ConfiguracionViewModel;
+    // El visor de registros se abre desde Configuración: el botón de Configuración sigue marcado.
+    public bool EsConfiguracionActiva => VistaActual is ConfiguracionViewModel || VistaActual is VisorRegistrosViewModel;
     public bool EsAcercaDeActivo => VistaActual is AcercaDeViewModel;
     public bool EsEstadisticasActivo => VistaActual is EstadisticasViewModel;
     public bool EsHistorialActivo => VistaActual is HistorialViewModel;
     public bool EsLogrosActivo => VistaActual is LogrosViewModel;
     public bool EsActualizacionesActivo => VistaActual is ActualizacionesViewModel;
+    public bool EsVisorRegistrosActivo => VistaActual is VisorRegistrosViewModel;
 
     public NavigationService(IServiceProvider serviceProvider)
     {
@@ -118,6 +124,7 @@ public sealed partial class NavigationService : ObservableObject, INavigationSer
     public HistorialViewModel ObtenerHistorial() => _serviceProvider.GetRequiredService<HistorialViewModel>();
     public LogrosViewModel ObtenerLogros() => _serviceProvider.GetRequiredService<LogrosViewModel>();
     public ActualizacionesViewModel ObtenerActualizaciones() => _serviceProvider.GetRequiredService<ActualizacionesViewModel>();
+    public VisorRegistrosViewModel ObtenerVisorRegistros() => _serviceProvider.GetRequiredService<VisorRegistrosViewModel>();
     public DetalleViewModel CrearDetalle() => _serviceProvider.GetRequiredService<DetalleViewModel>();
     public ReproductorViewModel CrearReproductor() => _serviceProvider.GetRequiredService<ReproductorViewModel>();
 
@@ -207,6 +214,26 @@ public sealed partial class NavigationService : ObservableObject, INavigationSer
         catch (Exception ex)
         {
             AppLogger.Error("NavigationService", "Error navegando a configuración", ex);
+        }
+    }
+
+    public void Receive(NavegarMensaje_VisorRegistros message)
+    {
+        _ = NavegarVisorRegistros();
+    }
+
+    private async Task NavegarVisorRegistros()
+    {
+        try
+        {
+            var visor = ObtenerVisorRegistros();
+            VistaActual = visor;
+            // Cada visita relee los archivos: lo escrito desde la última vez tiene que aparecer.
+            await visor.CargarAsync();
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("NavigationService", "Error navegando al visor de registros", ex);
         }
     }
 

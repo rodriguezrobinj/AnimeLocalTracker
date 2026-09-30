@@ -41,9 +41,22 @@ public static class SeleccionArchivoTorrent
     /// <see cref="NyaaRssParser.ExtraerNumeroEpisodio"/> — los archivos dentro de un
     /// batch suelen nombrarse igual que releases sueltos, ej. "Anime - 07.mkv"). Si
     /// varios archivos parsean al mismo episodio (raro), el más grande. Null si
-    /// ningún nombre de archivo identifica ese episodio — el llamador cae a
-    /// <see cref="ElegirArchivoDeVideo"/> (el más grande de todos) en vez de fallar.
+    /// ningún nombre de archivo identifica ese episodio (ver <see cref="ElegirArchivo"/>).
     /// </summary>
+    /// <summary>
+    /// El archivo del episodio pedido: el que su nombre identifica como ese episodio o, si el torrent
+    /// trae un solo video (release de un episodio con un nombre de archivo raro), ese. En un pack con
+    /// varios videos donde ninguno se reconoce como el episodio devuelve null: antes se tomaba el más
+    /// grande, que era un episodio cualquiera guardado con el número pedido.
+    /// </summary>
+    public static string? ElegirArchivo(IReadOnlyCollection<(string Path, long Length)> archivos, int numeroEpisodio)
+        => ElegirArchivoDelEpisodio(archivos, numeroEpisodio)
+           ?? (ContarVideos(archivos) == 1 ? ElegirArchivoDeVideo(archivos) : null);
+
+    /// <summary>Cuántos archivos de video trae el torrent.</summary>
+    public static int ContarVideos(IEnumerable<(string Path, long Length)> archivos)
+        => archivos.Count(a => ExtensionesVideo.Contains(Path.GetExtension(a.Path), StringComparer.OrdinalIgnoreCase));
+
     public static string? ElegirArchivoDelEpisodio(IEnumerable<(string Path, long Length)> archivos, int numeroEpisodio)
     {
         return archivos
@@ -170,18 +183,30 @@ public class TorrentDownloadService : ITorrentDownloadService, IDisposable
 
             var torrent = await Torrent.LoadAsync(torrentBytes);
 
+            // El motor aún puede tener registrado este mismo torrent (un intento anterior que no llegó a
+            // retirarse, o uno que sigue sembrando): añadirlo otra vez fallaba con "A manager for this
+            // torrent has already been registered" y, como ese intento seguía reteniendo sus archivos,
+            // su carpeta temporal no se podía borrar y quedaba abandonada (1,4 GB en un caso real).
+            foreach (var anterior in _engine.Torrents.Where(t => Equals(t.InfoHashes, torrent.InfoHashes)).ToList())
+            {
+                AppLogger.Info("TorrentDownloadService", "El motor ya tenía este torrent registrado de un intento anterior: se retira antes de volver a añadirlo.");
+                _sembrando.TryRemove(anterior, out _);
+                await DetenerYQuitarAsync(anterior);
+            }
+
             Directory.CreateDirectory(carpetaTemporal);
             var settings = new TorrentSettingsBuilder { AllowDht = true, AllowPeerExchange = true, MaximumConnections = 100 }.ToSettings();
             manager = await _engine.AddAsync(torrent, carpetaTemporal, settings);
             await AnadirRastreadoresPublicosAsync(manager, torrent);
 
             var archivosDelTorrent = manager.Files.Select(f => (f.Path, f.Length)).ToList();
-            string? rutaElegida = SeleccionArchivoTorrent.ElegirArchivoDelEpisodio(archivosDelTorrent, numeroEpisodio)
-                ?? SeleccionArchivoTorrent.ElegirArchivoDeVideo(archivosDelTorrent);
+            string? rutaElegida = SeleccionArchivoTorrent.ElegirArchivo(archivosDelTorrent, numeroEpisodio);
             if (rutaElegida == null)
             {
                 await _engine.RemoveAsync(manager);
-                return new ResultadoTorrent(false, null, "El torrent no tiene ningún archivo de video reconocible.");
+                return new ResultadoTorrent(false, null, SeleccionArchivoTorrent.ContarVideos(archivosDelTorrent) == 0
+                    ? "El torrent no tiene ningún archivo de video reconocible."
+                    : $"El torrent no tiene ningún archivo reconocible como el episodio {numeroEpisodio}.");
             }
 
             var archivoElegido = manager.Files.First(f => f.Path == rutaElegida);
