@@ -143,6 +143,9 @@ def run_daemon():
             command = payload.get("command", "ping")
             data = payload.get("payload", {})
             result = process_command(command, data)
+            # El id de la petición vuelve en la respuesta: la app descarta una respuesta que no sea de la petición que espera.
+            if isinstance(result, dict) and "id" in payload:
+                result = {**result, "id": payload["id"]}
             print(json.dumps(result, ensure_ascii=False), flush=True)
         except json.JSONDecodeError:
             print(json.dumps({"success": False, "error": "JSON inválido en línea de comando"}), flush=True)

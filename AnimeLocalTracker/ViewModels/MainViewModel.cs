@@ -15,8 +15,58 @@ public partial class MainViewModel : ObservableObject,
     IRecipient<DescargaProgresoMensaje>,
     IRecipient<DescargaMusicaProgresoMensaje>,
     IRecipient<NuevosEpisodiosMensaje>,
-    IRecipient<MostrarDialogoRequestMessage>
+    IRecipient<MostrarDialogoRequestMessage>,
+    IRecipient<EstadoConexionMensaje>,
+    IRecipient<IdiomaCambiadoMensaje>
 {
+    // === Indicador de conexión (barra lateral) ===
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IndicadorConexionVisible), nameof(TextoEstadoConexion), nameof(TextoBadgeConexion))]
+    private bool _sinConexion;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IndicadorConexionVisible), nameof(TextoEstadoConexion), nameof(TextoBadgeConexion))]
+    private int _cambiosPendientesConexion;
+
+    /// <summary>Se ve sin conexión, o con conexión mientras quedan cambios por subir a AniList.</summary>
+    public bool IndicadorConexionVisible => SinConexion || CambiosPendientesConexion > 0;
+
+    /// <summary>Texto corto del distintivo de la barra superior ("Sin conexión · 2", "2 por sincronizar").</summary>
+    public string TextoBadgeConexion => SinConexion
+        ? (CambiosPendientesConexion > 0 ? $"{LocalizationService.T("Con_BadgeSinConexion")} · {CambiosPendientesConexion}" : LocalizationService.T("Con_BadgeSinConexion"))
+        : string.Format(LocalizationService.T("Con_BadgePendientes"), CambiosPendientesConexion);
+
+    public string TextoEstadoConexion => SinConexion
+        ? (CambiosPendientesConexion > 0
+            ? string.Format(LocalizationService.T("Con_SinConexionPendientes"), CambiosPendientesConexion)
+            : LocalizationService.T("Con_SinConexion"))
+        : string.Format(LocalizationService.T("Con_PendientesSincronizar"), CambiosPendientesConexion);
+
+    public void Receive(EstadoConexionMensaje message)
+    {
+        void Aplicar()
+        {
+            SinConexion = message.SinConexion;
+            CambiosPendientesConexion = message.CambiosPendientes;
+        }
+        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+        if (dispatcher != null && !dispatcher.CheckAccess()) dispatcher.InvokeAsync(Aplicar);
+        else Aplicar();
+    }
+
+    public void Receive(IdiomaCambiadoMensaje message)
+    {
+        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+        void Refrescar()
+        {
+            OnPropertyChanged(nameof(TextoEstadoConexion));
+            OnPropertyChanged(nameof(TextoBadgeConexion));
+        }
+        if (dispatcher != null && !dispatcher.CheckAccess()) dispatcher.InvokeAsync(Refrescar);
+        else Refrescar();
+    }
+
     private readonly INavigationService _navigationService;
     private readonly IAnimeTrackingService _animeTrackingService;
     private readonly AnimeLibraryService _animeLibraryService;

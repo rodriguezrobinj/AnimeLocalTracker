@@ -24,6 +24,7 @@ public partial class AgregarAnimeViewModel : ObservableObject,
     private readonly IDatabaseService _databaseService;
     private readonly AnimeLibraryService _animeLibraryService;
     private readonly IDialogService _dialogService;
+    private readonly GuardiaConexion? _guardiaConexion;
 
     [ObservableProperty]
     private ObservableCollection<AnimeBusquedaItem> _resultados = [];
@@ -65,7 +66,14 @@ public partial class AgregarAnimeViewModel : ObservableObject,
     /// <summary>Sin coincidencias por temporada/año/género, aunque la búsqueda en sí trajo resultados.</summary>
     public bool SinResultadosFiltrados => Resultados.Count > 0 && (ResultadosFiltrados?.IsEmpty ?? false);
 
-    public bool MostrarSinResultados => BusquedaSinResultados || SinResultadosFiltrados;
+    public bool MostrarSinResultados => (BusquedaSinResultados && !SinConexion) || SinResultadosFiltrados;
+
+    /// <summary>La búsqueda/tendencias volvieron vacías porque no hay internet: se dice eso, no "sin resultados, prueba en Romaji".</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(MostrarSinResultados))]
+    private bool _sinConexion;
+
+    private void ActualizarEstadoConexion() => SinConexion = Resultados.Count == 0 && (_guardiaConexion?.PareceSinConexion ?? false);
 
     private void RefrescarFiltroTemporada()
     {
@@ -215,8 +223,10 @@ public partial class AgregarAnimeViewModel : ObservableObject,
         IAnimeTrackingService animeTrackingService,
         IDatabaseService databaseService,
         AnimeLibraryService animeLibraryService,
-        IDialogService dialogService)
+        IDialogService dialogService,
+        GuardiaConexion? guardiaConexion = null)
     {
+        _guardiaConexion = guardiaConexion;
         _animeTrackingService = animeTrackingService;
         _databaseService = databaseService;
         _animeLibraryService = animeLibraryService;
@@ -291,6 +301,7 @@ public partial class AgregarAnimeViewModel : ObservableObject,
             }
 
             BusquedaSinResultados = Resultados.Count == 0;
+            ActualizarEstadoConexion();
             ActualizarTemporadasYAniosDisponibles();
             ActualizarGenerosDisponibles();
             RefrescarFiltroTemporada();
@@ -353,6 +364,7 @@ public partial class AgregarAnimeViewModel : ObservableObject,
             }
 
             BusquedaSinResultados = Resultados.Count == 0;
+            ActualizarEstadoConexion();
             ActualizarTemporadasYAniosDisponibles();
             ActualizarGenerosDisponibles();
             RefrescarFiltroTemporada();

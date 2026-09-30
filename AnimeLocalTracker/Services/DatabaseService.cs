@@ -94,8 +94,34 @@ public class DatabaseService : IDatabaseService, IDisposable
         (12, "personajes de AniList por anime (Adivina el personaje) + índice único (AnimeId, PersonajeId)", CrearTablasPersonajesAsync),
         (13, "análisis guardados de OP/ED por episodio (marcadores y saltos) + índices", CrearTablasSkipAsync),
         (14, "página de animeav1 ya verificada por anime (descargas sin repetir la búsqueda)", CrearTablaMediaAnimeAv1Async),
-        (15, "descargas de música (openings/endings) en el historial de descargas", AgregarColumnasMusicaHistorialAsync)
+        (15, "descargas de música (openings/endings) en el historial de descargas", AgregarColumnasMusicaHistorialAsync),
+        (16, "descartar análisis de OP/ED que pudieron guardarse con la respuesta de otra petición", DescartarAnalisisSkipDesfasadosAsync),
+        (17, "copia local de la programación de emisión (Calendario y Actualizaciones sin conexión) + índices", CrearTablaEmisionesGuardadasAsync),
+        (18, "seguimiento local por anime (editor de la Ficha sin conexión y cambios pendientes de AniList)", CrearTablaSeguimientoLocalAsync)
     };
+
+    /// <summary>v18: <see cref="SeguimientoLocal"/> (clave primaria = AniListId; los pendientes son pocos, sin índice).</summary>
+    private static Task CrearTablaSeguimientoLocalAsync(SQLiteAsyncConnection conexion) => conexion.CreateTableAsync<SeguimientoLocal>();
+
+    /// <summary>v17: programación de emisión guardada (<see cref="EmisionGuardada"/>). Índices explícitos: [Indexed] solo aplica a bases nuevas.</summary>
+    private static async Task CrearTablaEmisionesGuardadasAsync(SQLiteAsyncConnection conexion)
+    {
+        await conexion.CreateTableAsync<EmisionGuardada>();
+        await conexion.ExecuteAsync("CREATE UNIQUE INDEX IF NOT EXISTS IX_EmisionGuardada_Episodio ON EmisionGuardada(AniListId, Episodio);");
+        await conexion.ExecuteAsync("CREATE INDEX IF NOT EXISTS IX_EmisionGuardada_Fecha ON EmisionGuardada(EmisionUnixUtc);");
+    }
+
+    /// <summary>
+    /// v16: hasta ahora, una petición al motor Python interrumpida (cambiar de episodio a mitad del análisis, salir de la Ficha mientras
+    /// hacía miniaturas) dejaba su respuesta en el canal y la siguiente petición la leía como propia: el opening/ending de un episodio se
+    /// guardaba en otro (Katainaka no Ossan II: el 11 tenía los del 10 y el 12 los del 11) o quedaba vacío. No hay forma de saber qué
+    /// análisis salieron así, de modo que se descartan todos: cada episodio se vuelve a analizar al abrirlo (unos segundos, en segundo plano).
+    /// </summary>
+    private static async Task DescartarAnalisisSkipDesfasadosAsync(SQLiteAsyncConnection conexion)
+    {
+        await conexion.ExecuteAsync("DELETE FROM SegmentoSkipGuardado;");
+        await conexion.ExecuteAsync("DELETE FROM AnalisisSkipEpisodio;");
+    }
 
     /// <summary>
     /// v15: columnas Tipo/TemaClave/TemaTitulo en DescargaHistorial. sqlite-net las añade con ALTER TABLE ADD COLUMN si la
@@ -841,6 +867,8 @@ public class DatabaseService : IDatabaseService, IDisposable
             db.Execute("DELETE FROM AnalisisSkipEpisodio;");
             db.Execute("DELETE FROM SegmentoSkipGuardado;");
             db.Execute("DELETE FROM MediaAnimeAv1Verificado;");
+            db.Execute("DELETE FROM EmisionGuardada;");
+            db.Execute("DELETE FROM SeguimientoLocal;");
         });
     }
 
@@ -1030,6 +1058,56 @@ public class DatabaseService : IDatabaseService, IDisposable
     {
         if (proxima == null || proxima.AniListId <= 0) return;
         await _conexion.InsertOrReplaceAsync(proxima);
+    }
+
+    public async Task<SeguimientoLocal?> ObtenerSeguimientoLocalAsync(int aniListId)
+    {
+        return await _conexion.FindAsync<SeguimientoLocal>(aniListId);
+    }
+
+    public async Task GuardarSeguimientoLocalAsync(SeguimientoLocal seguimiento)
+    {
+        if (seguimiento == null || seguimiento.AniListId <= 0) return;
+        await _conexion.InsertOrReplaceAsync(seguimiento);
+    }
+
+    public async Task<List<SeguimientoLocal>> ObtenerSeguimientosPendientesAsync()
+    {
+        return await _conexion.Table<SeguimientoLocal>().Where(s => s.Pendiente).ToListAsync();
+    }
+
+    public async Task<List<ProximaEmisionLocal>> ObtenerProximasEmisionesAsync()
+    {
+        return await _conexion.Table<ProximaEmisionLocal>().ToListAsync();
+    }
+
+    /// <summary>Lo guardado más antiguo que esto se descarta (Actualizaciones mira 7 días atrás; el Calendario, la semana actual).</summary>
+    private const int DiasEmisionesGuardadas = 60;
+
+    public async Task GuardarEmisionesAsync(IReadOnlyCollection<int> animeIds, long inicioUnix, long finUnix, IReadOnlyList<EmisionGuardada> emisiones)
+    {
+        var ids = animeIds.Where(id => id > 0).Distinct().ToList();
+        long limite = DateTimeOffset.UtcNow.AddDays(-DiasEmisionesGuardadas).ToUnixTimeSeconds();
+        await _conexion.RunInTransactionAsync(db =>
+        {
+            // La ventana consultada se reemplaza entera: un episodio que AniList movió o quitó no queda duplicado.
+            foreach (var lote in ids.Chunk(500))
+                db.Execute($"DELETE FROM EmisionGuardada WHERE EmisionUnixUtc BETWEEN ? AND ? AND AniListId IN ({string.Join(",", lote)});", inicioUnix, finUnix);
+            foreach (var e in emisiones)
+            {
+                // Mismo episodio con otra fecha (fuera de la ventana): se queda la más reciente. Insert simple, no InsertOrReplace:
+                // sqlite-net incluiría el Id 0 en el REPLACE y cada fila pisaría a la anterior.
+                db.Execute("DELETE FROM EmisionGuardada WHERE AniListId = ? AND Episodio = ?;", e.AniListId, e.Episodio);
+                e.Id = 0;
+                db.Insert(e);
+            }
+            db.Execute("DELETE FROM EmisionGuardada WHERE EmisionUnixUtc < ?;", limite);
+        });
+    }
+
+    public async Task<List<EmisionGuardada>> ObtenerEmisionesAsync(long inicioUnix, long finUnix)
+    {
+        return await _conexion.Table<EmisionGuardada>().Where(e => e.EmisionUnixUtc >= inicioUnix && e.EmisionUnixUtc <= finUnix).ToListAsync();
     }
 
     public async Task<MediaAnimeAv1Verificado?> ObtenerMediaAnimeAv1Async(int aniListId)

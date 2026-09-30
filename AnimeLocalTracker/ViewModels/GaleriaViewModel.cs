@@ -28,6 +28,7 @@ public partial class GaleriaViewModel : ObservableObject,
     private readonly IDialogService _dialogService;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IImageCacheService _imageCacheService;
+    private readonly IPerfilAniListService? _perfilAniList;
     private readonly IFileScannerService _fileScannerService;
     
     public bool BibliotecaVacia => BibliotecaLocales.Count == 0;
@@ -328,9 +329,11 @@ public partial class GaleriaViewModel : ObservableObject,
         IHttpClientFactory httpClientFactory,
         IImageCacheService imageCacheService,
         IFileScannerService? fileScannerService = null,
-        MinijuegosViewModel? minijuegos = null)
+        MinijuegosViewModel? minijuegos = null,
+        IPerfilAniListService? perfilAniList = null)
     {
         _minijuegos = minijuegos;
+        _perfilAniList = perfilAniList;
         _animeTrackingService = animeTrackingService;
         _databaseService = databaseService;
         _authService = authService;
@@ -379,6 +382,7 @@ public partial class GaleriaViewModel : ObservableObject,
             if (!BibliotecaLocales.Any(a => a.AniListId == message.NuevoAnime.AniListId))
             {
                 _ = _imageCacheService.ObtenerPortada(message.NuevoAnime.AniListId, message.NuevoAnime.UrlPortada);
+                message.NuevoAnime.ResolverPortadaLocal();
                 message.NuevoAnime.NotificarPortadaActualizada();
                 BibliotecaLocales.Add(message.NuevoAnime);
                 ActualizarGenerosDisponibles();
@@ -396,6 +400,7 @@ public partial class GaleriaViewModel : ObservableObject,
                             var img = await _imageCacheService.ObtenerPortadaAsync(message.NuevoAnime.AniListId, message.NuevoAnime.UrlPortada);
                             if (img != null)
                             {
+                                message.NuevoAnime.ResolverPortadaLocal();
                                 System.Windows.Application.Current?.Dispatcher?.Invoke(() => message.NuevoAnime.NotificarPortadaActualizada());
                             }
                         }
@@ -614,6 +619,7 @@ public partial class GaleriaViewModel : ObservableObject,
         {
             var img = await _imageCacheService.ObtenerPortadaAsync(anime.AniListId, anime.UrlPortada);
             if (img == null) return;
+            anime.ResolverPortadaLocal(); // aquí, en segundo plano: la Ficha usará el archivo y no la URL
 
             listoEn[anime.AniListId] = reloj.ElapsedMilliseconds;
             if (dispatcher != null && !dispatcher.CheckAccess())
@@ -847,6 +853,18 @@ public partial class GaleriaViewModel : ObservableObject,
         if (!string.IsNullOrEmpty(token))
         {
             EstaConectado = true;
+            // Con copia local: sin conexión siguen tu nombre y tu avatar (antes salía el usuario por defecto).
+            if (_perfilAniList != null)
+            {
+                var guardado = await _perfilAniList.ObtenerAsync(token);
+                if (guardado != null)
+                {
+                    NombreUsuarioAniList = string.IsNullOrWhiteSpace(guardado.Nombre) ? LocalizationService.T("Gal_UsuarioDefault") : guardado.Nombre;
+                    AvatarUsuarioAniList = guardado.Avatar;
+                }
+                return;
+            }
+
             var perfil = await _animeTrackingService.ObtenerPerfilUsuarioAsync(token);
             if (perfil != null)
             {
@@ -996,6 +1014,14 @@ public partial class GaleriaViewModel : ObservableObject,
         var token = EstaConectado ? _authService.ObtenerTokenGuardado() : null;
         var datosLote = await _animeTrackingService.ObtenerAnimesPorIdsLoteAsync(
             listaAnimes.Select(a => a.AniListId), token);
+        if (datosLote.Count == 0)
+        {
+            // Sin conexión (o AniList caído): antes recorría la lista sin cambiar nada y decía "¡Actualización completada con éxito!".
+            TextoProgreso = LocalizationService.T("Gal_ActualizacionSinConexion");
+            await Task.Delay(3000);
+            EstaActualizando = false;
+            return;
+        }
 
         int procesados = 0;
         var modificados = new List<Models.AnimeItem>();

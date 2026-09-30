@@ -71,6 +71,27 @@ public class AgregarAnimeViewModelTests : IDisposable
             _dialogMock.Object);
     }
 
+    private sealed class RedFalsa(bool hayInternet) : IConectividadRed
+    {
+        public bool HayInternet => hayInternet;
+        public Task<bool> EsperarInternetAsync(TimeSpan maximo, CancellationToken ct) => Task.FromResult(hayInternet);
+    }
+
+    [Theory]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    public async Task TendenciasVacias_SinInternet_MuestraSinConexion_YNoSinResultados(bool hayInternet, bool esperadoSinConexion)
+    {
+        _trackingMock.Setup(t => t.ObtenerAnimesTendenciaAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<AniListMedia>());
+        var sut = new AgregarAnimeViewModel(_trackingMock.Object, _dbMock.Object, _libraryService, _dialogMock.Object,
+            new GuardiaConexion(new RedFalsa(hayInternet)));
+
+        await sut.CargarTendenciasAsync();
+
+        sut.SinConexion.Should().Be(esperadoSinConexion);
+        sut.MostrarSinResultados.Should().Be(!esperadoSinConexion, "sin internet no se sugiere 'prueba escribiendo en Romaji'");
+    }
+
     [Fact]
     public async Task CargarTendencias_DeberiaLlenarResultadosYActualizarEstado()
     {

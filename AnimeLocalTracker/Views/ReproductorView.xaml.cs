@@ -1065,7 +1065,7 @@ namespace AnimeLocalTracker.Views
             else if (k == vm.ObtenerTeclaPara("ModoMini"))
                 vm.AlternarModoMiniCommand.Execute(null);
             else if (k == vm.ObtenerTeclaPara("Cerrar"))
-                vm.TeclaCerrar(); // a pantalla completa, primero vuelve a ventana
+                vm.TeclaCerrar(); // sale del reproductor sin quitar la pantalla completa
             else
                 ejecutado = false;
 

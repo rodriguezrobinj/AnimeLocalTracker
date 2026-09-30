@@ -31,13 +31,16 @@ public partial class EstadisticasViewModel : ObservableObject, IRecipient<Idioma
     private readonly ILogrosService? _logrosService;
     private readonly IFranquiciaService? _franquiciaService;
     private readonly IHttpClientFactory? _httpClientFactory;
+    private readonly IPerfilAniListService? _perfilAniList;
 
     private static readonly IReadOnlyDictionary<int, int> SinFranquicias = new Dictionary<int, int>();
 
     public EstadisticasViewModel(IDatabaseService databaseService, IAnimeTrackingService animeTrackingService,
         IAuthService authService, IDialogService dialogService, ILogrosService? logrosService = null,
-        IFranquiciaService? franquiciaService = null, IHttpClientFactory? httpClientFactory = null)
+        IFranquiciaService? franquiciaService = null, IHttpClientFactory? httpClientFactory = null,
+        IPerfilAniListService? perfilAniList = null)
     {
+        _perfilAniList = perfilAniList;
         _databaseService = databaseService;
         _animeTrackingService = animeTrackingService;
         _authService = authService;
@@ -495,7 +498,17 @@ public partial class EstadisticasViewModel : ObservableObject, IRecipient<Idioma
         ImageSource? avatar = null;
 
         string token = _authService.ObtenerTokenGuardado();
-        if (!string.IsNullOrEmpty(token))
+        if (!string.IsNullOrEmpty(token) && _perfilAniList != null)
+        {
+            // Copia local: sin conexión la tarjeta sale con tu nombre y avatar (antes esperaba al perfil de AniList).
+            var guardado = await _perfilAniList.ObtenerAsync(token);
+            if (guardado != null)
+            {
+                if (!string.IsNullOrWhiteSpace(guardado.Nombre)) nombreUsuario = guardado.Nombre;
+                if (!string.IsNullOrWhiteSpace(guardado.Avatar)) avatar = await CargarImagenAsync(guardado.Avatar);
+            }
+        }
+        else if (!string.IsNullOrEmpty(token))
         {
             var perfil = await _animeTrackingService.ObtenerPerfilUsuarioAsync(token);
             if (perfil != null)

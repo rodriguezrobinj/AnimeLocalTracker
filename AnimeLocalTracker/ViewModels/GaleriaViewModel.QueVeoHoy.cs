@@ -444,7 +444,9 @@ public partial class GaleriaViewModel : IDisposable
         try
         {
             var img = await _imageCacheService.ObtenerPortadaAsync(anime.AniListId, anime.UrlPortada);
-            return img != null ? anime : null;
+            if (img == null) return null;
+            anime.ResolverPortadaLocal();
+            return anime;
         }
         catch (Exception ex)
         {

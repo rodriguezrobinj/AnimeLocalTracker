@@ -32,6 +32,9 @@ public interface IDownloadService
     void ReanudarTodas();
     IReadOnlyList<DescargaItem> ObtenerDescargasActivas();
 
+    /// <summary>Vuelve a poner en la cola lo que quedó pendiente al cerrar la app. Devuelve cuántas descargas restauró.</summary>
+    int RestaurarColaPendiente();
+
     /// <summary>Adelanta una descarga en cola al primer puesto. False si no estaba esperando un slot.</summary>
     bool PriorizarDescarga(int aniListId, int numeroEpisodio);
 

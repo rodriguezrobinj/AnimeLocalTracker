@@ -39,7 +39,29 @@ public sealed class DatosExtraService : IDatosExtraService
 
         if (!DebeConsultar(local, DateTime.UtcNow)) return local;
 
-        var (exito, media) = await _tracking.ObtenerDatosExtraAsync(aniListId);
+        // Copia vieja: se muestra ya y se refresca detrás (la próxima visita sale la nueva). Antes la ficha esperaba a AniList
+        // para enseñar lo que ya tenía guardado.
+        if (local != null)
+        {
+            UltimoRefresco = RefrescarAsync(aniListId, local);
+            return local;
+        }
+        return await RefrescarAsync(aniListId, null);
+    }
+
+    /// <summary>El refresco en segundo plano más reciente (para las pruebas).</summary>
+    internal Task<DatosExtraAnime?> UltimoRefresco { get; private set; } = Task.FromResult<DatosExtraAnime?>(null);
+
+    private async Task<DatosExtraAnime?> RefrescarAsync(int aniListId, DatosExtraAnime? local)
+    {
+        (bool exito, AniListMedia? media) respuesta;
+        try { respuesta = await _tracking.ObtenerDatosExtraAsync(aniListId); }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("DatosExtraService", $"No se pudieron consultar los datos de {aniListId}: {ex.Message}");
+            respuesta = (false, null);
+        }
+        var (exito, media) = respuesta;
         if (exito && media != null)
         {
             local = Convertir(aniListId, media, DateTime.UtcNow);

@@ -31,10 +31,17 @@ public sealed class ConectividadRedWindows : IConectividadRed
 {
     private static readonly TimeSpan IntervaloSondeo = TimeSpan.FromSeconds(2);
 
+    /// <summary>
+    /// Para probar la app sin internet sin desconectar el equipo: con la variable de entorno ANIMELOCALTRACKER_SIN_RED=1 la app se
+    /// comporta como si no hubiera conexión (ninguna petición sale, ver <see cref="GuardiaConexion"/>).
+    /// </summary>
+    public static bool SinRedForzado { get; } = Environment.GetEnvironmentVariable("ANIMELOCALTRACKER_SIN_RED") == "1";
+
     public bool HayInternet
     {
         get
         {
+            if (SinRedForzado) return false;
             try
             {
                 var perfil = NetworkInformation.GetInternetConnectionProfile();

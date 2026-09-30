@@ -144,8 +144,29 @@
                 <TextBlock Text="{Binding [Add_Cargando], Source={x:Static loc:LocalizationService.Instance}}" Foreground="#9CA3AF" FontSize="14" Margin="0,16,0,0" HorizontalAlignment="Center" FontWeight="SemiBold"/>
             </StackPanel>
 
+            <!-- Sin conexión: buscar/tendencias necesitan internet (no es "sin resultados").
+                 ZIndex: la lista de resultados (fondo transparente) va después en la misma celda y se quedaba con los clics del botón. -->
+            <StackPanel Visibility="{Binding SinConexion, Converter={StaticResource BoolToVis}}" Panel.ZIndex="5"
+                        VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,60,0,60">
+                <Border Background="#1E293B" CornerRadius="40" Width="80" Height="80" HorizontalAlignment="Center" Margin="0,0,0,16">
+                    <materialDesign:PackIcon Kind="WifiOff" Width="40" Height="40" Foreground="#94A3B8" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+                <TextBlock Text="{Binding [Add_SinConexionTitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="18" Foreground="#E2E8F0" FontWeight="Bold" HorizontalAlignment="Center"/>
+                <TextBlock Text="{Binding [Add_SinConexionSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                           FontSize="13" Foreground="#9CA3AF" HorizontalAlignment="Center" Margin="0,6,0,0" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="420"/>
+                <Button Command="{Binding CargarTendenciasCommand}" Cursor="Hand"
+                        Style="{StaticResource MaterialDesignOutlinedButton}"
+                        BorderBrush="#3B82F6" Foreground="#60A5FA" Margin="0,18,0,0"
+                        HorizontalAlignment="Center">
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon Kind="Refresh" Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding [Add_Reintentar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+
             <!-- Estado Vacío / Sin Resultados (búsqueda vacía o filtro de temporada/año sin coincidencias) -->
-            <StackPanel Visibility="{Binding MostrarSinResultados, Converter={StaticResource BoolToVis}}"
+            <StackPanel Visibility="{Binding MostrarSinResultados, Converter={StaticResource BoolToVis}}" Panel.ZIndex="5"
                         VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,60,0,60">
                 <Border Background="#1E293B" CornerRadius="40" Width="80" Height="80" HorizontalAlignment="Center" Margin="0,0,0,16">
                     <materialDesign:PackIcon Kind="MagnifyClose" Width="40" Height="40" Foreground="#6B7280" HorizontalAlignment="Center" VerticalAlignment="Center"/>

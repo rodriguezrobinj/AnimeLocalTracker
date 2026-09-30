@@ -108,6 +108,36 @@ public class AdivinaPersonajeViewModelTests
         sut.HayError.Should().BeFalse();
     }
 
+    private sealed class RedFalsa(bool hayInternet) : IConectividadRed
+    {
+        public bool HayInternet => hayInternet;
+        public Task<bool> EsperarInternetAsync(TimeSpan maximo, CancellationToken ct) => Task.FromResult(hayInternet);
+    }
+
+    [Fact]
+    public async Task SinConexion_BuscaEnToda_LaBiblioteca_YSoloPreguntaPorPersonajesConImagenGuardada()
+    {
+        // Solo los animes 19-30 tienen imágenes guardadas: antes, con 14 animes al azar, casi nunca salía una partida entera.
+        static bool Guardada(PersonajeAnime p) => p.AnimeId >= 19;
+        IReadOnlyCollection<int>? pedidos = null;
+        _personajes.Setup(p => p.ObtenerAsync(It.IsAny<IReadOnlyCollection<int>>(), It.IsAny<CancellationToken>()))
+            .Callback((IReadOnlyCollection<int> ids, CancellationToken _) => pedidos = ids)
+            .ReturnsAsync((IReadOnlyCollection<int> ids, CancellationToken _) => ids.ToDictionary(id => id, PersonajesDe));
+        _personajes.Setup(p => p.TieneImagenLocal(It.IsAny<PersonajeAnime>())).Returns((PersonajeAnime p) => Guardada(p));
+        _imagen = p => Guardada(p) ? "C:\\fake\\personaje.png" : null; // sin red, las demás no se pueden bajar
+        _db.Setup(d => d.ObtenerTodosLosAnimesAsync()).ReturnsAsync(
+            Enumerable.Range(1, 30).Select(i => new AnimeItem { AniListId = i, Titulo = $"Anime número {i}" }).ToList());
+        var sut = new AdivinaPersonajeViewModel(_db.Object, _personajes.Object, _records.Object, new GuardiaConexion(new RedFalsa(false)))
+            { Rng = new Random(42) };
+        await sut.PrepararAsync();
+
+        await sut.IniciarPartidaCommand.ExecuteAsync(null);
+
+        pedidos.Should().HaveCount(30, "sin conexión se mira toda la biblioteca (es leer de disco)");
+        sut.HayError.Should().BeFalse();
+        sut.TotalRondas.Should().Be(AdivinaAnimeJuego.RondasPorPartida);
+    }
+
     [Fact]
     public async Task Iniciar_ConsultaSoloAlgunosAnimesMasLosDeReserva()
     {

@@ -46,14 +46,18 @@ public class SyncService : ISyncService
 
         try
         {
+            // Primero los cambios del editor de seguimiento hechos sin conexión (estado, puntuación, fechas); luego el progreso de
+            // episodios, que nunca baja el de AniList.
+            var (seguimientosEnviados, seguimientosPendientes) = await SincronizarSeguimientosAsync(token);
+
             var noSincronizados = await _databaseService.ObtenerEpisodiosNoSincronizadosAsync();
             if (noSincronizados.Count == 0)
             {
-                return (0, 0);
+                return (seguimientosEnviados, seguimientosPendientes);
             }
 
-            int totalExitosos = 0;
-            int totalPendientes = noSincronizados.Count;
+            int totalExitosos = seguimientosEnviados;
+            int totalPendientes = noSincronizados.Count + seguimientosPendientes;
             var grupos = noSincronizados.GroupBy(e => e.AniListId);
 
             foreach (var grupo in grupos)
@@ -117,6 +121,35 @@ public class SyncService : ISyncService
         {
             _syncLock.Release();
         }
+    }
+
+    private async Task<(int Enviados, int Pendientes)> SincronizarSeguimientosAsync(string token)
+    {
+        var pendientes = await _databaseService.ObtenerSeguimientosPendientesAsync() ?? new List<SeguimientoLocal>();
+        int enviados = 0;
+        foreach (var s in pendientes)
+        {
+            try
+            {
+                if (!await _trackingService.GuardarSeguimientoUsuarioAsync(s.AniListId, s.Estado, s.Progreso, s.Puntaje, s.FechaInicio, s.FechaFin, token))
+                    continue;
+
+                enviados++;
+                // Solo se da por enviado si nadie lo volvió a cambiar mientras tanto (si no, el cambio nuevo sigue pendiente).
+                var actual = await _databaseService.ObtenerSeguimientoLocalAsync(s.AniListId);
+                if (actual != null && actual.ModificadoUtc == s.ModificadoUtc)
+                {
+                    actual.Pendiente = false;
+                    await _databaseService.GuardarSeguimientoLocalAsync(actual);
+                }
+                AppLogger.Info("SyncService", $"Seguimiento hecho sin conexión enviado a AniList: {s.AniListId} ({s.Estado}, progreso {s.Progreso}).");
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("SyncService", $"Error al enviar el seguimiento de {s.AniListId}: {ex.Message}");
+            }
+        }
+        return (enviados, pendientes.Count);
     }
 
     public void IniciarSincronizacionPeriodica(TimeSpan intervalo)

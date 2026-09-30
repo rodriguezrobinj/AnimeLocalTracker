@@ -65,6 +65,9 @@ public class DownloadService : IDownloadService
 
     private readonly HttpClient _httpClient;
     private readonly IDownloadStateStore _stateStore;
+    /// <summary>Archivo con la cola de descargas (null = no se guarda; así las pruebas nunca escriben en los datos del usuario).</summary>
+    private readonly string? _rutaColaPendiente;
+    private readonly object _lockCola = new();
     private readonly IVideoSourceResolver _sourceResolver;
     private readonly ISettingsService? _settingsService;
     private readonly IPythonBridgeService? _pythonBridge;
@@ -127,8 +130,10 @@ public class DownloadService : IDownloadService
         IDatabaseService? database = null,
         INyaaSourceService? nyaaSourceService = null,
         ITorrentDownloadService? torrentDownloadService = null,
-        IConectividadRed? conectividad = null)
+        IConectividadRed? conectividad = null,
+        string? rutaColaPendiente = null)
     {
+        _rutaColaPendiente = rutaColaPendiente;
         _database = database;
         _conectividad = conectividad;
         _httpClient = httpClientFactory.CreateClient("Downloader");
@@ -305,6 +310,7 @@ public class DownloadService : IDownloadService
             try { state.Cts.Cancel(); } catch { }
             LimpiarTemporalesSiNoHayTareaViva(state, key);
             WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(aniListId, numeroEpisodio, 0, isDownloading: false, isCompleted: false, isPaused: false, "", "Descarga cancelada", state.AnimeTitulo));
+            GuardarColaPendiente();
         }
     }
 
@@ -319,6 +325,7 @@ public class DownloadService : IDownloadService
                 WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, 0, isDownloading: false, isCompleted: false, isPaused: false, "", "Descarga cancelada", state.AnimeTitulo));
             }
         }
+        GuardarColaPendiente();
     }
 
     public void PausarDescarga(int aniListId, int numeroEpisodio)
@@ -331,6 +338,7 @@ public class DownloadService : IDownloadService
             try { state.Cts.Cancel(); } catch { }
 
             WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(aniListId, numeroEpisodio, state.Progreso, isDownloading: true, isCompleted: false, isPaused: true, state.RutaDestino, null, state.AnimeTitulo));
+            GuardarColaPendiente();
         }
     }
 
@@ -346,6 +354,7 @@ public class DownloadService : IDownloadService
                 WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, state.Progreso, isDownloading: true, isCompleted: false, isPaused: true, state.RutaDestino, null, state.AnimeTitulo));
             }
         }
+        GuardarColaPendiente();
     }
 
     public void ReanudarDescarga(int aniListId, int numeroEpisodio)
@@ -358,6 +367,7 @@ public class DownloadService : IDownloadService
             state.EnCola = true;
             WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(aniListId, numeroEpisodio, state.Progreso, isDownloading: true, isCompleted: false, isPaused: false, state.RutaDestino, null, state.AnimeTitulo));
             RelanzarDescarga(state, key);
+            GuardarColaPendiente();
         }
     }
 
@@ -430,6 +440,99 @@ public class DownloadService : IDownloadService
                 RelanzarDescarga(state, kvp.Key);
             }
         }
+        GuardarColaPendiente();
+    }
+
+    /// <summary>Una descarga de la cola tal como se guarda en disco.</summary>
+    internal sealed record DescargaPendiente(int AniListId, string AnimeTitulo, string CarpetaDestino, int NumeroEpisodio,
+        List<string> Titulos, bool Automatica, bool Pausada, double Progreso, long Orden, CandidatoTorrent? Torrent);
+
+    /// <summary>
+    /// Guarda la cola en disco tras cada cambio: antes, cerrar la app (o que Windows la cerrara) perdía la lista de descargas en
+    /// curso o esperando conexión; lo ya bajado sí quedaba (.downloading + .state) pero nadie lo retomaba.
+    /// </summary>
+    private void GuardarColaPendiente()
+    {
+        if (_rutaColaPendiente == null) return;
+        try
+        {
+            var lista = _activeDownloads.Values.OrderBy(s => s.Orden)
+                .Select(s => new DescargaPendiente(s.AniListId, s.AnimeTitulo, s.CarpetaDestino, s.NumeroEpisodio, s.Titulos, s.Automatica,
+                    s.IsPaused, s.Progreso, s.Orden, s.Torrent))
+                .ToList();
+            string json = System.Text.Json.JsonSerializer.Serialize(lista);
+            lock (_lockCola)
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(_rutaColaPendiente)!);
+                string temporal = _rutaColaPendiente + ".tmp";
+                File.WriteAllText(temporal, json);
+                File.Move(temporal, _rutaColaPendiente, overwrite: true);
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("DownloadService", $"No se pudo guardar la cola de descargas: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Al abrir la app: vuelve a poner en la cola lo que quedó pendiente. Las pausadas siguen en pausa; el resto se reanuda
+    /// desde donde iba (y si no hay internet, espera a que vuelva como cualquier descarga).
+    /// </summary>
+    public int RestaurarColaPendiente()
+    {
+        if (_rutaColaPendiente == null || !File.Exists(_rutaColaPendiente)) return 0;
+
+        List<DescargaPendiente>? pendientes;
+        try
+        {
+            lock (_lockCola) pendientes = System.Text.Json.JsonSerializer.Deserialize<List<DescargaPendiente>>(File.ReadAllText(_rutaColaPendiente));
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn("DownloadService", $"No se pudo leer la cola de descargas guardada: {ex.Message}");
+            return 0;
+        }
+
+        int restauradas = 0;
+        foreach (var p in (pendientes ?? new List<DescargaPendiente>()).OrderBy(p => p.Orden))
+        {
+            if (p.AniListId <= 0 || p.NumeroEpisodio <= 0 || string.IsNullOrWhiteSpace(p.CarpetaDestino)) continue;
+            if (p.Torrent != null && _torrentDownloadService == null) continue;
+
+            string key = $"{p.AniListId}_{p.NumeroEpisodio}";
+            var state = new DownloadState
+            {
+                Orden = Interlocked.Increment(ref _ordenCounter),
+                AniListId = p.AniListId,
+                AnimeTitulo = p.AnimeTitulo,
+                Titulos = p.Titulos is { Count: > 0 } ? p.Titulos : ConstruirListaTitulos(p.AnimeTitulo, null),
+                NumeroEpisodio = p.NumeroEpisodio,
+                Progreso = p.Progreso,
+                RutaDestino = Path.Combine(p.CarpetaDestino, $"Episodio {p.NumeroEpisodio:D2}.mp4"),
+                CarpetaDestino = p.CarpetaDestino,
+                Automatica = p.Automatica,
+                Torrent = p.Torrent,
+                IsPaused = p.Pausada
+            };
+            state.RutaTemporal = state.RutaDestino + ".downloading";
+
+            if (File.Exists(state.RutaDestino)) continue; // ya terminó (la app se cerró justo al acabar)
+            if (!_activeDownloads.TryAdd(key, state)) continue;
+            restauradas++;
+
+            WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, state.Progreso, isDownloading: true, isCompleted: false,
+                isPaused: state.IsPaused, state.RutaDestino, null, state.AnimeTitulo, enCola: !state.IsPaused));
+            if (!state.IsPaused)
+            {
+                if (!Directory.Exists(state.CarpetaDestino)) Directory.CreateDirectory(state.CarpetaDestino);
+                RelanzarDescarga(state, key);
+            }
+        }
+
+        GuardarColaPendiente();
+        if (restauradas > 0) AppLogger.Info("DownloadService", $"Cola de descargas restaurada: {restauradas} pendiente(s) de la sesión anterior.");
+        return restauradas;
     }
 
     public IReadOnlyList<AnimeLocalTracker.Models.DescargaItem> ObtenerDescargasActivas()
@@ -489,6 +592,7 @@ public class DownloadService : IDownloadService
         state.CarpetaDestino = carpetaDestino;
 
         if (!_activeDownloads.TryAdd(key, state)) return Task.CompletedTask;
+        GuardarColaPendiente();
         if (!Directory.Exists(carpetaDestino)) Directory.CreateDirectory(carpetaDestino);
 
         WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(aniListId, numeroEpisodio, 0, isDownloading: true, isCompleted: false, isPaused: false, "", null, animeTitulo, enCola: true));
@@ -535,6 +639,7 @@ public class DownloadService : IDownloadService
         state.CarpetaDestino = carpetaDestino;
 
         if (!_activeDownloads.TryAdd(key, state)) return Task.CompletedTask;
+        GuardarColaPendiente();
 
         if (!Directory.Exists(carpetaDestino))
         {
@@ -632,7 +737,7 @@ public class DownloadService : IDownloadService
 
                             // FUN-016: trazabilidad del ciclo de descarga en app.log (antes solo Debug)
                             AppLogger.Warn("DownloadService", $"No se encontró enlace para '{state.AnimeTitulo}' Ep {state.NumeroEpisodio}.");
-                            _activeDownloads.TryRemove(key, out _);
+                            _activeDownloads.TryRemove(key, out _); GuardarColaPendiente();
                             string errorNoEncontrado = $"No se encontró el episodio {state.NumeroEpisodio} en el servidor.";
                             WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, 0, isDownloading: false, isCompleted: false, isPaused: false, "", errorNoEncontrado, state.AnimeTitulo));
                             // Descarga automática: el episodio puede tardar horas en aparecer en el servidor; cada intento
@@ -720,7 +825,7 @@ public class DownloadService : IDownloadService
                 File.Move(state.RutaTemporal, state.RutaDestino);
                 _stateStore.EliminarArchivosTemporales(state.RutaTemporal);
 
-                _activeDownloads.TryRemove(key, out _);
+                _activeDownloads.TryRemove(key, out _); GuardarColaPendiente();
                 WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, 100, isDownloading: false, isCompleted: true, isPaused: false, state.RutaDestino, null, state.AnimeTitulo));
                 RegistrarEnHistorial(state, completada: true, null);
             }
@@ -749,7 +854,7 @@ public class DownloadService : IDownloadService
                 // FUN-017: no se borra el archivo parcial ni el .state aquí — ya se agotaron los
                 // reintentos automáticos, pero conservar el progreso permite que un reintento manual
                 // del usuario retome la descarga en vez de empezar desde cero.
-                _activeDownloads.TryRemove(key, out _);
+                _activeDownloads.TryRemove(key, out _); GuardarColaPendiente();
                 string error = DescribirErrorParaUsuario(ex);
                 WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, 0, isDownloading: false, isCompleted: false, isPaused: false, "", error, state.AnimeTitulo));
                 RegistrarEnHistorial(state, completada: false, error);
@@ -861,7 +966,7 @@ public class DownloadService : IDownloadService
                 var (exito, motivo) = await DescargarTorrentYCompletarAsync(state, key, candidato, seguirSembrando, ct);
                 if (!exito)
                 {
-                    _activeDownloads.TryRemove(key, out _);
+                    _activeDownloads.TryRemove(key, out _); GuardarColaPendiente();
                     string error = string.IsNullOrWhiteSpace(motivo) ? "No se pudo descargar el torrent elegido." : motivo;
                     WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, 0, isDownloading: false, isCompleted: false, isPaused: false, "", error, state.AnimeTitulo));
                     RegistrarEnHistorial(state, completada: false, error);
@@ -877,7 +982,7 @@ public class DownloadService : IDownloadService
             {
                 if (ct.IsCancellationRequested) return;
                 AppLogger.Error("DownloadService", $"Error en descarga por torrent (manual) {state.AnimeTitulo} Ep {state.NumeroEpisodio}", ex);
-                _activeDownloads.TryRemove(key, out _);
+                _activeDownloads.TryRemove(key, out _); GuardarColaPendiente();
                 string error = DescribirErrorParaUsuario(ex);
                 WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, 0, isDownloading: false, isCompleted: false, isPaused: false, "", error, state.AnimeTitulo));
                 RegistrarEnHistorial(state, completada: false, error);
@@ -928,7 +1033,7 @@ public class DownloadService : IDownloadService
         }
 
         state.Fuente = "Nyaa";
-        _activeDownloads.TryRemove(key, out _);
+        _activeDownloads.TryRemove(key, out _); GuardarColaPendiente();
         WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, 100, isDownloading: false, isCompleted: true, isPaused: false, state.RutaDestino, null, state.AnimeTitulo));
         RegistrarEnHistorial(state, completada: true, null);
         return (true, null);

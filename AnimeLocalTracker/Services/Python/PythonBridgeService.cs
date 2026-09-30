@@ -195,10 +195,12 @@ namespace AnimeLocalTracker.Services.Python
                 if (_daemonProcess == null || _daemonProcess.HasExited)
                     return default;
 
+                long id = Interlocked.Increment(ref _ultimoIdPeticion);
+                string? output;
                 try
                 {
                     string jsonInput = JsonSerializer.Serialize(payload, JsonOptions);
-                    string send = JsonSerializer.Serialize(new { command, payload = System.Text.Json.Nodes.JsonNode.Parse(jsonInput) }, JsonOptions);
+                    string send = JsonSerializer.Serialize(new { id, command, payload = System.Text.Json.Nodes.JsonNode.Parse(jsonInput) }, JsonOptions);
 
                     lock (DaemonLock)
                     {
@@ -209,23 +211,55 @@ namespace AnimeLocalTracker.Services.Python
                         _daemonIn.Flush();
                     }
 
-                    // Leer la línea de respuesta (el daemon responde una línea JSON por comando)
-                    string? output = await _daemonOut.ReadLineAsync(ct).AsTask().ConfigureAwait(false);
-                    if (string.IsNullOrWhiteSpace(output))
-                        return default;
-
-                    var res = JsonSerializer.Deserialize<TResponse>(output, SnakeCaseOptions);
-                    return res ?? JsonSerializer.Deserialize<TResponse>(output, JsonOptions);
+                    // Leer la línea de respuesta (el daemon responde una línea JSON por comando). Una respuesta con otro id es de una
+                    // petición anterior que se abandonó: se descarta y se sigue esperando la propia (daemons viejos no mandan id).
+                    while (true)
+                    {
+                        output = await _daemonOut.ReadLineAsync(ct).AsTask().ConfigureAwait(false);
+                        if (string.IsNullOrWhiteSpace(output))
+                        {
+                            CleanupDaemon(); // cerró la salida: murió
+                            return default;
+                        }
+                        if (!EsRespuestaDeOtraPeticion(output, id)) break;
+                        AppLogger.Warn("PythonBridge", $"Respuesta del daemon descartada: era de una petición anterior (esperada {id}).");
+                    }
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Si el daemon murió, cae al one-shot
-                    return default;
+                    // El comando ya se envió y su respuesta llegará más tarde. Si el daemon siguiera vivo, la PRÓXIMA petición leería esa
+                    // línea como propia (caso real: el opening/ending de un episodio se guardó en el siguiente, y otro episodio quedó
+                    // "sin respuesta" al leer la de una miniatura). Se reinicia (~1 s) en vez de arrastrar el desfase; de paso deja de
+                    // gastar CPU en un trabajo que ya nadie espera.
+                    AppLogger.Debug("PythonBridge", $"Comando '{command}' interrumpido ({ex.GetType().Name}); se reinicia el daemon para no desfasar las respuestas.");
+                    CleanupDaemon();
+                    if (ex is OperationCanceledException && ct.IsCancellationRequested) throw;
+                    return default; // el daemon murió: cae al one-shot
                 }
+
+                var res = JsonSerializer.Deserialize<TResponse>(output, SnakeCaseOptions);
+                return res ?? JsonSerializer.Deserialize<TResponse>(output, JsonOptions);
             }
             finally
             {
                 DaemonSemaphore.Release();
+            }
+        }
+
+        private static long _ultimoIdPeticion;
+
+        /// <summary>True si la línea trae un "id" distinto de <paramref name="id"/> (sin id, o ilegible, se acepta como propia).</summary>
+        internal static bool EsRespuestaDeOtraPeticion(string linea, long id)
+        {
+            try
+            {
+                return System.Text.Json.Nodes.JsonNode.Parse(linea) is System.Text.Json.Nodes.JsonObject obj
+                    && obj.TryGetPropertyValue("id", out var valor) && valor is System.Text.Json.Nodes.JsonValue v
+                    && v.TryGetValue<long>(out long recibido) && recibido != id;
+            }
+            catch (JsonException)
+            {
+                return false;
             }
         }
 
