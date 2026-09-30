@@ -11,6 +11,8 @@ public record NavegarMensaje_Detalle(AnimeItem AnimeSeleccionado, string? Reprod
 public record NavegarMensaje_Calendario();
 public record NavegarMensaje_Descargas();
 public record NavegarMensaje_Configuracion();
+/// <summary>Visor de registros (se abre desde Configuración → Registro de diagnóstico).</summary>
+public record NavegarMensaje_VisorRegistros();
 public record NavegarMensaje_AcercaDe();
 public record NavegarMensaje_Estadisticas();
 public record NavegarMensaje_Historial();

@@ -684,6 +684,17 @@
                                                                 <TextBlock Text="{Binding [Sel_Batch], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
                                                                            FontSize="11" FontWeight="Bold" Foreground="{DynamicResource Brush.Warning}"/>
                                                             </Border>
+                                                            <!-- Nombre del release que no coincide con el anime/temporada: el usuario decide -->
+                                                            <Border Style="{StaticResource AppChip}" Background="{DynamicResource Brush.WarningTint}"
+                                                                    Visibility="{Binding Dudoso, Converter={StaticResource BoolToVis}}"
+                                                                    ToolTip="{Binding [Sel_DudosoTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                                                <StackPanel Orientation="Horizontal">
+                                                                    <materialDesign:PackIcon Kind="AlertCircleOutline" Width="13" Height="13" Margin="0,0,4,0"
+                                                                                             VerticalAlignment="Center" Foreground="{DynamicResource Brush.Warning}"/>
+                                                                    <TextBlock Text="{Binding [Sel_Dudoso], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                                               FontSize="11" FontWeight="Bold" Foreground="{DynamicResource Brush.Warning}"/>
+                                                                </StackPanel>
+                                                            </Border>
                                                         </WrapPanel>
                                                     </StackPanel>
 

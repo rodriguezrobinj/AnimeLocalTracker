@@ -181,16 +181,28 @@ public class NyaaRssParserTests
     [Fact]
     public void ElegirMejorCandidato_SinEpisodioSueltoDisponible_DeberiaCaerAlMejorBatch()
     {
-        // Fase 2a: el episodio 99 no existe como release suelto en el fixture, pero
-        // hay varios batches con semillas suficientes — debe caer al de más semillas
-        // en vez de devolver null (preferencia con fallback).
+        // Fase 2a: el episodio 10 no existe como release suelto en el fixture, pero
+        // hay varios batches con semillas suficientes — debe caer a uno en vez de devolver
+        // null. El que declara su rango (01-13) y lo incluye va primero: es el más fiable.
         var candidatos = NyaaRssParser.ExtraerCandidatos(FixtureRssReal);
 
-        var elegido = NyaaRssParser.ElegirMejorCandidato(candidatos, numeroEpisodio: 99, minimoSeeders: 3);
+        var elegido = NyaaRssParser.ElegirMejorCandidato(candidatos, numeroEpisodio: 10, minimoSeeders: 3);
 
         elegido.Should().NotBeNull();
         elegido!.Value.EsBatch.Should().BeTrue();
-        elegido.Value.TorrentUrl.Should().Be("https://nyaa.si/download/1000008.torrent"); // Batch-Group, 200 semillas (el mejor batch)
+        elegido.Value.TorrentUrl.Should().Be("https://nyaa.si/download/1000008.torrent"); // Batch-Group (01-13)
+    }
+
+    [Fact]
+    public void ElegirMejorCandidato_PackCuyoRangoNoIncluyeElEpisodio_NoDeberiaElegirse()
+    {
+        // Un pack "(01-13)" no puede traer el episodio 99: antes se elegía igual y el torrent
+        // acababa guardando otro episodio con el número pedido.
+        var candidatos = NyaaRssParser.ExtraerCandidatos(FixtureRssReal);
+
+        var elegidos = NyaaRssParser.FiltrarYOrdenarCandidatos(candidatos, numeroEpisodio: 99, minimoSeeders: 3);
+
+        elegidos.Should().NotContain(c => c.TorrentUrl == "https://nyaa.si/download/1000008.torrent");
     }
 
     [Fact]

@@ -394,8 +394,21 @@ public class DownloadService : IDownloadService
     private bool FueCanceladaDefinitivamente(DownloadState state, string key)
         => !_activeDownloads.TryGetValue(key, out var actual) || !ReferenceEquals(actual, state);
 
+    private static string CarpetaBaseTemporalTorrents => Path.Combine(Path.GetTempPath(), "AnimeLocalTrackerTorrents");
+
     private static string RutaCarpetaTemporalTorrent(string key)
-        => Path.Combine(Path.GetTempPath(), "AnimeLocalTrackerTorrents", key);
+        => Path.Combine(CarpetaBaseTemporalTorrents, key);
+
+    public void LimpiarTemporalesTorrentHuerfanos()
+    {
+        // Cualquier descarga de la cola (no solo las de torrent): una HTTP puede pasar a torrent al fallar.
+        var enCola = new HashSet<string>(_activeDownloads.Keys, StringComparer.OrdinalIgnoreCase);
+        var resultado = LimpiezaTorrentsHuerfanos.Limpiar(CarpetaBaseTemporalTorrents, enCola);
+        if (resultado.Carpetas > 0)
+        {
+            AppLogger.Info("DownloadService", $"Limpieza de torrents abandonados: {resultado.Carpetas} carpeta(s) temporal(es), {resultado.Bytes / 1024d / 1024d:F0} MB liberados.");
+        }
+    }
 
     /// <summary>
     /// Borra las piezas de un torrent cancelado de forma definitiva. Solo se llama cuando ninguna
@@ -913,7 +926,7 @@ public class DownloadService : IDownloadService
             candidatos = await _nyaaSourceService!.BuscarCandidatosAsync(
                 state.Titulos, state.NumeroEpisodio,
                 configuracion?.GrupoFansubPreferidoTorrent, configuracion?.ResolucionPreferidaTorrent,
-                ct);
+                state.AniListId, ct);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
         catch (Exception ex)

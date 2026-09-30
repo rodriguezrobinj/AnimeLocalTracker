@@ -117,9 +117,13 @@ namespace AnimeLocalTracker.Services.Python
                 await proceso.StandardInput.FlushAsync(ct);
                 proceso.StandardInput.Close();
 
-                // Leer respuesta JSON por stdout
-                string output = await proceso.StandardOutput.ReadToEndAsync(ct);
-                string error = await proceso.StandardError.ReadToEndAsync(ct);
+                // Leer respuesta JSON por stdout y los avisos por stderr A LA VEZ: leyendo uno detrás de otro,
+                // si Python escribía más de lo que cabe en el búfer de stderr ambos procesos se quedaban
+                // esperándose (bloqueo) hasta que vencía el tiempo del comando.
+                var tareaSalida = proceso.StandardOutput.ReadToEndAsync(ct);
+                var tareaError = proceso.StandardError.ReadToEndAsync(ct);
+                string output = await tareaSalida;
+                string error = await tareaError;
 
                 await proceso.WaitForExitAsync(ct);
 
@@ -310,7 +314,15 @@ namespace AnimeLocalTracker.Services.Python
                 psi.Environment["PATH"] = ComposePath();
 
                 var proc = new Process { StartInfo = psi };
+                // stderr del daemon (avisos de numpy/librosa/yt-dlp, trazas de error): antes se redirigía pero
+                // nadie lo leía. Además de perderse, cuando se llenaba el búfer el daemon se quedaba colgado
+                // al intentar escribir. Ahora se vacía continuamente hacia el registro.
+                proc.ErrorDataReceived += (_, e) =>
+                {
+                    if (!string.IsNullOrWhiteSpace(e.Data)) AppLogger.Warn("PythonDaemon", e.Data);
+                };
                 proc.Start();
+                proc.BeginErrorReadLine();
                 JobObjectHelper.AddProcess(proc);
                 _daemonProcess = proc;
                 _daemonOut = proc.StandardOutput;

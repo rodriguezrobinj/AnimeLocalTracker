@@ -35,6 +35,12 @@ public class AppSettings
     /// aquí Y ha marcado ese archivo concreto como confiable (<see cref="PluginsConfiables"/>).</summary>
     public bool PluginsHabilitados { get; set; } = false;
 
+    /// <summary>
+    /// Escribir en el registro también las entradas de depuración (DEBUG). Apagado por defecto: el registro
+    /// es mucho más corto y los avisos/errores siguen llegando con las entradas que los precedieron.
+    /// </summary>
+    public bool RegistroDetallado { get; set; } = false;
+
     /// <summary>SEC-01: archivos de plugin en los que el usuario confió: nombre de archivo → huella SHA-256 (hex
     /// en mayúsculas) del contenido en el momento de confiar. Si el archivo cambia, la huella ya no coincide y deja de
     /// ser confiable hasta que el usuario lo confirme otra vez.</summary>

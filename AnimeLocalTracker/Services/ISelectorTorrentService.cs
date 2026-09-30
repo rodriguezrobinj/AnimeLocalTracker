@@ -15,6 +15,8 @@ public sealed class CandidatoTorrentItem
     public string Titulo => Original.Titulo;
     public int Seeders => Original.Seeders;
     public bool EsBatch => Original.EsBatch;
+    /// <summary>El nombre del release no coincide con el anime/temporada: se muestra con un aviso.</summary>
+    public bool Dudoso => Original.Dudoso;
     public string TamanoTexto { get; }
 
     /// <summary>Grupo de fansub/release ("Erai-raws"), si el título empieza con "[Grupo]"; si no, null.</summary>

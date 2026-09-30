@@ -358,6 +358,9 @@
             <DataTemplate DataType="{x:Type vm:LogrosViewModel}">
                 <views:LogrosView />
             </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:VisorRegistrosViewModel}">
+                <views:VisorRegistrosView />
+            </DataTemplate>
             <DataTemplate DataType="{x:Type vm:MinijuegosViewModel}">
                 <views:MinijuegosView />
             </DataTemplate>

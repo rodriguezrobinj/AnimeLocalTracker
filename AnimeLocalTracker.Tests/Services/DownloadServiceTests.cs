@@ -120,7 +120,7 @@ public class DownloadServiceTests
         var candidato = new CandidatoTorrent("[SubsPlease] Anime - 01 (1080p).mkv", "https://nyaa.si/download/1.torrent", "hash", 100, 500_000_000L);
         var nyaaMock = new Mock<INyaaSourceService>();
         nyaaMock
-            .Setup(n => n.BuscarCandidatosAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .Setup(n => n.BuscarCandidatosAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<CandidatoTorrent> { candidato });
 
         var torrentMock = new Mock<ITorrentDownloadService>();
@@ -204,7 +204,7 @@ public class DownloadServiceTests
         historial.NumeroEpisodio.Should().Be(5);
         torrentUrlRecibido.Should().Be(candidatoElegido.TorrentUrl);
         nyaaMock.Verify(n => n.BuscarEpisodioAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
-        nyaaMock.Verify(n => n.BuscarCandidatosAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+        nyaaMock.Verify(n => n.BuscarCandidatosAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()), Times.Never);
         resolverMock.Verify(r => r.BuscarUrlEpisodioAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<int?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -225,7 +225,7 @@ public class DownloadServiceTests
         var candidato = new CandidatoTorrent("[SubsPlease] Anime - 01 (1080p).mkv", "https://nyaa.si/download/1.torrent", "hash", 100, 500_000_000L);
         var nyaaMock = new Mock<INyaaSourceService>();
         nyaaMock
-            .Setup(n => n.BuscarCandidatosAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .Setup(n => n.BuscarCandidatosAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<CandidatoTorrent> { candidato });
 
         bool? seguirSembrandoRecibido = null;
@@ -276,8 +276,8 @@ public class DownloadServiceTests
         string? resolucionRecibida = null;
         var nyaaMock = new Mock<INyaaSourceService>();
         nyaaMock
-            .Setup(n => n.BuscarCandidatosAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
-            .Callback<IEnumerable<string>, int, string?, string?, CancellationToken>((_, _, grupo, resolucion, _) =>
+            .Setup(n => n.BuscarCandidatosAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()))
+            .Callback<IEnumerable<string>, int, string?, string?, int?, CancellationToken>((_, _, grupo, resolucion, _, _) =>
             {
                 grupoRecibido = grupo;
                 resolucionRecibida = resolucion;
@@ -334,7 +334,7 @@ public class DownloadServiceTests
 
         // Assert
         nyaaMock.Verify(n => n.BuscarEpisodioAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
-        nyaaMock.Verify(n => n.BuscarCandidatosAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+        nyaaMock.Verify(n => n.BuscarCandidatosAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()), Times.Never);
         torrentMock.Verify(t => t.DescargarAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<bool>(), It.IsAny<IProgress<(double, double)>?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -1624,7 +1624,7 @@ public class DownloadServiceTests
         var candidato = new CandidatoTorrent("[SubsPlease] Anime - 14 (1080p).mkv", "https://nyaa.si/download/14.torrent", "hash14", 200, 1_400_000_000L);
         var nyaaMock = new Mock<INyaaSourceService>();
         nyaaMock
-            .Setup(n => n.BuscarCandidatosAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .Setup(n => n.BuscarCandidatosAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<CandidatoTorrent> { candidato });
         var torrentMock = new Mock<ITorrentDownloadService>();
         torrentMock

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System;
 using System.Linq;
 using System.Net;
@@ -21,6 +22,21 @@ public class NyaaSourceServiceTests
     private static readonly string[] TitulosFrieren = { "Frieren" };
     private static readonly string[] TitulosFrierenCompleto = { "Frieren: Beyond Journey's End" };
     private static readonly string[] TitulosInexistente = { "Anime Inexistente" };
+    private static readonly string[] TitulosTresNombres = { "Frieren: Beyond Journey's End", "Frieren at the Funeral", "Sousou no Frieren" };
+
+    private const string FixtureSousouNoFrieren13 = """
+        <rss xmlns:nyaa="https://nyaa.si/xmlns/nyaa" version="2.0">
+        	<channel>
+        		<item>
+        			<title>[SubsPlease] Sousou no Frieren - 13 (1080p) [CEC8715E].mkv</title>
+        			<link>https://nyaa.si/download/2000009.torrent</link>
+        			<nyaa:seeders>500</nyaa:seeders>
+        			<nyaa:infoHash>aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</nyaa:infoHash>
+        			<nyaa:size>1.3 GiB</nyaa:size>
+        		</item>
+        	</channel>
+        </rss>
+        """;
 
     private const string FixtureConEpisodio13 = """
         <rss xmlns:nyaa="https://nyaa.si/xmlns/nyaa" version="2.0">
@@ -120,21 +136,23 @@ public class NyaaSourceServiceTests
     }
 
     [Fact]
-    public async Task BuscarEpisodioAsync_PrimerTerminoSinCandidatosValidos_DeberiaProbarElSiguiente()
+    public async Task BuscarEpisodioAsync_PrimerosTitulosSinCandidatosValidos_DeberiaProbarLosSiguientes()
     {
-        int intentos = 0;
+        // Los títulos se consultan en tandas de dos: si la primera no trae ningún release verificado,
+        // se sigue con los títulos siguientes.
+        var consultas = new List<string>();
         var servicio = Crear(req =>
         {
-            intentos++;
-            // El primer término (título completo) solo tiene el batch; el
-            // segundo (variación más corta) sí trae el episodio suelto.
-            return intentos == 1 ? Ok(FixtureSinCandidatosValidos) : Ok(FixtureConEpisodio13);
+            string q = Uri.UnescapeDataString(req.RequestUri!.Query);
+            lock (consultas) consultas.Add(q);
+            return q.Contains("sousou no frieren") ? Ok(FixtureSousouNoFrieren13) : Ok(FixtureSinCandidatosValidos);
         });
 
-        var resultado = await servicio.BuscarEpisodioAsync(TitulosFrierenCompleto, 13);
+        var resultado = await servicio.BuscarEpisodioAsync(TitulosTresNombres, 13);
 
         resultado.Should().NotBeNull();
-        intentos.Should().BeGreaterThan(1, "debió reintentar con otro término tras el primero sin candidatos válidos");
+        resultado!.Value.Titulo.Should().Contain("Sousou no Frieren - 13");
+        consultas.Should().Contain(q => q.Contains("sousou no frieren 13"), "se consulta con el número de episodio");
     }
 
     [Fact]

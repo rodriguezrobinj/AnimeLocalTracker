@@ -9,9 +9,10 @@ namespace AnimeLocalTracker.Services;
 /// candidatos válidos. <see cref="EsBatch"/> distingue un release de un solo episodio
 /// (el caso normal) de un batch/temporada completa (Fase 2a): en ese caso
 /// <c>ITorrentDownloadService</c> debe buscar el archivo del episodio pedido DENTRO
-/// del torrent en vez de asumir que es el único video.
+/// del torrent en vez de asumir que es el único video. <see cref="Dudoso"/>: el nombre del release no
+/// se pudo confirmar como este anime y temporada (solo aparecen así en el selector manual).
 /// </summary>
-public readonly record struct CandidatoTorrent(string Titulo, string TorrentUrl, string InfoHash, int Seeders, long TamanoBytes, bool EsBatch = false);
+public readonly record struct CandidatoTorrent(string Titulo, string TorrentUrl, string InfoHash, int Seeders, long TamanoBytes, bool EsBatch = false, bool Dudoso = false);
 
 /// <summary>
 /// Fuente de descarga por BitTorrent: busca en Nyaa.si el episodio pedido, prefiriendo
@@ -23,10 +24,9 @@ public readonly record struct CandidatoTorrent(string Titulo, string TorrentUrl,
 public interface INyaaSourceService
 {
     /// <summary>
-    /// Busca el episodio probando los títulos conocidos del anime (mismos términos
-    /// de búsqueda, en el mismo orden de especificidad, que ya usa el buscador de
-    /// catálogo de AnimeAV1). Null si ningún término encontró nada aprovechable
-    /// (ni un solo episodio ni un batch con semillas suficientes).
+    /// Busca el episodio con los títulos conocidos del anime y devuelve el mejor release
+    /// verificado (mismo anime y temporada, episodio correcto). Null si no hay ninguno
+    /// (ni un solo episodio ni un pack que lo incluya con semillas suficientes).
     /// </summary>
     /// <param name="grupoPreferido">Fase 2b: AppSettings.GrupoFansubPreferidoTorrent —
     /// preferencia con fallback, ver <see cref="NyaaRssParser.ElegirMejorCandidato"/>.</param>
@@ -41,14 +41,29 @@ public interface INyaaSourceService
 
     /// <summary>
     /// Fase 2d: igual que <see cref="BuscarEpisodioAsync"/> pero devuelve TODOS los
-    /// candidatos válidos (ordenados igual: preferencias, luego semillas) del primer
-    /// término que encontró alguno — para un selector manual. Lista vacía si ningún
-    /// término encontró nada aprovechable.
+    /// candidatos verificados (ordenados igual: preferencias, luego semillas). Lista vacía
+    /// si no hay ninguno. Con <paramref name="aniListId"/> también cuentan los releases de la parte
+    /// anterior con numeración continua ("2nd Season - 14" = episodio 1 de "2nd Season Part 2").
     /// </summary>
     Task<List<CandidatoTorrent>> BuscarCandidatosAsync(
         IEnumerable<string> titulos,
         int numeroEpisodio,
         string? grupoPreferido = null,
         string? resolucionPreferida = null,
+        int? aniListId = null,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Para el selector manual: los mismos candidatos verificados que <see cref="BuscarCandidatosAsync"/>
+    /// (sueltos y packs) y, al final, marcados como <see cref="CandidatoTorrent.Dudoso"/>, los releases con
+    /// el episodio correcto cuyo nombre no se pudo confirmar como este anime — la descarga automática
+    /// nunca los usa, pero el usuario puede reconocerlos y elegirlos.
+    /// </summary>
+    Task<List<CandidatoTorrent>> BuscarCandidatosParaElegirAsync(
+        IEnumerable<string> titulos,
+        int numeroEpisodio,
+        string? grupoPreferido = null,
+        string? resolucionPreferida = null,
+        int? aniListId = null,
         CancellationToken ct = default);
 }
