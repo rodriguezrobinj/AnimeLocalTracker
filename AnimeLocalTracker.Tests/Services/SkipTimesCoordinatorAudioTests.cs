@@ -174,6 +174,34 @@ public class SkipTimesCoordinatorAudioTests : IDisposable
         resultado.Should().ContainSingle().Which.Origen.Should().Be("aniskip");
     }
 
+    [Fact]
+    public async Task SiElMotorNoResponde_NoSeGuardaElAnalisis_YSeReintentaAlVolverAAbrir()
+    {
+        // Caso real (Katainaka no Ossan II ep 8): un fallo pasajero del motor se guardaba como análisis incompleto y el episodio
+        // quedaba sin marcas 12 h aunque al volver a abrirlo el motor ya funcionara.
+        Referencias(true, Tema("OP", "OP1", null, "op1.ogg"), Tema("ED", "ED1", null, "ed1.ogg"));
+        _python.Setup(p => p.ExecuteCommandAsync<It.IsAnyType, PluginDaemonResponse<SkipTimesCoordinator.DeteccionTemasResult>>(
+                "run-plugin", It.IsAny<It.IsAnyType>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((PluginDaemonResponse<SkipTimesCoordinator.DeteccionTemasResult>?)null);
+
+        await CrearSut(conBaseDeDatos: true).CargarSkipTimesAsync(101, 5, 1400, _episodio);
+
+        _db.Verify(d => d.GuardarAnalisisSkipAsync(It.IsAny<AnalisisSkipEpisodio>(), It.IsAny<IReadOnlyList<SegmentoSkipGuardado>>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SiElPluginDevuelveUnError_ElAnalisisSeGuardaIncompleto()
+    {
+        // Un error con texto (ffmpeg, archivo ilegible) es del archivo: repetirlo en cada apertura no arreglaría nada.
+        Referencias(true, Tema("OP", "OP1", null, "op1.ogg"));
+        RespuestaDelMotor(new SkipTimesCoordinator.DeteccionTemasResult { Success = false, Error = "ffmpeg no encontrado" });
+
+        await CrearSut(conBaseDeDatos: true).CargarSkipTimesAsync(101, 5, 1400, _episodio);
+
+        _analisisGuardado.Should().NotBeNull();
+        _analisisGuardado!.Completo.Should().BeFalse();
+    }
+
     // === AniSkip como respaldo ===
 
     [Fact]

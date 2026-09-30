@@ -56,8 +56,7 @@ public class AnimeThemesService : IAnimeThemesService
     public static IAsyncPolicy<HttpResponseMessage> CrearPoliticaReintentos(TimeSpan? esperaBase = null)
     {
         var espera = esperaBase ?? TimeSpan.FromSeconds(1);
-        return HttpPolicyExtensions
-            .HandleTransientHttpError()
+        return PoliticasHttp.ErroresPasajeros() // sin internet no se reintenta
             .OrResult(EsLimiteDePeticionesReintentable)
             .WaitAndRetryAsync(
                 retryCount: 2,

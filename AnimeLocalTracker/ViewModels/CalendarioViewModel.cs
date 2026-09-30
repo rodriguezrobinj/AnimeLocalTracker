@@ -15,12 +15,14 @@ public partial class CalendarioViewModel : ObservableObject, IDisposable
 {
     private readonly IDatabaseService _databaseService;
     private readonly IAnimeTrackingService _animeTrackingService;
+    private readonly IProgramacionEmisionService _programacion;
     private readonly SemaphoreSlim _cargaLock = new(1, 1);
 
     // CA1001: el semáforo y el temporizador se liberan en el cierre de la app (singleton DI)
     public void Dispose()
     {
         _temporizadorEstado?.Stop();
+        WeakReferenceMessenger.Default.Unregister<ConexionRecuperadaMensaje>(this);
         _cargaLock.Dispose();
         GC.SuppressFinalize(this);
     }
@@ -28,8 +30,8 @@ public partial class CalendarioViewModel : ObservableObject, IDisposable
     [ObservableProperty] private bool _estaCargando;
     [ObservableProperty] private int _totalAnimesEnEmision;
 
-    /// <summary>La última consulta a AniList falló (sin conexión, límite de peticiones, servidor caído) y se
-    /// conservó el calendario anterior en vez de vaciarlo: la UI muestra un aviso no intrusivo al respecto.</summary>
+    /// <summary>La última consulta a AniList falló y se muestra la programación guardada: al volver la conexión se recarga
+    /// sola (el aviso de "sin conexión" es el distintivo global de la barra superior, no uno por pestaña).</summary>
     [ObservableProperty] private bool _sinConexion;
 
     // Día actual para el badge "HOY" del calendario (formato invariante: LUNES, MARTES, ...)
@@ -44,14 +46,25 @@ public partial class CalendarioViewModel : ObservableObject, IDisposable
     public ObservableCollection<AiringEpisode> Sabado { get; } = new();
     public ObservableCollection<AiringEpisode> Domingo { get; } = new();
 
-    public CalendarioViewModel(IDatabaseService databaseService, IAnimeTrackingService animeTrackingService)
+    public CalendarioViewModel(IDatabaseService databaseService, IAnimeTrackingService animeTrackingService,
+        IProgramacionEmisionService? programacion = null)
     {
         _databaseService = databaseService;
         _animeTrackingService = animeTrackingService;
+        _programacion = programacion ?? new ProgramacionEmisionService(animeTrackingService, databaseService);
 
         // Refresco en vivo del estado "EMITIDO": cada minuto se revalúa la hora de
         // emisión para que el badge cambie sin necesidad de pulsar ACTUALIZAR.
         _temporizadorEstado = CrearTemporizadorEstado();
+
+        // Volvió la conexión mientras se mostraba la copia guardada: se trae la programación al día sin pulsar ACTUALIZAR.
+        WeakReferenceMessenger.Default.Register<CalendarioViewModel, ConexionRecuperadaMensaje>(this, static (vm, mensaje) =>
+        {
+            if (!vm.SinConexion) return;
+            var dispatcher = System.Windows.Application.Current?.Dispatcher;
+            if (dispatcher != null && !dispatcher.CheckAccess()) dispatcher.InvokeAsync(() => _ = vm.CargarCalendarioAsync());
+            else _ = vm.CargarCalendarioAsync();
+        });
 
         _ = CargarCalendarioAsync();
     }
@@ -130,18 +143,25 @@ public partial class CalendarioViewModel : ObservableObject, IDisposable
             long timestampInicio = ((DateTimeOffset)inicioSemana).ToUnixTimeSeconds();
             long timestampFin = ((DateTimeOffset)finSemana).ToUnixTimeSeconds();
 
-            var (exito, schedule) = await _animeTrackingService.ObtenerCalendarioEmisionAsync(ids, timestampInicio, timestampFin);
-            if (!exito)
+            // Sin conexión (o AniList caído/limitando) sale la última programación guardada: antes, abrir la app sin internet
+            // dejaba el Calendario vacío.
+            var programacion = await _programacion.ObtenerAsync(ids, timestampInicio, timestampFin);
+            var schedule = programacion.Episodios;
+            if (programacion.DesdeCopiaLocal && schedule.Count == 0 && !EstaVacio)
             {
-                // Sin conexión (o AniList caído/limitando): se conserva el último calendario cargado
-                // en vez de dejar la pestaña vacía — las listas de días NO se tocan.
-                AppLogger.Debug("CalendarioViewModel", "No se pudo actualizar el calendario de emisión; se conserva el último conocido.");
+                // Nada guardado (o no se pudo leer) pero ya había un calendario en pantalla: se conserva en vez de vaciarlo.
                 SinConexion = true;
                 return;
             }
-
-            SinConexion = false;
+            SinConexion = programacion.DesdeCopiaLocal;
+            if (programacion.DesdeCopiaLocal)
+                AppLogger.Debug("CalendarioViewModel", $"Sin respuesta de AniList: calendario desde la copia local ({schedule.Count} episodio(s)).");
             LimpiarListas();
+
+            // Lo que viene de la copia de la cuenta atrás no trae título.
+            var dicTitulos = animes.GroupBy(a => a.AniListId).ToDictionary(g => g.Key, g => g.First().Titulo);
+            foreach (var eps in schedule.Where(e => string.IsNullOrEmpty(e.Titulo)))
+                if (dicTitulos.TryGetValue(eps.AniListId, out var titulo)) eps.Titulo = titulo;
 
             int animesConEmisionSemanal = schedule.Select(e => e.AniListId).Distinct().Count();
             if (animesConEmisionSemanal > TotalAnimesEnEmision)

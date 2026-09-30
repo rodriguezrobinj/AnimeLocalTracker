@@ -19,7 +19,8 @@ namespace AnimeLocalTracker.ViewModels;
 /// de tu biblioteca que aún no tienes descargados, con descarga directa desde la lista.
 /// </summary>
 public partial class ActualizacionesViewModel : ObservableObject, IDisposable,
-    IRecipient<DescargaProgresoMensaje>, IRecipient<EpisodioActualizadoMensaje>, IRecipient<IdiomaCambiadoMensaje>
+    IRecipient<DescargaProgresoMensaje>, IRecipient<EpisodioActualizadoMensaje>, IRecipient<IdiomaCambiadoMensaje>,
+    IRecipient<ConexionRecuperadaMensaje>
 {
     // Claves de los filtros (chips)
     public const string FiltroTodos = "Todos";
@@ -31,6 +32,7 @@ public partial class ActualizacionesViewModel : ObservableObject, IDisposable,
 
     private readonly IDatabaseService _databaseService;
     private readonly IAnimeTrackingService _animeTrackingService;
+    private readonly IProgramacionEmisionService _programacion;
     private readonly IDownloadService _downloadService;
     private readonly IFileScannerService _fileScannerService;
     private readonly PythonEpisodeEnricher? _enricher;
@@ -55,8 +57,8 @@ public partial class ActualizacionesViewModel : ObservableObject, IDisposable,
     [ObservableProperty]
     private bool _estaCargando;
 
-    /// <summary>La última consulta a AniList falló (sin conexión, límite de peticiones, servidor caído) y se
-    /// conservó el feed anterior en vez de vaciarlo: la UI muestra un aviso no intrusivo al respecto.</summary>
+    /// <summary>La última consulta a AniList falló y el feed sale de la programación guardada: al volver la conexión se recarga
+    /// solo (el aviso de "sin conexión" es el distintivo global de la barra superior, no uno por pestaña).</summary>
     [ObservableProperty]
     private bool _sinConexion;
 
@@ -120,10 +122,12 @@ public partial class ActualizacionesViewModel : ObservableObject, IDisposable,
         IDownloadService downloadService,
         IFileScannerService fileScannerService,
         PythonEpisodeEnricher? enricher = null,
-        IDialogService? dialogService = null)
+        IDialogService? dialogService = null,
+        IProgramacionEmisionService? programacion = null)
     {
         _databaseService = databaseService;
         _animeTrackingService = animeTrackingService;
+        _programacion = programacion ?? new ProgramacionEmisionService(animeTrackingService, databaseService);
         _downloadService = downloadService;
         _fileScannerService = fileScannerService;
         _enricher = enricher;
@@ -164,17 +168,19 @@ public partial class ActualizacionesViewModel : ObservableObject, IDisposable,
             // 2) Episodios ya emitidos en los últimos 7 días (hasta ahora)
             long ahora = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
             long inicio = ahora - 7L * 24 * 60 * 60;
-            var (exito, schedule) = await _animeTrackingService.ObtenerCalendarioEmisionAsync(ids, inicio, ahora);
-            if (!exito)
+            // Sin conexión (o AniList caído/limitando) el feed sale de la programación guardada y se arma igual (descargado, visto,
+            // progreso son locales): antes, abrir la app sin internet dejaba la pestaña vacía.
+            var programacion = await _programacion.ObtenerAsync(ids, inicio, ahora);
+            var schedule = programacion.Episodios;
+            if (programacion.DesdeCopiaLocal && schedule.Count == 0 && Items.Count > 0)
             {
-                // Sin conexión (o AniList caído/limitando): se conserva el feed ya cargado —
-                // no tiene sentido vaciar los episodios recién descargados/vistos por no poder refrescar.
-                AppLogger.Debug("ActualizacionesViewModel", "No se pudieron consultar las actualizaciones; se conserva el feed anterior.");
+                // Nada guardado (o no se pudo leer) pero ya había un feed en pantalla: se conserva en vez de vaciarlo.
                 SinConexion = true;
                 return;
             }
-
-            SinConexion = false;
+            SinConexion = programacion.DesdeCopiaLocal;
+            if (programacion.DesdeCopiaLocal)
+                AppLogger.Debug("ActualizacionesViewModel", $"Sin respuesta de AniList: feed desde la copia local ({schedule.Count} episodio(s)).");
             if (schedule.Count == 0)
             {
                 Items.Clear();
@@ -632,6 +638,15 @@ public partial class ActualizacionesViewModel : ObservableObject, IDisposable,
     }
 
     /// <summary>Los textos de las tarjetas, chips y botones se construyen localizados: al cambiar de idioma se rehacen.</summary>
+    /// <summary>Volvió la conexión mientras se mostraba la copia guardada: el feed se trae al día solo.</summary>
+    public void Receive(ConexionRecuperadaMensaje message)
+    {
+        if (!SinConexion) return;
+        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+        if (dispatcher != null && !dispatcher.CheckAccess()) dispatcher.InvokeAsync(() => _ = CargarActualizacionesAsync());
+        else _ = CargarActualizacionesAsync();
+    }
+
     public void Receive(IdiomaCambiadoMensaje message)
     {
         var dispatcher = System.Windows.Application.Current?.Dispatcher;

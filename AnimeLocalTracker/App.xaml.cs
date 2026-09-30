@@ -120,7 +120,10 @@ public partial class App : Application
         services.AddSingleton<IGamepadService, GamepadService>();
         services.AddSingleton<IPluginService, PluginService>();
 
-        services.AddHttpClient();
+        // Sin internet, todas las peticiones fallan al instante (SinConexionHandler, siempre la última pieza antes de la red):
+        // antes cada consulta a AniList tardaba 60 s en rendirse y las pantallas esperaban ese minuto para mostrar lo guardado.
+        services.AddSingleton(sp => new GuardiaConexion(sp.GetRequiredService<IConectividadRed>(), sinRedForzado: ConectividadRedWindows.SinRedForzado));
+        services.AddHttpClient(Microsoft.Extensions.Options.Options.DefaultName).ConCorteSinConexion();
 
         // SEC-03: el cliente "Downloader" (scraper + descargas) no sigue redirects a ciegas:
         // cada salto se valida con UrlSeguridad (solo https, sin credenciales embebidas).
@@ -135,7 +138,8 @@ public partial class App : Application
                 ConnectTimeout = TimeSpan.FromSeconds(60),
                 PooledConnectionLifetime = TimeSpan.FromMinutes(5)
             })
-            .AddHttpMessageHandler(() => new RedirectSeguroHandler());
+            .AddHttpMessageHandler(() => new RedirectSeguroHandler())
+            .ConCorteSinConexion();
 
         // Igual que "Downloader" pero pidiendo las páginas comprimidas (gzip/brotli): el HTML de
         // AnimeAv1 y el RSS de Nyaa llegan varias veces más pequeños y la búsqueda del episodio
@@ -149,7 +153,8 @@ public partial class App : Application
                 PooledConnectionLifetime = TimeSpan.FromMinutes(5),
                 AutomaticDecompression = System.Net.DecompressionMethods.All
             })
-            .AddHttpMessageHandler(() => new RedirectSeguroHandler());
+            .AddHttpMessageHandler(() => new RedirectSeguroHandler())
+            .ConCorteSinConexion();
 
         // Descargas por torrent (Nyaa.si + MonoTorrent, Fase MVP): último recurso opt-in
         // cuando ninguna fuente HTTP encuentra el episodio — ver AppSettings.BusquedaTorrentHabilitada.
@@ -160,14 +165,18 @@ public partial class App : Application
 
         // Las descargas esperan a que vuelva internet en vez de gastar sus reintentos sin red.
         services.AddSingleton<IConectividadRed, ConectividadRedWindows>();
-        services.AddSingleton<IDownloadService, DownloadService>();
+        // La cola se guarda en disco y se restaura al abrir la app (en pruebas no se pasa ruta y no se escribe nada).
+        services.AddSingleton<IDownloadService>(sp => ActivatorUtilities.CreateInstance<DownloadService>(sp, AppDataPaths.ColaDescargasPath,
+            (IConectividadRed)new ConectividadConfirmada(sp.GetRequiredService<GuardiaConexion>())));
         
-        // IHttpClientFactory nativo con Polly para Rate Limiting
+        // IHttpClientFactory nativo con Polly: límite de peticiones de AniList + reintentos cortos (PoliticasHttp.AniList)
         services.AddHttpClient<IAnimeTrackingService, AniListTrackingService>()
-            .AddPolicyHandler(GetRetryPolicy());
+            .AddPolicyHandler(PoliticasHttp.AniList())
+            .ConCorteSinConexion();
         
         services.AddHttpClient<IAniSkipService, AniSkipService>()
-            .AddPolicyHandler(GetRetryPolicy());
+            .AddPolicyHandler(PoliticasHttp.AniList())
+            .ConCorteSinConexion();
 
         // Openings/endings vía AnimeThemes.moe: catálogo (JSON) + descarga del audio (.ogg → .mp3).
         // Política propia (reintentos cortos): la de AniList espera 60 s y este cliente corta a los 20 s.
@@ -178,7 +187,8 @@ public partial class App : Application
                 AutomaticDecompression = System.Net.DecompressionMethods.All,
                 PooledConnectionLifetime = TimeSpan.FromMinutes(5)
             })
-            .AddPolicyHandler(AnimeThemesService.CrearPoliticaReintentos());
+            .AddPolicyHandler(AnimeThemesService.CrearPoliticaReintentos())
+            .ConCorteSinConexion();
         services.AddSingleton<IAnimeThemesDownloadService, AnimeThemesDownloadService>();
         services.AddSingleton<IAudioDurationService, AudioDurationService>();
         // "Organizar mi música" (Configuración): nombre legible, etiquetas y portada a los mp3 descargados antes.
@@ -195,6 +205,12 @@ public partial class App : Application
 
         // Servicio de sincronización offline-online en segundo plano
         services.AddSingleton<ISyncService, SyncService>();
+        // Calendario y Actualizaciones: programación de AniList con copia local para verla sin conexión.
+        services.AddSingleton<IProgramacionEmisionService, ProgramacionEmisionService>();
+        // Nombre y avatar de AniList con copia local (Galería y tarjeta Wrapped sin conexión).
+        services.AddSingleton<IPerfilAniListService, PerfilAniListService>();
+        // Indicador de conexión + sincronización inmediata al volver internet.
+        services.AddSingleton<IEstadoConexionService, EstadoConexionService>();
 
         // Servicio de actualizaciones automáticas con Velopack y GitHub Releases
         services.AddSingleton<IUpdateService, UpdateService>();
@@ -352,7 +368,7 @@ public partial class App : Application
         services.AddSingleton<AnimeLocalTracker.Services.Minijuegos.IMinijuegosRecordsService, AnimeLocalTracker.Services.Minijuegos.MinijuegosRecordsService>();
         services.AddSingleton<AdivinaAnimeViewModel>();
         services.AddSingleton<AdivinaOpEdViewModel>();
-        services.AddHttpClient<IPersonajesService, PersonajesService>(); // sin reintentos largos: un juego no espera minutos a AniList
+        services.AddHttpClient<IPersonajesService, PersonajesService>().ConCorteSinConexion(); // sin reintentos largos: un juego no espera minutos a AniList
         services.AddSingleton<AdivinaPersonajeViewModel>();
         services.AddSingleton<MinijuegosViewModel>();
 
@@ -361,46 +377,6 @@ public partial class App : Application
 
         // Actualizaciones (episodios recién emitidos con descarga directa)
         services.AddSingleton<ActualizacionesViewModel>();
-    }
-
-    private static Polly.IAsyncPolicy<System.Net.Http.HttpResponseMessage> GetRetryPolicy()
-    {
-        var circuitBreaker = Polly.Extensions.Http.HttpPolicyExtensions
-            .HandleTransientHttpError()
-            .OrResult(msg => msg.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
-            .CircuitBreakerAsync(
-                handledEventsAllowedBeforeBreaking: 3,
-                durationOfBreak: TimeSpan.FromMinutes(2),
-                onBreak: (result, timespan) => AppLogger.Warn("AniListTrackingService", $"Circuit Breaker ABIERTO por {timespan.TotalSeconds}s"),
-                onReset: () => AppLogger.Info("AniListTrackingService", "Circuit Breaker RESET CERRADO"),
-                onHalfOpen: () => AppLogger.Info("AniListTrackingService", "Circuit Breaker MEDIO ABIERTO")
-            );
-
-        var random = new Random();
-        var retry = Polly.Extensions.Http.HttpPolicyExtensions
-            .HandleTransientHttpError()
-            .OrResult(msg => msg.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
-            // Permitir que el retry no falle de inmediato si el breaker está abierto (espera y reintenta)
-            .Or<Polly.CircuitBreaker.BrokenCircuitException>() 
-            .WaitAndRetryAsync(
-                retryCount: 3,
-                sleepDurationProvider: (retryCount, response, context) =>
-                {
-                    var delay = TimeSpan.FromSeconds(60); // Por defecto AniList bloquea 1 minuto
-                    if (response?.Result?.Headers.RetryAfter?.Delta.HasValue == true)
-                    {
-                        delay = response.Result.Headers.RetryAfter.Delta.Value.Add(TimeSpan.FromSeconds(1));
-                    }
-                    // Jitter para evitar thundering herd
-                    return delay.Add(TimeSpan.FromMilliseconds(random.Next(500, 2000)));
-                },
-                onRetryAsync: (outcome, timespan, retryCount, context) =>
-                {
-                    System.Diagnostics.Debug.WriteLine($"[AniList Rate Limit] Esperando {timespan.TotalSeconds} segundos. Reintento {retryCount}...");
-                    return System.Threading.Tasks.Task.CompletedTask;
-                });
-
-        return Polly.Policy.WrapAsync(retry, circuitBreaker);
     }
 
     private static System.Threading.Mutex? _singleInstanceMutex;
@@ -488,6 +464,15 @@ public partial class App : Application
 
             // Avisos y descarga automática de episodios nuevos (animes con la opción activada en su ficha).
             ServiceProvider.GetRequiredService<IEmisionMonitorService>().Iniciar();
+
+            // Indicador de conexión: al volver internet sincroniza al momento lo hecho sin conexión.
+            ServiceProvider.GetRequiredService<IEstadoConexionService>().Iniciar();
+            // Descargas que quedaron pendientes al cerrar la app: vuelven a la cola (las pausadas, en pausa).
+            _ = Task.Run(() =>
+            {
+                try { ServiceProvider.GetRequiredService<IDownloadService>().RestaurarColaPendiente(); }
+                catch (Exception ex) { AppLogger.Warn("App", $"No se pudo restaurar la cola de descargas: {ex.Message}"); }
+            });
 
             // Verificación de actualizaciones automáticas en segundo plano (4 h), salvo que
             // el usuario la desactive con "Buscar actualizaciones al iniciar".

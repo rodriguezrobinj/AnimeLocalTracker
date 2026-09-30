@@ -147,6 +147,7 @@ public class SkipTimesCoordinator : ISkipTimesCoordinator
         var resultados = new List<AniSkipResult>();
         bool completo = true;
         bool referenciasCompletas = false;
+        bool motorSinRespuesta = false;
 
         // 2) Audio de referencia (AnimeThemes): funciona con un solo episodio local y cubre opening y ending
         bool hayVideo = !string.IsNullOrWhiteSpace(rutaVideoLocal);
@@ -157,7 +158,9 @@ public class SkipTimesCoordinator : ISkipTimesCoordinator
             referenciasCompletas = referencias.Completa;
             if (!referencias.Completa) completo = false;
 
-            resultados.AddRange(await DetectarTemasAsync(episodio, referencias.Temas, rutaVideoLocal!, ct));
+            var deteccion = await DetectarTemasAsync(episodio, referencias.Temas, rutaVideoLocal!, ct);
+            motorSinRespuesta = deteccion.MotorSinRespuesta;
+            resultados.AddRange(deteccion.Tramos);
         }
         else
         {
@@ -204,7 +207,12 @@ public class SkipTimesCoordinator : ISkipTimesCoordinator
         if (ambosPorAudio) completo = true;
         else if (!resultados.Any(r => r.EsIntro) || !resultados.Any(r => r.EsEnding)) completo = false;
 
-        await GuardarAsync(animeId, episodio, firma, completo, resultados);
+        // Si el motor Python no respondió (fallo pasajero, no del archivo) no se guarda: guardarlo como incompleto dejaba el episodio sin
+        // marcas 12 h aunque al volver a abrirlo el análisis ya funcionara (caso real: Katainaka no Ossan II, episodio 8).
+        if (motorSinRespuesta)
+            AppLogger.Info("SkipTimesCoordinator", $"Análisis del episodio {episodio} sin guardar: el motor de audio no respondió; se repetirá al volver a abrirlo.");
+        else
+            await GuardarAsync(animeId, episodio, firma, completo, resultados);
         return resultados;
     }
 
@@ -231,14 +239,14 @@ public class SkipTimesCoordinator : ISkipTimesCoordinator
     /// prueban los temas que AnimeThemes dice que aplican al episodio y solo si ninguno acierta los demás (la numeración de los archivos
     /// no siempre coincide con la de AnimeThemes); para el ending también los openings (el episodio 1 y los finales suelen cerrar con él).
     /// </summary>
-    private async Task<List<AniSkipResult>> DetectarTemasAsync(int episodio, IReadOnlyList<TemaLocalDisponible> temas, string rutaEpisodio, CancellationToken ct)
+    private async Task<(List<AniSkipResult> Tramos, bool MotorSinRespuesta)> DetectarTemasAsync(int episodio, IReadOnlyList<TemaLocalDisponible> temas, string rutaEpisodio, CancellationToken ct)
     {
         var lista = new List<AniSkipResult>();
         var enviados = temas
             .Where(t => string.Equals(t.Tipo, "OP", StringComparison.OrdinalIgnoreCase) || string.Equals(t.Tipo, "ED", StringComparison.OrdinalIgnoreCase))
             .Select(t => new ReferenciaEnviada(t.RutaArchivo, t.Tipo.ToUpperInvariant(), t.AplicaAlEpisodio(episodio) ? 0 : 1))
             .ToList();
-        if (enviados.Count == 0) return lista;
+        if (enviados.Count == 0) return (lista, false);
 
         var payload = new
         {
@@ -259,9 +267,10 @@ public class SkipTimesCoordinator : ISkipTimesCoordinator
         if (respuesta is not { Success: true, Result: { Success: true } resultado })
         {
             // Antes un fallo del motor (ffmpeg, archivo ilegible…) se tragaba en silencio y parecía "no hay opening".
-            string motivo = respuesta?.Result?.Error ?? respuesta?.Error ?? "sin respuesta del motor Python";
-            AppLogger.Warn("SkipTimesCoordinator", $"No se pudo analizar el audio del episodio {episodio}: {motivo}");
-            return lista;
+            // Un error del plugin (ffmpeg, archivo ilegible…) viene con texto; sin él, el motor no contestó o contestó otra cosa.
+            string? motivo = respuesta?.Result?.Error ?? respuesta?.Error;
+            AppLogger.Warn("SkipTimesCoordinator", $"No se pudo analizar el audio del episodio {episodio}: {motivo ?? "sin respuesta válida del motor Python"}");
+            return (lista, motivo == null);
         }
 
         foreach (var tramo in new[] { "op", "ed" })
@@ -277,7 +286,7 @@ public class SkipTimesCoordinator : ISkipTimesCoordinator
             AppLogger.Info("SkipTimesCoordinator", $"REFERENCIA ANIMETHEMES: {tramo.ToUpperInvariant()} detectado [{mejor.Start:F1} - {mejor.End:F1}] (Conf: {mejor.Confidence:F2}{parcial}) con '{Path.GetFileName(mejor.ReferencePath)}'");
         }
         AppLogger.Debug("SkipTimesCoordinator", $"Audio de referencia del episodio {episodio}: {resultado.Evaluated} de {enviados.Count} tema(s) comparados en {resultado.Seconds:F1} s.");
-        return lista;
+        return (lista, false);
     }
 
     private sealed record ReferenciaEnviada(string Ruta, string Tipo, int Prioridad);

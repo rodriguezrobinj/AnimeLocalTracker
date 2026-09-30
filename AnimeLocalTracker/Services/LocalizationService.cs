@@ -33,6 +33,11 @@ public sealed class LocalizationService : INotifyPropertyChanged
 
     private static readonly Dictionary<string, string> Es = new()
     {
+        ["Con_BadgeSinConexion"] = "Sin conexión",
+        ["Con_BadgePendientes"] = "{0} por sincronizar",
+        ["Con_SinConexion"] = "Sin conexión — la app sigue funcionando con lo guardado",
+        ["Con_SinConexionPendientes"] = "Sin conexión — {0} cambio(s) se enviarán a AniList cuando vuelva internet",
+        ["Con_PendientesSincronizar"] = "{0} cambio(s) esperando a sincronizarse con AniList",
         ["Nav_Galeria"] = "Galería",
         ["Nav_Historial"] = "Historial",
         ["Nav_Actualizaciones"] = "Actualizaciones",
@@ -276,7 +281,6 @@ public sealed class LocalizationService : INotifyPropertyChanged
         // === ACTUALIZACIONES ===
         ["Act_Titulo"] = "Actualizaciones",
         ["Act_Subtitulo"] = "Capítulos recién emitidos de tus animes en emisión",
-        ["Act_SinConexion"] = "Sin conexión — mostrando la última programación guardada",
         ["Act_Descargar"] = "Descargar",
         ["Act_Reproducir"] = "Reproducir episodio",
         ["Act_Descargado"] = "Descargado",
@@ -612,6 +616,9 @@ public sealed class LocalizationService : INotifyPropertyChanged
         ["Add_ProximoEpisodioBadge"] = "Ep {0}+",
         ["Add_EpisodiosDesconocidoBadge"] = "Eps desc.",
         ["Add_ErrorBusquedaTitulo"] = "Error de conexión",
+        ["Add_SinConexionTitulo"] = "Sin conexión",
+        ["Add_SinConexionSub"] = "Buscar y añadir animes nuevos necesita internet. Tu biblioteca y lo que ya descargaste siguen disponibles.",
+        ["Add_Reintentar"] = "Reintentar",
         ["Add_ErrorBusquedaMsj"] = "No se pudo conectar con AniList. Revisa tu conexión e inténtalo de nuevo.",
 
         // === REPRODUCTOR (tooltips) ===
@@ -635,7 +642,6 @@ public sealed class LocalizationService : INotifyPropertyChanged
 
         // === CALENDARIO ===
         ["Cal_Titulo"] = "Calendario de Emisión",
-        ["Cal_SinConexion"] = "Sin conexión — mostrando la última programación guardada",
         ["Cal_SinEpisodios"] = "Sin episodios",
         ["Cal_YaEmitidoTip"] = "Ya emitido",
         ["Cal_ProximoTip"] = "Próximo",
@@ -840,6 +846,7 @@ public sealed class LocalizationService : INotifyPropertyChanged
         ["Gal_ConsultandoAniList"] = "Consultando AniList...",
         ["Gal_SincronizandoFormato"] = "Sincronizando: {0} ({1}/{2})",
         ["Gal_ActualizacionCompletada"] = "¡Actualización completada con éxito!",
+        ["Gal_ActualizacionSinConexion"] = "No se pudo conectar con AniList (¿sin internet?). Tu biblioteca sigue igual.",
 
         // --- Biblioteca: diálogos compartidos entre Galería y Detalle ---
         ["Bib_EliminarTitulo"] = "Eliminar de la biblioteca",
@@ -934,6 +941,10 @@ public sealed class LocalizationService : INotifyPropertyChanged
         ["Det_ErrorConectarAniListMsj"] = "Error al conectar con AniList para actualizar.",
         ["Det_ErrorAutenticacionTitulo"] = "Error de Autenticación",
         ["Det_DebesConectarAniListMsj"] = "Debes conectar tu cuenta de AniList primero.",
+        ["Det_SeguimientoPendienteTitulo"] = "Guardado sin conexión",
+        ["Det_SeguimientoPendienteMsj"] = "Tu cambio ya está en tu biblioteca y se enviará a AniList cuando vuelva la conexión.",
+        ["Det_SeguimientoLocalTitulo"] = "Guardado en tu biblioteca",
+        ["Det_SeguimientoLocalMsj"] = "Conecta tu cuenta de AniList en Configuración si quieres sincronizarlo.",
         ["Det_NubeSincronizadaTitulo"] = "Nube Sincronizada",
         ["Det_NubeSincronizadaMsj"] = "¡Seguimiento actualizado en AniList con éxito!",
         ["Det_ErrorSincronizacionTitulo"] = "Error de Sincronización",
@@ -1120,6 +1131,8 @@ public sealed class LocalizationService : INotifyPropertyChanged
         ["Cfg_EscaladoInteligenteSub"] = "Mejora la nitidez al ampliar videos de menor resolución (NVIDIA RTX Video Super Resolution o Intel). Automático: solo con tarjeta dedicada. No se aplica a videos de 10 bits.",
         ["Player_Audio"] = "Audio",
         ["Player_MenuAudio"] = "Pistas de audio",
+        ["Player_AudioUnicaPista"] = "Este video solo trae una pista de audio.",
+        ["Player_AudioSinPistas"] = "Este video no trae pistas de audio.",
         ["Player_Cancelar"] = "Cancelar",
         ["Player_SkipAutoFormato"] = "{0} automáticamente.",
         ["Skip_SaltarIntro"] = "Saltar intro",
@@ -1232,6 +1245,11 @@ public sealed class LocalizationService : INotifyPropertyChanged
 
     private static readonly Dictionary<string, string> En = new()
     {
+        ["Con_BadgeSinConexion"] = "Offline",
+        ["Con_BadgePendientes"] = "{0} to sync",
+        ["Con_SinConexion"] = "Offline — the app keeps working with what is saved",
+        ["Con_SinConexionPendientes"] = "Offline — {0} change(s) will be sent to AniList when the internet is back",
+        ["Con_PendientesSincronizar"] = "{0} change(s) waiting to sync with AniList",
         ["Nav_Galeria"] = "Library",
         ["Nav_Historial"] = "History",
         ["Nav_Actualizaciones"] = "Updates",
@@ -1475,7 +1493,6 @@ public sealed class LocalizationService : INotifyPropertyChanged
         // === ACTUALIZACIONES ===
         ["Act_Titulo"] = "Updates",
         ["Act_Subtitulo"] = "Recently aired episodes of your ongoing anime",
-        ["Act_SinConexion"] = "Offline — showing the last saved schedule",
         ["Act_Descargar"] = "Download",
         ["Act_Reproducir"] = "Play episode",
         ["Act_Descargado"] = "Downloaded",
@@ -1811,6 +1828,9 @@ public sealed class LocalizationService : INotifyPropertyChanged
         ["Add_ProximoEpisodioBadge"] = "Ep {0}+",
         ["Add_EpisodiosDesconocidoBadge"] = "Eps ?",
         ["Add_ErrorBusquedaTitulo"] = "Connection error",
+        ["Add_SinConexionTitulo"] = "Offline",
+        ["Add_SinConexionSub"] = "Searching and adding new anime needs internet. Your library and everything you downloaded are still available.",
+        ["Add_Reintentar"] = "Retry",
         ["Add_ErrorBusquedaMsj"] = "Couldn't connect to AniList. Check your connection and try again.",
 
         // === PLAYER (tooltips) ===
@@ -1834,7 +1854,6 @@ public sealed class LocalizationService : INotifyPropertyChanged
 
         // === CALENDAR ===
         ["Cal_Titulo"] = "Airing Calendar",
-        ["Cal_SinConexion"] = "Offline — showing the last saved schedule",
         ["Cal_SinEpisodios"] = "No episodes",
         ["Cal_YaEmitidoTip"] = "Already aired",
         ["Cal_ProximoTip"] = "Upcoming",
@@ -2039,6 +2058,7 @@ public sealed class LocalizationService : INotifyPropertyChanged
         ["Gal_ConsultandoAniList"] = "Querying AniList...",
         ["Gal_SincronizandoFormato"] = "Syncing: {0} ({1}/{2})",
         ["Gal_ActualizacionCompletada"] = "Update completed successfully!",
+        ["Gal_ActualizacionSinConexion"] = "Couldn't reach AniList (no internet?). Your library is unchanged.",
 
         // --- Library: dialogs shared between Library and Detail ---
         ["Bib_EliminarTitulo"] = "Remove from library",
@@ -2133,6 +2153,10 @@ public sealed class LocalizationService : INotifyPropertyChanged
         ["Det_ErrorConectarAniListMsj"] = "Error connecting to AniList to refresh.",
         ["Det_ErrorAutenticacionTitulo"] = "Authentication Error",
         ["Det_DebesConectarAniListMsj"] = "You must connect your AniList account first.",
+        ["Det_SeguimientoPendienteTitulo"] = "Saved offline",
+        ["Det_SeguimientoPendienteMsj"] = "Your change is already in your library and will be sent to AniList when the connection is back.",
+        ["Det_SeguimientoLocalTitulo"] = "Saved in your library",
+        ["Det_SeguimientoLocalMsj"] = "Connect your AniList account in Settings if you want to sync it.",
         ["Det_NubeSincronizadaTitulo"] = "Cloud Synced",
         ["Det_NubeSincronizadaMsj"] = "Tracking successfully updated on AniList!",
         ["Det_ErrorSincronizacionTitulo"] = "Sync Error",
@@ -2319,6 +2343,8 @@ public sealed class LocalizationService : INotifyPropertyChanged
         ["Cfg_EscaladoInteligenteSub"] = "Sharper image when enlarging lower-resolution videos (NVIDIA RTX Video Super Resolution or Intel). Automatic: dedicated cards only. Not applied to 10-bit videos.",
         ["Player_Audio"] = "Audio",
         ["Player_MenuAudio"] = "Audio tracks",
+        ["Player_AudioUnicaPista"] = "This video has only one audio track.",
+        ["Player_AudioSinPistas"] = "This video has no audio tracks.",
         ["Player_Cancelar"] = "Cancel",
         ["Player_SkipAutoFormato"] = "{0} automatically.",
         ["Skip_SaltarIntro"] = "Skip intro",

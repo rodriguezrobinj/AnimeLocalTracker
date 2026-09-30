@@ -643,11 +643,10 @@
                             <TextBlock Grid.Column="6" Text="{Binding TiempoCombinadoTexto}"
                                        Foreground="White" VerticalAlignment="Center" FontSize="13" FontWeight="Bold" Margin="5,0,0,0" Opacity="0.9"/>
 
-                            <!-- Audio (solo si el archivo trae más de una pista) + Subtítulos (menús manuales) -->
+                            <!-- Audio (siempre visible, aunque el archivo traiga una sola pista) + Subtítulos (menús manuales) -->
                             <StackPanel Grid.Column="8" Orientation="Horizontal">
                             <Button x:Name="AudioButton" Focusable="True"
                                     FocusVisualStyle="{StaticResource PlayerFocusVisual}"
-                                    Visibility="{Binding HayVariasPistasAudio, Converter={StaticResource BooleanToVisibilityConverter}}"
                                     ToolTip="{Binding [Player_MenuAudio], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
                                     AutomationProperties.Name="{Binding [Player_MenuAudio], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
                                     PreviewMouseLeftButtonDown="AudioButton_PreviewMouseLeftButtonDown"
@@ -709,6 +708,13 @@
                                                 </DataTemplate>
                                             </ItemsControl.ItemTemplate>
                                         </ItemsControl>
+                                        <!-- Con una sola pista (o ninguna) el menú lo explica en vez de parecer roto -->
+                                        <TextBlock Text="{Binding [Player_AudioUnicaPista], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                   Visibility="{Binding HayUnaSolaPistaAudio, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                                   Foreground="#94A3B8" FontSize="12" TextWrapping="Wrap" MaxWidth="240" Margin="15,8,10,0"/>
+                                        <TextBlock Text="{Binding [Player_AudioSinPistas], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                   Visibility="{Binding SinPistasAudio, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                                   Foreground="#94A3B8" FontSize="12" TextWrapping="Wrap" MaxWidth="240" Margin="15,0,10,0"/>
                                     </StackPanel>
                                 </Border>
                                 <Path x:Name="AudioPopupFlecha" Style="{StaticResource FlechaMenu}"/>

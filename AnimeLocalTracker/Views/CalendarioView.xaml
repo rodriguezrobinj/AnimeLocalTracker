@@ -151,16 +151,6 @@
             </Button>
         </Grid>
 
-        <!-- Sin conexión: se conservó el último calendario cargado en vez de vaciarlo -->
-        <Border CornerRadius="8" Background="#111827" BorderBrush="#1D4ED8" BorderThickness="1"
-                Padding="12,8" Margin="0,0,0,20"
-                Visibility="{Binding SinConexion, Converter={StaticResource BoolToVis}}">
-            <StackPanel Orientation="Horizontal">
-                <materialDesign:PackIcon Kind="WifiOff" Width="16" Height="16" Foreground="#60A5FA" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                <TextBlock Text="{Binding [Cal_SinConexion], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                           Foreground="#93C5FD" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
-            </StackPanel>
-        </Border>
         </StackPanel>
 
         <!-- Loader -->

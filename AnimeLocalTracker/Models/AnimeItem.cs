@@ -181,9 +181,14 @@ public partial class AnimeItem : ObservableObject
         }
     }
 
+    /// <summary>
+    /// La portada ya está en disco (acaba de cargarse o descargarse): la Ficha la toma del archivo. Antes esto borraba la ruta
+    /// guardada y <see cref="PortadaVisible"/> volvía a la URL: al abrir la app la Galería lo llamaba para todas las portadas, así
+    /// que la Ficha las pedía a internet (sin conexión se quedaban cargando para siempre). Llamar a <see cref="ResolverPortadaLocal"/>
+    /// antes, fuera del hilo de la interfaz.
+    /// </summary>
     public void NotificarPortadaActualizada()
     {
-        _portadaCacheada = null;
         OnPropertyChanged(nameof(PortadaVisible));
     }
 }

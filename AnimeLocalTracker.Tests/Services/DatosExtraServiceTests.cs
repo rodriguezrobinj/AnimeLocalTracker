@@ -52,12 +52,19 @@ public class DatosExtraServiceTests
     }
 
     [Fact]
-    public async Task ConCopiaDeMasDeUnaSemana_LaRefresca()
+    public async Task ConCopiaDeMasDeUnaSemana_LaMuestraYaYLaRefrescaDetras()
     {
         _db.Setup(d => d.ObtenerDatosExtraAsync(5)).ReturnsAsync(new DatosExtraAnime { AniListId = 5, NotaMedia = 60, ConsultadoUtc = DateTime.UtcNow.AddDays(-8) });
-        _tracking.Setup(t => t.ObtenerDatosExtraAsync(5)).ReturnsAsync((true, Media()));
+        var respuesta = new TaskCompletionSource<(bool, AniListMedia?)>();
+        _tracking.Setup(t => t.ObtenerDatosExtraAsync(5)).Returns(respuesta.Task);
+        var sut = CrearSut();
 
-        (await CrearSut().ObtenerAsync(5))!.NotaMedia.Should().Be(82);
+        var datos = await sut.ObtenerAsync(5); // AniList aún no respondió: no se le espera
+
+        datos!.NotaMedia.Should().Be(60);
+        respuesta.SetResult((true, Media()));
+        (await sut.UltimoRefresco)!.NotaMedia.Should().Be(82);
+        _db.Verify(d => d.GuardarDatosExtraAsync(It.Is<DatosExtraAnime>(x => x.NotaMedia == 82)), Times.Once);
     }
 
     [Fact]
@@ -66,7 +73,9 @@ public class DatosExtraServiceTests
         _db.Setup(d => d.ObtenerDatosExtraAsync(5)).ReturnsAsync(new DatosExtraAnime { AniListId = 5, NotaMedia = 60, ConsultadoUtc = DateTime.UtcNow.AddDays(-8) });
         _tracking.Setup(t => t.ObtenerDatosExtraAsync(5)).ReturnsAsync((false, (AniListMedia?)null));
 
-        var datos = await CrearSut().ObtenerAsync(5);
+        var sut = CrearSut();
+        var datos = await sut.ObtenerAsync(5);
+        await sut.UltimoRefresco;
 
         datos!.NotaMedia.Should().Be(60);
         DatosExtraService.DebeConsultar(datos, DateTime.UtcNow).Should().BeFalse("el fallo se anota y se reintenta pasadas unas horas");

@@ -78,10 +78,14 @@ public sealed partial class AdivinaPersonajeViewModel : MinijuegoViewModelBase, 
 
     protected override string JuegoId => JuegosMinijuego.AdivinaPersonaje;
 
-    public AdivinaPersonajeViewModel(IDatabaseService databaseService, IPersonajesService personajes, IMinijuegosRecordsService? records = null)
+    private readonly GuardiaConexion? _guardiaConexion;
+
+    public AdivinaPersonajeViewModel(IDatabaseService databaseService, IPersonajesService personajes, IMinijuegosRecordsService? records = null,
+        GuardiaConexion? guardiaConexion = null)
         : base(databaseService, records)
     {
         _personajes = personajes;
+        _guardiaConexion = guardiaConexion;
     }
 
     [RelayCommand]
@@ -217,10 +221,16 @@ public sealed partial class AdivinaPersonajeViewModel : MinijuegoViewModelBase, 
 
         try
         {
-            var candidatos = Biblioteca.OrderBy(_ => Rng.Next()).Take(AdivinaAnimeJuego.RondasPorPartida + AnimesExtra).ToList();
+            // Sin conexión solo sirven personajes ya guardados con su imagen: se mira toda la biblioteca (es leer de disco) en vez de
+            // unos pocos animes al azar, que casi nunca alcanzaban para una partida entera.
+            bool sinConexion = _guardiaConexion?.PareceSinConexion == true;
+            var mezclados = Biblioteca.OrderBy(_ => Rng.Next());
+            var candidatos = (sinConexion ? mezclados : mezclados.Take(AdivinaAnimeJuego.RondasPorPartida + AnimesExtra)).ToList();
             var porAnime = await _personajes.ObtenerAsync(candidatos.Select(a => a.AniListId).ToList(), limite.Token);
 
-            var elegidas = AdivinaPersonajeJuego.ElegirRespuestas(candidatos, porAnime, AdivinaAnimeJuego.RondasPorPartida + RondasExtra, Rng);
+            var respuestasPosibles = !sinConexion ? porAnime : porAnime.ToDictionary(
+                kv => kv.Key, kv => kv.Value.Where(_personajes.TieneImagenLocal).ToList());
+            var elegidas = AdivinaPersonajeJuego.ElegirRespuestas(candidatos, respuestasPosibles, AdivinaAnimeJuego.RondasPorPartida + RondasExtra, Rng);
             var rondas = new List<RondaAdivinaPersonaje>();
             foreach (var (anime, personaje) in elegidas)
             {

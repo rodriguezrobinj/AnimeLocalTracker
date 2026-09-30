@@ -69,6 +69,16 @@ public interface IDatabaseService
     // === PRÓXIMA EMISIÓN: copia local del próximo episodio de animes en emisión (cuenta atrás sin red) ===
     Task<ProximaEmisionLocal?> ObtenerProximaEmisionAsync(int aniListId);
     Task GuardarProximaEmisionAsync(ProximaEmisionLocal proxima);
+    Task<List<ProximaEmisionLocal>> ObtenerProximasEmisionesAsync();
+
+    Task<SeguimientoLocal?> ObtenerSeguimientoLocalAsync(int aniListId);
+    Task GuardarSeguimientoLocalAsync(SeguimientoLocal seguimiento);
+    /// <summary>Cambios del editor de seguimiento hechos sin conexión, a la espera de subirse a AniList.</summary>
+    Task<List<SeguimientoLocal>> ObtenerSeguimientosPendientesAsync();
+
+    /// <summary>Guarda la programación que dio AniList para esos animes en esa ventana (la reemplaza entera).</summary>
+    Task GuardarEmisionesAsync(IReadOnlyCollection<int> animeIds, long inicioUnix, long finUnix, IReadOnlyList<EmisionGuardada> emisiones);
+    Task<List<EmisionGuardada>> ObtenerEmisionesAsync(long inicioUnix, long finUnix);
 
     // === PÁGINA DE ANIMEAV1 VERIFICADA por anime (las descargas van directo a ella, también tras reiniciar) ===
     Task<MediaAnimeAv1Verificado?> ObtenerMediaAnimeAv1Async(int aniListId);

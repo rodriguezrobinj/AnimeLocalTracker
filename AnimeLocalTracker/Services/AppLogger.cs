@@ -54,8 +54,16 @@ public static class AppLogger
     public static void Debug(string source, string message) => Log("DEBUG", source, message);
     public static void Info(string source, string message) => Log("INFO", source, message);
     public static void Warn(string source, string message) => Log("WARN", source, message);
-    public static void Error(string source, string message, Exception? ex = null) =>
+    public static void Error(string source, string message, Exception? ex = null)
+    {
+        // Sin internet es un estado esperado de la app (offline-first), no un error: una línea sin traza en vez de llenar el log.
+        if (ex is SinConexionException)
+        {
+            Log("DEBUG", source, $"{message}: sin conexión.");
+            return;
+        }
         Log("ERROR", source, message, ex?.ToString());
+    }
 
     private static void Log(string level, string source, string message, string? exceptionDetails = null)
     {

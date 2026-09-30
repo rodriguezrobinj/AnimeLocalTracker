@@ -23,6 +23,9 @@ public interface IPersonajesService
 
     /// <summary>Ruta local de la imagen del personaje (la descarga la primera vez); null si no se pudo conseguir.</summary>
     Task<string?> ObtenerImagenAsync(PersonajeAnime personaje, CancellationToken ct = default);
+
+    /// <summary>La imagen del personaje ya está guardada (sin conexión, solo esos pueden ser respuesta).</summary>
+    bool TieneImagenLocal(PersonajeAnime personaje);
 }
 
 /// <summary>
@@ -215,6 +218,20 @@ public sealed class PersonajesService : IPersonajesService
             }
         }
         return resultado;
+    }
+
+    public bool TieneImagenLocal(PersonajeAnime personaje)
+    {
+        if (personaje.PersonajeId <= 0) return false;
+        try
+        {
+            var info = new FileInfo(Path.Combine(_carpetaImagenes, $"{personaje.PersonajeId}.jpg"));
+            return info.Exists && info.Length > 0;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
     }
 
     public async Task<string?> ObtenerImagenAsync(PersonajeAnime personaje, CancellationToken ct = default)

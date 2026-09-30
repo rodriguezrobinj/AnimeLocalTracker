@@ -31,10 +31,10 @@ public class ReproductorMejorasTests
     // === Esc y salida del reproductor ===
 
     [Fact]
-    public void Esc_APantallaCompleta_VuelveAVentana_SinCerrarElEpisodio()
+    public void Esc_APantallaCompleta_CierraElReproductor_SinQuitarLaPantallaCompleta()
     {
+        // Decisión del usuario: Esc solo sale del reproductor; la Ficha sigue a pantalla completa (quitarla es F11).
         _ventana.Setup(v => v.EstaEnPantallaCompleta).Returns(true);
-        _ventana.Setup(v => v.AlternarPantallaCompleta()).Returns("Fullscreen");
         using var sut = CrearSut();
         bool salio = false;
         var receptor = new object();
@@ -42,8 +42,9 @@ public class ReproductorMejorasTests
 
         sut.TeclaCerrar();
 
-        _ventana.Verify(v => v.AlternarPantallaCompleta(), Times.Once);
-        salio.Should().BeFalse("con Esc a pantalla completa se sale de pantalla completa, no del episodio");
+        salio.Should().BeTrue();
+        _ventana.Verify(v => v.AlternarPantallaCompleta(), Times.Never);
+        _ventana.Verify(v => v.SalirDePantallaCompleta(), Times.Never);
         WeakReferenceMessenger.Default.UnregisterAll(receptor);
     }
 
@@ -62,16 +63,20 @@ public class ReproductorMejorasTests
     }
 
     [Fact]
-    public void AlCerrar_LaVentanaVuelveASuTamanoNormal()
+    public void BotonDeRetroceder_APantallaCompleta_SaleDelReproductor_SinQuitarLaPantallaCompleta()
     {
-        // Antes, cerrar a pantalla completa dejaba la Ficha a pantalla completa (sin barra de tareas).
+        // Decisión del usuario: el botón de retroceder (y la ✕) hacen lo mismo que Esc; solo cierran el PiP si estaba abierto.
+        _ventana.Setup(v => v.EstaEnPantallaCompleta).Returns(true);
         using var sut = CrearSut();
+        bool salio = false;
         var receptor = new object();
-        WeakReferenceMessenger.Default.Register<NavegarMensaje_VolverDelReproductor>(receptor, (_, _) => { });
+        WeakReferenceMessenger.Default.Register<NavegarMensaje_VolverDelReproductor>(receptor, (_, _) => salio = true);
 
         sut.CerrarCommand.Execute(null);
 
-        _ventana.Verify(v => v.SalirDePantallaCompleta(), Times.Once);
+        salio.Should().BeTrue();
+        _ventana.Verify(v => v.SalirDePantallaCompleta(), Times.Never);
+        _ventana.Verify(v => v.AlternarPantallaCompleta(), Times.Never);
         _ventana.Verify(v => v.SalirModoMini(), Times.AtLeastOnce);
         WeakReferenceMessenger.Default.UnregisterAll(receptor);
     }

@@ -1261,72 +1261,121 @@ public partial class DetalleViewModel : ObservableObject,
         }
     }
     
+    /// <summary>Lo último que se puso en el editor desde código: si el usuario no lo tocó, lo de AniList puede reemplazarlo.</summary>
+    private (string Estado, int Progreso, float Puntaje, DateTime? Inicio, DateTime? Fin)? _editorAplicado;
+
+    private void AplicarAlEditor(string estado, int progreso, float puntaje, DateTime? inicio, DateTime? fin)
+    {
+        int max = ObtenerMaximoEpisodiosEmitidos();
+        EditProgreso = Math.Clamp(progreso, 0, max > 0 ? max : 9999);
+        EditProgresoTexto = EditProgreso.ToString();
+        EditEstadoVisual = ConvertirEstadoAEspanol(estado);
+        EditPuntaje = puntaje;
+        EditFechaInicio = inicio;
+        EditFechaFin = fin;
+        NotificarDerivadosEditor();
+        _editorAplicado = ValoresDelEditor();
+    }
+
+    private (string, int, float, DateTime?, DateTime?) ValoresDelEditor() =>
+        (ConvertirEstadoAIngles(EditEstadoVisual), EditProgreso, EditPuntaje, EditFechaInicio, EditFechaFin);
+
+    private static DateTime? DesdeFechaAniList(AniListFuzzyDate? fecha) =>
+        fecha?.Year is int anio ? new DateTime(anio, fecha.Month ?? 1, fecha.Day ?? 1) : null;
+
     [RelayCommand]
     private async Task AbrirEditorSeguimientoAsync()
     {
         if (AnimeSeleccionado == null) return;
-        
-        EditEstado = "CURRENT";
-        EditProgreso = AnimeSeleccionado.EpisodiosVistos;
-        EditProgresoTexto = EditProgreso.ToString();
-        EditPuntaje = 0;
-        EditFechaInicio = null;
-        EditFechaFin = null;
-        EditEstadoVisual = LocalizationService.T("Estado_Viendo");
-        NotificarDerivadosEditor();
+        var anime = AnimeSeleccionado;
+
+        // 1) Al instante, lo guardado en local. Antes abría con "Viendo, 0 pts, sin fechas" y solo se corregía si AniList
+        //    respondía: sin conexión mostraba datos falsos.
+        SeguimientoLocal? local = null;
+        try { local = await _databaseService.ObtenerSeguimientoLocalAsync(anime.AniListId); }
+        catch (Exception ex) { AppLogger.Debug("DetalleViewModel", $"No se pudo leer el seguimiento local de {anime.AniListId}: {ex.Message}"); }
+        if (!ReferenceEquals(anime, AnimeSeleccionado)) return;
+
+        string estadoLocal = local?.Estado ?? (string.IsNullOrWhiteSpace(anime.EstadoUsuario) ? "CURRENT" : anime.EstadoUsuario);
+        AplicarAlEditor(estadoLocal, local?.Progreso ?? anime.EpisodiosVistos, local?.Puntaje ?? 0, local?.FechaInicio, local?.FechaFin);
         MostrandoEditorSeguimiento = true;
 
+        // 2) Con conexión, lo de AniList (que puede venir de otro dispositivo). Un cambio local aún sin enviar manda sobre él.
+        if (local?.Pendiente == true) return;
         var token = _authService.ObtenerTokenGuardado();
         if (string.IsNullOrEmpty(token)) return;
 
-        var datos = await _animeTrackingService.ObtenerSeguimientoUsuarioAsync(AnimeSeleccionado.AniListId, token);
-        if (datos != null)
-        {
-            EditEstadoVisual = ConvertirEstadoAEspanol(datos.Status ?? "CURRENT");
-            int max = ObtenerMaximoEpisodiosEmitidos();
-            EditProgreso = Math.Clamp(datos.Progress, 0, max > 0 ? max : 9999);
-            EditProgresoTexto = EditProgreso.ToString();
-            EditPuntaje = datos.Score;
-            
-            if (datos.StartedAt != null && datos.StartedAt.Year.HasValue)
-                EditFechaInicio = new DateTime(datos.StartedAt.Year.Value, datos.StartedAt.Month ?? 1, datos.StartedAt.Day ?? 1);
-            
-            if (datos.CompletedAt != null && datos.CompletedAt.Year.HasValue)
-                EditFechaFin = new DateTime(datos.CompletedAt.Year.Value, datos.CompletedAt.Month ?? 1, datos.CompletedAt.Day ?? 1);
+        var datos = await _animeTrackingService.ObtenerSeguimientoUsuarioAsync(anime.AniListId, token);
+        if (datos == null || !ReferenceEquals(anime, AnimeSeleccionado)) return;
 
-            NotificarDerivadosEditor();
-        }
+        var remoto = new SeguimientoLocal
+        {
+            AniListId = anime.AniListId,
+            Estado = datos.Status ?? "CURRENT",
+            Progreso = datos.Progress,
+            Puntaje = datos.Score,
+            FechaInicio = DesdeFechaAniList(datos.StartedAt),
+            FechaFin = DesdeFechaAniList(datos.CompletedAt),
+            ModificadoUtc = DateTime.UtcNow
+        };
+        try { await _databaseService.GuardarSeguimientoLocalAsync(remoto); }
+        catch (Exception ex) { AppLogger.Debug("DetalleViewModel", $"No se pudo guardar el seguimiento local de {anime.AniListId}: {ex.Message}"); }
+
+        // Si el usuario ya empezó a editar mientras llegaba la respuesta, no se le pisa lo que escribió.
+        if (MostrandoEditorSeguimiento && _editorAplicado == ValoresDelEditor())
+            AplicarAlEditor(remoto.Estado, remoto.Progreso, remoto.Puntaje, remoto.FechaInicio, remoto.FechaFin);
     }
 
     [RelayCommand]
     private async Task GuardarEditorSeguimientoAsync()
     {
         if (AnimeSeleccionado == null) return;
-        
-        var token = _authService.ObtenerTokenGuardado();
-        if (string.IsNullOrEmpty(token))
-        {
-            await _dialogService.MostrarDialogoAsync(LocalizationService.T("Det_ErrorAutenticacionTitulo"), LocalizationService.T("Det_DebesConectarAniListMsj"), false, "AlertCircleOutline", "#E53935");
-            return;
-        }
+        var anime = AnimeSeleccionado;
 
         int max = ObtenerMaximoEpisodiosEmitidos();
         int progresoFinal = Math.Clamp(EditProgreso, 0, max > 0 ? max : 9999);
         string estadoEnIngles = ConvertirEstadoAIngles(EditEstadoVisual);
+        var token = _authService.ObtenerTokenGuardado();
+        bool conCuenta = !string.IsNullOrEmpty(token);
+
+        // 1) Siempre en local: sin conexión (o sin cuenta de AniList) el cambio ya no se pierde. Pendiente solo con cuenta: sin ella
+        //    no hay a dónde enviarlo, y subirlo al conectar una cuenta días después podría pisar lo que haya en AniList.
+        var seguimiento = new SeguimientoLocal
+        {
+            AniListId = anime.AniListId,
+            Estado = estadoEnIngles,
+            Progreso = progresoFinal,
+            Puntaje = EditPuntaje,
+            FechaInicio = EditFechaInicio,
+            FechaFin = EditFechaFin,
+            Pendiente = conCuenta,
+            ModificadoUtc = DateTime.UtcNow
+        };
+        anime.EstadoUsuario = estadoEnIngles;
+        anime.EpisodiosVistos = progresoFinal;
+        await _databaseService.ActualizarAnimeAsync(anime);
+        await _databaseService.GuardarSeguimientoLocalAsync(seguimiento);
+        MostrandoEditorSeguimiento = false;
+
+        if (!conCuenta)
+        {
+            _dialogService.MostrarToast(LocalizationService.T("Det_SeguimientoLocalTitulo"), LocalizationService.T("Det_SeguimientoLocalMsj"), "ContentSaveOutline", "#60A5FA");
+            return;
+        }
+
+        // 2) A AniList; si no se puede ahora, lo envía la sincronización cuando vuelva la conexión.
         bool exito = await _animeTrackingService.GuardarSeguimientoUsuarioAsync(
-            AnimeSeleccionado.AniListId, estadoEnIngles, progresoFinal, EditPuntaje, EditFechaInicio, EditFechaFin, token);
-            
+            anime.AniListId, estadoEnIngles, progresoFinal, EditPuntaje, EditFechaInicio, EditFechaFin, token!);
+
         if (exito)
         {
-            MostrandoEditorSeguimiento = false;
-            AnimeSeleccionado.EstadoUsuario = estadoEnIngles;
-            AnimeSeleccionado.EpisodiosVistos = progresoFinal;
-            await _databaseService.ActualizarAnimeAsync(AnimeSeleccionado);
+            seguimiento.Pendiente = false;
+            await _databaseService.GuardarSeguimientoLocalAsync(seguimiento);
             await _dialogService.MostrarDialogoAsync(LocalizationService.T("Det_NubeSincronizadaTitulo"), LocalizationService.T("Det_NubeSincronizadaMsj"), false, "CloudCheck", "#4CAF50");
         }
         else
         {
-            await _dialogService.MostrarDialogoAsync(LocalizationService.T("Det_ErrorSincronizacionTitulo"), LocalizationService.T("Det_ErrorSincronizacionMsj"), false, "AlertCircleOutline", "#E53935");
+            _dialogService.MostrarToast(LocalizationService.T("Det_SeguimientoPendienteTitulo"), LocalizationService.T("Det_SeguimientoPendienteMsj"), "CloudOffOutline", "#60A5FA");
         }
     }
     

@@ -1234,11 +1234,14 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         _subtitleCoordinator.SeleccionarPista(Player, stream);
     }
 
-    // ── Pistas de audio (solo con más de una: doblaje + original, comentarios…) ──
+    // ── Pistas de audio (doblaje + original, comentarios…). El botón está siempre; con una sola pista el menú lo dice. ──
 
     public System.Collections.ObjectModel.ObservableCollection<OpcionPistaAudio> PistasAudio { get; } = new();
 
     [ObservableProperty] private bool _hayVariasPistasAudio;
+    [ObservableProperty] private bool _hayUnaSolaPistaAudio;
+    /// <summary>El archivo abierto no trae audio. Falso antes de abrir (mientras carga no se afirma nada).</summary>
+    [ObservableProperty] private bool _sinPistasAudio;
 
     [RelayCommand]
     private void SeleccionarPistaAudio(OpcionPistaAudio? opcion)
@@ -1267,6 +1270,8 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             PistasAudio.Clear();
             foreach (var o in opciones) PistasAudio.Add(o);
             HayVariasPistasAudio = opciones.Count > 1;
+            HayUnaSolaPistaAudio = opciones.Count == 1;
+            SinPistasAudio = opciones.Count == 0;
         });
 
         if (!aplicarPreferencia) return;
@@ -2517,23 +2522,12 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     [RelayCommand]
     public void Cerrar() => SalirDelReproductor("botón o tecla Cerrar");
 
-    /// <summary>
-    /// Tecla de cerrar (Esc por defecto): a pantalla completa, primero vuelve al tamaño normal (como en cualquier reproductor);
-    /// solo cierra si ya estaba en ventana. Antes cerraba el episodio de golpe y dejaba la Ficha a pantalla completa.
-    /// </summary>
-    public void TeclaCerrar()
-    {
-        if (!EsModoMini && _windowModeCoordinator.EstaEnPantallaCompleta)
-        {
-            ToggleFullscreen();
-            return;
-        }
-        Cerrar();
-    }
+    /// <summary>Tecla de cerrar (Esc por defecto): solo sale del reproductor, igual que el botón de retroceder.</summary>
+    public void TeclaCerrar() => SalirDelReproductor("tecla Cerrar");
 
     /// <summary>
-    /// Única salida del reproductor: guarda, deja la ventana en su tamaño normal (sin PiP ni pantalla completa) y vuelve a la
-    /// vista anterior. Registra el motivo en el log: si alguna vez "vuelve solo a la ficha", el log dirá qué lo pidió.
+    /// Única salida del reproductor (botón de retroceder, ✕, Esc, fin de episodio): guarda, cierra el PiP y vuelve a la vista
+    /// anterior. La pantalla completa se conserva (decisión del usuario): solo se sale del reproductor, no del modo de la ventana. Registra el motivo en el log: si alguna vez "vuelve solo a la ficha", el log dirá qué lo pidió.
     /// </summary>
     private void SalirDelReproductor(string motivo)
     {
@@ -2541,7 +2535,6 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         try { AppLogger.Debug("ReproductorViewModel", $"[Arranque] Al salir: CurTime={TimeSpan.FromTicks(Player?.CurTime ?? 0).TotalSeconds:F1} s, estado {Player?.Status}, fotogramas {Player?.Video?.FramesDisplayed}, audio {Player?.Audio?.FramesDisplayed}, spec={Player?.VideoDecoder?.CurCodecSpec.Name} hw={Player?.VideoDecoder?.CurCodecSpec.IsHW} accel={Player?.VideoDecoder?.VideoAccelerated} pixfmt={Player?.Video?.PixelFormat} codec={Player?.Video?.Codec}."); } catch { }
         EsModoMini = false;
         _windowModeCoordinator.SalirModoMini();
-        _windowModeCoordinator.SalirDePantallaCompleta();
         _ = GuardarProgresoActualAsync();
         Dispose();
 

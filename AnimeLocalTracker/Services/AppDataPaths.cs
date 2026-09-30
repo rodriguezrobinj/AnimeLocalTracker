@@ -38,6 +38,8 @@ public static class AppDataPaths
     public static string TokenPath { get; } = Path.Combine(DataRoot, "anilist_token.txt");
     public static string SettingsPath { get; } = Path.Combine(DataRoot, "settings.json");
     public static string ReleaseInfoPath { get; } = Path.Combine(DataRoot, "release_info.json");
+    /// <summary>Cola de descargas pendientes (se restaura al abrir la app).</summary>
+    public static string ColaDescargasPath { get; } = Path.Combine(DataRoot, "cola_descargas.json");
 
     /// <summary>Ubicación heredada (pre-v5) de settings y caché de release: %AppData%\AnimeLocalTracker.</summary>
     private static string RutaRoamingAntigua() => Path.Combine(
