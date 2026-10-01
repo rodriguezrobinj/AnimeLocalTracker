@@ -30,6 +30,12 @@
     </ItemGroup>
 
     <ItemGroup>
+      <!-- FlyleafLib se queda sin precompilar al publicar: ParcheSubtitulosFlyleaf (Harmony) sustituye una función suya en
+           ejecución, y eso solo está probado sobre código compilado al vuelo, como en los builds de desarrollo. -->
+      <PublishReadyToRunExclude Include="FlyleafLib.dll" />
+    </ItemGroup>
+
+    <ItemGroup>
       <!-- Evita colisiones de nombres entre WinForms y WPF (UserControl, Application, Point, KeyEventArgs...). -->
       <Using Remove="System.Windows.Forms" />
       <Using Remove="System.Drawing" />
@@ -40,6 +46,8 @@
       <PackageReference Include="Flyleaf.FFmpeg" Version="9.0.0" />
       <PackageReference Include="FlyleafLib" Version="3.11.3" />
       <PackageReference Include="FlyleafLib.Controls.WPF" Version="1.7.3" />
+      <!-- Parche en caliente del lector de subtítulos ASS de FlyleafLib (ver Services/ParcheSubtitulosFlyleaf.cs). -->
+      <PackageReference Include="Lib.Harmony" Version="2.4.2" />
       <PackageReference Include="MaterialDesignThemes" Version="5.3.3-ci1462" />
       <PackageReference Include="MdXaml" Version="1.27.0" />
       <!-- Descargas por torrent (Nyaa.si, MVP): MIT, activamente mantenida. -->
