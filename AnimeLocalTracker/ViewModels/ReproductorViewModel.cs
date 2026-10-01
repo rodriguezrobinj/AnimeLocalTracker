@@ -306,13 +306,8 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     private IReadOnlyList<Models.SubtitleCue> _subtitleCues = Array.Empty<Models.SubtitleCue>();
     private CancellationTokenSource? _subtitleCuesCts;
 
-    /// <summary>
-    /// Se llama tras abrir el video y tras cada cambio de pista de subtítulos (mismo punto: <c>OpenCompleted</c>
-    /// vuelve a disparar cuando <see cref="SelectSubtitleStream"/> reabre el Player con otra pista). Extrae la
-    /// pista completa en segundo plano; hasta que termine (o si falla) se sigue mostrando el texto único de
-    /// Flyleaf, así los subtítulos nunca desaparecen por culpa de esta mejora.
-    /// </summary>
-    private void CargarCuesSubtitulosSiCorresponde()
+    /// <summary>Olvida la pista extraída (episodio nuevo o cambio de pista) y cancela la extracción que estuviera en curso.</summary>
+    private void ReiniciarCuesSubtitulos()
     {
         _subtitleCuesCts?.Cancel();
         _subtitleCuesCts?.Dispose();
@@ -320,9 +315,40 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
         SubtitulosDobleLineaActivo = false;
         _subtitleCues = Array.Empty<Models.SubtitleCue>();
+        SubtituloLineaAbajo = string.Empty;
+        SubtituloLineaArriba = string.Empty;
+    }
+
+    /// <summary>
+    /// Muestra la pista elegida (sola al abrir el episodio, o por el usuario en el menú). Las pistas de texto incrustadas las lee
+    /// la app por su cuenta y Flyleaf ni las abre: su lector de subtítulos ASS cierra la aplicación entera con ciertas etiquetas
+    /// de color (caso real: el cartel del título de Re:Zero 4th Season, <c>{\c&amp;H..&amp;\fad(..)..\3a&amp;H37&amp;..}</c>), en un
+    /// hilo suyo que no se puede proteger. Solo las pistas de imagen (PGS/VobSub), que la app no sabe dibujar, van por Flyleaf.
+    /// </summary>
+    private void AbrirPistaSubtitulos(object pista)
+    {
+        ReiniciarCuesSubtitulos();
+
+        if (pista is FlyleafLib.MediaFramework.MediaStream.SubtitlesStream { IsBitmap: false, ExternalStream: null } texto)
+        {
+            _subtitleCoordinator.Deshabilitar(Player); // por si Flyleaf tenía abierta otra pista (de imagen)
+            IniciarCargaCuesSubtitulos(_rutaVideo, texto.StreamIndex, null, texto);
+            return;
+        }
+
+        _subtitleCoordinator.SeleccionarPista(Player, pista);
+    }
+
+    /// <summary>
+    /// Se llama cuando Flyleaf termina de abrir una pista de subtítulos (de imagen, externa o una de texto que la app no pudo
+    /// leer). Se intenta extraer igualmente para resolver los solapes; hasta que termine (o si falla) se muestra el texto único
+    /// de Flyleaf.
+    /// </summary>
+    private void CargarCuesDePistaDeFlyleaf()
+    {
+        ReiniciarCuesSubtitulos();
 
         var subtitulos = Player?.Subtitles;
-        AppLogger.Debug("ReproductorViewModel", $"Pistas de subtítulos disponibles: {subtitulos?.Streams?.Count ?? -1}, activa (StreamIndex): {subtitulos?.StreamIndex ?? -99}.");
         if (subtitulos == null || subtitulos.StreamIndex < 0) return;
         var stream = subtitulos.Streams?.FirstOrDefault(s => s.StreamIndex == subtitulos.StreamIndex);
         if (stream == null) return;
@@ -331,15 +357,21 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         // incrustada en el propio contenedor no tiene ExternalStream y se identifica por su índice de flujo.
         string? rutaExterna = stream.ExternalStream?.Url;
         int? streamIndexEmbebido = rutaExterna == null ? stream.StreamIndex : null;
-        string rutaVideo = _rutaVideo;
 
+        IniciarCargaCuesSubtitulos(_rutaVideo, streamIndexEmbebido, rutaExterna, null);
+    }
+
+    private void IniciarCargaCuesSubtitulos(string rutaVideo, int? streamIndexEmbebido, string? rutaExterna, object? pistaSinFlyleaf)
+    {
         var cts = new CancellationTokenSource();
         _subtitleCuesCts = cts;
 
-        _ = CargarCuesSubtitulosAsync(rutaVideo, streamIndexEmbebido, rutaExterna, cts);
+        _ = CargarCuesSubtitulosAsync(rutaVideo, streamIndexEmbebido, rutaExterna, pistaSinFlyleaf, cts);
     }
 
-    private async Task CargarCuesSubtitulosAsync(string rutaVideo, int? streamIndexEmbebido, string? rutaExterna, CancellationTokenSource cts)
+    /// <param name="pistaSinFlyleaf">Pista de texto que Flyleaf no tiene abierta: si la app no consigue leerla, se le entrega a
+    /// Flyleaf como último recurso para no dejar el episodio sin subtítulos. Null si Flyleaf ya la está mostrando.</param>
+    private async Task CargarCuesSubtitulosAsync(string rutaVideo, int? streamIndexEmbebido, string? rutaExterna, object? pistaSinFlyleaf, CancellationTokenSource cts)
     {
         try
         {
@@ -348,9 +380,19 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
             _subtitleCues = cues;
             SubtitulosDobleLineaActivo = cues.Count > 0;
-            AppLogger.Debug("ReproductorViewModel", cues.Count > 0
-                ? $"Pista de subtítulos extraída: {cues.Count} líneas."
-                : "Extracción de subtítulos sin resultado: se sigue mostrando el texto único de Flyleaf.");
+            if (cues.Count > 0)
+            {
+                AppLogger.Debug("ReproductorViewModel", $"Pista de subtítulos {streamIndexEmbebido?.ToString() ?? "externa"} extraída: {cues.Count} líneas.");
+            }
+            else if (pistaSinFlyleaf != null && SubtitulosHabilitados)
+            {
+                AppLogger.Warn("ReproductorViewModel", $"No se pudo leer la pista de subtítulos {streamIndexEmbebido}: se deja en manos de Flyleaf.");
+                _subtitleCoordinator.SeleccionarPista(Player, pistaSinFlyleaf);
+            }
+            else
+            {
+                AppLogger.Debug("ReproductorViewModel", "Extracción de subtítulos sin resultado: se sigue mostrando lo que dé Flyleaf.");
+            }
         }
         catch (OperationCanceledException)
         {
@@ -861,10 +903,11 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                 config.Demuxer.BufferDuration = 300_000_000L;
             }
 
-            // 4. Subtítulos
+            // 4. Subtítulos: Flyleaf arranca siempre con los suyos apagados para que no abra (ni lea) ninguna pista por su cuenta;
+            // la app elige la pista y la lee ella misma (ver AbrirPistaSubtitulos).
             if (config.Subtitles != null)
             {
-                config.Subtitles.Enabled = SubtitulosHabilitados;
+                config.Subtitles.Enabled = false;
             }
 
             // 5. Filtros de audio guardados: ecualizador y Modo Noche (compresor de rango dinámico)
@@ -884,13 +927,13 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
             player.OpenCompleted += (s, e) =>
             {
-                // Cambiar de pista de subtítulos también dispara OpenCompleted: solo hay que extraer la pista nueva. Antes se
+                // Que Flyleaf abra una pista de subtítulos también dispara OpenCompleted: solo hay que extraer la pista nueva. Antes se
                 // reevaluaba "subtítulos por defecto" y, con esa opción apagada, se apagaba en el acto la pista que el usuario
                 // acababa de elegir en el menú.
                 if (e.IsSubtitles)
                 {
                     if (!e.Success) AppLogger.Warn("ReproductorViewModel", $"No se pudo abrir la pista de subtítulos: {e.Error}");
-                    CargarCuesSubtitulosSiCorresponde();
+                    CargarCuesDePistaDeFlyleaf();
                     return;
                 }
 
@@ -912,8 +955,8 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
                 _haCompletadoOpen = true;
                 AppLogger.Debug("ReproductorViewModel", $"[Arranque] OpenCompleted a los {_relojArranque.ElapsedMilliseconds} ms (estado {player.Status}).");
+                AppLogger.Debug("ReproductorViewModel", $"Pistas de subtítulos disponibles: {player.Subtitles?.Streams?.Count ?? -1}.");
                 EvaluarSubtitulosPorDefecto();
-                CargarCuesSubtitulosSiCorresponde();
 
                 try
                 {
@@ -1231,7 +1274,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
         SubtitulosHabilitados = true;
         SubtitulosIcon = "Subtitles";
-        _subtitleCoordinator.SeleccionarPista(Player, stream);
+        AbrirPistaSubtitulos(stream);
     }
 
     // ── Pistas de audio (doblaje + original, comentarios…). El botón está siempre; con una sola pista el menú lo dice. ──
@@ -1331,17 +1374,13 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             {
                 HabilitarSubtitulos();
 
-                // El archivo trae pistas pero ninguna marcada por defecto: Flyleaf no muestra nada. Se elige una (idioma de la app,
-                // luego inglés) y se abre como si el usuario la hubiera elegido en el menú.
+                // Flyleaf tiene sus subtítulos apagados y no elige pista: la elige la app (idioma de la app, luego inglés) y la
+                // abre como si el usuario la hubiera escogido en el menú.
                 if (!_pistaSubtitulosElegida)
                 {
                     _pistaSubtitulosElegida = true;
                     var pista = _subtitleCoordinator.PistaPorDefecto(Player, LocalizationService.Cultura.TwoLetterISOLanguageName);
-                    if (pista != null)
-                    {
-                        AppLogger.Debug("ReproductorViewModel", "Ninguna pista de subtítulos venía activa: se elige una automáticamente.");
-                        _subtitleCoordinator.SeleccionarPista(Player, pista);
-                    }
+                    if (pista != null) AbrirPistaSubtitulos(pista);
                 }
             }
             else
@@ -1367,11 +1406,12 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         SubtituloLineaArriba = string.Empty;
     }
 
+    /// <summary>Solo marca el estado: a Flyleaf no se le encienden los subtítulos aquí (abriría y leería una pista por su cuenta);
+    /// qué se muestra lo decide <see cref="AbrirPistaSubtitulos"/>.</summary>
     public void HabilitarSubtitulos()
     {
         SubtitulosHabilitados = true;
         SubtitulosIcon = "Subtitles";
-        _subtitleCoordinator.Habilitar(Player);
     }
 
     public EpisodioItem? ObtenerSiguienteEpisodio() => _episodeNavigator.ObtenerSiguiente(_episodio);
@@ -1757,6 +1797,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         _haCompletadoOpen = false;
         _finDeEpisodioProcesado = false;
         _pistaSubtitulosElegida = false;
+        ReiniciarCuesSubtitulos(); // las líneas del episodio anterior no valen para este
         _reintentosApertura = 0;
         _estrategiaSaltos = EstrategiaSaltos.Equilibrados;
 

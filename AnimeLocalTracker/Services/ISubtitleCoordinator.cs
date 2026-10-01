@@ -16,12 +16,13 @@ public interface ISubtitleCoordinator
     void Habilitar(Player? player);
     void Deshabilitar(Player? player);
 
-    /// <summary>Habilita subtítulos y reabre el Player con el stream elegido.</summary>
+    /// <summary>Habilita los subtítulos de Flyleaf y reabre el Player con el stream elegido. Solo para pistas que la app no
+    /// puede leer por su cuenta (de imagen, o de texto cuya extracción falló): las de texto no deben pasar por Flyleaf.</summary>
     void SeleccionarPista(Player? player, object stream);
 
     /// <summary>
-    /// Pista a activar cuando el archivo trae subtítulos pero ninguno viene marcado por defecto (Flyleaf entonces no muestra
-    /// nada). Null si ya hay una activa o no hay pistas de texto.
+    /// Pista a mostrar al abrir un episodio (Flyleaf arranca con sus subtítulos apagados y no elige ninguna).
+    /// Null si Flyleaf ya tiene una abierta o el archivo no trae pistas.
     /// </summary>
     object? PistaPorDefecto(Player? player, string idiomaPreferido);
 }
