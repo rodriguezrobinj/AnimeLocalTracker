@@ -916,6 +916,9 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                 config.Audio.Filters = ConstruirFiltrosAudio();
             }
 
+            // Red de seguridad para cuando Flyleaf sí decodifica una pista de texto: su lector de estilos ASS cerraba la app.
+            ParcheSubtitulosFlyleaf.Aplicar();
+
             var player = new Player(config);
 
             // Prioridad del proceso solo mientras hay un video abierto (se restaura en Dispose).
