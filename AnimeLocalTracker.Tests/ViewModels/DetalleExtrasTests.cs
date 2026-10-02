@@ -202,6 +202,62 @@ public class DetalleExtrasTests : IDisposable
         _db.Verify(d => d.ConservarRegistroTrasEliminarArchivoAsync(It.IsAny<int>(), It.IsAny<int>()), Times.Never);
     }
 
+    // ── Borrar un solo episodio ──
+
+    [Fact]
+    public async Task EliminarEpisodio_BorraElVideoYConservaElHistorial()
+    {
+        _dialogos.Setup(d => d.MostrarDialogoAsync(It.IsAny<string>(), It.IsAny<string>(), true, It.IsAny<string>(), It.IsAny<string>())).ReturnsAsync(true);
+        var sut = await FichaConEpisodiosAsync((1, 64, true), (2, 64, false));
+        var episodio = sut.Episodios.Todos.Single(e => e.NumeroEpisodio == 1);
+
+        await sut.Episodios.EliminarEpisodioCommand.ExecuteAsync(episodio);
+
+        File.Exists(Path.Combine(_carpeta, "Episodio 01.mp4")).Should().BeFalse();
+        File.Exists(Path.Combine(_carpeta, "Episodio 02.mp4")).Should().BeTrue();
+        episodio.Descargado.Should().BeFalse();
+        episodio.Visto.Should().BeTrue("borrar el archivo no borra que se vio");
+        _db.Verify(d => d.ConservarRegistroTrasEliminarArchivoAsync(7, 1), Times.Once);
+    }
+
+    [Fact]
+    public async Task EliminarEpisodio_SiElVideoEstaEnUsoUnMomento_EsperaYLoBorra()
+    {
+        // Lo que pasa recién abierta la ficha: la extracción de miniaturas tiene abierto el video unos instantes.
+        _dialogos.Setup(d => d.MostrarDialogoAsync(It.IsAny<string>(), It.IsAny<string>(), true, It.IsAny<string>(), It.IsAny<string>())).ReturnsAsync(true);
+        var sut = await FichaConEpisodiosAsync((1, 64, true));
+        var episodio = sut.Episodios.Todos.Single();
+        string ruta = Path.Combine(_carpeta, "Episodio 01.mp4");
+        var bloqueo = new FileStream(ruta, FileMode.Open, FileAccess.Read, FileShare.None);
+        _ = Task.Run(async () => { await Task.Delay(500); bloqueo.Dispose(); });
+
+        await sut.Episodios.EliminarEpisodioCommand.ExecuteAsync(episodio);
+
+        File.Exists(ruta).Should().BeFalse();
+        episodio.Descargado.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task EliminarEpisodio_SiElVideoSigueEnUso_AvisaYNoLoDaPorBorrado()
+    {
+        // Regresión: antes el episodio se daba por quitado aunque el archivo siguiera en el disco (ocupando espacio sin verse).
+        _dialogos.Setup(d => d.MostrarDialogoAsync(It.IsAny<string>(), It.IsAny<string>(), true, It.IsAny<string>(), It.IsAny<string>())).ReturnsAsync(true);
+        var sut = await FichaConEpisodiosAsync((1, 64, true));
+        sut.Episodios.IntentosBorradoEpisodio = 2;
+        var episodio = sut.Episodios.Todos.Single();
+        string ruta = Path.Combine(_carpeta, "Episodio 01.mp4");
+
+        using (new FileStream(ruta, FileMode.Open, FileAccess.Read, FileShare.None))
+        {
+            await sut.Episodios.EliminarEpisodioCommand.ExecuteAsync(episodio);
+        }
+
+        File.Exists(ruta).Should().BeTrue();
+        episodio.Descargado.Should().BeTrue("el archivo sigue ahí: la lista no debe decir lo contrario");
+        _db.Verify(d => d.ConservarRegistroTrasEliminarArchivoAsync(It.IsAny<int>(), It.IsAny<int>()), Times.Never);
+        _dialogos.Verify(d => d.MostrarDialogoAsync(LocalizationService.T("Det_EliminarEpisodioErrorTitulo"), It.Is<string>(m => m.Contains('1')), false, It.IsAny<string>(), It.IsAny<string>()), Times.Once);
+    }
+
     // ── Etiquetas de AniList ──
 
     [Fact]

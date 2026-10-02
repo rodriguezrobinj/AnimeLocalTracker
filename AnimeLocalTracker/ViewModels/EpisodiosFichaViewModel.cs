@@ -822,6 +822,9 @@ public sealed partial class EpisodiosFichaViewModel : ObservableObject,
     }
 
 
+    /// <summary>Cuántas veces se intenta borrar el video si está en uso (200 ms entre intentos). Ajustable solo en pruebas.</summary>
+    internal int IntentosBorradoEpisodio { get; set; } = AnimeLocalTracker.Core.BorradoDeArchivos.IntentosPorDefecto;
+
     [RelayCommand]
     private async Task EliminarEpisodio(EpisodioItem episodio)
     {
@@ -836,11 +839,32 @@ public sealed partial class EpisodiosFichaViewModel : ObservableObject,
         string rutaArchivo = episodio.RutaCompleta;
         string rutaMiniatura = PythonEpisodeEnricher.ObtenerRutaMiniaturaEsperada(rutaArchivo);
 
-        // 1. Borrar el archivo de video
-        try { if (File.Exists(rutaArchivo)) File.Delete(rutaArchivo); }
-        catch (Exception ex) { AppLogger.Debug("EpisodiosFichaViewModel", $"No se pudo borrar archivo del episodio: {ex.Message}"); }
+        // 1. Borrar el archivo de video. Fuera del hilo de la interfaz y con reintentos: recién abierta la ficha, la
+        //    extracción de miniaturas lo tiene abierto unos instantes. Si no se pudo, se avisa y el episodio se queda como
+        //    estaba (antes se daba por quitado aunque el archivo siguiera en el disco, ocupando espacio sin verse).
+        int intentos = IntentosBorradoEpisodio;
+        bool borrado = await Task.Run(() =>
+        {
+            try
+            {
+                if (File.Exists(rutaArchivo)) AnimeLocalTracker.Core.BorradoDeArchivos.BorrarConReintentos(rutaArchivo, intentos);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("EpisodiosFichaViewModel", $"No se pudo borrar el archivo del episodio {episodio.NumeroEpisodio}: {ex.Message}");
+                return false;
+            }
+        });
+        if (!borrado)
+        {
+            await _dialogService.MostrarDialogoAsync(LocalizationService.T("Det_EliminarEpisodioErrorTitulo"),
+                string.Format(LocalizationService.T("Det_EliminarEpisodioErrorMsj"), episodio.NumeroEpisodio),
+                false, "AlertCircleOutline", "#EF4444");
+            return;
+        }
 
-        // 2. Borrar su miniatura
+        // 2. Borrar su miniatura (opcional: la ficha puede tenerla abierta en pantalla)
         try { if (File.Exists(rutaMiniatura)) File.Delete(rutaMiniatura); } catch { }
 
         // 3. Conservar el registro en la base de datos: el historial es un registro

@@ -123,7 +123,7 @@ public partial class DetalleViewModel
                     if (File.Exists(ruta))
                     {
                         tamano = new FileInfo(ruta).Length;
-                        File.Delete(ruta);
+                        AnimeLocalTracker.Core.BorradoDeArchivos.BorrarConReintentos(ruta);
                     }
                 }
                 catch (Exception ex)
