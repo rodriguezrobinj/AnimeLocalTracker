@@ -39,6 +39,18 @@ La app navega cambiando `INavigationService.VistaActual` (un `ObservableObject`)
    (si la vista necesita cargar datos al entrar, hazlo en el `Receive` de `NavigationService`, no en el constructor del ViewModel — así recarga cada vez que se navega a ella, no solo la primera).
 7. **Botón en `MainWindow.xaml`** (sidebar): `Rectangle` indicador de activo (`Visibility` bindeado a `Navigation.EsXActivo`) + `Button` con `Command="{Binding NavegarXCommand}"`, `ToolTip`/`AutomationProperties.Name` localizados (clave `Nav_X` en `LocalizationService`, ES y EN).
 
+## La vista de una pestaña se conserva entre visitas
+
+La zona de contenido de `MainWindow` es `Controls/AnfitrionVistas` (no un `ContentControl`): la vista de cada pestaña se construye **una vez** y después solo se muestra u oculta (cambiar de pestaña pasó de 105-440 ms a 3-20 ms). Consecuencias al escribir una vista:
+
+- **`Loaded`/`Unloaded` NO llegan al entrar/salir de la pestaña** (solo la primera vez / al cerrar la app). Lo que deba pasar al salir —cerrar un `Popup` con `StaysOpen=True`, cerrar un panel, parar audio o un temporizador— o al volver, va en `IsVisibleChanged` (ejemplos: `GaleriaView`, `DescargasView`, `AdivinaOpEdView`).
+- El estado propio de la vista (desplazamiento, sección elegida, texto no enlazado) **se conserva** entre visitas.
+- Si el ViewModel se crea nuevo en cada visita (como `DetalleViewModel`), márcalo con `IVistaReutilizable`: hay una sola vista para todos y pasa de un ViewModel al siguiente. En `DataContextChanged` la vista debe reiniciar su estado propio (ver `DetalleView.ReiniciarEstadoDeLaVista`).
+- Secciones internas (subpestañas): mismo patrón. Para alternar entre varias vistas dentro de una pestaña usa otro `AnfitrionVistas` (ver `MinijuegosView`); para una sección que se quiera construir por adelantado, ocúltala con `BoolToVisOculto` (Hidden) en vez de `BoolToVis` (Collapsed no se mide). Mide el cambio con `MedidorRendimiento.MedirCambio("…")` justo antes de provocarlo.
+- `IsVisibleChanged` también llega cuando se oculta la ventana entera (bandeja): si lo que paras es algo que debe seguir ahí (música), comprueba antes `Window.GetWindow(this)?.IsVisible`.
+- Pestaña de uso frecuente: añádela a la lista de `MainWindow.PrecalentarPestanasAsync` para que se construya en reposo tras abrir la app. Eso crea su ViewModel al arrancar: su constructor no debe hacer trabajo caro en el hilo de la interfaz.
+- Para comprobar el coste: el registro deja `[Perf] Navegación A → B: colocada a los X ms, interfaz libre a los Y ms` en cada cambio (DEBUG por debajo de 250 ms, INFO por encima).
+
 ## Listas grandes: SIEMPRE `ListBox` virtualizado
 
 Nunca `ItemsControl` dentro de `ScrollViewer` para listas que pueden crecer (biblioteca, historial, descargas) — sin virtualización, WPF crea un contenedor visual por cada item y la lista se pone lenta/consume memoria con colecciones grandes.

@@ -27,6 +27,7 @@ public partial class App : Application
 
     public App()
     {
+        MedidorRendimiento.Hito("entorno .NET listo");
         try
         {
             Velopack.VelopackApp.Build().Run();
@@ -35,10 +36,18 @@ public partial class App : Application
         {
             AppLogger.Warn("Velopack", $"Aviso en inicialización de Velopack: {ex.Message}");
         }
+        MedidorRendimiento.Hito("Velopack");
 
         var services = new ServiceCollection();
         ConfigureServices(services);
         ServiceProvider = services.BuildServiceProvider();
+        MedidorRendimiento.Hito("servicios registrados");
+
+        // Mientras el hilo de la interfaz carga los estilos de App.xaml (lo siguiente que hace WPF), otro hilo va abriendo
+        // la base de datos, leyendo los ajustes y construyendo los servicios que la ventana necesita. OnStartup lo espera.
+        // Una segunda instancia no llega a tocar nada de eso: OnStartup la cierra.
+        _esPrimeraInstancia = TomarInstanciaUnica();
+        _preparacion = _esPrimeraInstancia ? Task.Run(PrepararDatosYServiciosAsync) : Task.CompletedTask;
 
         // === MANEJADORES GLOBALES DE EXCEPCIONES ===
         
@@ -388,6 +397,8 @@ public partial class App : Application
 
         // Servicio de caché y precarga de imágenes optimizadas para 60fps
         services.AddSingleton<IImageCacheService, ImageCacheService>();
+        // Lectura adelantada de la biblioteca y de las portadas de la primera pantalla mientras se construye la ventana.
+        services.AddSingleton<PrecargaBiblioteca>();
 
         // ARQ-02: alta de animes unificada (MainViewModel + AgregarAnimeViewModel)
         services.AddSingleton<AnimeLibraryService>();
@@ -426,9 +437,66 @@ public partial class App : Application
 
     private static System.Threading.Mutex? _singleInstanceMutex;
 
-    protected override async void OnStartup(StartupEventArgs e)
+    private readonly Task _preparacion;
+
+    /// <summary>
+    /// Trabajo de arranque que no necesita la interfaz, en un hilo aparte y en paralelo con la carga de App.xaml: migración
+    /// de datos antiguos, ajustes, base de datos y los servicios de los que depende la ventana principal (así, cuando el hilo
+    /// de la interfaz los pide, ya están construidos). Si la base de datos falla, la excepción llega a OnStartup.
+    /// </summary>
+    private static async Task PrepararDatosYServiciosAsync()
     {
-        // 0. Instancia única: Evitar colisiones de puertos (OAuth 5050), locks de base de datos y settings
+        // Migrar datos del layout de instalación antiguo (%LocalAppData%\AnimeLocalTracker) a la carpeta segura de datos,
+        // ANTES de inicializar la base de datos y de escribir nada en la carpeta nueva (el registro incluido).
+        AppDataPaths.MigrarDesdeInstalacionAntigua();
+
+        // OPS-05: la primera línea del log identifica versión y entorno del binario
+        // (antes no había forma de saber qué build produjo un app.log).
+        string versionApp = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "desconocida";
+        string arquitectura = System.Environment.Is64BitProcess ? "x64" : "x86";
+        AppLogger.Info("App", $"AnimeLocalTracker iniciando (versión {versionApp}, {arquitectura}).");
+
+        try
+        {
+            // Registro detallado (entradas DEBUG en disco): ajuste del usuario o variable de entorno.
+            if (ServiceProvider.GetRequiredService<ISettingsService>().ObtenerConfiguracion()?.RegistroDetallado == true) AppLogger.RegistroDetallado = true;
+            _ = LocalizationService.Instance; // construir los textos (ES/EN) ya, no al pintar la ventana
+        }
+        catch { }
+
+        // Se crean el archivo y las tablas antes de que nadie consulte.
+        await ServiceProvider.GetRequiredService<IDatabaseService>().InicializarBaseDatosAsync();
+        MedidorRendimiento.Hito("base de datos (en paralelo)");
+
+        // La biblioteca y las portadas de la primera pantalla se van leyendo ya, en otro hilo: la Galería las recoge al crearse.
+        try { ServiceProvider.GetRequiredService<PrecargaBiblioteca>().Iniciar(); }
+        catch (Exception ex) { AppLogger.Debug("App", $"No se pudo adelantar la lectura de la biblioteca: {ex.Message}"); }
+
+        // Solo servicios sin interfaz. Un fallo aquí no es fatal: el mismo error saldrá donde se use el servicio.
+        foreach (var tipo in ServiciosDeLaVentana)
+        {
+            try { ServiceProvider.GetService(tipo); }
+            catch (Exception ex) { AppLogger.Debug("App", $"No se pudo preparar {tipo.Name} por adelantado: {ex.Message}"); }
+        }
+        MedidorRendimiento.Hito("servicios listos (en paralelo)");
+    }
+
+    /// <summary>Servicios que piden MainViewModel y GaleriaViewModel al construirse (ninguno toca la interfaz al crearse).</summary>
+    private static readonly Type[] ServiciosDeLaVentana =
+    [
+        typeof(IHttpClientFactory), typeof(IAuthService), typeof(IAnimeTrackingService), typeof(IImageCacheService),
+        typeof(IPerfilAniListService), typeof(AnimeLibraryService), typeof(IDialogService), typeof(ISelectorTorrentService),
+        typeof(IUpdateService), typeof(NewEpisodeNotifier), typeof(IDownloadService), typeof(IAnimeThemesDownloadService)
+    ];
+
+    private readonly bool _esPrimeraInstancia;
+
+    /// <summary>
+    /// Instancia única: evita colisiones de puertos (OAuth 5050), locks de base de datos y settings. Se comprueba en el
+    /// constructor, antes de empezar a preparar datos en segundo plano. False si ya hay otra instancia abierta.
+    /// </summary>
+    private static bool TomarInstanciaUnica()
+    {
         const string mutexName = "Global\\AnimeLocalTracker_SingleInstance_Mutex";
         try
         {
@@ -437,28 +505,32 @@ public partial class App : Application
             {
                 _singleInstanceMutex?.Dispose();
                 _singleInstanceMutex = null;
-                Shutdown(0);
-                return;
             }
+            return esPrimeraInstancia;
         }
         catch
         {
             // Si la creación del Mutex global falla por permisos, continuar sin bloquear el arranque
+            return true;
+        }
+    }
+
+    protected override async void OnStartup(StartupEventArgs e)
+    {
+        if (!_esPrimeraInstancia)
+        {
+            Shutdown(0);
+            return;
         }
 
         base.OnStartup(e);
+        MedidorRendimiento.Hito("recursos de App.xaml");
 
         try
         {
-            // OPS-05: la primera línea del log identifica versión y entorno del binario
-            // (antes no había forma de saber qué build produjo un app.log).
-            string versionApp = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "desconocida";
-            string arquitectura = System.Environment.Is64BitProcess ? "x64" : "x86";
-            AppLogger.Info("App", $"AnimeLocalTracker iniciando (versión {versionApp}, {arquitectura}).");
-
-            // Migrar datos del layout de instalación antiguo (%LocalAppData%\AnimeLocalTracker)
-            // a la carpeta segura de datos, ANTES de inicializar la base de datos.
-            AppDataPaths.MigrarDesdeInstalacionAntigua();
+            // Base de datos, ajustes y servicios: empezaron en el constructor, en otro hilo (ver PrepararDatosYServiciosAsync).
+            await _preparacion;
+            MedidorRendimiento.Hito("preparación esperada");
 
             // Aplicar el idioma guardado (ES/EN) antes de construir la UI
             ISettingsService? settingsService = null;
@@ -466,35 +538,101 @@ public partial class App : Application
             {
                 settingsService = ServiceProvider.GetRequiredService<ISettingsService>();
                 LocalizationService.Instance.Idioma = settingsService.ObtenerConfiguracion()?.Idioma ?? "es";
-                // Registro detallado (entradas DEBUG en disco): ajuste del usuario o variable de entorno.
-                if (settingsService.ObtenerConfiguracion()?.RegistroDetallado == true) AppLogger.RegistroDetallado = true;
             }
             catch { }
 
-            // Pedimos la instancia del servicio de base de datos
-            var dbService = ServiceProvider.GetRequiredService<IDatabaseService>();
+            // PERF-01: el motor de video (Flyleaf) NO se inicia aquí, y tampoco lo que no hace falta para ver la ventana
+            // (sincronización, avisos de emisión, copia de seguridad, cola de descargas, motor Python…): todo eso arranca
+            // cuando la ventana ya está pintada (ver IniciarTrasPrimerPintado).
 
-            // PERF-01: el motor de video (Flyleaf) ya NO se inicia aquí: cargar FFmpeg cuesta 0,4-0,55 s y
-            // retrasaba la aparición de la ventana. Se inicia justo después de mostrarla (ver
-            // IniciarMotorFlyleafTrasMostrarVentana).
+            // En lugar de que WPF abra la ventana automáticamente (StartupUri),
+            // nosotros le pedimos al contenedor DI que nos construya la ventana
+            // con todas sus dependencias ya inyectadas.
+            var mainWindow = ServiceProvider.GetRequiredService<MainWindow>();
+            MedidorRendimiento.Hito("ventana construida");
 
-            // Obligamos a que se cree el archivo y la tabla antes de continuar
-            await dbService.InicializarBaseDatosAsync();
+            // Arranque con Windows (StartupService añade "--bandeja" al comando del registro):
+            // ocultar directo a la bandeja para no interrumpir el inicio de sesión con una ventana.
+            bool aLaBandeja = e.Args.Any(a => string.Equals(a, "--bandeja", StringComparison.OrdinalIgnoreCase));
 
-            // Backup rotativo de la biblioteca (protección contra corrupción/pérdida).
-            // BAK-02: se dispara en segundo plano para no retrasar la aparición de la
-            // ventana; DatabaseService captura y registra sus propios errores.
-            _ = dbService.CrearBackupRotativoAsync();
+            bool trasPintadoHecho = false;
+            void TrasPrimerPintado()
+            {
+                if (trasPintadoHecho) return;
+                trasPintadoHecho = true;
+                MedidorRendimiento.Hito("interfaz libre");
+                MedidorRendimiento.RegistrarArranque("Arranque");
+                IniciarTrasPrimerPintado(mainWindow, settingsService);
+            }
 
-            // Las vistas previas de música (openings/endings escuchados sin guardar) son temporales: se vacían al arrancar.
-            // En segundo plano y antes de que nadie pueda pedir una nueva (aún no hay ficha abierta).
-            var descargasMusica = ServiceProvider.GetRequiredService<IAnimeThemesDownloadService>();
-            _ = System.Threading.Tasks.Task.Run(descargasMusica.LimpiarVistasPrevias);
+            mainWindow.ContentRendered += (_, _) =>
+            {
+                MedidorRendimiento.Hito("primer pintado");
+                Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.ContextIdle, TrasPrimerPintado);
+            };
+            mainWindow.Show();
+            MedidorRendimiento.Hito("ventana mostrada");
 
-            // Iniciar sincronización periódica en segundo plano.
-            // FUN-005: el intervalo es el configurado (ya no 5 min fijos) y se reinicia al guardar.
+            if (aLaBandeja)
+            {
+                // La ventana se oculta antes de pintarse (ContentRendered puede no llegar): lo aplazado se inicia ya.
+                mainWindow.InicializarIntegracionesDelSistema();
+                ServiceProvider.GetRequiredService<ISystemTrayService>().IniciarEnBandeja();
+                TrasPrimerPintado();
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("App", "Error fatal durante el arranque", ex);
+            MessageBox.Show($"No se pudo iniciar la aplicación:\n{ex.Message}",
+                            "Error de inicio", MessageBoxButton.OK, MessageBoxImage.Error);
+            Shutdown(1);
+        }
+    }
+
+    /// <summary>
+    /// Todo lo que la app necesita tener en marcha pero no para mostrar la ventana. Antes corría ANTES de crearla, en el hilo
+    /// de la interfaz (medido: 0,26 s con el equipo caliente y 2,5 s en frío, recién compilada). Ahora la ventana sale
+    /// primero y esto arranca después: lo que no toca la interfaz, en otro hilo.
+    /// </summary>
+    private void IniciarTrasPrimerPintado(MainWindow mainWindow, ISettingsService? settingsService)
+    {
+        try { ServiceProvider.GetService<IGamepadService>()?.Iniciar(); }
+        catch (Exception ex) { AppLogger.Warn("App", $"No se pudo iniciar el servicio de mando: {ex.Message}"); }
+
+        _ = Task.Run(() =>
+        {
+            // Los controles multimedia de Windows y el icono de la bandeja se crean en el hilo de la interfaz, pero la
+            // biblioteca de 25 MB que usan los primeros se lee del disco aquí, para que ese hilo no espere por ella.
+            try { System.Reflection.Assembly.Load("Microsoft.Windows.SDK.NET"); }
+            catch (Exception ex) { AppLogger.Debug("App", $"No se pudo cargar por adelantado la biblioteca de Windows: {ex.Message}"); }
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.ApplicationIdle, mainWindow.InicializarIntegracionesDelSistema);
+
+            IniciarServiciosDeFondo(settingsService);
+        });
+
+        IniciarMotorDeVideoEnReposo();
+        mainWindow.PrecalentarPestanasEnReposo();
+    }
+
+    private static void IniciarServiciosDeFondo(ISettingsService? settingsService)
+    {
+        void Paso(string nombre, Action accion)
+        {
+            try { accion(); }
+            catch (Exception ex) { AppLogger.Warn("App", $"No se pudo iniciar '{nombre}': {ex.Message}"); }
+        }
+
+        var configuracion = settingsService?.ObtenerConfiguracion();
+
+        // Las vistas previas de música (openings/endings escuchados sin guardar) son temporales: se vacían al arrancar.
+        Paso("limpieza de vistas previas de música", () => ServiceProvider.GetRequiredService<IAnimeThemesDownloadService>().LimpiarVistasPrevias());
+
+        // Sincronización periódica en segundo plano.
+        // FUN-005: el intervalo es el configurado (ya no 5 min fijos) y se reinicia al guardar.
+        Paso("sincronización periódica", () =>
+        {
             var syncService = ServiceProvider.GetRequiredService<ISyncService>();
-            var configuracion = settingsService?.ObtenerConfiguracion();
             int intervaloMinutos = Math.Clamp(configuracion?.IntervaloSincronizacionMinutos ?? 5, 1, 1440);
             syncService.IniciarSincronizacionPeriodica(TimeSpan.FromMinutes(intervaloMinutos));
             if (settingsService != null)
@@ -508,104 +646,82 @@ public partial class App : Application
                     }
                 };
             }
+        });
 
-            // Avisos y descarga automática de episodios nuevos (animes con la opción activada en su ficha).
-            ServiceProvider.GetRequiredService<IEmisionMonitorService>().Iniciar();
+        // Avisos y descarga automática de episodios nuevos (animes con la opción activada en su ficha).
+        Paso("monitor de emisión", () => ServiceProvider.GetRequiredService<IEmisionMonitorService>().Iniciar());
 
-            // Indicador de conexión: al volver internet sincroniza al momento lo hecho sin conexión.
-            ServiceProvider.GetRequiredService<IEstadoConexionService>().Iniciar();
-            // Descargas que quedaron pendientes al cerrar la app: vuelven a la cola (las pausadas, en pausa).
-            _ = Task.Run(() =>
-            {
-                var descargas = ServiceProvider.GetRequiredService<IDownloadService>();
-                try { descargas.RestaurarColaPendiente(); }
-                catch (Exception ex) { AppLogger.Warn("App", $"No se pudo restaurar la cola de descargas: {ex.Message}"); }
-                // Después de restaurar (la cola dice qué carpetas siguen en uso): restos de torrents abandonados.
-                try { descargas.LimpiarTemporalesTorrentHuerfanos(); }
-                catch (Exception ex) { AppLogger.Warn("App", $"No se pudieron limpiar los torrents abandonados: {ex.Message}"); }
-            });
+        // Indicador de conexión: al volver internet sincroniza al momento lo hecho sin conexión.
+        Paso("estado de conexión", () => ServiceProvider.GetRequiredService<IEstadoConexionService>().Iniciar());
 
-            // Verificación de actualizaciones automáticas en segundo plano (4 h), salvo que
-            // el usuario la desactive con "Buscar actualizaciones al iniciar".
-            var updateService = ServiceProvider.GetRequiredService<IUpdateService>();
-            if (configuracion?.BuscarActualizacionesAlIniciar ?? true)
-            {
-                updateService.IniciarVerificacionSegundoPlano(TimeSpan.FromHours(4));
-            }
-            else
-            {
-                AppLogger.Info("App", "Comprobación automática de actualizaciones desactivada por configuración.");
-            }
-
-            // Pre-calentar el demonio de Python en segundo plano (Zero-Lag en primera entrada a un anime)
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    var pythonBridge = ServiceProvider.GetService<IPythonBridgeService>();
-                    if (pythonBridge != null)
-                    {
-                        await pythonBridge.IsAvailableAsync();
-                    }
-                }
-                catch { }
-            });
-
-            // En lugar de que WPF abra la ventana automáticamente (StartupUri),
-            // nosotros le pedimos al contenedor DI que nos construya la ventana
-            // con todas sus dependencias ya inyectadas.
-            var mainWindow = ServiceProvider.GetRequiredService<MainWindow>();
-            mainWindow.Show();
-            IniciarMotorFlyleafTrasMostrarVentana();
-
-            // Arranque con Windows (StartupService añade "--bandeja" al comando del registro):
-            // ocultar directo a la bandeja para no interrumpir el inicio de sesión con una ventana.
-            if (e.Args.Any(a => string.Equals(a, "--bandeja", StringComparison.OrdinalIgnoreCase)))
-            {
-                ServiceProvider.GetRequiredService<ISystemTrayService>().IniciarEnBandeja();
-            }
-
-            // Iniciar servicio de gamepad
-            var gamepad = ServiceProvider.GetService<IGamepadService>();
-            gamepad?.Iniciar();
-
-            // Notificaciones de episodios nuevos: primer chequeo a los 3 s y luego cada
-            // 30 min mientras la app esté abierta (FUN-008: antes solo UNA vez al arrancar).
-            var notifier = ServiceProvider.GetService<NewEpisodeNotifier>();
-            notifier?.IniciarMonitoreoPeriodico(TimeSpan.FromMinutes(30));
-        }
-        catch (Exception ex)
+        // Descargas que quedaron pendientes al cerrar la app: vuelven a la cola (las pausadas, en pausa).
+        Paso("cola de descargas", () =>
         {
-            AppLogger.Error("App", "Error fatal durante el arranque", ex);
-            MessageBox.Show($"No se pudo iniciar la aplicación:\n{ex.Message}",
-                            "Error de inicio", MessageBoxButton.OK, MessageBoxImage.Error);
-            Shutdown(1);
-        }
-    }
+            var descargas = ServiceProvider.GetRequiredService<IDownloadService>();
+            try { descargas.RestaurarColaPendiente(); }
+            catch (Exception ex) { AppLogger.Warn("App", $"No se pudo restaurar la cola de descargas: {ex.Message}"); }
+            // Después de restaurar (la cola dice qué carpetas siguen en uso): restos de torrents abandonados.
+            try { descargas.LimpiarTemporalesTorrentHuerfanos(); }
+            catch (Exception ex) { AppLogger.Warn("App", $"No se pudieron limpiar los torrents abandonados: {ex.Message}"); }
+        });
 
-    /// <summary>
-    /// Inicializa el motor de video nativo (Flyleaf) cuando la interfaz ya está pintada y en reposo.
-    /// Engine.Start exige el hilo de UI y no tiene versión asíncrona útil (StartAsync también bloquea ~0,5 s
-    /// antes de volver y deja IsLoaded=false), así que en vez de sacarlo del hilo se retrasa hasta que la
-    /// ventana ya es visible. Es idempotente: si el usuario abre un video antes, ReproductorViewModel lo
-    /// inicia por su cuenta y esta llamada posterior cuesta 0 ms. NO es fatal: si falla, el reproductor
-    /// degrada (CreateOptimizedPlayer lo maneja).
-    /// </summary>
-    private void IniciarMotorFlyleafTrasMostrarVentana()
-    {
-        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.ApplicationIdle, () =>
+        // Verificación de actualizaciones automáticas en segundo plano (4 h), salvo que
+        // el usuario la desactive con "Buscar actualizaciones al iniciar".
+        Paso("comprobación de actualizaciones", () =>
+        {
+            if (configuracion?.BuscarActualizacionesAlIniciar ?? true)
+                ServiceProvider.GetRequiredService<IUpdateService>().IniciarVerificacionSegundoPlano(TimeSpan.FromHours(4));
+            else
+                AppLogger.Info("App", "Comprobación automática de actualizaciones desactivada por configuración.");
+        });
+
+        // Notificaciones de episodios nuevos: primer chequeo a los 3 s y luego cada
+        // 30 min mientras la app esté abierta (FUN-008: antes solo UNA vez al arrancar).
+        Paso("avisos de episodios nuevos", () => ServiceProvider.GetService<NewEpisodeNotifier>()?.IniciarMonitoreoPeriodico(TimeSpan.FromMinutes(30)));
+
+        // Pre-calentar el demonio de Python en segundo plano (Zero-Lag en primera entrada a un anime)
+        _ = Task.Run(async () =>
         {
             try
             {
-                FlyleafLib.Engine.Start(new FlyleafLib.EngineConfig()
-                {
-                    FFmpegPath = ":FFmpeg", // Usa las DLLs del paquete NuGet Flyleaf.FFmpeg
-                    UIRefresh = true
-                });
+                var pythonBridge = ServiceProvider.GetService<IPythonBridgeService>();
+                if (pythonBridge != null) await pythonBridge.IsAvailableAsync();
             }
-            catch (Exception flyleafEx)
+            catch { }
+        });
+
+        // Backup rotativo de la biblioteca (protección contra corrupción/pérdida). Unos segundos después de abrir: mientras
+        // se hace la copia, el resto de consultas a la base de datos esperan, y al abrir la app se está leyendo la biblioteca.
+        // DatabaseService captura y registra sus propios errores.
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(RetrasoCopiaDeSeguridad);
+            await ServiceProvider.GetRequiredService<IDatabaseService>().CrearBackupRotativoAsync();
+        });
+    }
+
+    private static readonly TimeSpan RetrasoCopiaDeSeguridad = TimeSpan.FromSeconds(8);
+    private static readonly TimeSpan RetrasoMotorDeVideo = TimeSpan.FromSeconds(3);
+
+    /// <summary>
+    /// El motor de video (Flyleaf) carga 160 MB de bibliotecas de FFmpeg y su arranque exige el hilo de la interfaz: hacerlo
+    /// justo al mostrar la ventana la dejaba sin responder en el peor momento (0,3 s con el equipo caliente, varios segundos
+    /// en el primer arranque del día). Ahora las bibliotecas se cargan antes en otro hilo y el arranque, ya ligero, espera a
+    /// que la interfaz esté en reposo. Si se abre un video antes, el reproductor lo inicia por su cuenta (es idempotente).
+    /// </summary>
+    private void IniciarMotorDeVideoEnReposo()
+    {
+        _ = Task.Run(async () =>
+        {
+            try
             {
-                AppLogger.Error("App", "No se pudo iniciar el motor Flyleaf (el reproductor quedará degradado)", flyleafEx);
+                MotorVideo.PrecargarBibliotecas();
+                await Task.Delay(RetrasoMotorDeVideo);
+                await Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.ApplicationIdle, () => MotorVideo.AsegurarIniciado());
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("App", $"No se pudo preparar el motor de video por adelantado: {ex.Message}");
             }
         });
     }

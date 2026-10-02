@@ -6,7 +6,7 @@
              xmlns:vm="clr-namespace:AnimeLocalTracker.ViewModels"
              TextElement.Foreground="{DynamicResource MaterialDesignBody}"
              Background="Transparent"
-             Loaded="Vista_Loaded" Unloaded="Vista_Unloaded">
+             IsVisibleChanged="Vista_IsVisibleChanged" Unloaded="Vista_Unloaded">
 
     <UserControl.Resources>
         <!-- Chip de nivel (activable): activo = borde y texto del color del nivel (Tag) -->

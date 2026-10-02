@@ -129,6 +129,13 @@ public partial class HistorialViewModel : ObservableObject, IRecipient<EpisodioA
 
             var lista = new List<HistorialItemViewModel>();
 
+            // Qué miniaturas existen en disco: se comprueba en segundo plano (una consulta al disco por fila) para no
+            // detener la interfaz justo al entrar en la pestaña.
+            var miniaturasEnDisco = await Task.Run(() => registros
+                .Select(r => r.RutaMiniatura)
+                .Where(ruta => !string.IsNullOrWhiteSpace(ruta) && File.Exists(ruta))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase));
+
             foreach (var reg in registros)
             {
                 dicAnimes.TryGetValue(reg.AniListId, out var anime);
@@ -137,7 +144,7 @@ public partial class HistorialViewModel : ObservableObject, IRecipient<EpisodioA
                 string? rutaPortada = anime?.PortadaVisible;
 
                 // Ruta de imagen resuelta UNA vez (miniatura si existe en disco; si no, portada).
-                string? rutaImagen = !string.IsNullOrWhiteSpace(reg.RutaMiniatura) && File.Exists(reg.RutaMiniatura)
+                string? rutaImagen = !string.IsNullOrWhiteSpace(reg.RutaMiniatura) && miniaturasEnDisco.Contains(reg.RutaMiniatura)
                     ? reg.RutaMiniatura
                     : rutaPortada;
 

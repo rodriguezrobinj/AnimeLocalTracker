@@ -24,11 +24,23 @@ public partial class GaleriaViewModel
 
     public bool MostrandoBiblioteca => !MostrandoMinijuegos;
 
+    private bool _vistaMinijuegosCreada;
+
     /// <summary>
-    /// El ViewModel de los minijuegos solo mientras se ve esa sección; con la biblioteca visible es null y la vista de los juegos
-    /// se descarta (así un clip de audio de "Adivina el OP/ED" se corta al cambiar de sección).
+    /// El ViewModel de los minijuegos desde la primera vez que hace falta su vista (al abrir la sección o al prepararla por
+    /// adelantado); antes es null y la vista no existe. Después se conserva: volver a la sección no la reconstruye. El audio
+    /// de "Adivina el OP/ED" lo corta <see cref="MostrarBiblioteca"/> (y la propia vista al dejar de verse).
     /// </summary>
-    public MinijuegosViewModel? ContenidoMinijuegos => MostrandoMinijuegos ? _minijuegos : null;
+    public MinijuegosViewModel? ContenidoMinijuegos => _vistaMinijuegosCreada ? _minijuegos : null;
+
+    /// <summary>Crea ya la vista de los minijuegos (oculta) para que abrir la sección por primera vez no tenga que construirla.</summary>
+    public void PrepararVistaMinijuegos()
+    {
+        if (_minijuegos == null || _vistaMinijuegosCreada) return;
+
+        _vistaMinijuegosCreada = true;
+        OnPropertyChanged(nameof(ContenidoMinijuegos));
+    }
 
     [RelayCommand]
     private void MostrarBiblioteca()
@@ -36,6 +48,7 @@ public partial class GaleriaViewModel
         if (!MostrandoMinijuegos) return;
 
         _minijuegos?.DetenerJuegoActivo();
+        MedidorRendimiento.MedirCambio("Galería: Minijuegos → Biblioteca");
         MostrandoMinijuegos = false;
     }
 
@@ -44,6 +57,8 @@ public partial class GaleriaViewModel
     {
         if (_minijuegos == null || MostrandoMinijuegos) return;
 
+        MedidorRendimiento.MedirCambio("Galería: Biblioteca → Minijuegos");
+        _vistaMinijuegosCreada = true;
         MostrandoMinijuegos = true;
         await PrepararMinijuegosAsync();
     }

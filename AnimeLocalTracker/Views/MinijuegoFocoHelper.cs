@@ -27,6 +27,11 @@ internal sealed class MinijuegoFocoHelper
             RecuperarFoco();
         };
         vista.Unloaded += (_, _) => Desenlazar();
+        // La Galería (que contiene los minijuegos) se conserva al cambiar de pestaña: al volver no llega Loaded.
+        vista.IsVisibleChanged += (_, e) =>
+        {
+            if (e.NewValue is true && vista.IsLoaded) RecuperarFoco();
+        };
     }
 
     private void Enlazar()
@@ -56,7 +61,7 @@ internal sealed class MinijuegoFocoHelper
     {
         _vista.Dispatcher.BeginInvoke(DispatcherPriority.Input, () =>
         {
-            if (_vista.IsLoaded && !_vista.IsKeyboardFocusWithin) _vista.Focus();
+            if (_vista.IsLoaded && _vista.IsVisible && !_vista.IsKeyboardFocusWithin) _vista.Focus();
         });
     }
 }

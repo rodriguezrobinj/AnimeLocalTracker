@@ -61,7 +61,7 @@ public class GaleriaMinijuegosTests
         sut.MostrandoMinijuegos.Should().BeFalse();
         sut.MostrandoBiblioteca.Should().BeTrue();
         sut.HayMinijuegos.Should().BeTrue();
-        sut.ContenidoMinijuegos.Should().BeNull("la vista de los juegos solo existe con la sección abierta");
+        sut.ContenidoMinijuegos.Should().BeNull("la vista de los juegos no se crea hasta que hace falta");
     }
 
     [Fact]
@@ -118,8 +118,23 @@ public class GaleriaMinijuegosTests
         sut.MostrarBibliotecaCommand.Execute(null);
 
         sut.MostrandoMinijuegos.Should().BeFalse();
-        sut.ContenidoMinijuegos.Should().BeNull();
+        sut.ContenidoMinijuegos.Should().BeSameAs(_minijuegos, "la vista de los juegos se conserva para no reconstruirla al volver");
         _player.Verify(p => p.Detener(), Times.AtLeastOnce, "un clip de Adivina el OP/ED no debe seguir sonando en la biblioteca");
+    }
+
+    [Fact]
+    public void PrepararVistaMinijuegos_CreaLaVistaSinCambiarDeSeccion()
+    {
+        var sut = CrearSut();
+        var avisadas = new List<string?>();
+        sut.PropertyChanged += (_, e) => avisadas.Add(e.PropertyName);
+
+        sut.PrepararVistaMinijuegos();
+
+        sut.ContenidoMinijuegos.Should().BeSameAs(_minijuegos, "la vista se deja construida por adelantado");
+        sut.MostrandoMinijuegos.Should().BeFalse("prepararla no la muestra");
+        sut.MostrandoBiblioteca.Should().BeTrue();
+        avisadas.Should().Contain(nameof(GaleriaViewModel.ContenidoMinijuegos));
     }
 
     [Fact]

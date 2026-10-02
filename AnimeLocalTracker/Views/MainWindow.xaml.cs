@@ -76,26 +76,6 @@ public partial class MainWindow : Window, IVentanaPrincipal
         var source = System.Windows.Interop.HwndSource.FromHwnd(hwnd);
         source?.AddHook(WindowProc);
 
-        // SMT-01: SMTC se ata al HWND de la ventana principal una única vez, tan pronto
-        // como existe (no bloquea el arranque: falla en silencio en Windows < 1809).
-        try
-        {
-            App.ServiceProvider.GetService<ISystemMediaControlsService>()?.Inicializar(hwnd);
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Warn("MainWindow", $"No se pudo inicializar los controles multimedia del sistema: {ex.Message}");
-        }
-
-        try
-        {
-            App.ServiceProvider.GetService<ISystemTrayService>()?.Habilitar(this);
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Warn("MainWindow", $"No se pudo inicializar el icono de la bandeja del sistema: {ex.Message}");
-        }
-
         try
         {
             _panicKeyService = App.ServiceProvider.GetService<IPanicKeyService>();
@@ -118,6 +98,162 @@ public partial class MainWindow : Window, IVentanaPrincipal
     }
 
     private IPanicKeyService? _panicKeyService;
+    private bool _integracionesIniciadas;
+
+    /// <summary>
+    /// Controles multimedia de Windows (SMTC) e icono de la bandeja. No hacen falta para pintar la ventana y el primero
+    /// carga una biblioteca de 25 MB, así que App los inicia cuando la ventana ya se ve (antes iban en OnSourceInitialized,
+    /// es decir, antes del primer pintado). Una sola vez.
+    /// </summary>
+    public void InicializarIntegracionesDelSistema()
+    {
+        if (_integracionesIniciadas) return;
+        _integracionesIniciadas = true;
+
+        var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+
+        // SMT-01: SMTC se ata al HWND de la ventana principal una única vez (falla en silencio en Windows < 1809).
+        try
+        {
+            App.ServiceProvider.GetService<ISystemMediaControlsService>()?.Inicializar(hwnd);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn("MainWindow", $"No se pudo inicializar los controles multimedia del sistema: {ex.Message}");
+        }
+
+        try
+        {
+            App.ServiceProvider.GetService<ISystemTrayService>()?.Habilitar(this);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn("MainWindow", $"No se pudo inicializar el icono de la bandeja del sistema: {ex.Message}");
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  Pestañas preparadas por adelantado: la primera visita a una
+    //  pestaña construía su vista entera (0,1-1 s medidos). Con la app
+    //  en reposo se van construyendo de una en una, sin mostrarlas.
+    // ═══════════════════════════════════════════════════════════════
+
+    private static readonly TimeSpan EsperaAntesDePrecalentar = TimeSpan.FromSeconds(4);
+    private static readonly TimeSpan PausaEntrePestanas = TimeSpan.FromMilliseconds(350);
+    /// <summary>Sin tocar ratón ni teclado durante este tiempo se considera que el usuario no está en medio de algo.</summary>
+    private const int MsSinEntradaParaPrecalentar = 1000;
+
+    public void PrecalentarPestanasEnReposo()
+    {
+        if (DataContext is not MainViewModel vm) return;
+        _ = PrecalentarPestanasAsync(vm.Navigation);
+    }
+
+    private async System.Threading.Tasks.Task PrecalentarPestanasAsync(INavigationService navegacion)
+    {
+        try
+        {
+            await System.Threading.Tasks.Task.Delay(EsperaAntesDePrecalentar);
+
+            // De la más usada a la menos; cada ViewModel se pide al llegar su turno (crearlo también cuesta). "Acerca de" se
+            // queda fuera: es la más cara de construir (dibuja el registro de cambios) y la que menos se visita.
+            Func<object>[] pestanas =
+            [
+                navegacion.ObtenerHistorial, navegacion.ObtenerActualizaciones, navegacion.ObtenerCalendario,
+                navegacion.ObtenerDescargas, navegacion.ObtenerEstadisticas, navegacion.ObtenerLogros,
+                navegacion.ObtenerAgregarAnime, navegacion.ObtenerConfiguracion, navegacion.ObtenerVisorRegistros
+            ];
+
+            var reloj = System.Diagnostics.Stopwatch.StartNew();
+            long msTrabajo = 0;
+            int hechas = 0;
+
+            async System.Threading.Tasks.Task EnReposoAsync(Action trabajo)
+            {
+                // Nunca mientras el usuario está haciendo algo (desplazándose, escribiendo, viendo un episodio): se espera.
+                while (!EnReposoParaPrecalentar()) await System.Threading.Tasks.Task.Delay(1000);
+
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    var paso = System.Diagnostics.Stopwatch.StartNew();
+                    trabajo();
+                    msTrabajo += paso.ElapsedMilliseconds;
+                }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+
+                await System.Threading.Tasks.Task.Delay(PausaEntrePestanas);
+            }
+
+            foreach (var obtener in pestanas)
+            {
+                await EnReposoAsync(() =>
+                {
+                    if (ContenedorVistaPrincipal.Precalentar(obtener())) hechas++;
+                });
+            }
+
+            // La ficha: su vista es una sola y pasa de un anime al siguiente. Se deja construida con una ficha vacía,
+            // que se descarta enseguida; la primera que abras ya solo le cambia los datos.
+            await EnReposoAsync(() =>
+            {
+                var fichaVacia = navegacion.CrearDetalle();
+                if (ContenedorVistaPrincipal.Precalentar(fichaVacia)) hechas++;
+                fichaVacia.Dispose();
+            });
+
+            // Las secciones internas de la Galería: el menú de minijuegos y, después, cada juego (uno por paso).
+            if (BuscarDescendiente<GaleriaView>(ContenedorVistaPrincipal) is { } galeria)
+            {
+                bool quedan = true;
+                while (quedan)
+                {
+                    await EnReposoAsync(() =>
+                    {
+                        quedan = galeria.PrecalentarMinijuegos();
+                        if (quedan) hechas++;
+                    });
+                }
+            }
+
+            AppLogger.Info("MainWindow", $"[Perf] Pestañas preparadas por adelantado: {hechas} en {msTrabajo} ms de trabajo, repartidos en {reloj.ElapsedMilliseconds} ms.");
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn("MainWindow", $"No se pudieron preparar las pestañas por adelantado: {ex.Message}");
+        }
+    }
+
+    private static T? BuscarDescendiente<T>(DependencyObject raiz) where T : DependencyObject
+    {
+        int hijos = System.Windows.Media.VisualTreeHelper.GetChildrenCount(raiz);
+        for (int i = 0; i < hijos; i++)
+        {
+            var hijo = System.Windows.Media.VisualTreeHelper.GetChild(raiz, i);
+            if (hijo is T encontrado) return encontrado;
+            if (BuscarDescendiente<T>(hijo) is { } descendiente) return descendiente;
+        }
+        return null;
+    }
+
+    private bool EnReposoParaPrecalentar()
+    {
+        if (!IsVisible || WindowState == WindowState.Minimized) return false;
+        if (DataContext is MainViewModel { Navigation.ReproductorActivo: not null }) return false;
+
+        var info = new LASTINPUTINFO { cbSize = (uint)Marshal.SizeOf<LASTINPUTINFO>() };
+        if (!GetLastInputInfo(ref info)) return true;
+        return unchecked((uint)Environment.TickCount - info.dwTime) >= MsSinEntradaParaPrecalentar;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct LASTINPUTINFO
+    {
+        public uint cbSize;
+        public uint dwTime;
+    }
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetLastInputInfo(ref LASTINPUTINFO plii);
 
     /// <summary>
     /// "Modo discreto": silencia el video en curso (si hay uno) y oculta la app a la bandeja al

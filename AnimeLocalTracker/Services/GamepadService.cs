@@ -31,14 +31,22 @@ public class GamepadService : IGamepadService
         _timer = null;
     }
 
+    private static readonly TimeSpan IntervaloConMando = TimeSpan.FromMilliseconds(16); // ~60 FPS
+    /// <summary>Sin mando conectado no hay nada que leer 60 veces por segundo: basta con mirar de vez en cuando si se conecta uno.</summary>
+    private static readonly TimeSpan IntervaloSinMando = TimeSpan.FromSeconds(1);
+
     private void Timer_Tick(object? sender, EventArgs e)
     {
         // Revisamos el controlador 0 (Jugador 1)
-        if (Vortice.XInput.XInput.GetState(0, out State state))
+        bool conectado = Vortice.XInput.XInput.GetState(0, out State state);
+        if (conectado)
         {
             ProcesarEntrada(state.Gamepad);
             _previousGamepadState = state.Gamepad;
         }
+
+        var intervalo = conectado ? IntervaloConMando : IntervaloSinMando;
+        if (_timer != null && _timer.Interval != intervalo) _timer.Interval = intervalo;
     }
 
     private void ProcesarEntrada(Gamepad gamepad)

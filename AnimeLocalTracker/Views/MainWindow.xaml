@@ -4,6 +4,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         xmlns:loc="clr-namespace:AnimeLocalTracker.Services"
+        xmlns:controls="clr-namespace:AnimeLocalTracker.Controls"
         Title="{Binding [Win_Titulo], Source={x:Static loc:LocalizationService.Instance}}"
         Icon="/Resources/app.ico"
         Height="700" Width="1100"
@@ -419,10 +420,11 @@
                 </Border>
 
                 <!-- CONTENIDO PRINCIPAL: la vista se resuelve con las DataTemplates
-                     VM→Vista de App.xaml según la VistaActual (ARC-04). -->
+                     VM→Vista de App.xaml según la VistaActual (ARC-04). El anfitrión conserva viva la vista de cada
+                     pestaña y solo alterna cuál se ve (un ContentControl la reconstruía entera en cada visita). -->
                 <!-- Sin margen superior para que el fondo (ej. desenfoque) cubra toda la ventana detrás de la barra de título -->
-                <ContentControl x:Name="ContenedorVistaPrincipal" Grid.Column="0" Grid.ColumnSpan="2"
-                                Content="{Binding Navigation.VistaActual}" />
+                <controls:AnfitrionVistas x:Name="ContenedorVistaPrincipal" Grid.Column="0" Grid.ColumnSpan="2"
+                                          Vista="{Binding Navigation.VistaActual}" />
 
                 <!-- REPRODUCTOR IN-APP (EMBEBIDO DENTRO DE LA APLICACIÓN) -->
                 <!-- Ocupa toda la ventana en formato habitual. En formato mini el video pasa a su propia ventana flotante

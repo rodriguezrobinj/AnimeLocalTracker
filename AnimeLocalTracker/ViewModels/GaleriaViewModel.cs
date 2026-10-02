@@ -30,6 +30,7 @@ public partial class GaleriaViewModel : ObservableObject,
     private readonly IImageCacheService _imageCacheService;
     private readonly IPerfilAniListService? _perfilAniList;
     private readonly IFileScannerService _fileScannerService;
+    private readonly PrecargaBiblioteca? _precarga;
     
     public bool BibliotecaVacia => BibliotecaLocales.Count == 0;
 
@@ -330,8 +331,10 @@ public partial class GaleriaViewModel : ObservableObject,
         IImageCacheService imageCacheService,
         IFileScannerService? fileScannerService = null,
         MinijuegosViewModel? minijuegos = null,
-        IPerfilAniListService? perfilAniList = null)
+        IPerfilAniListService? perfilAniList = null,
+        PrecargaBiblioteca? precarga = null)
     {
+        _precarga = precarga;
         _minijuegos = minijuegos;
         _perfilAniList = perfilAniList;
         _animeTrackingService = animeTrackingService;
@@ -455,8 +458,34 @@ public partial class GaleriaViewModel : ObservableObject,
     {
         try
         {
-            var animes = await _databaseService.ObtenerTodosLosAnimesAsync() ?? new List<Models.AnimeItem>();
-            var todosRegistros = await _databaseService.ObtenerTodosLosRegistrosAsync() ?? new List<Models.RegistroEpisodio>();
+            var reloj = System.Diagnostics.Stopwatch.StartNew();
+            List<Models.AnimeItem>? animes = null;
+            List<Models.RegistroEpisodio>? todosRegistros = null;
+
+            // Al abrir la app, la biblioteca (y las portadas de la primera pantalla) ya se están leyendo desde antes de
+            // existir la ventana (ver PrecargaBiblioteca). Solo la primera vez; si falla, se lee aquí como siempre.
+            var despachadorArranque = System.Windows.Application.Current?.Dispatcher;
+            bool desdePrecarga = false;
+            if (_precarga?.Consumir() is { } lecturaAdelantada)
+            {
+                try
+                {
+                    var datos = await lecturaAdelantada;
+                    (animes, todosRegistros) = (datos.Animes, datos.Registros);
+                    desdePrecarga = despachadorArranque != null && despachadorArranque.CheckAccess();
+                }
+                catch (Exception ex)
+                {
+                    AppLogger.Warn("GaleriaViewModel", $"La lectura adelantada de la biblioteca falló; se lee de nuevo: {ex.Message}");
+                }
+            }
+            animes ??= await _databaseService.ObtenerTodosLosAnimesAsync() ?? new List<Models.AnimeItem>();
+            todosRegistros ??= await _databaseService.ObtenerTodosLosRegistrosAsync() ?? new List<Models.RegistroEpisodio>();
+            long msDatos = reloj.ElapsedMilliseconds;
+
+            // Primero la ventana y después las tarjetas: construirlas detiene la interfaz unas décimas, y con la ventana ya a
+            // la vista esa espera se nota mucho menos que con la pantalla todavía vacía.
+            if (desdePrecarga) await despachadorArranque!.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ContextIdle);
             var registrosPorAnime = todosRegistros.GroupBy(r => r.AniListId)
                                                   .ToDictionary(g => g.Key, g => g.ToList());
 
@@ -514,8 +543,23 @@ public partial class GaleriaViewModel : ObservableObject,
             OnPropertyChanged(nameof(SinResultados));
             OnPropertyChanged(nameof(HayFiltrosActivos));
             OnPropertyChanged(nameof(ConteoFiltradosTexto));
+            // Cuándo quedaron dibujadas las tarjetas: ContextIdle llega cuando la interfaz ya no tiene nada pendiente.
+            long msEntregada = reloj.ElapsedMilliseconds;
+            long msEntregadaDesdeInicio = MedidorRendimiento.MsDesdeInicio;
+            void RegistrarCarga() => AppLogger.Info("GaleriaViewModel",
+                $"[Perf] Biblioteca: {animes.Count} animes y {todosRegistros.Count} episodios leídos en {msDatos} ms; lista entregada a la pantalla a los {msEntregada} ms " +
+                $"y tarjetas dibujadas {reloj.ElapsedMilliseconds - msEntregada} ms después ({msEntregadaDesdeInicio} y {MedidorRendimiento.MsDesdeInicio} ms desde que se abrió la app).");
+            if (System.Windows.Application.Current?.Dispatcher is { } despachador)
+                _ = despachador.BeginInvoke(System.Windows.Threading.DispatcherPriority.ContextIdle, RegistrarCarga);
+            else
+                RegistrarCarga();
 
-            _ = CargarPortadasFaltantesEnSegundoPlanoAsync(animes);
+            // El resto de portadas (las de la primera pantalla ya vienen de la lectura adelantada): cuando las tarjetas ya
+            // están dibujadas, para que decodificarlas no compita con la interfaz por el procesador.
+            if (desdePrecarga)
+                _ = despachadorArranque!.BeginInvoke(System.Windows.Threading.DispatcherPriority.ContextIdle, () => { _ = CargarPortadasFaltantesEnSegundoPlanoAsync(animes); });
+            else
+                _ = CargarPortadasFaltantesEnSegundoPlanoAsync(animes);
             _ = CargarTemporadasYAniosFaltantesEnSegundoPlanoAsync(animes);
 
             await CargarPerfilUsuarioAsync();
@@ -612,8 +656,9 @@ public partial class GaleriaViewModel : ObservableObject,
         var listoEn = new System.Collections.Concurrent.ConcurrentDictionary<int, long>();
         var dispatcher = System.Windows.Application.Current?.Dispatcher;
 
-        // La decodificación es trabajo de CPU: se usan casi todos los núcleos, pero se deja uno libre para la UI.
-        int paralelismo = Math.Clamp(Environment.ProcessorCount - 1, 2, 6);
+        // La decodificación es trabajo de CPU: se usa la mitad de los hilos del procesador y el resto queda para la interfaz
+        // (con todos menos uno, en un equipo de 2 núcleos la galería se arrastraba mientras cargaban las portadas).
+        int paralelismo = Math.Clamp(Environment.ProcessorCount / 2, 1, 6);
 
         await Parallel.ForEachAsync(faltantes, new ParallelOptions { MaxDegreeOfParallelism = paralelismo }, async (anime, cancelacion) =>
         {

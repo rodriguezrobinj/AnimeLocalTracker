@@ -126,6 +126,9 @@ public partial class VisorRegistrosViewModel : ObservableObject, IRecipient<Idio
     [ObservableProperty] private int _numDebug;
 
     public bool EsSesionActual => ArchivoSeleccionado?.Archivo.Tipo == TipoArchivoRegistro.SesionActual;
+
+    /// <summary>La sesión actual ya está leída y en pantalla: al volver a la vista basta con añadir lo nuevo.</summary>
+    public bool SesionActualYaCargada => EsSesionActual && !EstaCargando && _leidoHasta > 0;
     public bool TieneEntradas => EntradasVisibles.Count > 0;
     public bool ArchivoVacio => !EstaCargando && TotalEntradas == 0;
     public bool SinResultados => !EstaCargando && TotalEntradas > 0 && EntradasVisibles.Count == 0;
@@ -283,11 +286,28 @@ public partial class VisorRegistrosViewModel : ObservableObject, IRecipient<Idio
             }
 
             // El archivo se rotó (volvió a empezar): se sustituye en vez de añadir.
-            _todas = hasta < desde || desde == 0 ? nuevas : nuevas.Concat(_todas).ToList();
+            bool rotado = hasta < desde || desde == 0;
+            _todas = rotado ? nuevas : nuevas.Concat(_todas).ToList();
             _leidoHasta = hasta;
             RecalcularContadores();
             AnadirFuentesNuevas(nuevas);
-            await AplicarFiltrosAsync();
+
+            // Lo normal: unas pocas líneas nuevas sobre una lista ya en pantalla. Se insertan arriba en la misma lista en vez
+            // de sustituirla entera (sustituirla obligaba a redibujar todas las filas visibles cada pocos segundos y en
+            // cada visita). Con el archivo rotado o un filtro a medio aplicar, se rehace como siempre.
+            if (!rotado && _filtrosEnCurso == 0 && EntradasVisibles is ObservableCollection<EntradaRegistroItem> enPantalla)
+            {
+                var (niveles, fuente, texto) = FiltroActual();
+                var visiblesNuevas = Filtrar(nuevas, niveles, fuente, texto);
+                for (int i = 0; i < visiblesNuevas.Count; i++) enPantalla.Insert(i, visiblesNuevas[i]);
+                OnPropertyChanged(nameof(TieneEntradas));
+                OnPropertyChanged(nameof(SinResultados));
+                OnPropertyChanged(nameof(TextoResumen));
+            }
+            else
+            {
+                await AplicarFiltrosAsync();
+            }
         }
         catch (Exception ex)
         {
@@ -375,17 +395,34 @@ public partial class VisorRegistrosViewModel : ObservableObject, IRecipient<Idio
     {
         int version = ++_versionFiltro;
         var todas = _todas;
+        var (niveles, fuente, texto) = FiltroActual();
+
+        List<EntradaRegistroItem> visibles;
+        _filtrosEnCurso++;
+        try
+        {
+            visibles = await Task.Run(() => Filtrar(todas, niveles, fuente, texto));
+        }
+        finally
+        {
+            _filtrosEnCurso--;
+        }
+        if (version != _versionFiltro) return; // llegó un filtro más nuevo
+        // Colección observable: la actualización en vivo le añade las líneas nuevas sin sustituirla (ver RefrescarEnVivoAsync).
+        EntradasVisibles = new ObservableCollection<EntradaRegistroItem>(visibles);
+    }
+
+    /// <summary>Filtros que se están aplicando fuera del hilo de la interfaz (solo se toca desde ese hilo).</summary>
+    private int _filtrosEnCurso;
+
+    private (HashSet<string> Niveles, string? Fuente, string Texto) FiltroActual()
+    {
         var niveles = new HashSet<string>(StringComparer.Ordinal);
         if (MostrarDebug) niveles.Add("DEBUG");
         if (MostrarInfo) niveles.Add("INFO");
         if (MostrarAvisos) niveles.Add("WARN");
         if (MostrarErrores) niveles.Add("ERROR");
-        string? fuente = EsTodas(FuenteSeleccionada) ? null : FuenteSeleccionada;
-        string texto = TextoBusqueda.Trim();
-
-        var visibles = await Task.Run(() => Filtrar(todas, niveles, fuente, texto));
-        if (version != _versionFiltro) return; // llegó un filtro más nuevo
-        EntradasVisibles = visibles;
+        return (niveles, EsTodas(FuenteSeleccionada) ? null : FuenteSeleccionada, TextoBusqueda.Trim());
     }
 
     internal static List<EntradaRegistroItem> Filtrar(IEnumerable<EntradaRegistroItem> todas, ISet<string> niveles, string? fuente, string texto)

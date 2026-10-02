@@ -9,4 +9,19 @@ public partial class MinijuegosView : UserControl
     {
         InitializeComponent();
     }
+
+    /// <summary>
+    /// Construye por adelantado la vista del siguiente juego que aún no la tenga (sin mostrarla). False cuando ya están
+    /// todas: se llama de una en una para repartir el trabajo.
+    /// </summary>
+    public bool PrecalentarSiguienteJuego()
+    {
+        if (DataContext is not ViewModels.MinijuegosViewModel vm) return false;
+
+        foreach (var juego in new ViewModels.MinijuegoViewModelBase[] { vm.AdivinaAnime, vm.AdivinaOpEd, vm.AdivinaPersonaje })
+        {
+            if (AnfitrionJuegos.Precalentar(juego)) return true;
+        }
+        return false;
+    }
 }
