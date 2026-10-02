@@ -50,14 +50,51 @@ public static class MotorVideo
             if (_iniciado) return true;
             try
             {
+                var reloj = System.Diagnostics.Stopwatch.StartNew();
                 Engine.Start(new EngineConfig { FFmpegPath = ":FFmpeg", UIRefresh = true });
                 _iniciado = true;
+                AppLogger.Info("MotorVideo", $"[Perf] Motor de video iniciado en {reloj.ElapsedMilliseconds} ms ({MedidorRendimiento.MsDesdeInicio} ms desde que se abrió la app).");
             }
             catch (Exception ex)
             {
                 AppLogger.Debug("MotorVideo", $"No se pudo iniciar el motor Flyleaf: {ex.Message}");
             }
             return _iniciado;
+        }
+    }
+
+    /// <summary>Orden de carga de las bibliotecas de FFmpeg: cada una depende de las anteriores.</summary>
+    private static readonly string[] OrdenBibliotecasFFmpeg = ["avutil", "swresample", "swscale", "avcodec", "avformat", "avfilter", "avdevice"];
+
+    /// <summary>
+    /// Carga en memoria las bibliotecas de FFmpeg (160 MB) desde un hilo cualquiera, para que <see cref="AsegurarIniciado"/>
+    /// —que sí exige el hilo de la interfaz— las encuentre ya cargadas y no deje la ventana sin responder mientras Windows
+    /// las lee del disco (y el antivirus las revisa). Si algo falla no pasa nada: el motor las cargará él, como antes.
+    /// </summary>
+    public static void PrecargarBibliotecas()
+    {
+        if (ViewModels.ReproductorViewModel.EsEntornoPruebas()) return;
+
+        try
+        {
+            string carpeta = System.IO.Path.Combine(AppContext.BaseDirectory, "FFmpeg");
+            if (!System.IO.Directory.Exists(carpeta)) return;
+
+            var reloj = System.Diagnostics.Stopwatch.StartNew();
+            var archivos = System.IO.Directory.GetFiles(carpeta, "*.dll");
+            int cargadas = 0;
+            foreach (string prefijo in OrdenBibliotecasFFmpeg)
+            {
+                foreach (string archivo in archivos.Where(a => System.IO.Path.GetFileName(a).StartsWith(prefijo + "-", StringComparison.OrdinalIgnoreCase)))
+                {
+                    if (System.Runtime.InteropServices.NativeLibrary.TryLoad(archivo, out _)) cargadas++;
+                }
+            }
+            AppLogger.Debug("MotorVideo", $"[Perf] Bibliotecas de FFmpeg cargadas por adelantado: {cargadas} en {reloj.ElapsedMilliseconds} ms.");
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("MotorVideo", $"No se pudieron cargar por adelantado las bibliotecas de FFmpeg: {ex.Message}");
         }
     }
 

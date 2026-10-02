@@ -27,6 +27,44 @@ public partial class GaleriaView : UserControl
         InitializeComponent();
         Loaded += GaleriaView_Loaded;
         Unloaded += GaleriaView_Unloaded;
+        IsVisibleChanged += GaleriaView_IsVisibleChanged;
+    }
+
+    /// <summary>
+    /// La vista se conserva al cambiar de pestaña (ver AnfitrionVistas), así que al salir no llega Unloaded: lo que no debe
+    /// quedarse abierto o a medias (el panel "Qué veo hoy", el menú del usuario) se cierra al dejar de verse.
+    /// </summary>
+    private void GaleriaView_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
+    {
+        if (e.NewValue is not false) return;
+
+        DetenerGiro();
+        if (DataContext is GaleriaViewModel vm)
+        {
+            vm.CerrarQueVerHoyCommand.Execute(null);
+            vm.CerrarMenuUsuarioCommand.Execute(null);
+        }
+    }
+
+    /// <summary>
+    /// Deja construida, sin mostrarla, la sección de minijuegos: primero el menú y, en llamadas sucesivas, un juego cada
+    /// vez. False cuando ya no queda nada por construir.
+    /// </summary>
+    public bool PrecalentarMinijuegos()
+    {
+        if (DataContext is not GaleriaViewModel vm || !vm.HayMinijuegos) return false;
+
+        if (vm.ContenidoMinijuegos == null)
+        {
+            vm.PrepararVistaMinijuegos();
+            SeccionMinijuegos.UpdateLayout();
+            return true;
+        }
+
+        var menu = FindVisualChild<MinijuegosView>(SeccionMinijuegos);
+        if (menu == null || !menu.PrecalentarSiguienteJuego()) return false;
+        SeccionMinijuegos.UpdateLayout();
+        return true;
     }
 
     private void GaleriaView_Loaded(object sender, RoutedEventArgs e)

@@ -14,7 +14,6 @@ public partial class VisorRegistrosView : UserControl
 
     private DispatcherTimer? _temporizador;
 
-    // Se guarda al cargar: en Unloaded el DataContext ya puede ser null (la vista se está quitando).
     private VisorRegistrosViewModel? _vm;
 
     public VisorRegistrosView()
@@ -22,8 +21,18 @@ public partial class VisorRegistrosView : UserControl
         InitializeComponent();
     }
 
-    private void Vista_Loaded(object sender, RoutedEventArgs e)
+    /// <summary>
+    /// La vista se conserva al salir (ver AnfitrionVistas): la actualización en vivo solo corre mientras se ve, también si
+    /// lo que se oculta es la ventana entera.
+    /// </summary>
+    private void Vista_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
     {
+        if (e.NewValue is not true)
+        {
+            _temporizador?.Stop();
+            return;
+        }
+
         _vm = DataContext as VisorRegistrosViewModel;
         if (_vm == null) return;
         _temporizador ??= new DispatcherTimer(IntervaloEnVivo, DispatcherPriority.Background, Temporizador_Tick, Dispatcher);

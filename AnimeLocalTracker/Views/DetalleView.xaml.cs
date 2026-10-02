@@ -24,7 +24,7 @@ public partial class DetalleView : UserControl
         var reloj = System.Diagnostics.Stopwatch.StartNew();
         InitializeComponent();
         long msCreada = reloj.ElapsedMilliseconds;
-        // La ficha crea una vista nueva en cada visita: cuánto cuesta construirla y cuándo queda colocada en pantalla.
+        // La vista se construye una vez (se reutiliza de un anime al siguiente): cuánto costó y cuándo quedó colocada.
         RoutedEventHandler? alCargar = null;
         alCargar = (_, _) =>
         {
@@ -38,6 +38,8 @@ public partial class DetalleView : UserControl
             _vmObservado = DataContext as DetalleViewModel;
             if (_vmObservado != null)
             {
+                // Otro anime en la misma vista: nada de lo que el usuario dejó en la ficha anterior debe seguir ahí.
+                if (!ReferenceEquals(_ultimoVm, _vmObservado)) ReiniciarEstadoDeLaVista();
                 _ultimoVm = _vmObservado;
                 _vmObservado.PropertyChanged += Ficha_PropertyChanged;
                 ObservarMusica(_vmObservado.Musica);
@@ -51,14 +53,59 @@ public partial class DetalleView : UserControl
         Loaded += (_, _) => (DataContext as DetalleViewModel)?.ReanudarContador();
         Unloaded += (_, _) =>
         {
-            // El contador de próximo episodio no debe seguir corriendo con la ficha oculta.
-            _ultimoVm?.DetenerContador();
-            // La música de la ficha no debe seguir sonando en otras pestañas (salvo que el usuario lo haya pedido: entonces
-            // la propia música sabe que se quedó de fondo y no se corta).
-            _ultimoVm?.Musica.AlOcultarLaFicha();
+            AlSalirDeLaFicha();
             DejarDeObservar();
             _vmObservado = null;
         };
+        // La vista se conserva y se reutiliza (ver AnfitrionVistas): al ir a otra pestaña no llega Unloaded, solo deja de
+        // verse. Si lo que se oculta es la ventana entera (bandeja), la ficha sigue abierta y no se toca nada.
+        IsVisibleChanged += (_, e) =>
+        {
+            if (e.NewValue is true) (DataContext as DetalleViewModel)?.ReanudarContador();
+            else if (Window.GetWindow(this) is not { IsVisible: false }) AlSalirDeLaFicha();
+        };
+    }
+
+    private void AlSalirDeLaFicha()
+    {
+        // El contador de próximo episodio no debe seguir corriendo con la ficha oculta.
+        _ultimoVm?.DetenerContador();
+        // La música de la ficha no debe seguir sonando en otras pestañas (salvo que el usuario lo haya pedido: entonces
+        // la propia música sabe que se quedó de fondo y no se corta).
+        _ultimoVm?.Musica.AlOcultarLaFicha();
+        CerrarMenus();
+    }
+
+    private void CerrarMenus()
+    {
+        AvisosPopup.IsOpen = false;
+        MarcarPopup.IsOpen = false;
+        HerramientasPopup.IsOpen = false;
+    }
+
+    /// <summary>
+    /// Deja la vista como recién abierta cuando pasa a mostrar otro anime: menús cerrados, caja "Ir al ep." vacía y las dos
+    /// columnas arriba del todo.
+    /// </summary>
+    private void ReiniciarEstadoDeLaVista()
+    {
+        CerrarMenus();
+        CajaIrAEpisodio.Clear();
+        ColumnaPortadaScroll.ScrollToTop();
+        ListaEpisodios.SelectedItem = null;
+        BuscarDescendiente<ScrollViewer>(ListaEpisodios)?.ScrollToTop();
+    }
+
+    private static T? BuscarDescendiente<T>(DependencyObject raiz) where T : DependencyObject
+    {
+        int hijos = VisualTreeHelper.GetChildrenCount(raiz);
+        for (int i = 0; i < hijos; i++)
+        {
+            var hijo = VisualTreeHelper.GetChild(raiz, i);
+            if (hijo is T encontrado) return encontrado;
+            if (BuscarDescendiente<T>(hijo) is { } descendiente) return descendiente;
+        }
+        return null;
     }
 
     private void DejarDeObservar()

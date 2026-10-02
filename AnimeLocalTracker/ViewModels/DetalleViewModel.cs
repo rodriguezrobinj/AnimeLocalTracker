@@ -26,7 +26,8 @@ namespace AnimeLocalTracker.ViewModels;
 public partial class DetalleViewModel : ObservableObject,
     IRecipient<UsuarioLogeadoMensaje>,
     IRecipient<UsuarioDesconectadoMensaje>,
-    IDisposable
+    IDisposable,
+    IVistaReutilizable
 {
     private readonly IAnimeTrackingService _animeTrackingService;
     private readonly IDatabaseService _databaseService;

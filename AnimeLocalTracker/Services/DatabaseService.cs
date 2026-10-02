@@ -368,10 +368,15 @@ public class DatabaseService : IDatabaseService, IDisposable
         var items = await _conexion.QueryAsync<AnimeItem>(
             "SELECT AniListId, MalId, Titulo, NombresAlternativos, RutaCarpeta, UrlPortada, " +
             "Generos, TotalEpisodios, Estado, EstadoUsuario FROM AnimeItem;");
-        foreach (var a in items)
+        // Fuera del hilo que llama (casi siempre el de la interfaz: Historial, Actualizaciones, Calendario): son tantos
+        // accesos a disco como animes hay en la biblioteca.
+        await Task.Run(() =>
         {
-            a.ResolverPortadaLocal();
-        }
+            foreach (var a in items)
+            {
+                a.ResolverPortadaLocal();
+            }
+        });
         return items;
     }
 

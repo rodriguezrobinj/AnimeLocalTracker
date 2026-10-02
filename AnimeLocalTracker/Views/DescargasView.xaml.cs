@@ -23,6 +23,11 @@ public partial class DescargasView : UserControl
             _ventana = null;
             MenuOpcionesPopup.IsOpen = false;
         };
+        // La vista se conserva al cambiar de pestaña (no llega Unloaded): el menú no debe quedarse abierto sobre otra pestaña.
+        IsVisibleChanged += (_, e) =>
+        {
+            if (e.NewValue is false) MenuOpcionesPopup.IsOpen = false;
+        };
     }
 
     // El popup usa StaysOpen=True y se cierra a mano: con StaysOpen=False, el clic sobre el propio botón ⋮

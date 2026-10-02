@@ -229,8 +229,15 @@ public sealed partial class NavigationService : ObservableObject, INavigationSer
         {
             var visor = ObtenerVisorRegistros();
             VistaActual = visor;
-            // Cada visita relee los archivos: lo escrito desde la última vez tiene que aparecer.
-            await visor.CargarAsync();
+            // Lo escrito desde la última visita tiene que aparecer. Si ya estaba abierta la sesión actual basta con añadir lo
+            // nuevo (releer el archivo entero y volver a dibujar la lista costaba 0,2-0,5 s en cada visita); la primera vez, o
+            // con otro archivo elegido, se relee todo.
+            if (visor.SesionActualYaCargada)
+            {
+                AppLogger.Flush(); // que lo último ya esté en el archivo
+                await visor.RefrescarEnVivoAsync();
+            }
+            else await visor.CargarAsync();
         }
         catch (Exception ex)
         {
@@ -402,6 +409,8 @@ public sealed partial class NavigationService : ObservableObject, INavigationSer
 
     partial void OnVistaActualChanged(ObservableObject? oldValue, ObservableObject newValue)
     {
+        MedidorRendimiento.MedirNavegacion(oldValue, newValue);
+
         // Al salir de una ficha (hacia otra ficha o hacia cualquier pestaña) se descarta: cancela sus cargas de fondo, deja de
         // escuchar avisos y suelta el reproductor de música. Antes solo se hacía al pasar de una ficha a otra. Cada visita crea
         // una ficha nueva, así que la anterior no se vuelve a mostrar.

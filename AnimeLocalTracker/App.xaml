@@ -67,6 +67,8 @@
             <!-- Conversores Globales -->
             <BooleanToVisibilityConverter x:Key="BoolToVis" />
             <materialDesign:BooleanToVisibilityConverter x:Key="InverseBoolToVis" TrueValue="Collapsed" FalseValue="Visible" />
+            <!-- Falso = Hidden (se mide, pero no se ve ni recibe clics): para secciones que se dejan construidas por adelantado -->
+            <materialDesign:BooleanToVisibilityConverter x:Key="BoolToVisOculto" TrueValue="Visible" FalseValue="Hidden" />
             <conv:StringEqualsConverter x:Key="StringEquals" />
             <conv:ZeroToVisibilityConverter x:Key="ZeroToVis" />
             <conv:NullToCollapsedConverter x:Key="NullToCollapsed" />

@@ -58,11 +58,13 @@ public sealed partial class MinijuegosViewModel : ObservableObject
     private void VolverAlMenu()
     {
         DetenerJuegoActivo();
+        Services.MedidorRendimiento.MedirCambio("Minijuegos: juego → menú");
         JuegoActivo = null;
     }
 
     private async Task AbrirAsync(MinijuegoViewModelBase juego)
     {
+        Services.MedidorRendimiento.MedirCambio($"Minijuegos: menú → {juego.GetType().Name.Replace("ViewModel", string.Empty)}");
         JuegoActivo = juego;
         await juego.PrepararAsync();
     }

@@ -280,7 +280,7 @@
             </Grid.ColumnDefinitions>
 
             <!-- ================= COLUMNA IZQUIERDA (PÓSTER Y ACCIONES) ================= -->
-            <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="0,0,30,0" Padding="0,0,4,0">
+            <ScrollViewer x:Name="ColumnaPortadaScroll" Grid.Column="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="0,0,30,0" Padding="0,0,4,0">
                 <StackPanel HorizontalAlignment="Stretch">
                     
                     <!-- PÓSTER DESTACADO Y GRANDE -->
