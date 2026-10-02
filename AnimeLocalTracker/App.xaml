@@ -22,6 +22,9 @@
 
                 <!-- Barra de progreso "quedó a medio ver" (Actualizaciones, Historial, Detalle) -->
                 <ResourceDictionary Source="/Themes/WatchProgressBar.xaml" />
+
+                <!-- Estilos compartidos por la ficha del anime y sus ventanas -->
+                <ResourceDictionary Source="/Views/FichaEstilos.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
             <!-- Estilo Shimmer Global para imágenes cargando -->
@@ -100,6 +103,19 @@
             <SolidColorBrush x:Key="Brush.AccentTint" Color="#2960A5FA" />
             <SolidColorBrush x:Key="Brush.SuccessTint" Color="#2934D399" />
             <SolidColorBrush x:Key="Brush.WarningTint" Color="#29F59E0B" />
+            <!-- Tonos de la ficha y de la ventana de música que se repetían como literales (mismos valores que ya se usaban) -->
+            <SolidColorBrush x:Key="Brush.Music" Color="#C084FC" />           <!-- morado de la música (openings/endings) -->
+            <SolidColorBrush x:Key="Brush.MusicSoft" Color="#D8B4FE" />       <!-- texto sobre chips de música -->
+            <SolidColorBrush x:Key="Brush.SurfaceControl" Color="#1F242C" />  <!-- botones y casillas de la cabecera de listas -->
+            <SolidColorBrush x:Key="Brush.BorderControl" Color="#2D333B" />   <!-- borde de esos controles y de los menús -->
+            <SolidColorBrush x:Key="Brush.SurfaceDialog" Color="#1A1F26" />   <!-- tarjetas de las ventanas flotantes -->
+            <SolidColorBrush x:Key="Brush.SurfaceChip" Color="#1F2937" />     <!-- etiquetas pequeñas dentro de filas -->
+            <SolidColorBrush x:Key="Brush.WarningStrong" Color="#FBBF24" />   <!-- ámbar de avisos (icono y botón) -->
+            <SolidColorBrush x:Key="Brush.WarningSoft" Color="#FCD34D" />     <!-- texto de avisos en ámbar -->
+            <SolidColorBrush x:Key="Brush.IconMuted" Color="#64748B" />       <!-- iconos de interruptores apagados -->
+            <SolidColorBrush x:Key="Brush.TextSoft" Color="#CBD5E1" />        <!-- texto entre el principal y el secundario -->
+            <SolidColorBrush x:Key="Brush.RingBase" Color="#33FFFFFF" />      <!-- aro base de los indicadores circulares -->
+            <SolidColorBrush x:Key="Brush.AccentStrongTint" Color="#1A3B82F6" /> <!-- fondo de chips pulsables -->
 
             <!-- ── Escala tipográfica (única fuente de verdad para tamaños) ── -->
             <Style x:Key="AppText.PageTitle" TargetType="TextBlock">

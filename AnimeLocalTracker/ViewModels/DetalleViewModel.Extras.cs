@@ -42,7 +42,7 @@ public partial class DetalleViewModel
     internal async Task CalcularEspacioEnDiscoAsync(CancellationToken cancellationToken = default)
     {
         var anime = AnimeSeleccionado;
-        var archivos = _todosLosEpisodios
+        var archivos = Episodios.Todos
             .Where(e => e.Descargado && !string.IsNullOrWhiteSpace(e.RutaCompleta))
             .Select(e => (e.RutaCompleta, e.Visto))
             .ToList();
@@ -98,7 +98,7 @@ public partial class DetalleViewModel
         var anime = AnimeSeleccionado;
         if (anime == null) return;
 
-        var vistos = _todosLosEpisodios
+        var vistos = Episodios.Todos
             .Where(e => e.Visto && e.Descargado && !string.IsNullOrWhiteSpace(e.RutaCompleta))
             .ToList();
         if (vistos.Count == 0) return;
@@ -155,17 +155,10 @@ public partial class DetalleViewModel
             try { await _databaseService.ConservarRegistroTrasEliminarArchivoAsync(anime.AniListId, episodio.NumeroEpisodio); }
             catch (Exception ex) { AppLogger.Debug("DetalleViewModel", $"No se pudo conservar el registro del episodio: {ex.Message}"); }
 
-            episodio.Descargado = false;
-            episodio.RutaCompleta = string.Empty;
-            episodio.RutaMiniatura = null;
-            episodio.TamanoArchivoFormateado = string.Empty;
-            episodio.Resolucion = string.Empty;
-            episodio.CodecVideo = string.Empty;
-            episodio.Fps = string.Empty;
-            episodio.Es10Bit = false;
+            episodio.QuitarArchivo();
         }
 
-        AplicarFiltrosYOrdenamiento();
+        Episodios.Refrescar();
         await CalcularEspacioEnDiscoAsync();
 
         _dialogService.MostrarToast(

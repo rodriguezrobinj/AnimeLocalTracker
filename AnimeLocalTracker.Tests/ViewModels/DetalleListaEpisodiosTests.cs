@@ -48,8 +48,8 @@ public class DetalleListaEpisodiosTests
     {
         var sut = await AbrirFichaAsync(totalEpisodios: 12, encontrados: [Archivo(1), Archivo(2), Archivo(3000)]);
 
-        sut.EpisodiosDelAnime.Should().HaveCount(12);
-        sut.EpisodiosDelAnime.Should().NotContain(e => e.NumeroEpisodio == 3000);
+        sut.Episodios.EpisodiosDelAnime.Should().HaveCount(12);
+        sut.Episodios.EpisodiosDelAnime.Should().NotContain(e => e.NumeroEpisodio == 3000);
     }
 
     [Fact]
@@ -58,8 +58,8 @@ public class DetalleListaEpisodiosTests
         // El archivo no desaparece del equipo del usuario: solo no se le dedica una fila que no tiene sentido en la lista oficial.
         var sut = await AbrirFichaAsync(totalEpisodios: 12, encontrados: [Archivo(1), Archivo(4000)]);
 
-        sut.EpisodiosDelAnime.Should().ContainSingle(e => e.NumeroEpisodio == 1 && e.Descargado);
-        sut.EpisodiosDelAnime.Should().HaveCount(12);
+        sut.Episodios.EpisodiosDelAnime.Should().ContainSingle(e => e.NumeroEpisodio == 1 && e.Descargado);
+        sut.Episodios.EpisodiosDelAnime.Should().HaveCount(12);
     }
 
     [Fact]
@@ -67,7 +67,7 @@ public class DetalleListaEpisodiosTests
     {
         var sut = await AbrirFichaAsync(totalEpisodios: 12, encontrados: [Archivo(1), Archivo(5), Archivo(12)]);
 
-        sut.EpisodiosDelAnime.Where(e => e.Descargado).Select(e => e.NumeroEpisodio).Should().BeEquivalentTo([1, 5, 12]);
+        sut.Episodios.EpisodiosDelAnime.Where(e => e.Descargado).Select(e => e.NumeroEpisodio).Should().BeEquivalentTo([1, 5, 12]);
     }
 
     [Fact]
@@ -76,7 +76,7 @@ public class DetalleListaEpisodiosTests
         // Anime recién añadido, sin sincronizar aún con AniList: no hay dato oficial con el que comparar.
         var sut = await AbrirFichaAsync(totalEpisodios: 0, encontrados: [Archivo(1), Archivo(2), Archivo(12)]);
 
-        sut.EpisodiosDelAnime.Should().HaveCount(12);
+        sut.Episodios.EpisodiosDelAnime.Should().HaveCount(12);
     }
 
     [Fact]
@@ -84,7 +84,7 @@ public class DetalleListaEpisodiosTests
     {
         var sut = await AbrirFichaAsync(totalEpisodios: 12, encontrados: [], episodiosVistos: 13);
 
-        sut.EpisodiosDelAnime.Should().HaveCount(13);
+        sut.Episodios.EpisodiosDelAnime.Should().HaveCount(13);
     }
 
     [Fact]
@@ -92,7 +92,7 @@ public class DetalleListaEpisodiosTests
     {
         var sut = await AbrirFichaAsync(totalEpisodios: 12, encontrados: [Archivo(3000), Archivo(50000), Archivo(999999)]);
 
-        sut.EpisodiosDelAnime.Should().HaveCount(12);
+        sut.Episodios.EpisodiosDelAnime.Should().HaveCount(12);
     }
 
     [Fact]
@@ -101,7 +101,7 @@ public class DetalleListaEpisodiosTests
         // El episodio 13 ya está descargado (preestreno/filtración) aunque AniList todavía marque 12 como el último emitido.
         var sut = await AbrirFichaAsync(totalEpisodios: 12, encontrados: [Archivo(1), Archivo(13)]);
 
-        sut.EpisodiosDelAnime.Should().Contain(e => e.NumeroEpisodio == 13 && e.Descargado);
-        sut.EpisodiosDelAnime.Should().HaveCount(13);
+        sut.Episodios.EpisodiosDelAnime.Should().Contain(e => e.NumeroEpisodio == 13 && e.Descargado);
+        sut.Episodios.EpisodiosDelAnime.Should().HaveCount(13);
     }
 }

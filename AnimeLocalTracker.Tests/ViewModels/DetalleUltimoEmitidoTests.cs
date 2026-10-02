@@ -57,7 +57,7 @@ public class DetalleUltimoEmitidoTests : IDisposable
 
         var sut = CrearSut(_monitor.Object);
         await sut.InicializarAsync(Anime(episodiosLocales));
-        await EsperarAsync(() => sut.EpisodiosDelAnime.Count >= Math.Max(episodiosLocales, ultimoEmitido));
+        await EsperarAsync(() => sut.Episodios.EpisodiosDelAnime.Count >= Math.Max(episodiosLocales, ultimoEmitido));
         return sut;
     }
 
@@ -76,7 +76,7 @@ public class DetalleUltimoEmitidoTests : IDisposable
     {
         var sut = await AbrirFichaAsync(episodiosLocales: 12, proxima: YaEmitido(13), ultimoEmitido: 13);
 
-        sut.EpisodiosDelAnime.Should().Contain(e => e.NumeroEpisodio == 13);
+        sut.Episodios.EpisodiosDelAnime.Should().Contain(e => e.NumeroEpisodio == 13);
         sut.AnimeSeleccionado!.TotalEpisodios.Should().Be(13);
         _db.Verify(d => d.ActualizarAnimeAsync(It.Is<AnimeItem>(a => a.TotalEpisodios == 13)), Times.Once);
     }
@@ -86,7 +86,7 @@ public class DetalleUltimoEmitidoTests : IDisposable
     {
         var sut = await AbrirFichaAsync(episodiosLocales: 12, proxima: YaEmitido(13), ultimoEmitido: 13);
 
-        var nuevo = sut.EpisodiosDelAnime.Single(e => e.NumeroEpisodio == 13);
+        var nuevo = sut.Episodios.EpisodiosDelAnime.Single(e => e.NumeroEpisodio == 13);
         nuevo.Descargado.Should().BeFalse();
         nuevo.Visto.Should().BeFalse();
     }
@@ -96,7 +96,7 @@ public class DetalleUltimoEmitidoTests : IDisposable
     {
         var sut = await AbrirFichaAsync(episodiosLocales: 12, proxima: AunNoSale(13), ultimoEmitido: 12);
 
-        sut.EpisodiosDelAnime.Should().NotContain(e => e.NumeroEpisodio == 13);
+        sut.Episodios.EpisodiosDelAnime.Should().NotContain(e => e.NumeroEpisodio == 13);
         _db.Verify(d => d.ActualizarAnimeAsync(It.IsAny<AnimeItem>()), Times.Never);
     }
 
@@ -105,7 +105,7 @@ public class DetalleUltimoEmitidoTests : IDisposable
     {
         var sut = await AbrirFichaAsync(episodiosLocales: 10, proxima: YaEmitido(13), ultimoEmitido: 13);
 
-        sut.EpisodiosDelAnime.Select(e => e.NumeroEpisodio).Should().Contain([11, 12, 13]);
+        sut.Episodios.EpisodiosDelAnime.Select(e => e.NumeroEpisodio).Should().Contain([11, 12, 13]);
     }
 
     [Fact]
@@ -121,7 +121,7 @@ public class DetalleUltimoEmitidoTests : IDisposable
         await sut.InicializarAsync(Anime(12));
         await Task.Delay(200); // sin monitor la sincronización nunca hace nada: no hay condición que esperar
 
-        sut.EpisodiosDelAnime.Should().HaveCount(12);
+        sut.Episodios.EpisodiosDelAnime.Should().HaveCount(12);
     }
 
     [Fact]
@@ -131,21 +131,21 @@ public class DetalleUltimoEmitidoTests : IDisposable
 
         var sut = await AbrirFichaAsync(episodiosLocales: 12, proxima: YaEmitido(13), ultimoEmitido: 13);
 
-        sut.EpisodiosDelAnime.Should().Contain(e => e.NumeroEpisodio == 13, "el usuario ya la ve aunque el guardado en BD falle");
+        sut.Episodios.EpisodiosDelAnime.Should().Contain(e => e.NumeroEpisodio == 13, "el usuario ya la ve aunque el guardado en BD falle");
     }
 
     [Fact]
     public async Task AlLlegarLaHoraDeEmisionMientrasLaFichaEstaAbierta_LaCuentaAtrasAñadeLaFilaSola()
     {
         var sut = await AbrirFichaAsync(episodiosLocales: 12, proxima: AunNoSale(13), ultimoEmitido: 12);
-        sut.EpisodiosDelAnime.Should().NotContain(e => e.NumeroEpisodio == 13);
+        sut.Episodios.EpisodiosDelAnime.Should().NotContain(e => e.NumeroEpisodio == 13);
 
         // La cuenta atrás vuelve a preguntar (esto es lo que hace su temporizador interno tras la hora de emisión).
         _proxima.Setup(s => s.ObtenerAsync(7, "RELEASING", It.IsAny<bool>())).ReturnsAsync(YaEmitido(13));
         _monitor.Setup(m => m.UltimoEmitido(It.IsAny<ProximaEmision?>(), It.Is<AnimeItem>(a => a.AniListId == 7), It.IsAny<DateTime>())).Returns(13);
         await InvocarCargarProximaEmisionAsync(sut);
 
-        sut.EpisodiosDelAnime.Should().Contain(e => e.NumeroEpisodio == 13);
+        sut.Episodios.EpisodiosDelAnime.Should().Contain(e => e.NumeroEpisodio == 13);
     }
 
     /// <summary>El refresco periódico lo dispara un DispatcherTimer privado; para probar el mismo camino sin depender del

@@ -440,11 +440,11 @@ public sealed class DescargasMusicaTests : IDisposable
             animeThemesService: themes.Object, animeThemesDownload: descargas.Object, audioTrackPlayer: reproductor);
 
         await ficha.InicializarAsync(new AnimeItem { AniListId = 21, Titulo = "ONE PIECE" });
-        await ficha.AbrirMusicaYReproducirAsync("ED|ED1|1");
+        await ficha.Musica.AbrirMusicaYReproducirAsync("ED|ED1|1");
 
-        ficha.MostrandoPanelMusica.Should().BeTrue();
-        ficha.TemasMusicales.Single(t => t.Slug == "ED1").Reproduciendo.Should().BeTrue();
-        ficha.TemasMusicales.Single(t => t.Slug == "OP1").Reproduciendo.Should().BeFalse();
+        ficha.Musica.MostrandoPanelMusica.Should().BeTrue();
+        ficha.Musica.TemasMusicales.Single(t => t.Slug == "ED1").Reproduciendo.Should().BeTrue();
+        ficha.Musica.TemasMusicales.Single(t => t.Slug == "OP1").Reproduciendo.Should().BeFalse();
     }
 
     // === Utilidades ===

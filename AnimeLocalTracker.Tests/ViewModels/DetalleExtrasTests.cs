@@ -162,10 +162,10 @@ public class DetalleExtrasTests : IDisposable
         _db.Verify(d => d.ConservarRegistroTrasEliminarArchivoAsync(7, 3), Times.Never);
 
         // La lista que ve el usuario debe reflejarlo AL MOMENTO (sin tener que recargar la pestaña).
-        sut.EpisodiosDelAnime.Single(e => e.NumeroEpisodio == 1).Descargado.Should().BeFalse();
-        sut.EpisodiosDelAnime.Single(e => e.NumeroEpisodio == 2).Descargado.Should().BeFalse();
-        sut.EpisodiosDelAnime.Single(e => e.NumeroEpisodio == 3).Descargado.Should().BeTrue();
-        sut.EpisodiosDelAnime.Single(e => e.NumeroEpisodio == 1).RutaCompleta.Should().BeEmpty();
+        sut.Episodios.EpisodiosDelAnime.Single(e => e.NumeroEpisodio == 1).Descargado.Should().BeFalse();
+        sut.Episodios.EpisodiosDelAnime.Single(e => e.NumeroEpisodio == 2).Descargado.Should().BeFalse();
+        sut.Episodios.EpisodiosDelAnime.Single(e => e.NumeroEpisodio == 3).Descargado.Should().BeTrue();
+        sut.Episodios.EpisodiosDelAnime.Single(e => e.NumeroEpisodio == 1).RutaCompleta.Should().BeEmpty();
         sut.HayEspacioLiberable.Should().BeFalse();
         sut.EspacioEnDiscoTexto.Should().NotBeEmpty("queda el episodio 3");
     }
@@ -185,8 +185,8 @@ public class DetalleExtrasTests : IDisposable
         await sut.LiberarEspacioCommand.ExecuteAsync(null);
 
         File.Exists(Path.Combine(_carpeta, "Episodio 01.mp4")).Should().BeFalse();
-        sut.EpisodiosDelAnime.Single(e => e.NumeroEpisodio == 1).Descargado.Should().BeFalse("el video ya no está: la lista debe reflejarlo");
-        sut.EpisodiosDelAnime.Single(e => e.NumeroEpisodio == 2).Descargado.Should().BeFalse();
+        sut.Episodios.EpisodiosDelAnime.Single(e => e.NumeroEpisodio == 1).Descargado.Should().BeFalse("el video ya no está: la lista debe reflejarlo");
+        sut.Episodios.EpisodiosDelAnime.Single(e => e.NumeroEpisodio == 2).Descargado.Should().BeFalse();
         _db.Verify(d => d.ConservarRegistroTrasEliminarArchivoAsync(7, 1), Times.Once);
     }
 

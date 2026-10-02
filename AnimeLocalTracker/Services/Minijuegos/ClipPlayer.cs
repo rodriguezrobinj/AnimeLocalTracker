@@ -35,8 +35,12 @@ public sealed class ClipPlayer : IClipPlayer
 
     public event EventHandler? ReproduccionTerminada;
 
+    /// <summary>Lo que hay que callar antes de que suene un clip (la música que sigue sonando fuera de la ficha).</summary>
+    public Action? AntesDeReproducir { get; set; }
+
     public void Reproducir(string ruta, TimeSpan duracion, double posicionRelativa)
     {
+        AntesDeReproducir?.Invoke();
         Detener();
         CerrarPlayer();
 

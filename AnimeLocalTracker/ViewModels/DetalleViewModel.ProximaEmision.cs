@@ -80,15 +80,10 @@ public partial class DetalleViewModel
         if (_monitorEmision == null || !ReferenceEquals(anime, AnimeSeleccionado)) return;
 
         int emitido = _monitorEmision.UltimoEmitido(proxima, anime, DateTime.UtcNow);
-        int maxActual = _todosLosEpisodios.Count; // filas 1..N contiguas: ver InicializarAsync
-        if (emitido <= maxActual) return;
+        if (emitido <= Episodios.Todos.Count) return;
 
-        for (int numero = maxActual + 1; numero <= emitido; numero++)
-        {
-            _todosLosEpisodios.Add(new EpisodioItem { NumeroEpisodio = numero });
-        }
+        Episodios.AnadirFilasHasta(emitido);
         anime.TotalEpisodios = emitido;
-        AplicarFiltrosYOrdenamiento();
 
         try
         {

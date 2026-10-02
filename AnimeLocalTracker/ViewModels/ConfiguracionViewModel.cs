@@ -231,6 +231,8 @@ public partial class ConfiguracionViewModel : ObservableObject
     [ObservableProperty] private bool _notificarNuevosEpisodios = true;
     [ObservableProperty] private bool _minimizarABandejaAlCerrar = false;
     [ObservableProperty] private bool _notificarConBandejaSiempre = false;
+    /// <summary>La música de openings/endings sigue sonando al salir de la ficha.</summary>
+    [ObservableProperty] private bool _musicaSigueFueraDeLaFicha = false;
     [ObservableProperty] private string _idioma = "es";
     [ObservableProperty] private double _velocidadReproduccionDefecto = 1.0;
     [ObservableProperty] private bool _iniciarConWindows = false;
@@ -375,6 +377,10 @@ public partial class ConfiguracionViewModel : ObservableObject
         _organizadorMusica = organizadorMusica;
 
         CargarDatosConfiguracion();
+
+        // Este ajuste también se cambia desde la ventana de música de la ficha (la chincheta). Esta pantalla se crea una sola
+        // vez: sin ponerse al día, su "Guardar" volvería a escribir el valor viejo encima del que se eligió allí.
+        if (settingsService is not null) settingsService.ConfiguracionModificada += config => MusicaSigueFueraDeLaFicha = config.MusicaSigueFueraDeLaFicha;
     }
 
     public void CargarDatosConfiguracion()
@@ -399,6 +405,7 @@ public partial class ConfiguracionViewModel : ObservableObject
         NotificarNuevosEpisodios = config.NotificarNuevosEpisodios;
         MinimizarABandejaAlCerrar = config.MinimizarABandejaAlCerrar;
         NotificarConBandejaSiempre = config.NotificarConBandejaSiempre;
+        MusicaSigueFueraDeLaFicha = config.MusicaSigueFueraDeLaFicha;
         Idioma = config.Idioma == "en" ? "en" : "es";
         VelocidadReproduccionDefecto = config.VelocidadReproduccionDefecto is >= 0.5 and <= 2.0 ? config.VelocidadReproduccionDefecto : 1.0;
         ModoSaltosVideo = config.ModoSaltosVideo is ModosRendimientoVideo.Exactos or ModosRendimientoVideo.Rapidos ? config.ModoSaltosVideo : ModosRendimientoVideo.Automatico;
@@ -623,6 +630,7 @@ public partial class ConfiguracionViewModel : ObservableObject
             config.NotificarNuevosEpisodios = NotificarNuevosEpisodios;
             config.MinimizarABandejaAlCerrar = MinimizarABandejaAlCerrar;
             config.NotificarConBandejaSiempre = NotificarConBandejaSiempre;
+            config.MusicaSigueFueraDeLaFicha = MusicaSigueFueraDeLaFicha;
             config.Idioma = Idioma == "en" ? "en" : "es";
             config.VelocidadReproduccionDefecto = VelocidadReproduccionDefecto is >= 0.5 and <= 2.0 ? VelocidadReproduccionDefecto : 1.0;
             config.ModoSaltosVideo = string.IsNullOrEmpty(ModoSaltosVideo) ? ModosRendimientoVideo.Automatico : ModoSaltosVideo;

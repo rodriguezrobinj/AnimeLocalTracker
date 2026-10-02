@@ -19,6 +19,11 @@ public partial class TemaAnimeItem : ObservableObject, IRecipient<IdiomaCambiado
     public TemaAnimeItem() => WeakReferenceMessenger.Default.Register(this);
 
     public string Slug => Info.Slug;
+
+    /// <summary>Lo que se ve en la etiqueta de la fila: "OP1", o "OP1 v2" para las versiones siguientes (antes las dos
+    /// versiones de un mismo tema salían idénticas en la lista).</summary>
+    public string EtiquetaSlug => Info.Version > 1 ? $"{Info.Slug} v{Info.Version}" : Info.Slug;
+
     public string Tipo => Info.Tipo;
     public string TituloCancion => string.IsNullOrWhiteSpace(Info.TituloCancion) ? Slug : Info.TituloCancion;
     public string Artistas => Info.Artistas;
@@ -39,10 +44,14 @@ public partial class TemaAnimeItem : ObservableObject, IRecipient<IdiomaCambiado
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(TituloVisible))]
     [NotifyPropertyChangedFor(nameof(ArtistasVisible))]
+    [NotifyPropertyChangedFor(nameof(TieneArtistasVisible))]
     private bool _ocultoPorSpoiler;
 
     public string TituloVisible => OcultoPorSpoiler ? LocalizationService.T("Det_MusicaSpoilerTitulo") : TituloCancion;
     public string ArtistasVisible => OcultoPorSpoiler ? LocalizationService.T("Det_MusicaSpoilerSub") : Artistas;
+
+    /// <summary>AnimeThemes no da el artista de muchos temas (55 de 75 en One Piece): sin él, la fila no reserva esa línea.</summary>
+    public bool TieneArtistasVisible => !string.IsNullOrWhiteSpace(ArtistasVisible);
 
     // === Tamaño (antes de descargar) ===
 
@@ -81,6 +90,7 @@ public partial class TemaAnimeItem : ObservableObject, IRecipient<IdiomaCambiado
         OnPropertyChanged(nameof(RangoTexto));
         OnPropertyChanged(nameof(TituloVisible));
         OnPropertyChanged(nameof(ArtistasVisible));
+        OnPropertyChanged(nameof(TieneArtistasVisible));
         OnPropertyChanged(nameof(TamanoTexto));
     }
 
@@ -96,6 +106,7 @@ public partial class TemaAnimeItem : ObservableObject, IRecipient<IdiomaCambiado
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(PuedePrevisualizar))]
+    [NotifyPropertyChangedFor(nameof(PuedeDescargar))]
     [NotifyPropertyChangedFor(nameof(EsperandoEnCola))]
     [NotifyPropertyChangedFor(nameof(MostrarIconoDescarga))]
     private bool _descargando;
@@ -109,7 +120,17 @@ public partial class TemaAnimeItem : ObservableObject, IRecipient<IdiomaCambiado
     [NotifyPropertyChangedFor(nameof(PuedeReproducir))]
     [NotifyPropertyChangedFor(nameof(EsSoloVistaPrevia))]
     [NotifyPropertyChangedFor(nameof(PuedePrevisualizar))]
+    [NotifyPropertyChangedFor(nameof(PuedeDescargar))]
     private bool _vistaPreviaLista;
+
+    /// <summary>
+    /// No hay internet (lo pone la ventana de música): no se ofrece bajar ni preparar nada nuevo. Lo que ya tiene archivo se
+    /// sigue pudiendo escuchar, y una vista previa ya lista se puede guardar (es mover un archivo).
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PuedePrevisualizar))]
+    [NotifyPropertyChangedFor(nameof(PuedeDescargar))]
+    private bool _sinConexion;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(PuedePrevisualizar))]
@@ -136,10 +157,10 @@ public partial class TemaAnimeItem : ObservableObject, IRecipient<IdiomaCambiado
     public bool TieneAudioEnLinea => !string.IsNullOrWhiteSpace(Info.AudioUrlOgg);
 
     /// <summary>Todavía no hay nada que escuchar ni se está preparando: se ofrece "escuchar antes de descargar".</summary>
-    public bool PuedePrevisualizar => TieneAudioEnLinea && !Descargado && !VistaPreviaLista && !PreparandoVistaPrevia && !Descargando;
+    public bool PuedePrevisualizar => TieneAudioEnLinea && !SinConexion && !Descargado && !VistaPreviaLista && !PreparandoVistaPrevia && !Descargando;
 
     /// <summary>Muestra el botón de descargar (o su progreso mientras baja).</summary>
-    public bool PuedeDescargar => TieneAudioEnLinea && !Descargado;
+    public bool PuedeDescargar => TieneAudioEnLinea && !Descargado && (!SinConexion || VistaPreviaLista || Descargando);
 
     // === Reproducción ===
 

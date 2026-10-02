@@ -3,7 +3,6 @@ using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
-using System.Windows.Markup;
 using System.Windows.Media;
 using AnimeLocalTracker.Services;
 using AnimeLocalTracker.ViewModels;
@@ -22,80 +21,166 @@ public partial class DetalleView : UserControl
 
     public DetalleView()
     {
+        var reloj = System.Diagnostics.Stopwatch.StartNew();
         InitializeComponent();
+        long msCreada = reloj.ElapsedMilliseconds;
+        // La ficha crea una vista nueva en cada visita: cuánto cuesta construirla y cuándo queda colocada en pantalla.
+        RoutedEventHandler? alCargar = null;
+        alCargar = (_, _) =>
+        {
+            Loaded -= alCargar;
+            AppLogger.Debug("DetalleView", $"[Perf] Vista de la ficha: creada en {msCreada} ms, colocada a los {reloj.ElapsedMilliseconds} ms.");
+        };
+        Loaded += alCargar;
         DataContextChanged += (_, _) =>
         {
-            if (_vmObservado != null) _vmObservado.PropertyChanged -= Vm_PropertyChanged;
+            DejarDeObservar();
             _vmObservado = DataContext as DetalleViewModel;
-            if (_vmObservado != null) _ultimoVm = _vmObservado;
-            if (_vmObservado != null) _vmObservado.PropertyChanged += Vm_PropertyChanged;
+            if (_vmObservado != null)
+            {
+                _ultimoVm = _vmObservado;
+                _vmObservado.PropertyChanged += Ficha_PropertyChanged;
+                ObservarMusica(_vmObservado.Musica);
+                _vmObservado.Seguimiento.PropertyChanged += Seguimiento_PropertyChanged;
+            }
+
+            // Aplazado: aquí WPF está en mitad de propagar el DataContext de la ficha, y dárselo ahora mismo a las ventanas ya
+            // creadas (otra propagación, anidada) puede cortar la primera y dejar controles sin datos.
+            Dispatcher.BeginInvoke(new Action(MostrarVentanasSiCorresponde));
         };
         Loaded += (_, _) => (DataContext as DetalleViewModel)?.ReanudarContador();
         Unloaded += (_, _) =>
         {
             // El contador de próximo episodio no debe seguir corriendo con la ficha oculta.
             _ultimoVm?.DetenerContador();
-            // La música de la ficha no debe seguir sonando en otras pestañas.
-            _ultimoVm?.DetenerMusica();
-            if (_vmObservado != null) _vmObservado.PropertyChanged -= Vm_PropertyChanged;
+            // La música de la ficha no debe seguir sonando en otras pestañas (salvo que el usuario lo haya pedido: entonces
+            // la propia música sabe que se quedó de fondo y no se corta).
+            _ultimoVm?.Musica.AlOcultarLaFicha();
+            DejarDeObservar();
             _vmObservado = null;
         };
     }
 
-    // === Barra de progreso de la música: ver TemaAnimeItem.Sincronizando/Arrastrando ===
-
-    /// <summary>
-    /// Cualquier cambio de la barra que no venga de la sincronización con el reproductor es del usuario (arrastre, clic en
-    /// la barra o teclado): salta a ese punto ahora mismo, así que arrastrar "escucha" el audio mientras se mueve.
-    /// </summary>
-    private void BarraTema_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    private void DejarDeObservar()
     {
-        if (sender is not Slider barra || barra.DataContext is not TemaAnimeItem tema || tema.Sincronizando) return;
-        _vmObservado?.BuscarTema(tema, e.NewValue);
+        ObservarMusica(null);
+        if (_vmObservado == null) return;
+
+        _vmObservado.PropertyChanged -= Ficha_PropertyChanged;
+        _vmObservado.Seguimiento.PropertyChanged -= Seguimiento_PropertyChanged;
     }
 
-    private void BarraTema_DragStarted(object sender, DragStartedEventArgs e)
+    private MusicaFichaViewModel? _musicaObservada;
+
+    private void ObservarMusica(MusicaFichaViewModel? musica)
     {
-        if (sender is Slider { DataContext: TemaAnimeItem tema }) tema.Arrastrando = true;
+        if (_musicaObservada != null) _musicaObservada.PropertyChanged -= Musica_PropertyChanged;
+        _musicaObservada = musica;
+        if (musica != null) musica.PropertyChanged += Musica_PropertyChanged;
     }
 
-    private void BarraTema_DragCompleted(object sender, DragCompletedEventArgs e)
+    /// <summary>La ficha cambió de música (recibió la que venía sonando de fondo): la ventana de música pasa a ser la suya.</summary>
+    private void Ficha_PropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (sender is Slider { DataContext: TemaAnimeItem tema }) tema.Arrastrando = false;
-    }
-
-    /// <summary>
-    /// El calendario del selector de fechas usa el idioma del elemento (por defecto en-US: "October 2024").
-    /// Se ajusta al idioma de la app cada vez que se abre el editor de seguimiento.
-    /// </summary>
-    private void Vm_PropertyChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName == nameof(DetalleViewModel.MostrandoEditorSeguimiento) && _vmObservado?.MostrandoEditorSeguimiento == true)
+        if (e.PropertyName != nameof(DetalleViewModel.Musica)) return;
+        EnHiloDeInterfaz(() =>
         {
-            EditorSeguimientoCard.Language = XmlLanguage.GetLanguage(LocalizationService.Cultura.IetfLanguageTag);
-        }
-        else if (e.PropertyName == nameof(DetalleViewModel.MostrandoPanelMusica) && _vmObservado?.MostrandoPanelMusica == true)
-        {
-            // El foco dentro de la ventana de música hace que Escape (KeyBinding de la tarjeta) la cierre.
-            Dispatcher.BeginInvoke(new Action(() => PanelMusicaCard.Focus()), System.Windows.Threading.DispatcherPriority.Input);
-        }
-        else if (e.PropertyName == nameof(DetalleViewModel.MostrandoCalendarioFecha) && _vmObservado?.MostrandoCalendarioFecha == true)
-        {
-            // Cada vez que se abre: idioma de la app, vista de días y el mes de la fecha ya elegida (o de hoy).
-            CalendarioFechaCard.Language = XmlLanguage.GetLanguage(LocalizationService.Cultura.IetfLanguageTag);
-            var fecha = _vmObservado.CalendarioFechaInicial;
-            CalendarioFecha.DisplayMode = CalendarMode.Month;
-            CalendarioFecha.SelectedDate = _vmObservado.CalendarioTieneFecha ? fecha : null;
-            CalendarioFecha.DisplayDate = fecha;
-        }
+            ObservarMusica(_vmObservado?.Musica);
+            MostrarVentanasSiCorresponde();
+        });
     }
 
-    /// <summary>Un clic en el fondo oscuro (fuera de la tarjeta) cierra la ventana de música.</summary>
-    private void FondoMusica_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    // === Ventanas de la ficha (música y editor de seguimiento): cada una vive en su propia vista y se crea la primera vez que
+    //     se abre. Construirlas en cada visita era trabajo perdido casi siempre: la mayoría de las veces no se abren. Una vez
+    //     creadas se quedan (su visibilidad sigue al ViewModel) y cambian de anime con la ficha. ===
+
+    private void Musica_PropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (!ReferenceEquals(e.OriginalSource, FondoMusica)) return;
-        if (_vmObservado?.ToggleMusicaCommand.CanExecute(null) == true) _vmObservado.ToggleMusicaCommand.Execute(null);
+        if (e.PropertyName == nameof(MusicaFichaViewModel.MostrandoPanelMusica)) EnHiloDeInterfaz(MostrarVentanasSiCorresponde);
+    }
+
+    private void Seguimiento_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(SeguimientoEditorViewModel.MostrandoEditorSeguimiento)) EnHiloDeInterfaz(MostrarVentanasSiCorresponde);
+    }
+
+    private void EnHiloDeInterfaz(Action accion)
+    {
+        if (Dispatcher.CheckAccess()) accion();
+        else Dispatcher.InvokeAsync(accion);
+    }
+
+    private void MostrarVentanasSiCorresponde()
+    {
+        var musica = _vmObservado?.Musica;
+        if (AnfitrionMusica.Content is PanelMusicaView panelMusica) panelMusica.DataContext = musica;
+        else if (musica?.MostrandoPanelMusica == true) AnfitrionMusica.Content = new PanelMusicaView { DataContext = musica };
+
+        var seguimiento = _vmObservado?.Seguimiento;
+        if (AnfitrionSeguimiento.Content is EditorSeguimientoView editor) editor.DataContext = seguimiento;
+        else if (seguimiento?.MostrandoEditorSeguimiento == true) AnfitrionSeguimiento.Content = new EditorSeguimientoView { DataContext = seguimiento };
+    }
+
+    // === Lista de episodios: doble clic o Enter reproducen; "Ir al ep." lleva la lista hasta ese episodio ===
+
+    private void ListaEpisodios_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton != System.Windows.Input.MouseButton.Left) return;
+        if (FilaDe(e.OriginalSource as DependencyObject, out bool sobreUnBoton) is not { } episodio || sobreUnBoton) return;
+
+        Reproducir(episodio);
         e.Handled = true;
+    }
+
+    private void ListaEpisodios_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key != System.Windows.Input.Key.Enter) return;
+        // Solo con el foco en la fila: Enter sobre un botón de la fila ya pulsa ese botón.
+        if (e.OriginalSource is not ListBoxItem { DataContext: AnimeLocalTracker.Models.EpisodioItem episodio }) return;
+
+        Reproducir(episodio);
+        e.Handled = true;
+    }
+
+    private void Reproducir(AnimeLocalTracker.Models.EpisodioItem episodio)
+    {
+        var comando = _vmObservado?.Episodios.ReproducirEpisodioCommand;
+        if (episodio.Descargado && comando?.CanExecute(episodio) == true) comando.Execute(episodio);
+    }
+
+    /// <summary>El episodio de la fila que contiene ese elemento (null si no está en una fila), y si el elemento es un botón de la fila.</summary>
+    private static AnimeLocalTracker.Models.EpisodioItem? FilaDe(DependencyObject? origen, out bool sobreUnBoton)
+    {
+        sobreUnBoton = false;
+        for (DependencyObject? actual = origen; actual != null;
+             actual = actual is Visual or System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetParent(actual) : LogicalTreeHelper.GetParent(actual))
+        {
+            if (actual is ButtonBase) sobreUnBoton = true;
+            if (actual is ListBoxItem fila) return fila.DataContext as AnimeLocalTracker.Models.EpisodioItem;
+        }
+        return null;
+    }
+
+    private void CajaIrAEpisodio_PreviewTextInput(object sender, System.Windows.Input.TextCompositionEventArgs e)
+    {
+        // Solo dígitos y hasta 4 (el límite se pone aquí y no con MaxLength: Material Design le añade un contador "0 / 4").
+        if (sender is TextBox caja && caja.Text.Length - caja.SelectionLength + e.Text.Length > 4) { e.Handled = true; return; }
+        foreach (char c in e.Text)
+        {
+            if (!char.IsDigit(c)) { e.Handled = true; return; }
+        }
+    }
+
+    private void CajaIrAEpisodio_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key != System.Windows.Input.Key.Enter || sender is not TextBox caja) return;
+
+        e.Handled = true;
+        if (_vmObservado?.Episodios.BuscarParaIr(caja.Text) is not { } episodio) return;
+
+        ListaEpisodios.SelectedItem = episodio;
+        ListaEpisodios.ScrollIntoView(episodio);
+        caja.Clear();
     }
 
     /// <summary>
@@ -109,49 +194,28 @@ public partial class DetalleView : UserControl
             boton.Tag = fila.Tag;
             menu.PlacementTarget = boton;
             menu.Placement = PlacementMode.Bottom;
+            menu.HorizontalOffset = 0;
             menu.VerticalOffset = 6;
+            menu.Closed += MenuEpisodio_CerradoTrasAbrirConBoton;
             menu.IsOpen = true;
             e.Handled = true;
         }
     }
 
     /// <summary>
-    /// El título del calendario avanza mes → año → década (comportamiento nativo). En la década su botón queda
-    /// deshabilitado y no había forma de volver: ahora pulsar el título en esa vista regresa a los días del mes.
+    /// El menú es uno solo para todas las filas. Al cerrarse tras abrirlo desde el botón se le quita el anclaje a ese botón y
+    /// vuelve a su colocación de clic derecho: si se quedara anclado, el siguiente clic derecho en OTRA fila abriría el menú
+    /// con el episodio de esta.
     /// </summary>
-    private void CalendarioTitulo_PreviewMouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    private static void MenuEpisodio_CerradoTrasAbrirConBoton(object sender, RoutedEventArgs e)
     {
-        if (sender is not Calendar calendario || calendario.DisplayMode != CalendarMode.Decade) return;
+        if (sender is not ContextMenu menu) return;
 
-        // Se comprueba por posición: con el botón deshabilitado, el origen del clic no es fiable (llega la rejilla de fondo).
-        var item = calendario.Template?.FindName("PART_CalendarItem", calendario) as Control;
-        var cabecera = item?.Template?.FindName("PART_HeaderButton", item) as FrameworkElement;
-        if (cabecera == null || !cabecera.IsVisible) return;
-
-        var zona = cabecera.TransformToAncestor(calendario).TransformBounds(new Rect(0, 0, cabecera.ActualWidth, cabecera.ActualHeight));
-        if (zona.Contains(e.GetPosition(calendario)))
-        {
-            calendario.DisplayMode = CalendarMode.Month;
-            e.Handled = true;
-        }
-    }
-
-    /// <summary>
-    /// Un clic en un día aplica la fecha y cierra la tarjeta. Se resuelve aquí (y no con SelectedDate) para que
-    /// también funcione al pulsar el día que ya estaba seleccionado, que no genera cambio de selección.
-    /// </summary>
-    private void CalendarioFecha_PreviewMouseLeftButtonUp(object sender, System.Windows.Input.MouseButtonEventArgs e)
-    {
-        for (DependencyObject? actual = e.OriginalSource as DependencyObject; actual != null && !ReferenceEquals(actual, CalendarioFecha); actual = VisualTreeHelper.GetParent(actual))
-        {
-            if (actual is System.Windows.Controls.Primitives.CalendarDayButton { DataContext: DateTime dia })
-            {
-                if (_vmObservado?.ElegirFechaCalendarioCommand.CanExecute(dia) == true)
-                    _vmObservado.ElegirFechaCalendarioCommand.Execute(dia);
-                e.Handled = true;
-                return;
-            }
-        }
+        menu.Closed -= MenuEpisodio_CerradoTrasAbrirConBoton;
+        menu.ClearValue(ContextMenu.PlacementTargetProperty);
+        menu.Placement = PlacementMode.RelativePoint;
+        menu.HorizontalOffset = 18;
+        menu.VerticalOffset = 12;
     }
 
     /// <summary>Al elegir una opción de un menú de acciones (Marcar / Herramientas) se cierra su popup; el comando se ejecuta después.</summary>

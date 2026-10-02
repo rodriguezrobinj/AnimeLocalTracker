@@ -80,6 +80,8 @@ public partial class MainViewModel : ObservableObject,
 
     public NavigationService Navigation => (NavigationService)_navigationService;
     public IDialogService DialogService { get; }
+    /// <summary>La música de una ficha que sigue sonando fuera de ella: alimenta la barra pequeña de la ventana principal.</summary>
+    public IMusicaDeFondoService? MusicaDeFondo { get; }
     /// <summary>Fase 2d: overlay para elegir un torrent a mano — mismo patrón que <see cref="DialogService"/>.</summary>
     public ISelectorTorrentService SelectorTorrentService { get; }
 
@@ -123,8 +125,10 @@ public partial class MainViewModel : ObservableObject,
         IFileScannerService fileScannerService,
         NewEpisodeNotifier newEpisodeNotifier,
         ISystemTrayService systemTrayService,
-        IAnimeThemesDownloadService? descargasMusica = null)
+        IAnimeThemesDownloadService? descargasMusica = null,
+        IMusicaDeFondoService? musicaDeFondo = null)
     {
+        MusicaDeFondo = musicaDeFondo;
         _descargasMusica = descargasMusica;
         _navigationService = navigationService;
         _animeTrackingService = animeTrackingService;

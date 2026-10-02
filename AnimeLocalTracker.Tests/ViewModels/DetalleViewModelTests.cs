@@ -75,10 +75,10 @@ public class DetalleViewModelTests
 
         // Assert
         sut.AnimeSeleccionado.Should().Be(anime);
-        sut.EpisodiosDelAnime.Should().HaveCount(3);
+        sut.Episodios.EpisodiosDelAnime.Should().HaveCount(3);
         
-        var ep1 = sut.EpisodiosDelAnime[2]; // Orden descendente por defecto: ep3, ep2, ep1
-        var ep3 = sut.EpisodiosDelAnime[0];
+        var ep1 = sut.Episodios.EpisodiosDelAnime[2]; // Orden descendente por defecto: ep3, ep2, ep1
+        var ep3 = sut.Episodios.EpisodiosDelAnime[0];
 
         ep1.NumeroEpisodio.Should().Be(1);
         ep1.Descargado.Should().BeTrue();
@@ -103,7 +103,7 @@ public class DetalleViewModelTests
         var seleccionados = new List<EpisodioItem> { ep1, ep2 };
 
         // Act
-        await sut.MarcarVistosCommand.ExecuteAsync(seleccionados);
+        await sut.Episodios.MarcarVistosCommand.ExecuteAsync(seleccionados);
 
         // Assert
         ep1.Visto.Should().BeTrue();
@@ -126,7 +126,7 @@ public class DetalleViewModelTests
         episodio.TieneProgresoGuardado.Should().BeTrue();
 
         // Act: marcar como visto
-        await sut.AlternarVistoEpisodioCommand.ExecuteAsync(episodio);
+        await sut.Episodios.AlternarVistoEpisodioCommand.ExecuteAsync(episodio);
 
         // Assert: visto y sin progreso guardado, en memoria, sin releer de la BD.
         episodio.Visto.Should().BeTrue();
@@ -134,7 +134,7 @@ public class DetalleViewModelTests
         episodio.TieneProgresoGuardado.Should().BeFalse();
 
         // Act: alternar de nuevo a no visto (no debe resucitar el progreso viejo)
-        await sut.AlternarVistoEpisodioCommand.ExecuteAsync(episodio);
+        await sut.Episodios.AlternarVistoEpisodioCommand.ExecuteAsync(episodio);
 
         // Assert
         episodio.Visto.Should().BeFalse();
@@ -173,15 +173,15 @@ public class DetalleViewModelTests
         await sut.InicializarAsync(anime);
 
         // Act: marcar hasta el episodio 3
-        var ep3 = sut.EpisodiosDelAnime.First(e => e.NumeroEpisodio == 3);
-        await sut.MarcarAnterioresVistosCommand.ExecuteAsync(ep3);
+        var ep3 = sut.Episodios.EpisodiosDelAnime.First(e => e.NumeroEpisodio == 3);
+        await sut.Episodios.MarcarAnterioresVistosCommand.ExecuteAsync(ep3);
 
         // Assert: 1, 2 y 3 deben quedar vistos; 4 y 5 no vistos
-        sut.EpisodiosDelAnime.First(e => e.NumeroEpisodio == 1).Visto.Should().BeTrue();
-        sut.EpisodiosDelAnime.First(e => e.NumeroEpisodio == 2).Visto.Should().BeTrue();
-        sut.EpisodiosDelAnime.First(e => e.NumeroEpisodio == 3).Visto.Should().BeTrue();
-        sut.EpisodiosDelAnime.First(e => e.NumeroEpisodio == 4).Visto.Should().BeFalse();
-        sut.EpisodiosDelAnime.First(e => e.NumeroEpisodio == 5).Visto.Should().BeFalse();
+        sut.Episodios.EpisodiosDelAnime.First(e => e.NumeroEpisodio == 1).Visto.Should().BeTrue();
+        sut.Episodios.EpisodiosDelAnime.First(e => e.NumeroEpisodio == 2).Visto.Should().BeTrue();
+        sut.Episodios.EpisodiosDelAnime.First(e => e.NumeroEpisodio == 3).Visto.Should().BeTrue();
+        sut.Episodios.EpisodiosDelAnime.First(e => e.NumeroEpisodio == 4).Visto.Should().BeFalse();
+        sut.Episodios.EpisodiosDelAnime.First(e => e.NumeroEpisodio == 5).Visto.Should().BeFalse();
         anime.EpisodiosVistos.Should().Be(3);
 
         _databaseServiceMock.Verify(d => d.GuardarRegistrosEpisodioBulkAsync(
@@ -205,10 +205,10 @@ public class DetalleViewModelTests
         await sut.InicializarAsync(anime);
 
         // Act
-        await sut.MarcarTemporadaCompletaCommand.ExecuteAsync(null);
+        await sut.Episodios.MarcarTemporadaCompletaCommand.ExecuteAsync(null);
 
         // Assert
-        sut.EpisodiosDelAnime.Should().OnlyContain(e => e.Visto);
+        sut.Episodios.EpisodiosDelAnime.Should().OnlyContain(e => e.Visto);
         anime.EpisodiosVistos.Should().Be(4);
 
         _databaseServiceMock.Verify(d => d.GuardarRegistrosEpisodioBulkAsync(
@@ -231,11 +231,11 @@ public class DetalleViewModelTests
 
         await sut.InicializarAsync(anime);
 
-        var ep1 = sut.EpisodiosDelAnime.First(e => e.NumeroEpisodio == 1);
+        var ep1 = sut.Episodios.EpisodiosDelAnime.First(e => e.NumeroEpisodio == 1);
         ep1.Visto.Should().BeFalse();
 
         // Act 1: marcar como visto
-        await sut.AlternarVistoEpisodioCommand.ExecuteAsync(ep1);
+        await sut.Episodios.AlternarVistoEpisodioCommand.ExecuteAsync(ep1);
 
         // Assert 1
         ep1.Visto.Should().BeTrue();
@@ -244,7 +244,7 @@ public class DetalleViewModelTests
             It.Is<RegistroEpisodio>(r => r.NumeroEpisodio == 1 && r.VistoLocal)), Times.Once);
 
         // Act 2: alternar a no visto
-        await sut.AlternarVistoEpisodioCommand.ExecuteAsync(ep1);
+        await sut.Episodios.AlternarVistoEpisodioCommand.ExecuteAsync(ep1);
 
         // Assert 2
         ep1.Visto.Should().BeFalse();

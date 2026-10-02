@@ -18,28 +18,20 @@ using AnimeLocalTracker.Messages;
 
 namespace AnimeLocalTracker.ViewModels;
 
-public partial class DetalleViewModel : ObservableObject, 
-    IRecipient<UsuarioLogeadoMensaje>, 
-    IRecipient<UsuarioDesconectadoMensaje>, 
-    IRecipient<EpisodioActualizadoMensaje>,
-    IRecipient<DescargaProgresoMensaje>,
+/// <summary>
+/// La ficha de un anime. Lleva la cabecera (datos del anime, etiquetas, espacio en disco, cuenta atrás del próximo episodio) y
+/// coordina sus tres piezas: <see cref="Episodios"/> (la lista y lo que se hace con cada episodio), <see cref="Musica"/>
+/// (openings y endings) y <see cref="Seguimiento"/> (editor de AniList). Se crea una por visita y se descarta al salir.
+/// </summary>
+public partial class DetalleViewModel : ObservableObject,
+    IRecipient<UsuarioLogeadoMensaje>,
+    IRecipient<UsuarioDesconectadoMensaje>,
     IDisposable
 {
     private readonly IAnimeTrackingService _animeTrackingService;
     private readonly IDatabaseService _databaseService;
     private readonly IAuthService _authService;
-    private readonly IFileScannerService _fileScannerService;
     private readonly IDialogService _dialogService;
-    private readonly IDownloadService _downloadService;
-    private readonly PythonEpisodeEnricher? _enricher;
-    private readonly IPluginService? _pluginService;
-    private readonly IVideoIntegrityService? _videoIntegrityService;
-    private readonly INyaaSourceService? _nyaaSourceService;
-    private readonly ISelectorTorrentService? _selectorTorrentService;
-    private readonly ISettingsService? _settingsService;
-
-    // Enriquecimiento de metadata/miniaturas de episodios (extraído a EpisodeEnrichmentCoordinator).
-    private readonly EpisodeEnrichmentCoordinator _enrichmentCoordinator = new();
 
     /// <summary>
     /// Cancela las cargas de fondo de ESTA ficha (espacio en disco, próximos episodios, próxima
@@ -50,123 +42,73 @@ public partial class DetalleViewModel : ObservableObject,
     /// </summary>
     private CancellationTokenSource? _ctsCargaFicha;
 
-    // CA1001: el coordinador de enriquecimiento (posee un SemaphoreSlim) y el CTS de las cargas de
-    // fondo se liberan al descartar el ViewModel (los transients no los dispone el contenedor).
+    private bool _liberado;
+
+    /// <summary>La ficha ya se descartó (se salió de ella): no atiende más mensajes ni cargas.</summary>
+    internal bool EstaLiberado => _liberado;
+
+    // Lo llama NavigationService al salir de la ficha hacia cualquier otro sitio. Suelta todo lo que la mantendría viva y
+    // trabajando sin estar en pantalla: antes cada ficha abierta se quedaba en memoria hasta cerrar la app, y las viejas
+    // seguían atendiendo los avisos de descargas y de configuración (una miniatura y un aviso por cada vez que se abrió).
     public void Dispose()
     {
+        if (_liberado) return;
+        _liberado = true;
+
+        WeakReferenceMessenger.Default.UnregisterAll(this);
+
         DetenerContador();
         _ctsCargaFicha?.Cancel();
         _ctsCargaFicha?.Dispose();
-        _enrichmentCoordinator.Dispose();
-        LiberarMusica();
+        Episodios.Dispose();
+        // Con "seguir sonando fuera de la ficha" y un tema sonando, la música no se libera: se queda de fondo.
+        if (_musicaDeFondo?.Conservar(Musica) != true) Musica.Dispose();
         GC.SuppressFinalize(this);
     }
-    
+
     [ObservableProperty]
     private AnimeItem? _animeSeleccionado;
 
-    private List<EpisodioItem> _todosLosEpisodios = new();
-    
-    public ObservableCollection<EpisodioItem> EpisodiosDelAnime { get; } = [];
+    /// <summary>La lista de episodios: filtro, orden, marcar, descargar, reproducir y las herramientas sobre los archivos.</summary>
+    public EpisodiosFichaViewModel Episodios { get; }
 
-    [ObservableProperty]
-    private bool _ordenAscendente = false;
+    /// <summary>Openings y endings del anime: lista, descargas y reproducción (su ventana es <c>PanelMusicaView</c>).</summary>
+    public MusicaFichaViewModel Musica { get; private set; }
 
-    [ObservableProperty]
-    private string _filtroEpisodios = LocalizationService.T("Filtro_Todos");
+    private readonly IMusicaDeFondoService? _musicaDeFondo;
 
-    public string[] OpcionesFiltro { get; } = [
-        LocalizationService.T("Filtro_Todos"), 
-        LocalizationService.T("Filtro_Descargados"), 
-        LocalizationService.T("Filtro_Vistos"), 
-        LocalizationService.T("Filtro_NoVistos"), 
-        LocalizationService.T("Filtro_Favoritos")
-    ];
+    /// <summary>
+    /// Si la música de este anime seguía sonando de fondo, esta ficha se la queda tal como iba (lista, tema, posición) en vez
+    /// de cargar la suya desde cero.
+    /// </summary>
+    private bool RecuperarMusicaDeFondo(AnimeItem anime)
+    {
+        var deFondo = _musicaDeFondo?.Recuperar(anime.AniListId);
+        if (deFondo == null) return false;
 
-    [ObservableProperty] private string _mensajeSinEpisodios = LocalizationService.T("Det_SinEpisodios");
-    [ObservableProperty] private string _subtituloSinEpisodios = LocalizationService.T("Det_SinEpisodiosSub");
+        var propia = Musica;
+        deFondo.UsarEpisodioMasAltoVisto(Episodios.EpisodioMasAltoVisto);
+        Musica = deFondo;
+        if (!ReferenceEquals(propia, deFondo)) propia.Dispose();
+        OnPropertyChanged(nameof(Musica));
+        return true;
+    }
+
+    /// <summary>Editor de seguimiento de AniList (su ventana es <c>EditorSeguimientoView</c>).</summary>
+    public SeguimientoEditorViewModel Seguimiento { get; }
+
+    partial void OnAnimeSeleccionadoChanged(AnimeItem? value)
+    {
+        Episodios.Anime = value;
+        Musica.Anime = value;
+        Seguimiento.Anime = value;
+    }
 
     // === ACCIONES HERO Y DETALLES ===
     [ObservableProperty] private bool _sinopsisExpandida = false;
     [ObservableProperty] private bool _esFavoritoAnime = false;
-    [ObservableProperty] private bool _tieneCapituloEnProgreso = false;
-
-    // === BANNER DE EPISODIOS FALTANTES (huecos en la carpeta local) ===
-    [ObservableProperty] private bool _hayEpisodiosFaltantes;
-    [ObservableProperty] private string _episodiosFaltantesTexto = string.Empty;
-    private List<int> _numerosEpisodiosFaltantes = new();
-
-    // === DOCTOR DE INTEGRIDAD DE VIDEO ===
-    [ObservableProperty] private bool _verificandoIntegridad;
-
-    public bool TieneEpisodios => EpisodiosDelAnime.Count > 0;
-
-    // === EDITOR DE SEGUIMIENTO ===
-    [ObservableProperty] private bool _mostrandoEditorSeguimiento;
-    [ObservableProperty] private string _editEstado = "CURRENT";
-    [ObservableProperty] private int _editProgreso;
-    [ObservableProperty] private string _editProgresoTexto = "0";
-
-    partial void OnEditProgresoTextoChanged(string value)
-    {
-        ProcesarProgresoTexto(value);
-    }
-
-    private void ProcesarProgresoTexto(string value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            EditProgreso = 0;
-            return;
-        }
-
-        string soloDigitos = new string(value.Where(char.IsDigit).ToArray());
-        if (string.IsNullOrEmpty(soloDigitos))
-        {
-            EditProgreso = 0;
-            EditProgresoTexto = "0";
-            return;
-        }
-
-        if (int.TryParse(soloDigitos, out int num))
-        {
-            int max = ObtenerMaximoEpisodiosEmitidos();
-            if (num < 0) num = 0;
-            if (max > 0 && num > max) num = max;
-
-            EditProgreso = num;
-            if (num.ToString() != value)
-            {
-                EditProgresoTexto = num.ToString();
-            }
-        }
-    }
-
-    public int ObtenerMaximoEpisodiosEmitidos()
-    {
-        if (AnimeSeleccionado == null) return 9999;
-        if (AnimeSeleccionado.TotalEpisodios > 0) return AnimeSeleccionado.TotalEpisodios;
-        if (_todosLosEpisodios.Count > 0) return _todosLosEpisodios.Count;
-        if (EpisodiosDelAnime.Count > 0) return EpisodiosDelAnime.Count;
-        return 9999;
-    }
-
-    [ObservableProperty] private float _editPuntaje;
-    [ObservableProperty] private DateTime? _editFechaInicio;
-    [ObservableProperty] private DateTime? _editFechaFin;
-    [ObservableProperty] private string _editEstadoVisual = LocalizationService.T("Estado_Viendo");
-    public List<string> OpcionesEstadoVisual { get; } = [
-        LocalizationService.T("Estado_Viendo"), 
-        LocalizationService.T("Estado_Finalizado"), 
-        LocalizationService.T("Estado_EnPausa"), 
-        LocalizationService.T("Estado_Abandonado"), 
-        LocalizationService.T("Estado_Planeando")
-    ];
 
     [ObservableProperty] private bool _estaConectado;
-    /// <summary>Fase 2d: espeja AppSettings.BusquedaTorrentHabilitada — controla si se
-    /// muestra el botón "elegir torrent manualmente" junto al de descargar.</summary>
-    [ObservableProperty] private bool _busquedaTorrentHabilitada;
 
     public DetalleViewModel(
         IAnimeTrackingService animeTrackingService, 
@@ -188,318 +130,59 @@ public partial class DetalleViewModel : ObservableObject,
         INyaaSourceService? nyaaSourceService = null,
         ISelectorTorrentService? selectorTorrentService = null,
         ISettingsService? settingsService = null,
-        IEnlacesMusicaService? enlacesMusica = null)
+        IEnlacesMusicaService? enlacesMusica = null,
+        IEstadoConexionService? estadoConexion = null,
+        IMusicaDeFondoService? musicaDeFondo = null)
     {
-        _enlacesMusica = enlacesMusica;
+        _musicaDeFondo = musicaDeFondo;
         _proximaEmision = proximaEmision;
         _datosExtra = datosExtra;
         _monitorEmision = monitorEmision;
-        _animeThemesService = animeThemesService;
-        _animeThemesDownload = animeThemesDownload;
-        _audioTrackPlayerInyectado = audioTrackPlayer;
-        _audioDuration = audioDuration;
         _animeTrackingService = animeTrackingService;
         _databaseService = databaseService;
         _authService = authService;
-        _fileScannerService = fileScannerService;
         _dialogService = dialogService;
-        _downloadService = downloadService;
-        _enricher = enricher;
-        _pluginService = pluginService;
-        _videoIntegrityService = videoIntegrityService;
-        _nyaaSourceService = nyaaSourceService;
-        _selectorTorrentService = selectorTorrentService;
-        _settingsService = settingsService;
-        CargarAjustesMusica();
+        Episodios = new EpisodiosFichaViewModel(databaseService, fileScannerService, dialogService, downloadService, enricher,
+            pluginService, videoIntegrityService, nyaaSourceService, selectorTorrentService, settingsService);
+        Seguimiento = new SeguimientoEditorViewModel(animeTrackingService, databaseService, authService, dialogService,
+            () => Episodios.Todos.Count > 0 ? Episodios.Todos.Count : Episodios.EpisodiosDelAnime.Count);
+        Musica = new MusicaFichaViewModel(dialogService, animeThemesService, animeThemesDownload, audioTrackPlayer, audioDuration,
+            enlacesMusica, settingsService, Episodios.EpisodioMasAltoVisto, estadoConexion, musicaDeFondo);
+
+        // Lo que la lista de episodios no sabe hacer por sí misma: el espacio en disco es de la cabecera, y la música no debe
+        // sonar bajo el video.
+        Episodios.ArchivosCambiados += () => _ = CalcularEspacioEnDiscoAsync();
+        Episodios.ReproduccionSolicitada += () => Musica.DetenerMusica();
 
         WeakReferenceMessenger.Default.Register<UsuarioLogeadoMensaje>(this);
         WeakReferenceMessenger.Default.Register<UsuarioDesconectadoMensaje>(this);
-        WeakReferenceMessenger.Default.Register<EpisodioActualizadoMensaje>(this);
-        WeakReferenceMessenger.Default.Register<DescargaProgresoMensaje>(this);
         EstaConectado = _authService.EstaAutenticado();
-
-        // Fase 2d: el botón "elegir torrent manualmente" solo tiene sentido si la
-        // búsqueda por torrent está activa — se mantiene sincronizado con Configuración.
-        BusquedaTorrentHabilitada = _settingsService?.ObtenerConfiguracion()?.BusquedaTorrentHabilitada ?? false;
-        if (_settingsService != null)
-        {
-            _settingsService.ConfiguracionModificada += config =>
-            {
-                var dispatcher = System.Windows.Application.Current?.Dispatcher;
-                if (dispatcher != null && !dispatcher.HasShutdownStarted)
-                {
-                    dispatcher.Invoke(() => BusquedaTorrentHabilitada = config?.BusquedaTorrentHabilitada ?? false);
-                }
-            };
-        }
     }
 
     public void Receive(UsuarioLogeadoMensaje message) => EstaConectado = true;
     public void Receive(UsuarioDesconectadoMensaje message) => EstaConectado = false;
-    public void Receive(EpisodioActualizadoMensaje message)
-    {
-        if (AnimeSeleccionado == null || AnimeSeleccionado.AniListId != message.AnimeId) return;
-
-        var episodio = _todosLosEpisodios.FirstOrDefault(e => e.NumeroEpisodio == message.NumeroEpisodio);
-        if (episodio != null)
-        {
-            // Ejecutar en el hilo principal de la UI sin bloquear al emisor
-            var dispatcher = System.Windows.Application.Current?.Dispatcher;
-            if (dispatcher != null && !dispatcher.HasShutdownStarted)
-            {
-                _ = dispatcher.InvokeAsync(() => AplicarEpisodioActualizado(episodio, message));
-            }
-            else
-            {
-                AplicarEpisodioActualizado(episodio, message);
-            }
-        }
-    }
-
-    /// <summary>
-    /// El reproductor avisa del progreso cada 3 s mientras se ve un episodio. Antes cada aviso rehacía la lista entera de la
-    /// ficha (que sigue abierta detrás del video): en One Piece, 1180 filas cada 3 s en el hilo de la interfaz, y la lista volvía
-    /// arriba. La fila ya se actualiza sola (es observable); la lista solo se rehace si cambió "visto" y el filtro depende de eso.
-    /// </summary>
-    internal void AplicarEpisodioActualizado(EpisodioItem episodio, EpisodioActualizadoMensaje message)
-    {
-        bool cambioVisto = episodio.Visto != message.VistoLocal;
-        episodio.Visto = message.VistoLocal;
-        episodio.ProgresoSegundos = message.ProgresoSegundos;
-        if (message.TotalSegundos > 0)
-        {
-            episodio.TotalSegundos = message.TotalSegundos;
-        }
-
-        if (cambioVisto)
-        {
-            if (AnimeSeleccionado != null) AnimeSeleccionado.EpisodiosVistos = _todosLosEpisodios.Count(e => e.Visto);
-            if (FiltroEpisodios is "Vistos" or "No Vistos") AplicarFiltrosYOrdenamiento();
-        }
-
-        TieneCapituloEnProgreso = _todosLosEpisodios.Any(e => e.TieneProgresoGuardado);
-    }
-
-    public void Receive(DescargaProgresoMensaje message)
-    {
-        if (AnimeSeleccionado == null || AnimeSeleccionado.AniListId != message.AniListId) return;
-
-        // InvokeAsync (no Invoke): los ticks de progreso llegan desde tareas de descarga en
-        // segundo plano; un Invoke síncrono por tick compite con el hilo de UI.
-        var dispatcher = System.Windows.Application.Current?.Dispatcher;
-        if (dispatcher == null || dispatcher.HasShutdownStarted) return;
-
-        _ = dispatcher.InvokeAsync(() =>
-        {
-            var episodio = _todosLosEpisodios.FirstOrDefault(e => e.NumeroEpisodio == message.NumeroEpisodio);
-            if (episodio != null)
-            {
-                episodio.IsDownloading = message.IsDownloading;
-                episodio.DownloadProgress = message.Progreso;
-
-                if (message.IsCompleted)
-                {
-                    episodio.Descargado = true;
-                    episodio.RutaCompleta = message.RutaArchivo;
-                    episodio.CalcularTamanoArchivo();
-                    _ = CalcularEspacioEnDiscoAsync();
-
-                    // Generar miniatura nativa y metadata técnica automáticamente sin salir de la pestaña
-                    _ = Task.Run(async () =>
-                    {
-                        try
-                        {
-                            if (!string.IsNullOrWhiteSpace(episodio.RutaCompleta))
-                            {
-                                string thumbPath = PythonEpisodeEnricher.ObtenerRutaMiniaturaEsperada(episodio.RutaCompleta);
-                                bool extraido;
-                                if (_enricher != null)
-                                {
-                                    // Rust primero, Python solo si hace falta, con reintento de
-                                    // timestamp si el frame cae en una cortinilla casi negra.
-                                    extraido = await _enricher.ExtraerMiniaturaAsync(episodio.RutaCompleta, thumbPath);
-                                }
-                                else
-                                {
-                                    extraido = NativeMethods.IsAvailable
-                                               && NativeMethods.ExtractFrame(episodio.RutaCompleta, thumbPath, 2.0, 320)
-                                               && PythonEpisodeEnricher.EsMiniaturaValida(thumbPath);
-                                }
-                                if (extraido)
-                                {
-                                    episodio.RutaMiniatura = thumbPath;
-                                }
-
-                                if (_enricher != null)
-                                {
-                                    await _enricher.EnriquecerEpisodioAsync(episodio);
-                                }
-
-                                // Persistir inmediatamente en SQLite
-                                try
-                                {
-                                    var reg = new RegistroEpisodio
-                                    {
-                                        AniListId = AnimeSeleccionado?.AniListId ?? 0,
-                                        NumeroEpisodio = episodio.NumeroEpisodio,
-                                        RutaArchivo = episodio.RutaCompleta,
-                                        Resolucion = episodio.Resolucion,
-                                        CodecVideo = episodio.CodecVideo,
-                                        Fps = episodio.Fps,
-                                        Es10Bit = episodio.Es10Bit,
-                                        RutaMiniatura = episodio.RutaMiniatura,
-                                        VistoLocal = episodio.Visto,
-                                        FavoritoLocal = episodio.Favorito,
-                                        ProgresoSegundos = episodio.ProgresoSegundos,
-                                        TotalSegundos = episodio.TotalSegundos
-                                    };
-
-                                    // FUN-019: si el episodio ya estaba visto o a medias (registro
-                                    // previo sin archivo local), la descarga NO debe resetear ese
-                                    // estado: el guardado solo añade los metadatos del archivo nuevo.
-                                    var registroPrevio = (await _databaseService.ObtenerRegistrosPorAnimeAsync(reg.AniListId).ConfigureAwait(false))
-                                        ?.FirstOrDefault(r => r.NumeroEpisodio == reg.NumeroEpisodio);
-                                    if (registroPrevio != null)
-                                    {
-                                        reg.VistoLocal = registroPrevio.VistoLocal;
-                                        reg.FavoritoLocal = registroPrevio.FavoritoLocal;
-                                        reg.ProgresoSegundos = registroPrevio.ProgresoSegundos;
-                                        reg.TotalSegundos = registroPrevio.TotalSegundos;
-                                        reg.UltimaReproduccion = registroPrevio.UltimaReproduccion;
-                                    }
-
-                                    await _databaseService.GuardarRegistroEpisodioAsync(reg).ConfigureAwait(false);
-                                }
-                                catch { }
-
-                                // PERF-01: refresco coalescido (varios pueden completar a la vez)
-                                SolicitarRefrescoEpisodios();
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            AppLogger.Debug("DetalleViewModel", $"Error generando miniatura post-descarga: {ex.Message}");
-                        }
-                    });
-
-                    _dialogService.MostrarDialogoAsync(LocalizationService.T("Det_DescargaCompletadaTitulo"),
-                        string.Format(LocalizationService.T("Det_DescargaCompletadaMsj"), episodio.NumeroEpisodio),
-                        false, "CheckCircleOutline", "#4CAF50");
-                    AplicarFiltrosYOrdenamiento();
-                }
-                else if (!string.IsNullOrEmpty(message.Error))
-                {
-                    _dialogService.MostrarDialogoAsync(LocalizationService.T("Det_ErrorDescargaTitulo"),
-                        string.Format(LocalizationService.T("Det_ErrorDescargaMsj"), episodio.NumeroEpisodio, message.Error),
-                        false, "AlertCircleOutline", "#E53935");
-                }
-            }
-        });
-    }
 
     public async Task InicializarAsync(AnimeItem anime)
     {
         ReiniciarContadorProximo();
         ReiniciarExtras();
-        ReiniciarMusica();
+        bool musicaRecuperada = RecuperarMusicaDeFondo(anime);
+        if (!musicaRecuperada) Musica.ReiniciarMusica();
         EstaConectado = _authService.EstaAutenticado();
         AnimeSeleccionado = anime;
         EsFavoritoAnime = anime.EsFavorito;
-        _todosLosEpisodios.Clear();
-        EpisodiosDelAnime.Clear();
+        var reloj = Stopwatch.StartNew();
 
-        // 1. CARGA RÁPIDA DE BASE DE DATOS Y DISCO (SIN INTERNET)
-        var registrosGuardados = await _databaseService.ObtenerRegistrosPorAnimeAsync(anime.AniListId);
-        anime.EpisodiosVistos = registrosGuardados.Count(r => r.VistoLocal);
-        
-        // Escaneamos la carpeta local si existe
-        List<EpisodioItem> encontrados = new();
-        if (!string.IsNullOrEmpty(anime.RutaCarpeta))
-        {
-            encontrados = await _fileScannerService.EscanearEpisodiosAsync(anime.RutaCarpeta);
-        }
+        // 1. La lista de episodios: base de datos y disco, sin internet. Se lee fuera del hilo de la interfaz y se muestra aquí,
+        //    en el mismo paso en que se arranca lo demás: un segundo salto de hilo esperaría a que se pintaran las filas.
+        var lectura = await Episodios.LeerAsync(anime, reloj);
 
-        // El total oficial de AniList manda cuando se conoce, con un pequeño margen para no ocultar un preestreno o una
-        // filtración real (ver CalcularMaxEpisodio); un archivo local con un número muy por encima de eso
-        // ("Episodio 3000.mp4") no debe inflar la lista sin sentido.
-        int maxEpisodio = Core.EpisodiosOrganizador.CalcularMaxEpisodio(anime.TotalEpisodios, encontrados, anime.EpisodiosVistos);
+        // Se salió de la ficha mientras leía la base de datos y el disco: no se arranca ninguna carga de fondo para ella.
+        if (_liberado) return;
 
-        // Límite de seguridad para prevenir asignaciones anómalas de memoria (máx 3000)
-        const int LimiteSeguridadEpisodios = 3000;
-        int episodiosACargar = Math.Min(maxEpisodio, LimiteSeguridadEpisodios);
-
-        // CARGA RÁPIDA: construimos la lista de episodios INMEDIATAMENTE sin esperar a
-        // generar miniaturas (antes se extraían todas en lote antes de mostrar la lista:
-        // con muchos episodios la pestaña quedaba bloqueada minutos/horas). Las miniaturas
-        // faltantes se generan en segundo plano y aparecen progresivamente.
-        var episodiosGenerados = await Task.Run(() =>
-        {
-            var archivosPorEp = encontrados.GroupBy(e => e.NumeroEpisodio)
-                                           .ToDictionary(g => g.Key, g => g.First());
-            var registrosPorEp = registrosGuardados.GroupBy(r => r.NumeroEpisodio)
-                                                   .ToDictionary(g => g.Key, g => g.First());
-
-            var temp = new List<EpisodioItem>(episodiosACargar);
-            for (int i = 1; i <= episodiosACargar; i++)
-            {
-                archivosPorEp.TryGetValue(i, out var archivoLocal);
-                registrosPorEp.TryGetValue(i, out var memoria);
-                
-                bool estaDescargando = _downloadService.EstaDescargando(anime.AniListId, i, out double prog);
-
-                // Recuperar miniatura y metadata técnica si ya existen en caché local / SQLite
-                string? thumbCache = null;
-                string resolucionCache = string.Empty;
-                string codecCache = string.Empty;
-                string fpsCache = string.Empty;
-                bool es10BitCache = false;
-
-                if (archivoLocal != null && !string.IsNullOrWhiteSpace(archivoLocal.RutaCompleta))
-                {
-                    thumbCache = (!string.IsNullOrEmpty(memoria?.RutaMiniatura)
-                                  && PythonEpisodeEnricher.EsMiniaturaValida(memoria.RutaMiniatura)
-                                  && !PythonEpisodeEnricher.EsFrameDemasiadoVacio(memoria.RutaMiniatura))
-                        ? memoria.RutaMiniatura
-                        : PythonEpisodeEnricher.ObtenerRutaMiniaturaSiExiste(archivoLocal.RutaCompleta);
-
-                    resolucionCache = memoria?.Resolucion ?? string.Empty;
-                    codecCache = memoria?.CodecVideo ?? string.Empty;
-                    fpsCache = memoria?.Fps ?? string.Empty;
-                    es10BitCache = memoria?.Es10Bit ?? false;
-                }
-
-                var ep = new EpisodioItem
-                {
-                    NumeroEpisodio = i,
-                    Descargado = archivoLocal != null,
-                    RutaCompleta = archivoLocal?.RutaCompleta ?? string.Empty,
-                    TamanoArchivoFormateado = archivoLocal?.TamanoArchivoFormateado ?? string.Empty,
-                    Visto = memoria != null && memoria.VistoLocal,
-                    Favorito = memoria != null && memoria.FavoritoLocal,
-                    ProgresoSegundos = memoria?.ProgresoSegundos ?? 0,
-                    TotalSegundos = memoria?.TotalSegundos ?? 0,
-                    UltimaReproduccion = memoria?.UltimaReproduccion ?? DateTime.MinValue,
-                    IsDownloading = estaDescargando,
-                    DownloadProgress = prog,
-                    Resolucion = resolucionCache,
-                    CodecVideo = codecCache,
-                    Fps = fpsCache,
-                    Es10Bit = es10BitCache,
-                    RutaMiniatura = thumbCache
-                };
-                
-                if (ep.ProgresoSegundos > 0)
-                {
-                    AnimeLocalTracker.Services.AppLogger.Debug("DetalleViewModel", $"Cargado Episodio {ep.NumeroEpisodio}: Progreso={ep.ProgresoSegundos}/{ep.TotalSegundos}, Visto={ep.Visto}, TieneProgreso={ep.TieneProgresoGuardado}");
-                }
-                
-                temp.Add(ep);
-            }
-            return temp;
-        });
-
-        _todosLosEpisodios.AddRange(episodiosGenerados);
-        AplicarFiltrosYOrdenamiento();
+        long msEnInterfaz = reloj.ElapsedMilliseconds;
+        Episodios.Mostrar(anime, lectura);
+        RegistrarTiempoDeApertura(anime.AniListId, lectura.Filas.Count, lectura.EnDisco, lectura.MsDatos, msEnInterfaz, reloj);
 
         // Navegación rápida entre fichas (flechas, clics seguidos): se cancelan las cargas de
         // fondo de la ficha anterior en vez de dejarlas terminar para un anime que ya no se ve.
@@ -508,264 +191,45 @@ public partial class DetalleViewModel : ObservableObject,
         _ctsCargaFicha = new CancellationTokenSource();
         var ctFicha = _ctsCargaFicha.Token;
 
-        // Enriquecimiento Python (metadata ffprobe + miniaturas) en segundo plano solo para los que falten
-        _ = EnriquecerEpisodiosEnSegundoPlanoAsync(anime.AniListId, ctFicha);
-        _ = CargarProximosEpisodiosDeAniListAsync(ctFicha);
+        // 2. Lo demás, en segundo plano: miniaturas y datos técnicos de los archivos, cuenta atrás, espacio en disco,
+        //    etiquetas, avisos y música.
+        _ = Episodios.EnriquecerEnSegundoPlanoAsync(ctFicha);
         _ = CargarProximaEmisionAsync(ctFicha);
         _ = CalcularEspacioEnDiscoAsync(ctFicha);
         _ = CargarDatosExtraAsync(ctFicha);
         _ = CargarPreferenciasEmisionAsync(ctFicha);
-        CargarEnlacesMusica(anime);
-        CargaTemasMusicalesTarea = CargarTemasMusicalesAsync(ctFicha);
+        if (!musicaRecuperada)
+        {
+            Musica.CargarEnlacesMusica(anime);
+            Musica.IniciarCargaDeTemas(ctFicha);
+        }
     }
 
     /// <summary>
-    /// Enriquecer los episodios locales que aún no tienen metadata técnica o miniatura vía
-    /// el bridge Python y guardar el resultado en SQLite para visitas instantáneas futuras.
-    /// La implementación vive en EpisodeEnrichmentCoordinator (extraída para reducir el
-    /// tamaño de este ViewModel); aquí solo se le pasan las dependencias necesarias.
+    /// Deja en el registro cuánto tardó la ficha en abrirse (igual que el [Perf] de la Galería): cuándo estaban los datos
+    /// (base de datos + carpeta + filas, fuera del hilo de la interfaz), cuándo pudo la interfaz ponerlos en la lista (antes
+    /// está ocupada construyendo la vista), cuándo se pintó y cuándo dejó de moverse todo. Sin esto no hay forma de saber si
+    /// un cambio la acelera o la frena.
     /// </summary>
-    private Task EnriquecerEpisodiosEnSegundoPlanoAsync(int aniListId, CancellationToken cancellationToken = default) =>
-        _enrichmentCoordinator.EnriquecerEnSegundoPlanoAsync(
-            aniListId, _todosLosEpisodios, _enricher, _databaseService, SolicitarRefrescoEpisodios, cancellationToken);
-
-    // PERF-01: refrescos coalescidos de la lista de episodios — varios episodios pueden
-    // completar su miniatura casi a la vez; repintar la lista completa por cada uno era
-    // O(N²) en la UI. Un solo refresco por ráfaga vía el Dispatcher.
-    private bool _refrescoListaEpisodiosPendiente;
-
-    private void SolicitarRefrescoEpisodios()
+    private static void RegistrarTiempoDeApertura(int aniListId, int filas, int enDisco, long msDatos, long msEnInterfaz, Stopwatch reloj)
     {
-        if (_refrescoListaEpisodiosPendiente) return;
-        _refrescoListaEpisodiosPendiente = true;
+        string texto = $"[Perf] Ficha {aniListId}: {filas} episodios ({enDisco} en disco); datos listos a los {msDatos} ms, " +
+                       $"en la lista a los {reloj.ElapsedMilliseconds} ms (la interfaz quedó libre a los {msEnInterfaz})";
 
-        var disp = System.Windows.Application.Current?.Dispatcher;
-        if (disp == null || disp.HasShutdownStarted)
+        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+        if (dispatcher == null || dispatcher.HasShutdownStarted)
         {
-            _refrescoListaEpisodiosPendiente = false;
+            AppLogger.Info("DetalleViewModel", texto + ".");
             return;
         }
 
-        _ = disp.InvokeAsync(() =>
-        {
-            _refrescoListaEpisodiosPendiente = false;
-            AplicarFiltrosYOrdenamiento();
-        });
-    }
-
-    /// <summary>
-    /// Consulta AniList para informar de próximos episodios aún no emitidos/localizados.
-    /// (Integración #6: temporalidad AniList vs episodios locales.)
-    /// </summary>
-    [ObservableProperty]
-    private string _proximosEpisodiosTexto = string.Empty;
-
-    [ObservableProperty]
-    private bool _tieneProximosEpisodios;
-
-    // ── Análisis de duplicados (perceptual hash vía Python) ──
-    [ObservableProperty]
-    private string _estadoDuplicados = string.Empty;
-
-    [ObservableProperty]
-    private bool _estaAnalizandoDuplicados;
-
-    [RelayCommand]
-    private async Task AnalizarDuplicadosAsync()
-    {
-        if (EstaAnalizandoDuplicados || _enricher == null) return;
-
-        try
-        {
-            EstaAnalizandoDuplicados = true;
-            EstadoDuplicados = string.Empty;
-            var duplicados = await _enricher.EncontrarDuplicadosAsync(_todosLosEpisodios);
-            if (duplicados.Count > 0)
-            {
-                EstadoDuplicados = string.Format(LocalizationService.T("Det_DuplicadosContador"), duplicados.Count);
-                await _dialogService.MostrarDialogoAsync(
-                    LocalizationService.T("Det_DuplicadosEncontradosTitulo"),
-                    string.Format(LocalizationService.T("Det_DuplicadosEncontradosMsj"), duplicados.Count, string.Join("\n", duplicados.Select(d => System.IO.Path.GetFileName(d)).Take(10))),
-                    false, "ContentDuplicate", "#F59E0B");
-            }
-            else
-            {
-                EstadoDuplicados = string.Empty;
-                await _dialogService.MostrarDialogoAsync(
-                    LocalizationService.T("Det_AnalisisDuplicadosTitulo"),
-                    LocalizationService.T("Det_SinDuplicadosMsj"),
-                    false, "CheckCircleOutline", "#10B981");
-            }
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Debug("DetalleViewModel", $"Error analizando duplicados: {ex.Message}");
-            EstadoDuplicados = string.Empty;
-            await _dialogService.MostrarDialogoAsync(
-                LocalizationService.T("Det_ErrorAnalisisTitulo"),
-                string.Format(LocalizationService.T("Det_ErrorAnalisisMsj"), ex.Message),
-                false, "AlertCircleOutline", "#EF4444");
-        }
-        finally
-        {
-            EstaAnalizandoDuplicados = false;
-        }
-    }
-
-    private async Task CargarProximosEpisodiosDeAniListAsync(CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            if (AnimeSeleccionado == null || cancellationToken.IsCancellationRequested) return;
-            var anime = AnimeSeleccionado;
-            var datos = await _animeTrackingService.ObtenerAnimePorIdAsync(anime.AniListId);
-            if (cancellationToken.IsCancellationRequested || !ReferenceEquals(anime, AnimeSeleccionado)) return; // se cambió de ficha mientras se consultaba
-            if (datos?.NextAiringEpisode == null) return;
-
-            int proximo = datos.NextAiringEpisode.Episode;
-            int maxLocal = _todosLosEpisodios.Count;
-            int faltantes = Math.Max(0, proximo - 1 - maxLocal);
-
-            if (faltantes > 0)
-            {
-                ProximosEpisodiosTexto = string.Format(LocalizationService.T("Det_ProximosEpisodiosFormato"), proximo, faltantes);
-                TieneProximosEpisodios = true;
-            }
-        }
-        catch
-        {
-            // Fallo de red: no bloquear la vista
-        }
-    }
-
-    partial void OnOrdenAscendenteChanged(bool value) => AplicarFiltrosYOrdenamiento();
-    partial void OnFiltroEpisodiosChanged(string value) => AplicarFiltrosYOrdenamiento();
-
-    private void AplicarFiltrosYOrdenamiento()
-    {
-        if (_todosLosEpisodios == null || _todosLosEpisodios.Count == 0)
-        {
-            EpisodiosDelAnime.Clear();
-            if (AnimeSeleccionado != null && (AnimeSeleccionado.Estado == "NOT_YET_RELEASED" || AnimeSeleccionado.TotalEpisodios == 0))
-            {
-                MensajeSinEpisodios = LocalizationService.T("Det_SinEpisodiosNoEstrenado");
-                SubtituloSinEpisodios = LocalizationService.T("Det_SinEpisodiosNoEstrenadoSub");
-            }
-            else
-            {
-                MensajeSinEpisodios = LocalizationService.T("Det_SinEpisodios");
-                SubtituloSinEpisodios = LocalizationService.T("Det_SinEpisodiosSub");
-            }
-            return;
-        }
-
-        // ARQ-01: filtrado/orden delegados a la lógica pura extraída (testeable sin UI)
-        var query = Core.EpisodiosOrganizador.FiltrarYOrdenar(_todosLosEpisodios, FiltroEpisodios, OrdenAscendente);
-
-        EpisodiosDelAnime.Clear();
-        foreach (var ep in query) EpisodiosDelAnime.Add(ep);
-
-        if (EpisodiosDelAnime.Count == 0)
-        {
-            MensajeSinEpisodios = LocalizationService.T("Det_SinEpisodiosFiltro");
-            SubtituloSinEpisodios = string.Format(LocalizationService.T("Det_SinEpisodiosFiltroSub"), FiltroEpisodios);
-        }
-
-        TieneCapituloEnProgreso = _todosLosEpisodios != null && _todosLosEpisodios.Any(e => e.TieneProgresoGuardado);
-
-        ActualizarEpisodiosFaltantes();
-    }
-
-    /// <summary>
-    /// Detecta huecos reales (episodios sin archivo local por debajo del episodio descargado
-    /// más alto) — no cuenta episodios "todavía no descargados" al final de la lista, que es
-    /// el estado normal de un anime en emisión, no un hueco silencioso que haga saltarte una
-    /// trama por accidente (el caso que describe este banner).
-    /// </summary>
-    private void ActualizarEpisodiosFaltantes()
-    {
-        int maxDescargado = _todosLosEpisodios.Where(e => e.Descargado).Select(e => e.NumeroEpisodio).DefaultIfEmpty(0).Max();
-
-        _numerosEpisodiosFaltantes = _todosLosEpisodios
-            .Where(e => !e.Descargado && e.NumeroEpisodio < maxDescargado)
-            .Select(e => e.NumeroEpisodio)
-            .OrderBy(n => n)
-            .ToList();
-
-        HayEpisodiosFaltantes = _numerosEpisodiosFaltantes.Count > 0;
-        EpisodiosFaltantesTexto = HayEpisodiosFaltantes
-            ? string.Format(LocalizationService.T("Det_FaltantesBannerFormato"), _numerosEpisodiosFaltantes.Count, FormatearListaEpisodios(_numerosEpisodiosFaltantes))
-            : string.Empty;
-    }
-
-    private static string FormatearListaEpisodios(List<int> numeros)
-    {
-        const int limiteVisible = 5;
-        var etiquetas = numeros.Take(limiteVisible)
-            .Select(n => string.Format(LocalizationService.T("Det_FaltanteEpisodioEtiqueta"), n))
-            .ToList();
-
-        string texto = etiquetas.Count == 1
-            ? etiquetas[0]
-            : string.Join(", ", etiquetas.Take(etiquetas.Count - 1)) + $" {LocalizationService.T("Det_Y")} " + etiquetas[^1];
-
-        int resto = numeros.Count - limiteVisible;
-        if (resto > 0) texto += $" {string.Format(LocalizationService.T("Det_FaltantesResto"), resto)}";
-        return texto;
-    }
-
-    [RelayCommand]
-    private async Task DescargarFaltantesAsync()
-    {
-        var faltantes = _todosLosEpisodios.Where(e => !e.Descargado && _numerosEpisodiosFaltantes.Contains(e.NumeroEpisodio)).ToList();
-        foreach (var episodio in faltantes)
-        {
-            await DescargarEpisodioAsync(episodio);
-        }
-    }
-
-    /// <summary>
-    /// "Doctor de integridad": verifica con ffprobe (sin decodificar el archivo entero) que
-    /// cada episodio descargado abra bien — detecta descargas que quedaron truncadas/corruptas
-    /// (el bug real que motivó esto: DownloadService trataba un corte de conexión a mitad de
-    /// descarga como éxito) antes de que el usuario se siente a verlas y se encuentre el error.
-    /// </summary>
-    [RelayCommand]
-    private async Task VerificarIntegridadAsync()
-    {
-        if (_videoIntegrityService == null || VerificandoIntegridad) return;
-
-        var descargados = _todosLosEpisodios.Where(e => e.Descargado && !string.IsNullOrWhiteSpace(e.RutaCompleta)).ToList();
-        if (descargados.Count == 0) return;
-
-        VerificandoIntegridad = true;
-        int corruptos = 0;
-        try
-        {
-            foreach (var episodio in descargados)
-            {
-                episodio.EstaCorrupto = false;
-                var resultado = await _videoIntegrityService.VerificarArchivoAsync(episodio.RutaCompleta);
-                if (resultado == ResultadoIntegridad.Corrupto)
-                {
-                    episodio.EstaCorrupto = true;
-                    corruptos++;
-                }
-            }
-
-            await _dialogService.MostrarDialogoAsync(
-                LocalizationService.T("Det_IntegridadTitulo"),
-                corruptos > 0
-                    ? string.Format(LocalizationService.T("Det_IntegridadConCorruptosFormato"), corruptos, descargados.Count)
-                    : string.Format(LocalizationService.T("Det_IntegridadSinCorruptosFormato"), descargados.Count),
-                false,
-                corruptos > 0 ? "AlertOctagonOutline" : "CheckCircleOutline",
-                corruptos > 0 ? "#F87171" : "#4CAF50");
-        }
-        finally
-        {
-            VerificandoIntegridad = false;
-        }
+        // Loaded llega tras el primer dibujado con las filas; ContextIdle, cuando ya no queda nada pendiente (etiquetas,
+        // música, espacio en disco y demás cargas de fondo ya colocadas).
+        long msPintada = 0;
+        _ = dispatcher.InvokeAsync(() => msPintada = reloj.ElapsedMilliseconds, System.Windows.Threading.DispatcherPriority.Loaded);
+        _ = dispatcher.InvokeAsync(
+            () => AppLogger.Info("DetalleViewModel", $"{texto}; pintada a los {msPintada} ms, asentada a los {reloj.ElapsedMilliseconds} ms."),
+            System.Windows.Threading.DispatcherPriority.ContextIdle);
     }
 
     /// <summary>
@@ -799,56 +263,6 @@ public partial class DetalleViewModel : ObservableObject,
         {
             AppLogger.Debug("DetalleViewModel", $"Error abriendo carpeta del anime: {ex.Message}");
         }
-    }
-
-    [RelayCommand]
-    private async Task EliminarEpisodio(EpisodioItem episodio)
-    {
-        if (episodio == null || !episodio.Descargado || string.IsNullOrWhiteSpace(episodio.RutaCompleta)) return;
-
-        bool confirmar = await _dialogService.MostrarDialogoAsync(
-            LocalizationService.T("Det_EliminarEpisodioTitulo"),
-            string.Format(LocalizationService.T("Det_EliminarEpisodioConfirmacionMsj"), episodio.NumeroEpisodio),
-            true, "DeleteOutline", "#EF4444");
-        if (!confirmar) return;
-
-        string rutaArchivo = episodio.RutaCompleta;
-        string rutaMiniatura = PythonEpisodeEnricher.ObtenerRutaMiniaturaEsperada(rutaArchivo);
-
-        // 1. Borrar el archivo de video
-        try { if (File.Exists(rutaArchivo)) File.Delete(rutaArchivo); }
-        catch (Exception ex) { AppLogger.Debug("DetalleViewModel", $"No se pudo borrar archivo del episodio: {ex.Message}"); }
-
-        // 2. Borrar su miniatura
-        try { if (File.Exists(rutaMiniatura)) File.Delete(rutaMiniatura); } catch { }
-
-        // 3. Conservar el registro en la base de datos: el historial es un registro
-        //    permanente — borrar el archivo NO debe borrar que se vio el episodio.
-        try
-        {
-            await _databaseService.ConservarRegistroTrasEliminarArchivoAsync(AnimeSeleccionado?.AniListId ?? 0, episodio.NumeroEpisodio);
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Debug("DetalleViewModel", $"No se pudo conservar el registro del episodio: {ex.Message}");
-        }
-
-        // 4. Reiniciar en la UI solo lo relativo al archivo (visto/progreso/fecha se conservan)
-        episodio.Descargado = false;
-        episodio.RutaCompleta = string.Empty;
-        episodio.RutaMiniatura = null;
-        episodio.TamanoArchivoFormateado = string.Empty;
-        episodio.Resolucion = string.Empty;
-        episodio.CodecVideo = string.Empty;
-        episodio.Fps = string.Empty;
-        episodio.Es10Bit = false;
-
-        AplicarFiltrosYOrdenamiento();
-        _ = CalcularEspacioEnDiscoAsync();
-
-        await _dialogService.MostrarDialogoAsync(LocalizationService.T("Det_EpisodioEliminadoTitulo"),
-            string.Format(LocalizationService.T("Det_EpisodioEliminadoMsj"), episodio.NumeroEpisodio),
-            false, "CheckCircleOutline", "#4CAF50");
     }
 
     [RelayCommand]
@@ -896,91 +310,6 @@ public partial class DetalleViewModel : ObservableObject,
     }
     
     [RelayCommand]
-    private async Task AnalizarOpenings()
-    {
-        if (AnimeSeleccionado == null || _pluginService == null) return;
-        var descargados = _todosLosEpisodios.Where(e => e.Descargado && File.Exists(e.RutaCompleta)).ToList();
-        if (descargados.Count < 2)
-        {
-            await _dialogService.MostrarDialogoAsync("Info", LocalizationService.T("Det_MinEpisodiosOPMsj"), false, "InformationOutline", "#60A5FA");
-            return;
-        }
-
-        await _dialogService.MostrarDialogoAsync(LocalizationService.T("Det_Analizando"), LocalizationService.T("Det_AnalizandoOpMsj"), false, "InformationOutline", "#60A5FA");
-        
-        var pluginRes = await _pluginService.EjecutarPluginAsync<object, AnimeLocalTracker.Services.SkipTimesCoordinator.AudioSkipResult>(
-            "audio_skip_plugin.py", 
-            "detect_opening", 
-            new { video_paths = descargados.Take(2).Select(e => e.RutaCompleta).ToArray() }
-        );
-        
-        if (pluginRes != null && pluginRes.Found)
-        {
-            await _dialogService.MostrarDialogoAsync(LocalizationService.T("Det_OpEncontradoTitulo"), string.Format(LocalizationService.T("Det_OpEncontradoMsj"), pluginRes.IntroEstimatedStart, pluginRes.IntroEstimatedEnd), false, "CheckCircle", "#10B981");
-        }
-        else
-        {
-            await _dialogService.MostrarDialogoAsync(LocalizationService.T("Det_OpNoEncontradoTitulo"), LocalizationService.T("Det_OpNoEncontradoMsj"), false, "CloseCircle", "#EF4444");
-        }
-    }
-    
-    [RelayCommand]
-    private async Task ReproducirEpisodio(EpisodioItem episodio)
-    {
-        if (episodio == null || AnimeSeleccionado == null) return;
-        
-        if (!episodio.Descargado || !File.Exists(episodio.RutaCompleta))
-        {
-            await _dialogService.MostrarDialogoAsync(LocalizationService.T("Det_EpisodioNoEncontradoTitulo"), string.Format(LocalizationService.T("Det_EpisodioNoEncontradoMsj"), episodio.NumeroEpisodio), false, "InformationOutline", "#FFC107");
-
-            string numeroEp = episodio.NumeroEpisodio.ToString("D2"); 
-            string busqueda = $"{AnimeSeleccionado.Titulo} {numeroEp}";
-            string url = $"https://nyaa.si/?f=0&c=0_0&q={Uri.EscapeDataString(busqueda)}";
-            
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = url, UseShellExecute = true });
-            return; 
-        }
-
-        try
-        {
-            // Enviamos un mensaje a la aplicación principal para que abra nuestra nueva ventana de reproductor
-            var episodiosDisponibles = _todosLosEpisodios.Where(e => e.Descargado && File.Exists(e.RutaCompleta)).ToList();
-
-            // El reproductor se dibuja encima de la ficha sin descargarla: la música de la ficha no debe sonar bajo el video.
-            DetenerMusica();
-
-            WeakReferenceMessenger.Default.Send(new NavegarMensaje_Reproductor(
-                episodio.RutaCompleta,
-                AnimeSeleccionado.AniListId,
-                AnimeSeleccionado.Titulo,
-                episodio.NumeroEpisodio,
-                EpisodiosDisponibles: episodiosDisponibles,
-                RutaPortada: AnimeSeleccionado.PortadaVisible
-            ));
-        }
-        catch (System.Exception ex)
-        {
-            await _dialogService.MostrarDialogoAsync(LocalizationService.T("Dlg_ErrorTitulo"), string.Format(LocalizationService.T("Det_ErrorIniciarReproductorMsj"), ex.Message), false, "AlertCircleOutline", "#E53935");
-        }
-    }
-    
-    [RelayCommand]
-    private async Task AlternarFavoritoEpisodioAsync(EpisodioItem episodio)
-    {
-        if (episodio == null || AnimeSeleccionado == null) return;
-        
-        episodio.Favorito = !episodio.Favorito;
-
-        // Solo la marca de favorito: guardar un registro entero ponía a cero el progreso del episodio.
-        await _databaseService.GuardarFavoritoEpisodioAsync(AnimeSeleccionado.AniListId, episodio.NumeroEpisodio, episodio.Favorito, episodio.RutaCompleta);
-        
-        if (FiltroEpisodios == "Favoritos")
-        {
-            AplicarFiltrosYOrdenamiento();
-        }
-    }
-    
-    [RelayCommand]
     private void AlternarSinopsis()
     {
         SinopsisExpandida = !SinopsisExpandida;
@@ -1010,198 +339,6 @@ public partial class DetalleViewModel : ObservableObject,
         {
             AppLogger.Error("DetalleViewModel", "Error abriendo WebView de AniList", ex);
         }
-    }
-
-    [RelayCommand]
-    private async Task ReanudarAsync()
-    {
-        if (_todosLosEpisodios.Count == 0) return;
-
-        // FUN-010: reanudar el episodio dejado a medias MÁS RECIENTE (antes se elegía el de
-        // menor número con progreso, ignorando UltimaReproduccion).
-        var epEnCurso = _todosLosEpisodios
-            .Where(e => e.TieneProgresoGuardado)
-            .OrderByDescending(e => e.UltimaReproduccion)
-            .FirstOrDefault();
-        if (epEnCurso != null)
-        {
-            await ReproducirEpisodio(epEnCurso);
-        }
-    }
-
-    [RelayCommand]
-    private async Task MarcarVistosAsync(System.Collections.IList? episodiosSeleccionados)
-    {
-        if (AnimeSeleccionado == null) return;
-
-        List<EpisodioItem> episodios;
-        if (episodiosSeleccionados != null && episodiosSeleccionados.Count > 0)
-        {
-            episodios = episodiosSeleccionados.Cast<EpisodioItem>().ToList();
-        }
-        else
-        {
-            episodios = EpisodiosDelAnime.Where(e => !e.Visto).ToList();
-        }
-
-        if (episodios.Count == 0) return;
-
-        var listaRegistros = new List<RegistroEpisodio>(episodios.Count);
-        foreach (var ep in episodios)
-        {
-            ep.Visto = true;
-            ep.ProgresoSegundos = 0;
-            listaRegistros.Add(new RegistroEpisodio
-            {
-                AniListId = AnimeSeleccionado.AniListId,
-                NumeroEpisodio = ep.NumeroEpisodio,
-                VistoLocal = true,
-                FavoritoLocal = ep.Favorito,
-                RutaArchivo = ep.RutaCompleta ?? string.Empty
-            });
-        }
-        await _databaseService.GuardarRegistrosEpisodioBulkAsync(listaRegistros);
-        AnimeSeleccionado.EpisodiosVistos = _todosLosEpisodios.Count(e => e.Visto);
-        await _databaseService.ActualizarAnimeAsync(AnimeSeleccionado);
-        WeakReferenceMessenger.Default.Send(new EpisodioActualizadoMensaje(AnimeSeleccionado.AniListId, 0, false, 0, 0));
-        AplicarFiltrosYOrdenamiento();
-    }
-
-    [RelayCommand]
-    private async Task MarcarNoVistosAsync(System.Collections.IList? episodiosSeleccionados)
-    {
-        if (AnimeSeleccionado == null) return;
-
-        List<EpisodioItem> episodios;
-        if (episodiosSeleccionados != null && episodiosSeleccionados.Count > 0)
-        {
-            episodios = episodiosSeleccionados.Cast<EpisodioItem>().ToList();
-        }
-        else
-        {
-            episodios = EpisodiosDelAnime.Where(e => e.Visto).ToList();
-        }
-
-        if (episodios.Count == 0) return;
-
-        var listaRegistros = new List<RegistroEpisodio>(episodios.Count);
-        foreach (var ep in episodios)
-        {
-            ep.Visto = false;
-            ep.ProgresoSegundos = 0;
-            listaRegistros.Add(new RegistroEpisodio
-            {
-                AniListId = AnimeSeleccionado.AniListId,
-                NumeroEpisodio = ep.NumeroEpisodio,
-                VistoLocal = false,
-                FavoritoLocal = ep.Favorito,
-                RutaArchivo = ep.RutaCompleta ?? string.Empty
-            });
-        }
-        await _databaseService.GuardarRegistrosEpisodioBulkAsync(listaRegistros);
-        AnimeSeleccionado.EpisodiosVistos = _todosLosEpisodios.Count(e => e.Visto);
-        await _databaseService.ActualizarAnimeAsync(AnimeSeleccionado);
-        WeakReferenceMessenger.Default.Send(new EpisodioActualizadoMensaje(AnimeSeleccionado.AniListId, 0, false, 0, 0));
-        AplicarFiltrosYOrdenamiento();
-    }
-
-    /// <summary>
-    /// Alterna el estado visto/no visto de un único episodio desde el menú contextual.
-    /// </summary>
-    [RelayCommand]
-    private async Task AlternarVistoEpisodioAsync(EpisodioItem? episodio)
-    {
-        if (episodio == null || AnimeSeleccionado == null) return;
-
-        episodio.Visto = !episodio.Visto;
-        episodio.ProgresoSegundos = 0; // consistente con el reset que hace la BD al marcar manualmente
-
-        var registro = new RegistroEpisodio
-        {
-            AniListId = AnimeSeleccionado.AniListId,
-            NumeroEpisodio = episodio.NumeroEpisodio,
-            VistoLocal = episodio.Visto,
-            FavoritoLocal = episodio.Favorito,
-            RutaArchivo = episodio.RutaCompleta ?? string.Empty
-        };
-
-        await _databaseService.GuardarRegistroEpisodioAsync(registro);
-        AnimeSeleccionado.EpisodiosVistos = _todosLosEpisodios.Count(e => e.Visto);
-        await _databaseService.ActualizarAnimeAsync(AnimeSeleccionado);
-        WeakReferenceMessenger.Default.Send(new EpisodioActualizadoMensaje(AnimeSeleccionado.AniListId, episodio.NumeroEpisodio, episodio.Visto, 0, 0));
-        AplicarFiltrosYOrdenamiento();
-    }
-
-    /// <summary>
-    /// Marca como vistos el episodio seleccionado y todos los anteriores (&lt;= N).
-    /// </summary>
-    [RelayCommand]
-    private async Task MarcarAnterioresVistosAsync(EpisodioItem? episodio)
-    {
-        if (episodio == null || AnimeSeleccionado == null) return;
-
-        var aMarcar = _todosLosEpisodios
-            .Where(e => e.NumeroEpisodio <= episodio.NumeroEpisodio && !e.Visto)
-            .ToList();
-
-        if (aMarcar.Count == 0) return;
-
-        var listaRegistros = new List<RegistroEpisodio>(aMarcar.Count);
-        foreach (var ep in aMarcar)
-        {
-            ep.Visto = true;
-            ep.ProgresoSegundos = 0;
-            listaRegistros.Add(new RegistroEpisodio
-            {
-                AniListId = AnimeSeleccionado.AniListId,
-                NumeroEpisodio = ep.NumeroEpisodio,
-                VistoLocal = true,
-                FavoritoLocal = ep.Favorito,
-                RutaArchivo = ep.RutaCompleta ?? string.Empty
-            });
-        }
-
-        await _databaseService.GuardarRegistrosEpisodioBulkAsync(listaRegistros);
-        AnimeSeleccionado.EpisodiosVistos = _todosLosEpisodios.Count(e => e.Visto);
-        await _databaseService.ActualizarAnimeAsync(AnimeSeleccionado);
-        WeakReferenceMessenger.Default.Send(new EpisodioActualizadoMensaje(AnimeSeleccionado.AniListId, 0, false, 0, 0));
-        AplicarFiltrosYOrdenamiento();
-    }
-
-    /// <summary>
-    /// Marca toda la temporada / serie completa del anime como vista.
-    /// </summary>
-    [RelayCommand]
-    private async Task MarcarTemporadaCompletaAsync()
-    {
-        if (AnimeSeleccionado == null) return;
-
-        var aMarcar = _todosLosEpisodios
-            .Where(e => !e.Visto)
-            .ToList();
-
-        if (aMarcar.Count == 0) return;
-
-        var listaRegistros = new List<RegistroEpisodio>(aMarcar.Count);
-        foreach (var ep in aMarcar)
-        {
-            ep.Visto = true;
-            ep.ProgresoSegundos = 0;
-            listaRegistros.Add(new RegistroEpisodio
-            {
-                AniListId = AnimeSeleccionado.AniListId,
-                NumeroEpisodio = ep.NumeroEpisodio,
-                VistoLocal = true,
-                FavoritoLocal = ep.Favorito,
-                RutaArchivo = ep.RutaCompleta ?? string.Empty
-            });
-        }
-
-        await _databaseService.GuardarRegistrosEpisodioBulkAsync(listaRegistros);
-        AnimeSeleccionado.EpisodiosVistos = _todosLosEpisodios.Count(e => e.Visto);
-        await _databaseService.ActualizarAnimeAsync(AnimeSeleccionado);
-        WeakReferenceMessenger.Default.Send(new EpisodioActualizadoMensaje(AnimeSeleccionado.AniListId, 0, false, 0, 0));
-        AplicarFiltrosYOrdenamiento();
     }
 
     [RelayCommand]
@@ -1261,220 +398,4 @@ public partial class DetalleViewModel : ObservableObject,
         }
     }
     
-    /// <summary>Lo último que se puso en el editor desde código: si el usuario no lo tocó, lo de AniList puede reemplazarlo.</summary>
-    private (string Estado, int Progreso, float Puntaje, DateTime? Inicio, DateTime? Fin)? _editorAplicado;
-
-    private void AplicarAlEditor(string estado, int progreso, float puntaje, DateTime? inicio, DateTime? fin)
-    {
-        int max = ObtenerMaximoEpisodiosEmitidos();
-        EditProgreso = Math.Clamp(progreso, 0, max > 0 ? max : 9999);
-        EditProgresoTexto = EditProgreso.ToString();
-        EditEstadoVisual = ConvertirEstadoAEspanol(estado);
-        EditPuntaje = puntaje;
-        EditFechaInicio = inicio;
-        EditFechaFin = fin;
-        NotificarDerivadosEditor();
-        _editorAplicado = ValoresDelEditor();
-    }
-
-    private (string, int, float, DateTime?, DateTime?) ValoresDelEditor() =>
-        (ConvertirEstadoAIngles(EditEstadoVisual), EditProgreso, EditPuntaje, EditFechaInicio, EditFechaFin);
-
-    private static DateTime? DesdeFechaAniList(AniListFuzzyDate? fecha) =>
-        fecha?.Year is int anio ? new DateTime(anio, fecha.Month ?? 1, fecha.Day ?? 1) : null;
-
-    [RelayCommand]
-    private async Task AbrirEditorSeguimientoAsync()
-    {
-        if (AnimeSeleccionado == null) return;
-        var anime = AnimeSeleccionado;
-
-        // 1) Al instante, lo guardado en local. Antes abría con "Viendo, 0 pts, sin fechas" y solo se corregía si AniList
-        //    respondía: sin conexión mostraba datos falsos.
-        SeguimientoLocal? local = null;
-        try { local = await _databaseService.ObtenerSeguimientoLocalAsync(anime.AniListId); }
-        catch (Exception ex) { AppLogger.Debug("DetalleViewModel", $"No se pudo leer el seguimiento local de {anime.AniListId}: {ex.Message}"); }
-        if (!ReferenceEquals(anime, AnimeSeleccionado)) return;
-
-        string estadoLocal = local?.Estado ?? (string.IsNullOrWhiteSpace(anime.EstadoUsuario) ? "CURRENT" : anime.EstadoUsuario);
-        AplicarAlEditor(estadoLocal, local?.Progreso ?? anime.EpisodiosVistos, local?.Puntaje ?? 0, local?.FechaInicio, local?.FechaFin);
-        MostrandoEditorSeguimiento = true;
-
-        // 2) Con conexión, lo de AniList (que puede venir de otro dispositivo). Un cambio local aún sin enviar manda sobre él.
-        if (local?.Pendiente == true) return;
-        var token = _authService.ObtenerTokenGuardado();
-        if (string.IsNullOrEmpty(token)) return;
-
-        var datos = await _animeTrackingService.ObtenerSeguimientoUsuarioAsync(anime.AniListId, token);
-        if (datos == null || !ReferenceEquals(anime, AnimeSeleccionado)) return;
-
-        var remoto = new SeguimientoLocal
-        {
-            AniListId = anime.AniListId,
-            Estado = datos.Status ?? "CURRENT",
-            Progreso = datos.Progress,
-            Puntaje = datos.Score,
-            FechaInicio = DesdeFechaAniList(datos.StartedAt),
-            FechaFin = DesdeFechaAniList(datos.CompletedAt),
-            ModificadoUtc = DateTime.UtcNow
-        };
-        try { await _databaseService.GuardarSeguimientoLocalAsync(remoto); }
-        catch (Exception ex) { AppLogger.Debug("DetalleViewModel", $"No se pudo guardar el seguimiento local de {anime.AniListId}: {ex.Message}"); }
-
-        // Si el usuario ya empezó a editar mientras llegaba la respuesta, no se le pisa lo que escribió.
-        if (MostrandoEditorSeguimiento && _editorAplicado == ValoresDelEditor())
-            AplicarAlEditor(remoto.Estado, remoto.Progreso, remoto.Puntaje, remoto.FechaInicio, remoto.FechaFin);
-    }
-
-    [RelayCommand]
-    private async Task GuardarEditorSeguimientoAsync()
-    {
-        if (AnimeSeleccionado == null) return;
-        var anime = AnimeSeleccionado;
-
-        int max = ObtenerMaximoEpisodiosEmitidos();
-        int progresoFinal = Math.Clamp(EditProgreso, 0, max > 0 ? max : 9999);
-        string estadoEnIngles = ConvertirEstadoAIngles(EditEstadoVisual);
-        var token = _authService.ObtenerTokenGuardado();
-        bool conCuenta = !string.IsNullOrEmpty(token);
-
-        // 1) Siempre en local: sin conexión (o sin cuenta de AniList) el cambio ya no se pierde. Pendiente solo con cuenta: sin ella
-        //    no hay a dónde enviarlo, y subirlo al conectar una cuenta días después podría pisar lo que haya en AniList.
-        var seguimiento = new SeguimientoLocal
-        {
-            AniListId = anime.AniListId,
-            Estado = estadoEnIngles,
-            Progreso = progresoFinal,
-            Puntaje = EditPuntaje,
-            FechaInicio = EditFechaInicio,
-            FechaFin = EditFechaFin,
-            Pendiente = conCuenta,
-            ModificadoUtc = DateTime.UtcNow
-        };
-        anime.EstadoUsuario = estadoEnIngles;
-        anime.EpisodiosVistos = progresoFinal;
-        await _databaseService.ActualizarAnimeAsync(anime);
-        await _databaseService.GuardarSeguimientoLocalAsync(seguimiento);
-        MostrandoEditorSeguimiento = false;
-
-        if (!conCuenta)
-        {
-            _dialogService.MostrarToast(LocalizationService.T("Det_SeguimientoLocalTitulo"), LocalizationService.T("Det_SeguimientoLocalMsj"), "ContentSaveOutline", "#60A5FA");
-            return;
-        }
-
-        // 2) A AniList; si no se puede ahora, lo envía la sincronización cuando vuelva la conexión.
-        bool exito = await _animeTrackingService.GuardarSeguimientoUsuarioAsync(
-            anime.AniListId, estadoEnIngles, progresoFinal, EditPuntaje, EditFechaInicio, EditFechaFin, token!);
-
-        if (exito)
-        {
-            seguimiento.Pendiente = false;
-            await _databaseService.GuardarSeguimientoLocalAsync(seguimiento);
-            await _dialogService.MostrarDialogoAsync(LocalizationService.T("Det_NubeSincronizadaTitulo"), LocalizationService.T("Det_NubeSincronizadaMsj"), false, "CloudCheck", "#4CAF50");
-        }
-        else
-        {
-            _dialogService.MostrarToast(LocalizationService.T("Det_SeguimientoPendienteTitulo"), LocalizationService.T("Det_SeguimientoPendienteMsj"), "CloudOffOutline", "#60A5FA");
-        }
-    }
-    
-    [RelayCommand]
-    private void CerrarEditorSeguimiento()
-    {
-        MostrandoEditorSeguimiento = false;
-    }
-    
-    private static string ConvertirEstadoAIngles(string estadoVisual)
-    {
-        if (estadoVisual == LocalizationService.T("Estado_Viendo")) return "CURRENT";
-        if (estadoVisual == LocalizationService.T("Estado_Finalizado")) return "COMPLETED";
-        if (estadoVisual == LocalizationService.T("Estado_EnPausa")) return "PAUSED";
-        if (estadoVisual == LocalizationService.T("Estado_Abandonado")) return "DROPPED";
-        if (estadoVisual == LocalizationService.T("Estado_Planeando")) return "PLANNING";
-        return "CURRENT";
-    }
-
-    private static string ConvertirEstadoAEspanol(string estadoIngles) => estadoIngles switch
-    {
-        "CURRENT" => LocalizationService.T("Estado_Viendo"),
-        "COMPLETED" => LocalizationService.T("Estado_Finalizado"),
-        "PAUSED" => LocalizationService.T("Estado_EnPausa"),
-        "DROPPED" => LocalizationService.T("Estado_Abandonado"),
-        "PLANNING" => LocalizationService.T("Estado_Planeando"),
-        _ => LocalizationService.T("Estado_Viendo")
-    };
-
-    [RelayCommand]
-    private async Task DescargarEpisodioAsync(EpisodioItem episodio)
-    {
-        if (episodio == null || AnimeSeleccionado == null) return;
-        if (episodio.IsDownloading) return;
-
-        episodio.IsDownloading = true;
-        episodio.DownloadProgress = 0;
-
-        var titulosCandidatos = new List<string>();
-        if (!string.IsNullOrWhiteSpace(AnimeSeleccionado.NombresAlternativos))
-        {
-            titulosCandidatos.AddRange(AnimeSeleccionado.NombresAlternativos.Split([" | ", ";"], StringSplitOptions.RemoveEmptyEntries));
-        }
-
-        await _downloadService.IniciarDescargaEpisodioAsync(
-            AnimeSeleccionado.AniListId,
-            AnimeSeleccionado.Titulo,
-            AnimeSeleccionado.RutaCarpeta,
-            episodio.NumeroEpisodio,
-            titulosCandidatos);
-    }
-
-    /// <summary>
-    /// Fase 2d: busca todos los candidatos de torrent válidos para el episodio (en vez
-    /// de dejar que la app elija sola el de más semillas), muestra el selector, y si el
-    /// usuario elige uno, lo descarga directo por torrent — sin pasar por el resolver
-    /// HTTP ni por la búsqueda automática de Nyaa.
-    /// </summary>
-    [RelayCommand]
-    private async Task ElegirTorrentManualAsync(EpisodioItem episodio)
-    {
-        if (episodio == null || AnimeSeleccionado == null) return;
-        if (episodio.IsDownloading) return;
-        if (_nyaaSourceService == null || _selectorTorrentService == null) return;
-
-        var titulosCandidatos = new List<string> { AnimeSeleccionado.Titulo };
-        if (!string.IsNullOrWhiteSpace(AnimeSeleccionado.NombresAlternativos))
-        {
-            titulosCandidatos.AddRange(AnimeSeleccionado.NombresAlternativos.Split([" | ", ";"], StringSplitOptions.RemoveEmptyEntries));
-        }
-
-        var configuracion = _settingsService?.ObtenerConfiguracion();
-        var candidatos = await _nyaaSourceService.BuscarCandidatosParaElegirAsync(
-            titulosCandidatos, episodio.NumeroEpisodio,
-            configuracion?.GrupoFansubPreferidoTorrent, configuracion?.ResolucionPreferidaTorrent,
-            AnimeSeleccionado.AniListId);
-
-        if (candidatos.Count == 0)
-        {
-            _dialogService.MostrarToast(
-                LocalizationService.T("Sel_Titulo"),
-                LocalizationService.T("Sel_SinCandidatos"),
-                "AlertCircleOutline", "#F59E0B");
-            return;
-        }
-
-        string tituloEpisodio = $"{AnimeSeleccionado.Titulo} — {episodio.TituloVisual}";
-        var elegido = await _selectorTorrentService.MostrarSelectorAsync(tituloEpisodio, candidatos);
-        if (elegido == null) return; // el usuario canceló
-
-        episodio.IsDownloading = true;
-        episodio.DownloadProgress = 0;
-
-        await _downloadService.IniciarDescargaTorrentManualAsync(
-            AnimeSeleccionado.AniListId,
-            AnimeSeleccionado.Titulo,
-            AnimeSeleccionado.RutaCarpeta,
-            episodio.NumeroEpisodio,
-            elegido.Value,
-            titulosCandidatos);
-    }
 }
