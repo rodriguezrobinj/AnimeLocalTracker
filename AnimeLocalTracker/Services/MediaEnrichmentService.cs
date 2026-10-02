@@ -31,16 +31,6 @@ public class MediaEnrichmentService : IMediaEnrichmentService
         var datosFrescos = await _animeTrackingService.ObtenerAnimePorIdAsync(anime.AniListId);
         if (datosFrescos == null) return false;
 
-        int episodiosEmitidos = 0;
-        if (datosFrescos.NextAiringEpisode != null && datosFrescos.NextAiringEpisode.Episode > 1)
-        {
-            episodiosEmitidos = datosFrescos.NextAiringEpisode.Episode - 1;
-        }
-        else
-        {
-            episodiosEmitidos = datosFrescos.Episodes ?? anime.TotalEpisodios;
-        }
-
         // TODO: Actualizar todos los campos adicionales (nombres alternativos, estado, géneros, portadas).
         // Delegado desde DetalleViewModel.cs (ARQ-03).
         

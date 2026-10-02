@@ -97,7 +97,10 @@ public class DatabaseService : IDatabaseService, IDisposable
         (15, "descargas de música (openings/endings) en el historial de descargas", AgregarColumnasMusicaHistorialAsync),
         (16, "descartar análisis de OP/ED que pudieron guardarse con la respuesta de otra petición", DescartarAnalisisSkipDesfasadosAsync),
         (17, "copia local de la programación de emisión (Calendario y Actualizaciones sin conexión) + índices", CrearTablaEmisionesGuardadasAsync),
-        (18, "seguimiento local por anime (editor de la Ficha sin conexión y cambios pendientes de AniList)", CrearTablaSeguimientoLocalAsync)
+        (18, "seguimiento local por anime (editor de la Ficha sin conexión y cambios pendientes de AniList)", CrearTablaSeguimientoLocalAsync),
+        // Columna nueva del modelo: sqlite-net la añade con ALTER TABLE ADD COLUMN (misma vía que la v4). Los animes que ya
+        // estaban quedan con NULL.
+        (19, "fecha de alta de cada anime (orden \"Añadidos recientemente\" de la Galería)", AgregarColumnasTemporadaFavoritoAsync)
     };
 
     /// <summary>v18: <see cref="SeguimientoLocal"/> (clave primaria = AniListId; los pendientes son pocos, sin índice).</summary>
@@ -794,6 +797,30 @@ public class DatabaseService : IDatabaseService, IDisposable
     public async Task<List<RegistroEpisodio>> ObtenerTodosLosRegistrosAsync()
     {
         return await _conexion.Table<RegistroEpisodio>().ToListAsync();
+    }
+
+    private sealed class ConteoVistos
+    {
+        public int AniListId { get; set; }
+        public int Vistos { get; set; }
+    }
+
+    public async Task<Dictionary<int, int>> ObtenerEpisodiosVistosPorAnimeAsync()
+    {
+        var filas = await _conexion.QueryAsync<ConteoVistos>(
+            "SELECT AniListId, COUNT(*) AS Vistos FROM RegistroEpisodio WHERE VistoLocal = 1 GROUP BY AniListId;");
+        return filas.ToDictionary(f => f.AniListId, f => f.Vistos);
+    }
+
+    public async Task GuardarProximasEmisionesAsync(IEnumerable<ProximaEmisionLocal> proximas)
+    {
+        var lista = proximas?.Where(p => p != null && p.AniListId > 0).ToList();
+        if (lista == null || lista.Count == 0) return;
+
+        await _conexion.RunInTransactionAsync(db =>
+        {
+            foreach (var proxima in lista) db.InsertOrReplace(proxima);
+        });
     }
 
     public async Task<List<RegistroEpisodio>> ObtenerHistorialEpisodiosAsync(int limite = 300)

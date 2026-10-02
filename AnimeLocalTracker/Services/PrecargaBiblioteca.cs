@@ -7,8 +7,8 @@ using AnimeLocalTracker.Models;
 
 namespace AnimeLocalTracker.Services;
 
-/// <summary>Lo que la Galería necesita para pintarse: la biblioteca y los registros de episodios.</summary>
-public sealed record DatosBiblioteca(List<AnimeItem> Animes, List<RegistroEpisodio> Registros);
+/// <summary>Lo que la Galería necesita para pintarse: la biblioteca y cuántos episodios vistos tiene cada anime.</summary>
+public sealed record DatosBiblioteca(List<AnimeItem> Animes, Dictionary<int, int> VistosPorAnime);
 
 /// <summary>
 /// Adelanta, mientras se construye la ventana principal, el trabajo que la Galería hacía DESPUÉS de mostrarse: leer la
@@ -42,8 +42,11 @@ public sealed class PrecargaBiblioteca
 
     private async Task<DatosBiblioteca> CargarAsync()
     {
+        var reloj = System.Diagnostics.Stopwatch.StartNew();
         var animes = await _baseDatos.ObtenerTodosLosAnimesAsync() ?? new List<AnimeItem>();
-        var registros = await _baseDatos.ObtenerTodosLosRegistrosAsync() ?? new List<RegistroEpisodio>();
+        long msAnimes = reloj.ElapsedMilliseconds;
+        var vistos = await _baseDatos.ObtenerEpisodiosVistosPorAnimeAsync() ?? new Dictionary<int, int>();
+        long msVistos = reloj.ElapsedMilliseconds - msAnimes;
 
         try
         {
@@ -64,6 +67,10 @@ public sealed class PrecargaBiblioteca
             AppLogger.Debug("PrecargaBiblioteca", $"No se pudieron adelantar las portadas: {ex.Message}");
         }
 
-        return new DatosBiblioteca(animes, registros);
+        // Lo que cuesta de verdad la lectura (fuera del hilo de la interfaz): el tiempo que anota la Galería incluye además la
+        // espera a que la ventana termine de construirse.
+        AppLogger.Info("PrecargaBiblioteca", $"[Perf] Lectura adelantada: {animes.Count} animes en {msAnimes} ms, episodios vistos por anime en {msVistos} ms, " +
+            $"portadas de la primera pantalla en {reloj.ElapsedMilliseconds - msAnimes - msVistos} ms.");
+        return new DatosBiblioteca(animes, vistos);
     }
 }

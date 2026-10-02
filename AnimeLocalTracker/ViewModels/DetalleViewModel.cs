@@ -277,37 +277,8 @@ public partial class DetalleViewModel : ObservableObject,
     {
         if (AnimeSeleccionado == null) return;
 
-        bool confirmacion = await _dialogService.MostrarDialogoAsync(
-            LocalizationService.T("Bib_EliminarTitulo"),
-            string.Format(LocalizationService.T("Bib_EliminarMsj"), AnimeSeleccionado.Titulo),
-            true, "HeartBrokenOutline", "#EF4444");
-
-        if (confirmacion)
-        {
-            // Opción extra: borrar también los archivos del disco
-            bool borrarArchivos = await _dialogService.MostrarDialogoAsync(
-                LocalizationService.T("Bib_BorrarArchivosTitulo"),
-                string.Format(LocalizationService.T("Bib_BorrarArchivosMsj"), string.IsNullOrWhiteSpace(AnimeSeleccionado.RutaCarpeta) ? LocalizationService.T("Bib_SinCarpetaLocal") : AnimeSeleccionado.RutaCarpeta),
-                true, "FolderOutline", "#EF4444");
-
-            string? carpeta = AnimeSeleccionado.RutaCarpeta;
-
-            await _databaseService.EliminarAnimeAsync(AnimeSeleccionado);
-
-            if (borrarArchivos && !string.IsNullOrWhiteSpace(carpeta) && Directory.Exists(carpeta))
-            {
-                try
-                {
-                    Directory.Delete(carpeta, recursive: true);
-                }
-                catch (Exception ex)
-                {
-                    AppLogger.Debug("DetalleViewModel", $"No se pudo borrar la carpeta del anime: {ex.Message}");
-                }
-            }
-
+        if (await EliminacionAnime.ConfirmarYEliminarAsync(AnimeSeleccionado, _dialogService, _databaseService))
             VolverAGaleria();
-        }
     }
     
     [RelayCommand]
@@ -350,28 +321,7 @@ public partial class DetalleViewModel : ObservableObject,
         var datosFrescos = await _animeTrackingService.ObtenerAnimePorIdAsync(AnimeSeleccionado.AniListId);
         if (datosFrescos != null)
         {
-            string estadoFresco = datosFrescos.Status?.ToUpperInvariant() ?? "UNKNOWN";
-            int episodiosEmitidos = 0;
-
-            if (estadoFresco == "NOT_YET_RELEASED")
-            {
-                episodiosEmitidos = 0;
-            }
-            else if (estadoFresco == "RELEASING")
-            {
-                if (datosFrescos.NextAiringEpisode != null)
-                {
-                    episodiosEmitidos = Math.Max(0, datosFrescos.NextAiringEpisode.Episode - 1);
-                }
-                else
-                {
-                    episodiosEmitidos = datosFrescos.Episodes ?? 0;
-                }
-            }
-            else
-            {
-                episodiosEmitidos = datosFrescos.Episodes ?? AnimeSeleccionado.TotalEpisodios;
-            }
+            int episodiosEmitidos = datosFrescos.EpisodiosEmitidos(AnimeSeleccionado.TotalEpisodios);
 
             var titulosAlt = new List<string>();
             if (!string.IsNullOrWhiteSpace(datosFrescos.Title.English)) titulosAlt.Add(datosFrescos.Title.English);

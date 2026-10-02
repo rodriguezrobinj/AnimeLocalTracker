@@ -18,7 +18,7 @@ public partial class MinijuegosView : UserControl
     {
         if (DataContext is not ViewModels.MinijuegosViewModel vm) return false;
 
-        foreach (var juego in new ViewModels.MinijuegoViewModelBase[] { vm.AdivinaAnime, vm.AdivinaOpEd, vm.AdivinaPersonaje })
+        foreach (var juego in vm.Juegos)
         {
             if (AnfitrionJuegos.Precalentar(juego)) return true;
         }

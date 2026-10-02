@@ -63,9 +63,14 @@ public partial class GaleriaViewModel
         await PrepararMinijuegosAsync();
     }
 
-    /// <summary>Al volver a la pestaña Galería con la sección de minijuegos abierta: recuenta los animes y refresca los récords.</summary>
+    /// <summary>
+    /// Al volver a la pestaña Galería: la lista se filtra y ordena otra vez (en la Ficha pudo cambiar el estado o lo visto de
+    /// un anime) y, con la sección de minijuegos abierta, se recuentan los animes y se refrescan los récords.
+    /// </summary>
     public async Task AlEntrarAsync()
     {
+        // Sin filtros ni orden especial no cambia nada de lo que se ve: no se rehace la lista en balde.
+        if (HayFiltrosActivos || TieneFiltrosAvanzadosActivos) RefrescarFiltro();
         if (MostrandoMinijuegos) await PrepararMinijuegosAsync();
     }
 

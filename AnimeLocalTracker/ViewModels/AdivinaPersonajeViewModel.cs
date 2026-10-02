@@ -39,23 +39,14 @@ public sealed partial class AdivinaPersonajeViewModel : MinijuegoViewModelBase, 
     private Queue<RondaPreparada> _pendientes = new();
     private RondaPreparada? _actual;
     private int _pistasReveladas;
-    private int _puntosGanadosRonda;
     private bool _avanzando;
     private bool _preparando;
 
     private sealed record RondaPreparada(RondaAdivinaPersonaje Ronda, string RutaImagen);
 
     /// <summary>Solo para pruebas: posición de la opción correcta de la ronda actual (-1 si no hay ronda).</summary>
-    internal int IndiceCorrecto => _actual?.Ronda.IndiceCorrecto ?? -1;
+    internal int IndiceCorrecto => IndiceCorrectoRonda;
 
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HayError))]
-    private string _mensajeError = string.Empty;
-
-    /// <summary>Mientras se buscan los personajes y se descargan las imágenes de la partida.</summary>
-    [ObservableProperty] private bool _estaPreparando;
-
-    [ObservableProperty] private ObservableCollection<PistaItem> _pistas = new();
     [ObservableProperty] private string _imagenRonda = string.Empty;
 
     /// <summary>Ancho al que se reduce la imagen (bloques); 0 = imagen entera (tras responder).</summary>
@@ -63,13 +54,26 @@ public sealed partial class AdivinaPersonajeViewModel : MinijuegoViewModelBase, 
     [NotifyPropertyChangedFor(nameof(EstaPixelada))]
     private int _ladoPixelado;
 
-    [ObservableProperty] private string _puntosPosiblesTexto = string.Empty;
-
     /// <summary>Solo tras responder: de qué anime es el personaje.</summary>
-    [ObservableProperty] private string _animeReveladoTexto = string.Empty;
+    public string AnimeReveladoTexto => DetalleRespuestaTexto;
 
-    public bool HayError => MensajeError.Length > 0;
     public bool EstaPixelada => LadoPixelado > 0;
+
+    public override string Icono => "AccountQuestionOutline";
+    protected override string ClaveTitulo => "Mini_PersonajeTitulo";
+    protected override string ClaveDescripcion => "Mini_PersonajeDesc";
+
+    /// <summary>Mientras se buscan los personajes y se descargan las imágenes de la partida.</summary>
+    public override string PreparandoTexto => EstaPreparando ? LocalizationService.T("Mini_PersonajePreparando") : string.Empty;
+
+    protected override int IndiceCorrectoRonda => _actual?.Ronda.IndiceCorrecto ?? -1;
+    protected override string RespuestaRonda => _actual?.Ronda.Respuesta.Nombre ?? string.Empty;
+    protected override int PuntosSiAcierta => AdivinaPersonajeJuego.Puntos(_pistasReveladas);
+
+    /// <summary>Al responder la imagen sale entera.</summary>
+    protected override void AlResponder() => LadoPixelado = 0;
+
+    protected override void AlVolverAlInicio() => CancelarTrabajo();
 
     public override bool PuedePedirPista => EsJugando && !HaRespondido && _actual != null && _pistasReveladas < _actual.Ronda.Pistas.Count;
     protected override bool HayMasRondas => _pendientes.Count > 0;
@@ -129,64 +133,12 @@ public sealed partial class AdivinaPersonajeViewModel : MinijuegoViewModelBase, 
     }
 
     [RelayCommand]
-    private async Task SiguienteAsync()
-    {
-        if (!EsJugando || !HaRespondido) return;
-        await AvanzarRondaAsync();
-    }
-
-    [RelayCommand]
     private void PedirPista()
     {
         if (!PuedePedirPista || _actual == null) return;
 
         _pistasReveladas++;
         RefrescarRonda();
-    }
-
-    [RelayCommand]
-    private void Responder(OpcionRespuesta? opcion)
-    {
-        if (opcion == null || _actual == null || HaRespondido || !EsJugando) return;
-
-        var ronda = _actual.Ronda;
-        HaRespondido = true;
-        UltimoFueAcierto = opcion.Indice == ronda.IndiceCorrecto;
-        Opciones[ronda.IndiceCorrecto].EsCorrecta = true;
-        ContabilizarRonda(UltimoFueAcierto);
-
-        if (UltimoFueAcierto)
-        {
-            _puntosGanadosRonda = AdivinaPersonajeJuego.Puntos(_pistasReveladas);
-            Puntos += _puntosGanadosRonda;
-            Aciertos++;
-        }
-        else
-        {
-            _puntosGanadosRonda = 0;
-            opcion.EsIncorrecta = true;
-        }
-
-        LadoPixelado = 0;
-        PuntosPosiblesTexto = string.Empty;
-        ActualizarResultadoTexto();
-        OnPropertyChanged(nameof(TextoSiguiente));
-    }
-
-    /// <summary>Atajo de teclado 1–4: responde con la opción de ese número.</summary>
-    [RelayCommand]
-    private void ResponderNumero(string? numero)
-    {
-        if (!int.TryParse(numero, NumberStyles.Integer, CultureInfo.InvariantCulture, out int n)) return;
-        Responder(Opciones.FirstOrDefault(o => o.Numero == n));
-    }
-
-    [RelayCommand]
-    private async Task VolverAlInicioAsync()
-    {
-        CancelarTrabajo();
-        Estado = EstadoMinijuego.Inicio;
-        await PrepararAsync();
     }
 
     public void Dispose()
@@ -276,7 +228,7 @@ public sealed partial class AdivinaPersonajeViewModel : MinijuegoViewModelBase, 
 
     // === Flujo de rondas ===
 
-    private async Task AvanzarRondaAsync()
+    protected override async Task AvanzarRondaAsync()
     {
         if (_avanzando) return;
         _avanzando = true;
@@ -300,11 +252,10 @@ public sealed partial class AdivinaPersonajeViewModel : MinijuegoViewModelBase, 
     {
         _actual = preparada;
         _pistasReveladas = 1;
-        _puntosGanadosRonda = 0;
 
         Opciones = new ObservableCollection<OpcionRespuesta>(preparada.Ronda.Opciones.Select((p, i) => new OpcionRespuesta(i, p.Nombre)));
         ImagenRonda = preparada.RutaImagen;
-        AnimeReveladoTexto = string.Empty;
+        DetalleRespuestaTexto = string.Empty;
         RondaNumero++;
         HaRespondido = false;
         UltimoFueAcierto = false;
@@ -329,15 +280,12 @@ public sealed partial class AdivinaPersonajeViewModel : MinijuegoViewModelBase, 
         OnPropertyChanged(nameof(PuedePedirPista));
     }
 
-    private void ActualizarResultadoTexto()
+    protected override void ActualizarResultadoTexto()
     {
         if (_actual == null || !HaRespondido) return;
 
-        var ronda = _actual.Ronda;
-        ResultadoTexto = UltimoFueAcierto
-            ? string.Format(LocalizationService.T("Mini_CorrectoFormato"), _puntosGanadosRonda)
-            : string.Format(LocalizationService.T("Mini_IncorrectoFormato"), ronda.Respuesta.Nombre);
-        AnimeReveladoTexto = string.Format(LocalizationService.T("Mini_PersonajeSaleEnFormato"), ronda.Anime.Titulo);
+        base.ActualizarResultadoTexto();
+        DetalleRespuestaTexto = string.Format(LocalizationService.T("Mini_PersonajeSaleEnFormato"), _actual.Ronda.Anime.Titulo);
     }
 
     internal static PistaItem ConvertirPista(PistaPersonaje pista) => pista.Tipo switch

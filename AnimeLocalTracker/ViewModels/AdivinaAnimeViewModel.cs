@@ -23,16 +23,24 @@ public sealed partial class AdivinaAnimeViewModel : MinijuegoViewModelBase
     private Queue<AnimeItem> _respuestasPendientes = new();
     private RondaAdivinaAnime? _ronda;
     private int _pistasReveladas;
-    private int _puntosGanadosRonda;
     private bool _avanzando;
 
     /// <summary>Solo para pruebas: posición de la opción correcta de la ronda actual (-1 si no hay ronda).</summary>
-    internal int IndiceCorrecto => _ronda?.IndiceCorrecto ?? -1;
+    internal int IndiceCorrecto => IndiceCorrectoRonda;
 
-    [ObservableProperty] private ObservableCollection<PistaItem> _pistas = new();
     [ObservableProperty] private string _portadaRonda = string.Empty;
     [ObservableProperty] private double _radioDesenfoque;
-    [ObservableProperty] private string _puntosPosiblesTexto = string.Empty;
+
+    public override string Icono => "HelpCircleOutline";
+    protected override string ClaveTitulo => "Mini_AdivinaTitulo";
+    protected override string ClaveDescripcion => "Mini_AdivinaDesc";
+
+    protected override int IndiceCorrectoRonda => _ronda?.IndiceCorrecto ?? -1;
+    protected override string RespuestaRonda => _ronda?.Respuesta.Titulo ?? string.Empty;
+    protected override int PuntosSiAcierta => AdivinaAnimeJuego.Puntos(_pistasReveladas);
+
+    /// <summary>Al responder la portada queda nítida.</summary>
+    protected override void AlResponder() => RadioDesenfoque = 0;
 
     public override bool PuedePedirPista => EsJugando && !HaRespondido && _ronda != null && _pistasReveladas < _ronda.Pistas.Count;
     protected override bool HayMasRondas => _respuestasPendientes.Count > 0;
@@ -64,13 +72,6 @@ public sealed partial class AdivinaAnimeViewModel : MinijuegoViewModelBase
     }
 
     [RelayCommand]
-    private async Task SiguienteAsync()
-    {
-        if (!EsJugando || !HaRespondido) return;
-        await AvanzarRondaAsync();
-    }
-
-    [RelayCommand]
     private void PedirPista()
     {
         if (!PuedePedirPista || _ronda == null) return;
@@ -79,50 +80,7 @@ public sealed partial class AdivinaAnimeViewModel : MinijuegoViewModelBase
         RefrescarRonda();
     }
 
-    [RelayCommand]
-    private void Responder(OpcionRespuesta? opcion)
-    {
-        if (opcion == null || _ronda == null || HaRespondido || !EsJugando) return;
-
-        HaRespondido = true;
-        UltimoFueAcierto = opcion.Indice == _ronda.IndiceCorrecto;
-        Opciones[_ronda.IndiceCorrecto].EsCorrecta = true;
-        ContabilizarRonda(UltimoFueAcierto);
-
-        if (UltimoFueAcierto)
-        {
-            _puntosGanadosRonda = AdivinaAnimeJuego.Puntos(_pistasReveladas);
-            Puntos += _puntosGanadosRonda;
-            Aciertos++;
-        }
-        else
-        {
-            _puntosGanadosRonda = 0;
-            opcion.EsIncorrecta = true;
-        }
-
-        RadioDesenfoque = 0;
-        PuntosPosiblesTexto = string.Empty;
-        ActualizarResultadoTexto();
-        OnPropertyChanged(nameof(TextoSiguiente));
-    }
-
-    /// <summary>Atajo de teclado 1–4: responde con la opción de ese número.</summary>
-    [RelayCommand]
-    private void ResponderNumero(string? numero)
-    {
-        if (!int.TryParse(numero, NumberStyles.Integer, CultureInfo.InvariantCulture, out int n)) return;
-        Responder(Opciones.FirstOrDefault(o => o.Numero == n));
-    }
-
-    [RelayCommand]
-    private async Task VolverAlInicioAsync()
-    {
-        Estado = EstadoMinijuego.Inicio;
-        await PrepararAsync();
-    }
-
-    private async Task AvanzarRondaAsync()
+    protected override async Task AvanzarRondaAsync()
     {
         if (_avanzando) return;
         _avanzando = true;
@@ -166,7 +124,6 @@ public sealed partial class AdivinaAnimeViewModel : MinijuegoViewModelBase
     {
         _ronda = ronda;
         _pistasReveladas = 1;
-        _puntosGanadosRonda = 0;
 
         Opciones = CrearOpciones(ronda.Opciones);
         PortadaRonda = ronda.Respuesta.PortadaVisible;
@@ -191,15 +148,6 @@ public sealed partial class AdivinaAnimeViewModel : MinijuegoViewModelBase
             PuntosPosiblesTexto = string.Format(LocalizationService.T("Mini_PuntosPosiblesFormato"), AdivinaAnimeJuego.Puntos(_pistasReveladas));
         }
         OnPropertyChanged(nameof(PuedePedirPista));
-    }
-
-    private void ActualizarResultadoTexto()
-    {
-        if (_ronda == null || !HaRespondido) return;
-
-        ResultadoTexto = UltimoFueAcierto
-            ? string.Format(LocalizationService.T("Mini_CorrectoFormato"), _puntosGanadosRonda)
-            : string.Format(LocalizationService.T("Mini_IncorrectoFormato"), _ronda.Respuesta.Titulo);
     }
 
     private static PistaItem ConvertirPista(PistaAnime pista)

@@ -33,53 +33,8 @@
     </UserControl.Resources>
 
     <Grid>
-        <!-- Cargando la biblioteca -->
-        <ProgressBar Style="{StaticResource MaterialDesignCircularProgressBar}"
-                     IsIndeterminate="True" Width="44" Height="44" Value="0" Foreground="{DynamicResource Brush.Accent}"
-                     HorizontalAlignment="Center" VerticalAlignment="Center"
-                     Visibility="{Binding EstaCargando, Converter={StaticResource BoolToVis}}"/>
-
-        <!-- Sin animes suficientes -->
-        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,40,0,40"
-                    Visibility="{Binding MostrarSinAnimes, Converter={StaticResource BoolToVis}}">
-            <Border Background="{DynamicResource Brush.Surface3}" CornerRadius="36" Width="72" Height="72" Margin="0,0,0,16" HorizontalAlignment="Center">
-                <materialDesign:PackIcon Kind="MusicNoteOff" Foreground="{DynamicResource Brush.TextTertiary}" Width="36" Height="36" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-            </Border>
-            <TextBlock Text="{Binding [Mini_NoHayAnimesTitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppEmptyTitle}"/>
-            <TextBlock Text="{Binding SinAnimesTexto}" Style="{StaticResource AppEmptyText}" Margin="0,6,0,0" MaxWidth="420" TextWrapping="Wrap"/>
-        </StackPanel>
-
-        <!-- Presentación del juego -->
-        <Border Style="{StaticResource AppCard}" MaxWidth="560" Padding="32,28" VerticalAlignment="Top" HorizontalAlignment="Center"
-                Visibility="{Binding MostrarPresentacion, Converter={StaticResource BoolToVis}}">
-            <StackPanel HorizontalAlignment="Center">
-                <Border Background="{DynamicResource Brush.Surface3}" CornerRadius="32" Width="64" Height="64" Margin="0,0,0,16" HorizontalAlignment="Center">
-                    <materialDesign:PackIcon Kind="MusicNote" Foreground="{DynamicResource Brush.Accent}" Width="34" Height="34" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                </Border>
-                <TextBlock Text="{Binding [Mini_OpEdTitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.Section}" HorizontalAlignment="Center"/>
-                <TextBlock Text="{Binding [Mini_OpEdDesc], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.Secondary}"
-                           TextWrapping="Wrap" TextAlignment="Center" Margin="0,10,0,0"/>
-                <TextBlock Text="{Binding RecordTexto}" Style="{StaticResource AppText.Micro}" Foreground="{DynamicResource Brush.Warning}"
-                           HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" Margin="0,12,0,0"
-                           Visibility="{Binding HayRecord, Converter={StaticResource BoolToVis}}"/>
-                <TextBlock Text="{Binding ReglasTexto}" Style="{StaticResource AppText.Micro}" Foreground="{DynamicResource Brush.TextTertiary}"
-                           HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" Margin="0,12,0,22"/>
-
-                <!-- Error de la partida anterior (sin conexión y sin temas descargados, etc.) -->
-                <Border Background="{DynamicResource Brush.Surface2}" BorderBrush="{DynamicResource Brush.Danger}" BorderThickness="1" CornerRadius="10"
-                        Padding="14,10" Margin="0,0,0,18" Visibility="{Binding HayError, Converter={StaticResource BoolToVis}}">
-                    <TextBlock Text="{Binding MensajeError}" Style="{StaticResource AppText.Secondary}" Foreground="{DynamicResource Brush.Danger}" TextWrapping="Wrap"/>
-                </Border>
-
-                <Button Command="{Binding IniciarPartidaCommand}" Style="{StaticResource MiniBotonPrincipal}" HorizontalAlignment="Center"
-                        AutomationProperties.Name="{Binding [Mini_Jugar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
-                    <StackPanel Orientation="Horizontal">
-                        <materialDesign:PackIcon Kind="Play" Width="20" Height="20" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                        <TextBlock Text="{Binding [Mini_Jugar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" VerticalAlignment="Center"/>
-                    </StackPanel>
-                </Button>
-            </StackPanel>
-        </Border>
+        <!-- Cargando / sin animes suficientes / presentación con "Jugar" -->
+        <views:MinijuegoInicioView/>
 
         <!-- Partida en curso -->
         <Grid Visibility="{Binding EsJugando, Converter={StaticResource BoolToVis}}">
@@ -147,58 +102,33 @@
                                 <TextBlock Text="{Binding [Mini_OpEd_Escuchar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
+
+                        <!-- Avance del clip que suena (lo anima el code-behind con la duración que da el ViewModel) -->
+                        <ProgressBar x:Name="AvanceClip" Minimum="0" Maximum="100" Value="0" Height="4" Margin="0,10,0,0"
+                                     Foreground="{DynamicResource Brush.Accent}" Background="{DynamicResource Brush.Surface3}" BorderThickness="0"
+                                     materialDesign:TransitionAssist.DisableTransitions="True"/>
+
+                        <!-- Volumen: el mismo ajuste que la música de la ficha. Delay: se aplica y se guarda al dejar de mover el control. -->
+                        <Grid Margin="0,10,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <materialDesign:PackIcon Kind="VolumeHigh" Width="18" Height="18" Foreground="{DynamicResource Brush.TextSecondary}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                            <Slider Grid.Column="1" Minimum="0" Maximum="1" Value="{Binding Volumen, Delay=250}" VerticalAlignment="Center" Cursor="Hand"
+                                    ToolTip="{Binding [Mini_OpEd_Volumen], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                    AutomationProperties.Name="{Binding [Mini_OpEd_Volumen], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                        </Grid>
+
+                        <!-- El clip no se pudo reproducir: se dice, en vez de dejar el altavoz encendido sin sonar nada -->
+                        <TextBlock Text="{Binding [Mini_OpEd_AudioFallido], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                   Style="{StaticResource AppText.Caption}" Foreground="{DynamicResource Brush.Danger}" TextWrapping="Wrap" Margin="0,10,0,0"
+                                   Visibility="{Binding AudioFallido, Converter={StaticResource BoolToVis}}"/>
                     </StackPanel>
 
-                    <StackPanel Grid.Column="1" MaxWidth="760" HorizontalAlignment="Left">
-
-                        <!-- Ronda y puntos -->
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
-                            <Border Style="{StaticResource AppBadge}" Margin="0,0,8,0">
-                                <TextBlock Text="{Binding RondaTexto}" Style="{StaticResource AppText.Micro}" VerticalAlignment="Center"/>
-                            </Border>
-                            <Border Style="{StaticResource AppBadge}" Background="{DynamicResource Brush.WarningTint}">
-                                <TextBlock Text="{Binding PuntosTexto}" Style="{StaticResource AppText.Micro}" Foreground="{DynamicResource Brush.Warning}" VerticalAlignment="Center"/>
-                            </Border>
-                        </StackPanel>
-
-                        <!-- Pistas de texto reveladas (las de "más audio" alargan el clip, no añaden tarjeta) -->
-                        <ItemsControl ItemsSource="{Binding Pistas}" Margin="0,0,0,10">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Border Style="{StaticResource AppCard}" Margin="0,0,0,6" Padding="14,8">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-                                            <materialDesign:PackIcon Kind="{Binding Icono}" Foreground="{DynamicResource Brush.Accent}" Width="20" Height="20"
-                                                                     VerticalAlignment="Top" Margin="0,2,12,0"/>
-                                            <StackPanel Grid.Column="1">
-                                                <TextBlock Text="{Binding Etiqueta}" Style="{StaticResource AppText.Micro}" Foreground="{DynamicResource Brush.TextTertiary}"/>
-                                                <TextBlock Text="{Binding Texto}" Style="{StaticResource AppText.Body}" TextWrapping="Wrap" Margin="0,2,0,0"/>
-                                            </StackPanel>
-                                        </Grid>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-
-                        <!-- Pedir otra ayuda -->
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,18"
-                                    Visibility="{Binding HaRespondido, Converter={StaticResource InverseBoolToVis}}">
-                            <Button Command="{Binding PedirPistaCommand}" Style="{StaticResource MiniBotonSecundario}"
-                                    IsEnabled="{Binding PuedePedirPista}"
-                                    AutomationProperties.Name="{Binding [Mini_PedirPista], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
-                                <StackPanel Orientation="Horizontal">
-                                    <materialDesign:PackIcon Kind="LightbulbOnOutline" Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                    <TextBlock Text="{Binding [Mini_PedirPista], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </Button>
-                            <TextBlock Text="{Binding PuntosPosiblesTexto}" Style="{StaticResource AppText.Caption}" VerticalAlignment="Center" Margin="14,0,0,0"/>
-                        </StackPanel>
-
-                        <views:MinijuegoOpcionesView/>
-                    </StackPanel>
+                    <!-- Ronda, pistas, opciones y resultado: igual en los tres juegos (las ayudas de "más audio" alargan el
+                         clip, no añaden tarjeta de pista) -->
+                    <views:MinijuegoRondaView Grid.Column="1" MaxWidth="760" HorizontalAlignment="Left"/>
                 </Grid>
             </ScrollViewer>
         </Grid>

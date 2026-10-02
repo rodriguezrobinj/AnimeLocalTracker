@@ -96,7 +96,19 @@ public class AniListMedia
     // NUEVO: Capturamos el calendario de emisión
     [JsonPropertyName("nextAiringEpisode")]
     public AniListNextAiringEpisode? NextAiringEpisode { get; set; }
-    
+
+    /// <summary>
+    /// Episodios que ya salieron: 0 si no se ha estrenado; el anterior al próximo programado si hay uno; si no, el total
+    /// de AniList. Cuando AniList no da ni lo uno ni lo otro (una serie larga en pausa) se conserva
+    /// <paramref name="totalConocido"/>: ponerlo a 0 dejaba la tarjeta en "1180 / 0".
+    /// </summary>
+    public int EpisodiosEmitidos(int totalConocido)
+    {
+        if (string.Equals(Status, "NOT_YET_RELEASED", StringComparison.OrdinalIgnoreCase)) return 0;
+        if (NextAiringEpisode != null) return Math.Max(0, NextAiringEpisode.Episode - 1);
+        return Episodes ?? totalConocido;
+    }
+
     [JsonPropertyName("startDate")]
     public AniListFuzzyDate? StartDate { get; set; }
 

@@ -47,6 +47,7 @@ public partial class AnimeItem : ObservableObject
 
     // Estado del usuario ("CURRENT", "COMPLETED", "PLANNING", etc)
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(EstadoUsuarioVisual))]
     private string _estadoUsuario = string.Empty;
 
     // Temporada de estreno ("WINTER", "SPRING", "SUMMER", "FALL") y año, capturados de
@@ -111,6 +112,37 @@ public partial class AnimeItem : ObservableObject
     [Ignore]
     [JsonIgnore]
     public string ColorEstado => Estado == "RELEASING" ? "#4CAF50" : "#9E9E9E";
+
+    /// <summary>
+    /// Cuándo se añadió a la biblioteca (UTC), para el orden "Añadidos recientemente". Null en los animes que ya estaban
+    /// antes de guardarse este dato (migración v19): quedan al final de ese orden.
+    /// </summary>
+    public System.DateTime? FechaAgregadoUtc { get; set; }
+
+    /// <summary>Tu estado con el anime, como lo enseña la tarjeta de la Galería (antes mostraba si seguía en emisión).</summary>
+    [Ignore]
+    [JsonIgnore]
+    public string EstadoUsuarioVisual => AnimeLocalTracker.Services.LocalizationService.T(EstadoUsuario switch
+    {
+        "CURRENT" => "Estado_Viendo",
+        "REPEATING" => "Tarjeta_ViendoDeNuevo",
+        "COMPLETED" => "Tarjeta_Completado",
+        "PAUSED" => "Estado_EnPausa",
+        "DROPPED" => "Estado_Abandonado",
+        _ => "Estado_Planeando"
+    });
+
+    /// <summary>Año y temporada de estreno en un solo número, para ordenar por "Estreno más reciente" (0 = sin datos).</summary>
+    [Ignore]
+    [JsonIgnore]
+    public int OrdenEstreno => AnioLanzamiento <= 0 ? 0 : AnioLanzamiento * 10 + Temporada switch
+    {
+        "WINTER" => 1,
+        "SPRING" => 2,
+        "SUMMER" => 3,
+        "FALL" => 4,
+        _ => 0
+    };
 
     [Ignore]
     [JsonIgnore]

@@ -8,8 +8,8 @@ namespace AnimeLocalTracker.Views;
 /// <summary>
 /// Los atajos de teclado de un minijuego solo funcionan con el foco dentro de su vista, y el botón "Jugar" (o "Siguiente")
 /// desaparece al cambiar de estado llevándose el foco: este ayudante se lo devuelve a la vista en cada cambio de estado o
-/// de ronda, y sube el desplazamiento al inicio. El ViewModel es singleton y la vista se recrea en cada visita, así que se
-/// engancha en Loaded y se suelta en Unloaded (si no, cada visita dejaría una suscripción viva).
+/// de ronda, y sube el desplazamiento al inicio. También al responder: tras un clic el foco se queda en la opción pulsada, y
+/// un botón con foco se queda con la tecla Enter (no llegaba a "Siguiente"). Se engancha en Loaded y se suelta en Unloaded.
 /// </summary>
 internal sealed class MinijuegoFocoHelper
 {
@@ -55,13 +55,17 @@ internal sealed class MinijuegoFocoHelper
             _scroll?.ScrollToTop();
             RecuperarFoco();
         }
+        else if (e.PropertyName == nameof(MinijuegoViewModelBase.HaRespondido) && _viewModel?.HaRespondido == true)
+        {
+            RecuperarFoco(aunqueEsteDentro: true);
+        }
     }
 
-    private void RecuperarFoco()
+    private void RecuperarFoco(bool aunqueEsteDentro = false)
     {
         _vista.Dispatcher.BeginInvoke(DispatcherPriority.Input, () =>
         {
-            if (_vista.IsLoaded && _vista.IsVisible && !_vista.IsKeyboardFocusWithin) _vista.Focus();
+            if (_vista.IsLoaded && _vista.IsVisible && (aunqueEsteDentro || !_vista.IsKeyboardFocusWithin)) _vista.Focus();
         });
     }
 }

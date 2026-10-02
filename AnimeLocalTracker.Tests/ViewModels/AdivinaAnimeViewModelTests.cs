@@ -49,6 +49,45 @@ public class AdivinaAnimeViewModelTests
     private static void ResponderMal(AdivinaAnimeViewModel sut) =>
         sut.ResponderCommand.Execute(sut.Opciones.First(o => o.Indice != sut.IndiceCorrecto));
 
+    // === Resumen con las rondas ===
+
+    [Fact]
+    public async Task ElResumen_ListaCadaRondaConSuRespuestaYSiSeAcerto()
+    {
+        var sut = await CrearSutAsync(12);
+        await sut.IniciarPartidaCommand.ExecuteAsync(null);
+
+        string primera = sut.Opciones[sut.IndiceCorrecto].Titulo;
+        ResponderBien(sut);
+        await sut.SiguienteCommand.ExecuteAsync(null);
+        string segunda = sut.Opciones[sut.IndiceCorrecto].Titulo;
+        ResponderMal(sut);
+
+        sut.ResumenRondas.Should().HaveCount(2);
+        sut.ResumenRondas[0].Should().BeEquivalentTo(new RondaResumen(1, primera, true, 100));
+        sut.ResumenRondas[1].Should().BeEquivalentTo(new RondaResumen(2, segunda, false, 0));
+
+        await sut.VolverAlInicioCommand.ExecuteAsync(null);
+        await sut.IniciarPartidaCommand.ExecuteAsync(null);
+        sut.ResumenRondas.Should().BeEmpty("una partida nueva empieza con el resumen vacío");
+    }
+
+    // === Solo animes que has visto (opción) ===
+
+    [Fact]
+    public async Task ConLaOpcionSoloVistos_NoCuentanLosQueSoloTienesApuntados()
+    {
+        var biblioteca = Biblioteca(8);
+        for (int i = 0; i < biblioteca.Count; i++) biblioteca[i].EstadoUsuario = i < 5 ? "COMPLETED" : "PLANNING";
+        biblioteca[7].EpisodiosVistos = 3; // apuntado, pero con episodios vistos: también cuenta
+        _db.Setup(d => d.ObtenerTodosLosAnimesAsync()).ReturnsAsync(biblioteca);
+        var sut = new AdivinaAnimeViewModel(_db.Object) { Rng = new Random(42), SoloVistos = true };
+
+        await sut.PrepararAsync();
+
+        sut.AnimesDisponibles.Should().Be(6);
+    }
+
     // === Preparación ===
 
     [Fact]

@@ -3,6 +3,7 @@
 1. **Ubicación de Datos de Usuario:**
    - La base de datos, configuraciones, portadas cacheadas y logs deben ubicarse exclusivamente en `AppDataPaths` (`%LocalAppData%\AnimeLocalTrackerData`).
    - Jamás escribir datos dinámicos o temporales dentro del directorio de instalación del programa.
+   - **Las pruebas y los scripts de verificación nunca escriben ni borran bajo `AppDataPaths`** (ya hubo un caso en que `dotnet test` borró el token real de AniList). Todo servicio que toque esa ruta debe aceptar una ruta inyectable para poder usar un directorio temporal en las pruebas.
 2. **Copias de Seguridad Confiables (Snapshots Atómicos):**
    - Dado que SQLite opera con Write-Ahead Logging (modo WAL), los respaldos de la base de datos abierta deben realizarse únicamente con el comando SQL `VACUUM INTO 'ruta_destino'`.
    - Prohibido utilizar `File.Copy` sobre la base de datos en ejecución para evitar corrupciones de datos.

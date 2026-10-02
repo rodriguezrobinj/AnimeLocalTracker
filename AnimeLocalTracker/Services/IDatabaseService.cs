@@ -33,6 +33,11 @@ public interface IDatabaseService
     Task GuardarRegistrosEpisodioBulkAsync(IEnumerable<RegistroEpisodio> registros);
     Task<List<RegistroEpisodio>> ObtenerRegistrosPorAnimeAsync(int aniListId);
     Task<List<RegistroEpisodio>> ObtenerTodosLosRegistrosAsync();
+    /// <summary>
+    /// Cuántos episodios vistos tiene cada anime (los que no tienen ninguno no aparecen). Lo cuenta la base de datos: la
+    /// Galería solo necesita ese número y antes traía todos los registros de episodios para contarlos ella.
+    /// </summary>
+    Task<Dictionary<int, int>> ObtenerEpisodiosVistosPorAnimeAsync();
     Task<List<RegistroEpisodio>> ObtenerHistorialEpisodiosAsync(int limite = 300);
     Task<List<RegistroEpisodio>> ObtenerEpisodiosNoSincronizadosAsync();
     Task MarcarEpisodiosSincronizadosAsync(IEnumerable<int> ids);
@@ -69,6 +74,8 @@ public interface IDatabaseService
     // === PRÓXIMA EMISIÓN: copia local del próximo episodio de animes en emisión (cuenta atrás sin red) ===
     Task<ProximaEmisionLocal?> ObtenerProximaEmisionAsync(int aniListId);
     Task GuardarProximaEmisionAsync(ProximaEmisionLocal proxima);
+    /// <summary>Guarda varias de una vez (una sola transacción): "Actualizar biblioteca" trae la de todos los animes en emisión.</summary>
+    Task GuardarProximasEmisionesAsync(IEnumerable<ProximaEmisionLocal> proximas);
     Task<List<ProximaEmisionLocal>> ObtenerProximasEmisionesAsync();
 
     Task<SeguimientoLocal?> ObtenerSeguimientoLocalAsync(int aniListId);

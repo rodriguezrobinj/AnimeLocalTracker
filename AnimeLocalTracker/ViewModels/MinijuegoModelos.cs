@@ -33,5 +33,8 @@ public sealed partial class OpcionRespuesta : ObservableObject
     public void RefrescarTextos() => OnPropertyChanged(nameof(NombreAccesible));
 }
 
+/// <summary>Una ronda ya jugada, para el resumen final: cuál era la respuesta, si se acertó y cuántos puntos dio.</summary>
+public sealed record RondaResumen(int Numero, string Respuesta, bool Acierto, int Puntos);
+
 /// <summary>Pista ya localizada, lista para mostrar.</summary>
 public sealed record PistaItem(string Icono, string Etiqueta, string Texto);

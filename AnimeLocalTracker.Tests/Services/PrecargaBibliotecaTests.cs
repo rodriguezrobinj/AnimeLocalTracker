@@ -25,11 +25,11 @@ public class PrecargaBibliotecaTests
         .Reverse() // la base de datos no devuelve los animes en el orden en que los muestra la Galería
         .ToList();
 
-    private static Mock<IDatabaseService> BaseDatos(List<AnimeItem> animes, List<RegistroEpisodio>? registros = null)
+    private static Mock<IDatabaseService> BaseDatos(List<AnimeItem> animes, Dictionary<int, int>? vistos = null)
     {
         var db = new Mock<IDatabaseService>();
         db.Setup(d => d.ObtenerTodosLosAnimesAsync()).ReturnsAsync(animes);
-        db.Setup(d => d.ObtenerTodosLosRegistrosAsync()).ReturnsAsync(registros ?? new List<RegistroEpisodio>());
+        db.Setup(d => d.ObtenerEpisodiosVistosPorAnimeAsync()).ReturnsAsync(vistos ?? new Dictionary<int, int>());
         return db;
     }
 
@@ -45,8 +45,8 @@ public class PrecargaBibliotecaTests
     public async Task Consumir_DeberiaEntregarLaLecturaUnaSolaVez()
     {
         var animes = Animes(5);
-        var registros = new List<RegistroEpisodio> { new() { AniListId = 1, NumeroEpisodio = 1, VistoLocal = true } };
-        var db = BaseDatos(animes, registros);
+        var vistos = new Dictionary<int, int> { [1] = 1 };
+        var db = BaseDatos(animes, vistos);
         var sut = new PrecargaBiblioteca(db.Object, Mock.Of<IImageCacheService>());
 
         sut.Iniciar();
@@ -56,7 +56,7 @@ public class PrecargaBibliotecaTests
         lectura.Should().NotBeNull();
         var datos = await lectura!;
         datos.Animes.Should().BeSameAs(animes);
-        datos.Registros.Should().BeSameAs(registros);
+        datos.VistosPorAnime.Should().BeSameAs(vistos);
         sut.Consumir().Should().BeNull("la lectura adelantada es solo para la primera carga de la Galería");
         db.Verify(d => d.ObtenerTodosLosAnimesAsync(), Times.Once);
     }
@@ -96,7 +96,7 @@ public class PrecargaBibliotecaTests
     public async Task Galeria_ConLecturaAdelantada_DeberiaUsarlaSinVolverALeerLaBaseDeDatos()
     {
         var animes = Animes(6);
-        var db = BaseDatos(animes, new List<RegistroEpisodio> { new() { AniListId = 2, NumeroEpisodio = 1, VistoLocal = true } });
+        var db = BaseDatos(animes, new Dictionary<int, int> { [2] = 1 });
         var imagenes = new Mock<IImageCacheService>();
         var precarga = new PrecargaBiblioteca(db.Object, imagenes.Object);
         precarga.Iniciar();
@@ -110,7 +110,7 @@ public class PrecargaBibliotecaTests
         galeria.BibliotecaLocales.Should().HaveCount(6);
         galeria.BibliotecaLocales.Single(a => a.AniListId == 2).EpisodiosVistos.Should().Be(1);
         db.Verify(d => d.ObtenerTodosLosAnimesAsync(), Times.Once, "la Galería usa la lectura adelantada en vez de repetirla");
-        db.Verify(d => d.ObtenerTodosLosRegistrosAsync(), Times.Once);
+        db.Verify(d => d.ObtenerEpisodiosVistosPorAnimeAsync(), Times.Once);
     }
 
     [Fact]
@@ -121,7 +121,7 @@ public class PrecargaBibliotecaTests
         db.SetupSequence(d => d.ObtenerTodosLosAnimesAsync())
           .ThrowsAsync(new InvalidOperationException("base de datos ocupada"))
           .ReturnsAsync(animes);
-        db.Setup(d => d.ObtenerTodosLosRegistrosAsync()).ReturnsAsync(new List<RegistroEpisodio>());
+        db.Setup(d => d.ObtenerEpisodiosVistosPorAnimeAsync()).ReturnsAsync(new Dictionary<int, int>());
         var imagenes = new Mock<IImageCacheService>();
         var precarga = new PrecargaBiblioteca(db.Object, imagenes.Object);
         precarga.Iniciar();

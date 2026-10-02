@@ -10,40 +10,33 @@
 
     <UserControl.InputBindings>
         <!-- Escape cierra el panel "Qué veo hoy" (sin efecto cuando está cerrado) -->
-        <KeyBinding Key="Escape" Command="{Binding CerrarQueVerHoyCommand}"/>
+        <KeyBinding Key="Escape" Command="{Binding QueVeoHoy.CerrarQueVerHoyCommand}"/>
     </UserControl.InputBindings>
 
     <UserControl.Resources>
-        <!-- ══ Botón "QUÉ VEO HOY": mismo recipe que "Filtros" y el resto de botones outlined de la app
-                 (superficie plana + borde sutil, acento azul; al pasar el ratón resalta con el azul). ══ -->
-        <Style x:Key="QueVeoHoyButton" TargetType="Button" BasedOn="{StaticResource MaterialDesignOutlinedButton}">
-            <Setter Property="Height" Value="40"/>
-            <Setter Property="Padding" Value="14,0"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Background" Value="{DynamicResource Brush.Surface1}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Brush.BorderStrong}"/>
-            <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}"/>
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="{DynamicResource Brush.Surface3}"/>
-                    <Setter Property="BorderBrush" Value="{DynamicResource Brush.AccentStrong}"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <!-- La tarjeta de anime (TarjetaAnime) y su menú contextual -->
+                <ResourceDictionary Source="GaleriaTarjeta.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
 
-        <!-- Botón del panel "Qué veo hoy" con aviso cuando no hay más opciones -->
-        <Style x:Key="QueVerOtroButton" TargetType="Button" BasedOn="{StaticResource AppOutlinedButton}">
-            <Setter Property="BorderBrush" Value="{DynamicResource Brush.BorderStrong}"/>
-            <Setter Property="ToolTipService.ShowOnDisabled" Value="True"/>
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="BorderBrush" Value="{DynamicResource Brush.AccentStrong}"/>
-                </Trigger>
-                <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="ToolTip" Value="{Binding [Gal_QueVerOtroSinOpcionTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
+            <!-- ══ Botón "QUÉ VEO HOY": mismo recipe que "Filtros" y el resto de botones outlined de la app
+                     (superficie plana + borde sutil, acento azul; al pasar el ratón resalta con el azul). ══ -->
+            <Style x:Key="QueVeoHoyButton" TargetType="Button" BasedOn="{StaticResource MaterialDesignOutlinedButton}">
+                <Setter Property="Height" Value="40"/>
+                <Setter Property="Padding" Value="14,0"/>
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="Background" Value="{DynamicResource Brush.Surface1}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource Brush.BorderStrong}"/>
+                <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}"/>
+                <Style.Triggers>
+                    <Trigger Property="IsMouseOver" Value="True">
+                        <Setter Property="Background" Value="{DynamicResource Brush.Surface3}"/>
+                        <Setter Property="BorderBrush" Value="{DynamicResource Brush.AccentStrong}"/>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+        </ResourceDictionary>
     </UserControl.Resources>
 
     <!-- Raíz sin márgenes: el panel "Qué veo hoy" la cubre por completo (antes quedaba dentro de la
@@ -57,7 +50,7 @@
                 <Style.Triggers>
                     <!-- Con la ruleta abierta la galería se difumina y no recibe NADA: ni rueda, ni barra de
                          scroll, ni clics, ni teclado (IsEnabled=False). -->
-                    <DataTrigger Binding="{Binding QueVerHoyAbierto}" Value="True">
+                    <DataTrigger Binding="{Binding QueVeoHoy.QueVerHoyAbierto}" Value="True">
                         <Setter Property="Effect">
                             <Setter.Value>
                                 <BlurEffect Radius="16" KernelType="Gaussian"/>
@@ -102,7 +95,7 @@
             
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                 <!-- Botón Qué Veo Hoy (abre el panel con la ruleta) -->
-                <Button Command="{Binding ElegirQueVerHoyCommand}"
+                <Button Command="{Binding QueVeoHoy.ElegirQueVerHoyCommand}"
                         Style="{StaticResource QueVeoHoyButton}" Margin="0,0,10,0"
                         ToolTip="{Binding [Gal_QueVerTip], Source={x:Static loc:LocalizationService.Instance}}"
                         AutomationProperties.Name="{Binding [Gal_QueVeoHoy], Source={x:Static loc:LocalizationService.Instance}}">
@@ -179,8 +172,8 @@
                         <!-- Expandable background that clips contents -->
                         <Border x:Name="UnifiedBackground" 
                                 Width="{Binding ActualWidth, ElementName=UserMenuToggle}"
-                                Background="#1E293B" CornerRadius="20"
-                                BorderBrush="#33FFFFFF" BorderThickness="1"
+                                Background="{DynamicResource Brush.Surface3}" CornerRadius="20"
+                                BorderBrush="{DynamicResource Brush.RingBase}" BorderThickness="1"
                                 VerticalAlignment="Top" HorizontalAlignment="Left"
                                 ClipToBounds="True">
                             <Border.Style>
@@ -195,8 +188,8 @@
                                         </DataTrigger>
                                         <DataTrigger Binding="{Binding MenuUsuarioAbierto}" Value="True">
                                             <Setter Property="Opacity" Value="1"/>
-                                            <Setter Property="Background" Value="#1E293B"/>
-                                            <Setter Property="BorderBrush" Value="#33FFFFFF"/>
+                                            <Setter Property="Background" Value="{DynamicResource Brush.Surface3}"/>
+                                            <Setter Property="BorderBrush" Value="{DynamicResource Brush.RingBase}"/>
                                             <!-- Softer bottom corners when open -->
                                             <Setter Property="CornerRadius" Value="20,20,16,16"/>
                                             <DataTrigger.EnterActions>
@@ -259,7 +252,7 @@
                         </Button.Template>
                         
                         <StackPanel Orientation="Horizontal">
-                            <Ellipse Width="28" Height="28" Margin="0,0,10,0" Stroke="#3B82F6" StrokeThickness="1.5">
+                            <Ellipse Width="28" Height="28" Margin="0,0,10,0" Stroke="{DynamicResource Brush.AccentStrong}" StrokeThickness="1.5">
                                 <Ellipse.Fill>
                                     <ImageBrush ImageSource="{Binding AvatarUsuarioAniList, TargetNullValue={x:Null}, FallbackValue={x:Null}, IsAsync=True}" Stretch="UniformToFill"/>
                                 </Ellipse.Fill>
@@ -311,252 +304,8 @@
             </StackPanel>
         </Grid>
 
-        <!-- BARRA DE BÚSQUEDA Y FILTROS -->
-        <Grid Grid.Row="1" Margin="0,0,0,20" Visibility="{Binding BibliotecaVacia, Converter={StaticResource InverseBoolToVis}}">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-            </Grid.RowDefinitions>
-
-            <!-- Fila Principal (Limpia y Compacta en 1 Sola Línea) -->
-            <Grid Grid.Row="0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-
-                <!-- Buscador Local -->
-                <Border Grid.Column="0" Background="{DynamicResource Brush.Surface1}" BorderBrush="{DynamicResource Brush.BorderStrong}" BorderThickness="1"
-                        CornerRadius="12" Height="44" VerticalAlignment="Center" Padding="14,0,5,0" Margin="0,0,10,0"
-                        HorizontalAlignment="Left" Width="330" ClipToBounds="True">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-
-                        <materialDesign:PackIcon Kind="Magnify" Width="20" Height="20" Foreground="{DynamicResource Brush.TextSecondary}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                        
-                        <TextBox Grid.Column="1" 
-                                 Text="{Binding TextoBusqueda, UpdateSourceTrigger=PropertyChanged}"
-                                 materialDesign:HintAssist.Hint="{Binding [Gal_BuscarHint], Source={x:Static loc:LocalizationService.Instance}}"
-                                 materialDesign:HintAssist.IsFloating="False"
-                                 materialDesign:TextFieldAssist.DecorationVisibility="Hidden"
-                                 materialDesign:TextFieldAssist.HasClearButton="True"
-                                 BorderThickness="0"
-                                 Background="Transparent"
-                                 VerticalAlignment="Center"
-                                 FontSize="13.5"
-                                 Foreground="White"
-                                 Margin="0,0,10,0"/>
-                    </Grid>
-                </Border>
-
-                <!-- Botón Desplegable de Filtros y Ordenación -->
-                <ToggleButton Grid.Column="1" IsChecked="{Binding PanelFiltrosVisible}"
-                              Height="44" Padding="14,0" Cursor="Hand" VerticalAlignment="Center"
-                              ToolTip="{Binding [Gal_FiltrosTip], Source={x:Static loc:LocalizationService.Instance}}"
-                              AutomationProperties.Name="{Binding [Gal_Filtros], Source={x:Static loc:LocalizationService.Instance}}">
-                    <ToggleButton.Style>
-                        <Style TargetType="ToggleButton" BasedOn="{StaticResource MaterialDesignOutlinedButton}">
-                            <Setter Property="BorderBrush" Value="{DynamicResource Brush.BorderStrong}"/>
-                            <Setter Property="Background" Value="{DynamicResource Brush.Surface1}"/>
-                            <Setter Property="Foreground" Value="{DynamicResource Brush.TextSecondary}"/>
-                            <Style.Triggers>
-                                <Trigger Property="IsChecked" Value="True">
-                                    <Setter Property="BorderBrush" Value="{DynamicResource Brush.AccentStrong}"/>
-                                    <Setter Property="Background" Value="{DynamicResource Brush.Surface3}"/>
-                                    <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}"/>
-                                </Trigger>
-                                <DataTrigger Binding="{Binding TieneFiltrosAvanzadosActivos}" Value="True">
-                                    <Setter Property="BorderBrush" Value="{DynamicResource Brush.AccentStrong}"/>
-                                    <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </ToggleButton.Style>
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <materialDesign:PackIcon Kind="TuneVariant" Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                        <TextBlock Text="{Binding [Gal_Filtros], Source={x:Static loc:LocalizationService.Instance}}" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                        
-                        <!-- Badge de conteo de filtros activos -->
-                        <Border Background="{DynamicResource Brush.AccentStrong}" CornerRadius="9" Height="18" MinWidth="18" Padding="5,0" Margin="8,0,0,0"
-                                VerticalAlignment="Center" Visibility="{Binding TieneFiltrosAvanzadosActivos, Converter={StaticResource BoolToVis}}">
-                            <TextBlock Text="{Binding CantidadFiltrosAvanzadosActivos}" FontSize="10.5" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                    </StackPanel>
-                </ToggleButton>
-
-                <!-- Chips de Estado a la derecha (WrapPanel: baja a una 2ª línea en vez de solaparse/recortarse con ventanas angostas) -->
-                <WrapPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                    <RadioButton Content="{Binding [Hist_FiltroTodos], Source={x:Static loc:LocalizationService.Instance}}" Margin="0,0,6,4" IsChecked="{Binding EsFiltroTodos, Mode=OneWay}" GroupName="FiltroEstado"
-                                 Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="Todos"
-                                 Style="{StaticResource MaterialDesignTabRadioButton}"
-                                 Height="34" Padding="14,0" FontSize="13" FontWeight="SemiBold"/>
-
-                    <RadioButton Content="{Binding [Gal_FiltroViendo], Source={x:Static loc:LocalizationService.Instance}}" Margin="0,0,6,4" IsChecked="{Binding EsFiltroViendo, Mode=OneWay}" GroupName="FiltroEstado"
-                                 Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="Viendo"
-                                 Style="{StaticResource MaterialDesignTabRadioButton}"
-                                 Height="34" Padding="14,0" FontSize="13" FontWeight="SemiBold"/>
-
-                    <RadioButton Content="{Binding [Hist_FiltroCompletados], Source={x:Static loc:LocalizationService.Instance}}" Margin="0,0,6,4" IsChecked="{Binding EsFiltroCompletados, Mode=OneWay}" GroupName="FiltroEstado"
-                                 Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="Completados"
-                                 Style="{StaticResource MaterialDesignTabRadioButton}"
-                                 Height="34" Padding="14,0" FontSize="13" FontWeight="SemiBold"/>
-
-                    <RadioButton Content="{Binding [Gal_FiltroPlaneando], Source={x:Static loc:LocalizationService.Instance}}" Margin="0,0,0,4" IsChecked="{Binding EsFiltroPlaneando, Mode=OneWay}" GroupName="FiltroEstado"
-                                 Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="Planeando"
-                                 Style="{StaticResource MaterialDesignTabRadioButton}"
-                                 Height="34" Padding="14,0" FontSize="13" FontWeight="SemiBold"/>
-                </WrapPanel>
-            </Grid>
-
-            <!-- Panel Expansible de Filtros Avanzados (Desplegable).
-                 UI-01: un WrapPanel único para selectores/toggles/"Limpiar filtros" evita el
-                 reflujo abrupto de una columna Grid Auto/Star, PERO el badge de conteo
-                 ("Mostrando X de Y animes") es el elemento más ancho del grupo y, si el resto
-                 ya llena la línea, terminaba flotando solo en una 2ª línea huérfana — igual de
-                 feo que el bug original. Se ancla con DockPanel.Dock="Right" fuera del
-                 WrapPanel: así SOLO los selectores/toggles se reflujan (como grupo, de forma
-                 predecible) y el conteo se queda fijo en la esquina derecha en su propia línea. -->
-            <Border Grid.Row="1" Margin="0,12,0,0" Padding="16,10"
-                    Background="{DynamicResource Brush.Surface1}" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1"
-                    CornerRadius="14" Visibility="{Binding PanelFiltrosVisible, Converter={StaticResource BoolToVis}}">
-                <DockPanel LastChildFill="True">
-                    <!-- Badge Conteo Filtrados: anclado a la derecha, nunca flota solo -->
-                    <Border DockPanel.Dock="Right" Background="{DynamicResource Brush.Surface2}" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1"
-                            CornerRadius="8" Height="36" Padding="12,0" Margin="10,0,0,0" VerticalAlignment="Top">
-                        <TextBlock Text="{Binding ConteoFiltradosTexto}" Style="{StaticResource AppText.Caption}"
-                                   FontWeight="SemiBold" Foreground="{DynamicResource Brush.TextSecondary}" VerticalAlignment="Center"/>
-                    </Border>
-
-                    <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <!-- Selector de Género: el valor real (GeneroSeleccionado, usado para filtrar
-                             contra AnimeItem.GenerosLista) sigue en inglés como lo entrega AniList —
-                             el ItemTemplate solo traduce lo que se MUESTRA. -->
-                        <ComboBox ItemsSource="{Binding GenerosDisponibles}"
-                                  SelectedItem="{Binding GeneroSeleccionado}"
-                                  Height="36" Margin="0,0,10,4"
-                                  VerticalAlignment="Center">
-                            <ComboBox.ItemTemplate>
-                                <DataTemplate>
-                                    <TextBlock Text="{Binding Converter={StaticResource GeneroTraducido}}"/>
-                                </DataTemplate>
-                            </ComboBox.ItemTemplate>
-                        </ComboBox>
-
-                        <!-- Selector de Temporada -->
-                        <ComboBox ItemsSource="{Binding TemporadasDisponibles}"
-                                  SelectedItem="{Binding TemporadaSeleccionada}"
-                                  ToolTip="{Binding [Gal_TemporadaTip], Source={x:Static loc:LocalizationService.Instance}}"
-                                  Height="36" Margin="0,0,10,4"
-                                  VerticalAlignment="Center"/>
-
-                        <!-- Selector de Año -->
-                        <ComboBox ItemsSource="{Binding AniosDisponibles}"
-                                  SelectedItem="{Binding AnioSeleccionado}"
-                                  ToolTip="{Binding [Gal_AnioTip], Source={x:Static loc:LocalizationService.Instance}}"
-                                  Height="36" Margin="0,0,10,4"
-                                  VerticalAlignment="Center"/>
-
-                        <!-- Selector de Ordenación -->
-                        <ComboBox ItemsSource="{Binding ListaOpcionesOrdenacion}"
-                                  SelectedItem="{Binding CriterioOrdenSeleccionado}"
-                                  Height="36" Margin="0,0,12,4"
-                                  VerticalAlignment="Center"/>
-
-                        <!-- Toggle: Solo con episodios pendientes -->
-                        <ToggleButton IsChecked="{Binding SoloConEpisodiosPendientes}"
-                                      Height="36" Margin="0,0,8,0" Padding="12,0"
-                                      ToolTip="{Binding [Gal_SoloPendientesTip], Source={x:Static loc:LocalizationService.Instance}}"
-                                      Cursor="Hand">
-                            <ToggleButton.Style>
-                                <Style TargetType="ToggleButton" BasedOn="{StaticResource MaterialDesignOutlinedButton}">
-                                    <Setter Property="Foreground" Value="{DynamicResource Brush.TextSecondary}"/>
-                                    <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}"/>
-                                    <Setter Property="Background" Value="Transparent"/>
-                                    <Style.Triggers>
-                                        <Trigger Property="IsChecked" Value="True">
-                                            <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}"/>
-                                            <Setter Property="BorderBrush" Value="{DynamicResource Brush.AccentStrong}"/>
-                                            <Setter Property="Background" Value="{DynamicResource Brush.Surface3}"/>
-                                        </Trigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </ToggleButton.Style>
-                            <StackPanel Orientation="Horizontal">
-                                <materialDesign:PackIcon Kind="ClockAlertOutline" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="{Binding [Gal_Pendientes], Source={x:Static loc:LocalizationService.Instance}}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </ToggleButton>
-
-                        <!-- Toggle: Solo con carpeta local asociada -->
-                        <ToggleButton IsChecked="{Binding SoloConCarpetaLocal}"
-                                      Height="36" Margin="0,0,8,0" Padding="12,0"
-                                      ToolTip="{Binding [Gal_SoloCarpetaTip], Source={x:Static loc:LocalizationService.Instance}}"
-                                      Cursor="Hand">
-                            <ToggleButton.Style>
-                                <Style TargetType="ToggleButton" BasedOn="{StaticResource MaterialDesignOutlinedButton}">
-                                    <Setter Property="Foreground" Value="{DynamicResource Brush.TextSecondary}"/>
-                                    <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}"/>
-                                    <Setter Property="Background" Value="Transparent"/>
-                                    <Style.Triggers>
-                                        <Trigger Property="IsChecked" Value="True">
-                                            <Setter Property="Foreground" Value="{DynamicResource Brush.Success}"/>
-                                            <Setter Property="BorderBrush" Value="{DynamicResource Brush.Success}"/>
-                                            <Setter Property="Background" Value="{DynamicResource Brush.Surface3}"/>
-                                        </Trigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </ToggleButton.Style>
-                            <StackPanel Orientation="Horizontal">
-                                <materialDesign:PackIcon Kind="FolderCheckOutline" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="{Binding [Gal_ConCarpetaLocal], Source={x:Static loc:LocalizationService.Instance}}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </ToggleButton>
-
-                        <!-- Toggle: Solo favoritos (favorito individual por anime, no un estado) -->
-                        <ToggleButton IsChecked="{Binding SoloFavoritos}"
-                                      Height="36" Margin="0,0,8,4" Padding="12,0"
-                                      ToolTip="{Binding [Gal_SoloFavoritosTip], Source={x:Static loc:LocalizationService.Instance}}"
-                                      Cursor="Hand">
-                            <ToggleButton.Style>
-                                <Style TargetType="ToggleButton" BasedOn="{StaticResource MaterialDesignOutlinedButton}">
-                                    <Setter Property="Foreground" Value="{DynamicResource Brush.TextSecondary}"/>
-                                    <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}"/>
-                                    <Setter Property="Background" Value="Transparent"/>
-                                    <Style.Triggers>
-                                        <Trigger Property="IsChecked" Value="True">
-                                            <Setter Property="Foreground" Value="{DynamicResource Brush.Rose}"/>
-                                            <Setter Property="BorderBrush" Value="{DynamicResource Brush.Rose}"/>
-                                            <Setter Property="Background" Value="{DynamicResource Brush.Surface3}"/>
-                                        </Trigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </ToggleButton.Style>
-                            <StackPanel Orientation="Horizontal">
-                                <materialDesign:PackIcon Kind="Heart" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="{Binding [Gal_Favoritos], Source={x:Static loc:LocalizationService.Instance}}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </ToggleButton>
-
-                        <!-- Botón Limpiar Filtros -->
-                        <Button Command="{Binding LimpiarFiltrosCommand}"
-                                Visibility="{Binding HayFiltrosActivos, Converter={StaticResource BoolToVis}}"
-                                Style="{StaticResource MaterialDesignFlatButton}"
-                                Foreground="{DynamicResource Brush.Rose}"
-                                Height="36" Padding="10,0" Margin="0,0,10,4"
-                                ToolTip="{Binding [Gal_LimpiarFiltrosTip], Source={x:Static loc:LocalizationService.Instance}}">
-                            <StackPanel Orientation="Horizontal">
-                                <materialDesign:PackIcon Kind="FilterRemoveOutline" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="{Binding [Gal_LimpiarFiltros], Source={x:Static loc:LocalizationService.Instance}}" FontSize="12" FontWeight="Bold" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Button>
-                    </WrapPanel>
-                </DockPanel>
-            </Border>
-        </Grid>
+        <!-- BARRA DE BÚSQUEDA Y FILTROS (control propio) -->
+        <views:GaleriaFiltrosView Grid.Row="1" Margin="0,0,0,20" Visibility="{Binding BibliotecaVacia, Converter={StaticResource InverseBoolToVis}}"/>
 
         <!-- Panel de progreso FLOTANTE -->
         <materialDesign:Card Grid.Row="2" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,40" 
@@ -564,41 +313,54 @@
                              Visibility="{Binding EstaActualizando, Converter={StaticResource BoolToVis}}" 
                              Panel.ZIndex="50" materialDesign:ElevationAssist.Elevation="Dp8">
             <StackPanel Orientation="Horizontal">
-                <materialDesign:PackIcon Kind="CloudSync" Foreground="#34D399" Width="24" Height="24" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                <materialDesign:PackIcon Kind="CloudSync" Foreground="{DynamicResource Brush.Success}" Width="24" Height="24" VerticalAlignment="Center" Margin="0,0,10,0"/>
                 <TextBlock Text="{Binding TextoProgreso}" 
                            FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,15,0"
                            Foreground="{DynamicResource MaterialDesignBodyLight}" FontSize="14"/>
-                <ProgressBar Minimum="0" Maximum="{Binding ProgresoTotal}" 
-                             Value="{Binding ProgresoActual}" 
-                             Width="150" Height="6" VerticalAlignment="Center" Foreground="#34D399" 
-                             Background="#404CAF50" materialDesign:TransitionAssist.DisableTransitions="True"/>
+                <!-- Indeterminada: es una sola consulta a AniList; la barra que "avanzaba" por anime saltaba de vacía a llena de golpe -->
+                <ProgressBar IsIndeterminate="{Binding EstaActualizando}"
+                             Width="150" Height="6" VerticalAlignment="Center" Foreground="{DynamicResource Brush.Success}"
+                             Background="#404CAF50"/>
             </StackPanel>
         </materialDesign:Card>
 
         <!-- BARRA DE ACCIONES MÚLTIPLES (FLOTANTE) -->
         <Border Grid.Row="2" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,30" 
-                Background="#1E293B" CornerRadius="24" Padding="20,8"
+                Background="{DynamicResource Brush.Surface3}" CornerRadius="24" Padding="16,8"
                 Visibility="{Binding ModoSeleccion, Converter={StaticResource BoolToVis}}"
-                Panel.ZIndex="100" BorderBrush="#40FFFFFF" BorderThickness="1">
+                Panel.ZIndex="100" BorderBrush="{DynamicResource Brush.BorderStrong}" BorderThickness="1">
             <Border.Effect>
                 <DropShadowEffect Color="Black" BlurRadius="20" Opacity="0.5" Direction="270" ShadowDepth="4"/>
             </Border.Effect>
+            <!-- Los colores de cada destino son los mismos que los de la etiqueta de estado de la tarjeta -->
             <StackPanel Orientation="Horizontal">
-                <TextBlock Text="{Binding [Gal_MoverA], Source={x:Static loc:LocalizationService.Instance}}" Foreground="White" VerticalAlignment="Center" Margin="0,0,15,0" FontWeight="Bold" FontSize="14"/>
+                <TextBlock Text="{Binding SeleccionadosTexto}" Foreground="{DynamicResource Brush.TextSecondary}" VerticalAlignment="Center" Margin="0,0,4,0" FontWeight="SemiBold" FontSize="13"/>
+                <Button Content="{Binding [Gal_SeleccionarTodos], Source={x:Static loc:LocalizationService.Instance}}" Command="{Binding SeleccionarTodosCommand}"
+                        Style="{StaticResource MaterialDesignFlatButton}" Foreground="{DynamicResource Brush.AccentSoft}" FontWeight="SemiBold" Padding="10,0"/>
+
+                <Border Width="1" Background="{DynamicResource Brush.BorderStrong}" Margin="8,5"/>
+
+                <TextBlock Text="{Binding [Gal_MoverA], Source={x:Static loc:LocalizationService.Instance}}" Foreground="{DynamicResource Brush.TextPrimary}" VerticalAlignment="Center" Margin="4,0,6,0" FontWeight="Bold" FontSize="14"/>
 
                 <Button Content="{Binding [Gal_FiltroViendo], Source={x:Static loc:LocalizationService.Instance}}" Command="{Binding CategorizarSeleccionadosCommand}" CommandParameter="CURRENT"
-                        Style="{StaticResource MaterialDesignFlatButton}" Foreground="#64B5F6" FontWeight="Bold"/>
+                        Style="{StaticResource MaterialDesignFlatButton}" Foreground="{DynamicResource Brush.Accent}" FontWeight="Bold" Padding="10,0"/>
 
                 <Button Content="{Binding [Hist_FiltroCompletados], Source={x:Static loc:LocalizationService.Instance}}" Command="{Binding CategorizarSeleccionadosCommand}" CommandParameter="COMPLETED"
-                        Style="{StaticResource MaterialDesignFlatButton}" Foreground="#81C784" FontWeight="Bold"/>
+                        Style="{StaticResource MaterialDesignFlatButton}" Foreground="{DynamicResource Brush.Success}" FontWeight="Bold" Padding="10,0"/>
 
                 <Button Content="{Binding [Gal_FiltroPlaneando], Source={x:Static loc:LocalizationService.Instance}}" Command="{Binding CategorizarSeleccionadosCommand}" CommandParameter="PLANNING"
-                        Style="{StaticResource MaterialDesignFlatButton}" Foreground="#E0E0E0" FontWeight="Bold"/>
+                        Style="{StaticResource MaterialDesignFlatButton}" Foreground="{DynamicResource Brush.TextPrimary}" FontWeight="Bold" Padding="10,0"/>
 
-                <Border Width="1" Background="#40FFFFFF" Margin="10,5"/>
+                <Button Content="{Binding [Gal_FiltroEnPausa], Source={x:Static loc:LocalizationService.Instance}}" Command="{Binding CategorizarSeleccionadosCommand}" CommandParameter="PAUSED"
+                        Style="{StaticResource MaterialDesignFlatButton}" Foreground="{DynamicResource Brush.WarningStrong}" FontWeight="Bold" Padding="10,0"/>
+
+                <Button Content="{Binding [Gal_FiltroAbandonados], Source={x:Static loc:LocalizationService.Instance}}" Command="{Binding CategorizarSeleccionadosCommand}" CommandParameter="DROPPED"
+                        Style="{StaticResource MaterialDesignFlatButton}" Foreground="{DynamicResource Brush.Danger}" FontWeight="Bold" Padding="10,0"/>
+
+                <Border Width="1" Background="{DynamicResource Brush.BorderStrong}" Margin="8,5"/>
 
                 <Button Content="{Binding [Gal_Cancelar], Source={x:Static loc:LocalizationService.Instance}}" Command="{Binding ToggleModoSeleccionCommand}"
-                        Style="{StaticResource MaterialDesignFlatButton}" Foreground="#E57373" FontWeight="Bold"/>
+                        Style="{StaticResource MaterialDesignFlatButton}" Foreground="{DynamicResource Brush.TextSecondary}" FontWeight="Bold" Padding="10,0"/>
             </StackPanel>
         </Border>
 
@@ -621,8 +383,21 @@
                     Visibility="{Binding SinResultados, Converter={StaticResource BoolToVis}}">
             <materialDesign:PackIcon Kind="MagnifyRemoveOutline" Width="80" Height="80" Foreground="{DynamicResource Brush.TextTertiary}" HorizontalAlignment="Center" Margin="0,0,0,20" Opacity="0.5"/>
             <TextBlock Text="{Binding [Gal_SinResultadosTitulo], Source={x:Static loc:LocalizationService.Instance}}" Style="{StaticResource AppEmptyTitle}"/>
-            <TextBlock Text="{Binding [Gal_SinResultadosSub], Source={x:Static loc:LocalizationService.Instance}}" Style="{StaticResource AppEmptyText}" Margin="0,10,0,0"/>
+            <TextBlock Text="{Binding [Gal_SinResultadosSub], Source={x:Static loc:LocalizationService.Instance}}" Style="{StaticResource AppEmptyText}" Margin="0,10,0,24"/>
+            <Button Command="{Binding LimpiarFiltrosCommand}" Style="{StaticResource AppOutlinedButton}" HorizontalAlignment="Center" Cursor="Hand"
+                    AutomationProperties.Name="{Binding [Gal_LimpiarFiltros], Source={x:Static loc:LocalizationService.Instance}}">
+                <StackPanel Orientation="Horizontal">
+                    <materialDesign:PackIcon Kind="FilterRemoveOutline" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding [Gal_LimpiarFiltros], Source={x:Static loc:LocalizationService.Instance}}" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                </StackPanel>
+            </Button>
         </StackPanel>
+
+        <!-- CARGANDO la biblioteca al abrir la app -->
+        <ProgressBar Grid.Row="2" Style="{StaticResource MaterialDesignCircularProgressBar}" IsIndeterminate="{Binding EstaCargando}"
+                     Width="44" Height="44" Value="0" Foreground="{DynamicResource Brush.Accent}"
+                     HorizontalAlignment="Center" VerticalAlignment="Center"
+                     Visibility="{Binding EstaCargando, Converter={StaticResource BoolToVis}}"/>
 
         <!-- Lista virtualizada y acelerada por hardware (60fps+) -->
         <ListBox x:Name="ListaGaleria" Grid.Row="2" ItemsSource="{Binding BibliotecaFiltrada}" Margin="-14,0,-14,0" Padding="0,0,14,0"
@@ -639,105 +414,8 @@
                  VirtualizingPanel.CacheLengthUnit="Item"
                  VirtualizingPanel.CacheLength="4,4"
                  RenderOptions.ClearTypeHint="Enabled"
-                 KeyboardNavigation.DirectionalNavigation="Continue">
-            <ListBox.Resources>
-                <!-- Menú contextual (clic derecho): favorito y eliminar de la biblioteca. UNO para todas las tarjetas:
-                     antes cada tarjeta creaba el suyo (con sus tres estilos y plantillas) aunque nunca se abriera.
-                     Al abrirse toma el anime de la tarjeta sobre la que se pulsó (PlacementTarget).
-                     Estilo oscuro propio (igual que el menú de episodio en DetalleView): el ContextMenu por
-                     defecto de WPF usa el tema claro del sistema y desentonaba por completo con el resto de la app. -->
-                <ContextMenu x:Key="MenuTarjetaAnime" Background="#151B29" BorderBrush="#2D333B" BorderThickness="1"
-                             Padding="6" FontSize="12.5" Foreground="#E2E8F0" HasDropShadow="False">
-                    <ContextMenu.Resources>
-                        <Style TargetType="ContextMenu">
-                            <Setter Property="Template">
-                                <Setter.Value>
-                                    <ControlTemplate TargetType="ContextMenu">
-                                        <Border Background="{TemplateBinding Background}"
-                                                BorderBrush="{TemplateBinding BorderBrush}"
-                                                BorderThickness="{TemplateBinding BorderThickness}"
-                                                CornerRadius="10" Padding="6">
-                                            <Border.Effect>
-                                                <DropShadowEffect BlurRadius="18" ShadowDepth="3" Opacity="0.55" Color="#000000"/>
-                                            </Border.Effect>
-                                            <ScrollViewer>
-                                                <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle"/>
-                                            </ScrollViewer>
-                                        </Border>
-                                    </ControlTemplate>
-                                </Setter.Value>
-                            </Setter>
-                        </Style>
-                        <Style TargetType="MenuItem">
-                            <Setter Property="Foreground" Value="#E2E8F0"/>
-                            <Setter Property="Background" Value="Transparent"/>
-                            <Setter Property="Template">
-                                <Setter.Value>
-                                    <ControlTemplate TargetType="MenuItem">
-                                        <Border x:Name="FondoItem" Background="{TemplateBinding Background}"
-                                                CornerRadius="7" Padding="10,8">
-                                            <Grid>
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                </Grid.ColumnDefinitions>
-                                                <ContentPresenter Grid.Column="0" ContentSource="Icon" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                                                <ContentPresenter Grid.Column="1" ContentSource="Header" RecognizesAccessKey="True" VerticalAlignment="Center"/>
-                                            </Grid>
-                                        </Border>
-                                        <ControlTemplate.Triggers>
-                                            <Trigger Property="IsHighlighted" Value="True">
-                                                <Setter TargetName="FondoItem" Property="Background" Value="#24344A"/>
-                                            </Trigger>
-                                            <Trigger Property="IsEnabled" Value="False">
-                                                <Setter Property="Opacity" Value="0.45"/>
-                                            </Trigger>
-                                        </ControlTemplate.Triggers>
-                                    </ControlTemplate>
-                                </Setter.Value>
-                            </Setter>
-                        </Style>
-                        <Style TargetType="Separator">
-                            <Setter Property="Background" Value="#2D333B"/>
-                            <Setter Property="Height" Value="1"/>
-                            <Setter Property="Margin" Value="8,4"/>
-                            <Setter Property="Template">
-                                <Setter.Value>
-                                    <ControlTemplate TargetType="Separator">
-                                        <Border Background="{TemplateBinding Background}"
-                                                Height="{TemplateBinding Height}"
-                                                Margin="{TemplateBinding Margin}"/>
-                                    </ControlTemplate>
-                                </Setter.Value>
-                            </Setter>
-                        </Style>
-                    </ContextMenu.Resources>
-                    <MenuItem Header="{Binding [Gal_MarcarFavorito], Source={x:Static loc:LocalizationService.Instance}}"
-                              Command="{Binding PlacementTarget.Tag.AlternarFavoritoCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                              CommandParameter="{Binding}"
-                              Visibility="{Binding EsFavorito, Converter={StaticResource InverseBoolToVis}}">
-                        <MenuItem.Icon>
-                            <materialDesign:PackIcon Kind="HeartOutline" Foreground="#F43F5E" Width="16" Height="16"/>
-                        </MenuItem.Icon>
-                    </MenuItem>
-                    <MenuItem Header="{Binding [Gal_QuitarFavorito], Source={x:Static loc:LocalizationService.Instance}}"
-                              Command="{Binding PlacementTarget.Tag.AlternarFavoritoCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                              CommandParameter="{Binding}"
-                              Visibility="{Binding EsFavorito, Converter={StaticResource BoolToVis}}">
-                        <MenuItem.Icon>
-                            <materialDesign:PackIcon Kind="Heart" Foreground="#F43F5E" Width="16" Height="16"/>
-                        </MenuItem.Icon>
-                    </MenuItem>
-                    <Separator/>
-                    <MenuItem Header="{Binding [Gal_EliminarAnime], Source={x:Static loc:LocalizationService.Instance}}"
-                              Command="{Binding PlacementTarget.Tag.EliminarAnimeCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                              CommandParameter="{Binding}">
-                        <MenuItem.Icon>
-                            <materialDesign:PackIcon Kind="DeleteOutline" Foreground="#F87171" Width="16" Height="16"/>
-                        </MenuItem.Icon>
-                    </MenuItem>
-                </ContextMenu>
-            </ListBox.Resources>
+                 KeyboardNavigation.DirectionalNavigation="Continue"
+                 ItemTemplate="{StaticResource TarjetaAnime}">
             <ListBox.ItemsPanel>
                 <ItemsPanelTemplate>
                     <vwp:VirtualizingWrapPanel Orientation="Horizontal" SpacingMode="None" />
@@ -761,180 +439,6 @@
                 </Style>
             </ListBox.ItemContainerStyle>
 
-            <ListBox.ItemTemplate>
-                <DataTemplate>
-                    <materialDesign:Card Width="180" Height="265" Margin="14"
-                                         UniformCornerRadius="14" Background="#14181E"
-                                         BorderBrush="#262D38" BorderThickness="1"
-                                         RenderTransformOrigin="0.5,0.5" ClipToBounds="True"
-                                         Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=ListBox}}"
-                                         ContextMenu="{StaticResource MenuTarjetaAnime}">
-                        <materialDesign:Card.RenderTransform>
-                            <ScaleTransform ScaleX="1" ScaleY="1" />
-                        </materialDesign:Card.RenderTransform>
-                        <materialDesign:Card.Style>
-                            <Style TargetType="materialDesign:Card" BasedOn="{StaticResource {x:Type materialDesign:Card}}">
-                                <Setter Property="materialDesign:ElevationAssist.Elevation" Value="Dp2" />
-                                <Style.Triggers>
-                                    <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter Property="materialDesign:ElevationAssist.Elevation" Value="Dp8" />
-                                        <Setter Property="BorderBrush" Value="#3B82F6" />
-                                        <Trigger.EnterActions>
-                                            <BeginStoryboard>
-                                                <Storyboard>
-                                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" To="1.04" Duration="0:0:0.12" />
-                                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" To="1.04" Duration="0:0:0.12" />
-                                                </Storyboard>
-                                            </BeginStoryboard>
-                                        </Trigger.EnterActions>
-                                        <Trigger.ExitActions>
-                                            <BeginStoryboard>
-                                                <Storyboard>
-                                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" To="1.0" Duration="0:0:0.12" />
-                                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" To="1.0" Duration="0:0:0.12" />
-                                                </Storyboard>
-                                            </BeginStoryboard>
-                                        </Trigger.ExitActions>
-                                    </Trigger>
-                                    
-                                    <!-- Trigger para Navegación por Teclado o Mando -->
-                                    <Trigger Property="IsKeyboardFocusWithin" Value="True">
-                                        <Setter Property="materialDesign:ElevationAssist.Elevation" Value="Dp8" />
-                                        <Setter Property="BorderBrush" Value="#3B82F6" />
-                                        <Trigger.EnterActions>
-                                            <BeginStoryboard>
-                                                <Storyboard>
-                                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" To="1.04" Duration="0:0:0.12" />
-                                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" To="1.04" Duration="0:0:0.12" />
-                                                </Storyboard>
-                                            </BeginStoryboard>
-                                        </Trigger.EnterActions>
-                                        <Trigger.ExitActions>
-                                            <BeginStoryboard>
-                                                <Storyboard>
-                                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" To="1.0" Duration="0:0:0.12" />
-                                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" To="1.0" Duration="0:0:0.12" />
-                                                </Storyboard>
-                                            </BeginStoryboard>
-                                        </Trigger.ExitActions>
-                                    </Trigger>
-                                </Style.Triggers>
-                            </Style>
-                        </materialDesign:Card.Style>
-
-
-                        <!-- Botón interactivo para abrir detalle -->
-                        <Button Command="{Binding DataContext.AbrirDetalleCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
-                                CommandParameter="{Binding}"
-                                Padding="0" Background="Transparent" BorderThickness="0" Height="265"
-                                HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
-                                AutomationProperties.Name="{Binding Titulo}">
-                            <Button.Template>
-                                <ControlTemplate TargetType="Button">
-                                    <Border Background="Transparent">
-                                        <ContentPresenter />
-                                    </Border>
-                                </ControlTemplate>
-                            </Button.Template>
-                            <Grid>
-                                <!-- Fondo estático oscuro para carga instantánea sin animación infinita -->
-                                <Border Background="#1B222C" CornerRadius="14" />
-
-                                <!-- Efecto "bones": shimmer SOLO mientras la portada de ESTA tarjeta
-                                     no está aún en memoria (evita re-animar tarjetas ya cacheadas
-                                     durante el scroll virtualizado). -->
-                                <Border Style="{StaticResource ShimmerEffectStyle}" CornerRadius="14">
-                                    <Border.Visibility>
-                                        <MultiBinding Converter="{StaticResource AnimeCoverLoading}">
-                                            <Binding Path="." />
-                                            <Binding Path="PortadaVisible" />
-                                        </MultiBinding>
-                                    </Border.Visibility>
-                                </Border>
-
-                                <!-- Portada precargada y congelada en memoria con escalado de alta definición -->
-                                <Image Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" SnapsToDevicePixels="True">
-                                    <Image.Source>
-                                        <MultiBinding Converter="{StaticResource AnimeCoverMulti}">
-                                            <Binding Path="." />
-                                            <Binding Path="PortadaVisible" />
-                                        </MultiBinding>
-                                    </Image.Source>
-                                </Image>
-
-                                <!-- OVERLAY DE SELECCIÓN -->
-                                <Border Background="#66000000" Visibility="{Binding EstaSeleccionado, Converter={StaticResource BoolToVis}}"/>
-                                <Border BorderBrush="#3B82F6" BorderThickness="3" CornerRadius="14" Visibility="{Binding EstaSeleccionado, Converter={StaticResource BoolToVis}}"/>
-
-                                <!-- CHECKBOX DE SELECCIÓN (Visible solo en ModoSeleccion) -->
-                                <CheckBox IsChecked="{Binding EstaSeleccionado}" 
-                                          Visibility="{Binding DataContext.ModoSeleccion, RelativeSource={RelativeSource AncestorType=ListBox}, Converter={StaticResource BoolToVis}}"
-                                          HorizontalAlignment="Right" VerticalAlignment="Top" Margin="8"
-                                          Style="{StaticResource MaterialDesignDarkCheckBox}"
-                                          IsHitTestVisible="False"
-                                          Panel.ZIndex="10"/>
-
-                                <Border Background="{Binding ColorEstado}" Padding="8,4" CornerRadius="6" 
-                                        HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10"
-                                        materialDesign:ElevationAssist.Elevation="Dp2"
-                                        Visibility="{Binding EstaSeleccionado, Converter={StaticResource InverseBoolToVis}}">
-                                    <!-- UX-03: texto oscuro sobre los chips claros (#4CAF50/#9E9E9E):
-                                         el blanco daba 2.7:1; el oscuro supera 6:1 -->
-                                    <TextBlock Text="{Binding EstadoVisual}" Foreground="#0B1220" FontSize="11" FontWeight="Bold"/>
-                                </Border>
-
-                                <!-- BADGE FAVORITO (individual por anime, debajo del chip de estado) -->
-                                <Border Background="#F43F5E" CornerRadius="11" Width="24" Height="24"
-                                        HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10,40,0,0"
-                                        Visibility="{Binding EsFavorito, Converter={StaticResource BoolToVis}}"
-                                        materialDesign:ElevationAssist.Elevation="Dp2"
-                                        ToolTip="{Binding [Gal_Favorito], Source={x:Static loc:LocalizationService.Instance}}">
-                                    <materialDesign:PackIcon Kind="Heart" Foreground="White" Width="13" Height="13" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                </Border>
-
-                                <!-- BADGE NUEVOS EPISODIOS -->
-                                <Border Background="#E11D48" CornerRadius="10" Padding="8,4" 
-                                        HorizontalAlignment="Right" VerticalAlignment="Top" Margin="10"
-                                        Visibility="{Binding TieneNuevosEpisodios, Converter={StaticResource BoolToVis}}"
-                                        materialDesign:ElevationAssist.Elevation="Dp4"
-                                        Panel.ZIndex="15">
-                                    <TextBlock Foreground="White" FontSize="11" FontWeight="Bold">
-                                        <TextBlock.Text>
-                                            <MultiBinding Converter="{StaticResource LocalizedFormat}">
-                                                <Binding Path="[Gal_NuevosEpisodiosFormato]" Source="{x:Static loc:LocalizationService.Instance}" />
-                                                <Binding Path="NuevosEpisodios" />
-                                            </MultiBinding>
-                                        </TextBlock.Text>
-                                    </TextBlock>
-                                </Border>
-
-
-                                <Border VerticalAlignment="Bottom" Padding="12,25,12,12">
-                                    <Border.Background>
-                                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                                            <GradientStop Color="#00000000" Offset="0"/>
-                                            <GradientStop Color="#CC000000" Offset="0.5"/>
-                                            <GradientStop Color="#FF000000" Offset="1"/>
-                                        </LinearGradientBrush>
-                                    </Border.Background>
-                                    <StackPanel>
-                                        <TextBlock Text="{Binding Titulo}" Foreground="White" FontWeight="Bold" 
-                                                   FontSize="13.5" TextTrimming="CharacterEllipsis" MaxHeight="42" TextWrapping="Wrap" Margin="0,0,0,7" />
-                                        
-                                        <!-- PROGRESS BAR DIRECTO SIN ANIMACIÓN DE TRANSICIÓN EN SCROLL -->
-                                        <ProgressBar Value="{Binding ProgresoPorcentaje, Mode=OneWay}" Height="4" 
-                                                     Background="#44FFFFFF" Foreground="#F43F5E" 
-                                                     BorderThickness="0" Margin="0,0,0,4"
-                                                     materialDesign:TransitionAssist.DisableTransitions="True"/>
-                                        
-                                        <TextBlock Text="{Binding ProgresoEpisodiosTexto}" Foreground="#B3FFFFFF" FontSize="11" FontWeight="SemiBold" />
-                                    </StackPanel>
-                                </Border>
-                            </Grid>
-                        </Button>
-                    </materialDesign:Card>
-                </DataTemplate>
-            </ListBox.ItemTemplate>
         </ListBox>
     </Grid>
     </Grid>
@@ -958,211 +462,8 @@
     </Grid>
     </Grid>
 
-    <!-- ═══ QUÉ VEO HOY: panel modal con ruleta de portadas ═══ -->
-    <Grid x:Name="OverlayQueVeoHoy" Visibility="{Binding QueVerHoyAbierto, Converter={StaticResource BoolToVis}}"
-          KeyboardNavigation.TabNavigation="Cycle" KeyboardNavigation.ControlTabNavigation="Cycle"
-          PreviewMouseWheel="Overlay_PreviewMouseWheel">
-        <!-- Fondo oscurecido sobre TODA la vista: un clic fuera del panel lo cierra -->
-        <Border Background="{DynamicResource Brush.Scrim}">
-            <Border.InputBindings>
-                <MouseBinding MouseAction="LeftClick" Command="{Binding CerrarQueVerHoyCommand}"/>
-            </Border.InputBindings>
-        </Border>
-
-        <Border x:Name="PanelQueVeoHoy" Style="{StaticResource AppCard}" CornerRadius="20" Padding="26,22" Width="700"
-                Focusable="True" FocusVisualStyle="{x:Null}"
-                HorizontalAlignment="Center" VerticalAlignment="Center">
-            <StackPanel>
-                <!-- Cabecera -->
-                <Grid Margin="0,0,0,16">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <Border Background="{DynamicResource Brush.Surface3}" CornerRadius="10" Width="36" Height="36" Margin="0,0,12,0">
-                            <materialDesign:PackIcon Kind="DiceMultiple" Width="20" Height="20" Foreground="{DynamicResource Brush.Accent}"
-                                                     HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <TextBlock Text="{Binding [Gal_QueVeoHoyTitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                   Style="{StaticResource AppText.Section}" FontSize="20" VerticalAlignment="Center"/>
-                    </StackPanel>
-                    <Button Command="{Binding CerrarQueVerHoyCommand}" HorizontalAlignment="Right" VerticalAlignment="Center"
-                            Style="{StaticResource MaterialDesignFlatButton}" Width="36" Height="36" Padding="0" Cursor="Hand"
-                            Foreground="{DynamicResource Brush.TextSecondary}"
-                            ToolTip="{Binding [Gal_QueVerCerrar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                            AutomationProperties.Name="{Binding [Gal_QueVerCerrar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
-                        <materialDesign:PackIcon Kind="Close" Width="18" Height="18"/>
-                    </Button>
-                </Grid>
-
-                <!-- Cuerpo de altura fija (ruleta 158 + zona inferior 84 + aire): todas las fases ocupan lo mismo
-                     y el panel no cambia de tamaño ni "salta" al pasar de una fase a otra. -->
-                <Grid Height="254">
-
-                    <!-- Escaneando la biblioteca -->
-                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center"
-                                Visibility="{Binding EsFaseBuscandoQueVer, Converter={StaticResource BoolToVis}}">
-                        <ProgressBar Style="{StaticResource MaterialDesignCircularProgressBar}" Width="40" Height="40" Margin="0,0,0,14"
-                                     IsIndeterminate="True" Value="0" Foreground="{DynamicResource Brush.Accent}"/>
-                        <TextBlock Text="{Binding [Gal_QueVerBuscandoTitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                   Style="{StaticResource AppText.Secondary}" HorizontalAlignment="Center"/>
-                    </StackPanel>
-
-                    <!-- Ruleta: la tira de portadas se desplaza y se detiene en el anime elegido -->
-                    <Grid Height="158" VerticalAlignment="Top" Visibility="{Binding MostrarTiraQueVer, Converter={StaticResource BoolToVis}}">
-                        <Canvas x:Name="RuletaCanvas" ClipToBounds="True">
-                            <Canvas.OpacityMask>
-                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                                    <GradientStop Color="Transparent" Offset="0"/>
-                                    <GradientStop Color="Black" Offset="0.1"/>
-                                    <GradientStop Color="Black" Offset="0.9"/>
-                                    <GradientStop Color="Transparent" Offset="1"/>
-                                </LinearGradientBrush>
-                            </Canvas.OpacityMask>
-                            <!-- Tarjeta 100x142 + separación 10: deben coincidir con las constantes de GaleriaView.xaml.cs -->
-                            <ItemsControl x:Name="RuletaItems" ItemsSource="{Binding RuletaPortadasQueVer}" Canvas.Left="0" Canvas.Top="8">
-                                <ItemsControl.RenderTransform>
-                                    <TranslateTransform X="0"/>
-                                </ItemsControl.RenderTransform>
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <StackPanel Orientation="Horizontal"/>
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Border Width="100" Height="142" Margin="0,0,10,0" CornerRadius="10"
-                                                Background="{DynamicResource Brush.Surface3}">
-                                            <!-- ClipToBounds solo recorta a un rectángulo: la portada (esquinas rectas) se recorta con una
-                                                 geometría redondeada del mismo radio que el interior del marco de selección (13 - 3 = 10). -->
-                                            <Border.Clip>
-                                                <RectangleGeometry Rect="0,0,100,142" RadiusX="10" RadiusY="10"/>
-                                            </Border.Clip>
-                                            <Image Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality">
-                                                <Image.Source>
-                                                    <MultiBinding Converter="{StaticResource AnimeCoverMulti}">
-                                                        <Binding Path="."/>
-                                                        <Binding Path="PortadaVisible"/>
-                                                    </MultiBinding>
-                                                </Image.Source>
-                                            </Image>
-                                        </Border>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </Canvas>
-
-                        <!-- Marco fijo en el centro. El borde (3 px) queda por FUERA de la tarjeta de 100x142:
-                             106x148 = tarjeta + 3 px por lado, y radio 13 = 10 de la tarjeta + 3. Así abraza la portada
-                             elegida sin huecos. -->
-                        <Border Width="106" Height="148" CornerRadius="13" BorderThickness="3" IsHitTestVisible="False"
-                                BorderBrush="{DynamicResource Brush.Accent}"
-                                HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </Grid>
-
-                    <!-- Zona inferior (84 px): "Eligiendo…" mientras gira y el resultado después, en UNA fila -->
-                    <Grid Height="84" VerticalAlignment="Bottom" Visibility="{Binding MostrarTiraQueVer, Converter={StaticResource BoolToVis}}">
-                        <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Style="{StaticResource AppText.Secondary}"
-                                   Text="{Binding [Gal_QueVerEligiendo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                   Visibility="{Binding EsFaseGirandoQueVer, Converter={StaticResource BoolToVis}}"/>
-
-                        <Grid VerticalAlignment="Center" RenderTransformOrigin="0.5,0.5"
-                              Visibility="{Binding EsFaseResultadoQueVer, Converter={StaticResource BoolToVis}}">
-                            <Grid.RenderTransform>
-                                <TranslateTransform Y="0"/>
-                            </Grid.RenderTransform>
-                            <Grid.Style>
-                                <Style TargetType="Grid">
-                                    <Style.Triggers>
-                                        <Trigger Property="Visibility" Value="Visible">
-                                            <Trigger.EnterActions>
-                                                <BeginStoryboard>
-                                                    <Storyboard>
-                                                        <DoubleAnimation Storyboard.TargetProperty="Opacity" From="0" To="1" Duration="0:0:0.35"/>
-                                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)" From="12" To="0" Duration="0:0:0.35">
-                                                            <DoubleAnimation.EasingFunction>
-                                                                <QuarticEase EasingMode="EaseOut"/>
-                                                            </DoubleAnimation.EasingFunction>
-                                                        </DoubleAnimation>
-                                                    </Storyboard>
-                                                </BeginStoryboard>
-                                            </Trigger.EnterActions>
-                                        </Trigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Grid.Style>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-
-                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,20,0">
-                                <TextBlock Text="{Binding [Gal_QueVerTuEleccion], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                           Style="{StaticResource AppText.Micro}" Foreground="{DynamicResource Brush.Accent}"/>
-                                <TextBlock Text="{Binding QueVerElegido.Titulo}" Style="{StaticResource AppText.Section}" FontSize="18"
-                                           TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="48" Margin="0,2,0,0"
-                                           ToolTip="{Binding QueVerElegido.Titulo}"/>
-                                <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
-                                    <TextBlock Text="{Binding QueVerEpisodioTexto}" Style="{StaticResource AppText.BodyStrong}"
-                                               Foreground="{DynamicResource Brush.AccentSoft}"/>
-                                    <TextBlock Text="  ·  " Style="{StaticResource AppText.Caption}"/>
-                                    <TextBlock Text="{Binding QueVerProgresoTexto}" Style="{StaticResource AppText.Caption}" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </StackPanel>
-
-                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                                <Button Command="{Binding VerElegidoQueVerCommand}" Style="{StaticResource AppPrimaryButton}"
-                                        Height="40" Padding="18,0" Margin="0,0,10,0" Cursor="Hand"
-                                        materialDesign:ButtonAssist.CornerRadius="8"
-                                        AutomationProperties.Name="{Binding [Gal_QueVerVerAhora], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
-                                    <StackPanel Orientation="Horizontal">
-                                        <materialDesign:PackIcon Kind="PlayCircleOutline" Width="20" Height="20" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                        <TextBlock Text="{Binding [Gal_QueVerVerAhora], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                                   VerticalAlignment="Center" FontWeight="Bold" FontSize="12.5"/>
-                                    </StackPanel>
-                                </Button>
-                                <Button Command="{Binding OtroQueVerHoyCommand}" Style="{StaticResource QueVerOtroButton}"
-                                        Height="40" Padding="16,0" Cursor="Hand"
-                                        materialDesign:ButtonAssist.CornerRadius="8"
-                                        AutomationProperties.Name="{Binding [Gal_QueVerOtro], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
-                                    <StackPanel Orientation="Horizontal">
-                                        <materialDesign:PackIcon Kind="DiceMultiple" Width="18" Height="18" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                        <TextBlock Text="{Binding [Gal_QueVerOtro], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                                   VerticalAlignment="Center" FontWeight="SemiBold" FontSize="12.5"/>
-                                    </StackPanel>
-                                </Button>
-                            </StackPanel>
-                        </Grid>
-                    </Grid>
-
-                    <!-- Sin carpeta / sin pendientes / error -->
-                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center"
-                                Visibility="{Binding EsFaseVaciaQueVer, Converter={StaticResource BoolToVis}}">
-                        <materialDesign:PackIcon Width="44" Height="44" HorizontalAlignment="Center" Margin="0,0,0,12"
-                                                 Kind="AlertCircleOutline" Foreground="{DynamicResource Brush.Warning}">
-                            <materialDesign:PackIcon.Style>
-                                <Style TargetType="materialDesign:PackIcon">
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding FaseActualQueVer}" Value="SinCarpeta">
-                                            <Setter Property="Kind" Value="FolderMultiple"/>
-                                            <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}"/>
-                                        </DataTrigger>
-                                        <DataTrigger Binding="{Binding FaseActualQueVer}" Value="SinPendientes">
-                                            <Setter Property="Kind" Value="EmoticonHappyOutline"/>
-                                            <Setter Property="Foreground" Value="{DynamicResource Brush.Success}"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </materialDesign:PackIcon.Style>
-                        </materialDesign:PackIcon>
-                        <TextBlock Text="{Binding QueVerMensaje}" Style="{StaticResource AppText.Secondary}" TextAlignment="Center"
-                                   TextWrapping="Wrap" MaxWidth="480" HorizontalAlignment="Center"/>
-                        <Button Command="{Binding CerrarQueVerHoyCommand}" Style="{StaticResource QueVerOtroButton}" Margin="0,16,0,0"
-                                Height="38" Padding="22,0" Cursor="Hand" HorizontalAlignment="Center"
-                                materialDesign:ButtonAssist.CornerRadius="8"
-                                Content="{Binding [Gal_QueVerCerrar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
-                    </StackPanel>
-                </Grid>
-            </StackPanel>
-        </Border>
-    </Grid>
+    <!-- QUE VEO HOY: panel modal con ruleta de portadas (control propio, con su ViewModel) -->
+    <views:QueVeoHoyPanel DataContext="{Binding QueVeoHoy}"/>
     </Grid>
 
 </UserControl>

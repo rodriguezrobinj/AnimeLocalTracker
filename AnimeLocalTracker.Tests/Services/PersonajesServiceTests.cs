@@ -107,6 +107,18 @@ public class PersonajesServiceTests : IDisposable
     // === Copia local y consultas ===
 
     [Fact]
+    public async Task Obtener_SiAniListNoResponde_NoInsisteConElRestoDeLosLotes()
+    {
+        // Sin salida a internet cada lote esperaba su tiempo máximo: con toda la biblioteca, la partida agotaba su tope
+        // y fallaba aunque hubiera personajes guardados.
+        _responder = _ => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable);
+
+        await _sut.ObtenerAsync(Enumerable.Range(1, PersonajesService.AnimesPorConsulta * 3).ToList());
+
+        _peticiones.Should().HaveCount(1);
+    }
+
+    [Fact]
     public async Task Obtener_ConCopiaVigente_NoConsultaAAniList()
     {
         var guardado = new PersonajeAnime { AnimeId = 1, PersonajeId = 5, Nombre = "Guardado" };

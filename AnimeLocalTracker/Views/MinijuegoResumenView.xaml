@@ -36,6 +36,37 @@
                 </Border>
                 <TextBlock Text="{Binding ResumenRecordTexto}" Style="{StaticResource AppText.Caption}" HorizontalAlignment="Center"/>
             </StackPanel>
+
+            <!-- Ronda a ronda: cuál era la respuesta y si se acertó (10 filas como mucho: un ItemsControl basta) -->
+            <TextBlock Text="{Binding [Mini_ResumenRondas], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                       Style="{StaticResource AppText.Micro}" Foreground="{DynamicResource Brush.TextTertiary}" Margin="0,0,0,6"/>
+            <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="210" Margin="0,0,0,22" Width="420">
+                <ItemsControl ItemsSource="{Binding ResumenRondas}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="0,3">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <materialDesign:PackIcon x:Name="Icono" Kind="CloseCircleOutline" Foreground="{DynamicResource Brush.Danger}" Width="16" Height="16"
+                                                         VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <TextBlock Grid.Column="1" Text="{Binding Respuesta}" Style="{StaticResource AppText.Secondary}" TextTrimming="CharacterEllipsis"
+                                           VerticalAlignment="Center" ToolTip="{Binding Respuesta}"/>
+                                <TextBlock Grid.Column="2" Text="{Binding Puntos, StringFormat='+{0}'}" Style="{StaticResource AppText.Micro}"
+                                           Foreground="{DynamicResource Brush.TextTertiary}" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                            </Grid>
+                            <DataTemplate.Triggers>
+                                <DataTrigger Binding="{Binding Acierto}" Value="True">
+                                    <Setter TargetName="Icono" Property="Kind" Value="CheckCircleOutline"/>
+                                    <Setter TargetName="Icono" Property="Foreground" Value="{DynamicResource Brush.Success}"/>
+                                </DataTrigger>
+                            </DataTemplate.Triggers>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                 <Button Command="{Binding IniciarPartidaCommand}" Style="{StaticResource MiniBotonPrincipal}" Margin="0,0,10,0"
                         AutomationProperties.Name="{Binding [Mini_JugarDeNuevo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">

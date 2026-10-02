@@ -76,6 +76,7 @@
             <conv:AnimeCoverLoadingConverter x:Key="AnimeCoverLoading" />
             <conv:LocalizedFormatConverter x:Key="LocalizedFormat" />
             <conv:GeneroTraducidoConverter x:Key="GeneroTraducido" />
+            <conv:TemporadaTextoConverter x:Key="TemporadaTexto" />
             <conv:InverseBoolConverter x:Key="InverseBool" />
             <conv:DialogoTonoConverter x:Key="DialogoTono" />
 

@@ -8,6 +8,7 @@ using AnimeLocalTracker.Models;
 using AnimeLocalTracker.Services;
 using AnimeLocalTracker.Services.Minijuegos;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 
 namespace AnimeLocalTracker.ViewModels;
@@ -26,6 +27,21 @@ public abstract partial class MinijuegoViewModelBase : ObservableObject, IRecipi
 
     /// <summary>Animes utilizables de la biblioteca (con id y título), recargados al entrar al juego.</summary>
     protected List<AnimeItem> Biblioteca { get; private set; } = new();
+
+    /// <summary>
+    /// La biblioteca ya cargada en memoria (la de la Galería). Sin ella, o si aún está vacía, se lee de la base de datos:
+    /// antes cada juego la releía entera (con sinopsis y comprobación de portadas) cada vez que se entraba.
+    /// </summary>
+    internal Func<IReadOnlyList<AnimeItem>>? FuenteBiblioteca { get; set; }
+
+    /// <summary>
+    /// Opción del menú de minijuegos: jugar solo con animes que has visto o estás viendo (los que solo tienes apuntados en
+    /// "Planeando" y sin ningún episodio visto quedan fuera, también como opciones falsas).
+    /// </summary>
+    internal bool SoloVistos { get; set; }
+
+    /// <summary>Las rondas ya jugadas de la partida, para el resumen final.</summary>
+    public ObservableCollection<RondaResumen> ResumenRondas { get; } = new();
 
     /// <summary>Solo para pruebas: semilla fija = partidas reproducibles.</summary>
     internal Random Rng { get; set; } = Random.Shared;
@@ -64,6 +80,69 @@ public abstract partial class MinijuegoViewModelBase : ObservableObject, IRecipi
 
     [ObservableProperty] private bool _ultimoFueAcierto;
     [ObservableProperty] private string _resultadoTexto = string.Empty;
+
+    /// <summary>Pistas ya reveladas de la ronda, listas para mostrar.</summary>
+    [ObservableProperty] private ObservableCollection<PistaItem> _pistas = new();
+
+    /// <summary>"Acertar ahora vale 80 pts" (vacío tras responder).</summary>
+    [ObservableProperty] private string _puntosPosiblesTexto = string.Empty;
+
+    /// <summary>Solo tras responder: un dato más sobre la respuesta (p. ej. de qué anime es el personaje). Vacío si el juego no lo usa.</summary>
+    [ObservableProperty] private string _detalleRespuestaTexto = string.Empty;
+
+    /// <summary>Por qué no se pudo empezar la última partida (sin conexión y sin nada guardado, etc.).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HayError))]
+    private string _mensajeError = string.Empty;
+
+    public bool HayError => MensajeError.Length > 0;
+
+    /// <summary>Mientras se prepara una partida entera antes de empezar (el juego que lo necesite).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PreparandoTexto))]
+    private bool _estaPreparando;
+
+    // === Lo que distingue a cada juego en el menú y en su pantalla de inicio ===
+
+    /// <summary>Nombre del icono (PackIconKind) del juego.</summary>
+    public abstract string Icono { get; }
+
+    /// <summary>Icono del aviso "no hay animes suficientes".</summary>
+    public virtual string IconoSinAnimes => "GamepadVariantOutline";
+
+    protected abstract string ClaveTitulo { get; }
+    protected abstract string ClaveDescripcion { get; }
+
+    public string TituloTexto => LocalizationService.T(ClaveTitulo);
+    public string DescripcionTexto => LocalizationService.T(ClaveDescripcion);
+
+    /// <summary>Texto bajo el indicador de carga mientras se prepara la partida (vacío si el juego no prepara nada).</summary>
+    public virtual string PreparandoTexto => string.Empty;
+
+    // === La ronda en curso, vista desde la base ===
+
+    /// <summary>Posición de la opción correcta de la ronda actual (-1 si no hay ronda).</summary>
+    protected abstract int IndiceCorrectoRonda { get; }
+
+    /// <summary>Nombre de la respuesta correcta de la ronda actual (para el texto del resultado y el resumen).</summary>
+    protected abstract string RespuestaRonda { get; }
+
+    /// <summary>Puntos que daría acertar ahora mismo, con las pistas ya pedidas.</summary>
+    protected abstract int PuntosSiAcierta { get; }
+
+    protected virtual bool PuedeResponder => EsJugando && !HaRespondido && IndiceCorrectoRonda >= 0;
+
+    /// <summary>Puntos que dio la última ronda respondida (0 si se falló).</summary>
+    protected int PuntosGanadosRonda { get; private set; }
+
+    /// <summary>Lo propio de cada juego al responder (aclarar la imagen, hacer sonar la canción…).</summary>
+    protected virtual void AlResponder() { }
+
+    /// <summary>Muestra la ronda siguiente o, si no quedan, termina la partida.</summary>
+    protected abstract Task AvanzarRondaAsync();
+
+    /// <summary>Lo propio de cada juego al volver al inicio (cancelar lo que se estuviera preparando, cortar el sonido).</summary>
+    protected virtual void AlVolverAlInicio() { }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HayRecord))]
@@ -147,8 +226,11 @@ public abstract partial class MinijuegoViewModelBase : ObservableObject, IRecipi
         try
         {
             EstaCargando = true;
-            var todos = await _databaseService.ObtenerTodosLosAnimesAsync() ?? new List<AnimeItem>();
-            Biblioteca = todos.Where(AdivinaAnimeJuego.EsUtilizable).ToList();
+            var enMemoria = FuenteBiblioteca?.Invoke();
+            var todos = enMemoria is { Count: > 0 }
+                ? enMemoria
+                : await _databaseService.ObtenerTodosLosAnimesAsync() ?? new List<AnimeItem>();
+            Biblioteca = todos.Where(AdivinaAnimeJuego.EsUtilizable).Where(a => !SoloVistos || LoHasVisto(a)).ToList();
             AnimesDisponibles = Biblioteca.Count;
         }
         catch (Exception ex)
@@ -186,14 +268,86 @@ public abstract partial class MinijuegoViewModelBase : ObservableObject, IRecipi
         _rachaMaxima = 0;
         EsNuevoRecord = false;
         MejorAnterior = 0;
+        ResumenRondas.Clear();
     }
 
-    /// <summary>Lleva la cuenta de aciertos seguidos (la mejor racha de la partida alimenta un logro).</summary>
-    protected void ContabilizarRonda(bool acierto)
+    /// <summary>
+    /// Anota la ronda recién respondida: la racha de aciertos seguidos (la mejor de la partida alimenta un logro) y la línea
+    /// del resumen final (cuál era la respuesta, si se acertó y con cuántos puntos).
+    /// </summary>
+    protected void ContabilizarRonda(bool acierto, string respuesta, int puntos)
     {
         _rachaActual = acierto ? _rachaActual + 1 : 0;
         _rachaMaxima = Math.Max(_rachaMaxima, _rachaActual);
+        ResumenRondas.Add(new RondaResumen(RondaNumero, respuesta, acierto, puntos));
     }
+
+    [RelayCommand]
+    private void Responder(OpcionRespuesta? opcion)
+    {
+        if (opcion == null || !PuedeResponder) return;
+
+        int correcta = IndiceCorrectoRonda;
+        HaRespondido = true;
+        UltimoFueAcierto = opcion.Indice == correcta;
+        Opciones[correcta].EsCorrecta = true;
+
+        if (UltimoFueAcierto)
+        {
+            PuntosGanadosRonda = PuntosSiAcierta;
+            Puntos += PuntosGanadosRonda;
+            Aciertos++;
+        }
+        else
+        {
+            PuntosGanadosRonda = 0;
+            opcion.EsIncorrecta = true;
+        }
+        ContabilizarRonda(UltimoFueAcierto, RespuestaRonda, PuntosGanadosRonda);
+
+        PuntosPosiblesTexto = string.Empty;
+        AlResponder();
+        ActualizarResultadoTexto();
+        OnPropertyChanged(nameof(TextoSiguiente));
+    }
+
+    /// <summary>Atajo de teclado 1–4: responde con la opción de ese número.</summary>
+    [RelayCommand]
+    private void ResponderNumero(string? numero)
+    {
+        if (!int.TryParse(numero, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out int n)) return;
+        Responder(Opciones.FirstOrDefault(o => o.Numero == n));
+    }
+
+    [RelayCommand]
+    private async Task SiguienteAsync()
+    {
+        if (!EsJugando || !HaRespondido) return;
+        await AvanzarRondaAsync();
+    }
+
+    /// <summary>Vuelve a la pantalla de inicio del juego. A mitad de partida es "abandonar": la partida no se guarda.</summary>
+    [RelayCommand]
+    private async Task VolverAlInicioAsync()
+    {
+        AlVolverAlInicio();
+        Estado = EstadoMinijuego.Inicio;
+        await PrepararAsync();
+    }
+
+    /// <summary>"¡Correcto! +80 pts" o "Era: …", en el idioma actual. Sin efecto si la ronda aún no se respondió.</summary>
+    protected virtual void ActualizarResultadoTexto()
+    {
+        if (!HaRespondido || IndiceCorrectoRonda < 0) return;
+
+        ResultadoTexto = UltimoFueAcierto
+            ? string.Format(LocalizationService.T("Mini_CorrectoFormato"), PuntosGanadosRonda)
+            : string.Format(LocalizationService.T("Mini_IncorrectoFormato"), RespuestaRonda);
+    }
+
+    /// <summary>Visto = con algún episodio visto o en cualquier estado que no sea "Planeando".</summary>
+    private static bool LoHasVisto(AnimeItem anime) =>
+        anime.EpisodiosVistos > 0 || anime.EstadoUsuario is "CURRENT" or "REPEATING" or "COMPLETED" or "PAUSED" or "DROPPED";
 
     /// <summary>
     /// Pasa al resumen y guarda la partida (récords y logros). Se muestra el resumen ya, antes de guardar: si guardar falla,
@@ -248,6 +402,9 @@ public abstract partial class MinijuegoViewModelBase : ObservableObject, IRecipi
     {
         foreach (var opcion in Opciones) opcion.RefrescarTextos();
         OnPropertyChanged(nameof(TextoSiguiente));
+        OnPropertyChanged(nameof(TituloTexto));
+        OnPropertyChanged(nameof(DescripcionTexto));
+        OnPropertyChanged(nameof(PreparandoTexto));
         OnPropertyChanged(nameof(RondaTexto));
         OnPropertyChanged(nameof(PuntosTexto));
         OnPropertyChanged(nameof(ReglasTexto));
