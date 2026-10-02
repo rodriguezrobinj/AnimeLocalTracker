@@ -45,7 +45,7 @@ public class DetalleMusicaTests
     [Fact]
     public void TieneTemasMusicales_SinTemas_DeberiaSerFalso()
     {
-        CrearSut().TieneTemasMusicales.Should().BeFalse();
+        CrearSut().Musica.TieneTemasMusicales.Should().BeFalse();
     }
 
     [Fact]
@@ -58,12 +58,12 @@ public class DetalleMusicaTests
         _themesDownload.Setup(d => d.EstaDescargado(7, ed)).Returns(false);
 
         var sut = await AbrirFichaAsync();
-        await sut.CargarTemasMusicalesAsync();
+        await sut.Musica.CargarTemasMusicalesAsync();
 
-        sut.TemasMusicales.Should().HaveCount(2);
-        sut.TieneTemasMusicales.Should().BeTrue();
-        sut.TemasMusicales.Single(t => t.Slug == "OP1").Descargado.Should().BeTrue();
-        sut.TemasMusicales.Single(t => t.Slug == "ED1").Descargado.Should().BeFalse();
+        sut.Musica.TemasMusicales.Should().HaveCount(2);
+        sut.Musica.TieneTemasMusicales.Should().BeTrue();
+        sut.Musica.TemasMusicales.Single(t => t.Slug == "OP1").Descargado.Should().BeTrue();
+        sut.Musica.TemasMusicales.Single(t => t.Slug == "ED1").Descargado.Should().BeFalse();
     }
 
     [Fact]
@@ -78,9 +78,9 @@ public class DetalleMusicaTests
         _themesDownload.Setup(d => d.EstaDescargado(7, op)).Returns(() => reconciliado);
 
         var sut = await AbrirFichaAsync();
-        await sut.CargarTemasMusicalesAsync();
+        await sut.Musica.CargarTemasMusicalesAsync();
 
-        sut.TemasMusicales.Single().Descargado.Should().BeTrue();
+        sut.Musica.TemasMusicales.Single().Descargado.Should().BeTrue();
     }
 
     [Fact]
@@ -96,11 +96,11 @@ public class DetalleMusicaTests
         _themesDownload.Setup(d => d.EstaDescargado(7, It.IsAny<AnimeThemeInfo>())).Returns(true);
 
         var sut = await AbrirFichaAsync();
-        await sut.CargarTemasMusicalesAsync();
+        await sut.Musica.CargarTemasMusicalesAsync();
 
-        sut.TemasMusicales.Select(t => t.Slug).Should().Equal("OP1", "ED1");
-        sut.TemasMusicales.Should().OnlyContain(t => t.Descargado && t.PuedeReproducir && !t.PuedeDescargar && !t.PuedePrevisualizar);
-        sut.TemasMusicales.Single(t => t.Slug == "OP1").TituloCancion.Should().Be("OP1", "sin AnimeThemes no se sabe el título");
+        sut.Musica.TemasMusicales.Select(t => t.Slug).Should().Equal("OP1", "ED1");
+        sut.Musica.TemasMusicales.Should().OnlyContain(t => t.Descargado && t.PuedeReproducir && !t.PuedeDescargar && !t.PuedePrevisualizar);
+        sut.Musica.TemasMusicales.Single(t => t.Slug == "OP1").TituloCancion.Should().Be("OP1", "sin AnimeThemes no se sabe el título");
         _themesDownload.Verify(d => d.ReconciliarDescargasLocales(It.IsAny<int>(), It.IsAny<IReadOnlyList<AnimeThemeInfo>>()), Times.Never);
     }
 
@@ -115,11 +115,11 @@ public class DetalleMusicaTests
         _themesDownload.Setup(d => d.EstaDescargado(7, It.IsAny<AnimeThemeInfo>())).Returns(false); // lo borró desde la ficha
 
         var sut = await AbrirFichaAsync();
-        await sut.CargarTemasMusicalesAsync();
-        await sut.DescargarTemaCommand.ExecuteAsync(sut.TemasMusicales.Single());
+        await sut.Musica.CargarTemasMusicalesAsync();
+        await sut.Musica.DescargarTemaCommand.ExecuteAsync(sut.Musica.TemasMusicales.Single());
 
         _themesDownload.Verify(d => d.DescargarYConvertirAsync(It.IsAny<int>(), It.IsAny<AnimeThemeInfo>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Never);
-        sut.TemasMusicales.Single().PuedeDescargar.Should().BeFalse();
+        sut.Musica.TemasMusicales.Single().PuedeDescargar.Should().BeFalse();
     }
 
     [Fact]
@@ -135,8 +135,8 @@ public class DetalleMusicaTests
             .Returns(termina.Task);
 
         var sut = await AbrirFichaAsync();
-        await sut.CargarTemasMusicalesAsync();
-        var item = sut.TemasMusicales.Single();
+        await sut.Musica.CargarTemasMusicalesAsync();
+        var item = sut.Musica.TemasMusicales.Single();
 
         item.Descargando.Should().BeTrue();
         termina.SetResult(null);
@@ -157,10 +157,10 @@ public class DetalleMusicaTests
         _themesDownload.Setup(d => d.DescargarYConvertirAsync(7, op, It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>())).ReturnsAsync(@"C:\Music\7\OP_OP1_v1_eptodos.mp3");
 
         var sut = await AbrirFichaAsync();
-        await sut.CargarTemasMusicalesAsync();
-        var item = sut.TemasMusicales.Single();
+        await sut.Musica.CargarTemasMusicalesAsync();
+        var item = sut.Musica.TemasMusicales.Single();
 
-        await sut.DescargarTemaCommand.ExecuteAsync(item);
+        await sut.Musica.DescargarTemaCommand.ExecuteAsync(item);
 
         item.Descargado.Should().BeTrue();
         item.Descargando.Should().BeFalse();
@@ -175,10 +175,10 @@ public class DetalleMusicaTests
         _themesDownload.Setup(d => d.DescargarYConvertirAsync(7, op, It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>())).ReturnsAsync((string?)null);
 
         var sut = await AbrirFichaAsync();
-        await sut.CargarTemasMusicalesAsync();
-        var item = sut.TemasMusicales.Single();
+        await sut.Musica.CargarTemasMusicalesAsync();
+        var item = sut.Musica.TemasMusicales.Single();
 
-        await sut.DescargarTemaCommand.ExecuteAsync(item);
+        await sut.Musica.DescargarTemaCommand.ExecuteAsync(item);
 
         item.Descargado.Should().BeFalse();
         _dialogos.Verify(d => d.MostrarToast(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Once);
@@ -192,13 +192,41 @@ public class DetalleMusicaTests
         _themesDownload.Setup(d => d.EstaDescargado(7, op)).Returns(true);
 
         var sut = await AbrirFichaAsync();
-        await sut.CargarTemasMusicalesAsync();
-        var item = sut.TemasMusicales.Single();
+        await sut.Musica.CargarTemasMusicalesAsync();
+        var item = sut.Musica.TemasMusicales.Single();
 
-        sut.EliminarTemaCommand.Execute(item);
+        _dialogos.Setup(d => d.MostrarDialogoAsync(It.IsAny<string>(), It.IsAny<string>(), true, It.IsAny<string>(), It.IsAny<string>())).ReturnsAsync(true); // acepta la confirmación
+        sut.Musica.EliminarTemaCommand.Execute(item);
 
         item.Descargado.Should().BeFalse();
         _themesDownload.Verify(d => d.Eliminar(7, op), Times.Once);
+    }
+
+    [Fact]
+    public async Task EliminarTema_SiNoSeConfirma_NoBorraNada()
+    {
+        var op = new AnimeThemeInfo { Slug = "OP1", Tipo = "OP", AudioUrlOgg = "https://a.animethemes.moe/op.ogg" };
+        _themesService.Setup(s => s.ObtenerTemasAsync(7, It.IsAny<CancellationToken>())).ReturnsAsync(new List<AnimeThemeInfo> { op });
+        _themesDownload.Setup(d => d.EstaDescargado(7, op)).Returns(true);
+
+        var sut = await AbrirFichaAsync();
+        await sut.Musica.CargarTemasMusicalesAsync();
+        var item = sut.Musica.TemasMusicales.Single();
+
+        sut.Musica.EliminarTemaCommand.Execute(item); // el diálogo simulado responde "no"
+
+        item.Descargado.Should().BeTrue();
+        _themesDownload.Verify(d => d.Eliminar(It.IsAny<int>(), It.IsAny<AnimeThemeInfo>()), Times.Never);
+    }
+
+    [Theory]
+    [InlineData(1, "OP1")]
+    [InlineData(2, "OP1 v2")]
+    public void EtiquetaSlug_DistingueLasVersionesDeUnMismoTema(int version, string esperado)
+    {
+        var item = new TemaAnimeItem { Info = new AnimeThemeInfo { Slug = "OP1", Tipo = "OP", Version = version, AudioUrlOgg = string.Empty } };
+
+        item.EtiquetaSlug.Should().Be(esperado);
     }
 
     [Fact]
@@ -209,14 +237,14 @@ public class DetalleMusicaTests
         _themesDownload.Setup(d => d.EstaDescargado(It.IsAny<int>(), It.IsAny<AnimeThemeInfo>())).Returns(false);
 
         var sut = await AbrirFichaAsync(aniListId: 7);
-        await sut.CargarTemasMusicalesAsync();
-        sut.TemasMusicales.Should().HaveCount(1);
+        await sut.Musica.CargarTemasMusicalesAsync();
+        sut.Musica.TemasMusicales.Should().HaveCount(1);
 
         // Navegar a otro anime sin temas conocidos: la lista de la ficha anterior no debe seguir ahí.
         _themesService.Setup(s => s.ObtenerTemasAsync(8, It.IsAny<CancellationToken>())).ReturnsAsync(new List<AnimeThemeInfo>());
         await sut.InicializarAsync(new AnimeItem { AniListId = 8, Titulo = "Otro anime" });
 
-        sut.TemasMusicales.Should().BeEmpty();
-        sut.MostrandoPanelMusica.Should().BeFalse();
+        sut.Musica.TemasMusicales.Should().BeEmpty();
+        sut.Musica.MostrandoPanelMusica.Should().BeFalse();
     }
 }

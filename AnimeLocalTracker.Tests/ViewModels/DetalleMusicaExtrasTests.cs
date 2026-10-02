@@ -50,7 +50,7 @@ public sealed class DetalleMusicaExtrasTests : IDisposable
             _tracking.Object, _db.Object, Mock.Of<IAuthService>(), _escaner.Object, _dialogos.Object, _downloadService.Object,
             animeThemesService: _themes.Object, animeThemesDownload: _descargas.Object, audioTrackPlayer: _player);
         await sut.InicializarAsync(anime);
-        await sut.CargarTemasMusicalesAsync();
+        await sut.Musica.CargarTemasMusicalesAsync();
         return sut;
     }
 
@@ -70,13 +70,13 @@ public sealed class DetalleMusicaExtrasTests : IDisposable
         Confirmar(true);
         var sut = await AbrirFichaAsync(null, op1, op2, ed1);
 
-        await sut.DescargarTodosCommand.ExecuteAsync(null);
+        await sut.Musica.DescargarTodosCommand.ExecuteAsync(null);
 
         _dialogos.Verify(d => d.MostrarDialogoAsync(It.IsAny<string>(), It.Is<string>(m => m.Contains('2') && m.Contains('5')), true, It.IsAny<string>(), It.IsAny<string>()),
             Times.Once, "pregunta antes, con cuántos son (2) y cuánto pesan (2 × 2,5 MB = 5,0 MB)");
         _descargas.Verify(d => d.DescargarYConvertirAsync(7, op2, It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Never);
-        sut.TemasMusicales.Should().OnlyContain(t => t.Descargado && !t.EnCola && !t.Descargando);
-        sut.DescargandoTodos.Should().BeFalse();
+        sut.Musica.TemasMusicales.Should().OnlyContain(t => t.Descargado && !t.EnCola && !t.Descargando);
+        sut.Musica.DescargandoTodos.Should().BeFalse();
         _dialogos.Verify(d => d.MostrarToast(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Once);
     }
 
@@ -86,10 +86,10 @@ public sealed class DetalleMusicaExtrasTests : IDisposable
         Confirmar(false);
         var sut = await AbrirFichaAsync(null, Tema("OP", "OP1"));
 
-        await sut.DescargarTodosCommand.ExecuteAsync(null);
+        await sut.Musica.DescargarTodosCommand.ExecuteAsync(null);
 
         _descargas.Verify(d => d.DescargarYConvertirAsync(It.IsAny<int>(), It.IsAny<AnimeThemeInfo>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Never);
-        sut.TemasMusicales.Single().EnCola.Should().BeFalse();
+        sut.Musica.TemasMusicales.Single().EnCola.Should().BeFalse();
     }
 
     [Fact]
@@ -99,9 +99,9 @@ public sealed class DetalleMusicaExtrasTests : IDisposable
         _descargas.Setup(d => d.DescargarYConvertirAsync(7, It.IsAny<AnimeThemeInfo>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>())).ReturnsAsync("x.mp3");
         Confirmar(true);
         var sut = await AbrirFichaAsync(null, op, ed);
-        sut.CambiarFiltroTemasCommand.Execute("Endings");
+        sut.Musica.CambiarFiltroTemasCommand.Execute("Endings");
 
-        await sut.DescargarTodosCommand.ExecuteAsync(null);
+        await sut.Musica.DescargarTodosCommand.ExecuteAsync(null);
 
         _descargas.Verify(d => d.DescargarYConvertirAsync(7, ed, It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Once);
         _descargas.Verify(d => d.DescargarYConvertirAsync(7, op, It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Never);
@@ -117,7 +117,7 @@ public sealed class DetalleMusicaExtrasTests : IDisposable
         Confirmar(true);
         var sut = await AbrirFichaAsync(null, ok, mal1, mal2);
 
-        await sut.DescargarTodosCommand.ExecuteAsync(null);
+        await sut.Musica.DescargarTodosCommand.ExecuteAsync(null);
 
         _dialogos.Verify(d => d.MostrarToast(It.IsAny<string>(), It.Is<string>(m => m.Contains('1') && m.Contains('3') && m.Contains('2')), It.IsAny<string>(), "#F59E0B"), Times.Once);
         _dialogos.Verify(d => d.MostrarToast(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Once);
@@ -139,10 +139,10 @@ public sealed class DetalleMusicaExtrasTests : IDisposable
         Confirmar(true);
         var sut = await AbrirFichaAsync(null, Enumerable.Range(1, 6).Select(i => Tema("OP", "OP" + i)).ToArray());
 
-        await sut.DescargarTodosCommand.ExecuteAsync(null);
+        await sut.Musica.DescargarTodosCommand.ExecuteAsync(null);
 
-        maximo.Should().Be(DetalleViewModel.DescargasSimultaneasTodos);
-        sut.TemasMusicales.Should().OnlyContain(t => t.Descargado);
+        maximo.Should().Be(MusicaFichaViewModel.DescargasSimultaneasTodos);
+        sut.Musica.TemasMusicales.Should().OnlyContain(t => t.Descargado);
     }
 
     [Fact]
@@ -158,17 +158,17 @@ public sealed class DetalleMusicaExtrasTests : IDisposable
         Confirmar(true);
         var sut = await AbrirFichaAsync(null, Enumerable.Range(1, 5).Select(i => Tema("OP", "OP" + i)).ToArray());
 
-        var descarga = sut.DescargarTodosCommand.ExecuteAsync(null);
+        var descarga = sut.Musica.DescargarTodosCommand.ExecuteAsync(null);
         await Task.Delay(50);
-        sut.DescargandoTodos.Should().BeTrue();
-        sut.MostrarProgresoDescargaTodos.Should().BeTrue();
-        sut.TemasMusicales.Count(t => t.EsperandoEnCola).Should().Be(3, "2 bajando y 3 esperando turno");
+        sut.Musica.DescargandoTodos.Should().BeTrue();
+        sut.Musica.MostrarProgresoDescargaTodos.Should().BeTrue();
+        sut.Musica.TemasMusicales.Count(t => t.EsperandoEnCola).Should().Be(3, "2 bajando y 3 esperando turno");
 
-        await sut.DescargarTodosCommand.ExecuteAsync(null); // mismo botón: cancelar
+        await sut.Musica.DescargarTodosCommand.ExecuteAsync(null); // mismo botón: cancelar
         await descarga;
 
-        sut.DescargandoTodos.Should().BeFalse();
-        sut.TemasMusicales.Should().OnlyContain(t => !t.Descargado && !t.EnCola && !t.Descargando);
+        sut.Musica.DescargandoTodos.Should().BeFalse();
+        sut.Musica.TemasMusicales.Should().OnlyContain(t => !t.Descargado && !t.EnCola && !t.Descargando);
         _descargas.Verify(d => d.DescargarYConvertirAsync(7, It.IsAny<AnimeThemeInfo>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
         _dialogos.Verify(d => d.MostrarToast(It.IsAny<string>(), It.IsAny<string>(), "CloseCircleOutline", It.IsAny<string>()), Times.Once);
     }
@@ -180,7 +180,7 @@ public sealed class DetalleMusicaExtrasTests : IDisposable
         _descargas.Setup(d => d.EstaDescargado(7, op)).Returns(true);
         var sut = await AbrirFichaAsync(null, op);
 
-        await sut.DescargarTodosCommand.ExecuteAsync(null);
+        await sut.Musica.DescargarTodosCommand.ExecuteAsync(null);
 
         _dialogos.Verify(d => d.MostrarDialogoAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
         _dialogos.Verify(d => d.MostrarToast(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), "#10B981"), Times.Once);
@@ -192,7 +192,7 @@ public sealed class DetalleMusicaExtrasTests : IDisposable
         Confirmar(false);
         var sut = await AbrirFichaAsync(null, Tema("OP", "OP1", tamano: null), Tema("OP", "OP2"));
 
-        await sut.DescargarTodosCommand.ExecuteAsync(null);
+        await sut.Musica.DescargarTodosCommand.ExecuteAsync(null);
 
         _dialogos.Verify(d => d.MostrarDialogoAsync(It.IsAny<string>(), It.Is<string>(m => !m.Contains("MB")), true, It.IsAny<string>(), It.IsAny<string>()), Times.Once);
     }
@@ -211,7 +211,7 @@ public sealed class DetalleMusicaExtrasTests : IDisposable
     {
         var anime = new AnimeItem { AniListId = 7, Titulo = "x", EpisodiosVistos = vistos, TotalEpisodios = 24, EstadoUsuario = estado };
 
-        DetalleViewModel.DebeOcultarSpoiler(Tema("ED", "ED9", rango, spoiler), anime).Should().Be(esperado);
+        MusicaFichaViewModel.DebeOcultarSpoiler(Tema("ED", "ED9", rango, spoiler), anime).Should().Be(esperado);
     }
 
     [Fact]
@@ -221,8 +221,8 @@ public sealed class DetalleMusicaExtrasTests : IDisposable
         var anime = new AnimeItem { AniListId = 21, Titulo = "One Piece", EpisodiosVistos = 180, TotalEpisodios = 1200, EstadoUsuario = "CURRENT" };
         var ed27 = Tema("ED", "ED27", "1163", spoiler: true);
 
-        DetalleViewModel.DebeOcultarSpoiler(ed27, anime).Should().BeTrue();
-        DetalleViewModel.DebeOcultarSpoiler(ed27, anime, episodioMasAltoVisto: 1180).Should().BeFalse();
+        MusicaFichaViewModel.DebeOcultarSpoiler(ed27, anime).Should().BeTrue();
+        MusicaFichaViewModel.DebeOcultarSpoiler(ed27, anime, episodioMasAltoVisto: 1180).Should().BeFalse();
     }
 
     [Fact]
@@ -230,14 +230,14 @@ public sealed class DetalleMusicaExtrasTests : IDisposable
     {
         var anime = new AnimeItem { AniListId = 7, Titulo = "Frieren", EpisodiosVistos = 3, TotalEpisodios = 28, EstadoUsuario = "CURRENT" };
         var sut = await AbrirFichaAsync(anime, Tema("ED", "ED2", "28", spoiler: true), Tema("OP", "OP1", "1-28"));
-        var ed = sut.TemasMusicales.Single(t => t.Slug == "ED2");
+        var ed = sut.Musica.TemasMusicales.Single(t => t.Slug == "ED2");
 
         ed.OcultoPorSpoiler.Should().BeTrue();
         ed.TituloVisible.Should().NotContain("ED2").And.NotBe(ed.TituloCancion);
         ed.ArtistasVisible.Should().NotBe("Artista");
-        sut.TemasMusicales.Single(t => t.Slug == "OP1").OcultoPorSpoiler.Should().BeFalse();
+        sut.Musica.TemasMusicales.Single(t => t.Slug == "OP1").OcultoPorSpoiler.Should().BeFalse();
 
-        sut.RevelarSpoilerTemaCommand.Execute(ed);
+        sut.Musica.RevelarSpoilerTemaCommand.Execute(ed);
 
         ed.TituloVisible.Should().Be("Canción ED2");
         ed.ArtistasVisible.Should().Be("Artista");
@@ -249,11 +249,11 @@ public sealed class DetalleMusicaExtrasTests : IDisposable
     public async Task ElTamano_SoloSeMuestraMientrasNoEstaGuardado()
     {
         var sut = await AbrirFichaAsync(null, Tema("OP", "OP1", tamano: 2_621_440), Tema("OP", "OP2", tamano: null));
-        var conTamano = sut.TemasMusicales[0];
+        var conTamano = sut.Musica.TemasMusicales[0];
 
         conTamano.MostrarTamano.Should().BeTrue();
         conTamano.TamanoTexto.Should().MatchRegex(@"^2[.,]5 MB$");
-        sut.TemasMusicales[1].MostrarTamano.Should().BeFalse("AnimeThemes no dio el tamaño");
+        sut.Musica.TemasMusicales[1].MostrarTamano.Should().BeFalse("AnimeThemes no dio el tamaño");
 
         conTamano.Descargado = true;
         conTamano.MostrarTamano.Should().BeFalse();
@@ -269,11 +269,11 @@ public sealed class DetalleMusicaExtrasTests : IDisposable
             _descargas.Setup(d => d.CarpetaDescargas(7)).Returns(carpetaAnime);
             var sut = await AbrirFichaAsync(null, Tema("OP", "OP1"));
             var abiertas = new List<string>();
-            sut.AbrirCarpetaEnExplorador = abiertas.Add;
+            sut.Musica.AbrirCarpetaEnExplorador = abiertas.Add;
 
-            sut.AbrirCarpetaMusicaCommand.Execute(null);
+            sut.Musica.AbrirCarpetaMusicaCommand.Execute(null);
             System.IO.Directory.CreateDirectory(carpetaAnime);
-            sut.AbrirCarpetaMusicaCommand.Execute(null);
+            sut.Musica.AbrirCarpetaMusicaCommand.Execute(null);
 
             abiertas.Should().Equal(raiz, carpetaAnime);
         }
@@ -290,16 +290,16 @@ public sealed class DetalleMusicaExtrasTests : IDisposable
         _descargas.Setup(d => d.EstaDescargado(7, op)).Returns(true);
         _descargas.Setup(d => d.ObtenerRutaLocalEsperada(7, op)).Returns(@"C:\Music\7\OP_OP1_v1_eptodos.mp3");
         var sut = await AbrirFichaAsync(null, op);
-        var item = sut.TemasMusicales.Single();
+        var item = sut.Musica.TemasMusicales.Single();
 
-        sut.ReproducirTemaCommand.Execute(item);
-        sut.MusicaSonando.Should().BeTrue();
+        sut.Musica.ReproducirTemaCommand.Execute(item);
+        sut.Musica.MusicaSonando.Should().BeTrue();
 
-        sut.ReproducirTemaCommand.Execute(item); // pausa
-        sut.MusicaSonando.Should().BeFalse();
+        sut.Musica.ReproducirTemaCommand.Execute(item); // pausa
+        sut.Musica.MusicaSonando.Should().BeFalse();
 
-        sut.ReproducirTemaCommand.Execute(item); // reanuda
-        sut.DetenerMusica();
-        sut.MusicaSonando.Should().BeFalse();
+        sut.Musica.ReproducirTemaCommand.Execute(item); // reanuda
+        sut.Musica.DetenerMusica();
+        sut.Musica.MusicaSonando.Should().BeFalse();
     }
 }

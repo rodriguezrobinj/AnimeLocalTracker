@@ -23,6 +23,30 @@ public sealed class WpfHostFixture : IDisposable
     private Dispatcher? _dispatcher;
     private Exception? _errorDeArranque;
 
+    /// <summary>
+    /// La paleta de la app (los <c>Brush.*</c> de App.xaml), leída del propio App.xaml del proyecto: las vistas de la ficha
+    /// los piden por StaticResource y sin ellos no se pueden crear. Leerla del archivo evita mantener aquí una copia.
+    /// </summary>
+    private static void CargarPaleta(Application app)
+    {
+        for (var dir = new System.IO.DirectoryInfo(AppContext.BaseDirectory); dir != null; dir = dir.Parent)
+        {
+            string candidato = System.IO.Path.Combine(dir.FullName, "AnimeLocalTracker", "App.xaml");
+            if (!System.IO.File.Exists(candidato)) continue;
+
+            var pinceles = System.Text.RegularExpressions.Regex.Matches(
+                System.IO.File.ReadAllText(candidato), "<SolidColorBrush x:Key=\"(Brush\\.[A-Za-z0-9]+)\" Color=\"(#[0-9A-Fa-f]+)\"");
+            foreach (System.Text.RegularExpressions.Match m in pinceles)
+            {
+                var pincel = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(m.Groups[2].Value));
+                pincel.Freeze();
+                app.Resources[m.Groups[1].Value] = pincel;
+            }
+            return;
+        }
+        throw new InvalidOperationException("No se encontró AnimeLocalTracker/App.xaml para cargar la paleta de colores.");
+    }
+
     public WpfHostFixture()
     {
         _hilo = new Thread(() =>
@@ -45,6 +69,7 @@ public sealed class WpfHostFixture : IDisposable
                 app.Resources["ShimmerEffectStyle"] = new Style(typeof(Border));
                 app.Resources["AppWatchProgressBar"] = new Style(typeof(ProgressBar));
                 app.Resources["AppWatchProgressBar.Overlay"] = new Style(typeof(ProgressBar));
+                CargarPaleta(app);
                 app.Resources["BoolToVis"] = new BooleanToVisibilityConverter();
                 app.Resources["InverseBoolToVis"] = new MaterialDesignThemes.Wpf.Converters.BooleanToVisibilityConverter
                 {

@@ -163,7 +163,7 @@ public class AvisoProgresoReproductorTests
 
         var sut = new DetalleViewModel(_tracking.Object, _db.Object, _auth.Object, _escaner.Object, _dialogos.Object, _descargas.Object);
         await sut.InicializarAsync(anime);
-        sut.FiltroEpisodios = filtro;
+        sut.Episodios.FiltroEpisodios = filtro;
         return sut;
     }
 
@@ -172,25 +172,25 @@ public class AvisoProgresoReproductorTests
     {
         var sut = await AbrirFichaAsync();
         int cambiosDeLista = 0;
-        sut.EpisodiosDelAnime.CollectionChanged += (_, _) => cambiosDeLista++;
-        var episodio = sut.EpisodiosDelAnime.Single(e => e.NumeroEpisodio == 5);
+        sut.Episodios.EpisodiosDelAnime.CollectionChanged += (_, _) => cambiosDeLista++;
+        var episodio = sut.Episodios.EpisodiosDelAnime.Single(e => e.NumeroEpisodio == 5);
 
-        sut.AplicarEpisodioActualizado(episodio, new EpisodioActualizadoMensaje(7, 5, false, 300, 1400, SoloProgreso: true));
+        sut.Episodios.AplicarEpisodioActualizado(episodio, new EpisodioActualizadoMensaje(7, 5, false, 300, 1400, SoloProgreso: true));
 
         episodio.ProgresoSegundos.Should().Be(300);
         cambiosDeLista.Should().Be(0, "antes se vaciaba y rellenaba la lista entera cada 3 s (1180 filas en One Piece)");
-        sut.TieneCapituloEnProgreso.Should().BeTrue();
+        sut.Episodios.TieneCapituloEnProgreso.Should().BeTrue();
     }
 
     [Fact]
     public async Task ConFiltroNoVistos_MarcarVisto_SiQuitaLaFilaDeLaLista()
     {
         var sut = await AbrirFichaAsync("No Vistos");
-        var episodio = sut.EpisodiosDelAnime.Single(e => e.NumeroEpisodio == 5);
+        var episodio = sut.Episodios.EpisodiosDelAnime.Single(e => e.NumeroEpisodio == 5);
 
-        sut.AplicarEpisodioActualizado(episodio, new EpisodioActualizadoMensaje(7, 5, true, 0, 1400));
+        sut.Episodios.AplicarEpisodioActualizado(episodio, new EpisodioActualizadoMensaje(7, 5, true, 0, 1400));
 
-        sut.EpisodiosDelAnime.Should().NotContain(e => e.NumeroEpisodio == 5);
+        sut.Episodios.EpisodiosDelAnime.Should().NotContain(e => e.NumeroEpisodio == 5);
     }
 
     [Fact]

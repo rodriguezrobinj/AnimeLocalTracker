@@ -42,7 +42,7 @@ public class DetalleMusicaFiltroTests
 
         var sut = CrearSut();
         await sut.InicializarAsync(anime);
-        await sut.CargarTemasMusicalesAsync();
+        await sut.Musica.CargarTemasMusicalesAsync();
         return sut;
     }
 
@@ -51,7 +51,7 @@ public class DetalleMusicaFiltroTests
     {
         var sut = await AbrirFichaConTemasAsync(21, Tema("OP", "OP1"), Tema("ED", "ED1"));
 
-        sut.MostrarFiltroTemasMusicales.Should().BeTrue();
+        sut.Musica.MostrarFiltroTemasMusicales.Should().BeTrue();
     }
 
     [Fact]
@@ -59,7 +59,7 @@ public class DetalleMusicaFiltroTests
     {
         var sut = await AbrirFichaConTemasAsync(21, Tema("OP", "OP1"), Tema("OP", "OP2"));
 
-        sut.MostrarFiltroTemasMusicales.Should().BeFalse();
+        sut.Musica.MostrarFiltroTemasMusicales.Should().BeFalse();
     }
 
     [Fact]
@@ -67,8 +67,8 @@ public class DetalleMusicaFiltroTests
     {
         var sut = await AbrirFichaConTemasAsync(21, Tema("OP", "OP1"), Tema("ED", "ED1"), Tema("ED", "ED2"));
 
-        sut.EsFiltroTemasTodos.Should().BeTrue();
-        sut.TemasMusicalesVisibles.Should().HaveCount(3);
+        sut.Musica.EsFiltroTemasTodos.Should().BeTrue();
+        sut.Musica.TemasMusicalesVisibles.Should().HaveCount(3);
     }
 
     [Fact]
@@ -76,11 +76,11 @@ public class DetalleMusicaFiltroTests
     {
         var sut = await AbrirFichaConTemasAsync(21, Tema("OP", "OP1"), Tema("OP", "OP2"), Tema("ED", "ED1"));
 
-        sut.CambiarFiltroTemasCommand.Execute("Openings");
+        sut.Musica.CambiarFiltroTemasCommand.Execute("Openings");
 
-        sut.EsFiltroTemasOpenings.Should().BeTrue();
-        sut.EsFiltroTemasTodos.Should().BeFalse();
-        sut.TemasMusicalesVisibles.Select(t => t.Slug).Should().Equal("OP1", "OP2");
+        sut.Musica.EsFiltroTemasOpenings.Should().BeTrue();
+        sut.Musica.EsFiltroTemasTodos.Should().BeFalse();
+        sut.Musica.TemasMusicalesVisibles.Select(t => t.Slug).Should().Equal("OP1", "OP2");
     }
 
     [Fact]
@@ -88,20 +88,20 @@ public class DetalleMusicaFiltroTests
     {
         var sut = await AbrirFichaConTemasAsync(21, Tema("OP", "OP1"), Tema("ED", "ED1"), Tema("ED", "ED2"));
 
-        sut.CambiarFiltroTemasCommand.Execute("Endings");
+        sut.Musica.CambiarFiltroTemasCommand.Execute("Endings");
 
-        sut.TemasMusicalesVisibles.Select(t => t.Slug).Should().Equal("ED1", "ED2");
+        sut.Musica.TemasMusicalesVisibles.Select(t => t.Slug).Should().Equal("ED1", "ED2");
     }
 
     [Fact]
     public async Task VolverATodos_MuestraDeNuevoTodosLosTemas()
     {
         var sut = await AbrirFichaConTemasAsync(21, Tema("OP", "OP1"), Tema("ED", "ED1"));
-        sut.CambiarFiltroTemasCommand.Execute("Endings");
+        sut.Musica.CambiarFiltroTemasCommand.Execute("Endings");
 
-        sut.CambiarFiltroTemasCommand.Execute("Todos");
+        sut.Musica.CambiarFiltroTemasCommand.Execute("Todos");
 
-        sut.TemasMusicalesVisibles.Should().HaveCount(2);
+        sut.Musica.TemasMusicalesVisibles.Should().HaveCount(2);
     }
 
     [Fact]
@@ -109,24 +109,24 @@ public class DetalleMusicaFiltroTests
     {
         var sut = await AbrirFichaConTemasAsync(21, Tema("OP", "OP1"), Tema("ED", "ED1"), Tema("ED", "ED2"));
 
-        sut.CambiarFiltroTemasCommand.Execute("Openings");
+        sut.Musica.CambiarFiltroTemasCommand.Execute("Openings");
 
-        sut.TemasMusicales.Should().HaveCount(3, "la lista completa (de la que sale 'siguiente que se pueda escuchar') no depende del filtro");
+        sut.Musica.TemasMusicales.Should().HaveCount(3, "la lista completa (de la que sale 'siguiente que se pueda escuchar') no depende del filtro");
     }
 
     [Fact]
     public async Task AlCambiarDeFicha_ElFiltroVuelveATodos()
     {
         var sut = await AbrirFichaConTemasAsync(21, Tema("OP", "OP1"), Tema("ED", "ED1"));
-        sut.CambiarFiltroTemasCommand.Execute("Endings");
+        sut.Musica.CambiarFiltroTemasCommand.Execute("Endings");
 
         var otro = new AnimeItem { AniListId = 22, Titulo = "Otro anime" };
         _themesService.Setup(s => s.ObtenerTemasAsync(22, It.IsAny<CancellationToken>())).ReturnsAsync(new List<AnimeThemeInfo> { Tema("OP", "OP1") });
         await sut.InicializarAsync(otro);
-        await sut.CargarTemasMusicalesAsync();
+        await sut.Musica.CargarTemasMusicalesAsync();
 
-        sut.EsFiltroTemasTodos.Should().BeTrue();
-        sut.TemasMusicalesVisibles.Should().ContainSingle();
+        sut.Musica.EsFiltroTemasTodos.Should().BeTrue();
+        sut.Musica.TemasMusicalesVisibles.Should().ContainSingle();
     }
 
     [Fact]
@@ -134,7 +134,7 @@ public class DetalleMusicaFiltroTests
     {
         var sut = CrearSut();
 
-        sut.MostrarFiltroTemasMusicales.Should().BeFalse();
-        sut.TemasMusicalesVisibles.Should().BeEmpty();
+        sut.Musica.MostrarFiltroTemasMusicales.Should().BeFalse();
+        sut.Musica.TemasMusicalesVisibles.Should().BeEmpty();
     }
 }

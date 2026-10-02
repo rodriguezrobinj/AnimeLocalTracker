@@ -125,7 +125,12 @@ public sealed partial class NavigationService : ObservableObject, INavigationSer
     public LogrosViewModel ObtenerLogros() => _serviceProvider.GetRequiredService<LogrosViewModel>();
     public ActualizacionesViewModel ObtenerActualizaciones() => _serviceProvider.GetRequiredService<ActualizacionesViewModel>();
     public VisorRegistrosViewModel ObtenerVisorRegistros() => _serviceProvider.GetRequiredService<VisorRegistrosViewModel>();
-    public DetalleViewModel CrearDetalle() => _serviceProvider.GetRequiredService<DetalleViewModel>();
+    /// <summary>
+    /// Una ficha nueva por visita. Se crea con la fábrica registrada en App: pedida directamente al contenedor, este guarda una
+    /// referencia a cada instancia desechable hasta que la app se cierra, y ninguna ficha se liberaba nunca.
+    /// </summary>
+    public DetalleViewModel CrearDetalle() =>
+        _serviceProvider.GetService<Func<DetalleViewModel>>()?.Invoke() ?? _serviceProvider.GetRequiredService<DetalleViewModel>();
     public ReproductorViewModel CrearReproductor() => _serviceProvider.GetRequiredService<ReproductorViewModel>();
 
     public void Receive(NavegarMensaje_Galeria message)
@@ -170,16 +175,12 @@ public sealed partial class NavigationService : ObservableObject, INavigationSer
     {
         try
         {
-            // Navegación rápida entre fichas (ej. varios clics seguidos en la galería): la ficha
-            // anterior se descarta sin haber terminado de cargar; se cancelan sus tareas de fondo
-            // en vez de dejarlas seguir golpeando disco/red por un anime que ya no está en pantalla.
-            if (VistaActual is DetalleViewModel anterior) anterior.Dispose();
-
+            // La ficha anterior (si se venía de otra) se descarta en OnVistaActualChanged al asignar la nueva.
             var detalleVm = CrearDetalle();
             _vistaAnteriorADetalleCalendario = VistaActual is CalendarioViewModel ? VistaActual : null;
             VistaActual = detalleVm;
             await detalleVm.InicializarAsync(message.AnimeSeleccionado);
-            if (!string.IsNullOrWhiteSpace(message.ReproducirTemaClave)) await detalleVm.AbrirMusicaYReproducirAsync(message.ReproducirTemaClave);
+            if (!string.IsNullOrWhiteSpace(message.ReproducirTemaClave)) await detalleVm.Musica.AbrirMusicaYReproducirAsync(message.ReproducirTemaClave);
         }
         catch (Exception ex)
         {
@@ -354,6 +355,9 @@ public sealed partial class NavigationService : ObservableObject, INavigationSer
 
             _vistaAnteriorAlReproductor = VistaActual;
 
+            // Un episodio empieza a sonar: la música que seguía de fondo se corta.
+            _serviceProvider.GetService<IMusicaDeFondoService>()?.Detener();
+
             var viewModel = CrearReproductor();
             if (viewModel == null) return;
 
@@ -398,6 +402,11 @@ public sealed partial class NavigationService : ObservableObject, INavigationSer
 
     partial void OnVistaActualChanged(ObservableObject? oldValue, ObservableObject newValue)
     {
+        // Al salir de una ficha (hacia otra ficha o hacia cualquier pestaña) se descarta: cancela sus cargas de fondo, deja de
+        // escuchar avisos y suelta el reproductor de música. Antes solo se hacía al pasar de una ficha a otra. Cada visita crea
+        // una ficha nueva, así que la anterior no se vuelve a mostrar.
+        if (oldValue is DetalleViewModel fichaAnterior && !ReferenceEquals(oldValue, newValue)) fichaAnterior.Dispose();
+
         if (ReproductorActivo == null) return;
 
         // Navegar con el reproductor abierto: el episodio sigue en el mini reproductor (su propia ventana) y la app queda libre.

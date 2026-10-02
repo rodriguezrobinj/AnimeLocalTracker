@@ -30,22 +30,22 @@ public class DetalleSeguimientoEditorTests
     {
         var sut = CrearSut(28);
 
-        sut.EstadosChips.Should().HaveCount(5);
-        sut.EstadosChips.Count(c => c.EsActivo).Should().Be(1);
-        sut.EstadosChips.Single(c => c.EsActivo).Clave.Should().Be(LocalizationService.T("Estado_Viendo"));
+        sut.Seguimiento.EstadosChips.Should().HaveCount(5);
+        sut.Seguimiento.EstadosChips.Count(c => c.EsActivo).Should().Be(1);
+        sut.Seguimiento.EstadosChips.Single(c => c.EsActivo).Clave.Should().Be(LocalizationService.T("Estado_Viendo"));
     }
 
     [Fact]
     public void SeleccionarEstado_MueveElChipActivoSinRecrearLosChips()
     {
         var sut = CrearSut(28);
-        var chips = sut.EstadosChips.ToList();
+        var chips = sut.Seguimiento.EstadosChips.ToList();
 
-        sut.SeleccionarEstadoCommand.Execute(LocalizationService.T("Estado_EnPausa"));
+        sut.Seguimiento.SeleccionarEstadoCommand.Execute(LocalizationService.T("Estado_EnPausa"));
 
-        sut.EstadosChips.Should().Equal(chips, "los botones no deben regenerarse al elegir (se perderían clics)");
-        sut.EstadosChips.Single(c => c.EsActivo).Clave.Should().Be(LocalizationService.T("Estado_EnPausa"));
-        sut.EditEstadoVisual.Should().Be(LocalizationService.T("Estado_EnPausa"));
+        sut.Seguimiento.EstadosChips.Should().Equal(chips, "los botones no deben regenerarse al elegir (se perderían clics)");
+        sut.Seguimiento.EstadosChips.Single(c => c.EsActivo).Clave.Should().Be(LocalizationService.T("Estado_EnPausa"));
+        sut.Seguimiento.EditEstadoVisual.Should().Be(LocalizationService.T("Estado_EnPausa"));
     }
 
     [Fact]
@@ -53,24 +53,24 @@ public class DetalleSeguimientoEditorTests
     {
         var sut = CrearSut(12);
         var inicio = new DateTime(2024, 10, 5);
-        sut.EditFechaInicio = inicio;
+        sut.Seguimiento.EditFechaInicio = inicio;
 
-        sut.SeleccionarEstadoCommand.Execute(LocalizationService.T("Estado_Finalizado"));
+        sut.Seguimiento.SeleccionarEstadoCommand.Execute(LocalizationService.T("Estado_Finalizado"));
 
-        sut.EditProgreso.Should().Be(12);
-        sut.EditFechaFin.Should().Be(DateTime.Today);
-        sut.EditFechaInicio.Should().Be(inicio);
+        sut.Seguimiento.EditProgreso.Should().Be(12);
+        sut.Seguimiento.EditFechaFin.Should().Be(DateTime.Today);
+        sut.Seguimiento.EditFechaInicio.Should().Be(inicio);
     }
 
     [Fact]
     public void SeleccionarFinalizado_ConTotalDesconocido_NoInventaElProgreso()
     {
         var sut = CrearSut(0);
-        sut.EditProgresoTexto = "7";
+        sut.Seguimiento.EditProgresoTexto = "7";
 
-        sut.SeleccionarEstadoCommand.Execute(LocalizationService.T("Estado_Finalizado"));
+        sut.Seguimiento.SeleccionarEstadoCommand.Execute(LocalizationService.T("Estado_Finalizado"));
 
-        sut.EditProgreso.Should().Be(7);
+        sut.Seguimiento.EditProgreso.Should().Be(7);
     }
 
     [Fact]
@@ -78,11 +78,11 @@ public class DetalleSeguimientoEditorTests
     {
         var sut = CrearSut(12);
         var fin = new DateTime(2024, 10, 12);
-        sut.EditFechaFin = fin;
+        sut.Seguimiento.EditFechaFin = fin;
 
-        sut.SeleccionarEstadoCommand.Execute(LocalizationService.T("Estado_Finalizado"));
+        sut.Seguimiento.SeleccionarEstadoCommand.Execute(LocalizationService.T("Estado_Finalizado"));
 
-        sut.EditFechaFin.Should().Be(fin);
+        sut.Seguimiento.EditFechaFin.Should().Be(fin);
     }
 
     [Fact]
@@ -90,70 +90,70 @@ public class DetalleSeguimientoEditorTests
     {
         var sut = CrearSut(12);
 
-        sut.SeleccionarEstadoCommand.Execute(LocalizationService.T("Estado_Viendo"));
+        sut.Seguimiento.SeleccionarEstadoCommand.Execute(LocalizationService.T("Estado_Viendo"));
 
-        sut.EditFechaInicio.Should().Be(DateTime.Today);
+        sut.Seguimiento.EditFechaInicio.Should().Be(DateTime.Today);
     }
 
     [Fact]
     public void Stepper_SumaYRestaRespetandoElTotalYElCero()
     {
         var sut = CrearSut(3);
-        sut.EditProgresoTexto = "2";
+        sut.Seguimiento.EditProgresoTexto = "2";
 
-        sut.IncrementarProgresoCommand.Execute(null);
-        sut.EditProgreso.Should().Be(3);
+        sut.Seguimiento.IncrementarProgresoCommand.Execute(null);
+        sut.Seguimiento.EditProgreso.Should().Be(3);
 
-        sut.IncrementarProgresoCommand.Execute(null);
-        sut.EditProgreso.Should().Be(3, "no puede pasar del total de episodios");
+        sut.Seguimiento.IncrementarProgresoCommand.Execute(null);
+        sut.Seguimiento.EditProgreso.Should().Be(3, "no puede pasar del total de episodios");
 
-        sut.EditProgresoTexto = "0";
-        sut.DecrementarProgresoCommand.Execute(null);
-        sut.EditProgreso.Should().Be(0);
+        sut.Seguimiento.EditProgresoTexto = "0";
+        sut.Seguimiento.DecrementarProgresoCommand.Execute(null);
+        sut.Seguimiento.EditProgreso.Should().Be(0);
     }
 
     [Fact]
     public void TotalDeEpisodios_SeMuestraSoloSiSeConoce()
     {
         var conTotal = CrearSut(10);
-        conTotal.EditTotalEpisodiosTexto.Should().Be("/ 10");
-        conTotal.TieneTotalEpisodios.Should().BeTrue();
+        conTotal.Seguimiento.EditTotalEpisodiosTexto.Should().Be("/ 10");
+        conTotal.Seguimiento.TieneTotalEpisodios.Should().BeTrue();
 
         var sinTotal = CrearSut(0);
-        sinTotal.TieneTotalEpisodios.Should().BeFalse();
-        sinTotal.EditTotalEpisodiosTexto.Should().BeEmpty();
+        sinTotal.Seguimiento.TieneTotalEpisodios.Should().BeFalse();
+        sinTotal.Seguimiento.EditTotalEpisodiosTexto.Should().BeEmpty();
     }
 
     [Fact]
     public void Puntuacion_MuestraGuionSiEsCero()
     {
         var sut = CrearSut(10);
-        sut.EditPuntajeTexto.Should().Be("—");
+        sut.Seguimiento.EditPuntajeTexto.Should().Be("—");
 
-        sut.EditPuntaje = 85;
-        sut.EditPuntajeTexto.Should().Be("85");
+        sut.Seguimiento.EditPuntaje = 85;
+        sut.Seguimiento.EditPuntajeTexto.Should().Be("85");
 
-        sut.EditPuntaje = 0;
-        sut.EditPuntajeTexto.Should().Be("—");
+        sut.Seguimiento.EditPuntaje = 0;
+        sut.Seguimiento.EditPuntajeTexto.Should().Be("—");
     }
 
     [Fact]
     public void CalendarioFecha_AbreConLaFechaYaElegidaYUnDiaLaAplicaYCierra()
     {
         var sut = CrearSut(10);
-        sut.EditFechaInicio = new DateTime(2024, 10, 5);
+        sut.Seguimiento.EditFechaInicio = new DateTime(2024, 10, 5);
 
-        sut.AbrirCalendarioInicioCommand.Execute(null);
+        sut.Seguimiento.AbrirCalendarioInicioCommand.Execute(null);
 
-        sut.MostrandoCalendarioFecha.Should().BeTrue();
-        sut.CalendarioTieneFecha.Should().BeTrue();
-        sut.CalendarioFechaInicial.Should().Be(new DateTime(2024, 10, 5));
+        sut.Seguimiento.MostrandoCalendarioFecha.Should().BeTrue();
+        sut.Seguimiento.CalendarioTieneFecha.Should().BeTrue();
+        sut.Seguimiento.CalendarioFechaInicial.Should().Be(new DateTime(2024, 10, 5));
 
-        sut.ElegirFechaCalendarioCommand.Execute(new DateTime(2014, 3, 9, 15, 30, 0));
+        sut.Seguimiento.ElegirFechaCalendarioCommand.Execute(new DateTime(2014, 3, 9, 15, 30, 0));
 
-        sut.EditFechaInicio.Should().Be(new DateTime(2014, 3, 9), "se guarda solo la fecha, sin hora");
-        sut.MostrandoCalendarioFecha.Should().BeFalse();
-        sut.EditFechaFin.Should().BeNull("el calendario de inicio no toca la fecha de fin");
+        sut.Seguimiento.EditFechaInicio.Should().Be(new DateTime(2014, 3, 9), "se guarda solo la fecha, sin hora");
+        sut.Seguimiento.MostrandoCalendarioFecha.Should().BeFalse();
+        sut.Seguimiento.EditFechaFin.Should().BeNull("el calendario de inicio no toca la fecha de fin");
     }
 
     [Fact]
@@ -161,50 +161,50 @@ public class DetalleSeguimientoEditorTests
     {
         var sut = CrearSut(10);
 
-        sut.AbrirCalendarioFinCommand.Execute(null);
+        sut.Seguimiento.AbrirCalendarioFinCommand.Execute(null);
 
-        sut.CalendarioTieneFecha.Should().BeFalse();
-        sut.CalendarioFechaInicial.Should().Be(DateTime.Today);
+        sut.Seguimiento.CalendarioTieneFecha.Should().BeFalse();
+        sut.Seguimiento.CalendarioFechaInicial.Should().Be(DateTime.Today);
     }
 
     [Fact]
     public void CalendarioFecha_QuitarVaciaSoloEseCampo()
     {
         var sut = CrearSut(10);
-        sut.EditFechaInicio = new DateTime(2024, 10, 5);
-        sut.EditFechaFin = new DateTime(2024, 10, 12);
-        sut.AbrirCalendarioFinCommand.Execute(null);
+        sut.Seguimiento.EditFechaInicio = new DateTime(2024, 10, 5);
+        sut.Seguimiento.EditFechaFin = new DateTime(2024, 10, 12);
+        sut.Seguimiento.AbrirCalendarioFinCommand.Execute(null);
 
-        sut.QuitarFechaCalendarioCommand.Execute(null);
+        sut.Seguimiento.QuitarFechaCalendarioCommand.Execute(null);
 
-        sut.EditFechaFin.Should().BeNull();
-        sut.EditFechaInicio.Should().Be(new DateTime(2024, 10, 5));
-        sut.MostrandoCalendarioFecha.Should().BeFalse();
+        sut.Seguimiento.EditFechaFin.Should().BeNull();
+        sut.Seguimiento.EditFechaInicio.Should().Be(new DateTime(2024, 10, 5));
+        sut.Seguimiento.MostrandoCalendarioFecha.Should().BeFalse();
     }
 
     [Fact]
     public void CalendarioFecha_CancelarNoCambiaNada()
     {
         var sut = CrearSut(10);
-        sut.EditFechaInicio = new DateTime(2024, 10, 5);
-        sut.AbrirCalendarioInicioCommand.Execute(null);
+        sut.Seguimiento.EditFechaInicio = new DateTime(2024, 10, 5);
+        sut.Seguimiento.AbrirCalendarioInicioCommand.Execute(null);
 
-        sut.CerrarCalendarioFechaCommand.Execute(null);
+        sut.Seguimiento.CerrarCalendarioFechaCommand.Execute(null);
 
-        sut.EditFechaInicio.Should().Be(new DateTime(2024, 10, 5));
-        sut.MostrandoCalendarioFecha.Should().BeFalse();
+        sut.Seguimiento.EditFechaInicio.Should().Be(new DateTime(2024, 10, 5));
+        sut.Seguimiento.MostrandoCalendarioFecha.Should().BeFalse();
     }
 
     [Fact]
     public void TextoDeLosCamposDeFecha_MuestraGuionSiNoHayFecha()
     {
         var sut = CrearSut(10);
-        sut.EditFechaInicioTexto.Should().Be("—");
+        sut.Seguimiento.EditFechaInicioTexto.Should().Be("—");
 
-        sut.EditFechaInicio = new DateTime(2024, 10, 5);
-        sut.EditFechaInicioTexto.Should().Contain("2024");
+        sut.Seguimiento.EditFechaInicio = new DateTime(2024, 10, 5);
+        sut.Seguimiento.EditFechaInicioTexto.Should().Contain("2024");
 
-        sut.EditFechaInicio = null;
-        sut.EditFechaInicioTexto.Should().Be("—");
+        sut.Seguimiento.EditFechaInicio = null;
+        sut.Seguimiento.EditFechaInicioTexto.Should().Be("—");
     }
 }

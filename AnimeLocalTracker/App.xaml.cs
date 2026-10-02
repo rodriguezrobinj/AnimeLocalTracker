@@ -104,7 +104,10 @@ public partial class App : Application
         services.AddTransient<MainViewModel>();
         services.AddSingleton<GaleriaViewModel>();
         services.AddSingleton<AgregarAnimeViewModel>();
-        services.AddTransient<DetalleViewModel>();
+        // La ficha se crea por visita con esta fábrica (ver NavigationService.CrearDetalle). ActivatorUtilities resuelve sus
+        // dependencias igual que el contenedor, pero sin que este retenga la instancia: un transitorio desechable pedido al
+        // contenedor raíz no se libera hasta cerrar la app.
+        services.AddSingleton<Func<DetalleViewModel>>(sp => () => ActivatorUtilities.CreateInstance<DetalleViewModel>(sp));
         services.AddSingleton<CalendarioViewModel>();
         services.AddTransient<ReproductorViewModel>();
         services.AddSingleton<DescargasViewModel>();
@@ -114,6 +117,8 @@ public partial class App : Application
         // ARC-02: la navegación resuelve ViewModels a través de un único servicio;
         // los ViewModels ya no reciben IServiceProvider.
         services.AddSingleton<INavigationService, NavigationService>();
+        // La música de la ficha que sigue sonando al salir de ella (si el usuario lo activa).
+        services.AddSingleton<IMusicaDeFondoService, MusicaDeFondoService>();
 
         // 3. Aquí registraremos los Servicios
         services.AddSingleton<ISettingsService, SettingsService>();
@@ -400,7 +405,11 @@ public partial class App : Application
         services.AddSingleton<VisorRegistrosViewModel>();
 
         // Minijuegos (singleton: una partida en curso sobrevive al cambiar de pestaña)
-        services.AddSingleton<AnimeLocalTracker.Services.Minijuegos.IClipPlayer, AnimeLocalTracker.Services.Minijuegos.ClipPlayer>();
+        services.AddSingleton<AnimeLocalTracker.Services.Minijuegos.IClipPlayer>(sp => new AnimeLocalTracker.Services.Minijuegos.ClipPlayer
+        {
+            // En "Adivina el opening/ending" no puede sonar a la vez la música que seguía de fondo.
+            AntesDeReproducir = () => sp.GetService<IMusicaDeFondoService>()?.Detener()
+        });
         services.AddSingleton<AnimeLocalTracker.Services.Minijuegos.IMinijuegosRecordsService, AnimeLocalTracker.Services.Minijuegos.MinijuegosRecordsService>();
         services.AddSingleton<AdivinaAnimeViewModel>();
         services.AddSingleton<AdivinaOpEdViewModel>();

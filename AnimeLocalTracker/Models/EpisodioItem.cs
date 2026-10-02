@@ -180,6 +180,22 @@ public partial class EpisodioItem : ObservableObject
         return string.Empty;
     }
 
+    /// <summary>
+    /// El archivo del episodio ya no está en disco (se borró): se limpia lo que dependía de él. Visto, progreso, favorito y
+    /// fecha de reproducción se conservan: el historial es permanente.
+    /// </summary>
+    public void QuitarArchivo()
+    {
+        Descargado = false;
+        RutaCompleta = string.Empty;
+        RutaMiniatura = null;
+        TamanoArchivoFormateado = string.Empty;
+        Resolucion = string.Empty;
+        CodecVideo = string.Empty;
+        Fps = string.Empty;
+        Es10Bit = false;
+    }
+
     public void CalcularTamanoArchivo(long len)
     {
         TamanoArchivoFormateado = FormatearTamano(len);

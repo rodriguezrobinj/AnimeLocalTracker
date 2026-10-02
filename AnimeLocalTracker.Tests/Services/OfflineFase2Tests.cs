@@ -139,13 +139,13 @@ public class OfflineFase2Tests : IDisposable
         _tracking.Setup(t => t.ObtenerSeguimientoUsuarioAsync(7, "tok")).ReturnsAsync((AniListMediaList?)null);
         var sut = Ficha("tok", Anime(), new Mock<IDialogService>());
 
-        await sut.AbrirEditorSeguimientoCommand.ExecuteAsync(null);
+        await sut.Seguimiento.AbrirEditorSeguimientoCommand.ExecuteAsync(null);
 
-        sut.MostrandoEditorSeguimiento.Should().BeTrue();
-        sut.EditEstadoVisual.Should().Be(LocalizationService.T("Estado_Finalizado"));
-        sut.EditProgreso.Should().Be(28);
-        sut.EditPuntaje.Should().Be(9);
-        sut.EditFechaFin.Should().Be(new DateTime(2026, 9, 20));
+        sut.Seguimiento.MostrandoEditorSeguimiento.Should().BeTrue();
+        sut.Seguimiento.EditEstadoVisual.Should().Be(LocalizationService.T("Estado_Finalizado"));
+        sut.Seguimiento.EditProgreso.Should().Be(28);
+        sut.Seguimiento.EditPuntaje.Should().Be(9);
+        sut.Seguimiento.EditFechaFin.Should().Be(new DateTime(2026, 9, 20));
     }
 
     [Fact]
@@ -153,10 +153,10 @@ public class OfflineFase2Tests : IDisposable
     {
         var sut = Ficha(null, Anime(), new Mock<IDialogService>());
 
-        await sut.AbrirEditorSeguimientoCommand.ExecuteAsync(null);
+        await sut.Seguimiento.AbrirEditorSeguimientoCommand.ExecuteAsync(null);
 
-        sut.EditEstadoVisual.Should().Be(LocalizationService.T("Estado_EnPausa"));
-        sut.EditProgreso.Should().Be(12);
+        sut.Seguimiento.EditEstadoVisual.Should().Be(LocalizationService.T("Estado_EnPausa"));
+        sut.Seguimiento.EditProgreso.Should().Be(12);
     }
 
     [Fact]
@@ -166,10 +166,10 @@ public class OfflineFase2Tests : IDisposable
         _tracking.Setup(t => t.ObtenerSeguimientoUsuarioAsync(7, "tok")).ReturnsAsync(new AniListMediaList { Status = "CURRENT", Progress = 3 });
         var sut = Ficha("tok", Anime(), new Mock<IDialogService>());
 
-        await sut.AbrirEditorSeguimientoCommand.ExecuteAsync(null);
+        await sut.Seguimiento.AbrirEditorSeguimientoCommand.ExecuteAsync(null);
 
-        sut.EditEstadoVisual.Should().Be(LocalizationService.T("Estado_Abandonado"));
-        sut.EditProgreso.Should().Be(5);
+        sut.Seguimiento.EditEstadoVisual.Should().Be(LocalizationService.T("Estado_Abandonado"));
+        sut.Seguimiento.EditProgreso.Should().Be(5);
     }
 
     [Fact]
@@ -181,10 +181,10 @@ public class OfflineFase2Tests : IDisposable
         });
         var sut = Ficha("tok", Anime(), new Mock<IDialogService>());
 
-        await sut.AbrirEditorSeguimientoCommand.ExecuteAsync(null);
+        await sut.Seguimiento.AbrirEditorSeguimientoCommand.ExecuteAsync(null);
 
-        sut.EditProgreso.Should().Be(28);
-        sut.EditFechaInicio.Should().Be(new DateTime(2026, 8, 2));
+        sut.Seguimiento.EditProgreso.Should().Be(28);
+        sut.Seguimiento.EditFechaInicio.Should().Be(new DateTime(2026, 8, 2));
         _db.Verify(d => d.GuardarSeguimientoLocalAsync(It.Is<SeguimientoLocal>(s => s.Estado == "COMPLETED" && s.Puntaje == 8 && !s.Pendiente)), Times.Once);
     }
 
@@ -198,18 +198,18 @@ public class OfflineFase2Tests : IDisposable
         var dialogos = new Mock<IDialogService>();
         var anime = Anime();
         var sut = Ficha("tok", anime, dialogos);
-        await sut.AbrirEditorSeguimientoCommand.ExecuteAsync(null);
-        sut.EditEstadoVisual = LocalizationService.T("Estado_Finalizado");
-        sut.EditProgreso = 28;
+        await sut.Seguimiento.AbrirEditorSeguimientoCommand.ExecuteAsync(null);
+        sut.Seguimiento.EditEstadoVisual = LocalizationService.T("Estado_Finalizado");
+        sut.Seguimiento.EditProgreso = 28;
 
-        await sut.GuardarEditorSeguimientoCommand.ExecuteAsync(null);
+        await sut.Seguimiento.GuardarEditorSeguimientoCommand.ExecuteAsync(null);
 
         anime.EstadoUsuario.Should().Be("COMPLETED");
         anime.EpisodiosVistos.Should().Be(28);
         _db.Verify(d => d.ActualizarAnimeAsync(anime), Times.Once);
         guardados.Last().Should().Match<SeguimientoLocal>(s => s.Estado == "COMPLETED" && s.Progreso == 28 && s.Pendiente);
         dialogos.Verify(d => d.MostrarToast(LocalizationService.T("Det_SeguimientoPendienteTitulo"), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Once);
-        sut.MostrandoEditorSeguimiento.Should().BeFalse();
+        sut.Seguimiento.MostrandoEditorSeguimiento.Should().BeFalse();
     }
 
     [Fact]
@@ -221,7 +221,7 @@ public class OfflineFase2Tests : IDisposable
         _db.Setup(d => d.GuardarSeguimientoLocalAsync(It.IsAny<SeguimientoLocal>())).Callback<SeguimientoLocal>(s => guardados.Add(new SeguimientoLocal { Pendiente = s.Pendiente })).Returns(Task.CompletedTask);
         var sut = Ficha("tok", Anime(), new Mock<IDialogService>());
 
-        await sut.GuardarEditorSeguimientoCommand.ExecuteAsync(null);
+        await sut.Seguimiento.GuardarEditorSeguimientoCommand.ExecuteAsync(null);
 
         guardados.Select(g => g.Pendiente).Should().Equal(true, false);
     }
@@ -232,7 +232,7 @@ public class OfflineFase2Tests : IDisposable
         var dialogos = new Mock<IDialogService>();
         var sut = Ficha(null, Anime(), dialogos);
 
-        await sut.GuardarEditorSeguimientoCommand.ExecuteAsync(null);
+        await sut.Seguimiento.GuardarEditorSeguimientoCommand.ExecuteAsync(null);
 
         _db.Verify(d => d.GuardarSeguimientoLocalAsync(It.Is<SeguimientoLocal>(s => !s.Pendiente)), Times.Once);
         _tracking.Verify(t => t.GuardarSeguimientoUsuarioAsync(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<float>(), It.IsAny<DateTime?>(), It.IsAny<DateTime?>(), It.IsAny<string>()), Times.Never);

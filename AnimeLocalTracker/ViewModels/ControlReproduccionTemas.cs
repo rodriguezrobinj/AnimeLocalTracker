@@ -74,7 +74,9 @@ public sealed class ControlReproduccionTemas : IDisposable
             return;
         }
 
-        Detener();
+        // Sin avisar: quien escucha vería un instante "no hay nada cargado" entre un tema y el siguiente (y la música de fondo
+        // se da por terminada cuando no queda tema cargado). El aviso sale al final, ya con el tema nuevo.
+        Detener(avisar: false);
 
         Actual = tema;
         tema.EsPistaActual = true;
@@ -123,7 +125,9 @@ public sealed class ControlReproduccionTemas : IDisposable
     }
 
     /// <summary>Corta la pista actual y libera el archivo. Seguro de llamar siempre.</summary>
-    public void Detener()
+    public void Detener() => Detener(avisar: true);
+
+    private void Detener(bool avisar)
     {
         _temporizador?.Stop();
         _posicionPendiente = null;
@@ -138,7 +142,7 @@ public sealed class ControlReproduccionTemas : IDisposable
         }
 
         _player.Cerrar();
-        if (habia) AvisarEstado();
+        if (habia && avisar) AvisarEstado();
     }
 
     /// <summary>

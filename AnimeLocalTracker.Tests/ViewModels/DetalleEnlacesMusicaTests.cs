@@ -46,9 +46,9 @@ public class DetalleEnlacesMusicaTests
 
         var sut = await AbrirFichaAsync(CrearSut());
 
-        sut.EnlacesMusica.Should().ContainSingle().Which.Nombre.Should().Be("AniPlaylist");
-        sut.EnlacesMusica[0].Url.Should().Be("https://aniplaylist.com/Frieren");
-        sut.TieneEnlacesMusica.Should().BeTrue();
+        sut.Musica.EnlacesMusica.Should().ContainSingle().Which.Nombre.Should().Be("AniPlaylist");
+        sut.Musica.EnlacesMusica[0].Url.Should().Be("https://aniplaylist.com/Frieren");
+        sut.Musica.TieneEnlacesMusica.Should().BeTrue();
     }
 
     [Fact]
@@ -56,8 +56,8 @@ public class DetalleEnlacesMusicaTests
     {
         var sut = await AbrirFichaAsync(CrearSut(conServicio: false));
 
-        sut.EnlacesMusica.Should().BeEmpty();
-        sut.TieneEnlacesMusica.Should().BeFalse();
+        sut.Musica.EnlacesMusica.Should().BeEmpty();
+        sut.Musica.TieneEnlacesMusica.Should().BeFalse();
     }
 
     [Fact]
@@ -67,7 +67,7 @@ public class DetalleEnlacesMusicaTests
 
         var sut = await AbrirFichaAsync(CrearSut());
 
-        sut.TieneEnlacesMusica.Should().BeFalse();
+        sut.Musica.TieneEnlacesMusica.Should().BeFalse();
     }
 
     [Fact]
@@ -80,7 +80,7 @@ public class DetalleEnlacesMusicaTests
         await AbrirFichaAsync(sut, 7, "Frieren");
         await AbrirFichaAsync(sut, 8, "Bleach");
 
-        sut.EnlacesMusica.Should().ContainSingle().Which.Url.Should().EndWith("/Bleach");
+        sut.Musica.EnlacesMusica.Should().ContainSingle().Which.Url.Should().EndWith("/Bleach");
     }
 
     [Fact]
@@ -90,7 +90,7 @@ public class DetalleEnlacesMusicaTests
         _enlaces.Setup(s => s.Abrir(AniPlaylist)).Returns(true);
         var sut = await AbrirFichaAsync(CrearSut());
 
-        sut.AbrirEnlaceMusicaCommand.Execute(sut.EnlacesMusica[0]);
+        sut.Musica.AbrirEnlaceMusicaCommand.Execute(sut.Musica.EnlacesMusica[0]);
 
         _enlaces.Verify(s => s.Abrir(AniPlaylist), Times.Once);
         _dialogos.Verify(d => d.MostrarToast(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
@@ -103,7 +103,7 @@ public class DetalleEnlacesMusicaTests
         _enlaces.Setup(s => s.Abrir(It.IsAny<EnlaceMusica>())).Returns(false);
         var sut = await AbrirFichaAsync(CrearSut());
 
-        sut.AbrirEnlaceMusicaCommand.Execute(sut.EnlacesMusica[0]);
+        sut.Musica.AbrirEnlaceMusicaCommand.Execute(sut.Musica.EnlacesMusica[0]);
 
         _dialogos.Verify(d => d.MostrarToast(It.IsAny<string>(), It.Is<string>(m => m.Contains("AniPlaylist")), It.IsAny<string>(), It.IsAny<string>()), Times.Once);
     }
@@ -113,8 +113,8 @@ public class DetalleEnlacesMusicaTests
     {
         var sut = CrearSut(conServicio: false);
 
-        sut.AbrirEnlaceMusicaCommand.Execute(null);
-        sut.AbrirEnlaceMusicaCommand.Execute(new EnlaceMusicaItem(AniPlaylist));
+        sut.Musica.AbrirEnlaceMusicaCommand.Execute(null);
+        sut.Musica.AbrirEnlaceMusicaCommand.Execute(new EnlaceMusicaItem(AniPlaylist));
 
         _dialogos.Verify(d => d.MostrarToast(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
     }

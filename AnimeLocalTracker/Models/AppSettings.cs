@@ -61,6 +61,13 @@ public class AppSettings
     public double VolumenMusica { get; set; } = 0.8;
     /// <summary>Al terminar un opening/ending de la ficha, pasa solo al siguiente que se pueda escuchar.</summary>
     public bool ReproduccionContinuaMusica { get; set; } = true;
+    /// <summary>La música de la ficha elige el siguiente tema al azar.</summary>
+    public bool AleatorioMusica { get; set; }
+    /// <summary>La música de la ficha repite el mismo tema al terminar.</summary>
+    public bool RepetirMusica { get; set; }
+    /// <summary>Al salir de la ficha con un opening/ending sonando, la música sigue (con una barra en la ventana principal).
+    /// Apagado por defecto: se corta al salir.</summary>
+    public bool MusicaSigueFueraDeLaFicha { get; set; }
     /// <summary>Velocidad de reproducción aplicada al abrir un video (0.5 a 2.0).</summary>
     public double VelocidadReproduccionDefecto { get; set; } = 1.0;
     /// <summary>Compresor de rango dinámico de audio ("modo noche") activo por defecto al abrir un video.</summary>

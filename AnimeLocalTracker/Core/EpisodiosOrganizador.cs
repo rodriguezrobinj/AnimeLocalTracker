@@ -10,9 +10,17 @@ namespace AnimeLocalTracker.Core;
 /// </summary>
 public static class EpisodiosOrganizador
 {
+    // Claves fijas del filtro de episodios. NO son el texto que se ve: la ficha muestra la traducción de cada una. Antes se
+    // comparaba contra el texto del desplegable y, con la app en inglés ("Watched", "Downloaded"…), ningún filtro coincidía.
+    public const string FiltroTodos = "Todos";
+    public const string FiltroDescargados = "Descargados";
+    public const string FiltroVistos = "Vistos";
+    public const string FiltroNoVistos = "No Vistos";
+    public const string FiltroFavoritos = "Favoritos";
+
     /// <summary>
-    /// Aplica el filtro textual de episodios ("Todos", "Descargados", "Vistos",
-    /// "No Vistos", "Favoritos") y el orden (ascendente/descendente por número).
+    /// Aplica el filtro de episodios (una de las claves <c>Filtro*</c>; cualquier otra cosa equivale a "Todos")
+    /// y el orden (ascendente/descendente por número).
     /// </summary>
     public static List<EpisodioItem> FiltrarYOrdenar(
         IEnumerable<EpisodioItem> episodios, string filtro, bool ordenAscendente)
@@ -21,16 +29,16 @@ public static class EpisodiosOrganizador
 
         switch (filtro)
         {
-            case "Descargados":
+            case FiltroDescargados:
                 query = query.Where(e => e.Descargado);
                 break;
-            case "Vistos":
+            case FiltroVistos:
                 query = query.Where(e => e.Visto);
                 break;
-            case "No Vistos":
+            case FiltroNoVistos:
                 query = query.Where(e => !e.Visto);
                 break;
-            case "Favoritos":
+            case FiltroFavoritos:
                 query = query.Where(e => e.Favorito);
                 break;
         }
@@ -75,5 +83,22 @@ public static class EpisodiosOrganizador
         }
 
         return episodiosVistos > max ? episodiosVistos : max;
+    }
+
+    /// <summary>
+    /// Huecos de la carpeta local: episodios sin archivo, por debajo del más alto que sí está en disco, que además NO se han
+    /// visto. Un episodio ya visto no es un hueco: lo normal es verlo y liberar su espacio (antes One Piece, con 1180 vistos y
+    /// solo el último en disco, avisaba de "1179 episodios faltantes"). Los que aún no se han descargado por encima del más
+    /// alto tampoco cuentan: es el estado normal de un anime en emisión.
+    /// </summary>
+    public static List<int> CalcularFaltantes(IReadOnlyCollection<EpisodioItem> episodios)
+    {
+        int maxDescargado = episodios.Where(e => e.Descargado).Select(e => e.NumeroEpisodio).DefaultIfEmpty(0).Max();
+
+        return episodios
+            .Where(e => !e.Descargado && !e.Visto && e.NumeroEpisodio < maxDescargado)
+            .Select(e => e.NumeroEpisodio)
+            .OrderBy(n => n)
+            .ToList();
     }
 }

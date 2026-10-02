@@ -1008,6 +1008,13 @@
                                     </ctl:SettingRow>
                                     <Border Style="{StaticResource CfgDivider}"/>
 
+                                    <ctl:SettingRow Title="{Binding [Cfg_MusicaSeguirFuera], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                    Description="{Binding [Cfg_MusicaSeguirFueraSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                        <ToggleButton IsChecked="{Binding MusicaSigueFueraDeLaFicha}" Style="{StaticResource CfgSwitch}"
+                                                      AutomationProperties.Name="{Binding [Cfg_MusicaSeguirFuera], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                    </ctl:SettingRow>
+                                    <Border Style="{StaticResource CfgDivider}"/>
+
                                     <ctl:SettingRow Title="{Binding [Cfg_IniciarConWindows], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
                                                     Description="{Binding [Cfg_IniciarConWindowsSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
                                         <ToggleButton IsChecked="{Binding IniciarConWindows}" Style="{StaticResource CfgSwitch}"

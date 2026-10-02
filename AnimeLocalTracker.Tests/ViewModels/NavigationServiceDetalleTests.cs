@@ -69,4 +69,33 @@ public class NavigationServiceDetalleTests : IDisposable
         _navigationService.VistaActual.Should().BeOfType<DetalleViewModel>()
             .Which.AnimeSeleccionado.Should().Be(animeB);
     }
+
+    private sealed class OtraPestana : CommunityToolkit.Mvvm.ComponentModel.ObservableObject;
+
+    [Fact]
+    public async Task SalirDeLaFicha_HaciaOtraPestana_LaDescarta()
+    {
+        // Antes solo se descartaba al pasar de una ficha a otra: saliendo a la Galería o al Historial seguía viva y trabajando.
+        await _navigationService.InicializarDetalleAsync(new NavegarMensaje_Detalle(new AnimeItem { AniListId = 1, Titulo = "Anime A" }));
+        var detalle = (DetalleViewModel)_navigationService.VistaActual;
+        detalle.EstaLiberado.Should().BeFalse();
+
+        _navigationService.VistaActual = new OtraPestana();
+
+        detalle.EstaLiberado.Should().BeTrue();
+    }
+
+    [Fact]
+    public void CrearDetalle_ConFabricaRegistrada_LaUsaEnVezDePedirlaAlContenedor()
+    {
+        var deFabrica = new DetalleViewModel(
+            Mock.Of<IAnimeTrackingService>(), _dbMock.Object, Mock.Of<IAuthService>(),
+            _fileScannerMock.Object, Mock.Of<IDialogService>(), _downloadMock.Object);
+        Func<DetalleViewModel> fabrica = () => deFabrica;
+        _spMock.Setup(sp => sp.GetService(typeof(Func<DetalleViewModel>))).Returns((object)fabrica); // como objeto: Moq no debe invocarla él
+
+        _navigationService.CrearDetalle().Should().BeSameAs(deFabrica);
+
+        deFabrica.Dispose();
+    }
 }

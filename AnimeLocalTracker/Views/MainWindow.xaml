@@ -721,6 +721,86 @@
                     </Border>
                 </Grid>
 
+                <!-- MÚSICA DE FONDO: el opening/ending que sigue sonando tras salir de su ficha (solo si el usuario lo activó).
+                     Por debajo del reproductor de video (ZIndex 50): al abrir un episodio la música se corta. -->
+                <Border Grid.Column="1" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="16,0,0,16" Panel.ZIndex="15"
+                        Background="{DynamicResource Brush.Surface2}" BorderBrush="{DynamicResource Brush.BorderStrong}" BorderThickness="1"
+                        CornerRadius="12" Padding="10,6,6,6" MaxWidth="430"
+                        Visibility="{Binding MusicaDeFondo.HayMusica, Converter={StaticResource BoolToVis}, FallbackValue=Collapsed}">
+                    <Border.Effect>
+                        <DropShadowEffect BlurRadius="18" ShadowDepth="4" Opacity="0.45" Color="Black"/>
+                    </Border.Effect>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <materialDesign:PackIcon Grid.Column="0" Kind="MusicNote" Width="18" Height="18" Foreground="{DynamicResource Brush.Accent}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <!-- El título vuelve a la ficha del anime, con su ventana de música abierta -->
+                        <Button Grid.Column="1" Command="{Binding MusicaDeFondo.IrALaFichaCommand}" Cursor="Hand" Background="Transparent" BorderThickness="0"
+                                HorizontalAlignment="Left" Padding="0" FocusVisualStyle="{x:Null}" MaxWidth="230"
+                                ToolTip="{Binding [Mus_FondoVolver], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                AutomationProperties.Name="{Binding [Mus_FondoVolver], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent"><ContentPresenter/></Border>
+                                </ControlTemplate>
+                            </Button.Template>
+                            <StackPanel>
+                                <TextBlock FontSize="12.5" FontWeight="SemiBold" Foreground="{DynamicResource Brush.TextPrimary}" TextTrimming="CharacterEllipsis">
+                                    <Run Text="{Binding MusicaDeFondo.Activa.TemaActual.EtiquetaSlug, Mode=OneWay}" Foreground="{DynamicResource Brush.AccentSoft}"/>
+                                    <Run Text="{Binding MusicaDeFondo.Activa.TemaActual.TituloVisible, Mode=OneWay}"/>
+                                </TextBlock>
+                                <TextBlock Text="{Binding MusicaDeFondo.TituloAnime}" FontSize="10.5" Foreground="{DynamicResource Brush.TextTertiary}" TextTrimming="CharacterEllipsis"/>
+                            </StackPanel>
+                        </Button>
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,0,0">
+                            <Button Command="{Binding MusicaDeFondo.Activa.TemaAnteriorCommand}" Style="{StaticResource MaterialDesignToolButton}" Width="30" Height="30" Padding="0" Cursor="Hand"
+                                    ToolTip="{Binding [Det_MusicaAnterior], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                    AutomationProperties.Name="{Binding [Det_MusicaAnterior], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                <materialDesign:PackIcon Kind="SkipPrevious" Width="19" Height="19" Foreground="{DynamicResource Brush.TextPrimary}"/>
+                            </Button>
+                            <Button Command="{Binding MusicaDeFondo.Activa.AlternarTemaActualCommand}" Width="32" Height="32" Padding="0" Cursor="Hand">
+                                <Button.Style>
+                                    <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignToolButton}">
+                                        <Setter Property="ToolTip" Value="{Binding [Det_MusicaReproducir], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                        <Setter Property="AutomationProperties.Name" Value="{Binding [Det_MusicaReproducir], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding MusicaDeFondo.Activa.MusicaSonando}" Value="True">
+                                                <Setter Property="ToolTip" Value="{Binding [Det_MusicaPausar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                                <Setter Property="AutomationProperties.Name" Value="{Binding [Det_MusicaPausar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                                <materialDesign:PackIcon Width="24" Height="24" Foreground="{DynamicResource Brush.Accent}">
+                                    <materialDesign:PackIcon.Style>
+                                        <Style TargetType="materialDesign:PackIcon">
+                                            <Setter Property="Kind" Value="PlayCircle"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding MusicaDeFondo.Activa.MusicaSonando}" Value="True">
+                                                    <Setter Property="Kind" Value="PauseCircle"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </materialDesign:PackIcon.Style>
+                                </materialDesign:PackIcon>
+                            </Button>
+                            <Button Command="{Binding MusicaDeFondo.Activa.TemaSiguienteCommand}" Style="{StaticResource MaterialDesignToolButton}" Width="30" Height="30" Padding="0" Cursor="Hand"
+                                    ToolTip="{Binding [Det_MusicaSiguiente], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                    AutomationProperties.Name="{Binding [Det_MusicaSiguiente], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                <materialDesign:PackIcon Kind="SkipNext" Width="19" Height="19" Foreground="{DynamicResource Brush.TextPrimary}"/>
+                            </Button>
+                            <Button Command="{Binding MusicaDeFondo.DetenerMusicaCommand}" Style="{StaticResource MaterialDesignToolButton}" Width="30" Height="30" Padding="0" Cursor="Hand" Margin="4,0,0,0"
+                                    ToolTip="{Binding [Mus_FondoDetener], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                    AutomationProperties.Name="{Binding [Mus_FondoDetener], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                <materialDesign:PackIcon Kind="Close" Width="15" Height="15" Foreground="{DynamicResource Brush.TextTertiary}"/>
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
                 <!-- TOAST NOTIFICATION (Residual) -->
                 <Border Grid.Column="0" Grid.ColumnSpan="2" HorizontalAlignment="Center" VerticalAlignment="Bottom" Panel.ZIndex="3000" IsHitTestVisible="False" AutomationProperties.LiveSetting="Assertive">
                     <Border.Style>

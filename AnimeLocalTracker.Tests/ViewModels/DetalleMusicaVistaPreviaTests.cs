@@ -56,7 +56,7 @@ public class DetalleMusicaVistaPreviaTests : IDisposable
             _tracking.Object, _db.Object, Mock.Of<IAuthService>(), _escaner.Object, _dialogos.Object, _downloadService.Object,
             animeThemesService: _themes.Object, animeThemesDownload: _descargas.Object, audioTrackPlayer: _player);
         await sut.InicializarAsync(new AnimeItem { AniListId = aniListId, Titulo = "Frieren" });
-        await sut.CargarTemasMusicalesAsync();
+        await sut.Musica.CargarTemasMusicalesAsync();
         return sut;
     }
 
@@ -76,7 +76,7 @@ public class DetalleMusicaVistaPreviaTests : IDisposable
 
         var sut = await AbrirFichaAsync();
 
-        var item = sut.TemasMusicales.Single();
+        var item = sut.Musica.TemasMusicales.Single();
         item.VistaPreviaLista.Should().BeTrue();
         item.Descargado.Should().BeFalse();
         item.PuedeReproducir.Should().BeTrue();
@@ -90,7 +90,7 @@ public class DetalleMusicaVistaPreviaTests : IDisposable
 
         var sut = await AbrirFichaAsync();
 
-        var item = sut.TemasMusicales.Single();
+        var item = sut.Musica.TemasMusicales.Single();
         item.Descargado.Should().BeTrue();
         item.VistaPreviaLista.Should().BeFalse();
     }
@@ -101,9 +101,9 @@ public class DetalleMusicaVistaPreviaTests : IDisposable
     public async Task Previsualizar_DeberiaPrepararLaVistaPreviaYEmpezarASonar()
     {
         var sut = await AbrirFichaAsync();
-        var item = sut.TemasMusicales.Single();
+        var item = sut.Musica.TemasMusicales.Single();
 
-        await sut.PrevisualizarTemaCommand.ExecuteAsync(item);
+        await sut.Musica.PrevisualizarTemaCommand.ExecuteAsync(item);
 
         item.VistaPreviaLista.Should().BeTrue();
         item.PreparandoVistaPrevia.Should().BeFalse();
@@ -123,9 +123,9 @@ public class DetalleMusicaVistaPreviaTests : IDisposable
         _descargas.Setup(d => d.PrepararVistaPreviaAsync(7, _op, It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
             .Returns<int, AnimeThemeInfo, IProgress<double>?, CancellationToken>((_, _, p, _) => { progresoRecibido = p; return espera.Task; });
         var sut = await AbrirFichaAsync();
-        var item = sut.TemasMusicales.Single();
+        var item = sut.Musica.TemasMusicales.Single();
 
-        var primera = sut.PrevisualizarTemaCommand.ExecuteAsync(item);
+        var primera = sut.Musica.PrevisualizarTemaCommand.ExecuteAsync(item);
         item.PreparandoVistaPrevia.Should().BeTrue();
         item.PuedePrevisualizar.Should().BeFalse();
 
@@ -134,7 +134,7 @@ public class DetalleMusicaVistaPreviaTests : IDisposable
         await EsperarAsync(() => item.ProgresoPreparacion == 0.5);
         item.ProgresoPreparacionPorcentaje.Should().Be(50);
 
-        await sut.PrevisualizarTemaCommand.ExecuteAsync(item); // segundo clic mientras prepara: se ignora
+        await sut.Musica.PrevisualizarTemaCommand.ExecuteAsync(item); // segundo clic mientras prepara: se ignora
         _descargas.Verify(d => d.PrepararVistaPreviaAsync(7, _op, It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Once);
 
         espera.SetResult(RutaPrevia);
@@ -147,9 +147,9 @@ public class DetalleMusicaVistaPreviaTests : IDisposable
     {
         _descargas.Setup(d => d.PrepararVistaPreviaAsync(7, _op, It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>())).ReturnsAsync((string?)null);
         var sut = await AbrirFichaAsync();
-        var item = sut.TemasMusicales.Single();
+        var item = sut.Musica.TemasMusicales.Single();
 
-        await sut.PrevisualizarTemaCommand.ExecuteAsync(item);
+        await sut.Musica.PrevisualizarTemaCommand.ExecuteAsync(item);
 
         item.VistaPreviaLista.Should().BeFalse();
         item.PreparandoVistaPrevia.Should().BeFalse();
@@ -163,9 +163,9 @@ public class DetalleMusicaVistaPreviaTests : IDisposable
     {
         _descargas.Setup(d => d.ObtenerRutaVistaPrevia(7, _op)).Returns(RutaPrevia);
         var sut = await AbrirFichaAsync();
-        var item = sut.TemasMusicales.Single();
+        var item = sut.Musica.TemasMusicales.Single();
 
-        await sut.PrevisualizarTemaCommand.ExecuteAsync(item);
+        await sut.Musica.PrevisualizarTemaCommand.ExecuteAsync(item);
 
         _descargas.Verify(d => d.PrepararVistaPreviaAsync(It.IsAny<int>(), It.IsAny<AnimeThemeInfo>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Never);
         _player.RutaAbierta.Should().Be(RutaPrevia);
@@ -176,9 +176,9 @@ public class DetalleMusicaVistaPreviaTests : IDisposable
     {
         _descargas.Setup(d => d.EstaDescargado(7, _op)).Returns(true);
         var sut = await AbrirFichaAsync();
-        var item = sut.TemasMusicales.Single();
+        var item = sut.Musica.TemasMusicales.Single();
 
-        await sut.PrevisualizarTemaCommand.ExecuteAsync(item);
+        await sut.Musica.PrevisualizarTemaCommand.ExecuteAsync(item);
 
         _descargas.Verify(d => d.PrepararVistaPreviaAsync(It.IsAny<int>(), It.IsAny<AnimeThemeInfo>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
@@ -190,8 +190,8 @@ public class DetalleMusicaVistaPreviaTests : IDisposable
         _descargas.Setup(d => d.PrepararVistaPreviaAsync(7, _op, It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
             .Returns(espera.Task);
         var sut = await AbrirFichaAsync();
-        var item = sut.TemasMusicales.Single();
-        var preparando = sut.PrevisualizarTemaCommand.ExecuteAsync(item);
+        var item = sut.Musica.TemasMusicales.Single();
+        var preparando = sut.Musica.PrevisualizarTemaCommand.ExecuteAsync(item);
 
         _themes.Setup(s => s.ObtenerTemasAsync(8, It.IsAny<CancellationToken>())).ReturnsAsync(new List<AnimeThemeInfo>());
         await sut.InicializarAsync(new AnimeItem { AniListId = 8, Titulo = "Otro anime" });
@@ -209,9 +209,9 @@ public class DetalleMusicaVistaPreviaTests : IDisposable
         _descargas.Setup(d => d.ObtenerRutaVistaPrevia(7, _op)).Returns(RutaPrevia);
         _descargas.Setup(d => d.GuardarVistaPrevia(7, _op)).Returns(true);
         var sut = await AbrirFichaAsync();
-        var item = sut.TemasMusicales.Single();
+        var item = sut.Musica.TemasMusicales.Single();
 
-        await sut.DescargarTemaCommand.ExecuteAsync(item);
+        await sut.Musica.DescargarTemaCommand.ExecuteAsync(item);
 
         item.Descargado.Should().BeTrue();
         item.VistaPreviaLista.Should().BeFalse();
@@ -225,12 +225,12 @@ public class DetalleMusicaVistaPreviaTests : IDisposable
     {
         _descargas.Setup(d => d.GuardarVistaPrevia(7, _op)).Returns(true);
         var sut = await AbrirFichaAsync();
-        var item = sut.TemasMusicales.Single();
-        await sut.PrevisualizarTemaCommand.ExecuteAsync(item);
+        var item = sut.Musica.TemasMusicales.Single();
+        await sut.Musica.PrevisualizarTemaCommand.ExecuteAsync(item);
         _player.Posicion = TimeSpan.FromSeconds(33);
         _player.Llamadas.Clear();
 
-        await sut.DescargarTemaCommand.ExecuteAsync(item);
+        await sut.Musica.DescargarTemaCommand.ExecuteAsync(item);
 
         _player.Llamadas.Should().ContainInOrder("Cerrar", $"Abrir:{RutaGuardada}", "Reproducir");
         _player.Posicion.Should().Be(TimeSpan.FromSeconds(33));
@@ -245,9 +245,9 @@ public class DetalleMusicaVistaPreviaTests : IDisposable
         _descargas.Setup(d => d.GuardarVistaPrevia(7, _op)).Returns(false);
         _descargas.Setup(d => d.DescargarYConvertirAsync(7, _op, It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>())).ReturnsAsync(RutaGuardada);
         var sut = await AbrirFichaAsync();
-        var item = sut.TemasMusicales.Single();
+        var item = sut.Musica.TemasMusicales.Single();
 
-        await sut.DescargarTemaCommand.ExecuteAsync(item);
+        await sut.Musica.DescargarTemaCommand.ExecuteAsync(item);
 
         item.Descargado.Should().BeTrue();
         _descargas.Verify(d => d.DescargarYConvertirAsync(7, _op, It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Once);
@@ -261,9 +261,9 @@ public class DetalleMusicaVistaPreviaTests : IDisposable
         _descargas.Setup(d => d.DescargarYConvertirAsync(7, _op, It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
             .Returns<int, AnimeThemeInfo, IProgress<double>?, CancellationToken>((_, _, p, _) => { progreso = p; return espera.Task; });
         var sut = await AbrirFichaAsync();
-        var item = sut.TemasMusicales.Single();
+        var item = sut.Musica.TemasMusicales.Single();
 
-        var descarga = sut.DescargarTemaCommand.ExecuteAsync(item);
+        var descarga = sut.Musica.DescargarTemaCommand.ExecuteAsync(item);
         item.Descargando.Should().BeTrue();
         progreso!.Report(0.25);
         await EsperarAsync(() => item.ProgresoDescarga == 0.25);
@@ -282,9 +282,9 @@ public class DetalleMusicaVistaPreviaTests : IDisposable
     {
         _descargas.Setup(d => d.EstaDescargado(7, _op)).Returns(true);
         var sut = await AbrirFichaAsync();
-        var item = sut.TemasMusicales.Single();
+        var item = sut.Musica.TemasMusicales.Single();
 
-        sut.ReproducirTemaCommand.Execute(item);
+        sut.Musica.ReproducirTemaCommand.Execute(item);
 
         _player.RutaAbierta.Should().Be(RutaGuardada);
         item.Reproduciendo.Should().BeTrue();
@@ -295,13 +295,13 @@ public class DetalleMusicaVistaPreviaTests : IDisposable
     {
         _descargas.Setup(d => d.EstaDescargado(7, _op)).Returns(true);
         var sut = await AbrirFichaAsync();
-        var item = sut.TemasMusicales.Single();
-        sut.ReproducirTemaCommand.Execute(item);
+        var item = sut.Musica.TemasMusicales.Single();
+        sut.Musica.ReproducirTemaCommand.Execute(item);
         _player.Posicion = TimeSpan.FromSeconds(50);
 
-        sut.ReproducirTemaCommand.Execute(item); // pausa
+        sut.Musica.ReproducirTemaCommand.Execute(item); // pausa
         item.Reproduciendo.Should().BeFalse();
-        sut.ReproducirTemaCommand.Execute(item); // reanuda
+        sut.Musica.ReproducirTemaCommand.Execute(item); // reanuda
 
         item.Reproduciendo.Should().BeTrue();
         _player.VecesQue("Abrir").Should().Be(1);
@@ -313,7 +313,7 @@ public class DetalleMusicaVistaPreviaTests : IDisposable
     {
         var sut = await AbrirFichaAsync();
 
-        sut.ReproducirTemaCommand.Execute(sut.TemasMusicales.Single());
+        sut.Musica.ReproducirTemaCommand.Execute(sut.Musica.TemasMusicales.Single());
 
         _player.VecesQue("Abrir").Should().Be(0);
     }
@@ -323,10 +323,10 @@ public class DetalleMusicaVistaPreviaTests : IDisposable
     {
         _descargas.Setup(d => d.EstaDescargado(7, _op)).Returns(true);
         var sut = await AbrirFichaAsync();
-        var item = sut.TemasMusicales.Single();
-        sut.ReproducirTemaCommand.Execute(item);
+        var item = sut.Musica.TemasMusicales.Single();
+        sut.Musica.ReproducirTemaCommand.Execute(item);
 
-        sut.BuscarTema(item, 61);
+        sut.Musica.BuscarTema(item, 61);
 
         _player.Posicion.Should().Be(TimeSpan.FromSeconds(61));
         item.PosicionTexto.Should().Be("1:01");
@@ -337,7 +337,7 @@ public class DetalleMusicaVistaPreviaTests : IDisposable
     {
         var sut = await AbrirFichaAsync();
 
-        var act = () => sut.BuscarTema(sut.TemasMusicales.Single(), 10);
+        var act = () => sut.Musica.BuscarTema(sut.Musica.TemasMusicales.Single(), 10);
 
         act.Should().NotThrow();
     }
@@ -351,10 +351,11 @@ public class DetalleMusicaVistaPreviaTests : IDisposable
         var ordenados = new List<string>();
         _descargas.Setup(d => d.Eliminar(7, _op)).Callback(() => ordenados.Add($"Eliminar(cerrado={_player.EstaCerrado})"));
         var sut = await AbrirFichaAsync();
-        var item = sut.TemasMusicales.Single();
-        sut.ReproducirTemaCommand.Execute(item);
+        var item = sut.Musica.TemasMusicales.Single();
+        sut.Musica.ReproducirTemaCommand.Execute(item);
 
-        sut.EliminarTemaCommand.Execute(item);
+        _dialogos.Setup(d => d.MostrarDialogoAsync(It.IsAny<string>(), It.IsAny<string>(), true, It.IsAny<string>(), It.IsAny<string>())).ReturnsAsync(true); // acepta la confirmación
+        sut.Musica.EliminarTemaCommand.Execute(item);
 
         ordenados.Should().ContainSingle().Which.Should().Be("Eliminar(cerrado=True)");
         item.Descargado.Should().BeFalse();
@@ -366,14 +367,14 @@ public class DetalleMusicaVistaPreviaTests : IDisposable
     {
         _descargas.Setup(d => d.EstaDescargado(7, _op)).Returns(true);
         var sut = await AbrirFichaAsync();
-        sut.ReproducirTemaCommand.Execute(sut.TemasMusicales.Single());
+        sut.Musica.ReproducirTemaCommand.Execute(sut.Musica.TemasMusicales.Single());
         _themes.Setup(s => s.ObtenerTemasAsync(8, It.IsAny<CancellationToken>())).ReturnsAsync(new List<AnimeThemeInfo>());
 
         await sut.InicializarAsync(new AnimeItem { AniListId = 8, Titulo = "Otro" });
 
         _player.EstaCerrado.Should().BeTrue();
         _player.EstaSonando.Should().BeFalse();
-        sut.TemasMusicales.Should().BeEmpty();
+        sut.Musica.TemasMusicales.Should().BeEmpty();
     }
 
     [Fact]
@@ -381,14 +382,14 @@ public class DetalleMusicaVistaPreviaTests : IDisposable
     {
         _descargas.Setup(d => d.EstaDescargado(7, _op)).Returns(true);
         var sut = await AbrirFichaAsync();
-        var item = sut.TemasMusicales.Single();
-        sut.ReproducirTemaCommand.Execute(item);
+        var item = sut.Musica.TemasMusicales.Single();
+        sut.Musica.ReproducirTemaCommand.Execute(item);
 
-        sut.DetenerMusica();
+        sut.Musica.DetenerMusica();
 
         _player.EstaSonando.Should().BeFalse();
         item.Reproduciendo.Should().BeFalse();
-        sut.TemasMusicales.Should().HaveCount(1);
+        sut.Musica.TemasMusicales.Should().HaveCount(1);
     }
 
     [Fact]
@@ -396,7 +397,7 @@ public class DetalleMusicaVistaPreviaTests : IDisposable
     {
         var sut = await AbrirFichaAsync();
 
-        var act = () => sut.DetenerMusica();
+        var act = () => sut.Musica.DetenerMusica();
 
         act.Should().NotThrow();
     }
@@ -406,7 +407,7 @@ public class DetalleMusicaVistaPreviaTests : IDisposable
     {
         _descargas.Setup(d => d.EstaDescargado(7, _op)).Returns(true);
         var sut = await AbrirFichaAsync();
-        sut.ReproducirTemaCommand.Execute(sut.TemasMusicales.Single());
+        sut.Musica.ReproducirTemaCommand.Execute(sut.Musica.TemasMusicales.Single());
 
         sut.Dispose();
 
@@ -423,19 +424,19 @@ public class DetalleMusicaVistaPreviaTests : IDisposable
         try
         {
             var sut = await AbrirFichaAsync();
-            sut.ReproducirTemaCommand.Execute(sut.TemasMusicales.Single());
+            sut.Musica.ReproducirTemaCommand.Execute(sut.Musica.TemasMusicales.Single());
 
-            sut.VolumenMusica = 0.35;
+            sut.Musica.VolumenMusica = 0.35;
 
             _player.Volumen.Should().Be(0.35);
 
             var otraFicha = await AbrirFichaAsync();
-            otraFicha.VolumenMusica.Should().Be(0.35, "el volumen elegido dura toda la sesión");
+            otraFicha.Musica.VolumenMusica.Should().Be(0.35, "el volumen elegido dura toda la sesión");
         }
         finally
         {
             var restaurar = await AbrirFichaAsync();
-            restaurar.VolumenMusica = original;
+            restaurar.Musica.VolumenMusica = original;
         }
     }
 }
