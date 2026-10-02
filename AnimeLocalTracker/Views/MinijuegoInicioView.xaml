@@ -1,0 +1,70 @@
+<UserControl x:Class="AnimeLocalTracker.Views.MinijuegoInicioView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+             xmlns:loc="clr-namespace:AnimeLocalTracker.Services"
+             Background="Transparent">
+
+    <!-- Lo que los tres juegos enseñan antes de empezar una partida: cargando, "no hay animes suficientes" y la presentación
+         con el botón Jugar. Se enlaza al ViewModel del juego (Icono, TituloTexto, DescripcionTexto, RecordTexto, ReglasTexto,
+         MensajeError, IniciarPartidaCommand…). -->
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="MinijuegosEstilos.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <Grid>
+        <!-- Cargando la biblioteca o preparando la partida -->
+        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="{Binding EstaCargando, Converter={StaticResource BoolToVis}}">
+            <ProgressBar Style="{StaticResource MaterialDesignCircularProgressBar}"
+                         IsIndeterminate="True" Width="44" Height="44" Value="0" Foreground="{DynamicResource Brush.Accent}" HorizontalAlignment="Center"/>
+            <TextBlock Text="{Binding PreparandoTexto}" Style="{StaticResource AppText.Secondary}" Margin="0,14,0,0" HorizontalAlignment="Center"
+                       Visibility="{Binding EstaPreparando, Converter={StaticResource BoolToVis}}"/>
+        </StackPanel>
+
+        <!-- Sin animes suficientes -->
+        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,40,0,40"
+                    Visibility="{Binding MostrarSinAnimes, Converter={StaticResource BoolToVis}}">
+            <Border Background="{DynamicResource Brush.Surface3}" CornerRadius="36" Width="72" Height="72" Margin="0,0,0,16" HorizontalAlignment="Center">
+                <materialDesign:PackIcon Kind="{Binding IconoSinAnimes}" Foreground="{DynamicResource Brush.TextTertiary}" Width="36" Height="36" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+            <TextBlock Text="{Binding [Mini_NoHayAnimesTitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppEmptyTitle}"/>
+            <TextBlock Text="{Binding SinAnimesTexto}" Style="{StaticResource AppEmptyText}" Margin="0,6,0,0" MaxWidth="420" TextWrapping="Wrap"/>
+        </StackPanel>
+
+        <!-- Presentación del juego -->
+        <Border Style="{StaticResource AppCard}" MaxWidth="560" Padding="32,28" VerticalAlignment="Top" HorizontalAlignment="Center"
+                Visibility="{Binding MostrarPresentacion, Converter={StaticResource BoolToVis}}">
+            <StackPanel HorizontalAlignment="Center">
+                <Border Background="{DynamicResource Brush.Surface3}" CornerRadius="32" Width="64" Height="64" Margin="0,0,0,16" HorizontalAlignment="Center">
+                    <materialDesign:PackIcon Kind="{Binding Icono}" Foreground="{DynamicResource Brush.Accent}" Width="34" Height="34" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+                <TextBlock Text="{Binding TituloTexto}" Style="{StaticResource AppText.Section}" HorizontalAlignment="Center"/>
+                <TextBlock Text="{Binding DescripcionTexto}" Style="{StaticResource AppText.Secondary}"
+                           TextWrapping="Wrap" TextAlignment="Center" Margin="0,10,0,0"/>
+                <TextBlock Text="{Binding RecordTexto}" Style="{StaticResource AppText.Micro}" Foreground="{DynamicResource Brush.Warning}"
+                           HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" Margin="0,12,0,0"
+                           Visibility="{Binding HayRecord, Converter={StaticResource BoolToVis}}"/>
+                <TextBlock Text="{Binding ReglasTexto}" Style="{StaticResource AppText.Micro}" Foreground="{DynamicResource Brush.TextTertiary}"
+                           HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" Margin="0,12,0,22"/>
+
+                <!-- Por qué no se pudo empezar la partida anterior (sin conexión y sin nada guardado, etc.) -->
+                <Border Background="{DynamicResource Brush.Surface2}" BorderBrush="{DynamicResource Brush.Danger}" BorderThickness="1" CornerRadius="10"
+                        Padding="14,10" Margin="0,0,0,18" Visibility="{Binding HayError, Converter={StaticResource BoolToVis}}">
+                    <TextBlock Text="{Binding MensajeError}" Style="{StaticResource AppText.Secondary}" Foreground="{DynamicResource Brush.Danger}" TextWrapping="Wrap"/>
+                </Border>
+
+                <Button Command="{Binding IniciarPartidaCommand}" Style="{StaticResource MiniBotonPrincipal}" HorizontalAlignment="Center"
+                        AutomationProperties.Name="{Binding [Mini_Jugar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon Kind="Play" Width="20" Height="20" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding [Mini_Jugar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

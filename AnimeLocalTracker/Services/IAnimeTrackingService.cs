@@ -27,6 +27,8 @@ public interface IAnimeTrackingService
     /// puntuación. Un valor null significa "no modificar" (nunca borra la fecha que AniList ya tenga).
     /// </summary>
     Task<bool> GuardarFechasSeguimientoAsync(int mediaId, System.DateTime? fechaInicio, System.DateTime? fechaFin, string token, bool marcarCompletado);
+    /// <summary>Cambia SOLO el estado (CURRENT, COMPLETED…) en AniList; no toca progreso, puntuación ni fechas.</summary>
+    Task<bool> GuardarEstadoSeguimientoAsync(int mediaId, string estado, string token);
     /// <summary>
     /// Próximo episodio programado de un anime (consulta mínima y SIN caché en memoria: la usa la caché local de la
     /// cuenta atrás). Exito=false si la consulta falló; con Exito=true y Proximo=null, AniList no tiene ninguno programado.

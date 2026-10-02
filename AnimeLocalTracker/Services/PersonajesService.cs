@@ -127,7 +127,9 @@ public sealed class PersonajesService : IPersonajesService
             ct.ThrowIfCancellationRequested();
 
             var nuevos = await ConsultarAsync(lote, ct);
-            if (nuevos == null) continue; // sin red o AniList caído: se sigue con la copia vieja de esos animes
+            // Sin red o AniList caído: se sigue con la copia vieja y no se insiste con los demás lotes. Con wifi pero sin salida a
+            // internet cada intento esperaba su tiempo máximo y la partida agotaba el suyo teniendo personajes guardados.
+            if (nuevos == null) break;
 
             try { await _database.GuardarPersonajesAsync(nuevos); }
             catch (Exception ex) { AppLogger.Debug("PersonajesService", $"No se pudieron guardar los personajes: {ex.Message}"); }

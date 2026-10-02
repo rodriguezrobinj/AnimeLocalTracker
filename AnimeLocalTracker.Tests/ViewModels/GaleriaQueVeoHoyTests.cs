@@ -71,26 +71,26 @@ public class GaleriaQueVeoHoyTests
         WeakReferenceMessenger.Default.Register<NavegarMensaje_Reproductor>(receptor, (r, m) => ((Receptor)r).Receive(m));
         try
         {
-            await sut.ElegirQueVerHoyCommand.ExecuteAsync(null);
+            await sut.QueVeoHoy.ElegirQueVerHoyCommand.ExecuteAsync(null);
 
             // Antes saltaba directo al reproductor sin dejar opción; ahora primero gira la ruleta.
-            sut.FaseActualQueVer.Should().Be(FaseQueVer.Girando);
-            sut.QueVerElegido!.AniListId.Should().Be(50);
-            sut.QueVerEpisodioNumero.Should().Be(2, "es el siguiente episodio no visto en orden cronológico");
+            sut.QueVeoHoy.FaseActualQueVer.Should().Be(FaseQueVer.Girando);
+            sut.QueVeoHoy.QueVerElegido!.AniListId.Should().Be(50);
+            sut.QueVeoHoy.QueVerEpisodioNumero.Should().Be(2, "es el siguiente episodio no visto en orden cronológico");
             receptor.Recibido.Should().BeNull("no se navega hasta que el usuario pulse Ver ahora");
 
-            sut.TerminarGiroQueVerCommand.Execute(null);
-            sut.FaseActualQueVer.Should().Be(FaseQueVer.Resultado);
+            sut.QueVeoHoy.TerminarGiroQueVerCommand.Execute(null);
+            sut.QueVeoHoy.FaseActualQueVer.Should().Be(FaseQueVer.Resultado);
             receptor.Recibido.Should().BeNull();
 
-            sut.VerElegidoQueVerCommand.Execute(null);
+            sut.QueVeoHoy.VerElegidoQueVerCommand.Execute(null);
 
             receptor.Recibido.Should().NotBeNull();
             receptor.Recibido!.AnimeId.Should().Be(50);
             receptor.Recibido.TituloAnime.Should().Be("One Piece");
             receptor.Recibido.Episodio.Should().Be(2);
             receptor.Recibido.EpisodiosDisponibles.Should().HaveCount(3);
-            sut.FaseActualQueVer.Should().Be(FaseQueVer.Oculto, "el panel se cierra al ir al reproductor");
+            sut.QueVeoHoy.FaseActualQueVer.Should().Be(FaseQueVer.Oculto, "el panel se cierra al ir al reproductor");
         }
         finally
         {
@@ -105,10 +105,10 @@ public class GaleriaQueVeoHoyTests
         foreach (var a in animes) Configurar(a, 2);
         var sut = await CrearAsync(animes);
 
-        await sut.ElegirQueVerHoyCommand.ExecuteAsync(null);
+        await sut.QueVeoHoy.ElegirQueVerHoyCommand.ExecuteAsync(null);
 
-        sut.RuletaPortadasQueVer.Should().HaveCount(40);
-        sut.RuletaPortadasQueVer[sut.RuletaIndiceGanadorQueVer].AniListId.Should().Be(sut.QueVerElegido!.AniListId);
+        sut.QueVeoHoy.RuletaPortadasQueVer.Should().HaveCount(40);
+        sut.QueVeoHoy.RuletaPortadasQueVer[sut.QueVeoHoy.RuletaIndiceGanadorQueVer].AniListId.Should().Be(sut.QueVeoHoy.QueVerElegido!.AniListId);
     }
 
     [Fact]
@@ -118,11 +118,11 @@ public class GaleriaQueVeoHoyTests
         Configurar(anime, totalEpisodios: 1, vistos: 1);
         var sut = await CrearAsync(anime);
 
-        await sut.ElegirQueVerHoyCommand.ExecuteAsync(null);
+        await sut.QueVeoHoy.ElegirQueVerHoyCommand.ExecuteAsync(null);
 
-        sut.FaseActualQueVer.Should().Be(FaseQueVer.SinPendientes);
-        sut.QueVerMensaje.Should().NotBeNullOrWhiteSpace();
-        sut.EstaBuscandoQueVer.Should().BeFalse();
+        sut.QueVeoHoy.FaseActualQueVer.Should().Be(FaseQueVer.SinPendientes);
+        sut.QueVeoHoy.QueVerMensaje.Should().NotBeNullOrWhiteSpace();
+        sut.QueVeoHoy.EstaBuscandoQueVer.Should().BeFalse();
         _dialog.Verify(d => d.MostrarDialogoAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
     }
 
@@ -131,10 +131,10 @@ public class GaleriaQueVeoHoyTests
     {
         var sut = await CrearAsync(new AnimeItem { AniListId = 50, Titulo = "One Piece", EstadoUsuario = "CURRENT" });
 
-        await sut.ElegirQueVerHoyCommand.ExecuteAsync(null);
+        await sut.QueVeoHoy.ElegirQueVerHoyCommand.ExecuteAsync(null);
 
-        sut.FaseActualQueVer.Should().Be(FaseQueVer.SinCarpeta);
-        sut.EstaBuscandoQueVer.Should().BeFalse();
+        sut.QueVeoHoy.FaseActualQueVer.Should().Be(FaseQueVer.SinCarpeta);
+        sut.QueVeoHoy.EstaBuscandoQueVer.Should().BeFalse();
     }
 
     [Fact]
@@ -146,9 +146,9 @@ public class GaleriaQueVeoHoyTests
         Configurar(enCurso, 3, vistos: 1);
         var sut = await CrearAsync(planeado, enCurso);
 
-        await sut.ElegirQueVerHoyCommand.ExecuteAsync(null);
+        await sut.QueVeoHoy.ElegirQueVerHoyCommand.ExecuteAsync(null);
 
-        sut.QueVerElegido!.AniListId.Should().Be(2);
+        sut.QueVeoHoy.QueVerElegido!.AniListId.Should().Be(2);
     }
 
     [Theory]
@@ -162,10 +162,10 @@ public class GaleriaQueVeoHoyTests
         Configurar(anime, totalEpisodios: 12);
         var sut = await CrearAsync(anime);
 
-        await sut.ElegirQueVerHoyCommand.ExecuteAsync(null);
+        await sut.QueVeoHoy.ElegirQueVerHoyCommand.ExecuteAsync(null);
 
-        sut.FaseActualQueVer.Should().Be(FaseQueVer.SinPendientes);
-        sut.QueVerElegido.Should().BeNull();
+        sut.QueVeoHoy.FaseActualQueVer.Should().Be(FaseQueVer.SinPendientes);
+        sut.QueVeoHoy.QueVerElegido.Should().BeNull();
     }
 
     [Fact]
@@ -177,9 +177,9 @@ public class GaleriaQueVeoHoyTests
         Configurar(planeado, totalEpisodios: 2);
         var sut = await CrearAsync(alDia, planeado);
 
-        await sut.ElegirQueVerHoyCommand.ExecuteAsync(null);
+        await sut.QueVeoHoy.ElegirQueVerHoyCommand.ExecuteAsync(null);
 
-        sut.QueVerElegido!.AniListId.Should().Be(2);
+        sut.QueVeoHoy.QueVerElegido!.AniListId.Should().Be(2);
     }
 
     [Fact]
@@ -192,9 +192,9 @@ public class GaleriaQueVeoHoyTests
         _db.Setup(d => d.ObtenerRegistrosPorAnimeAsync(1)).ReturnsAsync(new List<RegistroEpisodio>());
         var sut = await CrearAsync(planeado);
 
-        await sut.ElegirQueVerHoyCommand.ExecuteAsync(null);
+        await sut.QueVeoHoy.ElegirQueVerHoyCommand.ExecuteAsync(null);
 
-        sut.FaseActualQueVer.Should().Be(FaseQueVer.SinPendientes);
+        sut.QueVeoHoy.FaseActualQueVer.Should().Be(FaseQueVer.SinPendientes);
     }
 
     [Fact]
@@ -206,20 +206,20 @@ public class GaleriaQueVeoHoyTests
         Configurar(b, 2);
         var sut = await CrearAsync(a, b);
 
-        await sut.ElegirQueVerHoyCommand.ExecuteAsync(null);
-        sut.TerminarGiroQueVerCommand.Execute(null);
-        int primero = sut.QueVerElegido!.AniListId;
+        await sut.QueVeoHoy.ElegirQueVerHoyCommand.ExecuteAsync(null);
+        sut.QueVeoHoy.TerminarGiroQueVerCommand.Execute(null);
+        int primero = sut.QueVeoHoy.QueVerElegido!.AniListId;
 
-        sut.OtroQueVerHoyCommand.CanExecute(null).Should().BeTrue();
-        await sut.OtroQueVerHoyCommand.ExecuteAsync(null);
-        sut.FaseActualQueVer.Should().Be(FaseQueVer.Girando);
-        int segundo = sut.QueVerElegido!.AniListId;
+        sut.QueVeoHoy.OtroQueVerHoyCommand.CanExecute(null).Should().BeTrue();
+        await sut.QueVeoHoy.OtroQueVerHoyCommand.ExecuteAsync(null);
+        sut.QueVeoHoy.FaseActualQueVer.Should().Be(FaseQueVer.Girando);
+        int segundo = sut.QueVeoHoy.QueVerElegido!.AniListId;
         segundo.Should().NotBe(primero);
 
         // Con todo mostrado el ciclo se reinicia, pero nunca repite el que acaba de salir.
-        sut.TerminarGiroQueVerCommand.Execute(null);
-        await sut.OtroQueVerHoyCommand.ExecuteAsync(null);
-        sut.QueVerElegido!.AniListId.Should().Be(primero);
+        sut.QueVeoHoy.TerminarGiroQueVerCommand.Execute(null);
+        await sut.QueVeoHoy.OtroQueVerHoyCommand.ExecuteAsync(null);
+        sut.QueVeoHoy.QueVerElegido!.AniListId.Should().Be(primero);
     }
 
     [Fact]
@@ -229,11 +229,11 @@ public class GaleriaQueVeoHoyTests
         Configurar(unico, 2);
         var sut = await CrearAsync(unico);
 
-        await sut.ElegirQueVerHoyCommand.ExecuteAsync(null);
-        sut.TerminarGiroQueVerCommand.Execute(null);
+        await sut.QueVeoHoy.ElegirQueVerHoyCommand.ExecuteAsync(null);
+        sut.QueVeoHoy.TerminarGiroQueVerCommand.Execute(null);
 
-        sut.HayOtraOpcionQueVer.Should().BeFalse();
-        sut.OtroQueVerHoyCommand.CanExecute(null).Should().BeFalse();
+        sut.QueVeoHoy.HayOtraOpcionQueVer.Should().BeFalse();
+        sut.QueVeoHoy.OtroQueVerHoyCommand.CanExecute(null).Should().BeFalse();
     }
 
     [Fact]
@@ -244,9 +244,9 @@ public class GaleriaQueVeoHoyTests
         foreach (var a in animes) Configurar(a, 2);
         var sut = await CrearAsync(animes);
 
-        await sut.ElegirQueVerHoyCommand.ExecuteAsync(null);
+        await sut.QueVeoHoy.ElegirQueVerHoyCommand.ExecuteAsync(null);
 
-        sut.FaseActualQueVer.Should().Be(FaseQueVer.Girando);
+        sut.QueVeoHoy.FaseActualQueVer.Should().Be(FaseQueVer.Girando);
         _scanner.Invocations.Count(i => i.Method.Name == nameof(IFileScannerService.EscanearEpisodiosAsync))
             .Should().BeLessThanOrEqualTo(12, "basta con reunir unos 8 candidatos");
     }
@@ -258,18 +258,18 @@ public class GaleriaQueVeoHoyTests
         Configurar(anime, 2);
         var sut = await CrearAsync(anime);
 
-        await sut.ElegirQueVerHoyCommand.ExecuteAsync(null);
-        sut.QueVerHoyAbierto.Should().BeTrue();
-        sut.SePuedeAyudarAverQueVer.Should().BeFalse("mientras el panel está abierto el botón queda ocupado");
+        await sut.QueVeoHoy.ElegirQueVerHoyCommand.ExecuteAsync(null);
+        sut.QueVeoHoy.QueVerHoyAbierto.Should().BeTrue();
+        sut.QueVeoHoy.SePuedeAyudarAverQueVer.Should().BeFalse("mientras el panel está abierto el botón queda ocupado");
 
-        sut.CerrarQueVerHoyCommand.Execute(null);
+        sut.QueVeoHoy.CerrarQueVerHoyCommand.Execute(null);
 
-        sut.FaseActualQueVer.Should().Be(FaseQueVer.Oculto);
-        sut.QueVerElegido.Should().BeNull();
-        sut.ElegirQueVerHoyCommand.CanExecute(null).Should().BeTrue();
+        sut.QueVeoHoy.FaseActualQueVer.Should().Be(FaseQueVer.Oculto);
+        sut.QueVeoHoy.QueVerElegido.Should().BeNull();
+        sut.QueVeoHoy.ElegirQueVerHoyCommand.CanExecute(null).Should().BeTrue();
 
-        await sut.ElegirQueVerHoyCommand.ExecuteAsync(null);
-        sut.FaseActualQueVer.Should().Be(FaseQueVer.Girando);
+        await sut.QueVeoHoy.ElegirQueVerHoyCommand.ExecuteAsync(null);
+        sut.QueVeoHoy.FaseActualQueVer.Should().Be(FaseQueVer.Girando);
     }
 
     [Fact]
@@ -279,10 +279,10 @@ public class GaleriaQueVeoHoyTests
         Configurar(anime, 2);
         var sut = await CrearAsync(anime);
 
-        await sut.ElegirQueVerHoyCommand.ExecuteAsync(null);
+        await sut.QueVeoHoy.ElegirQueVerHoyCommand.ExecuteAsync(null);
 
-        sut.VerElegidoQueVerCommand.CanExecute(null).Should().BeFalse("la ruleta todavía está girando");
-        sut.TerminarGiroQueVerCommand.Execute(null);
-        sut.VerElegidoQueVerCommand.CanExecute(null).Should().BeTrue();
+        sut.QueVeoHoy.VerElegidoQueVerCommand.CanExecute(null).Should().BeFalse("la ruleta todavía está girando");
+        sut.QueVeoHoy.TerminarGiroQueVerCommand.Execute(null);
+        sut.QueVeoHoy.VerElegidoQueVerCommand.CanExecute(null).Should().BeTrue();
     }
 }

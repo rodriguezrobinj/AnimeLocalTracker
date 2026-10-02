@@ -15,9 +15,9 @@ namespace AnimeLocalTracker.ViewModels;
 
 /// <summary>
 /// "Adivina el OP/ED": suena un trozo de un opening/ending y hay que decir de qué anime de tu biblioteca es.
-/// Los clips salen de AnimeThemes.moe (audio .ogg → mp3 con el ffmpeg de la app) y se guardan en la misma carpeta que
-/// las descargas de la ficha; una vez guardados se juega sin conexión. Cada ronda se prepara en segundo plano mientras
-/// se juega la anterior, y si AnimeThemes no responde se usan solo los temas ya descargados.
+/// Los clips salen de AnimeThemes.moe (audio .ogg → mp3 con el ffmpeg de la app): se usan los que ya descargaste desde la
+/// ficha y los demás van a la caché temporal de vistas previas, no a tu carpeta de música. Cada ronda se prepara en segundo
+/// plano mientras se juega la anterior, y si AnimeThemes no responde se usan solo los temas que tengas descargados.
 /// La lógica pura vive en <see cref="AdivinaOpEdJuego"/>.
 /// </summary>
 public sealed partial class AdivinaOpEdViewModel : MinijuegoViewModelBase, IDisposable
@@ -45,7 +45,6 @@ public sealed partial class AdivinaOpEdViewModel : MinijuegoViewModelBase, IDisp
     private RondaOpEd? _ronda;
     private int _pasosExtra;
     private int _rondasPedidas;
-    private int _puntosGanadosRonda;
     private int _fallosSeguidos;
     private int _timeoutsSeguidos;
     private bool _soloLocal;
@@ -62,21 +61,27 @@ public sealed partial class AdivinaOpEdViewModel : MinijuegoViewModelBase, IDisp
     [NotifyPropertyChangedFor(nameof(PuedePedirPista))]
     private bool _estaPreparandoRonda;
 
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HayError))]
-    private string _mensajeError = string.Empty;
-
-    [ObservableProperty] private ObservableCollection<PistaItem> _pistas = new();
     [ObservableProperty] private string _tipoTemaTexto = string.Empty;
     [ObservableProperty] private int _segundosClip = AdivinaOpEdJuego.SegundosIniciales;
-    [ObservableProperty] private string _puntosPosiblesTexto = string.Empty;
     [ObservableProperty] private bool _estaSonando;
+
+    /// <summary>El clip no se pudo reproducir (archivo dañado o sin dispositivo de audio): se avisa en vez de aparentar que suena.</summary>
+    [ObservableProperty] private bool _audioFallido;
 
     /// <summary>Solo tras responder: portada del anime y datos del tema.</summary>
     [ObservableProperty] private string _portadaRespuesta = string.Empty;
     [ObservableProperty] private string _temaReveladoTexto = string.Empty;
 
-    public bool HayError => MensajeError.Length > 0;
+    public override string Icono => "MusicNote";
+    public override string IconoSinAnimes => "MusicNoteOff";
+    protected override string ClaveTitulo => "Mini_OpEdTitulo";
+    protected override string ClaveDescripcion => "Mini_OpEdDesc";
+
+    protected override int IndiceCorrectoRonda => _ronda?.IndiceCorrecto ?? -1;
+    protected override string RespuestaRonda => _ronda?.Respuesta.Titulo ?? string.Empty;
+    protected override int PuntosSiAcierta => AdivinaAnimeJuego.Puntos(1 + _pasosExtra);
+    protected override bool PuedeResponder => base.PuedeResponder && !EstaPreparandoRonda;
+
     /// <summary>Dentro del panel de partida: la ronda cuando está lista; mientras no, el indicador de "preparando".</summary>
     public bool MostrarContenidoRonda => !EstaPreparandoRonda;
     public string SegundosClipTexto => string.Format(LocalizationService.T("Mini_OpEd_ClipFormato"), SegundosClip);
@@ -89,16 +94,55 @@ public sealed partial class AdivinaOpEdViewModel : MinijuegoViewModelBase, IDisp
 
     protected override string JuegoId => JuegosMinijuego.AdivinaOpEd;
 
+    private readonly ISettingsService? _settings;
+
+    /// <summary>Volumen del clip (0 a 1). Es el mismo ajuste que la música de la ficha: se cambia en un sitio y vale para los dos.</summary>
+    [ObservableProperty] private double _volumen = 0.8;
+
+    /// <summary>Cuánto dura lo que está sonando: la vista dibuja con ello el avance del clip.</summary>
+    [ObservableProperty] private TimeSpan _duracionSonando;
+
     public AdivinaOpEdViewModel(IDatabaseService databaseService, IAnimeThemesService themes,
-        IAnimeThemesDownloadService descargas, IClipPlayer player, IMinijuegosRecordsService? records = null) : base(databaseService, records)
+        IAnimeThemesDownloadService descargas, IClipPlayer player, IMinijuegosRecordsService? records = null,
+        ISettingsService? settings = null) : base(databaseService, records)
     {
+        _settings = settings;
+        if (settings?.ObtenerConfiguracion() is { } config && double.IsFinite(config.VolumenMusica))
+            _volumen = Math.Clamp(config.VolumenMusica, 0, 1);
+        player.Volumen = _volumen;
         _themes = themes;
         _descargas = descargas;
         _player = player;
         _player.ReproduccionTerminada += (_, _) => EstaSonando = false;
+        _player.ReproduccionFallida += (_, _) =>
+        {
+            EstaSonando = false;
+            AudioFallido = true;
+        };
     }
 
     partial void OnSegundosClipChanged(int value) => OnPropertyChanged(nameof(SegundosClipTexto));
+
+    partial void OnVolumenChanged(double value)
+    {
+        _player.Volumen = value;
+        _ = GuardarVolumenAsync(value);
+    }
+
+    private async Task GuardarVolumenAsync(double valor)
+    {
+        try
+        {
+            var config = _settings?.ObtenerConfiguracion();
+            if (config == null) return;
+            config.VolumenMusica = Math.Clamp(valor, 0, 1);
+            await _settings!.GuardarConfiguracionAsync(config);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("AdivinaOpEdViewModel", $"No se pudo guardar el volumen: {ex.Message}");
+        }
+    }
 
     [RelayCommand]
     private async Task IniciarPartidaAsync()
@@ -129,14 +173,7 @@ public sealed partial class AdivinaOpEdViewModel : MinijuegoViewModelBase, IDisp
         _locales = await Task.Run(() => CargarLocales(biblioteca));
 
         _siguiente = IniciarPreparacion(ct);
-        await AvanzarAsync();
-    }
-
-    [RelayCommand]
-    private async Task SiguienteAsync()
-    {
-        if (!EsJugando || !HaRespondido) return;
-        await AvanzarAsync();
+        await AvanzarRondaAsync();
     }
 
     [RelayCommand]
@@ -159,54 +196,20 @@ public sealed partial class AdivinaOpEdViewModel : MinijuegoViewModelBase, IDisp
         Reproducir(HaRespondido ? AdivinaOpEdJuego.SegundosRevelacion : SegundosClip);
     }
 
-    [RelayCommand]
-    private void Responder(OpcionRespuesta? opcion)
+    /// <summary>Al responder se ve de dónde venía la canción y suena un trozo más largo para disfrutarla.</summary>
+    protected override void AlResponder()
     {
-        if (opcion == null || _ronda == null || HaRespondido || !EsJugando || EstaPreparandoRonda) return;
-
-        HaRespondido = true;
-        UltimoFueAcierto = opcion.Indice == _ronda.IndiceCorrecto;
-        Opciones[_ronda.IndiceCorrecto].EsCorrecta = true;
-        ContabilizarRonda(UltimoFueAcierto);
-
-        if (UltimoFueAcierto)
-        {
-            _puntosGanadosRonda = AdivinaAnimeJuego.Puntos(1 + _pasosExtra);
-            Puntos += _puntosGanadosRonda;
-            Aciertos++;
-        }
-        else
-        {
-            _puntosGanadosRonda = 0;
-            opcion.EsIncorrecta = true;
-        }
-
+        if (_ronda == null) return;
         PortadaRespuesta = _ronda.Respuesta.PortadaVisible;
-        PuntosPosiblesTexto = string.Empty;
         ActualizarTemaRevelado();
-        ActualizarResultadoTexto();
-        OnPropertyChanged(nameof(TextoSiguiente));
-
-        // Al responder suena un trozo más largo: se disfruta la canción y se ve de dónde venía.
         Reproducir(AdivinaOpEdJuego.SegundosRevelacion);
     }
 
-    /// <summary>Atajo de teclado 1–4: responde con la opción de ese número.</summary>
-    [RelayCommand]
-    private void ResponderNumero(string? numero)
-    {
-        if (!int.TryParse(numero, NumberStyles.Integer, CultureInfo.InvariantCulture, out int n)) return;
-        Responder(Opciones.FirstOrDefault(o => o.Numero == n));
-    }
-
-    [RelayCommand]
-    private async Task VolverAlInicioAsync()
+    protected override void AlVolverAlInicio()
     {
         CancelarTrabajo();
         Detener();
         EstaPreparandoRonda = false;
-        Estado = EstadoMinijuego.Inicio;
-        await PrepararAsync();
     }
 
     /// <summary>Al cerrar la app (el contenedor de DI libera los singleton): cancela lo pendiente y corta el sonido.</summary>
@@ -226,7 +229,7 @@ public sealed partial class AdivinaOpEdViewModel : MinijuegoViewModelBase, IDisp
 
     // === Flujo de rondas ===
 
-    private async Task AvanzarAsync()
+    protected override async Task AvanzarRondaAsync()
     {
         if (_avanzando) return;
         _avanzando = true;
@@ -370,7 +373,9 @@ public sealed partial class AdivinaOpEdViewModel : MinijuegoViewModelBase, IDisp
 
         if (temas.Count > 0) _timeoutsSeguidos = 0;
 
-        var elegido = AdivinaOpEdJuego.ElegirTema(temas, t => _descargas.EstaDescargado(id, t), Rng);
+        // Se prefiere lo que ya está en disco: lo que guardaste tú o lo que el juego ya bajó en esta sesión.
+        var elegido = AdivinaOpEdJuego.ElegirTema(temas,
+            t => _descargas.EstaDescargado(id, t) || _descargas.ObtenerRutaVistaPrevia(id, t) != null, Rng);
         if (elegido == null) return null;
 
         string? ruta;
@@ -380,9 +385,11 @@ public sealed partial class AdivinaOpEdViewModel : MinijuegoViewModelBase, IDisp
         }
         else
         {
+            // A la caché temporal de vistas previas (se vacía al abrir la app), no a tu carpeta de música: jugar dejaba hasta
+            // 10 canciones por partida en tu biblioteca y otras tantas entradas en la pestaña Descargas.
             using var limiteDescarga = CancellationTokenSource.CreateLinkedTokenSource(ct);
             limiteDescarga.CancelAfter(TiempoMaximoDescarga);
-            ruta = await _descargas.DescargarYConvertirAsync(id, elegido, limiteDescarga.Token);
+            ruta = await _descargas.PrepararVistaPreviaAsync(id, elegido, null, limiteDescarga.Token);
         }
 
         return ruta == null ? null : new TemaParaJugar(elegido.Tipo, elegido.Slug, elegido.TituloCancion, elegido.Artistas, ruta);
@@ -412,7 +419,6 @@ public sealed partial class AdivinaOpEdViewModel : MinijuegoViewModelBase, IDisp
     {
         _ronda = ronda;
         _pasosExtra = 0;
-        _puntosGanadosRonda = 0;
 
         Opciones = CrearOpciones(ronda.Opciones);
         PortadaRespuesta = string.Empty;
@@ -431,8 +437,11 @@ public sealed partial class AdivinaOpEdViewModel : MinijuegoViewModelBase, IDisp
     private void Reproducir(int segundos)
     {
         if (_ronda == null) return;
-        _player.Reproducir(_ronda.Tema.RutaLocal, TimeSpan.FromSeconds(segundos), _ronda.PosicionInicio);
+        // Antes de pedir el clip: si falla al abrirse, el aviso de fallo llega dentro de la propia llamada.
+        AudioFallido = false;
+        DuracionSonando = TimeSpan.FromSeconds(segundos);
         EstaSonando = true;
+        _player.Reproducir(_ronda.Tema.RutaLocal, TimeSpan.FromSeconds(segundos), _ronda.PosicionInicio);
     }
 
     /// <summary>Reconstruye lo que depende de cuántos pasos se han pedido (pistas, duración del clip, puntos posibles).</summary>
@@ -449,15 +458,6 @@ public sealed partial class AdivinaOpEdViewModel : MinijuegoViewModelBase, IDisp
             PuntosPosiblesTexto = string.Format(LocalizationService.T("Mini_PuntosPosiblesFormato"), AdivinaAnimeJuego.Puntos(1 + _pasosExtra));
 
         OnPropertyChanged(nameof(PuedePedirPista));
-    }
-
-    private void ActualizarResultadoTexto()
-    {
-        if (_ronda == null || !HaRespondido) return;
-
-        ResultadoTexto = UltimoFueAcierto
-            ? string.Format(LocalizationService.T("Mini_CorrectoFormato"), _puntosGanadosRonda)
-            : string.Format(LocalizationService.T("Mini_IncorrectoFormato"), _ronda.Respuesta.Titulo);
     }
 
     private void ActualizarTemaRevelado()
@@ -503,6 +503,7 @@ public sealed partial class AdivinaOpEdViewModel : MinijuegoViewModelBase, IDisp
         RefrescarRonda();
         ActualizarTemaRevelado();
         ActualizarResultadoTexto();
+        if (HayError) MensajeError = LocalizationService.T("Mini_OpEdSinRondas");
         OnPropertyChanged(nameof(SegundosClipTexto));
         base.RefrescarTextos();
     }

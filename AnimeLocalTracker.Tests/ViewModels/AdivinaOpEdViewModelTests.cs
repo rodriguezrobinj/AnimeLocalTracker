@@ -33,8 +33,8 @@ public class AdivinaOpEdViewModelTests
         _descargas.Setup(d => d.EstaDescargado(It.IsAny<int>(), It.IsAny<AnimeThemeInfo>())).Returns(false);
         _descargas.Setup(d => d.ObtenerRutaLocalEsperada(It.IsAny<int>(), It.IsAny<AnimeThemeInfo>()))
             .Returns((int id, AnimeThemeInfo t) => $@"C:\Music\{id}\{t.Slug}.mp3");
-        _descargas.Setup(d => d.DescargarYConvertirAsync(It.IsAny<int>(), It.IsAny<AnimeThemeInfo>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((int id, AnimeThemeInfo t, CancellationToken _) => $@"C:\Music\{id}\{t.Slug}.mp3");
+        _descargas.Setup(d => d.PrepararVistaPreviaAsync(It.IsAny<int>(), It.IsAny<AnimeThemeInfo>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((int id, AnimeThemeInfo t, IProgress<double>? _, CancellationToken _) => $@"C:\Music\{id}\{t.Slug}.mp3");
         _descargas.Setup(d => d.ListarDescargasLocales(It.IsAny<int>())).Returns(new List<TemaLocalDisponible>());
     }
 
@@ -273,6 +273,67 @@ public class AdivinaOpEdViewModelTests
     }
 
     [Fact]
+    public async Task LosClipsNuevos_VanALaCacheTemporal_NoATuCarpetaDeMusica()
+    {
+        var sut = await CrearSutAsync(6);
+
+        await sut.IniciarPartidaCommand.ExecuteAsync(null);
+
+        _descargas.Verify(d => d.PrepararVistaPreviaAsync(It.IsAny<int>(), It.IsAny<AnimeThemeInfo>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.AtLeastOnce);
+        _descargas.Verify(d => d.DescargarYConvertirAsync(It.IsAny<int>(), It.IsAny<AnimeThemeInfo>(), It.IsAny<CancellationToken>()), Times.Never,
+            "jugar no debe dejar canciones en la biblioteca de música ni entradas en la pestaña Descargas");
+    }
+
+    [Fact]
+    public async Task ElVolumen_SaleDeLosAjustesDeLaMusica_YSeGuardaAlCambiarlo()
+    {
+        var ajustes = new AppSettings { VolumenMusica = 0.3 };
+        var servicio = new Mock<ISettingsService>();
+        servicio.Setup(s => s.ObtenerConfiguracion()).Returns(ajustes);
+        _player.SetupProperty(p => p.Volumen);
+        _db.Setup(d => d.ObtenerTodosLosAnimesAsync()).ReturnsAsync(Biblioteca(6));
+
+        var sut = new AdivinaOpEdViewModel(_db.Object, _themes.Object, _descargas.Object, _player.Object, settings: servicio.Object);
+
+        sut.Volumen.Should().Be(0.3);
+        _player.Object.Volumen.Should().Be(0.3);
+
+        sut.Volumen = 0.6;
+        await Task.Delay(50);
+
+        _player.Object.Volumen.Should().Be(0.6);
+        ajustes.VolumenMusica.Should().Be(0.6);
+        servicio.Verify(s => s.GuardarConfiguracionAsync(ajustes), Times.Once);
+    }
+
+    [Fact]
+    public async Task AlSonarUnClip_SeSabeCuantoDura_ParaMostrarSuAvance()
+    {
+        var sut = await CrearSutAsync(6);
+
+        await sut.IniciarPartidaCommand.ExecuteAsync(null);
+        sut.DuracionSonando.Should().Be(TimeSpan.FromSeconds(AdivinaOpEdJuego.SegundosIniciales));
+
+        ResponderBien(sut);
+        sut.DuracionSonando.Should().Be(TimeSpan.FromSeconds(AdivinaOpEdJuego.SegundosRevelacion));
+    }
+
+    [Fact]
+    public async Task SiElClipNoSePuedeReproducir_DejaDeMarcarQueSuenaYAvisa()
+    {
+        var sut = await CrearSutAsync(6);
+        await sut.IniciarPartidaCommand.ExecuteAsync(null);
+
+        _player.Raise(p => p.ReproduccionFallida += null, EventArgs.Empty);
+
+        sut.EstaSonando.Should().BeFalse();
+        sut.AudioFallido.Should().BeTrue();
+
+        sut.EscucharCommand.Execute(null);
+        sut.AudioFallido.Should().BeFalse("al reintentar se quita el aviso hasta saber si vuelve a fallar");
+    }
+
+    [Fact]
     public async Task Escuchar_DespuesDeResponder_DeberiaReproducirElTrozoLargo()
     {
         var sut = await CrearSutAsync(6);
@@ -366,7 +427,7 @@ public class AdivinaOpEdViewModelTests
 
         await sut.IniciarPartidaCommand.ExecuteAsync(null);
 
-        _descargas.Verify(d => d.DescargarYConvertirAsync(It.IsAny<int>(), It.IsAny<AnimeThemeInfo>(), It.IsAny<CancellationToken>()), Times.Never);
+        _descargas.Verify(d => d.PrepararVistaPreviaAsync(It.IsAny<int>(), It.IsAny<AnimeThemeInfo>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()), Times.Never);
         _player.Verify(p => p.Reproducir(It.Is<string>(r => r.Contains(@"C:\Music\")), It.IsAny<TimeSpan>(), It.IsAny<double>()), Times.AtLeastOnce);
     }
 
@@ -470,7 +531,7 @@ public class AdivinaOpEdViewModelTests
     [Fact]
     public async Task SiLaDescargaFalla_DeberiaSaltarEseAnimeYUsarOtro()
     {
-        _descargas.Setup(d => d.DescargarYConvertirAsync(1, It.IsAny<AnimeThemeInfo>(), It.IsAny<CancellationToken>())).ReturnsAsync((string?)null);
+        _descargas.Setup(d => d.PrepararVistaPreviaAsync(1, It.IsAny<AnimeThemeInfo>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>())).ReturnsAsync((string?)null);
         var sut = await CrearSutAsync(6);
         await sut.IniciarPartidaCommand.ExecuteAsync(null);
 

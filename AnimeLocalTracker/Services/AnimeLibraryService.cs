@@ -79,7 +79,8 @@ public class AnimeLibraryService
             Generos = animeAPI.Genres != null ? string.Join(", ", animeAPI.Genres) : string.Empty,
             Sinopsis = animeAPI.Description ?? string.Empty,
             Temporada = animeAPI.Season ?? string.Empty,
-            AnioLanzamiento = animeAPI.StartDate?.Year ?? 0
+            AnioLanzamiento = animeAPI.StartDate?.Year ?? 0,
+            FechaAgregadoUtc = DateTime.UtcNow
         };
 
         await _databaseService.GuardarAnimeAsync(nuevoAnime);
@@ -94,15 +95,5 @@ public class AnimeLibraryService
     /// Calcula cuántos episodios han salido según el estado del anime:
     /// no estrenado → 0; en emisión → el que sigue al último emitido; finalizado → total.
     /// </summary>
-    private static int CalcularEpisodiosEmitidos(AniListMedia animeAPI)
-    {
-        string estadoAnime = animeAPI.Status?.ToUpperInvariant() ?? "UNKNOWN";
-
-        return estadoAnime switch
-        {
-            "NOT_YET_RELEASED" => 0,
-            "RELEASING" when animeAPI.NextAiringEpisode != null => Math.Max(0, animeAPI.NextAiringEpisode.Episode - 1),
-            _ => animeAPI.Episodes ?? 0
-        };
-    }
+    private static int CalcularEpisodiosEmitidos(AniListMedia animeAPI) => animeAPI.EpisodiosEmitidos(totalConocido: 0);
 }

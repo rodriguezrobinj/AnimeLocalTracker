@@ -18,15 +18,31 @@ public interface IClipPlayer
 
     bool EstaReproduciendo { get; }
 
+    /// <summary>Volumen de 0 a 1; se aplica también a lo que esté sonando.</summary>
+    double Volumen { get; set; }
+
     /// <summary>Se dispara al acabar el clip (por tiempo o por fin del archivo), no al llamar a <see cref="Detener"/>.</summary>
     event EventHandler? ReproduccionTerminada;
+
+    /// <summary>El archivo no se pudo abrir o reproducir: no va a sonar nada.</summary>
+    event EventHandler? ReproduccionFallida;
 }
 
 public sealed class ClipPlayer : IClipPlayer
 {
-    private const double Volumen = 0.85;
+    private double _volumen = 0.8;
 
     private MediaPlayer? _player;
+
+    public double Volumen
+    {
+        get => _volumen;
+        set
+        {
+            _volumen = double.IsFinite(value) ? Math.Clamp(value, 0, 1) : _volumen;
+            if (_player != null) _player.Volume = _volumen;
+        }
+    }
     private DispatcherTimer? _temporizador;
     private TimeSpan _duracion;
     private double _posicionRelativa;
@@ -34,6 +50,7 @@ public sealed class ClipPlayer : IClipPlayer
     public bool EstaReproduciendo { get; private set; }
 
     public event EventHandler? ReproduccionTerminada;
+    public event EventHandler? ReproduccionFallida;
 
     /// <summary>Lo que hay que callar antes de que suene un clip (la música que sigue sonando fuera de la ficha).</summary>
     public Action? AntesDeReproducir { get; set; }
@@ -59,8 +76,7 @@ public sealed class ClipPlayer : IClipPlayer
         }
         catch (Exception ex)
         {
-            AppLogger.Debug("ClipPlayer", $"No se pudo abrir '{ruta}': {ex.Message}");
-            EstaReproduciendo = false;
+            Fallar($"No se pudo abrir '{ruta}': {ex.Message}");
         }
     }
 
@@ -96,7 +112,7 @@ public sealed class ClipPlayer : IClipPlayer
 
     private MediaPlayer CrearPlayer()
     {
-        var player = new MediaPlayer { Volume = Volumen };
+        var player = new MediaPlayer { Volume = _volumen };
 
         // Los eventos de un reproductor ya sustituido se ignoran (podrían llegar tarde y arrancar o cortar el clip nuevo).
         player.MediaOpened += (_, _) =>
@@ -110,8 +126,7 @@ public sealed class ClipPlayer : IClipPlayer
         player.MediaFailed += (_, e) =>
         {
             if (!ReferenceEquals(player, _player)) return;
-            AppLogger.Debug("ClipPlayer", $"Fallo de reproducción: {e.ErrorException?.Message}");
-            EstaReproduciendo = false;
+            Fallar($"Fallo de reproducción: {e.ErrorException?.Message}");
         };
         return player;
     }
@@ -135,9 +150,17 @@ public sealed class ClipPlayer : IClipPlayer
         }
         catch (Exception ex)
         {
-            AppLogger.Debug("ClipPlayer", $"No se pudo iniciar el clip: {ex.Message}");
-            EstaReproduciendo = false;
+            Fallar($"No se pudo iniciar el clip: {ex.Message}");
         }
+    }
+
+    /// <summary>Antes solo quedaba una línea de depuración: el juego seguía mostrando el altavoz encendido sin sonar nada.</summary>
+    private void Fallar(string motivo)
+    {
+        AppLogger.Warn("ClipPlayer", motivo);
+        _temporizador?.Stop();
+        EstaReproduciendo = false;
+        ReproduccionFallida?.Invoke(this, EventArgs.Empty);
     }
 
     private void AlVencerElTemporizador(object? sender, EventArgs e) => Terminar();

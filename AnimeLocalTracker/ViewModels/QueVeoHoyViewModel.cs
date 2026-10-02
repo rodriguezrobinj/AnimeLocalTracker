@@ -32,9 +32,33 @@ public enum FaseQueVer
 /// "Qué veo hoy": elige al azar un anime con episodios locales pendientes y propone su SIGUIENTE
 /// episodio no visto (orden cronológico, para no romper la trama). En vez de saltar directo al
 /// reproductor, muestra una ruleta de portadas y deja al usuario aceptar, pedir otro o cerrar.
+/// Lo crea la Galería, que le presta su biblioteca ya cargada.
 /// </summary>
-public partial class GaleriaViewModel : IDisposable
+public sealed partial class QueVeoHoyViewModel : ObservableObject, IDisposable
 {
+    private readonly Func<IReadOnlyList<AnimeItem>> _biblioteca;
+    private readonly IFileScannerService _fileScannerService;
+    private readonly IDatabaseService _databaseService;
+    private readonly IImageCacheService _imageCacheService;
+
+    private IReadOnlyList<AnimeItem> Biblioteca => _biblioteca();
+
+    public QueVeoHoyViewModel(Func<IReadOnlyList<AnimeItem>> biblioteca, IFileScannerService fileScannerService,
+        IDatabaseService databaseService, IImageCacheService imageCacheService)
+    {
+        _biblioteca = biblioteca;
+        _fileScannerService = fileScannerService;
+        _databaseService = databaseService;
+        _imageCacheService = imageCacheService;
+    }
+
+    /// <summary>La Galería cargó o cambió su biblioteca: el botón "Qué veo hoy" se activa o desactiva según haya animes.</summary>
+    public void AlCambiarLaBiblioteca()
+    {
+        OnPropertyChanged(nameof(SePuedeAyudarAverQueVer));
+        ElegirQueVerHoyCommand.NotifyCanExecuteChanged();
+    }
+
     // Con 8 candidatos hay variedad de sobra para la ruleta y para varios "Otro": no hace falta
     // escanear TODA la biblioteca en cada clic (antes se recorrían las carpetas de los ~200 animes).
     private const int CandidatosObjetivoQueVer = 8;
@@ -69,7 +93,7 @@ public partial class GaleriaViewModel : IDisposable
     public bool QueVerHoyAbierto => FaseActualQueVer != FaseQueVer.Oculto;
     /// <summary>Mientras hay panel abierto y trabajando (escaneo o ruleta) el botón queda ocupado.</summary>
     public bool EstaBuscandoQueVer => FaseActualQueVer is FaseQueVer.Buscando or FaseQueVer.Girando;
-    public bool SePuedeAyudarAverQueVer => FaseActualQueVer == FaseQueVer.Oculto && !BibliotecaVacia;
+    public bool SePuedeAyudarAverQueVer => FaseActualQueVer == FaseQueVer.Oculto && Biblioteca.Count > 0;
     public bool EsFaseBuscandoQueVer => FaseActualQueVer == FaseQueVer.Buscando;
     public bool EsFaseGirandoQueVer => FaseActualQueVer == FaseQueVer.Girando;
     public bool EsFaseResultadoQueVer => FaseActualQueVer == FaseQueVer.Resultado;
@@ -110,7 +134,7 @@ public partial class GaleriaViewModel : IDisposable
 
         try
         {
-            var conCarpeta = BibliotecaLocales
+            var conCarpeta = Biblioteca
                 .Where(a => !string.IsNullOrWhiteSpace(a.RutaCarpeta))
                 .ToList();
 
@@ -137,7 +161,7 @@ public partial class GaleriaViewModel : IDisposable
         }
         catch (Exception ex)
         {
-            AppLogger.Error("GaleriaViewModel", "Error en Qué veo hoy", ex);
+            AppLogger.Error("QueVeoHoyViewModel", "Error en Qué veo hoy", ex);
             MostrarEstadoVacioQueVer(FaseQueVer.Error, "Gal_QueVeoHoyErrorMsj");
         }
     }
@@ -168,7 +192,7 @@ public partial class GaleriaViewModel : IDisposable
         }
         catch (Exception ex)
         {
-            AppLogger.Error("GaleriaViewModel", "Error al elegir otro en Qué veo hoy", ex);
+            AppLogger.Error("QueVeoHoyViewModel", "Error al elegir otro en Qué veo hoy", ex);
             MostrarEstadoVacioQueVer(FaseQueVer.Error, "Gal_QueVeoHoyErrorMsj");
         }
     }
@@ -331,7 +355,7 @@ public partial class GaleriaViewModel : IDisposable
             }
             catch (Exception ex)
             {
-                AppLogger.Debug("GaleriaViewModel", $"Qué veo hoy: error escaneando {anime.Titulo}: {ex.Message}");
+                AppLogger.Debug("QueVeoHoyViewModel", $"Qué veo hoy: error escaneando {anime.Titulo}: {ex.Message}");
                 return null;
             }
         }, ct);
@@ -386,7 +410,7 @@ public partial class GaleriaViewModel : IDisposable
     /// </summary>
     private async Task PrepararTiraAsync(AnimeItem ganador, CancellationToken ct)
     {
-        var relleno = Barajar(BibliotecaLocales.Where(a =>
+        var relleno = Barajar(Biblioteca.Where(a =>
                 a.AniListId != ganador.AniListId && !string.IsNullOrWhiteSpace(a.UrlPortada)))
             .Take(PortadasDistintasTiraQueVer)
             .ToList();
@@ -450,7 +474,7 @@ public partial class GaleriaViewModel : IDisposable
         }
         catch (Exception ex)
         {
-            AppLogger.Debug("GaleriaViewModel", $"Qué veo hoy: portada no disponible para {anime.Titulo}: {ex.Message}");
+            AppLogger.Debug("QueVeoHoyViewModel", $"Qué veo hoy: portada no disponible para {anime.Titulo}: {ex.Message}");
             return null;
         }
     }
@@ -472,7 +496,7 @@ public partial class GaleriaViewModel : IDisposable
         }
         catch (Exception ex)
         {
-            AppLogger.Debug("GaleriaViewModel", $"Qué veo hoy: error notificando portadas tardías: {ex.Message}");
+            AppLogger.Debug("QueVeoHoyViewModel", $"Qué veo hoy: error notificando portadas tardías: {ex.Message}");
         }
     }
 

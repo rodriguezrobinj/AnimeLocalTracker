@@ -2,9 +2,9 @@ using System.Windows.Controls;
 
 namespace AnimeLocalTracker.Views;
 
-public partial class MinijuegoOpcionesView : UserControl
+public partial class GaleriaFiltrosView : UserControl
 {
-    public MinijuegoOpcionesView()
+    public GaleriaFiltrosView()
     {
         InitializeComponent();
     }

@@ -251,8 +251,8 @@ public class MinijuegosRecordsIntegracionTests
                 : new List<AnimeThemeInfo>());
         var descargas = new Mock<IAnimeThemesDownloadService>();
         descargas.Setup(d => d.EstaDescargado(It.IsAny<int>(), It.IsAny<AnimeThemeInfo>())).Returns(false);
-        descargas.Setup(d => d.DescargarYConvertirAsync(It.IsAny<int>(), It.IsAny<AnimeThemeInfo>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((int id, AnimeThemeInfo t, CancellationToken _) => $@"C:\Music\{id}\{t.Slug}.mp3");
+        descargas.Setup(d => d.PrepararVistaPreviaAsync(It.IsAny<int>(), It.IsAny<AnimeThemeInfo>(), It.IsAny<IProgress<double>?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((int id, AnimeThemeInfo t, IProgress<double>? _, CancellationToken _) => $@"C:\Music\{id}\{t.Slug}.mp3");
         descargas.Setup(d => d.ListarDescargasLocales(It.IsAny<int>())).Returns(new List<TemaLocalDisponible>());
 
         var sut = new AdivinaOpEdViewModel(_db.Object, themes.Object, descargas.Object, Mock.Of<IClipPlayer>(), _records.Object) { Rng = new Random(42) };

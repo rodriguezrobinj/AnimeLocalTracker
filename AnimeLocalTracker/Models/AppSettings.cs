@@ -68,6 +68,8 @@ public class AppSettings
     /// <summary>Al salir de la ficha con un opening/ending sonando, la música sigue (con una barra en la ventana principal).
     /// Apagado por defecto: se corta al salir.</summary>
     public bool MusicaSigueFueraDeLaFicha { get; set; }
+    /// <summary>Minijuegos: preguntar solo por animes que has visto o estás viendo. Apagado por defecto.</summary>
+    public bool MinijuegosSoloVistos { get; set; }
     /// <summary>Velocidad de reproducción aplicada al abrir un video (0.5 a 2.0).</summary>
     public double VelocidadReproduccionDefecto { get; set; } = 1.0;
     /// <summary>Compresor de rango dinámico de audio ("modo noche") activo por defecto al abrir un video.</summary>

@@ -632,10 +632,17 @@ public class AniListTrackingService : IAnimeTrackingService
         }
     }
     
-    public async Task<bool> GuardarFechasSeguimientoAsync(int mediaId, DateTime? fechaInicio, DateTime? fechaFin, string token, bool marcarCompletado)
+    public Task<bool> GuardarFechasSeguimientoAsync(int mediaId, DateTime? fechaInicio, DateTime? fechaFin, string token, bool marcarCompletado)
     {
-        if (!fechaInicio.HasValue && !fechaFin.HasValue && !marcarCompletado) return true;
+        if (!fechaInicio.HasValue && !fechaFin.HasValue && !marcarCompletado) return Task.FromResult(true);
+        return GuardarCamposSeguimientoAsync(mediaId, fechaInicio, fechaFin, marcarCompletado ? "COMPLETED" : null, token);
+    }
 
+    public Task<bool> GuardarEstadoSeguimientoAsync(int mediaId, string estado, string token) =>
+        GuardarCamposSeguimientoAsync(mediaId, null, null, estado, token);
+
+    private async Task<bool> GuardarCamposSeguimientoAsync(int mediaId, DateTime? fechaInicio, DateTime? fechaFin, string? estado, string token)
+    {
         try
         {
             // Solo se declaran y envían las variables con valor: un argumento ausente no se modifica en AniList,
@@ -650,11 +657,11 @@ public class AniListTrackingService : IAnimeTrackingService
                 argumentos.Add("startedAt: $startedAt");
                 variables["startedAt"] = new { year = fechaInicio.Value.Year, month = fechaInicio.Value.Month, day = fechaInicio.Value.Day };
             }
-            if (marcarCompletado)
+            if (estado != null)
             {
                 declaraciones.Add("$status: MediaListStatus");
                 argumentos.Add("status: $status");
-                variables["status"] = "COMPLETED";
+                variables["status"] = estado;
             }
             if (fechaFin.HasValue)
             {
@@ -672,7 +679,7 @@ public class AniListTrackingService : IAnimeTrackingService
 
             if (content.Contains("\"errors\""))
             {
-                AppLogger.Warn("AniListTrackingService", $"AniList rechazó las fechas de seguimiento de MediaId {mediaId}: {Truncar(content)}");
+                AppLogger.Warn("AniListTrackingService", $"AniList rechazó el cambio de seguimiento de MediaId {mediaId}: {Truncar(content)}");
                 return false;
             }
 
@@ -683,7 +690,7 @@ public class AniListTrackingService : IAnimeTrackingService
         }
         catch (Exception ex)
         {
-            AppLogger.Error("AniListTrackingService", $"Error al guardar las fechas de seguimiento de MediaId {mediaId}", ex);
+            AppLogger.Error("AniListTrackingService", $"Error al guardar el cambio de seguimiento de MediaId {mediaId}", ex);
             return false;
         }
     }

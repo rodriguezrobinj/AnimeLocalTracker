@@ -169,13 +169,20 @@ public class GaleriaMinijuegosTests
     public async Task AlEntrarAsync_ConLaSeccionDeMinijuegosAbierta_RefrescaLosAnimesDisponibles()
     {
         var sut = CrearSut();
+        await Task.Delay(100); // deja terminar la carga inicial de la biblioteca
         await sut.MostrarMinijuegosCommand.ExecuteAsync(null);
         await _minijuegos.AbrirAdivinaAnimeCommand.ExecuteAsync(null);
+        _minijuegos.AdivinaAnime.AnimesDisponibles.Should().Be(Titulos.Length);
+
+        // Se añade un anime desde otra pestaña y se vuelve a la Galería: el juego cuenta con él (lo toma de la biblioteca que
+        // la Galería ya tiene en memoria, sin releer la base de datos).
+        sut.Receive(new AnimeLocalTracker.Messages.AnimeAñadidoMensaje(new AnimeItem { AniListId = 99, Titulo = "Frieren" }));
         _db.Invocations.Clear();
 
         await sut.AlEntrarAsync();
 
-        _db.Verify(d => d.ObtenerTodosLosAnimesAsync(), Times.AtLeastOnce);
+        _minijuegos.AdivinaAnime.AnimesDisponibles.Should().Be(Titulos.Length + 1);
+        _db.Verify(d => d.ObtenerTodosLosAnimesAsync(), Times.Never);
     }
 
     [Fact]

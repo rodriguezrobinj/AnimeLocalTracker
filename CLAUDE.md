@@ -9,6 +9,16 @@ Reglas de arquitectura y convenciones del proyecto (compartidas con otras herram
 @.agents/rules/persistence.md
 @.agents/rules/ui-wpf-vistas.md
 @.agents/rules/comunicacion-explicaciones.md
+@.agents/rules/skills-orquestacion.md
+
+## Cómo trabajar (resumen)
+
+Hay varios plugins de skills instalados (superpowers, agent-skills, ponytail, caveman, ui-ux-pro-max, taste-skill, Emil Kowalski, figma, dotnet-*). **La jerarquía y el dueño de cada tarea están en `skills-orquestacion.md`; léelo antes de activar skills de proceso.** Lo esencial:
+
+- Precedencia: instrucción del usuario > `CLAUDE.md`/reglas > skills del repo > superpowers > plugins de dominio > plugins de estilo.
+- Proceso pesado (brainstorming, plan escrito) solo para funciones nuevas o cambios multi-módulo; los cambios pequeños se hacen directo.
+- Sin commit ni push sin orden; al subir, solo a `main`. Sin ramas, worktrees ni subagentes por iniciativa propia.
+- Responder siempre en español.
 
 ## Build y tests
 

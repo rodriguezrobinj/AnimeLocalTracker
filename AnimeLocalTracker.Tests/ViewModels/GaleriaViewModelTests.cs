@@ -32,8 +32,8 @@ public class GaleriaViewModelTests
             .ReturnsAsync(animes ?? new List<AnimeItem>());
 
         _databaseServiceMock
-            .Setup(d => d.ObtenerTodosLosRegistrosAsync())
-            .ReturnsAsync(registros ?? new List<RegistroEpisodio>());
+            .Setup(d => d.ObtenerEpisodiosVistosPorAnimeAsync())
+            .ReturnsAsync((registros ?? new List<RegistroEpisodio>()).Where(r => r.VistoLocal).GroupBy(r => r.AniListId).ToDictionary(g => g.Key, g => g.Count()));
 
         return new GaleriaViewModel(
             _trackingServiceMock.Object,
@@ -321,7 +321,7 @@ public class GaleriaViewModelTests
         sut.SoloConEpisodiosPendientes = true;
         sut.CantidadFiltrosAvanzadosActivos.Should().Be(2);
 
-        sut.CriterioOrdenSeleccionado = "Más Recientes";
+        sut.CriterioOrdenSeleccionado = "Estreno más reciente";
         sut.CantidadFiltrosAvanzadosActivos.Should().Be(3);
 
         sut.SoloConCarpetaLocal = true;

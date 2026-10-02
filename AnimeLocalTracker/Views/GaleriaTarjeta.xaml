@@ -1,0 +1,338 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+                    xmlns:loc="clr-namespace:AnimeLocalTracker.Services">
+
+    <!-- La tarjeta de anime de la Galeria y su menu contextual. Los comandos se buscan en el GaleriaViewModel de la lista
+         que la contiene (AncestorType=ListBox). -->
+
+    <!-- Menú contextual (clic derecho): favorito y eliminar de la biblioteca. UNO para todas las tarjetas:
+         antes cada tarjeta creaba el suyo (con sus tres estilos y plantillas) aunque nunca se abriera.
+         Al abrirse toma el anime de la tarjeta sobre la que se pulsó (PlacementTarget).
+         Estilo oscuro propio (igual que el menú de episodio en DetalleView): el ContextMenu por
+         defecto de WPF usa el tema claro del sistema y desentonaba por completo con el resto de la app. -->
+    <ContextMenu x:Key="MenuTarjetaAnime" Background="#151B29" BorderBrush="{DynamicResource Brush.BorderControl}" BorderThickness="1"
+                 Padding="6" FontSize="12.5" Foreground="{DynamicResource Brush.TextPrimary}" HasDropShadow="False">
+        <ContextMenu.Resources>
+            <Style TargetType="ContextMenu">
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ContextMenu">
+                            <Border Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="10" Padding="6">
+                                <Border.Effect>
+                                    <DropShadowEffect BlurRadius="18" ShadowDepth="3" Opacity="0.55" Color="#000000"/>
+                                </Border.Effect>
+                                <ScrollViewer>
+                                    <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle"/>
+                                </ScrollViewer>
+                            </Border>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+            <Style TargetType="MenuItem">
+                <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}"/>
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="MenuItem">
+                            <Border x:Name="FondoItem" Background="{TemplateBinding Background}"
+                                    CornerRadius="7" Padding="10,8">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <ContentPresenter Grid.Column="0" ContentSource="Icon" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                    <ContentPresenter Grid.Column="1" ContentSource="Header" RecognizesAccessKey="True" VerticalAlignment="Center"/>
+                                </Grid>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsHighlighted" Value="True">
+                                    <Setter TargetName="FondoItem" Property="Background" Value="#24344A"/>
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter Property="Opacity" Value="0.45"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+            <Style TargetType="Separator">
+                <Setter Property="Background" Value="{DynamicResource Brush.BorderControl}"/>
+                <Setter Property="Height" Value="1"/>
+                <Setter Property="Margin" Value="8,4"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Separator">
+                            <Border Background="{TemplateBinding Background}"
+                                    Height="{TemplateBinding Height}"
+                                    Margin="{TemplateBinding Margin}"/>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+        </ContextMenu.Resources>
+        <MenuItem Header="{Binding [Gal_MarcarFavorito], Source={x:Static loc:LocalizationService.Instance}}"
+                  Command="{Binding PlacementTarget.Tag.AlternarFavoritoCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                  CommandParameter="{Binding}"
+                  Visibility="{Binding EsFavorito, Converter={StaticResource InverseBoolToVis}}">
+            <MenuItem.Icon>
+                <materialDesign:PackIcon Kind="HeartOutline" Foreground="{DynamicResource Brush.Rose}" Width="16" Height="16"/>
+            </MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Header="{Binding [Gal_QuitarFavorito], Source={x:Static loc:LocalizationService.Instance}}"
+                  Command="{Binding PlacementTarget.Tag.AlternarFavoritoCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                  CommandParameter="{Binding}"
+                  Visibility="{Binding EsFavorito, Converter={StaticResource BoolToVis}}">
+            <MenuItem.Icon>
+                <materialDesign:PackIcon Kind="Heart" Foreground="{DynamicResource Brush.Rose}" Width="16" Height="16"/>
+            </MenuItem.Icon>
+        </MenuItem>
+        <Separator/>
+        <MenuItem Header="{Binding [Gal_EliminarAnime], Source={x:Static loc:LocalizationService.Instance}}"
+                  Command="{Binding PlacementTarget.Tag.EliminarAnimeCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                  CommandParameter="{Binding}">
+            <MenuItem.Icon>
+                <materialDesign:PackIcon Kind="DeleteOutline" Foreground="{DynamicResource Brush.Danger}" Width="16" Height="16"/>
+            </MenuItem.Icon>
+        </MenuItem>
+    </ContextMenu>
+
+    <DataTemplate x:Key="TarjetaAnime">
+        <materialDesign:Card Width="180" Height="265" Margin="14"
+                             UniformCornerRadius="14" Background="{DynamicResource Brush.Surface1}"
+                             BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1"
+                             RenderTransformOrigin="0.5,0.5" ClipToBounds="True"
+                             Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                             ContextMenu="{StaticResource MenuTarjetaAnime}">
+            <materialDesign:Card.RenderTransform>
+                <ScaleTransform ScaleX="1" ScaleY="1" />
+            </materialDesign:Card.RenderTransform>
+            <materialDesign:Card.Style>
+                <Style TargetType="materialDesign:Card" BasedOn="{StaticResource {x:Type materialDesign:Card}}">
+                    <Setter Property="materialDesign:ElevationAssist.Elevation" Value="Dp2" />
+                    <Style.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="materialDesign:ElevationAssist.Elevation" Value="Dp8" />
+                            <Setter Property="BorderBrush" Value="{DynamicResource Brush.AccentStrong}" />
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" To="1.04" Duration="0:0:0.12" />
+                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" To="1.04" Duration="0:0:0.12" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" To="1.0" Duration="0:0:0.12" />
+                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" To="1.0" Duration="0:0:0.12" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
+                        </Trigger>
+                        
+                        <!-- Trigger para Navegación por Teclado o Mando -->
+                        <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                            <Setter Property="materialDesign:ElevationAssist.Elevation" Value="Dp8" />
+                            <Setter Property="BorderBrush" Value="{DynamicResource Brush.AccentStrong}" />
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" To="1.04" Duration="0:0:0.12" />
+                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" To="1.04" Duration="0:0:0.12" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" To="1.0" Duration="0:0:0.12" />
+                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" To="1.0" Duration="0:0:0.12" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
+                        </Trigger>
+                    </Style.Triggers>
+                </Style>
+            </materialDesign:Card.Style>
+
+
+            <!-- Botón interactivo para abrir detalle -->
+            <Button Command="{Binding DataContext.AbrirDetalleCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                    CommandParameter="{Binding}"
+                    Padding="0" Background="Transparent" BorderThickness="0" Height="265"
+                    HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                    AutomationProperties.Name="{Binding Titulo}">
+                <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="Transparent">
+                            <ContentPresenter />
+                        </Border>
+                    </ControlTemplate>
+                </Button.Template>
+                <Grid>
+                    <!-- Fondo estático oscuro para carga instantánea sin animación infinita -->
+                    <Border Background="#1B222C" CornerRadius="14" />
+
+                    <!-- Efecto "bones": shimmer SOLO mientras la portada de ESTA tarjeta
+                         no está aún en memoria (evita re-animar tarjetas ya cacheadas
+                         durante el scroll virtualizado). -->
+                    <Border Style="{StaticResource ShimmerEffectStyle}" CornerRadius="14">
+                        <Border.Visibility>
+                            <MultiBinding Converter="{StaticResource AnimeCoverLoading}">
+                                <Binding Path="." />
+                                <Binding Path="PortadaVisible" />
+                            </MultiBinding>
+                        </Border.Visibility>
+                    </Border>
+
+                    <!-- Portada precargada y congelada en memoria con escalado de alta definición -->
+                    <Image Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" SnapsToDevicePixels="True">
+                        <Image.Source>
+                            <MultiBinding Converter="{StaticResource AnimeCoverMulti}">
+                                <Binding Path="." />
+                                <Binding Path="PortadaVisible" />
+                            </MultiBinding>
+                        </Image.Source>
+                    </Image>
+
+                    <!-- OVERLAY DE SELECCIÓN -->
+                    <Border Background="#66000000" Visibility="{Binding EstaSeleccionado, Converter={StaticResource BoolToVis}}"/>
+                    <Border BorderBrush="{DynamicResource Brush.AccentStrong}" BorderThickness="3" CornerRadius="14" Visibility="{Binding EstaSeleccionado, Converter={StaticResource BoolToVis}}"/>
+
+                    <!-- CHECKBOX DE SELECCIÓN (Visible solo en ModoSeleccion) -->
+                    <CheckBox IsChecked="{Binding EstaSeleccionado}" 
+                              Visibility="{Binding DataContext.ModoSeleccion, RelativeSource={RelativeSource AncestorType=ListBox}, Converter={StaticResource BoolToVis}}"
+                              HorizontalAlignment="Right" VerticalAlignment="Top" Margin="8"
+                              Style="{StaticResource MaterialDesignDarkCheckBox}"
+                              IsHitTestVisible="False"
+                              Panel.ZIndex="10"/>
+
+                    <!-- Tu estado con el anime (Viendo, Completado…), el mismo del que hablan los filtros de arriba. Antes
+                         decía si el anime seguía en emisión, y no había forma de ver tu estado sin abrir la ficha;
+                         que hay capítulos por ver ya lo dice el aviso "N Nuevos". -->
+                    <Border Padding="8,4" CornerRadius="6"
+                            HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10"
+                            Visibility="{Binding EstaSeleccionado, Converter={StaticResource InverseBoolToVis}}">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Background" Value="{DynamicResource Brush.TextSecondary}"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding EstadoUsuario}" Value="CURRENT">
+                                        <Setter Property="Background" Value="{DynamicResource Brush.Accent}"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding EstadoUsuario}" Value="REPEATING">
+                                        <Setter Property="Background" Value="{DynamicResource Brush.Accent}"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding EstadoUsuario}" Value="COMPLETED">
+                                        <Setter Property="Background" Value="{DynamicResource Brush.Success}"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding EstadoUsuario}" Value="PAUSED">
+                                        <Setter Property="Background" Value="{DynamicResource Brush.WarningStrong}"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding EstadoUsuario}" Value="DROPPED">
+                                        <Setter Property="Background" Value="{DynamicResource Brush.Danger}"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <!-- UX-03: texto oscuro sobre chips claros (el blanco no llegaba al contraste AA) -->
+                        <TextBlock Text="{Binding EstadoUsuarioVisual}" Foreground="#0B1220" FontSize="11" FontWeight="Bold"/>
+                    </Border>
+
+                    <!-- BADGE FAVORITO (individual por anime, debajo del chip de estado) -->
+                    <!-- Es un botón: se ve siempre en los favoritos y, en los demás, al pasar el ratón por la tarjeta
+                         (antes marcar un favorito solo se podía con el clic derecho, que no se descubría). -->
+                    <Button Width="26" Height="26" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10,40,0,0" Cursor="Hand"
+                            Command="{Binding DataContext.AlternarFavoritoCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                            CommandParameter="{Binding}" Focusable="False">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="Fondo" Background="{DynamicResource Brush.Scrim}" CornerRadius="13">
+                                    <materialDesign:PackIcon x:Name="Icono" Kind="HeartOutline" Foreground="White" Width="14" Height="14"
+                                                             HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <DataTrigger Binding="{Binding EsFavorito}" Value="True">
+                                        <Setter TargetName="Fondo" Property="Background" Value="{DynamicResource Brush.Rose}"/>
+                                        <Setter TargetName="Icono" Property="Kind" Value="Heart"/>
+                                    </DataTrigger>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="Fondo" Property="Background" Value="{DynamicResource Brush.Rose}"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                        <Button.Style>
+                            <Style TargetType="Button">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Setter Property="ToolTip" Value="{Binding [Gal_MarcarFavorito], Source={x:Static loc:LocalizationService.Instance}}"/>
+                                <Setter Property="AutomationProperties.Name" Value="{Binding [Gal_MarcarFavorito], Source={x:Static loc:LocalizationService.Instance}}"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=materialDesign:Card}}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding EsFavorito}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                        <Setter Property="ToolTip" Value="{Binding [Gal_QuitarFavorito], Source={x:Static loc:LocalizationService.Instance}}"/>
+                                        <Setter Property="AutomationProperties.Name" Value="{Binding [Gal_QuitarFavorito], Source={x:Static loc:LocalizationService.Instance}}"/>
+                                    </DataTrigger>
+                                    <!-- En modo selección un clic en la tarjeta la marca: el corazón no debe interceptarlo -->
+                                    <DataTrigger Binding="{Binding DataContext.ModoSeleccion, RelativeSource={RelativeSource AncestorType=ListBox}}" Value="True">
+                                        <Setter Property="IsHitTestVisible" Value="False"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+
+                    <!-- BADGE NUEVOS EPISODIOS -->
+                    <Border Background="#E11D48" CornerRadius="10" Padding="8,4" 
+                            HorizontalAlignment="Right" VerticalAlignment="Top" Margin="10"
+                            Visibility="{Binding TieneNuevosEpisodios, Converter={StaticResource BoolToVis}}"
+                            materialDesign:ElevationAssist.Elevation="Dp4"
+                            Panel.ZIndex="15">
+                        <TextBlock Foreground="White" FontSize="11" FontWeight="Bold">
+                            <TextBlock.Text>
+                                <MultiBinding Converter="{StaticResource LocalizedFormat}">
+                                    <Binding Path="[Gal_NuevosEpisodiosFormato]" Source="{x:Static loc:LocalizationService.Instance}" />
+                                    <Binding Path="NuevosEpisodios" />
+                                </MultiBinding>
+                            </TextBlock.Text>
+                        </TextBlock>
+                    </Border>
+
+
+                    <Border VerticalAlignment="Bottom" Padding="12,25,12,12">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                <GradientStop Color="#00000000" Offset="0"/>
+                                <GradientStop Color="#CC000000" Offset="0.5"/>
+                                <GradientStop Color="#FF000000" Offset="1"/>
+                            </LinearGradientBrush>
+                        </Border.Background>
+                        <StackPanel>
+                            <TextBlock Text="{Binding Titulo}" Foreground="White" FontWeight="Bold" 
+                                       FontSize="13.5" TextTrimming="CharacterEllipsis" MaxHeight="42" TextWrapping="Wrap" Margin="0,0,0,7" />
+                            
+                            <!-- PROGRESS BAR DIRECTO SIN ANIMACIÓN DE TRANSICIÓN EN SCROLL -->
+                            <ProgressBar Value="{Binding ProgresoPorcentaje, Mode=OneWay}" Height="4" 
+                                         Background="#44FFFFFF" Foreground="{DynamicResource Brush.Rose}" 
+                                         BorderThickness="0" Margin="0,0,0,4"
+                                         materialDesign:TransitionAssist.DisableTransitions="True"/>
+                            
+                            <TextBlock Text="{Binding ProgresoEpisodiosTexto}" Foreground="#B3FFFFFF" FontSize="11" FontWeight="SemiBold" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Button>
+        </materialDesign:Card>
+    </DataTemplate>
+</ResourceDictionary>

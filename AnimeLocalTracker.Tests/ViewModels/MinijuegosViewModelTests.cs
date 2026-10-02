@@ -57,6 +57,57 @@ public class MinijuegosViewModelTests
     }
 
     [Fact]
+    public async Task SoloVistos_SeRecuerdaEntreSesiones_YSeAplicaALosJuegos()
+    {
+        var ajustes = new AppSettings();
+        var servicio = new Mock<ISettingsService>();
+        servicio.Setup(s => s.ObtenerConfiguracion()).Returns(ajustes);
+        var juego = new AdivinaAnimeViewModel(_db.Object);
+        var sut = new MinijuegosViewModel(juego,
+            new AdivinaOpEdViewModel(_db.Object, Mock.Of<IAnimeThemesService>(), Mock.Of<IAnimeThemesDownloadService>(), _player.Object),
+            new AdivinaPersonajeViewModel(_db.Object, Mock.Of<IPersonajesService>()), servicio.Object);
+        sut.SoloVistos.Should().BeFalse("la opción viene apagada");
+
+        sut.SoloVistos = true;
+        await Task.Delay(50);
+
+        juego.SoloVistos.Should().BeTrue();
+        ajustes.MinijuegosSoloVistos.Should().BeTrue();
+        servicio.Verify(s => s.GuardarConfiguracionAsync(ajustes), Times.Once);
+
+        // Otra sesión: arranca con lo guardado
+        var otra = new MinijuegosViewModel(new AdivinaAnimeViewModel(_db.Object),
+            new AdivinaOpEdViewModel(_db.Object, Mock.Of<IAnimeThemesService>(), Mock.Of<IAnimeThemesDownloadService>(), _player.Object),
+            new AdivinaPersonajeViewModel(_db.Object, Mock.Of<IPersonajesService>()), servicio.Object);
+        otra.SoloVistos.Should().BeTrue();
+        otra.AdivinaAnime.SoloVistos.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ConLaBibliotecaDeLaGaleria_LosJuegosNoVuelvenALeerLaBaseDeDatos()
+    {
+        var sut = CrearSut();
+        var deLaGaleria = Titulos.Take(4).Select((t, i) => new AnimeItem { AniListId = i + 1, Titulo = t }).ToList();
+        sut.UsarBiblioteca(() => deLaGaleria);
+
+        await sut.AbrirAdivinaAnimeCommand.ExecuteAsync(null);
+
+        sut.AdivinaAnime.AnimesDisponibles.Should().Be(4);
+        _db.Verify(d => d.ObtenerTodosLosAnimesAsync(), Times.Never);
+    }
+
+    [Fact]
+    public async Task SiLaGaleriaAunNoTieneLaBiblioteca_LosJuegosLaLeenDeLaBaseDeDatos()
+    {
+        var sut = CrearSut();
+        sut.UsarBiblioteca(() => new List<AnimeItem>());
+
+        await sut.AbrirAdivinaAnimeCommand.ExecuteAsync(null);
+
+        sut.AdivinaAnime.AnimesDisponibles.Should().Be(5);
+    }
+
+    [Fact]
     public async Task AbrirAdivinaAnime_DeberiaAbrirEseJuegoYPrepararlo()
     {
         var sut = CrearSut();

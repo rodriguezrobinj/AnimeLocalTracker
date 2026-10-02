@@ -1,0 +1,270 @@
+<UserControl x:Class="AnimeLocalTracker.Views.GaleriaFiltrosView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+             xmlns:loc="clr-namespace:AnimeLocalTracker.Services"
+             Background="Transparent">
+
+    <!-- Buscador, pestanas de estado y panel de filtros avanzados de la Galeria. Usa el GaleriaViewModel de la vista que lo contiene. -->
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Fila Principal (Limpia y Compacta en 1 Sola Línea) -->
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Buscador Local -->
+            <Border Grid.Column="0" Background="{DynamicResource Brush.Surface1}" BorderBrush="{DynamicResource Brush.BorderStrong}" BorderThickness="1"
+                    CornerRadius="12" Height="44" VerticalAlignment="Center" Padding="14,0,5,0" Margin="0,0,10,0"
+                    HorizontalAlignment="Left" Width="330" ClipToBounds="True">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <materialDesign:PackIcon Kind="Magnify" Width="20" Height="20" Foreground="{DynamicResource Brush.TextSecondary}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    
+                    <TextBox Grid.Column="1" 
+                             Text="{Binding TextoBusqueda, UpdateSourceTrigger=PropertyChanged}"
+                             materialDesign:HintAssist.Hint="{Binding [Gal_BuscarHint], Source={x:Static loc:LocalizationService.Instance}}"
+                             materialDesign:HintAssist.IsFloating="False"
+                             materialDesign:TextFieldAssist.DecorationVisibility="Hidden"
+                             materialDesign:TextFieldAssist.HasClearButton="True"
+                             BorderThickness="0"
+                             Background="Transparent"
+                             VerticalAlignment="Center"
+                             FontSize="13.5"
+                             Foreground="White"
+                             Margin="0,0,10,0"/>
+                </Grid>
+            </Border>
+
+            <!-- Botón Desplegable de Filtros y Ordenación -->
+            <ToggleButton Grid.Column="1" IsChecked="{Binding PanelFiltrosVisible}"
+                          Height="44" Padding="14,0" Cursor="Hand" VerticalAlignment="Center"
+                          ToolTip="{Binding [Gal_FiltrosTip], Source={x:Static loc:LocalizationService.Instance}}"
+                          AutomationProperties.Name="{Binding [Gal_Filtros], Source={x:Static loc:LocalizationService.Instance}}">
+                <ToggleButton.Style>
+                    <Style TargetType="ToggleButton" BasedOn="{StaticResource MaterialDesignOutlinedButton}">
+                        <Setter Property="BorderBrush" Value="{DynamicResource Brush.BorderStrong}"/>
+                        <Setter Property="Background" Value="{DynamicResource Brush.Surface1}"/>
+                        <Setter Property="Foreground" Value="{DynamicResource Brush.TextSecondary}"/>
+                        <Style.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter Property="BorderBrush" Value="{DynamicResource Brush.AccentStrong}"/>
+                                <Setter Property="Background" Value="{DynamicResource Brush.Surface3}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}"/>
+                            </Trigger>
+                            <DataTrigger Binding="{Binding TieneFiltrosAvanzadosActivos}" Value="True">
+                                <Setter Property="BorderBrush" Value="{DynamicResource Brush.AccentStrong}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </ToggleButton.Style>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <materialDesign:PackIcon Kind="TuneVariant" Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding [Gal_Filtros], Source={x:Static loc:LocalizationService.Instance}}" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    
+                    <!-- Badge de conteo de filtros activos -->
+                    <Border Background="{DynamicResource Brush.AccentStrong}" CornerRadius="9" Height="18" MinWidth="18" Padding="5,0" Margin="8,0,0,0"
+                            VerticalAlignment="Center" Visibility="{Binding TieneFiltrosAvanzadosActivos, Converter={StaticResource BoolToVis}}">
+                        <TextBlock Text="{Binding CantidadFiltrosAvanzadosActivos}" FontSize="10.5" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                </StackPanel>
+            </ToggleButton>
+
+            <!-- Chips de Estado a la derecha (WrapPanel: baja a una 2ª línea en vez de solaparse/recortarse con ventanas angostas) -->
+            <WrapPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                <RadioButton Content="{Binding [Hist_FiltroTodos], Source={x:Static loc:LocalizationService.Instance}}" Margin="0,0,6,4" IsChecked="{Binding EsFiltroTodos, Mode=OneWay}" GroupName="FiltroEstado"
+                             Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="Todos"
+                             Style="{StaticResource MaterialDesignTabRadioButton}"
+                             Height="34" Padding="14,0" FontSize="13" FontWeight="SemiBold"/>
+
+                <RadioButton Content="{Binding [Gal_FiltroViendo], Source={x:Static loc:LocalizationService.Instance}}" Margin="0,0,6,4" IsChecked="{Binding EsFiltroViendo, Mode=OneWay}" GroupName="FiltroEstado"
+                             Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="Viendo"
+                             Style="{StaticResource MaterialDesignTabRadioButton}"
+                             Height="34" Padding="14,0" FontSize="13" FontWeight="SemiBold"/>
+
+                <RadioButton Content="{Binding [Hist_FiltroCompletados], Source={x:Static loc:LocalizationService.Instance}}" Margin="0,0,6,4" IsChecked="{Binding EsFiltroCompletados, Mode=OneWay}" GroupName="FiltroEstado"
+                             Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="Completados"
+                             Style="{StaticResource MaterialDesignTabRadioButton}"
+                             Height="34" Padding="14,0" FontSize="13" FontWeight="SemiBold"/>
+
+                <RadioButton Content="{Binding [Gal_FiltroPlaneando], Source={x:Static loc:LocalizationService.Instance}}" Margin="0,0,6,4" IsChecked="{Binding EsFiltroPlaneando, Mode=OneWay}" GroupName="FiltroEstado"
+                             Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="Planeando"
+                             Style="{StaticResource MaterialDesignTabRadioButton}"
+                             Height="34" Padding="14,0" FontSize="13" FontWeight="SemiBold"/>
+
+                <RadioButton Content="{Binding [Gal_FiltroEnPausa], Source={x:Static loc:LocalizationService.Instance}}" Margin="0,0,6,4" IsChecked="{Binding EsFiltroEnPausa, Mode=OneWay}" GroupName="FiltroEstado"
+                             Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="EnPausa"
+                             Style="{StaticResource MaterialDesignTabRadioButton}"
+                             Height="34" Padding="14,0" FontSize="13" FontWeight="SemiBold"/>
+
+                <RadioButton Content="{Binding [Gal_FiltroAbandonados], Source={x:Static loc:LocalizationService.Instance}}" Margin="0,0,0,4" IsChecked="{Binding EsFiltroAbandonados, Mode=OneWay}" GroupName="FiltroEstado"
+                             Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="Abandonados"
+                             Style="{StaticResource MaterialDesignTabRadioButton}"
+                             Height="34" Padding="14,0" FontSize="13" FontWeight="SemiBold"/>
+            </WrapPanel>
+        </Grid>
+
+        <!-- Panel Expansible de Filtros Avanzados (Desplegable).
+             UI-01: un WrapPanel único para selectores/toggles/"Limpiar filtros" evita el
+             reflujo abrupto de una columna Grid Auto/Star, PERO el badge de conteo
+             ("Mostrando X de Y animes") es el elemento más ancho del grupo y, si el resto
+             ya llena la línea, terminaba flotando solo en una 2ª línea huérfana — igual de
+             feo que el bug original. Se ancla con DockPanel.Dock="Right" fuera del
+             WrapPanel: así SOLO los selectores/toggles se reflujan (como grupo, de forma
+             predecible) y el conteo se queda fijo en la esquina derecha en su propia línea. -->
+        <Border Grid.Row="1" Margin="0,12,0,0" Padding="16,10"
+                Background="{DynamicResource Brush.Surface1}" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1"
+                CornerRadius="14" Visibility="{Binding PanelFiltrosVisible, Converter={StaticResource BoolToVis}}">
+            <DockPanel LastChildFill="True">
+                <!-- Badge Conteo Filtrados: anclado a la derecha, nunca flota solo -->
+                <Border DockPanel.Dock="Right" Background="{DynamicResource Brush.Surface2}" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1"
+                        CornerRadius="8" Height="36" Padding="12,0" Margin="10,0,0,0" VerticalAlignment="Top">
+                    <TextBlock Text="{Binding ConteoFiltradosTexto}" Style="{StaticResource AppText.Caption}"
+                               FontWeight="SemiBold" Foreground="{DynamicResource Brush.TextSecondary}" VerticalAlignment="Center"/>
+                </Border>
+
+                <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <!-- Selector de Género: el valor real (GeneroSeleccionado, usado para filtrar
+                         contra AnimeItem.GenerosLista) sigue en inglés como lo entrega AniList —
+                         el ItemTemplate solo traduce lo que se MUESTRA. -->
+                    <ComboBox ItemsSource="{Binding GenerosDisponibles}"
+                              SelectedItem="{Binding GeneroSeleccionado}"
+                              Height="36" Margin="0,0,10,4"
+                              VerticalAlignment="Center">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Converter={StaticResource GeneroTraducido}}"/>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+
+                    <!-- Selector de Temporada: el valor es el código de AniList (WINTER…); la plantilla lo traduce al mostrarlo -->
+                    <ComboBox ItemsSource="{Binding TemporadasDisponibles}"
+                              SelectedItem="{Binding TemporadaSeleccionada}"
+                              ToolTip="{Binding [Gal_TemporadaTip], Source={x:Static loc:LocalizationService.Instance}}"
+                              Height="36" Margin="0,0,10,4"
+                              VerticalAlignment="Center">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Converter={StaticResource TemporadaTexto}}"/>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+
+                    <!-- Selector de Año -->
+                    <ComboBox ItemsSource="{Binding AniosDisponibles}"
+                              SelectedItem="{Binding AnioSeleccionado}"
+                              ToolTip="{Binding [Gal_AnioTip], Source={x:Static loc:LocalizationService.Instance}}"
+                              Height="36" Margin="0,0,10,4"
+                              VerticalAlignment="Center"/>
+
+                    <!-- Selector de Ordenación -->
+                    <ComboBox ItemsSource="{Binding ListaOpcionesOrdenacion}"
+                              SelectedItem="{Binding CriterioOrdenSeleccionado}"
+                              Height="36" Margin="0,0,12,4"
+                              VerticalAlignment="Center"/>
+
+                    <!-- Toggle: Solo con episodios pendientes -->
+                    <ToggleButton IsChecked="{Binding SoloConEpisodiosPendientes}"
+                                  Height="36" Margin="0,0,8,0" Padding="12,0"
+                                  ToolTip="{Binding [Gal_SoloPendientesTip], Source={x:Static loc:LocalizationService.Instance}}"
+                                  Cursor="Hand">
+                        <ToggleButton.Style>
+                            <Style TargetType="ToggleButton" BasedOn="{StaticResource MaterialDesignOutlinedButton}">
+                                <Setter Property="Foreground" Value="{DynamicResource Brush.TextSecondary}"/>
+                                <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}"/>
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Style.Triggers>
+                                    <Trigger Property="IsChecked" Value="True">
+                                        <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}"/>
+                                        <Setter Property="BorderBrush" Value="{DynamicResource Brush.AccentStrong}"/>
+                                        <Setter Property="Background" Value="{DynamicResource Brush.Surface3}"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ToggleButton.Style>
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="ClockAlertOutline" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding [Gal_Pendientes], Source={x:Static loc:LocalizationService.Instance}}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </ToggleButton>
+
+                    <!-- Toggle: Solo con carpeta local asociada -->
+                    <ToggleButton IsChecked="{Binding SoloConCarpetaLocal}"
+                                  Height="36" Margin="0,0,8,0" Padding="12,0"
+                                  ToolTip="{Binding [Gal_SoloCarpetaTip], Source={x:Static loc:LocalizationService.Instance}}"
+                                  Cursor="Hand">
+                        <ToggleButton.Style>
+                            <Style TargetType="ToggleButton" BasedOn="{StaticResource MaterialDesignOutlinedButton}">
+                                <Setter Property="Foreground" Value="{DynamicResource Brush.TextSecondary}"/>
+                                <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}"/>
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Style.Triggers>
+                                    <Trigger Property="IsChecked" Value="True">
+                                        <Setter Property="Foreground" Value="{DynamicResource Brush.Success}"/>
+                                        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Success}"/>
+                                        <Setter Property="Background" Value="{DynamicResource Brush.Surface3}"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ToggleButton.Style>
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="FolderCheckOutline" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding [Gal_ConCarpetaLocal], Source={x:Static loc:LocalizationService.Instance}}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </ToggleButton>
+
+                    <!-- Toggle: Solo favoritos (favorito individual por anime, no un estado) -->
+                    <ToggleButton IsChecked="{Binding SoloFavoritos}"
+                                  Height="36" Margin="0,0,8,4" Padding="12,0"
+                                  ToolTip="{Binding [Gal_SoloFavoritosTip], Source={x:Static loc:LocalizationService.Instance}}"
+                                  Cursor="Hand">
+                        <ToggleButton.Style>
+                            <Style TargetType="ToggleButton" BasedOn="{StaticResource MaterialDesignOutlinedButton}">
+                                <Setter Property="Foreground" Value="{DynamicResource Brush.TextSecondary}"/>
+                                <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}"/>
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Style.Triggers>
+                                    <Trigger Property="IsChecked" Value="True">
+                                        <Setter Property="Foreground" Value="{DynamicResource Brush.Rose}"/>
+                                        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Rose}"/>
+                                        <Setter Property="Background" Value="{DynamicResource Brush.Surface3}"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ToggleButton.Style>
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="Heart" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding [Gal_Favoritos], Source={x:Static loc:LocalizationService.Instance}}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </ToggleButton>
+
+                    <!-- Botón Limpiar Filtros -->
+                    <Button Command="{Binding LimpiarFiltrosCommand}"
+                            Visibility="{Binding HayFiltrosActivos, Converter={StaticResource BoolToVis}}"
+                            Style="{StaticResource MaterialDesignFlatButton}"
+                            Foreground="{DynamicResource Brush.Rose}"
+                            Height="36" Padding="10,0" Margin="0,0,10,4"
+                            ToolTip="{Binding [Gal_LimpiarFiltrosTip], Source={x:Static loc:LocalizationService.Instance}}">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="FilterRemoveOutline" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding [Gal_LimpiarFiltros], Source={x:Static loc:LocalizationService.Instance}}" FontSize="12" FontWeight="Bold" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                </WrapPanel>
+            </DockPanel>
+        </Border>
+    </Grid>
+</UserControl>

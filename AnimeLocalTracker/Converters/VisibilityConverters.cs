@@ -77,6 +77,26 @@ public class GeneroTraducidoConverter : IValueConverter
         => Binding.DoNothing;
 }
 
+/// <summary>
+/// Código de temporada de AniList (WINTER, SPRING, SUMMER, FALL; vacío = todas) → texto en el idioma actual. Solo para
+/// mostrar: el filtro de la Galería guarda el código, así que cambiar de idioma no lo pierde.
+/// </summary>
+public class TemporadaTextoConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) => (value as string)?.ToUpperInvariant() switch
+    {
+        "WINTER" => AnimeLocalTracker.Services.LocalizationService.T("Temporada_Invierno"),
+        "SPRING" => AnimeLocalTracker.Services.LocalizationService.T("Temporada_Primavera"),
+        "SUMMER" => AnimeLocalTracker.Services.LocalizationService.T("Temporada_Verano"),
+        "FALL" => AnimeLocalTracker.Services.LocalizationService.T("Temporada_Otonio"),
+        null or "" => AnimeLocalTracker.Services.LocalizationService.T("Gal_TodasLasTemporadas"),
+        _ => value
+    };
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => Binding.DoNothing;
+}
+
 /// <summary>Niega un bool — usado para IsEnabled ligado a un flag "ocupado/cargando".</summary>
 public class InverseBoolConverter : IValueConverter
 {
