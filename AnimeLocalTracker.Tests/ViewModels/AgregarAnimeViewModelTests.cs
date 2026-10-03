@@ -211,6 +211,27 @@ public class AgregarAnimeViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task FiltroDeTemporada_SeConservaAlCambiarDeIdioma()
+    {
+        _trackingMock.Setup(t => t.ObtenerAnimesTendenciaAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<AniListMedia>
+            {
+                new() { Id = 1, Title = new AniListTitle { Romaji = "Frieren" }, Status = "FINISHED", Season = "FALL" },
+                new() { Id = 2, Title = new AniListTitle { Romaji = "Dandadan" }, Status = "FINISHED", Season = "WINTER" }
+            });
+        var sut = CreateSut();
+        await Task.Delay(50);
+        sut.TemporadasDisponibles.Should().Equal("", "WINTER", "FALL"); // códigos: el texto lo pone la vista en el idioma de cada momento
+
+        sut.TemporadaSeleccionada = "FALL";
+        sut.Receive(new IdiomaCambiadoMensaje());
+
+        sut.TemporadaSeleccionada.Should().Be("FALL");
+        sut.ResultadosFiltrados.Cast<AnimeBusquedaItem>().Should().ContainSingle(a => a.TituloPrincipal == "Frieren");
+        sut.HayFiltrosActivos.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task ReceiveAnimeAñadido_ConItemYaEnResultados_DeberiaMarcarloEnBiblioteca()
     {
         // Arrange
