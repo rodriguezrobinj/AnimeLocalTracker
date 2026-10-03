@@ -378,18 +378,23 @@ public partial class App : Application
                 (id, _) => PrecuelasAnime.ObtenerAsync(db, id));
         });
         services.AddSingleton<ProveedorVideoAnimeAv1>();
+        // JKAnime (segundo sitio): mismo cliente "Scraper" (páginas comprimidas, redirecciones validadas); sus servidores los
+        // resuelve el mismo código que los de AnimeAV1 (MP4Upload, Mega, Voe).
+        services.AddSingleton(sp => new JkAnimeClient(sp.GetRequiredService<IHttpClientFactory>().CreateClient("Scraper")));
+        services.AddSingleton<ProveedorVideoJkAnime>();
         services.AddSingleton<IVideoSourceResolver>(sp =>
         {
             // Plugins C# "drop-in": cualquier IProveedorVideo hallado en la carpeta de plugins
             // se suma a los proveedores nativos — el orquestador no distingue entre ambos.
-            var proveedores = new List<IProveedorVideo> { sp.GetRequiredService<ProveedorVideoAnimeAv1>() };
+            var proveedores = new List<IProveedorVideo> { sp.GetRequiredService<ProveedorVideoAnimeAv1>(), sp.GetRequiredService<ProveedorVideoJkAnime>() };
             // SEC-01: un .dll solo se carga si los plugins están activados Y el usuario confió en ese archivo con su
             // huella SHA-256 actual (Configuración → Plugins). Por defecto no se carga ninguno.
             var settingsPlugins = sp.GetRequiredService<ISettingsService>();
             proveedores.AddRange(CSharpPluginLoader.CargarProveedoresVideo(
                 AppDataPaths.PluginsFolder,
                 esConfiable: ruta => AnimeLocalTracker.Core.ConfianzaPlugins.PuedeEjecutarse(settingsPlugins.ObtenerConfiguracion(), ruta)));
-            return new OrquestadorMultiProveedor(proveedores);
+            // El orden de los sitios lo elige el usuario en Configuración: se lee en cada búsqueda (sin reiniciar la app).
+            return new OrquestadorMultiProveedor(proveedores, ordenProveedores: () => settingsPlugins.ObtenerConfiguracion().OrdenProveedoresVideo);
         });
 
         // Persistencia del estado de descargas segmentadas (.state)

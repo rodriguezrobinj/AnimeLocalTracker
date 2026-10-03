@@ -56,7 +56,7 @@ def process_command(command: str, payload: Dict[str, Any]) -> Dict[str, Any]:
     elif command == "resolve-stream":
         url = payload.get("url", "")
         headers = payload.get("headers")
-        return StreamExtractor.extract_stream_info(url, headers)
+        return StreamExtractor.extract_stream_info(url, headers, payload.get("server"))
 
     elif command == "download-stream":
         url = payload.get("url", "")

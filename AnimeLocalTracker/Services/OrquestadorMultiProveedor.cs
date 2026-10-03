@@ -27,14 +27,21 @@ public class OrquestadorMultiProveedor : IVideoSourceResolver
         public DateTime? CooldownHasta { get; set; }
     }
 
+    /// <summary>Orden de sitios elegido por el usuario (lista separada por comas con los nombres de proveedor), leído en cada búsqueda.</summary>
+    private readonly Func<string?>? _ordenProveedores;
+
+    /// <param name="ordenProveedores">Devuelve el orden elegido en Configuración ("JKAnime,AnimeAV1") o null. Se consulta en cada
+    /// búsqueda, así un cambio se aplica sin reiniciar la app. Los no listados van después, en el orden de registro.</param>
     public OrquestadorMultiProveedor(
         IEnumerable<IProveedorVideo> proveedores,
         int maxFallosConsecutivos = 3,
-        TimeSpan? cooldown = null)
+        TimeSpan? cooldown = null,
+        Func<string?>? ordenProveedores = null)
     {
         _proveedores = proveedores.Select(p => new EstadoProveedor(p)).ToList();
         _maxFallosConsecutivos = Math.Max(1, maxFallosConsecutivos);
         _cooldown = cooldown ?? TimeSpan.FromMinutes(5);
+        _ordenProveedores = ordenProveedores;
     }
 
     public async Task<string?> BuscarUrlEpisodioAsync(IEnumerable<string> titulos, int numeroEpisodio, int? aniListId = null, string? audioPreferido = null, string? servidorPreferido = null, CancellationToken cancellationToken = default)
@@ -85,7 +92,16 @@ public class OrquestadorMultiProveedor : IVideoSourceResolver
     private IEnumerable<EstadoProveedor> ProveedoresAProbar()
     {
         var sanos = _proveedores.Where(EstaSaludable).ToList();
-        return sanos.Count > 0 ? sanos : _proveedores;
+        var lista = sanos.Count > 0 ? sanos : _proveedores;
+
+        // Los que el usuario ordenó, primero y en ese orden; el resto (plugins…) detrás, en el de registro (OrderBy es estable).
+        var elegidos = Models.OrdenProveedores.Dividir(_ordenProveedores?.Invoke()).ToList();
+        if (elegidos.Count == 0) return lista;
+        return lista.OrderBy(e =>
+        {
+            int puesto = elegidos.FindIndex(n => n.Equals(e.Proveedor.Nombre, StringComparison.OrdinalIgnoreCase));
+            return puesto < 0 ? int.MaxValue : puesto;
+        }).ToList();
     }
 
     private bool EstaSaludable(EstadoProveedor e)

@@ -146,7 +146,6 @@ public partial class ConfiguracionViewModel : ObservableObject
     [ObservableProperty] private bool _evitarSuspensionPantalla = true;
     [ObservableProperty] private string _accionFinEpisodio = AccionFinEpisodioValores.AutoPlayCuentaAtras;
     [ObservableProperty] private string _preferenciaAudioAnimeAv1 = "";
-    [ObservableProperty] private string _servidorPreferidoAnimeAv1 = "";
     [ObservableProperty] private bool _busquedaTorrentHabilitada;
     [ObservableProperty] private string _grupoFansubPreferidoTorrent = "";
     [ObservableProperty] private string _resolucionPreferidaTorrent = "";
@@ -340,6 +339,43 @@ public partial class ConfiguracionViewModel : ObservableObject
             LocalizationService.T(informe.Escalado ? "Cfg_DiagEscaladoSi" : "Cfg_DiagEscaladoNo"));
     }
 
+    // === Orden de los servidores de descarga y de los sitios de video ===
+
+    /// <summary>Los servidores en el orden en que se probarán al descargar; el usuario lo cambia con las flechas.</summary>
+    public System.Collections.ObjectModel.ObservableCollection<ServidorOrdenItem> OrdenServidores { get; } = new();
+
+    /// <summary>Los sitios de video (AnimeAV1, JKAnime) en el orden en que se probarán; si uno no tiene el episodio, se pasa al siguiente.</summary>
+    public System.Collections.ObjectModel.ObservableCollection<ServidorOrdenItem> OrdenProveedores { get; } = new();
+
+    private static void CargarLista(System.Collections.ObjectModel.ObservableCollection<ServidorOrdenItem> lista, System.Collections.Generic.IEnumerable<string> nombres)
+    {
+        lista.Clear();
+        foreach (var nombre in nombres) lista.Add(new ServidorOrdenItem(nombre, (item, desplazamiento) => MoverEnLista(lista, item, desplazamiento)));
+        ActualizarPuestos(lista);
+    }
+
+    private static void ActualizarPuestos(System.Collections.ObjectModel.ObservableCollection<ServidorOrdenItem> lista)
+    {
+        for (int i = 0; i < lista.Count; i++)
+        {
+            lista[i].Posicion = i + 1;
+            lista[i].PuedeSubir = i > 0;
+            lista[i].PuedeBajar = i < lista.Count - 1;
+        }
+    }
+
+    private static void MoverEnLista(System.Collections.ObjectModel.ObservableCollection<ServidorOrdenItem> lista, ServidorOrdenItem item, int desplazamiento)
+    {
+        int desde = lista.IndexOf(item), hasta = desde + desplazamiento;
+        if (desde < 0 || hasta < 0 || hasta >= lista.Count) return;
+        lista.Move(desde, hasta);
+        ActualizarPuestos(lista);
+    }
+
+    [RelayCommand] private void RestablecerOrdenServidores() => CargarLista(OrdenServidores, AnimeLocalTracker.Models.OrdenServidores.Predeterminado);
+
+    [RelayCommand] private void RestablecerOrdenProveedores() => CargarLista(OrdenProveedores, AnimeLocalTracker.Models.OrdenProveedores.Predeterminado);
+
     public bool EsSeccionBiblioteca => SeccionActiva == SeccionConfiguracion.Biblioteca;
     public bool EsSeccionReproduccion => SeccionActiva == SeccionConfiguracion.Reproduccion;
     public bool EsSeccionAtajos => SeccionActiva == SeccionConfiguracion.Atajos;
@@ -396,7 +432,8 @@ public partial class ConfiguracionViewModel : ObservableObject
         EvitarSuspensionPantalla = config.EvitarSuspensionPantalla;
         AccionFinEpisodio = string.IsNullOrWhiteSpace(config.AccionFinEpisodio) ? AccionFinEpisodioValores.AutoPlayCuentaAtras : config.AccionFinEpisodio;
         PreferenciaAudioAnimeAv1 = config.PreferenciaAudioAnimeAv1 ?? "";
-        ServidorPreferidoAnimeAv1 = config.ServidorPreferidoAnimeAv1 ?? "";
+        CargarLista(OrdenServidores, AnimeLocalTracker.Models.OrdenServidores.DesdeAjuste(config.ServidorPreferidoAnimeAv1));
+        CargarLista(OrdenProveedores, AnimeLocalTracker.Models.OrdenProveedores.DesdeAjuste(config.OrdenProveedoresVideo));
         BusquedaTorrentHabilitada = config.BusquedaTorrentHabilitada;
         GrupoFansubPreferidoTorrent = config.GrupoFansubPreferidoTorrent ?? "";
         ResolucionPreferidaTorrent = config.ResolucionPreferidaTorrent ?? "";
@@ -621,7 +658,8 @@ public partial class ConfiguracionViewModel : ObservableObject
             config.EvitarSuspensionPantalla = EvitarSuspensionPantalla;
             config.AccionFinEpisodio = AccionFinEpisodio;
             config.PreferenciaAudioAnimeAv1 = string.IsNullOrEmpty(PreferenciaAudioAnimeAv1) ? null : PreferenciaAudioAnimeAv1;
-            config.ServidorPreferidoAnimeAv1 = string.IsNullOrEmpty(ServidorPreferidoAnimeAv1) ? null : ServidorPreferidoAnimeAv1;
+            config.ServidorPreferidoAnimeAv1 = AnimeLocalTracker.Models.OrdenServidores.ParaAjuste(OrdenServidores.Select(s => s.Nombre));
+            config.OrdenProveedoresVideo = AnimeLocalTracker.Models.OrdenProveedores.ParaAjuste(OrdenProveedores.Select(s => s.Nombre));
             config.BusquedaTorrentHabilitada = BusquedaTorrentHabilitada;
             config.GrupoFansubPreferidoTorrent = string.IsNullOrEmpty(GrupoFansubPreferidoTorrent) ? null : GrupoFansubPreferidoTorrent;
             config.ResolucionPreferidaTorrent = string.IsNullOrEmpty(ResolucionPreferidaTorrent) ? null : ResolucionPreferidaTorrent;

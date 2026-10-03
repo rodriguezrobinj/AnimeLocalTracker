@@ -30,12 +30,20 @@ public static partial class AnimeAv1HtmlParser
     /// Cada pista se extrae por separado para poder etiquetar el idioma de cada servidor.
     /// Solo se devuelven URLs https; el filtrado por host permitido lo hace UrlSeguridad.
     /// </summary>
-    public static List<EmbedServidor> ExtraerEmbeds(string html)
+    public static List<EmbedServidor> ExtraerEmbeds(string html) => ExtraerBloque(html, "embeds:{");
+
+    /// <summary>
+    /// Bloque <c>downloads:{SUB:[{server,url},...],DUB:[...]}</c> de la misma página: enlaces de DESCARGA (TransferIt, Mega,
+    /// 1Fichier, MP4Upload) que la app no leía. Mismo formato que <see cref="ExtraerEmbeds"/>.
+    /// </summary>
+    public static List<EmbedServidor> ExtraerDescargas(string html) => ExtraerBloque(html, "downloads:{");
+
+    private static List<EmbedServidor> ExtraerBloque(string html, string claveBloque)
     {
         var lista = new List<EmbedServidor>();
         if (string.IsNullOrWhiteSpace(html)) return lista;
 
-        int inicio = html.IndexOf("embeds:{", StringComparison.Ordinal);
+        int inicio = html.IndexOf(claveBloque, StringComparison.Ordinal);
         if (inicio < 0) return lista;
 
         // Se incluye el "]}" final: hace falta el corchete de cierre de la ÚLTIMA pista para
@@ -62,27 +70,31 @@ public static partial class AnimeAv1HtmlParser
     }
 
     /// <summary>
-    /// Orden de preferencia de servidores: MP4Upload primero — es la ÚNICA fuente
-    /// fiable hoy (el player HLS de zilla está tras Cloudflare anti-bot que ni la
-    /// impersonación de yt-dlp pasa; Voe/UPNShare/Byse no tienen extractor).
-    /// HLS se conserva como intento (403 limpio en el log) por si el sitio
-    /// relaja Cloudflare. Mega se excluye.
+    /// Orden de preferencia de servidores: MP4Upload primero (AV1 1080p, el mejor archivo); si no resuelve,
+    /// TransferIt y Mega (el MISMO archivo, 1080p: vienen del bloque <c>downloads</c> y los resuelve la API de MEGA),
+    /// Mediafire y Vidhide (1080p, solo de JKAnime; los resuelve el daemon), Voe (H.264 720p) y Streamwish (HLS 720p, lento).
+    /// El player HLS de zilla
+    /// está tras Cloudflare anti-bot que ni la impersonación de yt-dlp pasa; UPNShare y Byse no tienen
+    /// extractor: ver docs/investigacion-servidores-descarga.md.
+    /// HLS se conserva como intento (403 limpio en el log) por si el sitio relaja Cloudflare.
     /// </summary>
     /// <param name="audioPreferido">"SUB"/"DUB" (AppSettings.PreferenciaAudioAnimeAv1). Es una
     /// PREFERENCIA con fallback, no un filtro estricto: si la pista pedida no tiene ningún
     /// servidor disponible, se cae a la otra en vez de no descargar nada. Null/vacío = sin
     /// preferencia, mismo orden de siempre (solo por servidor, sin importar el idioma).</param>
-    /// <param name="servidorPreferido">Servidor preferido (AppSettings.ServidorPreferidoAnimeAv1,
-    /// ej. "MP4Upload"). También es PREFERENCIA con fallback: se prueba primero y, si no
-    /// resuelve, se sigue con el resto en el orden de siempre. Null/vacío = sin preferencia.</param>
+    /// <param name="servidorPreferido">Orden elegido por el usuario (AppSettings.ServidorPreferidoAnimeAv1): un
+    /// servidor ("MP4Upload") o una lista separada por comas ("Voe,Mega"). También es PREFERENCIA con fallback: esos se
+    /// prueban primero y en ese orden y, si no resuelven, se sigue con el resto en el orden de siempre. Null/vacío =
+    /// sin preferencia.</param>
     public static List<EmbedServidor> OrdenarEmbedsPorPreferencia(IEnumerable<EmbedServidor> embeds, string? audioPreferido = null, string? servidorPreferido = null)
     {
-        var preferenciaServidor = new[] { "MP4Upload", "HLS", "Voe", "UPNShare", "Byse" };
-        if (!string.IsNullOrWhiteSpace(servidorPreferido))
+        var preferenciaServidor = new[] { "MP4Upload", "HLS", "TransferIt", "Mega", "Mediafire", "Vidhide", "Voe", "Streamwish", "UPNShare", "Byse" };
+        // El ajuste del usuario es una lista ordenada ("Voe,Mega"): esos primero y en ese orden; el resto, como siempre.
+        var elegidos = Models.OrdenServidores.Dividir(servidorPreferido).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        if (elegidos.Length > 0)
         {
-            preferenciaServidor = preferenciaServidor
-                .Where(s => !s.Equals(servidorPreferido, StringComparison.OrdinalIgnoreCase))
-                .Prepend(servidorPreferido)
+            preferenciaServidor = elegidos
+                .Concat(preferenciaServidor.Where(s => !elegidos.Contains(s, StringComparer.OrdinalIgnoreCase)))
                 .ToArray();
         }
 
@@ -1150,9 +1162,112 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
             return [];
         }
 
+        // Del bloque de descargas solo interesan TransferIt y Mega (MP4Upload ya sale de los embeds y 1Fichier pide captcha).
+        var descargas = AnimeAv1HtmlParser.ExtraerDescargas(html)
+            .Where(d => d.Server.Equals("TransferIt", StringComparison.OrdinalIgnoreCase) || d.Server.Equals("Mega", StringComparison.OrdinalIgnoreCase));
+
         return AnimeAv1HtmlParser.ExtraerEmbeds(html)
+            .Concat(descargas)
             .Where(e => Core.UrlSeguridad.EsUrlEmbedPermitida(e.Url))
             .ToList();
+    }
+
+    // === Mega y TransferIt (ver MegaTransferIt) ===
+
+    /// <summary>
+    /// Enlace de descarga de un archivo de TransferIt (<c>transfer.it/t/ID</c>): lista sus nodos, pide la URL temporal del
+    /// archivo y comprueba que MEGA todavía deja descargar. El archivo se sirve EN CLARO. Null si algo falla.
+    /// </summary>
+    public async Task<string?> ResolverTransferItAsync(string enlace, CancellationToken ct = default)
+    {
+        string? transferencia = MegaTransferIt.ExtraerHandleTransferIt(enlace);
+        if (transferencia == null) return null;
+
+        string urlApi = $"{MegaTransferIt.ApiTransferIt}?id=1&x={transferencia}";
+        var archivo = MegaTransferIt.LeerArchivoDeTransferencia(await PostApiMegaAsync(urlApi, MegaTransferIt.CuerpoListarTransferencia(), ct));
+        if (archivo == null)
+        {
+            AppLogger.Info("AnimeAv1VideoSourceResolver", "TransferIt: la transferencia no existe o ya no tiene archivos.");
+            return null;
+        }
+
+        string respuesta = await PostApiMegaAsync(urlApi, MegaTransferIt.CuerpoDescargaTransferencia(archivo.Value.Handle), ct);
+        var descarga = MegaTransferIt.LeerRespuestaG(respuesta);
+        if (descarga == null)
+        {
+            AppLogger.Info("AnimeAv1VideoSourceResolver", $"TransferIt: sin enlace de descarga (código {MegaTransferIt.CodigoErrorApi(respuesta)?.ToString() ?? "?"}).");
+            return null;
+        }
+        return await MegaTieneCuotaAsync(descarga.Url, ct) ? descarga.Url : null;
+    }
+
+    /// <summary>
+    /// Enlace de descarga de un archivo de Mega (<c>mega.nz/file/ID#CLAVE</c>). Devuelve la URL temporal del archivo CIFRADO con
+    /// la clave en el fragmento (<c>#mega=…</c>): <c>DownloadService</c> lo descifra al terminar de bajarlo. Null si falla o
+    /// si la cuota gratuita de MEGA está agotada (así el proveedor sigue con el siguiente servidor en vez de fallar luego).
+    /// </summary>
+    public async Task<string?> ResolverMegaAsync(string enlace, CancellationToken ct = default)
+    {
+        var parseado = MegaTransferIt.ParsearEnlaceMega(enlace);
+        if (parseado == null) return null;
+
+        string respuesta = await PostApiMegaAsync($"{MegaTransferIt.ApiMega}?id=1", MegaTransferIt.CuerpoDescargaMega(parseado.Value.Handle), ct);
+        var descarga = MegaTransferIt.LeerRespuestaG(respuesta);
+        if (descarga == null)
+        {
+            AppLogger.Info("AnimeAv1VideoSourceResolver", $"Mega: sin enlace de descarga (código {MegaTransferIt.CodigoErrorApi(respuesta)?.ToString() ?? "?"}).");
+            return null;
+        }
+        return await MegaTieneCuotaAsync(descarga.Url, ct) ? MegaTransferIt.UrlConClave(descarga.Url, parseado.Value.Clave) : null;
+    }
+
+    /// <summary>POST a la API de MEGA. Devuelve el cuerpo de la respuesta o "" si falla (nunca lanza: el proveedor sigue con otro servidor).</summary>
+    private async Task<string> PostApiMegaAsync(string url, string cuerpo, CancellationToken ct)
+    {
+        try
+        {
+            using var req = new HttpRequestMessage(HttpMethod.Post, url) { Content = new StringContent(cuerpo, System.Text.Encoding.UTF8, "application/json") };
+            req.Headers.Add("User-Agent", UserAgent);
+            using var res = await _httpClient.SendAsync(req, ct);
+            return res.IsSuccessStatusCode ? await res.Content.ReadAsStringAsync(ct) : "";
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or SinConexionException)
+        {
+            AppLogger.Debug("AnimeAv1VideoSourceResolver", $"Fallo consultando la API de MEGA: {ex.Message}");
+            return "";
+        }
+    }
+
+    /// <summary>
+    /// Pide el primer byte del archivo: MEGA responde 509 cuando se agotó la cuota gratuita (unos GB cada 6 h por IP). Mejor
+    /// descubrirlo aquí, con otros servidores por probar, que a mitad de una descarga.
+    /// </summary>
+    private async Task<bool> MegaTieneCuotaAsync(string urlDescarga, CancellationToken ct)
+    {
+        try
+        {
+            using var req = new HttpRequestMessage(HttpMethod.Get, urlDescarga);
+            req.Headers.Add("User-Agent", UserAgent);
+            req.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(0, 0);
+            using var res = await _httpClient.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
+            if (res.IsSuccessStatusCode) return true;
+
+            if ((int)res.StatusCode == 509)
+            {
+                string espera = res.Headers.TryGetValues("X-MEGA-Time-Left", out var valores) ? $" (vuelve en ~{valores.First()} s)" : "";
+                AppLogger.Warn("AnimeAv1VideoSourceResolver", $"MEGA: cuota de transferencia gratuita agotada{espera}; se prueba otro servidor.");
+            }
+            else
+            {
+                AppLogger.Info("AnimeAv1VideoSourceResolver", $"MEGA: el enlace de descarga respondió {(int)res.StatusCode}.");
+            }
+            return false;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or SinConexionException)
+        {
+            AppLogger.Debug("AnimeAv1VideoSourceResolver", $"Fallo comprobando el enlace de MEGA: {ex.Message}");
+            return false;
+        }
     }
 
     private static bool EsDominioPermitido(string url, string dominioEsperado)
@@ -1175,7 +1290,7 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
             var mp4UploadId = AnimeAv1HtmlParser.ExtraerMp4UploadId(html);
             if (!string.IsNullOrEmpty(mp4UploadId))
             {
-                var directMp4 = await ExtractFromMp4UploadAsync($"https://www.mp4upload.com/embed-{mp4UploadId}.html", cancellationToken);
+                var directMp4 = await ResolverMp4UploadAsync($"https://www.mp4upload.com/embed-{mp4UploadId}.html", "https://animeav1.com/", cancellationToken);
                 if (!string.IsNullOrEmpty(directMp4))
                 {
                     return directMp4;
@@ -1184,17 +1299,18 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
         }
         else if (EsDominioPermitido(pageUrl, "mp4upload.com"))
         {
-            return await ExtractFromMp4UploadAsync(pageUrl, cancellationToken);
+            return await ResolverMp4UploadAsync(pageUrl, "https://animeav1.com/", cancellationToken);
         }
 
         return null;
     }
 
-    private async Task<string?> ExtractFromMp4UploadAsync(string embedUrl, CancellationToken cancellationToken)
+    /// <summary>URL directa del video de un embed de MP4Upload. <paramref name="referer"/> es el sitio desde el que se abre (cada sitio, el suyo).</summary>
+    public async Task<string?> ResolverMp4UploadAsync(string embedUrl, string referer, CancellationToken cancellationToken)
     {
         if (!EsDominioPermitido(embedUrl, "mp4upload.com")) return null;
 
-        var html = await ObtenerHtmlAsync(embedUrl, cancellationToken, referer: "https://animeav1.com/");
+        var html = await ObtenerHtmlAsync(embedUrl, cancellationToken, referer: referer);
         if (html == null) return null;
 
         // INT-01: parseo delegado al contrato tipado (testeable con fixtures).

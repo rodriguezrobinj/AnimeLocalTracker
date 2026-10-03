@@ -1202,6 +1202,43 @@ public class DownloadService : IDownloadService
         {
             await DescargarSecuencialConTurnoAsync(videoUrl, destinationPath, totalBytes, progress, cancellationToken);
         }
+
+        // Mega sirve el archivo cifrado: se baja igual que cualquier otro (por trozos, reanudable) y al final se descifra.
+        if (MegaTransferIt.ClaveDeUrl(videoUrl) is { } claveMega)
+        {
+            await DescifrarArchivoMegaAsync(destinationPath, claveMega, cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// Descifra en su sitio el archivo de Mega recién descargado. Escribe a un .dec y lo sustituye al final, así un corte
+    /// nunca deja el archivo a medias; y si ya está en claro (un descifrado anterior que terminó justo antes del corte)
+    /// no se vuelve a descifrar.
+    /// </summary>
+    private static async Task DescifrarArchivoMegaAsync(string ruta, byte[] clave, CancellationToken ct)
+    {
+        var cabecera = new byte[16];
+        int leidos;
+        await using (var fs = new FileStream(ruta, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+        {
+            leidos = await fs.ReadAtLeastAsync(cabecera, cabecera.Length, throwOnEndOfStream: false, ct);
+        }
+        if (MegaTransferIt.PareceContenedorDeVideo(cabecera.AsSpan(0, leidos)))
+        {
+            AppLogger.Debug("DownloadService", "El archivo de Mega ya está en claro: no se descifra de nuevo.");
+            return;
+        }
+
+        string descifrado = ruta + ".dec";
+        try
+        {
+            await MegaTransferIt.DescifrarArchivoAsync(ruta, descifrado, clave, ct);
+            File.Move(descifrado, ruta, overwrite: true);
+        }
+        finally
+        {
+            try { if (File.Exists(descifrado)) File.Delete(descifrado); } catch { /* temporal: se sobrescribe la próxima vez */ }
+        }
     }
 
     private readonly record struct RespuestaSondeo(bool Exito, bool Parcial, long Total, bool AnunciaRangos, System.Net.HttpStatusCode? Estado = null);

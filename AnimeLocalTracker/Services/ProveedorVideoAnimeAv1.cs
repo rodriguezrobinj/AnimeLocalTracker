@@ -9,14 +9,16 @@ namespace AnimeLocalTracker.Services;
 
 /// <summary>
 /// Proveedor AnimeAV1 (Fase A multi-fuente): resuelve episodios usando los embeds
-/// multi-servidor de la página (MP4Upload directo con el extractor C# y
-/// Voe/UPNShare/HLS/Byse vía yt-dlp en el daemon; Mega queda fuera de alcance).
+/// multi-servidor de la página (MP4Upload directo con el extractor C# y, como respaldo, TransferIt y Mega con la
+/// API de MEGA y Voe con su extractor propio en el daemon; HLS/UPNShare/Byse también pasan por el daemon pero
+/// hoy no resuelven).
 /// Es un IProveedorVideo intercambiable dentro del orquestador.
 /// </summary>
 public class ProveedorVideoAnimeAv1 : IProveedorVideo
 {
     private readonly IPythonBridgeService _pythonBridge;
     private readonly AnimeAv1VideoSourceResolver _resolver;
+    private readonly ResolvedorServidoresVideo _servidores;
 
     public string Nombre => "AnimeAV1";
 
@@ -24,83 +26,20 @@ public class ProveedorVideoAnimeAv1 : IProveedorVideo
     {
         _pythonBridge = pythonBridge;
         _resolver = resolver;
+        _servidores = new ResolvedorServidoresVideo(pythonBridge, resolver);
     }
 
     public async Task<string?> BuscarUrlEpisodioAsync(IEnumerable<string> titulos, int numeroEpisodio, int? aniListId = null, string? audioPreferido = null, string? servidorPreferido = null, CancellationToken ct = default)
     {
-        // La página del episodio publica los embeds de HLS, UPNShare, Voe, Byse,
-        // Mega y MP4Upload. Se prueban en orden de preferencia; Mega se omite.
+        // La página del episodio publica los embeds de HLS, UPNShare, Voe, Byse y MP4Upload, y en su bloque de
+        // descargas TransferIt y Mega. Se prueban en orden de preferencia (ver OrdenarEmbedsPorPreferencia).
         // El AniListId se usa para verificar el MAL ID de la página (anti-confusión
         // entre animes con nombres parecidos).
         var embeds = await _resolver.ObtenerEmbedsEpisodioAsync(titulos, numeroEpisodio, aniListId, ct);
         var ordenados = AnimeAv1HtmlParser.OrdenarEmbedsPorPreferencia(embeds, audioPreferido, servidorPreferido);
         if (ordenados.Count == 0) return null;
 
-        foreach (var embed in ordenados)
-        {
-            if (ct.IsCancellationRequested) return null;
-
-            try
-            {
-                if (embed.Server.Equals("MP4Upload", StringComparison.OrdinalIgnoreCase))
-                {
-                    // Extractor directo probado (C#): embed → player → src
-                    var directo = await _resolver.GetVideoUrlAsync(embed.Url, ct);
-                    if (Core.UrlSeguridad.EsUrlVideoPermitida(directo))
-                    {
-                        AppLogger.Info("ProveedorVideoAnimeAv1", $"Episodio resuelto vía MP4Upload: {SanitizarUrlParaLog(directo)}");
-                        return directo;
-                    }
-                    AppLogger.Debug("ProveedorVideoAnimeAv1", "Servidor 'MP4Upload' sin video directo en el player (embed roto o 'undef' del sitio).");
-                    continue;
-                }
-
-                // Servidores que resuelve yt-dlp (HLS, Voe, UPNShare, Byse)
-                if (!await _pythonBridge.IsAvailableAsync())
-                {
-                    AppLogger.Debug("ProveedorVideoAnimeAv1", $"Daemon Python no disponible; se omite '{embed.Server}'.");
-                    continue;
-                }
-
-                var result = await _pythonBridge.ExecuteCommandOneShotAsync<object, StreamResult>(
-                    "resolve-stream",
-                    new { url = embed.Url },
-                    ct);
-
-                if (result == null)
-                {
-                    AppLogger.Warn("ProveedorVideoAnimeAv1", $"Servidor '{embed.Server}' sin respuesta del daemon (resolver o URL no soportada).");
-                    continue;
-                }
-                if (!result.Success)
-                {
-                    AppLogger.Info("ProveedorVideoAnimeAv1", $"Servidor '{embed.Server}' falló en el daemon: {result.Error}");
-                    continue;
-                }
-                if (!Core.UrlSeguridad.EsUrlDescargaHttpSegura(result.DirectUrl))
-                {
-                    AppLogger.Warn("ProveedorVideoAnimeAv1", $"Servidor '{embed.Server}' devolvió URL no segura: {SanitizarUrlParaLog(result.DirectUrl)}");
-                    continue;
-                }
-
-                // Los manifiestos HLS/DASH se descargan con el daemon
-                // (download-stream con yt-dlp segmentado)
-                if (Core.UrlSeguridad.EsUrlManifiestoStreaming(result.DirectUrl))
-                {
-                    AppLogger.Info("ProveedorVideoAnimeAv1", $"Episodio resuelto como HLS/DASH ({embed.Server}); se descargará con el daemon.");
-                    return result.DirectUrl;
-                }
-
-                AppLogger.Info("ProveedorVideoAnimeAv1", $"Episodio resuelto con yt-dlp ({embed.Server}): {SanitizarUrlParaLog(result.DirectUrl)}");
-                return result.DirectUrl;
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Warn("ProveedorVideoAnimeAv1", $"Servidor '{embed.Server}' falló con excepción: {ex.Message}");
-            }
-        }
-
-        return null;
+        return await _servidores.ResolverPrimeroAsync(ordenados, "https://animeav1.com/", ct);
     }
 
     public async Task<string?> GetVideoUrlAsync(string pageUrl, CancellationToken ct = default)
@@ -132,7 +71,7 @@ public class ProveedorVideoAnimeAv1 : IProveedorVideo
                 }
                 else
                 {
-                    AppLogger.Info("ProveedorVideoAnimeAv1", $"Stream resuelto exitosamente con yt-dlp: {SanitizarUrlParaLog(result.DirectUrl)}");
+                    AppLogger.Info("ProveedorVideoAnimeAv1", $"Stream resuelto exitosamente con yt-dlp: {ResolvedorServidoresVideo.SanitizarUrlParaLog(result.DirectUrl)}");
                     return result.DirectUrl;
                 }
             }
@@ -144,13 +83,6 @@ public class ProveedorVideoAnimeAv1 : IProveedorVideo
 
         // 2. Fallback al extractor interno en C# (solo domina sus propios hosts)
         return await _resolver.GetVideoUrlAsync(pageUrl, ct);
-    }
-
-    private static string SanitizarUrlParaLog(string? url)
-    {
-        if (string.IsNullOrWhiteSpace(url)) return "(vacía)";
-        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)) return "(url no parseable)";
-        return $"{uri.Scheme}://{uri.Authority}{uri.AbsolutePath}";
     }
 
     /// <summary>DTO del resultado del daemon (resolve-stream). Público para testeo.</summary>
