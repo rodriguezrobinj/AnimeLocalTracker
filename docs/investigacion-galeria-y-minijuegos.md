@@ -401,8 +401,8 @@ Cada fase termina con `repo-build-test` y, las que cambian lo que se ve, con com
   contextual (`GaleriaTarjeta.xaml`, recurso `TarjetaAnime`) y el panel de "Qué veo hoy". Se quitó el guardado manual del
   desplazamiento (sobraba desde que la pestaña se conserva).
 - **Texto traducido usado como valor:** el filtro de temporada guarda el código de AniList y la vista lo traduce
-  (`TemporadaTextoConverter`); cambiar de idioma ya no lo borra. *El mismo problema sigue en el filtro de temporada de
-  "Agregar anime", fuera del alcance de esta investigación.*
+  (`TemporadaTextoConverter`); cambiar de idioma ya no lo borra. Arreglado igual en "Agregar anime" (2026-10-02, a
+  petición del usuario; visto en la app).
 - **Pruebas:** 1 nueva; las de "Qué veo hoy" apuntan al ViewModel nuevo. Suite: 2.420, todas en verde.
 - **Visto en la app real:** Galería (tarjetas, filtros de estado, sin resultados y "Limpiar filtros"), "Qué veo hoy" con su
   ruleta, menú de juegos con los tres juegos, pantalla de inicio de un juego, partida con 4 opciones y "Abandonar

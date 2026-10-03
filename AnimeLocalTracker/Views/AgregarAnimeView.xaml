@@ -113,10 +113,17 @@
                         </DataTemplate>
                     </ComboBox.ItemTemplate>
                 </ComboBox>
+                <!-- El valor es el código de AniList (WINTER…); la plantilla lo traduce al mostrarlo -->
                 <ComboBox ItemsSource="{Binding TemporadasDisponibles}"
                           SelectedItem="{Binding TemporadaSeleccionada}"
                           ToolTip="{Binding [Add_TemporadaTip], Source={x:Static loc:LocalizationService.Instance}}"
-                          Height="34" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                          Height="34" Margin="0,0,8,0" VerticalAlignment="Center">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Converter={StaticResource TemporadaTexto}}"/>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
                 <ComboBox ItemsSource="{Binding AniosDisponibles}"
                           SelectedItem="{Binding AnioSeleccionado}"
                           ToolTip="{Binding [Add_AnioTip], Source={x:Static loc:LocalizationService.Instance}}"

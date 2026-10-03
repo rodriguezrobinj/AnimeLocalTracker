@@ -33,7 +33,11 @@ public partial class AgregarAnimeViewModel : ObservableObject,
     public ICollectionView ResultadosFiltrados { get; }
 
     // --- FILTROS DE TEMPORADA Y AÑO (sobre resultados de búsqueda/tendencias) ---
-    public static string TodasLasTemporadas => LocalizationService.T("Gal_TodasLasTemporadas");
+    /// <summary>
+    /// "Todas las temporadas". El filtro guarda el código de AniList (WINTER…) y la vista lo traduce al mostrarlo
+    /// (TemporadaTextoConverter): antes guardaba el texto traducido y al cambiar de idioma el filtro se perdía.
+    /// </summary>
+    public const string TodasLasTemporadas = "";
     public static string TodosLosAños => LocalizationService.T("Gal_TodosLosAnios");
 
     [ObservableProperty]
@@ -102,7 +106,7 @@ public partial class AgregarAnimeViewModel : ObservableObject,
         if (obj is not AnimeBusquedaItem item) return true;
 
         if (TemporadaSeleccionada != TodasLasTemporadas &&
-            item.TemporadaTexto != TemporadaSeleccionada)
+            !string.Equals(item.Media.Season, TemporadaSeleccionada, StringComparison.OrdinalIgnoreCase))
         {
             return false;
         }
@@ -122,15 +126,6 @@ public partial class AgregarAnimeViewModel : ObservableObject,
         return true;
     }
 
-    private static string SeasonATexto(string codigo) => codigo switch
-    {
-        "WINTER" => LocalizationService.T("Temporada_Invierno"),
-        "SPRING" => LocalizationService.T("Temporada_Primavera"),
-        "SUMMER" => LocalizationService.T("Temporada_Verano"),
-        "FALL" => LocalizationService.T("Temporada_Otonio"),
-        _ => codigo
-    };
-
     private void ActualizarTemporadasYAniosDisponibles()
     {
         var ordenTemporadas = new[] { "WINTER", "SPRING", "SUMMER", "FALL" };
@@ -142,8 +137,7 @@ public partial class AgregarAnimeViewModel : ObservableObject,
 
         var nuevaListaTemporadas = new List<string> { TodasLasTemporadas };
         nuevaListaTemporadas.AddRange(
-            ordenTemporadas.Where(t => temporadasUnicas.Contains(t, StringComparer.OrdinalIgnoreCase))
-                           .Select(SeasonATexto));
+            ordenTemporadas.Where(t => temporadasUnicas.Contains(t, StringComparer.OrdinalIgnoreCase)));
 
         string prevTemporada = TemporadaSeleccionada;
         TemporadasDisponibles = new ObservableCollection<string>(nuevaListaTemporadas);
