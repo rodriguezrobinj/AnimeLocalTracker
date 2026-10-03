@@ -99,12 +99,17 @@ public class AppSettings
     /// fallback, no un filtro estricto: si el episodio no tiene esa pista, se descarga en la otra.</summary>
     public string? PreferenciaAudioAnimeAv1 { get; set; }
 
-    /// <summary>Servidor preferido al descargar de AnimeAV1: uno de los valores de
-    /// <see cref="ServidorPreferidoValores"/>, o null/vacío = sin preferencia (orden de
-    /// siempre: MP4Upload primero). Es una preferencia con fallback, no un filtro estricto:
-    /// si el servidor pedido no resuelve el episodio, se sigue probando el resto en el
-    /// orden habitual en vez de fallar la descarga.</summary>
+    /// <summary>Orden de los servidores al descargar de AnimeAV1 (Configuración): lista separada por comas con valores de
+    /// <see cref="ServidorPreferidoValores"/> ("Voe,MP4Upload,TransferIt,Mega"), o un solo valor (formato antiguo = "este
+    /// primero"), o null/vacío = orden por defecto (ver <see cref="OrdenServidores"/>). Es una preferencia con fallback, no
+    /// un filtro estricto: los servidores no listados se prueban después en el orden habitual y, si uno no resuelve el
+    /// episodio, se sigue con el siguiente en vez de fallar la descarga.</summary>
     public string? ServidorPreferidoAnimeAv1 { get; set; }
+
+    /// <summary>Orden en que se prueban los sitios de video (Configuración): lista separada por comas con los nombres de proveedor
+    /// ("JKAnime,AnimeAV1"), o null/vacío = el de siempre (AnimeAV1 primero). Ver <see cref="OrdenProveedores"/>. Los sitios no
+    /// listados (y los plugins) se prueban después en el orden habitual.</summary>
+    public string? OrdenProveedoresVideo { get; set; }
 
     /// <summary>Busca y descarga por torrent en Nyaa.si (MonoTorrent) como último recurso,
     /// solo cuando ninguna fuente HTTP encontró el episodio. Apagado por defecto: es una
@@ -196,13 +201,18 @@ public static class PreferenciaAudioValores
 }
 
 /// <summary>Valores válidos de <see cref="AppSettings.ServidorPreferidoAnimeAv1"/> — coinciden
-/// tal cual con los nombres de servidor que publica el sitio. Hoy solo <see cref="Mp4Upload"/>
-/// resuelve de forma fiable (ver comentario de OrdenarEmbedsPorPreferencia); los demás quedan
-/// disponibles para cuando el sitio o el daemon ganen un extractor real.</summary>
+/// tal cual con los nombres de servidor que publica el sitio. Resuelven hoy: <see cref="Mp4Upload"/>,
+/// <see cref="TransferIt"/>, <see cref="Mega"/> y <see cref="Voe"/> (ver comentario de OrdenarEmbedsPorPreferencia);
+/// los demás quedan disponibles para cuando el sitio o el daemon ganen un extractor real.</summary>
 public static class ServidorPreferidoValores
 {
     public const string Mp4Upload = "MP4Upload";
     public const string Hls = "HLS";
+    public const string TransferIt = "TransferIt";
+    public const string Mega = "Mega";
+    public const string Mediafire = "Mediafire";
+    public const string Vidhide = "Vidhide";
+    public const string Streamwish = "Streamwish";
     public const string Voe = "Voe";
     public const string UpnShare = "UPNShare";
     public const string Byse = "Byse";

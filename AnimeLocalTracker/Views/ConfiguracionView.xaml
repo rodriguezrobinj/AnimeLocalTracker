@@ -45,6 +45,38 @@
             </Setter>
         </Style>
 
+        <!-- Fila de una lista que se ordena con flechas (sitios de video, servidores de descarga): puesto, nombre y flechas -->
+        <DataTemplate x:Key="FilaOrdenTemplate">
+            <Border Background="{DynamicResource Brush.Surface2}" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1"
+                    CornerRadius="8" Padding="12,3,6,3" Margin="0,0,0,6"
+                    AutomationProperties.Name="{Binding Nombre}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="26"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="{Binding Posicion}" Style="{StaticResource AppText.Caption}" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="1" Text="{Binding Nombre}" Style="{StaticResource AppText.BodyStrong}" FontSize="13" VerticalAlignment="Center"/>
+                    <Button Grid.Column="2" Style="{StaticResource MaterialDesignIconButton}" Width="32" Height="32" Padding="0" Cursor="Hand"
+                            Foreground="{DynamicResource Brush.TextSecondary}"
+                            Command="{Binding SubirCommand}" IsEnabled="{Binding PuedeSubir}"
+                            ToolTip="{Binding [Cfg_OrdenServidores_Subir], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                            AutomationProperties.Name="{Binding [Cfg_OrdenServidores_Subir], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                        <materialDesign:PackIcon Kind="ChevronUp" Width="20" Height="20"/>
+                    </Button>
+                    <Button Grid.Column="3" Style="{StaticResource MaterialDesignIconButton}" Width="32" Height="32" Padding="0" Cursor="Hand"
+                            Foreground="{DynamicResource Brush.TextSecondary}"
+                            Command="{Binding BajarCommand}" IsEnabled="{Binding PuedeBajar}"
+                            ToolTip="{Binding [Cfg_OrdenServidores_Bajar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                            AutomationProperties.Name="{Binding [Cfg_OrdenServidores_Bajar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                        <materialDesign:PackIcon Kind="ChevronDown" Width="20" Height="20"/>
+                    </Button>
+                </Grid>
+            </Border>
+        </DataTemplate>
+
         <!-- Grupo: tarjeta que agrupa filas separadas por líneas finas -->
         <Style x:Key="CfgGroup" TargetType="Border" BasedOn="{StaticResource AppCard}">
             <Setter Property="CornerRadius" Value="14"/>
@@ -525,17 +557,29 @@
                                     </ctl:SettingRow>
                                     <Border Style="{StaticResource CfgDivider}"/>
 
+                                    <ctl:SettingRow Title="{Binding [Cfg_OrdenProveedores], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                    Description="{Binding [Cfg_OrdenProveedoresSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                        <StackPanel MinWidth="280">
+                                            <ItemsControl ItemsSource="{Binding OrdenProveedores}" ItemTemplate="{StaticResource FilaOrdenTemplate}" KeyboardNavigation.TabNavigation="Continue"/>
+                                            <Button Style="{StaticResource CfgRowButton}" HorizontalAlignment="Right" Margin="0,2,0,0"
+                                                    Command="{Binding RestablecerOrdenProveedoresCommand}"
+                                                    AutomationProperties.Name="{Binding [Cfg_OrdenServidores_Restablecer], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                                <TextBlock Text="{Binding [Cfg_OrdenServidores_Restablecer], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontWeight="SemiBold" FontSize="12"/>
+                                            </Button>
+                                        </StackPanel>
+                                    </ctl:SettingRow>
+                                    <Border Style="{StaticResource CfgDivider}"/>
+
                                     <ctl:SettingRow Title="{Binding [Cfg_ServidorPreferido], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
                                                     Description="{Binding [Cfg_ServidorPreferidoSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
-                                        <ComboBox SelectedValue="{Binding ServidorPreferidoAnimeAv1}" SelectedValuePath="Tag" Height="36" MinWidth="230"
-                                                  AutomationProperties.Name="{Binding [Cfg_ServidorPreferido], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
-                                            <ComboBoxItem Content="{Binding [Cfg_ServidorPreferido_Ninguno], Source={x:Static loc:LocalizationService.Instance}}" Tag=""/>
-                                            <ComboBoxItem Content="MP4Upload" Tag="MP4Upload"/>
-                                            <ComboBoxItem Content="HLS" Tag="HLS"/>
-                                            <ComboBoxItem Content="Voe" Tag="Voe"/>
-                                            <ComboBoxItem Content="UPNShare" Tag="UPNShare"/>
-                                            <ComboBoxItem Content="Byse" Tag="Byse"/>
-                                        </ComboBox>
+                                        <StackPanel MinWidth="280">
+                                            <ItemsControl ItemsSource="{Binding OrdenServidores}" ItemTemplate="{StaticResource FilaOrdenTemplate}" KeyboardNavigation.TabNavigation="Continue"/>
+                                            <Button Style="{StaticResource CfgRowButton}" HorizontalAlignment="Right" Margin="0,2,0,0"
+                                                    Command="{Binding RestablecerOrdenServidoresCommand}"
+                                                    AutomationProperties.Name="{Binding [Cfg_OrdenServidores_Restablecer], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                                <TextBlock Text="{Binding [Cfg_OrdenServidores_Restablecer], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontWeight="SemiBold" FontSize="12"/>
+                                            </Button>
+                                        </StackPanel>
                                     </ctl:SettingRow>
                                     <Border Style="{StaticResource CfgDivider}"/>
 

@@ -4,6 +4,9 @@ import os
 import yt_dlp
 
 from resolvers.browser_stream_extractor import BrowserStreamExtractor, es_dominio_byse
+from resolvers.mediafire_extractor import MediafireExtractor, es_dominio_mediafire
+from resolvers.packed_extractor import PackedHlsExtractor, es_dominio_packed
+from resolvers.voe_extractor import VoeExtractor, es_dominio_voe
 
 # Impersonación (opcional): el player de zilla-networks (HLS de animeav1) está tras
 # Cloudflare anti-bot; yt-dlp puede pasar el challenge si curl_cffi está instalado.
@@ -36,7 +39,7 @@ class StreamExtractor:
             return False
 
     @staticmethod
-    def extract_stream_info(url: str, custom_headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+    def extract_stream_info(url: str, custom_headers: Optional[Dict[str, str]] = None, servidor: Optional[str] = None) -> Dict[str, Any]:
         """
         Extrae streams directos, calidades y subtítulos usando yt-dlp.
         Hardening INT-01: la URL de entrada se valida antes de tocar yt-dlp y
@@ -49,6 +52,19 @@ class StreamExtractor:
         # extractor para el sitio: se resuelve con el navegador (ver BrowserStreamExtractor).
         if es_dominio_byse(urlparse(url).netloc):
             return BrowserStreamExtractor.extract_byse(url, custom_headers)
+
+        # Voe: yt-dlp no tiene extractor; se resuelve con HTTP puro (ver voe_extractor.py).
+        if es_dominio_voe(urlparse(url).netloc):
+            return VoeExtractor.extract_voe(url, custom_headers)
+
+        # Mediafire: descarga directa leída de la página del archivo (ver mediafire_extractor.py).
+        if es_dominio_mediafire(urlparse(url).netloc):
+            return MediafireExtractor.extract_mediafire(url, custom_headers)
+
+        # Vidhide y Streamwish (mismo reproductor, listas HLS): sus dominios rotan, así que manda el nombre del servidor que da el
+        # sitio; por dominio solo se reconocen los conocidos (ver packed_extractor.py).
+        if (servidor or "").strip().lower() in ("vidhide", "streamwish") or es_dominio_packed(urlparse(url).netloc):
+            return PackedHlsExtractor.extract_packed(url, custom_headers)
 
         ydl_opts: Dict[str, Any] = {
             'quiet': True,
@@ -159,6 +175,9 @@ class StreamExtractor:
         ydl_opts: Dict[str, Any] = {
             'quiet': True,
             'no_warnings': True,
+            # La salida estándar del daemon es el canal de la respuesta (una línea JSON): sin esto yt-dlp escribe ahí su progreso
+            # ("[download] 12.3 % …", ~1800 líneas en un HLS de 147 fragmentos) y el lector de C# no entiende la respuesta.
+            'noprogress': True,
             # Hardening: nunca expandir playlists y acotar red/archivo
             'noplaylist': True,
             'playlist_items': '1',

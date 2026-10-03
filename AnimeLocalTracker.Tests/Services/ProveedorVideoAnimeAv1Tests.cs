@@ -552,7 +552,7 @@ public class ProveedorVideoAnimeAv1Tests
     }
 
     [Fact]
-    public void OrdenarEmbedsPorPreferencia_DeberiaPonerMp4UploadPrimeroYOmitirMega()
+    public void OrdenarEmbedsPorPreferencia_DeberiaPonerMp4UploadPrimeroYMegaAntesDeVoe()
     {
         // Arrange: lista en el orden del sitio (HLS, UPNShare, Voe, Byse, Mega, MP4Upload)
         var embeds = AnimeAv1HtmlParser.ExtraerEmbeds(FixturePaginaEpisodio);
@@ -561,8 +561,8 @@ public class ProveedorVideoAnimeAv1Tests
         // Act
         var ordenados = AnimeAv1HtmlParser.OrdenarEmbedsPorPreferencia(embeds);
 
-        // Assert: MP4Upload primero (única fuente fiable hoy; HLS tras Cloudflare
-        // anti-bot, Voe/UPNShare/Byse sin extractor); Mega excluido
-        ordenados.Select(e => e.Server).Should().Equal("MP4Upload", "HLS", "Voe", "UPNShare", "Byse");
+        // Assert: MP4Upload primero (el mejor archivo); Mega (mismo archivo, 1080p) antes que Voe (720p);
+        // UPNShare y Byse, que no resuelven, al final
+        ordenados.Select(e => e.Server).Should().Equal("MP4Upload", "HLS", "Mega", "Voe", "UPNShare", "Byse");
     }
 }

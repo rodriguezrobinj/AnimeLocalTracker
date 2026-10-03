@@ -641,6 +641,78 @@ public class DownloadServiceTests
         }
     }
 
+    private static byte[] VideoSintetico(int tamano)
+    {
+        var video = new byte[tamano]; // empieza como un mp4 (tamaño de caja + "ftyp") y sigue con bytes cualesquiera
+        new Random(7).NextBytes(video);
+        "\0\0\0 ftyp"u8.ToArray().CopyTo(video, 0);
+        return video;
+    }
+
+    private DownloadService CrearServiceQueSirve(byte[] cuerpo)
+    {
+        var handlerMock = new Mock<HttpMessageHandler>();
+        handlerMock.Protected()
+            .Setup<Task<HttpResponseMessage>>("SendAsync", ItExpr.IsAny<HttpRequestMessage>(), ItExpr.IsAny<CancellationToken>())
+            .Returns<HttpRequestMessage, CancellationToken>((req, _) =>
+            {
+                var respuesta = new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new ByteArrayContent(cuerpo) };
+                respuesta.Content.Headers.ContentLength = cuerpo.Length;
+                return Task.FromResult(respuesta);
+            });
+        var factoryMock = new Mock<IHttpClientFactory>();
+        factoryMock.Setup(f => f.CreateClient(It.IsAny<string>())).Returns(new HttpClient(handlerMock.Object));
+        return new DownloadService(factoryMock.Object, sourceResolver: _sourceResolverMock.Object, settingsService: _settingsServiceMock.Object);
+    }
+
+    [Fact]
+    public async Task DownloadVideoAsync_ConUrlDeMegaConClave_BajaElArchivoCifradoYLoGuardaEnClaro()
+    {
+        // Arrange: Mega sirve el archivo cifrado (AES-CTR); la clave viaja en el fragmento de la URL
+        var clave = Enumerable.Range(1, 32).Select(i => (byte)i).ToArray();
+        var video = VideoSintetico(600_000);
+        var cifrado = (byte[])video.Clone();
+        MegaTransferIt.Descifrar(clave, 0, cifrado);
+        var destino = Path.Combine(Path.GetTempPath(), $"mega_{Guid.NewGuid():N}.mp4");
+        var sut = CrearServiceQueSirve(cifrado);
+
+        try
+        {
+            // Act
+            await sut.DownloadVideoAsync(MegaTransferIt.UrlConClave("https://gfs1.userstorage.mega.co.nz/dl/token", clave), destino);
+
+            // Assert: el archivo final es el video en claro y no queda el temporal del descifrado
+            (await File.ReadAllBytesAsync(destino)).Should().Equal(video);
+            File.Exists(destino + ".dec").Should().BeFalse();
+        }
+        finally
+        {
+            try { File.Delete(destino); } catch { }
+        }
+    }
+
+    [Fact]
+    public async Task DownloadVideoAsync_ConUrlDeMegaYArchivoYaEnClaro_NoLoDescifraDeNuevo()
+    {
+        // Arrange: lo que llega ya es un video en claro (p. ej. una reanudación tras un corte justo al terminar de
+        // descifrar): descifrarlo otra vez lo convertiría en basura.
+        var clave = Enumerable.Range(1, 32).Select(i => (byte)i).ToArray();
+        var video = VideoSintetico(600_000);
+        var destino = Path.Combine(Path.GetTempPath(), $"mega_{Guid.NewGuid():N}.mp4");
+        var sut = CrearServiceQueSirve(video);
+
+        try
+        {
+            await sut.DownloadVideoAsync(MegaTransferIt.UrlConClave("https://gfs1.userstorage.mega.co.nz/dl/token", clave), destino);
+
+            (await File.ReadAllBytesAsync(destino)).Should().Equal(video);
+        }
+        finally
+        {
+            try { File.Delete(destino); } catch { }
+        }
+    }
+
     /// <summary>Servidor falso de video con soporte de Range, con fallos configurables.</summary>
     private sealed class ServidorRangosHandler : HttpMessageHandler
     {

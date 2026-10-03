@@ -132,17 +132,7 @@ namespace AnimeLocalTracker.Services.Python
                     AppLogger.Debug("PythonBridge", $"Stderr de '{command}': {error}");
                 }
 
-                if (string.IsNullOrWhiteSpace(output))
-                {
-                    return default;
-                }
-
-                var res = JsonSerializer.Deserialize<TResponse>(output, SnakeCaseOptions);
-                if (res == null)
-                {
-                    res = JsonSerializer.Deserialize<TResponse>(output, JsonOptions);
-                }
-                return res;
+                return InterpretarSalida<TResponse>(output);
             }
             catch (OperationCanceledException)
             {
@@ -161,6 +151,33 @@ namespace AnimeLocalTracker.Services.Python
             {
                 proceso?.Dispose();
             }
+        }
+
+        /// <summary>
+        /// Resultado de un comando de un solo uso: la ÚLTIMA línea JSON de la salida. Un comando largo puede escribir antes otras líneas
+        /// (el progreso de yt-dlp en una descarga HLS son ~1800): interpretar toda la salida como un único JSON fallaba y la app lo daba
+        /// por "respuesta vacía del daemon". Null si no hay ninguna línea JSON utilizable.
+        /// </summary>
+        internal static TResponse? InterpretarSalida<TResponse>(string output)
+        {
+            if (string.IsNullOrWhiteSpace(output)) return default;
+
+            var ultimaLineaJson = output.Split('\n')
+                .Select(l => l.Trim())
+                .LastOrDefault(l => l.StartsWith('{') || l.StartsWith('['));
+            foreach (var candidato in new[] { output.Trim(), ultimaLineaJson }.Where(c => !string.IsNullOrEmpty(c)).Distinct())
+            {
+                try
+                {
+                    var res = JsonSerializer.Deserialize<TResponse>(candidato!, SnakeCaseOptions) ?? JsonSerializer.Deserialize<TResponse>(candidato!, JsonOptions);
+                    if (res != null) return res;
+                }
+                catch (JsonException)
+                {
+                    // esa lectura no era el JSON: se prueba con la siguiente
+                }
+            }
+            return default;
         }
 
         // ────────────────────────────────────────────────────────────────

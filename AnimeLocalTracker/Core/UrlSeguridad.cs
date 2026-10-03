@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 
@@ -23,7 +24,7 @@ public static class UrlSeguridad
     private static readonly string[] HostsEmbedsAnimeAv1 =
     {
         "mp4upload.com", "voe.sx", "byselapuix.com", "animeav1.uns.bio",
-        "player.zilla-networks.com", "mega.nz"
+        "player.zilla-networks.com", "mega.nz", "transfer.it", "mediafire.com"
     };
 
     /// <summary>
@@ -117,13 +118,31 @@ public static class UrlSeguridad
 
     /// <summary>
     /// URL de embed de servidor publicada por la página de episodio: solo https y
-    /// hosts de proveedores conocidos (mp4upload, voe, byse, upnshare, zilla, mega).
+    /// hosts de proveedores conocidos (mp4upload, voe, byse, upnshare, zilla, mega, transfer.it).
     /// </summary>
     public static bool EsUrlEmbedPermitida(string? url)
     {
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)) return false;
         if (uri.Scheme != Uri.UriSchemeHttps) return false;
         return EsHostPermitido(uri.Host, HostsEmbedsAnimeAv1);
+    }
+
+    /// <summary>Servidores cuyos dominios ROTAN (Vidhide y Streamwish cambian de dominio cada poco): no valen en una lista fija.</summary>
+    private static readonly string[] ServidoresConDominiosQueRotan = { "Vidhide", "Streamwish" };
+
+    /// <summary>
+    /// Embed de un servidor que da el propio sitio (JKAnime): los hosts conocidos de siempre, o —solo si el sitio lo llama Vidhide o
+    /// Streamwish, que rotan de dominio— cualquier servidor de Internet por https. Un nombre desconocido no abre la puerta, y la IP
+    /// local, la red privada y las URLs con usuario siguen rechazadas.
+    /// </summary>
+    public static bool EsEmbedDeServidorPermitido(string? servidor, string? url)
+    {
+        if (EsUrlEmbedPermitida(url)) return true;
+        if (!ServidoresConDominiosQueRotan.Contains(servidor ?? string.Empty, StringComparer.OrdinalIgnoreCase)) return false;
+        return Uri.TryCreate(url, UriKind.Absolute, out var uri)
+            && uri.Scheme == Uri.UriSchemeHttps
+            && string.IsNullOrEmpty(uri.UserInfo)
+            && EsHostPublico(uri);
     }
 
     /// <summary>Host permitido para la búsqueda de torrents (Fase MVP: Nyaa.si).</summary>

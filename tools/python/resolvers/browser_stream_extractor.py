@@ -5,10 +5,11 @@ from typing import Any, Dict, List, Optional
 # Dominios que solo renderizan su reproductor con JavaScript en el cliente (SPA sin
 # nada server-side que scrapear) y para los que yt-dlp no tiene extractor propio.
 # Se resuelven capturando la petición de red real del manifiesto HLS en vez de
-# parsear HTML — investigado y confirmado contra el sitio real: Voe y UPNShare
-# quedaron descartados (Voe se ahoga en ~150 peticiones de redes de publicidad sin
-# llegar a pedir el video; UPNShare no disparó ninguna petición de video ni con
-# clic simulado), solo Byse resultó viable de forma consistente.
+# parsear HTML — investigado y confirmado contra el sitio real: con navegador, Voe y
+# UPNShare quedaron descartados (Voe se ahoga en ~150 peticiones de redes de publicidad
+# sin llegar a pedir el video; UPNShare no disparó ninguna petición de video ni con
+# clic simulado), solo Byse resultó viable. Voe SÍ se resuelve sin navegador, con HTTP
+# puro: ver voe_extractor.py.
 BYSE_HOST_SUFFIXES = ("byselapuix.com",)
 
 
