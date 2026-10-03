@@ -22,6 +22,7 @@ public partial class DetalleViewModel
     private bool _refrescandoProximaEmision;
     private bool _forzarProximaEmision;
     private DateTime _ultimoIntentoTrasEmisionUtc = DateTime.MinValue;
+    private DateTime _ultimaRevalidacionEstadoUtc = DateTime.MinValue;
 
     [ObservableProperty] private bool _tieneContadorProximo;
     [ObservableProperty] private string _contadorProximoTexto = string.Empty;
@@ -31,6 +32,7 @@ public partial class DetalleViewModel
     private void ReiniciarContadorProximo()
     {
         _proximaEmisionActual = null;
+        _ultimaRevalidacionEstadoUtc = DateTime.MinValue;
         TieneContadorProximo = false;
         ContadorProximoTexto = string.Empty;
         ContadorProximoTooltip = string.Empty;
@@ -57,6 +59,7 @@ public partial class DetalleViewModel
             else DetenerContador();
 
             await SincronizarUltimoEmitidoAsync(anime, proxima);
+            await RevalidarEstadoSiNoQuedaEmisionAsync(anime, proxima);
         }
         catch (Exception ex)
         {
@@ -65,6 +68,31 @@ public partial class DetalleViewModel
         finally
         {
             _refrescandoProximaEmision = false;
+        }
+    }
+
+    /// <summary>
+    /// Ya salió el último episodio programado y no hay otro por delante: puede que la temporada haya terminado. El estado
+    /// ("En emisión") solo se refrescaba con el botón Actualizar, así que aquí se pregunta a AniList (una consulta, como mucho
+    /// cada 15 min como el resto de revisiones tras una emisión) y, si ya no está en emisión, se guarda y se retira el contador.
+    /// </summary>
+    private async Task RevalidarEstadoSiNoQuedaEmisionAsync(AnimeItem anime, ProximaEmision? proxima)
+    {
+        if (proxima == null || proxima.EmisionUtc > DateTime.UtcNow) return;
+        if (DateTime.UtcNow - _ultimaRevalidacionEstadoUtc < ProximaEmisionService.RevisionTrasEmision) return;
+        _ultimaRevalidacionEstadoUtc = DateTime.UtcNow; // también si la consulta falla: sin red no se reintenta en cada tick
+
+        var frescos = await _animeTrackingService.ObtenerAnimePorIdAsync(anime.AniListId);
+        if (frescos?.Status is not { Length: > 0 } estado || estado == anime.Estado || !ReferenceEquals(anime, AnimeSeleccionado)) return;
+
+        anime.Estado = estado;
+        await _databaseService.ActualizarAnimeAsync(anime);
+
+        if (estado is not ("RELEASING" or "NOT_YET_RELEASED"))
+        {
+            _proximaEmisionActual = null;
+            ActualizarContadorProximo();
+            DetenerContador();
         }
     }
 
@@ -138,9 +166,15 @@ public partial class DetalleViewModel
         }
 
         var restante = proxima.EmisionUtc - DateTime.UtcNow;
-        ContadorProximoTexto = restante > TimeSpan.Zero
-            ? string.Format(LocalizationService.T("Det_ProximoEnFormato"), proxima.Episodio, FormatearCuentaAtras(restante))
-            : string.Format(LocalizationService.T("Det_ProximoDisponibleFormato"), proxima.Episodio);
+        if (restante <= TimeSpan.Zero)
+        {
+            // Ya salió: no queda nada que contar (la fila del episodio la añade SincronizarUltimoEmitidoAsync; si AniList programa
+            // otro, CargarProximaEmisionAsync trae su hora y el contador vuelve solo).
+            TieneContadorProximo = false;
+            return;
+        }
+
+        ContadorProximoTexto = string.Format(LocalizationService.T("Det_ProximoEnFormato"), proxima.Episodio, FormatearCuentaAtras(restante));
         ContadorProximoTooltip = string.Format(LocalizationService.T("Det_ProximoTooltipFormato"), proxima.Episodio,
             proxima.EmisionUtc.ToLocalTime().ToString("f", LocalizationService.Cultura));
         TieneContadorProximo = true;

@@ -1706,6 +1706,12 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             _arranqueRegistrado = false;
             _cambiandoPistaAudio = false;
             _imagenLista = false;
+            if (_reabiertoPorProcesador)
+            {
+                // El episodio anterior no pudo con la tarjeta gráfica; este se juzga por sí solo con el ajuste del usuario.
+                _reabiertoPorProcesador = false;
+                Player.Config.Video.VideoAcceleration = _settingsService?.ObtenerConfiguracion()?.AceleracionHardwareVideo ?? true;
+            }
 
             // El audio arrancaba antes que la imagen (el decodificador de video tarda ~0,5-0,8 s en mostrar el primer fotograma y, al
             // reanudar, además sonaba el principio del episodio antes del salto). Se abre en silencio y VigilarArranqueAsync lo quita
@@ -1829,11 +1835,21 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     private async Task VigilarArranqueAsync(Player player, CancellationToken ct)
     {
         var reloj = Stopwatch.StartNew();
+        bool reabierto = false;
         try
         {
             while (!ct.IsCancellationRequested && !player.IsDisposed && reloj.ElapsedMilliseconds < 3000 && FotogramasMostrados(player) == 0)
                 await Task.Delay(10, ct);
             AppLogger.Debug("ReproductorViewModel", $"[Arranque] Primer fotograma a los {_relojArranque.ElapsedMilliseconds} ms.");
+
+            if (!ct.IsCancellationRequested && !player.IsDisposed &&
+                MotorVideo.DebeReintentarPorProcesador(player.VideoDecoder?.VideoAccelerated ?? false, FotogramasMostrados(player), _reabiertoPorProcesador))
+            {
+                // El OpenCompleted de la reapertura lanza otro vigilante: este termina sin destapar el video ni dar por lista la imagen.
+                reabierto = true;
+                ReabrirPorProcesador(player);
+                return;
+            }
 
             // La consulta del punto guardado suele terminar mucho antes (milisegundos); si la base de datos va lenta, se espera un poco.
             try { await _tareaReanudacion.WaitAsync(TimeSpan.FromSeconds(2), ct); } catch (TimeoutException) { }
@@ -1886,10 +1902,33 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         }
         finally
         {
-            _imagenLista = true; // aunque se haya cancelado o agotado la espera: el bucle no debe quedarse sin aplicar la reanudación
-            AplicarRendimientoSegunEquipo(player);
-            try { if (!player.IsDisposed && player.Audio != null && !_cambiandoPistaAudio) player.Audio.Mute = IsMuted; } catch { }
+            if (!reabierto)
+            {
+                _imagenLista = true; // aunque se haya cancelado o agotado la espera: el bucle no debe quedarse sin aplicar la reanudación
+                AplicarRendimientoSegunEquipo(player);
+                try { if (!player.IsDisposed && player.Audio != null && !_cambiandoPistaAudio) player.Audio.Mute = IsMuted; } catch { }
+            }
         }
+    }
+
+    /// <summary>El episodio actual ya se reabrió una vez sin tarjeta gráfica (se restablece al cambiar de episodio).</summary>
+    private bool _reabiertoPorProcesador;
+
+    /// <summary>Apaga la decodificación por tarjeta solo para este episodio y lo reabre: Flyleaf elige entonces libdav1d.</summary>
+    private void ReabrirPorProcesador(Player player)
+    {
+        _reabiertoPorProcesador = true;
+        string ruta = _rutaVideo;
+        AppLogger.Warn("ReproductorViewModel", $"La tarjeta gráfica no mostró imagen en 3 s ({player.Video?.Codec}); se reabre decodificando por procesador.");
+        try
+        {
+            player.Config.Video.VideoAcceleration = false;
+            _cambiandoPistaAudio = false;
+            _haCompletadoOpen = false;
+            player.Stop();
+            player.OpenAsync(ruta);
+        }
+        catch (Exception ex) { AppLogger.Warn("ReproductorViewModel", $"Falló la reapertura por procesador: {ex.Message}"); }
     }
 
     private async Task CargarFotogramasClaveAsync(string ruta, CancellationToken ct)

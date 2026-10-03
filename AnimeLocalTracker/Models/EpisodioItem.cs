@@ -61,12 +61,13 @@ public partial class EpisodioItem : ObservableObject
     private double _totalSegundos;
 
     // === Metadata técnica (ffprobe vía Python bridge) ===
+    // Los cuatro alimentan BadgeTecnico (calculado): sin avisar de su cambio, el texto se quedaba en pantalla al borrar el archivo.
     private string _resolucion = string.Empty;
     [Ignore]
     public string Resolucion
     {
         get => _resolucion;
-        set => SetProperty(ref _resolucion, value);
+        set { if (SetProperty(ref _resolucion, value)) OnPropertyChanged(nameof(BadgeTecnico)); }
     }
 
     private string _codecVideo = string.Empty;
@@ -74,7 +75,7 @@ public partial class EpisodioItem : ObservableObject
     public string CodecVideo
     {
         get => _codecVideo;
-        set => SetProperty(ref _codecVideo, value);
+        set { if (SetProperty(ref _codecVideo, value)) OnPropertyChanged(nameof(BadgeTecnico)); }
     }
 
     private string _fps = string.Empty;
@@ -82,7 +83,7 @@ public partial class EpisodioItem : ObservableObject
     public string Fps
     {
         get => _fps;
-        set => SetProperty(ref _fps, value);
+        set { if (SetProperty(ref _fps, value)) OnPropertyChanged(nameof(BadgeTecnico)); }
     }
 
     private bool _es10Bit;
@@ -90,7 +91,7 @@ public partial class EpisodioItem : ObservableObject
     public bool Es10Bit
     {
         get => _es10Bit;
-        set => SetProperty(ref _es10Bit, value);
+        set { if (SetProperty(ref _es10Bit, value)) OnPropertyChanged(nameof(BadgeTecnico)); }
     }
 
     private string? _rutaMiniatura;
