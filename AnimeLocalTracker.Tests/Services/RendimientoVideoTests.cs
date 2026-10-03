@@ -31,6 +31,16 @@ public class RendimientoVideoTests
     public void Saltos_SegunModoYEquipo(string? modo, bool porHardware, int hilos, EstrategiaSaltos esperado) =>
         MotorVideo.ElegirEstrategiaSaltos(modo, porHardware, hilos).Should().Be(esperado);
 
+    // === Respaldo por procesador ===
+
+    [Theory]
+    [InlineData(true, 0u, false, true)]   // Tokyo Revengers en la HD 620: GPU elegida, 0 fotogramas tras la espera
+    [InlineData(true, 0u, true, false)]   // ya se reintentó por procesador: no se repite en bucle
+    [InlineData(true, 5u, false, false)]  // la GPU sí mostró imagen
+    [InlineData(false, 0u, false, false)] // ya va por procesador: reabrir no cambiaría nada
+    public void RespaldoPorProcesador_SoloSiLaTarjetaNoMostroImagen(bool porHardware, uint fotogramas, bool yaReintentado, bool esperado) =>
+        MotorVideo.DebeReintentarPorProcesador(porHardware, fotogramas, yaReintentado).Should().Be(esperado);
+
     // === Escalado inteligente ===
 
     [Theory]

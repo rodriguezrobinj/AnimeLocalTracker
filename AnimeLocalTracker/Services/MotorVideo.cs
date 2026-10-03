@@ -137,6 +137,15 @@ public static class MotorVideo
     public static string? PatronTarjeta(string? nombre) =>
         string.IsNullOrWhiteSpace(nombre) ? null : "^" + System.Text.RegularExpressions.Regex.Escape(nombre.Trim()) + "$";
 
+    /// <summary>
+    /// Flyleaf pide la tarjeta gráfica y, si no soporta el formato, suele caer solo a software (libdav1d). Pero si ffmpeg rechaza los
+    /// paquetes antes de pedirle nada a la tarjeta (Tokyo Revengers S4 en una Intel HD 620: "trailing_one_bit out of range"), no hay fallo
+    /// limpio: la tarjeta queda elegida y no llega ni un fotograma. Con la tarjeta elegida y 0 fotogramas tras la espera, se reabre por
+    /// procesador (una vez por episodio).
+    /// </summary>
+    public static bool DebeReintentarPorProcesador(bool porHardware, uint fotogramas, bool yaReintentado) =>
+        porHardware && fotogramas == 0 && !yaReintentado;
+
     // === Modo automático ===
 
     /// <summary>
