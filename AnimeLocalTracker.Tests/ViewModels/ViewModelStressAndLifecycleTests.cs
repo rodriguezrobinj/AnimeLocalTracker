@@ -68,17 +68,20 @@ public class ViewModelStressAndLifecycleTests
             // Act: Conmutar 100 veces entre todas las vistas principales
             for (int i = 0; i < 100; i++)
             {
-                sut.Navigation.Receive(new NavegarMensaje_Calendario());
-                sut.Navigation.EsCalendarioActivo.Should().BeTrue();
+                sut.Navigation.Receive(new NavegarMensaje_Pestana(Pestanas.Calendario));
+                sut.Navigation.EstaActiva(Pestanas.Calendario).Should().BeTrue();
+                sut.PestanasSuperiores.Where(b => b.EsActiva).Select(b => b.Pestana).Should().Equal(Pestanas.Calendario);
 
-                sut.Navigation.Receive(new NavegarMensaje_Descargas());
-                sut.Navigation.EsDescargasActivas.Should().BeTrue();
+                sut.Navigation.Receive(new NavegarMensaje_Pestana(Pestanas.Descargas));
+                sut.Navigation.EstaActiva(Pestanas.Descargas).Should().BeTrue();
 
-                sut.Navigation.Receive(new NavegarMensaje_Configuracion());
-                sut.Navigation.EsConfiguracionActiva.Should().BeTrue();
+                sut.Navigation.Receive(new NavegarMensaje_Pestana(Pestanas.Configuracion));
+                sut.Navigation.EstaActiva(Pestanas.Configuracion).Should().BeTrue();
+                sut.PestanasInferiores.Where(b => b.EsActiva).Select(b => b.Pestana).Should().Equal(Pestanas.Configuracion);
+                sut.PestanasSuperiores.Should().NotContain(b => b.EsActiva);
 
-                sut.Navigation.Receive(new NavegarMensaje_Galeria());
-                sut.Navigation.EsGaleriaActiva.Should().BeTrue();
+                sut.Navigation.Receive(new NavegarMensaje_Pestana(Pestanas.Galeria));
+                sut.Navigation.EstaActiva(Pestanas.Galeria).Should().BeTrue();
             }
         }
         finally

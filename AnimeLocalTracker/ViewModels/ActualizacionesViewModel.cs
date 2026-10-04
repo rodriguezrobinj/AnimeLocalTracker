@@ -18,7 +18,7 @@ namespace AnimeLocalTracker.ViewModels;
 /// Actualizaciones: episodios recién emitidos (últimos 7 días) de los animes en emisión
 /// de tu biblioteca que aún no tienes descargados, con descarga directa desde la lista.
 /// </summary>
-public partial class ActualizacionesViewModel : ObservableObject, IDisposable,
+public partial class ActualizacionesViewModel : ObservableObject, IAlEntrarEnPestana, IDisposable,
     IRecipient<DescargaProgresoMensaje>, IRecipient<EpisodioActualizadoMensaje>, IRecipient<IdiomaCambiadoMensaje>,
     IRecipient<ConexionRecuperadaMensaje>
 {
@@ -113,6 +113,12 @@ public partial class ActualizacionesViewModel : ObservableObject, IDisposable,
     // pestaña — se recarga como mucho una vez cada 30 s (mismo cooldown que Historial).
     private static readonly TimeSpan CooldownRecarga = TimeSpan.FromSeconds(30);
     private DateTime _ultimaCargaUtc = DateTime.MinValue;
+    /// <summary>Al abrir la pestaña (ver <see cref="IAlEntrarEnPestana"/>).</summary>
+    public async Task AlEntrarAsync()
+    {
+        if (NecesitaRecargar()) await CargarActualizacionesAsync();
+    }
+
     public bool NecesitaRecargar() =>
         Items.Count == 0 || (DateTime.UtcNow - _ultimaCargaUtc) >= CooldownRecarga;
 

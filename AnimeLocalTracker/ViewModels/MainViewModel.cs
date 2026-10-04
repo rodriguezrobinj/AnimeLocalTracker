@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -59,6 +61,7 @@ public partial class MainViewModel : ObservableObject,
     {
         OnPropertyChanged(nameof(TextoEstadoConexion));
         OnPropertyChanged(nameof(TextoBadgeConexion));
+        foreach (var boton in BotonesDeLaBarra) boton.RefrescarTexto();
     });
 
     private readonly INavigationService _navigationService;
@@ -80,6 +83,24 @@ public partial class MainViewModel : ObservableObject,
     public ISelectorTorrentService SelectorTorrentService { get; }
 
     public string VersionAppTexto => _updateService.ObtenerVersionActual();
+
+    // === BARRA LATERAL ===
+    /// <summary>Botones de la barra lateral (grupo de arriba y grupo de abajo), en el orden de <see cref="Pestanas.Todas"/>.</summary>
+    public IReadOnlyList<PestanaItemViewModel> PestanasSuperiores { get; }
+    public IReadOnlyList<PestanaItemViewModel> PestanasInferiores { get; }
+
+    private IEnumerable<PestanaItemViewModel> BotonesDeLaBarra => PestanasSuperiores.Concat(PestanasInferiores);
+
+    private void MarcarPestanaActiva()
+    {
+        foreach (var boton in BotonesDeLaBarra) boton.EsActiva = _navigationService.EstaActiva(boton.Pestana);
+    }
+
+    /// <summary>El número de descargas en curso se muestra sobre el botón de Descargas.</summary>
+    partial void OnConteoDescargasActivasChanged(int value)
+    {
+        foreach (var boton in BotonesDeLaBarra) if (boton.Pestana == Pestanas.Descargas) boton.Insignia = value;
+    }
 
     // === BADGE DE DESCARGAS ===
     [ObservableProperty]
@@ -138,10 +159,20 @@ public partial class MainViewModel : ObservableObject,
         _systemTrayService.ReanudarUltimoAnimeSolicitado += OnReanudarUltimoAnimeSolicitado;
         _systemTrayService.BuscarNuevosEpisodiosSolicitado += OnBuscarNuevosEpisodiosSolicitado;
 
+        // Barra lateral: un botón por fila de la tabla de pestañas.
+        var botones = Pestanas.Todas.Select((pestana, i) => new PestanaItemViewModel(pestana, i + 1)).ToList();
+        PestanasSuperiores = botones.Where(b => !b.Pestana.Inferior).ToList();
+        PestanasInferiores = botones.Where(b => b.Pestana.Inferior).ToList();
+        _navigationService.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(INavigationService.VistaActual)) MarcarPestanaActiva();
+        };
+
         WeakReferenceMessenger.Default.RegisterAll(this);
 
         // Cargamos la vista inicial a través del servicio de navegación
-        WeakReferenceMessenger.Default.Send(new NavegarMensaje_Galeria());
+        Pestanas.Galeria.Abrir();
+        MarcarPestanaActiva();
         ActualizarConteoDescargas();
     }
 
@@ -258,30 +289,6 @@ public partial class MainViewModel : ObservableObject,
         });
     }
 
-    [RelayCommand]
-    private void NavegarGaleria() => WeakReferenceMessenger.Default.Send(new NavegarMensaje_Galeria());
-
-    [RelayCommand]
-    private void NavegarAgregarAnime() => WeakReferenceMessenger.Default.Send(new NavegarMensaje_AgregarAnime());
-
-    [RelayCommand]
-    private void NavegarCalendario() => WeakReferenceMessenger.Default.Send(new NavegarMensaje_Calendario());
-
-    [RelayCommand]
-    private void NavegarDescargas() => WeakReferenceMessenger.Default.Send(new NavegarMensaje_Descargas());
-
-    [RelayCommand]
-    private void NavegarConfiguracion() => WeakReferenceMessenger.Default.Send(new NavegarMensaje_Configuracion());
-
-    [RelayCommand]
-    private void NavegarAcercaDe() => WeakReferenceMessenger.Default.Send(new NavegarMensaje_AcercaDe());
-
-    [RelayCommand]
-    private void NavegarEstadisticas() => WeakReferenceMessenger.Default.Send(new NavegarMensaje_Estadisticas());
-
-    [RelayCommand]
-    private void NavegarLogros() => WeakReferenceMessenger.Default.Send(new NavegarMensaje_Logros());
-
     /// <summary>
     /// Avisos y diálogos que otros ViewModels piden por mensaje (reproductor: "Episodio marcado como visto",
     /// AniSkip, reanudar…; calendario). El receptor se perdió en el refactor de IDialogService y esos avisos
@@ -306,15 +313,9 @@ public partial class MainViewModel : ObservableObject,
         }
     }
 
-    [RelayCommand]
-    private void NavegarHistorial() => WeakReferenceMessenger.Default.Send(new NavegarMensaje_Historial());
-
-    [RelayCommand]
-    private void NavegarActualizaciones() => WeakReferenceMessenger.Default.Send(new NavegarMensaje_Actualizaciones());
-
     public void Receive(AbrirBuscadorMensaje message)
     {
-        NavegarAgregarAnime();
+        Pestanas.AgregarAnime.Abrir();
     }
 
     [RelayCommand]

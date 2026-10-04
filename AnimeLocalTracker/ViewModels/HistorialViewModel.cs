@@ -20,7 +20,7 @@ public enum FiltroHistorial
     Completados
 }
 
-public partial class HistorialViewModel : ObservableObject, IRecipient<EpisodioActualizadoMensaje>, IRecipient<IdiomaCambiadoMensaje>
+public partial class HistorialViewModel : ObservableObject, IAlEntrarEnPestana, IRecipient<EpisodioActualizadoMensaje>, IRecipient<IdiomaCambiadoMensaje>
 {
     /// <summary>Feed simple: solo los N capítulos reproducidos más recientes.</summary>
     private const int LimiteHistorial = 60;
@@ -76,6 +76,12 @@ public partial class HistorialViewModel : ObservableObject, IRecipient<EpisodioA
     public bool TieneElementos => ItemsFiltrados.Count > 0;
     public bool EstaVacio => !EstaCargando && ItemsHistorial.Count == 0;
     public bool SinResultadosBusqueda => !EstaCargando && ItemsHistorial.Count > 0 && ItemsFiltrados.Count == 0;
+
+    /// <summary>Al abrir la pestaña (ver <see cref="IAlEntrarEnPestana"/>).</summary>
+    public async Task AlEntrarAsync()
+    {
+        if (NecesitaRecargar()) await CargarHistorialAsync();
+    }
 
     /// <summary>NAV-01: evita re-consultar la BD en cada visita a la pestaña — los items ya
     /// se mantienen al día en vivo vía <see cref="Receive"/>, así que solo hace falta recargar
@@ -261,7 +267,7 @@ public partial class HistorialViewModel : ObservableObject, IRecipient<EpisodioA
     [RelayCommand]
     public void ExplorarGaleria()
     {
-        WeakReferenceMessenger.Default.Send(new NavegarMensaje_Galeria());
+        Pestanas.Galeria.Abrir();
     }
 
     public void Receive(EpisodioActualizadoMensaje message)

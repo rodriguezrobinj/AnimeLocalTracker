@@ -267,7 +267,7 @@ public partial class DetalleViewModel : ObservableObject,
     [RelayCommand]
     private void VolverAGaleria()
     {
-        WeakReferenceMessenger.Default.Send(new NavegarMensaje_Galeria());
+        Pestanas.Galeria.Abrir();
     }
     
     [RelayCommand]

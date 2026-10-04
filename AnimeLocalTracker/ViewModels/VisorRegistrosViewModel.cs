@@ -502,7 +502,7 @@ public partial class VisorRegistrosViewModel : ObservableObject, IRecipient<Idio
     }
 
     [RelayCommand]
-    private void Volver() => WeakReferenceMessenger.Default.Send(new NavegarMensaje_Configuracion());
+    private void Volver() => Pestanas.Configuracion.Abrir();
 
     [RelayCommand]
     private void AlternarDetalle(EntradaRegistroItem? item)

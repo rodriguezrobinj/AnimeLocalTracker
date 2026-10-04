@@ -103,7 +103,7 @@ public class MainViewModelTests : IDisposable
         var sut = CreateSut();
 
         // Act
-        CommunityToolkit.Mvvm.Messaging.IMessengerExtensions.Send(CommunityToolkit.Mvvm.Messaging.WeakReferenceMessenger.Default, new AnimeLocalTracker.Messages.NavegarMensaje_Descargas());
+        CommunityToolkit.Mvvm.Messaging.IMessengerExtensions.Send(CommunityToolkit.Mvvm.Messaging.WeakReferenceMessenger.Default, new AnimeLocalTracker.Messages.NavegarMensaje_Pestana(Pestanas.Descargas));
 
         // Assert
         sut.Navigation.VistaActual.Should().BeSameAs(descargasVm);
@@ -116,13 +116,13 @@ public class MainViewModelTests : IDisposable
         var sut = CreateSut();
         var otra = new DescargasViewModel(_downloadMock.Object);
         _spMock.Setup(sp => sp.GetService(typeof(DescargasViewModel))).Returns(otra);
-        CommunityToolkit.Mvvm.Messaging.IMessengerExtensions.Send(CommunityToolkit.Mvvm.Messaging.WeakReferenceMessenger.Default, new AnimeLocalTracker.Messages.NavegarMensaje_Descargas());
+        CommunityToolkit.Mvvm.Messaging.IMessengerExtensions.Send(CommunityToolkit.Mvvm.Messaging.WeakReferenceMessenger.Default, new AnimeLocalTracker.Messages.NavegarMensaje_Pestana(Pestanas.Descargas));
         sut.Navigation.VistaActual.Should().BeSameAs(otra);
 
         _spMock.Setup(sp => sp.GetService(typeof(GaleriaViewModel))).Returns(_galeriaVm);
 
         // Act
-        CommunityToolkit.Mvvm.Messaging.IMessengerExtensions.Send(CommunityToolkit.Mvvm.Messaging.WeakReferenceMessenger.Default, new AnimeLocalTracker.Messages.NavegarMensaje_Galeria());
+        CommunityToolkit.Mvvm.Messaging.IMessengerExtensions.Send(CommunityToolkit.Mvvm.Messaging.WeakReferenceMessenger.Default, new AnimeLocalTracker.Messages.NavegarMensaje_Pestana(Pestanas.Galeria));
 
         // Assert
         sut.Navigation.VistaActual.Should().BeSameAs(_galeriaVm);

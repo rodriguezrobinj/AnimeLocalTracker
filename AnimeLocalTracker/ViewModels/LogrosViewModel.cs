@@ -32,7 +32,7 @@ public sealed partial class FiltroChip : ObservableObject
 /// Pestaña "Logros": catálogo completo con filtros. Es una lista virtualizada agrupada por
 /// categoría (cabeceras de tipo string + tarjetas <see cref="LogroItemViewModel"/>), ver ui-wpf-vistas.md.
 /// </summary>
-public partial class LogrosViewModel : ObservableObject, IRecipient<IdiomaCambiadoMensaje>
+public partial class LogrosViewModel : ObservableObject, IAlEntrarEnPestana, IRecipient<IdiomaCambiadoMensaje>
 {
     public const string TodasLasCategorias = "Todas";
     public const string EstadoTodos = "Todos";
@@ -74,6 +74,12 @@ public partial class LogrosViewModel : ObservableObject, IRecipient<IdiomaCambia
         _logrosService = logrosService;
         ConstruirFiltros();
         WeakReferenceMessenger.Default.RegisterAll(this);
+    }
+
+    /// <summary>Al abrir la pestaña (ver <see cref="IAlEntrarEnPestana"/>).</summary>
+    public async Task AlEntrarAsync()
+    {
+        if (NecesitaRecargar()) await CargarAsync();
     }
 
     public bool NecesitaRecargar() =>
