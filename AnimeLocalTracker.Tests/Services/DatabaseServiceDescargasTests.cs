@@ -150,4 +150,28 @@ public class DatabaseServiceDescargasTests : IDisposable
 
         (await _sut.ObtenerDescargasHistorialAsync()).Should().BeEmpty();
     }
+
+    [Fact]
+    public async Task VaciarBiblioteca_NoDejaLoBorradoRecuperableDentroDelArchivo()
+    {
+        // Un DELETE solo marca las filas como libres: el texto sigue en el archivo hasta que se compacta.
+        const string marcador = "TituloPrivadoQueNoDebeQuedar";
+        await _sut.InicializarBaseDatosAsync();
+        for (int episodio = 1; episodio <= 200; episodio++)
+        {
+            var descarga = Descarga(episodio, DateTime.UtcNow);
+            descarga.AnimeTitulo = marcador;
+            await _sut.GuardarDescargaHistorialAsync(descarga);
+        }
+
+        await _sut.VaciarBibliotecaAsync();
+
+        foreach (var archivo in new[] { _rutaDb, _rutaDb + "-wal" }.Where(File.Exists))
+        {
+            using var flujo = new FileStream(archivo, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            var contenido = new byte[flujo.Length];
+            flujo.ReadExactly(contenido);
+            System.Text.Encoding.UTF8.GetString(contenido).Should().NotContain(marcador, $"'{Path.GetFileName(archivo)}' no debe conservar lo borrado");
+        }
+    }
 }

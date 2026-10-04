@@ -535,6 +535,54 @@ public class DownloadServiceTests
         _sut.CancelarTodas();
     }
 
+    [Theory]
+    [InlineData(1000L, 0L, false, 1000L + Margen)]      // descarga nueva: todo el archivo más el margen
+    [InlineData(1000L, 1000L, false, 0L)]               // reanudar: el parcial ya tiene su tamaño reservado
+    [InlineData(1000L, 400L, false, 600L + Margen)]     // parcial más pequeño: solo lo que falta por reservar
+    [InlineData(1000L, 1000L, true, 1000L + Margen)]    // Mega: hace falta sitio para la copia descifrada
+    [InlineData(1000L, 5000L, false, 0L)]               // parcial mayor que el total: nada que reservar
+    public void EspacioLibreNecesario_NoCuentaDosVecesLoQueElParcialYaReservo(long total, long yaReservado, bool mega, long esperado)
+    {
+        DownloadService.EspacioLibreNecesario(total, yaReservado, mega).Should().Be(esperado);
+    }
+
+    private const long Margen = 100L * 1024 * 1024;
+
+    [Theory]
+    [InlineData("\0\0\0\u0020ftypisom\0\0\u0002\0isomiso2avc1mp41", true)]   // MP4
+    [InlineData("\u001AE\u00DF\u00A3 matroska", true)]                       // MKV
+    [InlineData("<html><body>403 Forbidden</body></html>", false)]
+    [InlineData("  {\"error\":\"expired\"}", false)]
+    [InlineData("#EXTM3U\n#EXT-X-VERSION:3\nhttps://otro.sitio/segmento.ts\n", false)]
+    [InlineData("\r\n#EXTM3U\nfile:///C:/Users/x/secreto.mkv\n", false)]
+    [InlineData("ffconcat version 1.0\nfile 'C:/Users/x/secreto.mkv'\n", false)]
+    public void ArchivoPareceVideo_RechazaPaginasDeErrorYListasDeReproduccion(string contenido, bool esperado)
+    {
+        string ruta = Path.Combine(Path.GetTempPath(), $"AltCabecera_{Guid.NewGuid():N}.downloading");
+        File.WriteAllBytes(ruta, System.Text.Encoding.Latin1.GetBytes(contenido));
+        try
+        {
+            DownloadService.ArchivoPareceVideo(ruta).Should().Be(esperado);
+        }
+        finally
+        {
+            File.Delete(ruta);
+        }
+    }
+
+    [Theory]
+    [InlineData("https://a4.mp4upload.com:183/d/abc/video.mp4", true)]
+    [InlineData("https://delivery.voe-cdn.example/video.mp4", false)]
+    [InlineData("https://gfs270n123.userstorage.mega.co.nz/dl/abc", false)]
+    [InlineData("https://download2267.mediafire.com/abc/video.mp4", false)]
+    public void CrearPeticionVideo_SoloMandaElRefererDeMp4UploadAMp4Upload(string url, bool conReferer)
+    {
+        using var peticion = DownloadService.CrearPeticionVideo(HttpMethod.Get, url);
+
+        peticion.Headers.UserAgent.ToString().Should().Contain("Mozilla");
+        (peticion.Headers.Referrer != null).Should().Be(conReferer);
+    }
+
     private static async Task EsperarHastaAsync(Func<bool> condition, int timeoutMs = 5000)
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();

@@ -745,16 +745,11 @@ public partial class ConfiguracionViewModel : ObservableObject
             // 1) Sesión de AniList (token cifrado con DPAPI)
             _authService.CerrarSesion();
 
-            // 2) Biblioteca local (tablas completas en una transacción)
+            // 2) Biblioteca local (tablas completas en una transacción, y el archivo compactado para que no quede nada recuperable)
             await _databaseService.VaciarBibliotecaAsync();
 
-            // 3) Datos satélite en disco
-            BorrarCarpetaSiExiste(AppDataPaths.CoversDir);
-            BorrarCarpetaSiExiste(AppDataPaths.ThumbnailsDir);
-            BorrarCarpetaSiExiste(Path.Combine(AppDataPaths.DataRoot, "Backups"));
-            BorrarCarpetaSiExiste(AppDataPaths.LogsDir);
-            BorrarArchivoSiExiste(AppDataPaths.TokenPath);
-            BorrarArchivoSiExiste(Path.Combine(AppDataPaths.DataRoot, "episodios_notificados.json"));
+            // 3) El arranque con Windows apunta a esta app: tampoco debe quedar.
+            _startupService?.Sincronizar(false);
         }
         catch (Exception ex)
         {
@@ -775,7 +770,26 @@ public partial class ConfiguracionViewModel : ObservableObject
             "CheckCircle",
             "#4CAF50");
 
-        // Cerrar para que el arranque siguiente reconstruya todo desde cero.
+        // 4) Todo lo demás (ajustes, música, cola de descargas, portadas, registros, cachés…): la carpeta de datos entera.
+        CerrarAppYBorrarDatos();
+    }
+
+    /// <summary>
+    /// Lanza el borrado de la carpeta de datos y cierra la app. Sustituible en las pruebas, que nunca deben tocar los datos
+    /// reales ni cerrar nada.
+    /// </summary>
+    internal Action CerrarAppYBorrarDatos { get; set; } = CerrarAppYBorrarDatosReal;
+
+    private static void CerrarAppYBorrarDatosReal()
+    {
+        // Con la app abierta la carpeta no se puede borrar entera (base de datos, registro e imágenes en uso): lo hace otro
+        // proceso en cuanto esta se cierra (ver BorradoTotalDeDatos).
+        if (!BorradoTotalDeDatos.LanzarTrasCerrar())
+        {
+            AppLogger.Warn("ConfiguracionViewModel", "No se pudo lanzar el borrado de la carpeta de datos: se borra desde aquí lo que no esté en uso.");
+            BorradoTotalDeDatos.BorrarCarpetas(BorradoTotalDeDatos.CarpetasDeDatos(), intentos: 1, esperaMs: 0);
+        }
+
         var app = System.Windows.Application.Current;
         if (app != null)
         {
@@ -784,33 +798,6 @@ public partial class ConfiguracionViewModel : ObservableObject
             {
                 dispatcher.Invoke(() => app!.Shutdown());
             }
-        }
-    }
-
-    private static void BorrarCarpetaSiExiste(string directorio)
-    {
-        try
-        {
-            if (Directory.Exists(directorio))
-            {
-                Directory.Delete(directorio, recursive: true);
-            }
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Warn("ConfiguracionViewModel", $"No se pudo borrar '{directorio}': {ex.Message}");
-        }
-    }
-
-    private static void BorrarArchivoSiExiste(string ruta)
-    {
-        try
-        {
-            if (File.Exists(ruta)) File.Delete(ruta);
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Warn("ConfiguracionViewModel", $"No se pudo borrar '{ruta}': {ex.Message}");
         }
     }
 
@@ -1003,10 +990,11 @@ public partial class ConfiguracionViewModel : ObservableObject
 
         try
         {
-            int animes = await _databaseService.ImportarBibliotecaJsonAsync(dialogo.FileName);
-            await _dialogService.MostrarDialogoAsync("OK",
-                string.Format(LocalizationService.T("Cfg_BibliotecaImportada"), animes),
-                false, "CheckCircleOutline", "#4CAF50");
+            var resultado = await _databaseService.ImportarBibliotecaJsonAsync(dialogo.FileName, RutaBaseAnimes);
+            string mensaje = string.Format(LocalizationService.T("Cfg_BibliotecaImportada"), resultado.Animes);
+            if (resultado.RutasDeRedQuitadas > 0)
+                mensaje += "\n\n" + string.Format(LocalizationService.T("Cfg_ImportadaRutasDeRedQuitadas"), resultado.RutasDeRedQuitadas);
+            await _dialogService.MostrarDialogoAsync("OK", mensaje, false, "CheckCircleOutline", "#4CAF50");
         }
         catch (Exception ex)
         {

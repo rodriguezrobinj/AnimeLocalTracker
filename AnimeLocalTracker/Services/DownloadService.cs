@@ -59,6 +59,10 @@ public class DownloadService : IDownloadService
     private const int MaxReintentosDescargaTransitoria = 5;
     // Sin internet se espera en tramos de un minuto sin gastar reintentos; tras ~1 h se abandona como antes.
     private static readonly TimeSpan EsperaMaximaSinConexion = TimeSpan.FromMinutes(1);
+    // Tope a la espera de que la ejecución anterior de una descarga termine de detenerse al reanudarla.
+    private static readonly TimeSpan EsperaMaximaEjecucionAnterior = TimeSpan.FromSeconds(30);
+    // Margen de disco libre además de lo que ocupa el video (su .state y lo que necesite el sistema).
+    private const long MargenEspacioLibreBytes = 100L * 1024 * 1024;
     private const int MaxEsperasSinConexion = 60;
     // SEC-03: tope de seguridad por archivo en el modo secuencial (el segmentado ya lo acota).
     private const long MaxArchivoDescargaBytes = 35L * 1024 * 1024 * 1024;
@@ -119,6 +123,20 @@ public class DownloadService : IDownloadService
         public CandidatoTorrent? Torrent { get; set; }
         /// <summary>Esperas de hasta un minuto hechas por falta de internet (acotadas por <see cref="MaxEsperasSinConexion"/>).</summary>
         public int EsperasSinConexion { get; set; }
+        /// <summary>La última ejecución lanzada (ver <see cref="EsperarEjecucionAnteriorAsync"/>).</summary>
+        public Task Ejecucion { get; set; } = Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Reanudar justo después de pausar: la ejecución anterior aún puede estar cerrando el archivo y
+    /// guardando su estado. La nueva espera a que termine, para que nunca haya dos a la vez sobre el
+    /// mismo parcial (ni un mismo episodio ocupando dos huecos). Con tope, por si la anterior se quedó colgada.
+    /// </summary>
+    private static async Task EsperarEjecucionAnteriorAsync(Task anterior, CancellationToken ct)
+    {
+        if (anterior.IsCompleted) return;
+        await Task.WhenAny(anterior, Task.Delay(EsperaMaximaEjecucionAnterior, ct));
+        ct.ThrowIfCancellationRequested();
     }
 
     public DownloadService(
@@ -178,9 +196,19 @@ public class DownloadService : IDownloadService
             liberar = DespacharSlotsPendientesLocked();
         }
 
-        foreach (var tcs in liberar)
+        ConcederSlots(liberar);
+    }
+
+    /// <summary>
+    /// Completa (fuera del lock) los slots ya contados en <see cref="_slotsActivos"/>. Si el waiter se
+    /// canceló justo antes (pausa o cancelación que aún no lo había retirado de la cola), nadie usará
+    /// ese slot ni lo liberará: se devuelve aquí. Sin esto se perdía un hueco hasta reiniciar la app.
+    /// </summary>
+    private void ConcederSlots(TaskCompletionSource<bool>[] concedidos)
+    {
+        foreach (var tcs in concedidos)
         {
-            tcs.TrySetResult(true);
+            if (!tcs.TrySetResult(true)) LiberarSlot();
         }
     }
 
@@ -284,10 +312,7 @@ public class DownloadService : IDownloadService
             liberar = DespacharSlotsPendientesLocked();
         }
 
-        foreach (var tcs in liberar)
-        {
-            tcs.TrySetResult(true);
-        }
+        ConcederSlots(liberar);
     }
 
     public bool EstaDescargando(int aniListId, int numeroEpisodio, out double progreso)
@@ -394,7 +419,7 @@ public class DownloadService : IDownloadService
     private bool FueCanceladaDefinitivamente(DownloadState state, string key)
         => !_activeDownloads.TryGetValue(key, out var actual) || !ReferenceEquals(actual, state);
 
-    private static string CarpetaBaseTemporalTorrents => Path.Combine(Path.GetTempPath(), "AnimeLocalTrackerTorrents");
+    internal static string CarpetaBaseTemporalTorrents => Path.Combine(Path.GetTempPath(), "AnimeLocalTrackerTorrents");
 
     private static string RutaCarpetaTemporalTorrent(string key)
         => Path.Combine(CarpetaBaseTemporalTorrents, key);
@@ -469,13 +494,15 @@ public class DownloadService : IDownloadService
         if (_rutaColaPendiente == null) return;
         try
         {
-            var lista = _activeDownloads.Values.OrderBy(s => s.Orden)
-                .Select(s => new DescargaPendiente(s.AniListId, s.AnimeTitulo, s.CarpetaDestino, s.NumeroEpisodio, s.Titulos, s.Automatica,
-                    s.IsPaused, s.Progreso, s.Orden, s.Torrent))
-                .ToList();
-            string json = System.Text.Json.JsonSerializer.Serialize(lista);
+            // La foto de la cola se toma DENTRO del lock: tomada fuera, dos cambios a la vez podían escribirse
+            // en orden inverso y dejar en disco una descarga ya cancelada, que volvía al reabrir la app.
             lock (_lockCola)
             {
+                var lista = _activeDownloads.Values.OrderBy(s => s.Orden)
+                    .Select(s => new DescargaPendiente(s.AniListId, s.AnimeTitulo, s.CarpetaDestino, s.NumeroEpisodio, s.Titulos, s.Automatica,
+                        s.IsPaused, s.Progreso, s.Orden, s.Torrent))
+                    .ToList();
+                string json = System.Text.Json.JsonSerializer.Serialize(lista);
                 Directory.CreateDirectory(Path.GetDirectoryName(_rutaColaPendiente)!);
                 string temporal = _rutaColaPendiente + ".tmp";
                 File.WriteAllText(temporal, json);
@@ -605,13 +632,12 @@ public class DownloadService : IDownloadService
         state.CarpetaDestino = carpetaDestino;
 
         if (!_activeDownloads.TryAdd(key, state)) return Task.CompletedTask;
-        GuardarColaPendiente();
-        if (!Directory.Exists(carpetaDestino)) Directory.CreateDirectory(carpetaDestino);
 
         WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(aniListId, numeroEpisodio, 0, isDownloading: true, isCompleted: false, isPaused: false, "", null, animeTitulo, enCola: true));
 
         EjecutarDescargaTorrentAsync(state, key, candidatoElegido);
-        return Task.CompletedTask;
+        // Disco fuera del hilo que llama (suele ser el de la interfaz); la carpeta la crea la propia descarga.
+        return Task.Run(GuardarColaPendiente);
     }
 
     private static List<string> ConstruirListaTitulos(string animeTitulo, IEnumerable<string>? titulosAlternativos)
@@ -652,17 +678,12 @@ public class DownloadService : IDownloadService
         state.CarpetaDestino = carpetaDestino;
 
         if (!_activeDownloads.TryAdd(key, state)) return Task.CompletedTask;
-        GuardarColaPendiente();
-
-        if (!Directory.Exists(carpetaDestino))
-        {
-            Directory.CreateDirectory(carpetaDestino);
-        }
 
         WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(aniListId, numeroEpisodio, 0, isDownloading: true, isCompleted: false, isPaused: false, "", null, animeTitulo, enCola: true));
 
         EjecutarBucleDescargaAsync(state);
-        return Task.CompletedTask;
+        // Disco fuera del hilo que llama (suele ser el de la interfaz); la carpeta la crea la propia descarga.
+        return Task.Run(GuardarColaPendiente);
     }
 
     /// <summary>
@@ -698,7 +719,8 @@ public class DownloadService : IDownloadService
         // El token de ESTA ejecución: Reanudar crea otro en state.Cts, y esta tarea (que puede seguir
         // deteniéndose tras la pausa) no debe confundir el nuevo con el suyo.
         var ct = state.Cts.Token;
-        _ = Task.Run(async () =>
+        var anterior = state.Ejecucion;
+        state.Ejecucion = Task.Run(async () =>
         {
             bool slotAdquirido = false;
             int reintentosResolucion = 0;
@@ -707,6 +729,7 @@ public class DownloadService : IDownloadService
             double progresoAlUltimoCorte = state.Progreso;
             try
             {
+                await EsperarEjecucionAnteriorAsync(anterior, ct);
                 await AdquirirSlotAsync(key, state, ct);
                 slotAdquirido = true;
                 state.EnCola = false;
@@ -834,8 +857,8 @@ public class DownloadService : IDownloadService
                     }
                 }
 
-                if (File.Exists(state.RutaDestino)) File.Delete(state.RutaDestino);
-                File.Move(state.RutaTemporal, state.RutaDestino);
+                // Sustitución en un solo paso: borrar primero dejaba al usuario sin el archivo anterior si el movimiento fallaba.
+                File.Move(state.RutaTemporal, state.RutaDestino, overwrite: true);
                 _stateStore.EliminarArchivosTemporales(state.RutaTemporal);
 
                 _activeDownloads.TryRemove(key, out _); GuardarColaPendiente();
@@ -962,11 +985,13 @@ public class DownloadService : IDownloadService
     private void EjecutarDescargaTorrentAsync(DownloadState state, string key, CandidatoTorrent candidato)
     {
         var ct = state.Cts.Token; // ver EjecutarBucleDescargaAsync
-        _ = Task.Run(async () =>
+        var anterior = state.Ejecucion;
+        state.Ejecucion = Task.Run(async () =>
         {
             bool slotAdquirido = false;
             try
             {
+                await EsperarEjecucionAnteriorAsync(anterior, ct);
                 await AdquirirSlotAsync(key, state, ct);
                 slotAdquirido = true;
                 state.EnCola = false;
@@ -1120,8 +1145,7 @@ public class DownloadService : IDownloadService
             !resultado.RutaArchivo.Equals(destinationPath, StringComparison.OrdinalIgnoreCase) &&
             File.Exists(resultado.RutaArchivo))
         {
-            if (File.Exists(destinationPath)) File.Delete(destinationPath);
-            File.Move(resultado.RutaArchivo, destinationPath);
+            File.Move(resultado.RutaArchivo, destinationPath, overwrite: true);
         }
         else if (!File.Exists(destinationPath))
         {
@@ -1147,18 +1171,18 @@ public class DownloadService : IDownloadService
             throw new InvalidOperationException("La URL del video no es segura (solo se admiten enlaces https).");
         }
 
+        var dir = Path.GetDirectoryName(destinationPath);
+        if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+        {
+            Directory.CreateDirectory(dir);
+        }
+
         // Fase 2: los manifiestos HLS/DASH no son archivos directos — se descargan
         // con yt-dlp en el daemon (segmentos, encriptación y merge los maneja yt-dlp)
         if (_pythonBridge != null && Core.UrlSeguridad.EsUrlManifiestoStreaming(videoUrl))
         {
             await DescargarManifiestoConDaemonAsync(videoUrl, destinationPath, cancellationToken);
             return;
-        }
-
-        var dir = Path.GetDirectoryName(destinationPath);
-        if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
-        {
-            Directory.CreateDirectory(dir);
         }
 
         // Obtener tamaño y verificar soporte de rangos
@@ -1334,9 +1358,7 @@ public class DownloadService : IDownloadService
     {
         try
         {
-            using var req = new HttpRequestMessage(metodo, videoUrl);
-            req.Headers.Add("User-Agent", UserAgent);
-            req.Headers.Add("Referer", "https://www.mp4upload.com/");
+            using var req = CrearPeticionVideo(metodo, videoUrl);
             if (conRango) req.Headers.Range = new RangeHeaderValue(0, 0);
 
             using var res = await _httpClient.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
@@ -1424,9 +1446,11 @@ public class DownloadService : IDownloadService
         {
             var driveRoot = Path.GetPathRoot(Path.GetFullPath(destinationPath)) ?? "C:\\";
             var driveInfo = new DriveInfo(driveRoot);
-            if (driveInfo.IsReady && driveInfo.AvailableFreeSpace < totalBytes + 100 * 1024 * 1024)
+            var parcial = new FileInfo(destinationPath);
+            long necesario = EspacioLibreNecesario(totalBytes, parcial.Exists ? parcial.Length : 0, MegaTransferIt.ClaveDeUrl(videoUrl) != null);
+            if (driveInfo.IsReady && driveInfo.AvailableFreeSpace < necesario)
             {
-                throw new DownloadAbortDefinitivoException($"Espacio insuficiente en disco para descargar el archivo. Se requieren {totalBytes / (1024 * 1024)} MB y solo hay {driveInfo.AvailableFreeSpace / (1024 * 1024)} MB libres.");
+                throw new DownloadAbortDefinitivoException($"Espacio insuficiente en disco para descargar el archivo. Se requieren {necesario / (1024 * 1024)} MB y solo hay {driveInfo.AvailableFreeSpace / (1024 * 1024)} MB libres.");
             }
         }
         catch (IOException) { throw; }
@@ -1470,7 +1494,7 @@ public class DownloadService : IDownloadService
             {
                 while (await timer.WaitForNextTickAsync(guardadorCts.Token))
                 {
-                    try { await _stateStore.GuardarAsync(statePath, stateInfo); }
+                    try { await GuardarEstadoTrasVolcarAsync(statePath, stateInfo, fileHandle); }
                     catch (Exception ex) { AppLogger.Debug("DownloadService", $"Guardado periódico del estado omitido: {ex.Message}"); }
                 }
             }
@@ -1548,7 +1572,7 @@ public class DownloadService : IDownloadService
         if (falloReal != null || cancellationToken.IsCancellationRequested)
         {
             // Pausa, cancelación o corte: se conserva el progreso para poder reanudar.
-            await _stateStore.GuardarAsync(statePath, stateInfo);
+            await GuardarEstadoTrasVolcarAsync(statePath, stateInfo, fileHandle);
             if (falloReal != null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(falloReal).Throw();
             cancellationToken.ThrowIfCancellationRequested();
         }
@@ -1568,6 +1592,46 @@ public class DownloadService : IDownloadService
         }
 
         progress?.Report((100.0, 0));
+    }
+
+    /// <summary>
+    /// Disco libre que hace falta para empezar o seguir una descarga por trozos. Al reanudar, el parcial
+    /// ya tiene reservado su tamaño: contarlo otra vez daba un falso "espacio insuficiente" con el disco
+    /// justo. Un archivo de Mega se descifra a una copia, así que necesita su tamaño una vez más.
+    /// </summary>
+    internal static long EspacioLibreNecesario(long totalBytes, long yaReservado, bool seDescifraEnCopia)
+    {
+        long pendiente = Math.Max(0, totalBytes - yaReservado) + (seDescifraEnCopia ? totalBytes : 0);
+        return pendiente == 0 ? 0 : pendiente + MargenEspacioLibreBytes;
+    }
+
+    /// <summary>
+    /// Petición al servidor de video. El Referer de MP4Upload solo va a MP4Upload: a los demás servidores
+    /// (Voe, Mega, TransferIt, Mediafire) no hay por qué decirles que se viene de otro sitio.
+    /// </summary>
+    internal static HttpRequestMessage CrearPeticionVideo(HttpMethod metodo, string videoUrl)
+    {
+        var req = new HttpRequestMessage(metodo, videoUrl);
+        req.Headers.Add("User-Agent", UserAgent);
+        if (Core.UrlSeguridad.EsUrlVideoPermitida(videoUrl)) req.Headers.Add("Referer", "https://www.mp4upload.com/");
+        return req;
+    }
+
+    /// <summary>
+    /// Guarda el .state solo después de asegurar en disco los bytes que da por descargados. Sin esto,
+    /// tras un apagón o un cuelgue de Windows el .state podía ir por delante del archivo: los trozos
+    /// "ya bajados" quedaban a ceros y el video terminaba roto sin ningún aviso.
+    /// </summary>
+    private async Task GuardarEstadoTrasVolcarAsync(string statePath, DownloadStateInfo stateInfo, SafeFileHandle fileHandle)
+    {
+        // La foto se toma ANTES de volcar: lo que se escriba mientras dura el volcado queda para el siguiente guardado.
+        var foto = new DownloadStateInfo
+        {
+            TotalBytes = stateInfo.TotalBytes,
+            Segments = stateInfo.Segments.Select(s => new SegmentState { Start = s.Start, End = s.End, CurrentOffset = s.CurrentOffset }).ToList()
+        };
+        RandomAccess.FlushToDisk(fileHandle);
+        await _stateStore.GuardarAsync(statePath, foto);
     }
 
     /// <summary>
@@ -1684,9 +1748,7 @@ public class DownloadService : IDownloadService
         long desdeByte = tramo[indice].CurrentOffset;
         long hastaByte = tramo[^1].End;
 
-        using var req = new HttpRequestMessage(HttpMethod.Get, videoUrl);
-        req.Headers.Add("User-Agent", UserAgent);
-        req.Headers.Add("Referer", "https://www.mp4upload.com/");
+        using var req = CrearPeticionVideo(HttpMethod.Get, videoUrl);
         req.Headers.Range = new RangeHeaderValue(desdeByte, hastaByte);
 
         var reloj = Stopwatch.StartNew();
@@ -1940,9 +2002,7 @@ public class DownloadService : IDownloadService
             return;
         }
 
-        using var req = new HttpRequestMessage(HttpMethod.Get, videoUrl);
-        req.Headers.Add("User-Agent", UserAgent);
-        req.Headers.Add("Referer", "https://www.mp4upload.com/");
+        using var req = CrearPeticionVideo(HttpMethod.Get, videoUrl);
 
         if (existingLength > 0 && totalBytes > 0)
         {
@@ -2110,7 +2170,7 @@ public class DownloadService : IDownloadService
     /// Comprobación barata de que el archivo descargado es un video y no una página de error
     /// (HTML/JSON) que el servidor entregó con código 200 al caducar el enlace.
     /// </summary>
-    private static bool ArchivoPareceVideo(string ruta)
+    internal static bool ArchivoPareceVideo(string ruta)
     {
         try
         {
@@ -2125,7 +2185,10 @@ public class DownloadService : IDownloadService
             {
                 byte b = cabecera[i];
                 if (b is (byte)' ' or (byte)'\t' or (byte)'\r' or (byte)'\n') continue;
-                return b is not ((byte)'<' or (byte)'{');
+                // '<' y '{': página de error. '#' y "ffconcat": una lista de reproducción (#EXTM3U…) guardada como si fuera
+                // el video; al abrirla, el reproductor iría a buscar las direcciones o archivos que la lista diga.
+                return b is not ((byte)'<' or (byte)'{' or (byte)'#')
+                       && !cabecera.AsSpan(i, leidos - i).StartsWith("ffconcat"u8);
             }
             return false; // todo espacios/ceros de pre-asignación no es un video
         }

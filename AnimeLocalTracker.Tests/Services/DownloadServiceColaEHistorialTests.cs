@@ -112,6 +112,61 @@ public class DownloadServiceColaEHistorialTests
     }
 
     [Fact]
+    public async Task CancelarUnaDescargaEnCola_JustoCuandoSeLeConcedeElHueco_NoPierdeElHueco()
+    {
+        // La carrera dura microsegundos: se repite para que, sin el arreglo, falle casi siempre.
+        for (int vuelta = 0; vuelta < 25; vuelta++)
+        {
+            var (orden, _) = ResolverConPuertas();
+            var sut = CrearSut(); // un solo hueco
+
+            await sut.IniciarDescargaEpisodioAsync(1, "A", Carpeta, 1);
+            await EsperarHastaAsync(() => { lock (orden) return orden.Count == 1; });
+            await sut.IniciarDescargaEpisodioAsync(1, "A", Carpeta, 2);
+            await Task.Delay(50); // deja que el episodio 2 llegue a la cola de espera
+
+            // El episodio 2 se cancela y, antes de que se retire de la cola, se le concede un hueco nuevo.
+            sut.CancelarDescarga(1, 2);
+            sut.ActualizarLimiteDescargas(2);
+
+            await sut.IniciarDescargaEpisodioAsync(1, "A", Carpeta, 3);
+            await EsperarHastaAsync(() => { lock (orden) return orden.Contains(3); }, timeoutMs: 2000);
+
+            sut.CancelarTodas();
+        }
+    }
+
+    [Fact]
+    public async Task ReanudarJustoTrasPausar_EsperaAQueLaEjecucionAnteriorTermineDeDetenerse()
+    {
+        int llamadas = 0;
+        var primera = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _resolver
+            .Setup(r => r.BuscarUrlEpisodioAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<int>(), It.IsAny<int?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .Returns(async (IEnumerable<string> _, int _, int? _, string? _, string? _, CancellationToken _) =>
+            {
+                // La primera búsqueda tarda en detenerse tras la pausa (no atiende a la cancelación).
+                if (Interlocked.Increment(ref llamadas) == 1) await primera.Task;
+                return null;
+            });
+        var sut = CrearSut();
+        sut.ActualizarLimiteDescargas(2); // hay un hueco libre: lo único que frena a la segunda ejecución es la primera
+
+        await sut.IniciarDescargaEpisodioAsync(1, "A", Carpeta, 1);
+        await EsperarHastaAsync(() => Volatile.Read(ref llamadas) == 1);
+
+        sut.PausarDescarga(1, 1);
+        sut.ReanudarDescarga(1, 1);
+        await Task.Delay(300);
+        Volatile.Read(ref llamadas).Should().Be(1, "la ejecución anterior aún se está deteniendo: no puede haber dos a la vez sobre el mismo archivo");
+
+        primera.TrySetResult(true);
+        await EsperarHastaAsync(() => Volatile.Read(ref llamadas) == 2);
+
+        sut.CancelarTodas();
+    }
+
+    [Fact]
     public async Task SiNoSeEncuentraElEpisodio_GuardaLaFallidaEnElHistorialYAvisa()
     {
         _resolver

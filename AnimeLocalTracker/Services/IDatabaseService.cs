@@ -4,6 +4,12 @@ using AnimeLocalTracker.Models;
 
 namespace AnimeLocalTracker.Services;
 
+/// <summary>
+/// Resultado de importar una biblioteca: animes fusionados y cuántos entraron SIN su carpeta porque apuntaba a un
+/// servidor de red que esta biblioteca no usa (ver <see cref="AnimeLocalTracker.Core.EntradaSegura.ServidorDeRed"/>).
+/// </summary>
+public readonly record struct ResultadoImportacion(int Animes, int RutasDeRedQuitadas);
+
 public interface IDatabaseService
 {
     Task InicializarBaseDatosAsync();
@@ -24,8 +30,9 @@ public interface IDatabaseService
     Task<bool> ExportarCopiaSeguridadAsync(string rutaDestino);
     Task<bool> RestaurarCopiaSeguridadAsync(string rutaOrigen);
     Task<int> ExportarBibliotecaJsonAsync(string rutaDestino);
-    Task<int> ImportarBibliotecaJsonAsync(string rutaOrigen);
-    
+    /// <param name="rutaBaseAnimes">Carpeta de anime configurada: si está en un servidor de red, las rutas a ESE servidor se conservan.</param>
+    Task<ResultadoImportacion> ImportarBibliotecaJsonAsync(string rutaOrigen, string? rutaBaseAnimes = null);
+
     // === NUEVOS MÉTODOS PARA EL TRACKING ===
     Task GuardarRegistroEpisodioAsync(RegistroEpisodio registro);
     /// <summary>Cambia SOLO la marca de favorito de un episodio (crea el registro si no existe): no toca progreso, visto ni historial.</summary>

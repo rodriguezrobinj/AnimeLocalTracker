@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using SQLite;
+using AnimeLocalTracker.Core;
 using AnimeLocalTracker.Models;
 
 namespace AnimeLocalTracker.Services;
@@ -542,9 +543,9 @@ public class DatabaseService : IDatabaseService, IDisposable
     /// fusionando con la existente (upsert por AniListId / AniListId+Episodio).
     /// Devuelve la cantidad de animes importados.
     /// </summary>
-    public async Task<int> ImportarBibliotecaJsonAsync(string rutaOrigen)
+    public async Task<ResultadoImportacion> ImportarBibliotecaJsonAsync(string rutaOrigen, string? rutaBaseAnimes = null)
     {
-        if (!File.Exists(rutaOrigen)) return 0;
+        if (!File.Exists(rutaOrigen)) return default;
 
         // IMP-01: rechazar archivos fuera de rango antes de leerlos
         if (new FileInfo(rutaOrigen).Length > TopeImportacionBytes)
@@ -565,7 +566,7 @@ public class DatabaseService : IDatabaseService, IDisposable
             AppLogger.Error("DatabaseService", "Import: el archivo no es un JSON de biblioteca válido", ex);
             throw new InvalidDataException("El archivo seleccionado no es un JSON de biblioteca válido de AnimeLocalTracker.");
         }
-        if (backup?.Animes == null) return 0;
+        if (backup?.Animes == null) return default;
 
         // IMP-02: saneado semántico — solo filas coherentes entran a la base
         var animesValidos = backup.Animes.Where(EsAnimeImportable).ToList();
@@ -579,6 +580,35 @@ public class DatabaseService : IDatabaseService, IDisposable
                 return r;
             })
             .ToList();
+
+        // IMP-05: el archivo puede venir de otra persona. Una ruta de red (\\servidor\…) hace que Windows se conecte a ese
+        // servidor con las credenciales del usuario en cuanto la app mira la carpeta, así que solo se conservan las de
+        // servidores que esta biblioteca YA usa (sus animes o su carpeta base); el resto entra sin carpeta.
+        var carpetasActuales = (await _conexion.Table<AnimeItem>().ToListAsync()).ToDictionary(a => a.AniListId, a => a.RutaCarpeta);
+        var servidoresPropios = carpetasActuales.Values
+            .Select(EntradaSegura.ServidorDeRed)
+            .Append(EntradaSegura.ServidorDeRed(rutaBaseAnimes))
+            .Where(s => s != null)
+            .ToHashSet();
+        bool EsDeServidorAjeno(string? ruta) => EntradaSegura.ServidorDeRed(ruta) is { } servidor && !servidoresPropios.Contains(servidor);
+
+        var sinCarpeta = new HashSet<int>();
+        foreach (var anime in animesValidos.Where(a => EsDeServidorAjeno(a.RutaCarpeta)))
+        {
+            // Si el anime ya estaba en la biblioteca conserva la carpeta que tenía aquí.
+            anime.RutaCarpeta = carpetasActuales.GetValueOrDefault(anime.AniListId) ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(anime.RutaCarpeta)) sinCarpeta.Add(anime.AniListId);
+        }
+        int rutasDeRedQuitadas = sinCarpeta.Count;
+        foreach (var registro in registrosValidos)
+        {
+            if (EsDeServidorAjeno(registro.RutaArchivo)) registro.RutaArchivo = string.Empty;
+            // Las miniaturas solo viven en la carpeta de datos de la app: cualquier otra ruta no es de aquí.
+            if (!string.IsNullOrWhiteSpace(registro.RutaMiniatura) && !EntradaSegura.EstaDentroDe(AppDataPaths.ThumbnailsDir, registro.RutaMiniatura))
+                registro.RutaMiniatura = null;
+        }
+        if (rutasDeRedQuitadas > 0)
+            AppLogger.Warn("DatabaseService", $"Import: {rutasDeRedQuitadas} animes apuntaban a un servidor de red ajeno a esta biblioteca; se importan sin carpeta.");
 
         int descartados = (backup.Animes.Count - animesValidos.Count)
                           + ((backup.Registros ?? new List<RegistroEpisodio>()).Count - registrosValidos.Count);
@@ -602,7 +632,7 @@ public class DatabaseService : IDatabaseService, IDisposable
             AplicarUpsertRegistros(db, registrosValidos);
         });
 
-        return animesUnicos.Count;
+        return new ResultadoImportacion(animesUnicos.Count, rutasDeRedQuitadas);
     }
 
     private static bool EsAnimeImportable(AnimeItem a)
@@ -902,6 +932,18 @@ public class DatabaseService : IDatabaseService, IDisposable
             db.Execute("DELETE FROM EmisionGuardada;");
             db.Execute("DELETE FROM SeguimientoLocal;");
         });
+
+        // Un DELETE solo marca las filas como libres: títulos, rutas e historial seguían legibles dentro del archivo
+        // (y de su -wal). Compactar reescribe la base sin ellas y vaciar el -wal quita la copia que queda ahí.
+        try
+        {
+            await _conexion.ExecuteAsync("VACUUM;");
+            await _conexion.ExecuteScalarAsync<int>("PRAGMA wal_checkpoint(TRUNCATE);");
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn("DatabaseService", $"No se pudo compactar la base de datos tras vaciarla: {ex.Message}");
+        }
     }
 
     public async Task<List<RelacionAnime>> ObtenerRelacionesAnimeAsync()

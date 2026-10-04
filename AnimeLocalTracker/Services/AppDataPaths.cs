@@ -42,7 +42,7 @@ public static class AppDataPaths
     public static string ColaDescargasPath { get; } = Path.Combine(DataRoot, "cola_descargas.json");
 
     /// <summary>Ubicación heredada (pre-v5) de settings y caché de release: %AppData%\AnimeLocalTracker.</summary>
-    private static string RutaRoamingAntigua() => Path.Combine(
+    internal static string RutaRoamingAntigua() => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "AnimeLocalTracker");
 

@@ -90,7 +90,11 @@ namespace AnimeLocalTracker.Services.Python
                     RedirectStandardError = true,
                     CreateNoWindow = true,
                     StandardOutputEncoding = Encoding.UTF8,
-                    StandardInputEncoding = Encoding.UTF8
+                    StandardInputEncoding = Encoding.UTF8,
+                    // El daemon llama a "ffmpeg"/"ffprobe" por su nombre, y Windows mira la carpeta actual ANTES que el
+                    // PATH: con la carpeta desde la que se abrió la app, un ffmpeg.exe dejado ahí se ejecutaría. La de
+                    // la instalación es de fiar.
+                    WorkingDirectory = AppDomain.CurrentDomain.BaseDirectory
                 };
                 psi.Environment["PATH"] = ComposePath();
 
@@ -326,7 +330,8 @@ namespace AnimeLocalTracker.Services.Python
                     StandardOutputEncoding = Encoding.UTF8,
                     // ¡Sin BOM! Encoding.UTF8 (estático) sí lo emite, y el primer
                     // comando llegaba como \ufeff{...} → "JSON inválido".
-                    StandardInputEncoding = new UTF8Encoding(false)
+                    StandardInputEncoding = new UTF8Encoding(false),
+                    WorkingDirectory = AppDomain.CurrentDomain.BaseDirectory
                 };
                 psi.Environment["PATH"] = ComposePath();
 
@@ -418,51 +423,12 @@ namespace AnimeLocalTracker.Services.Python
             if (!string.IsNullOrEmpty(_cachedExecutablePath) || !string.IsNullOrEmpty(_cachedScriptPath))
                 return;
 
-            string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            // En un build publicado solo vale el ejecutable de la propia instalación (ver LocalizadorHerramientasPython).
+            (_cachedExecutablePath, _cachedScriptPath) = LocalizadorHerramientasPython.Daemon(
+                AppDomain.CurrentDomain.BaseDirectory, Directory.GetCurrentDirectory(), LocalizadorHerramientasPython.CompilacionDeDesarrollo);
 
-            // 1. Buscar binario compilado embebido AnimeTrackerTools.exe
-            // (--onedir: el exe vive en una subcarpeta con su nombre junto a sus dependencias,
-            // no suelto en Tools/; se mantienen las rutas antiguas por compatibilidad con builds previos)
-            string[] possibleBinaryPaths =
-            {
-                Path.Combine(baseDir, "Tools", "AnimeTrackerTools", "AnimeTrackerTools.exe"),
-                Path.Combine(baseDir, "Tools", "AnimeTrackerTools.exe"),
-                Path.Combine(baseDir, "AnimeTrackerTools.exe"),
-                Path.Combine(Directory.GetCurrentDirectory(), "AnimeLocalTracker", "Tools", "AnimeTrackerTools", "AnimeTrackerTools.exe"),
-                Path.Combine(Directory.GetCurrentDirectory(), "AnimeLocalTracker", "Tools", "AnimeTrackerTools.exe")
-            };
-
-            foreach (var path in possibleBinaryPaths)
-            {
-                if (File.Exists(path))
-                {
-                    _cachedExecutablePath = path;
-                    AppLogger.Info("PythonBridge", $"Motor Python nativo detectado: {path}");
-                    return;
-                }
-            }
-
-            // 2. Buscar script cli.py en directorio tools/python/ recursivamente hacia arriba
-            var searchDir = new DirectoryInfo(baseDir);
-            for (int i = 0; i < 6 && searchDir != null; i++)
-            {
-                string candidate = Path.Combine(searchDir.FullName, "tools", "python", "cli.py");
-                if (File.Exists(candidate))
-                {
-                    _cachedScriptPath = candidate;
-                    AppLogger.Info("PythonBridge", $"Script Python detectado: {candidate}");
-                    return;
-                }
-                searchDir = searchDir.Parent;
-            }
-
-            string cwdCandidate = Path.Combine(Directory.GetCurrentDirectory(), "tools", "python", "cli.py");
-            if (File.Exists(cwdCandidate))
-            {
-                _cachedScriptPath = Path.GetFullPath(cwdCandidate);
-                AppLogger.Info("PythonBridge", $"Script Python detectado en CWD: {_cachedScriptPath}");
-                return;
-            }
+            if (!string.IsNullOrEmpty(_cachedExecutablePath)) AppLogger.Info("PythonBridge", $"Motor Python nativo detectado: {_cachedExecutablePath}");
+            else if (!string.IsNullOrEmpty(_cachedScriptPath)) AppLogger.Info("PythonBridge", $"Script Python detectado: {_cachedScriptPath}");
         }
 
         private static string GetPythonCommand()
@@ -475,16 +441,9 @@ namespace AnimeLocalTracker.Services.Python
                 if (File.Exists(pyExe)) return pyExe;
             }
 
-            // 2. Si existe el entorno virtual local, buscarlo
-            var searchDir = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
-            for (int i = 0; i < 6 && searchDir != null; i++)
-            {
-                string venv = Path.Combine(searchDir.FullName, "tools", "python", ".venv", "Scripts", "python.exe");
-                if (File.Exists(venv)) return venv;
-                searchDir = searchDir.Parent;
-            }
-
-            return "python";
+            // 2. Si existe el entorno virtual local, buscarlo. (Solo se llega aquí en desarrollo: sin script no hay intérprete que lanzar.)
+            return LocalizadorHerramientasPython.BuscarEnRepositorio(AppDomain.CurrentDomain.BaseDirectory, Path.Combine(".venv", "Scripts", "python.exe"))
+                   ?? "python";
         }
 
         /// <summary>

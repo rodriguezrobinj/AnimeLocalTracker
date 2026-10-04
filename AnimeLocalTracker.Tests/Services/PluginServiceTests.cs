@@ -153,6 +153,20 @@ public class PluginServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task EjecutarPluginAsync_MandaAlDaemonLaHuellaDelContenidoAprobado()
+    {
+        string ruta = Crear("a.py", "contenido aprobado");
+        _config.PluginsHabilitados = true;
+        await _sut.EstablecerConfianzaAsync("a.py", true);
+
+        await _sut.EjecutarPluginAsync<object, string>("a.py", "f", new object());
+
+        // Con la huella, el daemon se niega a ejecutar el archivo si lo cambian justo después de esta comprobación.
+        _bridge.Verify(b => b.ExecuteCommandAsync<object, PluginDaemonResponse<string>>("run-plugin",
+            It.Is<object>(p => p.ToString()!.Contains("sha256 = " + ConfianzaPlugins.CalcularSha256(ruta))), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task EjecutarPluginAsync_SiElArchivoCambioTrasConfiar_NoDeberiaEjecutarlo()
     {
         string ruta = Crear("a.py", "bueno");

@@ -217,8 +217,8 @@ public class TorrentDownloadService : ITorrentDownloadService, IDisposable
 
             await manager.StartAsync();
 
-            var vigilante = new VigilanteEstancamientoTorrent(manager.Progress, DateTime.UtcNow);
-            while (manager.Progress < 100.0)
+            var vigilante = new VigilanteEstancamientoTorrent(ProgresoDeLoPedido(manager), DateTime.UtcNow);
+            while (ProgresoDeLoPedido(manager) < 100.0)
             {
                 ct.ThrowIfCancellationRequested();
 
@@ -233,16 +233,17 @@ public class TorrentDownloadService : ITorrentDownloadService, IDisposable
                     return new ResultadoTorrent(false, null, $"Error del torrent: {motivo}");
                 }
 
-                string? estancado = vigilante.Registrar(manager.Progress, DateTime.UtcNow);
+                double progresoPedido = ProgresoDeLoPedido(manager);
+                string? estancado = vigilante.Registrar(progresoPedido, DateTime.UtcNow);
                 if (estancado != null)
                 {
-                    AppLogger.Warn("TorrentDownloadService", $"{estancado} Progreso: {manager.Progress:F1} %, conexiones: {manager.OpenConnections}.");
+                    AppLogger.Warn("TorrentDownloadService", $"{estancado} Progreso: {progresoPedido:F1} %, conexiones: {manager.OpenConnections}.");
                     await DetenerYQuitarAsync(manager);
                     manager = null;
                     return new ResultadoTorrent(false, null, estancado);
                 }
 
-                progress?.Report((manager.Progress, manager.Monitor.DownloadRate));
+                progress?.Report((progresoPedido, manager.Monitor.DownloadRate));
                 await Task.Delay(IntervaloSondeoMs, ct);
             }
 
@@ -273,15 +274,15 @@ public class TorrentDownloadService : ITorrentDownloadService, IDisposable
 
             string? carpetaDestino = Path.GetDirectoryName(rutaDestinoEsperada);
             if (!string.IsNullOrEmpty(carpetaDestino)) Directory.CreateDirectory(carpetaDestino);
-            if (File.Exists(rutaDestinoEsperada)) File.Delete(rutaDestinoEsperada);
 
+            // Sustitución en un solo paso: borrar primero dejaba al usuario sin el archivo anterior si fallaba el traslado.
             if (dejandoSembrando)
             {
-                File.Copy(rutaFinal, rutaDestinoEsperada);
+                File.Copy(rutaFinal, rutaDestinoEsperada, overwrite: true);
             }
             else
             {
-                File.Move(rutaFinal, rutaDestinoEsperada);
+                File.Move(rutaFinal, rutaDestinoEsperada, overwrite: true);
             }
 
             return new ResultadoTorrent(true, rutaDestinoEsperada, null);
@@ -313,6 +314,13 @@ public class TorrentDownloadService : ITorrentDownloadService, IDisposable
             }
         }
     }
+
+    /// <summary>
+    /// Avance (0–100) de lo que SÍ se pidió descargar. <c>Progress</c> cuenta el torrent entero, también
+    /// los archivos marcados para no bajarse: en un pack (o un episodio con archivos sueltos al lado)
+    /// nunca llegaba a 100, y el episodio ya descargado se daba por estancado y se borraba.
+    /// </summary>
+    internal static double ProgresoDeLoPedido(TorrentManager manager) => manager.PartialProgress;
 
     /// <summary>
     /// Rastreadores públicos veteranos que se suman a los del .torrent (como la opción "añadir

@@ -84,7 +84,7 @@ public class DatabaseServiceUpsertTests : IDisposable
             await File.WriteAllTextAsync(rutaJson, System.Text.Json.JsonSerializer.Serialize(backup));
 
             // Act
-            int importados = await _sut.ImportarBibliotecaJsonAsync(rutaJson);
+            int importados = (await _sut.ImportarBibliotecaJsonAsync(rutaJson)).Animes;
 
             // Assert: un solo anime y gana la última entrada del JSON
             importados.Should().Be(1);
@@ -226,7 +226,7 @@ public class DatabaseServiceUpsertTests : IDisposable
         try
         {
             // Act
-            int importados = await _sut.ImportarBibliotecaJsonAsync(jsonPath);
+            int importados = (await _sut.ImportarBibliotecaJsonAsync(jsonPath)).Animes;
 
             // Assert: solo la fila válida entra
             importados.Should().Be(1);
@@ -242,6 +242,80 @@ public class DatabaseServiceUpsertTests : IDisposable
         {
             try { if (File.Exists(jsonPath)) File.Delete(jsonPath); } catch { }
         }
+    }
+
+    [Fact]
+    public async Task ImportarBibliotecaJsonAsync_QuitaLasRutasDeRedDeServidoresQueLaBibliotecaNoUsa()
+    {
+        // IMP-05: un archivo de otra persona no puede elegir a qué servidor de red se conecta la app.
+        await _sut.InicializarBaseDatosAsync();
+        await _sut.GuardarAnimeAsync(new AnimeItem { AniListId = 1, Titulo = "Ya en la biblioteca", RutaCarpeta = @"\\MiNas\Anime\Ya" });
+        await _sut.GuardarAnimeAsync(new AnimeItem { AniListId = 705, Titulo = "Ya tenía carpeta", RutaCarpeta = @"D:\Anime\Propio" });
+        string miniaturaPropia = Path.Combine(AppDataPaths.ThumbnailsDir, "abc.jpg"); // solo la ruta: no se toca el disco
+        var backup = new DatabaseService.BibliotecaBackup
+        {
+            Animes = new List<AnimeItem>
+            {
+                new() { AniListId = 700, Titulo = "Servidor ajeno", RutaCarpeta = @"\\servidor-ajeno\share\Anime" },
+                new() { AniListId = 701, Titulo = "Mi NAS", RutaCarpeta = @"\\minas\Anime\Otro" },
+                new() { AniListId = 702, Titulo = "Carpeta base", RutaCarpeta = @"\\nas-base\Videos\Anime\X" },
+                new() { AniListId = 703, Titulo = "Disco local", RutaCarpeta = @"D:\Anime\Local" },
+                new() { AniListId = 704, Titulo = "Barras al revés", RutaCarpeta = "//servidor-ajeno/share/Anime" },
+                new() { AniListId = 705, Titulo = "Ya tenía carpeta", RutaCarpeta = @"\\servidor-ajeno\share\Pisar" }
+            },
+            Registros = new List<RegistroEpisodio>
+            {
+                new() { AniListId = 700, NumeroEpisodio = 1, RutaArchivo = @"\\servidor-ajeno\share\Anime\01.mkv", RutaMiniatura = @"\\servidor-ajeno\share\mini.jpg" },
+                new() { AniListId = 703, NumeroEpisodio = 1, RutaArchivo = @"D:\Anime\Local\01.mkv", RutaMiniatura = @"C:\Users\otro\Documents\foto.jpg" },
+                new() { AniListId = 703, NumeroEpisodio = 2, RutaArchivo = @"D:\Anime\Local\02.mkv", RutaMiniatura = miniaturaPropia }
+            }
+        };
+        var jsonPath = Path.Combine(Path.GetTempPath(), $"AnimeTracker_Import_{Guid.NewGuid():N}.json");
+        await File.WriteAllTextAsync(jsonPath, System.Text.Json.JsonSerializer.Serialize(backup));
+        try
+        {
+            var resultado = await _sut.ImportarBibliotecaJsonAsync(jsonPath, rutaBaseAnimes: @"\\NAS-BASE\Videos\Anime");
+
+            resultado.Animes.Should().Be(6);
+            resultado.RutasDeRedQuitadas.Should().Be(2, "solo los dos animes nuevos de un servidor ajeno quedan sin carpeta");
+
+            var carpetas = (await _sut.ObtenerTodosLosAnimesAsync()).ToDictionary(a => a.AniListId, a => a.RutaCarpeta);
+            carpetas[700].Should().BeEmpty();
+            carpetas[704].Should().BeEmpty();
+            carpetas[701].Should().Be(@"\\minas\Anime\Otro", "ese servidor ya lo usa otro anime de la biblioteca");
+            carpetas[702].Should().Be(@"\\nas-base\Videos\Anime\X", "es el servidor de la carpeta base configurada");
+            carpetas[703].Should().Be(@"D:\Anime\Local");
+            carpetas[705].Should().Be(@"D:\Anime\Propio", "un anime que ya estaba conserva su carpeta en vez de perderla");
+
+            var ajeno = (await _sut.ObtenerRegistrosPorAnimeAsync(700)).Single();
+            ajeno.RutaArchivo.Should().BeEmpty();
+            ajeno.RutaMiniatura.Should().BeNull();
+
+            var locales = (await _sut.ObtenerRegistrosPorAnimeAsync(703)).OrderBy(r => r.NumeroEpisodio).ToList();
+            locales[0].RutaArchivo.Should().Be(@"D:\Anime\Local\01.mkv");
+            locales[0].RutaMiniatura.Should().BeNull("una miniatura fuera de la carpeta de la app no es una miniatura de la app");
+            locales[1].RutaMiniatura.Should().Be(miniaturaPropia);
+        }
+        finally
+        {
+            try { if (File.Exists(jsonPath)) File.Delete(jsonPath); } catch { }
+        }
+    }
+
+    [Theory]
+    [InlineData(@"\\Servidor\recurso\carpeta", "servidor")]
+    [InlineData("//Servidor/recurso", "servidor")]
+    [InlineData(@"\\?\UNC\Servidor\recurso", "servidor")]
+    [InlineData(@"\\192.168.1.50\c$", "192.168.1.50")]
+    [InlineData(@"\\.\PhysicalDrive0", ".")]
+    [InlineData(@"\\?\C:\Anime", null)]
+    [InlineData(@"D:\Anime\Frieren", null)]
+    [InlineData("Anime", null)]
+    [InlineData("", null)]
+    [InlineData(null, null)]
+    public void ServidorDeRed_ReconoceLasRutasQueSalenDelEquipo(string? ruta, string? esperado)
+    {
+        AnimeLocalTracker.Core.EntradaSegura.ServidorDeRed(ruta).Should().Be(esperado);
     }
 
     [Fact]
@@ -408,7 +482,7 @@ public class DatabaseServiceUpsertTests : IDisposable
             await _sut.ExportarBibliotecaJsonAsync(jsonPath);
             var sut2 = new DatabaseService(db2Path);
             await sut2.InicializarBaseDatosAsync();
-            int importados = await sut2.ImportarBibliotecaJsonAsync(jsonPath);
+            int importados = (await sut2.ImportarBibliotecaJsonAsync(jsonPath)).Animes;
 
             // Assert: los datos sobreviven al round-trip
             importados.Should().Be(1);
