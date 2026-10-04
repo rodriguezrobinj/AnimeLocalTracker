@@ -67,8 +67,8 @@
                 <materialDesign:PackIcon Kind="InformationOutline" Width="26" Height="26" Foreground="{DynamicResource Brush.Accent}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
             </Border>
             <StackPanel VerticalAlignment="Center">
-                <TextBlock Text="{Binding [Acerca_Titulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.PageTitle}"/>
-                <TextBlock Text="{Binding [Acerca_Subtitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                <TextBlock Text="{loc:T Acerca_Titulo}" Style="{StaticResource AppText.PageTitle}"/>
+                <TextBlock Text="{loc:T Acerca_Subtitulo}"
                            Style="{StaticResource AppText.Caption}" Margin="0,3,0,0"/>
             </StackPanel>
         </StackPanel>
@@ -92,9 +92,9 @@
                         </Border>
 
                         <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
-                            <TextBlock Text="{Binding [Acerca_NombreApp], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                            <TextBlock Text="{loc:T Acerca_NombreApp}"
                                        FontSize="22" FontWeight="Bold" Foreground="{DynamicResource Brush.TextPrimary}"/>
-                            <TextBlock Text="{Binding [Acerca_Descripcion], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                            <TextBlock Text="{loc:T Acerca_Descripcion}"
                                        Style="{StaticResource AcercaBody}" Margin="0,4,0,0"/>
                         </StackPanel>
 
@@ -102,11 +102,11 @@
                                 Style="{StaticResource AppPrimaryButton}"
                                 Height="42" Padding="18,0" VerticalAlignment="Center" Cursor="Hand"
                                 materialDesign:ButtonAssist.CornerRadius="8"
-                                ToolTip="{Binding [Acerca_ComprobarActualizacionesTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                AutomationProperties.Name="{Binding [Acerca_BuscarActualizaciones], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                ToolTip="{loc:T Acerca_ComprobarActualizacionesTip}"
+                                AutomationProperties.Name="{loc:T Acerca_BuscarActualizaciones}">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="Update" Width="18" Height="18" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                <TextBlock Text="{Binding [Acerca_BuscarActualizaciones], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                <TextBlock Text="{loc:T Acerca_BuscarActualizaciones}"
                                            VerticalAlignment="Center" FontWeight="SemiBold" FontSize="12"/>
                             </StackPanel>
                         </Button>
@@ -127,7 +127,7 @@
                                 <materialDesign:PackIcon Kind="Update" Style="{StaticResource AcercaChipIcon}"/>
                             </Border>
                             <StackPanel VerticalAlignment="Center">
-                                <TextBlock Text="{Binding [Acerca_Version], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.Micro}"/>
+                                <TextBlock Text="{loc:T Acerca_Version}" Style="{StaticResource AppText.Micro}"/>
                                 <TextBlock Text="{Binding VersionAppTexto, Mode=OneWay}" Style="{StaticResource AppText.BodyStrong}" Margin="0,2,0,0"/>
                             </StackPanel>
                         </StackPanel>
@@ -139,7 +139,7 @@
                                 <materialDesign:PackIcon Kind="HeartOutline" Style="{StaticResource AcercaChipIcon}"/>
                             </Border>
                             <StackPanel VerticalAlignment="Center">
-                                <TextBlock Text="{Binding [Acerca_Licencia], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.Micro}"/>
+                                <TextBlock Text="{loc:T Acerca_Licencia}" Style="{StaticResource AppText.Micro}"/>
                                 <TextBlock Text="MIT" Style="{StaticResource AppText.BodyStrong}" Margin="0,2,0,0"/>
                             </StackPanel>
                         </StackPanel>
@@ -161,7 +161,7 @@
                                 </Border>
                                 <StackPanel VerticalAlignment="Center">
                                     <TextBlock Text="{Binding NovedadesTituloTexto, Mode=OneWay}" Style="{StaticResource AppText.Section}"/>
-                                    <TextBlock Text="{Binding [Acerca_RegistroCambios], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.Caption}"/>
+                                    <TextBlock Text="{loc:T Acerca_RegistroCambios}" Style="{StaticResource AppText.Caption}"/>
                                 </StackPanel>
                             </StackPanel>
 
@@ -206,8 +206,8 @@
                                 <materialDesign:PackIcon Kind="ShieldAccount" Style="{StaticResource AcercaChipIcon}" Foreground="{DynamicResource Brush.Success}"/>
                             </Border>
                             <StackPanel VerticalAlignment="Center">
-                                <TextBlock Text="{Binding [Acerca_PrivacidadTitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.Section}"/>
-                                <TextBlock Text="{Binding [Acerca_PrivacidadSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.Caption}"/>
+                                <TextBlock Text="{loc:T Acerca_PrivacidadTitulo}" Style="{StaticResource AppText.Section}"/>
+                                <TextBlock Text="{loc:T Acerca_PrivacidadSub}" Style="{StaticResource AppText.Caption}"/>
                             </StackPanel>
                         </StackPanel>
 
@@ -223,19 +223,19 @@
                             <Border Grid.Column="0" Background="{DynamicResource Brush.Surface2}" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1" CornerRadius="12" Padding="16">
                                 <StackPanel>
                                     <materialDesign:PackIcon Kind="Harddisk" Width="20" Height="20" Foreground="{DynamicResource Brush.Success}" HorizontalAlignment="Left" Margin="0,0,0,8"/>
-                                    <TextBlock Text="{Binding [Acerca_PrivacidadP1], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AcercaBody}"/>
+                                    <TextBlock Text="{loc:T Acerca_PrivacidadP1}" Style="{StaticResource AcercaBody}"/>
                                 </StackPanel>
                             </Border>
                             <Border Grid.Column="2" Background="{DynamicResource Brush.Surface2}" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1" CornerRadius="12" Padding="16">
                                 <StackPanel>
                                     <materialDesign:PackIcon Kind="AccountSync" Width="20" Height="20" Foreground="{DynamicResource Brush.Accent}" HorizontalAlignment="Left" Margin="0,0,0,8"/>
-                                    <TextBlock Text="{Binding [Acerca_PrivacidadP2], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AcercaBody}"/>
+                                    <TextBlock Text="{loc:T Acerca_PrivacidadP2}" Style="{StaticResource AcercaBody}"/>
                                 </StackPanel>
                             </Border>
                             <Border Grid.Column="4" Background="{DynamicResource Brush.Surface2}" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1" CornerRadius="12" Padding="16">
                                 <StackPanel>
                                     <materialDesign:PackIcon Kind="EyeOffOutline" Width="20" Height="20" Foreground="{DynamicResource Brush.Success}" HorizontalAlignment="Left" Margin="0,0,0,8"/>
-                                    <TextBlock Text="{Binding [Acerca_PrivacidadP3], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AcercaBody}"/>
+                                    <TextBlock Text="{loc:T Acerca_PrivacidadP3}" Style="{StaticResource AcercaBody}"/>
                                 </StackPanel>
                             </Border>
                         </Grid>
@@ -250,12 +250,12 @@
                                 <materialDesign:PackIcon Kind="AlertCircleOutline" Style="{StaticResource AcercaChipIcon}" Foreground="{DynamicResource Brush.Warning}"/>
                             </Border>
                             <StackPanel VerticalAlignment="Center">
-                                <TextBlock Text="{Binding [Acerca_AvisoContenidoTitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.Section}"/>
-                                <TextBlock Text="{Binding [Acerca_AvisoContenidoSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.Caption}"/>
+                                <TextBlock Text="{loc:T Acerca_AvisoContenidoTitulo}" Style="{StaticResource AppText.Section}"/>
+                                <TextBlock Text="{loc:T Acerca_AvisoContenidoSub}" Style="{StaticResource AppText.Caption}"/>
                             </StackPanel>
                         </StackPanel>
 
-                        <TextBlock Text="{Binding [Acerca_AvisoContenidoTexto], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AcercaBody}"/>
+                        <TextBlock Text="{loc:T Acerca_AvisoContenidoTexto}" Style="{StaticResource AcercaBody}"/>
                     </StackPanel>
                 </Border>
 
@@ -274,7 +274,7 @@
                                     <materialDesign:PackIcon Kind="Github" Style="{StaticResource AcercaChipIcon}" Foreground="{DynamicResource Brush.TextPrimary}"/>
                                 </Border>
                                 <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding [Acerca_ProyectoOpenSource], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.Section}"/>
+                                    <TextBlock Text="{loc:T Acerca_ProyectoOpenSource}" Style="{StaticResource AppText.Section}"/>
                                     <TextBlock Text="{Binding LicenciaTexto, Mode=OneWay}" Style="{StaticResource AppText.Caption}"/>
                                 </StackPanel>
                             </StackPanel>
@@ -299,11 +299,11 @@
                                     BorderBrush="{DynamicResource Brush.TextTertiary}" Foreground="{DynamicResource Brush.TextPrimary}"
                                     Height="38" Padding="16,0" Margin="0,0,10,0" VerticalAlignment="Center" Cursor="Hand"
                                     materialDesign:ButtonAssist.CornerRadius="8"
-                                    ToolTip="{Binding [Acerca_ReportarProblemaTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                    AutomationProperties.Name="{Binding [Acerca_ReportarProblema], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                    ToolTip="{loc:T Acerca_ReportarProblemaTip}"
+                                    AutomationProperties.Name="{loc:T Acerca_ReportarProblema}">
                                 <StackPanel Orientation="Horizontal">
                                     <materialDesign:PackIcon Kind="BugOutline" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                    <TextBlock Text="{Binding [Acerca_ReportarProblema], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="12"/>
+                                    <TextBlock Text="{loc:T Acerca_ReportarProblema}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="12"/>
                                 </StackPanel>
                             </Button>
 
@@ -312,11 +312,11 @@
                                     BorderBrush="{DynamicResource Brush.AccentStrong}"
                                     Height="38" Padding="16,0" VerticalAlignment="Center" Cursor="Hand"
                                     materialDesign:ButtonAssist.CornerRadius="8"
-                                    ToolTip="{Binding [Acerca_AbrirRepositorioTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                    AutomationProperties.Name="{Binding [Acerca_VerGitHub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                    ToolTip="{loc:T Acerca_AbrirRepositorioTip}"
+                                    AutomationProperties.Name="{loc:T Acerca_VerGitHub}">
                                 <StackPanel Orientation="Horizontal">
                                     <materialDesign:PackIcon Kind="OpenInNew" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                    <TextBlock Text="{Binding [Acerca_VerGitHub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="12"/>
+                                    <TextBlock Text="{loc:T Acerca_VerGitHub}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="12"/>
                                 </StackPanel>
                             </Button>
                         </StackPanel>

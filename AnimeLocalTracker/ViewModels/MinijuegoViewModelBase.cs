@@ -386,17 +386,8 @@ public abstract partial class MinijuegoViewModelBase : ObservableObject, IRecipi
     protected static ObservableCollection<OpcionRespuesta> CrearOpciones(IEnumerable<AnimeItem> animes) =>
         new(animes.Select((a, i) => new OpcionRespuesta(i, a.Titulo)));
 
-    public void Receive(IdiomaCambiadoMensaje message)
-    {
-        // Pistas, resultado y etiquetas se construyen con LocalizationService.T(): rehacerlos.
-        var dispatcher = System.Windows.Application.Current?.Dispatcher;
-        if (dispatcher != null && !dispatcher.CheckAccess())
-        {
-            dispatcher.Invoke(RefrescarTextos);
-            return;
-        }
-        RefrescarTextos();
-    }
+    // Pistas, resultado y etiquetas se construyen con LocalizationService.T(): rehacerlos.
+    public void Receive(IdiomaCambiadoMensaje message) => Core.HiloUi.Ejecutar(RefrescarTextos);
 
     protected virtual void RefrescarTextos()
     {

@@ -41,8 +41,8 @@
                     <materialDesign:PackIcon Kind="History" Foreground="{StaticResource Brush.Accent}" Width="26" Height="26" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
                 <StackPanel VerticalAlignment="Center">
-                    <TextBlock Text="{Binding [Hist_Titulo], Source={x:Static loc:LocalizationService.Instance}}" Style="{StaticResource AppText.PageTitle}"/>
-                    <TextBlock Text="{Binding [Hist_Subtitulo], Source={x:Static loc:LocalizationService.Instance}}" FontSize="12" Foreground="{StaticResource Brush.TextSecondary}" Margin="0,3,0,0"/>
+                    <TextBlock Text="{loc:T Hist_Titulo}" Style="{StaticResource AppText.PageTitle}"/>
+                    <TextBlock Text="{loc:T Hist_Subtitulo}" FontSize="12" Foreground="{StaticResource Brush.TextSecondary}" Margin="0,3,0,0"/>
                 </StackPanel>
             </StackPanel>
 
@@ -61,7 +61,7 @@
                     </Border>
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="{Binding TotalElementos}" FontSize="24" FontWeight="Bold" Foreground="White"/>
-                        <TextBlock Text="{Binding [Hist_Resumen_Capitulos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="11.5" Foreground="{StaticResource Brush.TextTertiary}"/>
+                        <TextBlock Text="{loc:T Hist_Resumen_Capitulos}" FontSize="11.5" Foreground="{StaticResource Brush.TextTertiary}"/>
                     </StackPanel>
                 </StackPanel>
             </Border>
@@ -73,7 +73,7 @@
                     </Border>
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="{Binding TotalEnProgreso}" FontSize="24" FontWeight="Bold" Foreground="White"/>
-                        <TextBlock Text="{Binding [Hist_Resumen_EnProgreso], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="11.5" Foreground="{StaticResource Brush.TextTertiary}"/>
+                        <TextBlock Text="{loc:T Hist_Resumen_EnProgreso}" FontSize="11.5" Foreground="{StaticResource Brush.TextTertiary}"/>
                     </StackPanel>
                 </StackPanel>
             </Border>
@@ -85,7 +85,7 @@
                     </Border>
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="{Binding TiempoVistoTexto}" FontSize="24" FontWeight="Bold" Foreground="White"/>
-                        <TextBlock Text="{Binding [Hist_Resumen_Tiempo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="11.5" Foreground="{StaticResource Brush.TextTertiary}"/>
+                        <TextBlock Text="{loc:T Hist_Resumen_Tiempo}" FontSize="11.5" Foreground="{StaticResource Brush.TextTertiary}"/>
                     </StackPanel>
                 </StackPanel>
             </Border>
@@ -108,7 +108,7 @@
                 <TextBox Grid.Column="1" Text="{Binding TextoBusqueda, UpdateSourceTrigger=PropertyChanged}"
                          Background="Transparent" BorderThickness="0" Foreground="{StaticResource Brush.TextPrimary}" FontSize="12.5"
                          VerticalAlignment="Center" CaretBrush="{StaticResource Brush.Accent}"
-                         materialDesign:HintAssist.Hint="{Binding [Hist_BuscarPlaceholder], Source={x:Static loc:LocalizationService.Instance}}"
+                         materialDesign:HintAssist.Hint="{loc:T Hist_BuscarPlaceholder}"
                          materialDesign:TextFieldAssist.DecorationVisibility="Hidden"/>
 
                 <!-- BOTÓN LIMPIAR BÚSQUEDA -->
@@ -154,14 +154,14 @@
                 <Border Background="{StaticResource Brush.Surface3}" CornerRadius="36" Width="72" Height="72" Margin="0,0,0,16" HorizontalAlignment="Center">
                     <materialDesign:PackIcon Kind="History" Foreground="{StaticResource Brush.IconMuted}" Width="36" Height="36" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
-                <TextBlock Text="{Binding [Hist_VacioTitulo], Source={x:Static loc:LocalizationService.Instance}}" Style="{StaticResource AppEmptyTitle}"/>
-                <TextBlock Text="{Binding [Hist_VacioSubtitulo], Source={x:Static loc:LocalizationService.Instance}}" Style="{StaticResource AppEmptyText}" Margin="0,6,0,20" MaxWidth="420"/>
+                <TextBlock Text="{loc:T Hist_VacioTitulo}" Style="{StaticResource AppEmptyTitle}"/>
+                <TextBlock Text="{loc:T Hist_VacioSubtitulo}" Style="{StaticResource AppEmptyText}" Margin="0,6,0,20" MaxWidth="420"/>
                 <Button Command="{Binding ExplorarGaleriaCommand}"
                         Style="{StaticResource AppPrimaryButton}"
                         HorizontalAlignment="Center" Height="40" Padding="20,0" materialDesign:ButtonAssist.CornerRadius="20">
                     <StackPanel Orientation="Horizontal">
                         <materialDesign:PackIcon Kind="ViewGallery" Width="18" Height="18" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                        <TextBlock Text="{Binding [Hist_ExplorarGaleria], Source={x:Static loc:LocalizationService.Instance}}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        <TextBlock Text="{loc:T Hist_ExplorarGaleria}" FontWeight="SemiBold" VerticalAlignment="Center"/>
                     </StackPanel>
                 </Button>
             </StackPanel>
@@ -171,7 +171,7 @@
                         Visibility="{Binding SinResultadosBusqueda, Converter={StaticResource BoolToVis}}"
                         Margin="0,40,0,40">
                 <materialDesign:PackIcon Kind="MagnifyClose" Foreground="{StaticResource Brush.IconMuted}" Width="48" Height="48" HorizontalAlignment="Center" Margin="0,0,0,12"/>
-                <TextBlock Text="{Binding [Hist_SinResultados], Source={x:Static loc:LocalizationService.Instance}}" Style="{StaticResource AppEmptyText}" FontSize="15" HorizontalAlignment="Center"/>
+                <TextBlock Text="{loc:T Hist_SinResultados}" Style="{StaticResource AppEmptyText}" FontSize="15" HorizontalAlignment="Center"/>
             </StackPanel>
 
             <!-- 4. LISTA DE TARJETAS VIRTUALIZADA (ListBox: virtualización REAL.
@@ -215,8 +215,8 @@
                                         Background="Transparent" Cursor="Hand" VerticalAlignment="Center"
                                         Command="{Binding DataContext.ReanudarCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                         CommandParameter="{Binding}"
-                                        ToolTip="{Binding [Hist_Reanudar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                        AutomationProperties.Name="{Binding [Hist_Reanudar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                        ToolTip="{loc:T Hist_Reanudar}"
+                                        AutomationProperties.Name="{loc:T Hist_Reanudar}">
                                     <Border CornerRadius="10" Background="{StaticResource Brush.Surface3}" ClipToBounds="True">
                                         <Grid>
                                             <Border Style="{StaticResource ShimmerEffectStyle}">
@@ -239,7 +239,7 @@
                                     <Button Command="{Binding DataContext.NavegarDetalleCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                             CommandParameter="{Binding}" Cursor="Hand" HorizontalAlignment="Left"
                                             Background="Transparent" BorderThickness="0" Padding="0" Height="Auto" MinHeight="0"
-                                            ToolTip="{Binding [Hist_VerAnime], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                            ToolTip="{loc:T Hist_VerAnime}"
                                             AutomationProperties.Name="{Binding TituloAnime}">
                                         <TextBlock Text="{Binding TituloAnime}" FontWeight="Bold" FontSize="15" Foreground="{StaticResource Brush.TextPrimary}"
                                                    TextTrimming="CharacterEllipsis" MaxWidth="560"/>

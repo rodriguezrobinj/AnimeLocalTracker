@@ -107,7 +107,7 @@
                 </Setter>
             </Style>
         </ContextMenu.Resources>
-        <MenuItem Header="{Binding [Act_Reproducir], Source={x:Static loc:LocalizationService.Instance}}"
+        <MenuItem Header="{loc:T Act_Reproducir}"
                   Command="{Binding PlacementTarget.Tag.Episodios.ReproducirEpisodioCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                   CommandParameter="{Binding}"
                   Visibility="{Binding Descargado, Converter={StaticResource BoolToVis}}">
@@ -117,7 +117,7 @@
         </MenuItem>
         <!-- "Reproducir" (y su separador) solo en los episodios que están en disco -->
         <Separator Visibility="{Binding Descargado, Converter={StaticResource BoolToVis}}"/>
-        <MenuItem Header="{Binding [Det_MarcarVisto], Source={x:Static loc:LocalizationService.Instance}}"
+        <MenuItem Header="{loc:T Det_MarcarVisto}"
                   Command="{Binding PlacementTarget.Tag.Episodios.AlternarVistoEpisodioCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                   CommandParameter="{Binding}"
                   Visibility="{Binding Visto, Converter={StaticResource InverseBoolToVis}}">
@@ -125,7 +125,7 @@
                 <materialDesign:PackIcon Kind="Check" Foreground="#10B981" Width="16" Height="16"/>
             </MenuItem.Icon>
         </MenuItem>
-        <MenuItem Header="{Binding [Det_MarcarNoVisto], Source={x:Static loc:LocalizationService.Instance}}"
+        <MenuItem Header="{loc:T Det_MarcarNoVisto}"
                   Command="{Binding PlacementTarget.Tag.Episodios.AlternarVistoEpisodioCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                   CommandParameter="{Binding}"
                   Visibility="{Binding Visto, Converter={StaticResource BoolToVis}}">
@@ -133,14 +133,14 @@
                 <materialDesign:PackIcon Kind="EyeOffOutline" Foreground="{StaticResource Brush.TextSecondary}" Width="16" Height="16"/>
             </MenuItem.Icon>
         </MenuItem>
-        <MenuItem Header="{Binding [Det_MarcarAnterioresVistos], Source={x:Static loc:LocalizationService.Instance}}"
+        <MenuItem Header="{loc:T Det_MarcarAnterioresVistos}"
                   Command="{Binding PlacementTarget.Tag.Episodios.MarcarAnterioresVistosCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                   CommandParameter="{Binding}">
             <MenuItem.Icon>
                 <materialDesign:PackIcon Kind="CheckAll" Foreground="{StaticResource Brush.Success}" Width="16" Height="16"/>
             </MenuItem.Icon>
         </MenuItem>
-        <MenuItem Header="{Binding [Det_MarcarTemporadaCompleta], Source={x:Static loc:LocalizationService.Instance}}"
+        <MenuItem Header="{loc:T Det_MarcarTemporadaCompleta}"
                   Command="{Binding PlacementTarget.Tag.Episodios.MarcarTemporadaCompletaCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
             <MenuItem.Icon>
                 <materialDesign:PackIcon Kind="PlaylistCheck" Foreground="{StaticResource Brush.Accent}" Width="16" Height="16"/>
@@ -148,7 +148,7 @@
         </MenuItem>
         <!-- Como "Eliminar": solo en los episodios que están en disco (si no, quedaba una raya suelta al final del menú) -->
         <Separator Visibility="{Binding Descargado, Converter={StaticResource BoolToVis}}"/>
-        <MenuItem Header="{Binding [Det_EliminarEpisodio], Source={x:Static loc:LocalizationService.Instance}}"
+        <MenuItem Header="{loc:T Det_EliminarEpisodio}"
                   Command="{Binding PlacementTarget.Tag.Episodios.EliminarEpisodioCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                   CommandParameter="{Binding}"
                   Visibility="{Binding Descargado, Converter={StaticResource BoolToVis}}">
@@ -303,8 +303,8 @@
                                     Style="{StaticResource MaterialDesignFlatButton}"
                                     Padding="4,8" Height="Auto" Cursor="Hand"
                                     materialDesign:ButtonAssist.CornerRadius="8"
-                                    ToolTip="{Binding [Det_FavoritoAnimeTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                    AutomationProperties.Name="{Binding [Det_FavoritoAnime], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                    ToolTip="{loc:T Det_FavoritoAnimeTip}"
+                                    AutomationProperties.Name="{loc:T Det_FavoritoAnime}">
                                 <StackPanel HorizontalAlignment="Center">
                                     <materialDesign:PackIcon Width="20" Height="20" HorizontalAlignment="Center" Foreground="{StaticResource Brush.Rose}">
                                         <materialDesign:PackIcon.Style>
@@ -318,7 +318,7 @@
                                             </Style>
                                         </materialDesign:PackIcon.Style>
                                     </materialDesign:PackIcon>
-                                    <TextBlock Text="{Binding [Det_FavoritoAnime], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource Brush.TextPrimary}" Margin="0,4,0,0" HorizontalAlignment="Center" TextAlignment="Center"/>
+                                    <TextBlock Text="{loc:T Det_FavoritoAnime}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource Brush.TextPrimary}" Margin="0,4,0,0" HorizontalAlignment="Center" TextAlignment="Center"/>
                                 </StackPanel>
                             </Button>
 
@@ -328,11 +328,11 @@
                                     Visibility="{Binding EstaConectado, Converter={StaticResource BoolToVis}}"
                                     Padding="4,8" Height="Auto"
                                     materialDesign:ButtonAssist.CornerRadius="8"
-                                    ToolTip="{Binding [Det_SeguimientoTip], Source={x:Static loc:LocalizationService.Instance}}"
-                                    AutomationProperties.Name="{Binding [Det_Seguimiento], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                    ToolTip="{loc:T Det_SeguimientoTip}"
+                                    AutomationProperties.Name="{loc:T Det_Seguimiento}">
                                 <StackPanel HorizontalAlignment="Center">
                                     <materialDesign:PackIcon Kind="Sync" Width="20" Height="20" HorizontalAlignment="Center" Foreground="{StaticResource Brush.Accent}"/>
-                                    <TextBlock Text="{Binding [Det_Seguimiento], Source={x:Static loc:LocalizationService.Instance}}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource Brush.TextPrimary}" Margin="0,4,0,0" HorizontalAlignment="Center" TextAlignment="Center"/>
+                                    <TextBlock Text="{loc:T Det_Seguimiento}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource Brush.TextPrimary}" Margin="0,4,0,0" HorizontalAlignment="Center" TextAlignment="Center"/>
                                 </StackPanel>
                             </Button>
 
@@ -341,11 +341,11 @@
                                     Style="{StaticResource MaterialDesignFlatButton}"
                                     Padding="4,8" Height="Auto"
                                     materialDesign:ButtonAssist.CornerRadius="8"
-                                    ToolTip="{Binding [Det_WebViewTip], Source={x:Static loc:LocalizationService.Instance}}"
-                                    AutomationProperties.Name="{Binding [Det_WebView], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                    ToolTip="{loc:T Det_WebViewTip}"
+                                    AutomationProperties.Name="{loc:T Det_WebView}">
                                 <StackPanel HorizontalAlignment="Center">
                                     <materialDesign:PackIcon Kind="Earth" Width="20" Height="20" HorizontalAlignment="Center" Foreground="{StaticResource Brush.Accent}"/>
-                                    <TextBlock Text="{Binding [Det_WebView], Source={x:Static loc:LocalizationService.Instance}}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource Brush.TextPrimary}" Margin="0,4,0,0" HorizontalAlignment="Center" TextAlignment="Center"/>
+                                    <TextBlock Text="{loc:T Det_WebView}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource Brush.TextPrimary}" Margin="0,4,0,0" HorizontalAlignment="Center" TextAlignment="Center"/>
                                 </StackPanel>
                             </Button>
                         </UniformGrid>
@@ -427,7 +427,7 @@
                                           IsChecked="{Binding IsOpen, ElementName=AvisosPopup, Mode=TwoWay}"
                                           IsHitTestVisible="{Binding IsOpen, ElementName=AvisosPopup, Converter={StaticResource InverseBool}}"
                                           ToolTip="{Binding ContadorProximoTooltip}"
-                                          AutomationProperties.Name="{Binding [Det_AvisosTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                          AutomationProperties.Name="{loc:T Det_AvisosTip}">
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                     <materialDesign:PackIcon Kind="TimerOutline" Width="13" Height="13" Foreground="{StaticResource Brush.WarningStrong}" VerticalAlignment="Center" Margin="0,0,5,0"/>
                                     <TextBlock Text="{Binding ContadorProximoTexto}" FontSize="11" Foreground="{StaticResource Brush.WarningSoft}" FontWeight="SemiBold" VerticalAlignment="Center"/>
@@ -440,31 +440,31 @@
                                    StaysOpen="False" AllowsTransparency="True" PopupAnimation="Fade">
                                 <Border Style="{StaticResource DetMenuCard}" Width="320" Padding="14">
                                     <StackPanel>
-                                        <TextBlock Text="{Binding [Det_AvisosTitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="13.5" FontWeight="Bold" Foreground="White" Margin="0,0,0,10"/>
+                                        <TextBlock Text="{loc:T Det_AvisosTitulo}" FontSize="13.5" FontWeight="Bold" Foreground="White" Margin="0,0,0,10"/>
 
                                         <Grid Margin="0,0,0,12">
                                             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                             <StackPanel Grid.Column="0" Margin="0,0,12,0">
-                                                <TextBlock Text="{Binding [Det_AvisosAvisarTitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="12.5" FontWeight="SemiBold" Foreground="{StaticResource Brush.TextPrimary}"/>
-                                                <TextBlock Text="{Binding [Det_AvisosAvisarDesc], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="11" Foreground="{StaticResource Brush.TextTertiary}" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                                <TextBlock Text="{loc:T Det_AvisosAvisarTitulo}" FontSize="12.5" FontWeight="SemiBold" Foreground="{StaticResource Brush.TextPrimary}"/>
+                                                <TextBlock Text="{loc:T Det_AvisosAvisarDesc}" FontSize="11" Foreground="{StaticResource Brush.TextTertiary}" TextWrapping="Wrap" Margin="0,2,0,0"/>
                                             </StackPanel>
                                             <ToggleButton Grid.Column="1" Style="{StaticResource MaterialDesignSwitchToggleButton}" VerticalAlignment="Center"
                                                           IsChecked="{Binding AvisarEpisodioNuevo, Mode=TwoWay}" Cursor="Hand"
-                                                          AutomationProperties.Name="{Binding [Det_AvisosAvisarTitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                                          AutomationProperties.Name="{loc:T Det_AvisosAvisarTitulo}"/>
                                         </Grid>
 
                                         <Grid>
                                             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                             <StackPanel Grid.Column="0" Margin="0,0,12,0">
-                                                <TextBlock Text="{Binding [Det_AvisosDescargarTitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="12.5" FontWeight="SemiBold" Foreground="{StaticResource Brush.TextPrimary}"/>
-                                                <TextBlock Text="{Binding [Det_AvisosDescargarDesc], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="11" Foreground="{StaticResource Brush.TextTertiary}" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                                <TextBlock Text="{loc:T Det_AvisosDescargarTitulo}" FontSize="12.5" FontWeight="SemiBold" Foreground="{StaticResource Brush.TextPrimary}"/>
+                                                <TextBlock Text="{loc:T Det_AvisosDescargarDesc}" FontSize="11" Foreground="{StaticResource Brush.TextTertiary}" TextWrapping="Wrap" Margin="0,2,0,0"/>
                                             </StackPanel>
                                             <ToggleButton Grid.Column="1" Style="{StaticResource MaterialDesignSwitchToggleButton}" VerticalAlignment="Center"
                                                           IsChecked="{Binding DescargarAutomaticamente, Mode=TwoWay}" Cursor="Hand"
-                                                          AutomationProperties.Name="{Binding [Det_AvisosDescargarTitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                                          AutomationProperties.Name="{loc:T Det_AvisosDescargarTitulo}"/>
                                         </Grid>
 
-                                        <TextBlock Text="{Binding [Det_AvisosNota], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="10.5" Foreground="{StaticResource Brush.IconMuted}" TextWrapping="Wrap" Margin="0,12,0,0"/>
+                                        <TextBlock Text="{loc:T Det_AvisosNota}" FontSize="10.5" Foreground="{StaticResource Brush.IconMuted}" TextWrapping="Wrap" Margin="0,12,0,0"/>
                                     </StackPanel>
                                 </Border>
                             </Popup>
@@ -501,17 +501,17 @@
                         <!-- Tráiler -->
                         <Button Command="{Binding AbrirTrailerCommand}" Style="{StaticResource DetChipButton}" Margin="0,0,8,6" VerticalAlignment="Center"
                                 Visibility="{Binding TieneTrailer, Converter={StaticResource BoolToVis}}"
-                                ToolTip="{Binding [Det_TrailerTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" AutomationProperties.Name="{Binding [Det_Trailer], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                ToolTip="{loc:T Det_TrailerTip}" AutomationProperties.Name="{loc:T Det_Trailer}">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                 <materialDesign:PackIcon Kind="PlayCircleOutline" Width="13" Height="13" Foreground="{StaticResource Brush.Accent}" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                                <TextBlock Text="{Binding [Det_Trailer], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="11" Foreground="{StaticResource Brush.AccentSoft}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                <TextBlock Text="{loc:T Det_Trailer}" FontSize="11" Foreground="{StaticResource Brush.AccentSoft}" FontWeight="SemiBold" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
 
                         <!-- Openings & Endings (AnimeThemes.moe) -->
                         <Button Command="{Binding Musica.ToggleMusicaCommand}" Style="{StaticResource DetChipButton}" Margin="0,0,8,6" VerticalAlignment="Center"
                                 Visibility="{Binding Musica.TieneTemasMusicales, Converter={StaticResource BoolToVis}}"
-                                ToolTip="{Binding [Det_MusicaTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" AutomationProperties.Name="{Binding [Det_Musica], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                ToolTip="{loc:T Det_MusicaTip}" AutomationProperties.Name="{loc:T Det_Musica}">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                 <!-- Con un tema sonando (aunque el panel esté cerrado) el icono pasa a un ecualizador -->
                                 <materialDesign:PackIcon Width="13" Height="13" Foreground="{StaticResource Brush.Music}" VerticalAlignment="Center" Margin="0,0,5,0">
@@ -526,10 +526,10 @@
                                         </Style>
                                     </materialDesign:PackIcon.Style>
                                 </materialDesign:PackIcon>
-                                <TextBlock Text="{Binding [Det_Musica], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="11" Foreground="{StaticResource Brush.MusicSoft}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                <TextBlock Text="{loc:T Det_Musica}" FontSize="11" Foreground="{StaticResource Brush.MusicSoft}" FontWeight="SemiBold" VerticalAlignment="Center"/>
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Visibility="{Binding Musica.MusicaSonando, Converter={StaticResource BoolToVis}}">
                                     <TextBlock Text=" · " FontSize="11" Foreground="{StaticResource Brush.Music}" VerticalAlignment="Center"/>
-                                    <TextBlock Text="{Binding [Det_MusicaSonando], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="11" Foreground="{StaticResource Brush.Music}" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{loc:T Det_MusicaSonando}" FontSize="11" Foreground="{StaticResource Brush.Music}" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </StackPanel>
                         </Button>
@@ -626,7 +626,7 @@
                                         Height="30" Padding="10,0" Margin="10,0,0,0">
                                     <StackPanel Orientation="Horizontal">
                                         <materialDesign:PackIcon Kind="DownloadOutline" Width="14" Height="14" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                                        <TextBlock Text="{Binding [Det_DescargarFaltantes], Source={x:Static loc:LocalizationService.Instance}}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="11"/>
+                                        <TextBlock Text="{loc:T Det_DescargarFaltantes}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="11"/>
                                     </StackPanel>
                                 </Button>
                             </Grid>
@@ -648,16 +648,16 @@
                                 <Button Grid.Column="2" Command="{Binding Episodios.DeshacerMarcadoCommand}"
                                         Style="{StaticResource MaterialDesignOutlinedButton}" BorderBrush="{StaticResource Brush.Accent}" Foreground="{StaticResource Brush.AccentSoft}"
                                         Height="28" Padding="10,0" Margin="10,0,0,0" Cursor="Hand"
-                                        AutomationProperties.Name="{Binding [Det_Deshacer], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                        AutomationProperties.Name="{loc:T Det_Deshacer}">
                                     <StackPanel Orientation="Horizontal">
                                         <materialDesign:PackIcon Kind="UndoVariant" Width="14" Height="14" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                                        <TextBlock Text="{Binding [Det_Deshacer], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="11"/>
+                                        <TextBlock Text="{loc:T Det_Deshacer}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="11"/>
                                     </StackPanel>
                                 </Button>
                                 <Button Grid.Column="3" Command="{Binding Episodios.OlvidarMarcadoAnteriorCommand}" Style="{StaticResource MaterialDesignToolButton}"
                                         Width="26" Height="26" Padding="0" Margin="4,0,0,0" Cursor="Hand"
-                                        ToolTip="{Binding [Det_DeshacerDescartar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                        AutomationProperties.Name="{Binding [Det_DeshacerDescartar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                        ToolTip="{loc:T Det_DeshacerDescartar}"
+                                        AutomationProperties.Name="{loc:T Det_DeshacerDescartar}">
                                     <materialDesign:PackIcon Kind="Close" Width="14" Height="14" Foreground="{StaticResource Brush.TextTertiary}"/>
                                 </Button>
                             </Grid>
@@ -686,27 +686,27 @@
                         <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                             <ComboBox ItemsSource="{Binding Episodios.OpcionesFiltro}" SelectedItem="{Binding Episodios.FiltroSeleccionado}"
                                       DisplayMemberPath="Texto"
-                                      AutomationProperties.Name="{Binding [Det_FiltroEpisodios], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                      AutomationProperties.Name="{loc:T Det_FiltroEpisodios}"
                                       Height="34" Margin="0,0,8,0"
                                       VerticalAlignment="Center"/>
 
                             <ToggleButton IsChecked="{Binding Episodios.OrdenAscendente}" Style="{StaticResource MaterialDesignActionToggleButton}"
                                           Content="{materialDesign:PackIcon Kind=SortDescending, Size=18}"
                                           materialDesign:ToggleButtonAssist.OnContent="{materialDesign:PackIcon Kind=SortAscending, Size=18}"
-                                          ToolTip="{Binding [Det_OrdenTip], Source={x:Static loc:LocalizationService.Instance}}" Width="34" Height="34" Background="{StaticResource Brush.SurfaceControl}" BorderBrush="{StaticResource Brush.BorderControl}" BorderThickness="1" Foreground="White"
-                                          AutomationProperties.Name="{Binding [Det_OrdenTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" />
+                                          ToolTip="{loc:T Det_OrdenTip}" Width="34" Height="34" Background="{StaticResource Brush.SurfaceControl}" BorderBrush="{StaticResource Brush.BorderControl}" BorderThickness="1" Foreground="White"
+                                          AutomationProperties.Name="{loc:T Det_OrdenTip}" />
 
                             <!-- IR A UN EPISODIO: solo en series largas (en One Piece no había forma de llegar al 600 sin recorrer la lista) -->
                             <Border Background="{StaticResource Brush.SurfaceControl}" BorderBrush="{StaticResource Brush.BorderControl}" BorderThickness="1" CornerRadius="10" Height="34" Margin="8,0,0,0" Padding="10,0"
                                     Visibility="{Binding Episodios.MostrarIrAEpisodio, Converter={StaticResource BoolToVis}}"
-                                    ToolTip="{Binding [Det_IrAEpisodioTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                    ToolTip="{loc:T Det_IrAEpisodioTip}">
                                 <TextBox x:Name="CajaIrAEpisodio" Width="72" BorderThickness="0" Background="Transparent" Padding="0"
                                          Foreground="White" FontSize="12" CaretBrush="{StaticResource Brush.Accent}" VerticalAlignment="Center" VerticalContentAlignment="Center"
                                          materialDesign:TextFieldAssist.DecorationVisibility="Hidden"
-                                         materialDesign:HintAssist.Hint="{Binding [Det_IrAEpisodio], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                         materialDesign:HintAssist.Hint="{loc:T Det_IrAEpisodio}"
                                          materialDesign:HintAssist.IsFloating="False"
                                          PreviewTextInput="CajaIrAEpisodio_PreviewTextInput" KeyDown="CajaIrAEpisodio_KeyDown"
-                                         AutomationProperties.Name="{Binding [Det_IrAEpisodioTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                         AutomationProperties.Name="{loc:T Det_IrAEpisodioTip}"/>
                             </Border>
                         </StackPanel>
 
@@ -718,11 +718,11 @@
                                 <ToggleButton x:Name="MarcarToggle" Style="{StaticResource DetToolToggle}" Width="104"
                                               IsChecked="{Binding IsOpen, ElementName=MarcarPopup, Mode=TwoWay}"
                                               IsHitTestVisible="{Binding IsOpen, ElementName=MarcarPopup, Converter={StaticResource InverseBool}}"
-                                              ToolTip="{Binding [Det_MarcarVistosTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                              AutomationProperties.Name="{Binding [Det_Marcar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                              ToolTip="{loc:T Det_MarcarVistosTip}"
+                                              AutomationProperties.Name="{loc:T Det_Marcar}">
                                     <StackPanel Orientation="Horizontal">
                                         <materialDesign:PackIcon Kind="CheckAll" Width="17" Height="17" VerticalAlignment="Center" Foreground="{StaticResource Brush.Success}" Margin="0,0,6,0"/>
-                                        <TextBlock Text="{Binding [Det_Marcar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{loc:T Det_Marcar}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
                                         <materialDesign:PackIcon Kind="ChevronDown" Width="15" Height="15" VerticalAlignment="Center" Margin="4,1,0,0"/>
                                     </StackPanel>
                                 </ToggleButton>
@@ -739,8 +739,8 @@
                                             </Grid.ColumnDefinitions>
                                             <materialDesign:PackIcon Grid.Column="0" Kind="CheckAll" Width="20" Height="20" Foreground="{StaticResource Brush.Success}" VerticalAlignment="Center" Margin="0,0,12,0"/>
                                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding [Det_MarcarComoVistos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource Brush.TextPrimary}"/>
-                                                <TextBlock Text="{Binding [Det_MarcarVistosTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="11" Foreground="{StaticResource Brush.TextTertiary}" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                                <TextBlock Text="{loc:T Det_MarcarComoVistos}" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource Brush.TextPrimary}"/>
+                                                <TextBlock Text="{loc:T Det_MarcarVistosTip}" FontSize="11" Foreground="{StaticResource Brush.TextTertiary}" TextWrapping="Wrap" Margin="0,2,0,0"/>
                                             </StackPanel>
                                         </Grid>
                                     </Button>
@@ -753,8 +753,8 @@
                                             </Grid.ColumnDefinitions>
                                             <materialDesign:PackIcon Grid.Column="0" Kind="EyeOffOutline" Width="20" Height="20" Foreground="{StaticResource Brush.Danger}" VerticalAlignment="Center" Margin="0,0,12,0"/>
                                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding [Det_MarcarComoNoVistos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource Brush.TextPrimary}"/>
-                                                <TextBlock Text="{Binding [Det_MarcarNoVistosTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="11" Foreground="{StaticResource Brush.TextTertiary}" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                                <TextBlock Text="{loc:T Det_MarcarComoNoVistos}" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource Brush.TextPrimary}"/>
+                                                <TextBlock Text="{loc:T Det_MarcarNoVistosTip}" FontSize="11" Foreground="{StaticResource Brush.TextTertiary}" TextWrapping="Wrap" Margin="0,2,0,0"/>
                                             </StackPanel>
                                         </Grid>
                                     </Button>
@@ -765,13 +765,13 @@
 
                             <!-- ACTUALIZAR desde AniList -->
                             <Button Command="{Binding ActualizarAnimeActualCommand}" Style="{StaticResource DetToolBtn}" Margin="0,0,6,0"
-                                    ToolTip="{Binding [Det_ActualizarTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" AutomationProperties.Name="{Binding [Det_Actualizar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                    ToolTip="{loc:T Det_ActualizarTip}" AutomationProperties.Name="{loc:T Det_Actualizar}">
                                 <materialDesign:PackIcon Kind="Refresh" Width="18" Height="18" Foreground="{StaticResource Brush.Accent}"/>
                             </Button>
 
                             <!-- CARPETA del anime -->
                             <Button Command="{Binding AbrirCarpetaAnimeCommand}" Style="{StaticResource DetToolBtn}" Margin="0,0,6,0"
-                                    ToolTip="{Binding [Det_CarpetaTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" AutomationProperties.Name="{Binding [Det_Carpeta], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                    ToolTip="{loc:T Det_CarpetaTip}" AutomationProperties.Name="{loc:T Det_Carpeta}">
                                 <materialDesign:PackIcon Kind="FolderOpenOutline" Width="18" Height="18" Foreground="{StaticResource Brush.Success}"/>
                             </Button>
 
@@ -780,7 +780,7 @@
                                 <ToggleButton x:Name="HerramientasToggle" Style="{StaticResource DetToolToggle}"
                                               IsChecked="{Binding IsOpen, ElementName=HerramientasPopup, Mode=TwoWay}"
                                               IsHitTestVisible="{Binding IsOpen, ElementName=HerramientasPopup, Converter={StaticResource InverseBool}}"
-                                              ToolTip="{Binding [Det_Herramientas], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" AutomationProperties.Name="{Binding [Det_Herramientas], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                              ToolTip="{loc:T Det_Herramientas}" AutomationProperties.Name="{loc:T Det_Herramientas}">
                                     <Grid>
                                         <materialDesign:PackIcon Kind="DotsHorizontal" Width="20" Height="20">
                                             <materialDesign:PackIcon.Style>
@@ -819,8 +819,8 @@
                                             </Grid.ColumnDefinitions>
                                             <materialDesign:PackIcon Grid.Column="0" Kind="Magnify" Width="20" Height="20" Foreground="{StaticResource Brush.Accent}" VerticalAlignment="Center" Margin="0,0,12,0"/>
                                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding [Det_DetectarOp], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource Brush.TextPrimary}"/>
-                                                <TextBlock Text="{Binding [Det_DetectarOpTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="11" Foreground="{StaticResource Brush.TextTertiary}" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                                <TextBlock Text="{loc:T Det_DetectarOp}" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource Brush.TextPrimary}"/>
+                                                <TextBlock Text="{loc:T Det_DetectarOpTip}" FontSize="11" Foreground="{StaticResource Brush.TextTertiary}" TextWrapping="Wrap" Margin="0,2,0,0"/>
                                             </StackPanel>
                                         </Grid>
                                     </Button>
@@ -833,8 +833,8 @@
                                             </Grid.ColumnDefinitions>
                                             <materialDesign:PackIcon Grid.Column="0" Kind="ShieldSearch" Width="20" Height="20" Foreground="{StaticResource Brush.WarningStrong}" VerticalAlignment="Center" Margin="0,0,12,0"/>
                                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding [Det_VerificarIntegridad], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource Brush.TextPrimary}"/>
-                                                <TextBlock Text="{Binding [Det_VerificarIntegridadDesc], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="11" Foreground="{StaticResource Brush.TextTertiary}" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                                <TextBlock Text="{loc:T Det_VerificarIntegridad}" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource Brush.TextPrimary}"/>
+                                                <TextBlock Text="{loc:T Det_VerificarIntegridadDesc}" FontSize="11" Foreground="{StaticResource Brush.TextTertiary}" TextWrapping="Wrap" Margin="0,2,0,0"/>
                                             </StackPanel>
                                         </Grid>
                                     </Button>
@@ -846,8 +846,8 @@
                                             </Grid.ColumnDefinitions>
                                             <materialDesign:PackIcon Grid.Column="0" Kind="ContentDuplicate" Width="20" Height="20" Foreground="{StaticResource Brush.WarningStrong}" VerticalAlignment="Center" Margin="0,0,12,0"/>
                                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding [Det_Duplicados], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource Brush.TextPrimary}"/>
-                                                <TextBlock Text="{Binding [Det_DuplicadosTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="11" Foreground="{StaticResource Brush.TextTertiary}" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                                <TextBlock Text="{loc:T Det_Duplicados}" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource Brush.TextPrimary}"/>
+                                                <TextBlock Text="{loc:T Det_DuplicadosTip}" FontSize="11" Foreground="{StaticResource Brush.TextTertiary}" TextWrapping="Wrap" Margin="0,2,0,0"/>
                                             </StackPanel>
                                         </Grid>
                                     </Button>
@@ -860,7 +860,7 @@
                                             </Grid.ColumnDefinitions>
                                             <materialDesign:PackIcon Grid.Column="0" Kind="DeleteSweepOutline" Width="20" Height="20" Foreground="{StaticResource Brush.Danger}" VerticalAlignment="Center" Margin="0,0,12,0"/>
                                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding [Det_LiberarEspacio], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource Brush.TextPrimary}"/>
+                                                <TextBlock Text="{loc:T Det_LiberarEspacio}" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource Brush.TextPrimary}"/>
                                                 <TextBlock Text="{Binding LiberarEspacioDescripcion}" FontSize="11" Foreground="{StaticResource Brush.TextTertiary}" TextWrapping="Wrap" Margin="0,2,0,0"/>
                                             </StackPanel>
                                         </Grid>
@@ -874,8 +874,8 @@
                                             </Grid.ColumnDefinitions>
                                             <materialDesign:PackIcon Grid.Column="0" Kind="TrashCanOutline" Width="20" Height="20" Foreground="{StaticResource Brush.Danger}" VerticalAlignment="Center" Margin="0,0,12,0"/>
                                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding [Bib_EliminarTitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource Brush.TextPrimary}"/>
-                                                <TextBlock Text="{Binding [Det_EliminarDeBibliotecaDesc], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="11" Foreground="{StaticResource Brush.TextTertiary}" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                                <TextBlock Text="{loc:T Bib_EliminarTitulo}" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource Brush.TextPrimary}"/>
+                                                <TextBlock Text="{loc:T Det_EliminarDeBibliotecaDesc}" FontSize="11" Foreground="{StaticResource Brush.TextTertiary}" TextWrapping="Wrap" Margin="0,2,0,0"/>
                                             </StackPanel>
                                         </Grid>
                                     </Button>
@@ -952,8 +952,8 @@
                                             <Button Command="{Binding DataContext.Episodios.AlternarFavoritoEpisodioCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                     CommandParameter="{Binding}"
                                                     Style="{StaticResource DetRowIconBtn}" Width="26" Height="26" Padding="0"
-                                                    ToolTip="{Binding [Det_FavoritoTip], Source={x:Static loc:LocalizationService.Instance}}"
-                                                    AutomationProperties.Name="{Binding [Det_FavoritoTip], Source={x:Static loc:LocalizationService.Instance}}">
+                                                    ToolTip="{loc:T Det_FavoritoTip}"
+                                                    AutomationProperties.Name="{loc:T Det_FavoritoTip}">
                                                 <materialDesign:PackIcon x:Name="IconoBookmark" Kind="BookmarkOutline" Foreground="#6B7280" Width="17" Height="17" VerticalAlignment="Center"/>
                                             </Button>
                                         </StackPanel>
@@ -991,11 +991,11 @@
                                             <!-- BADGE ARCHIVO CORRUPTO (Doctor de Integridad) -->
                                             <Border CornerRadius="4" Background="#3A1416" BorderBrush="{StaticResource Brush.Danger}" BorderThickness="1"
                                                     Padding="6,2" Margin="0,4,0,0" HorizontalAlignment="Left"
-                                                    ToolTip="{Binding [Det_ArchivoCorruptoTip], Source={x:Static loc:LocalizationService.Instance}}"
+                                                    ToolTip="{loc:T Det_ArchivoCorruptoTip}"
                                                     Visibility="{Binding EstaCorrupto, Converter={StaticResource BoolToVis}}">
                                                 <StackPanel Orientation="Horizontal">
                                                     <materialDesign:PackIcon Kind="AlertOctagonOutline" Width="11" Height="11" Foreground="{StaticResource Brush.Danger}" VerticalAlignment="Center" Margin="0,0,3,0"/>
-                                                    <TextBlock Text="{Binding [Det_ArchivoCorruptoBadge], Source={x:Static loc:LocalizationService.Instance}}" Foreground="#FCA5A5" FontSize="10" FontWeight="Medium"/>
+                                                    <TextBlock Text="{loc:T Det_ArchivoCorruptoBadge}" Foreground="#FCA5A5" FontSize="10" FontWeight="Medium"/>
                                                 </StackPanel>
                                             </Border>
                                         </StackPanel>
@@ -1013,8 +1013,8 @@
                                             <Button Command="{Binding DataContext.Episodios.ReproducirEpisodioCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                     CommandParameter="{Binding}"
                                                     Style="{StaticResource DetRowIconBtn}" Width="34" Height="34"
-                                                    ToolTip="{Binding [Act_Reproducir], Source={x:Static loc:LocalizationService.Instance}}"
-                                                    AutomationProperties.Name="{Binding [Act_Reproducir], Source={x:Static loc:LocalizationService.Instance}}"
+                                                    ToolTip="{loc:T Act_Reproducir}"
+                                                    AutomationProperties.Name="{loc:T Act_Reproducir}"
                                                     Visibility="{Binding Descargado, Converter={StaticResource BoolToVis}}"
                                                     Margin="0,0,4,0">
                                                 <materialDesign:PackIcon Kind="PlayCircle" Foreground="{StaticResource Brush.Accent}" Width="28" Height="28" VerticalAlignment="Center"/>
@@ -1023,15 +1023,15 @@
                                             <!-- 1b. DESCARGADO: ICONO QUE ABRE EL MENÚ DEL EPISODIO -->
                                             <Button Click="BotonEpisodioDescargado_Click"
                                                     Style="{StaticResource DetRowIconBtn}" Width="34" Height="34"
-                                                    ToolTip="{Binding [Det_OpcionesTip], Source={x:Static loc:LocalizationService.Instance}}"
-                                                    AutomationProperties.Name="{Binding [Det_OpcionesNombre], Source={x:Static loc:LocalizationService.Instance}}"
+                                                    ToolTip="{loc:T Det_OpcionesTip}"
+                                                    AutomationProperties.Name="{loc:T Det_OpcionesNombre}"
                                                     Visibility="{Binding Descargado, Converter={StaticResource BoolToVis}}">
                                                 <materialDesign:PackIcon Kind="CheckCircle" Foreground="#10B981" Width="24" Height="24" VerticalAlignment="Center"/>
                                             </Button>
 
                                             <!-- 2. DESCARGANDO O EN COLA -->
                                             <Grid Width="34" Height="34" VerticalAlignment="Center" HorizontalAlignment="Center"
-                                                  ToolTip="{Binding [Det_DescargandoTip], Source={x:Static loc:LocalizationService.Instance}}"
+                                                  ToolTip="{loc:T Det_DescargandoTip}"
                                                   Visibility="{Binding IsDownloading, Converter={StaticResource BoolToVis}}">
                                                 
                                                 <Ellipse Width="24" Height="24" Stroke="{StaticResource Brush.RingBase}" StrokeThickness="3" 
@@ -1057,7 +1057,7 @@
                                             <Button Command="{Binding DataContext.Episodios.DescargarEpisodioCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                     CommandParameter="{Binding}"
                                                     Width="34" Height="34"
-                                                    ToolTip="{Binding [Det_DescargarEpisodioTip], Source={x:Static loc:LocalizationService.Instance}}">
+                                                    ToolTip="{loc:T Det_DescargarEpisodioTip}">
                                                 <Button.Style>
                                                     <Style TargetType="Button" BasedOn="{StaticResource DetRowIconBtn}">
                                                         <Setter Property="Visibility" Value="Visible"/>
@@ -1078,8 +1078,8 @@
                                             <Button Command="{Binding DataContext.Episodios.ElegirTorrentManualCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                     CommandParameter="{Binding}"
                                                     Width="34" Height="34"
-                                                    ToolTip="{Binding [Det_ElegirTorrentTip], Source={x:Static loc:LocalizationService.Instance}}"
-                                                    AutomationProperties.Name="{Binding [Det_ElegirTorrentTip], Source={x:Static loc:LocalizationService.Instance}}"
+                                                    ToolTip="{loc:T Det_ElegirTorrentTip}"
+                                                    AutomationProperties.Name="{loc:T Det_ElegirTorrentTip}"
                                                     Cursor="Hand">
                                                 <Button.Style>
                                                     <Style TargetType="Button" BasedOn="{StaticResource DetRowIconBtn}">

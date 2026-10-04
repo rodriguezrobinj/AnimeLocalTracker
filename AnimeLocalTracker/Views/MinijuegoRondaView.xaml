@@ -67,10 +67,10 @@
                     Visibility="{Binding HaRespondido, Converter={StaticResource InverseBoolToVis}}">
             <Button Command="{Binding PedirPistaCommand}" Style="{StaticResource MiniBotonSecundario}"
                     IsEnabled="{Binding PuedePedirPista}"
-                    AutomationProperties.Name="{Binding [Mini_PedirPista], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                    AutomationProperties.Name="{loc:T Mini_PedirPista}">
                 <StackPanel Orientation="Horizontal">
                     <materialDesign:PackIcon Kind="LightbulbOnOutline" Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                    <TextBlock Text="{Binding [Mini_PedirPista], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" VerticalAlignment="Center"/>
+                    <TextBlock Text="{loc:T Mini_PedirPista}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
             <TextBlock Text="{Binding PuntosPosiblesTexto}" Style="{StaticResource AppText.Caption}" VerticalAlignment="Center" Margin="14,0,0,0"/>
@@ -116,9 +116,9 @@
 
         <!-- Abandonar: antes la única forma de empezar otra partida era terminar las 10 rondas. Una partida abandonada no se guarda. -->
         <Button Command="{Binding VolverAlInicioCommand}" Style="{StaticResource MiniBotonSecundario}" HorizontalAlignment="Left" Margin="0,14,0,0"
-                ToolTip="{Binding [Mini_AbandonarTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                AutomationProperties.Name="{Binding [Mini_Abandonar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
-            <TextBlock Text="{Binding [Mini_Abandonar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                ToolTip="{loc:T Mini_AbandonarTip}"
+                AutomationProperties.Name="{loc:T Mini_Abandonar}">
+            <TextBlock Text="{loc:T Mini_Abandonar}"/>
         </Button>
     </StackPanel>
 </UserControl>

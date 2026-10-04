@@ -69,10 +69,7 @@ public sealed partial class MinijuegosViewModel : ObservableObject
             // Un juego abierto (sin partida en marcha) recuenta ya con qué animes puede jugar.
             if (JuegoActivo != null) await JuegoActivo.PrepararAsync();
 
-            var config = _settings?.ObtenerConfiguracion();
-            if (config == null) return;
-            config.MinijuegosSoloVistos = valor;
-            await _settings!.GuardarConfiguracionAsync(config);
+            if (_settings != null) await _settings.ActualizarAsync(c => c.MinijuegosSoloVistos = valor);
         }
         catch (Exception ex)
         {

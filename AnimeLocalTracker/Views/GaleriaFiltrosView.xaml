@@ -34,7 +34,7 @@
                     
                     <TextBox Grid.Column="1" 
                              Text="{Binding TextoBusqueda, UpdateSourceTrigger=PropertyChanged}"
-                             materialDesign:HintAssist.Hint="{Binding [Gal_BuscarHint], Source={x:Static loc:LocalizationService.Instance}}"
+                             materialDesign:HintAssist.Hint="{loc:T Gal_BuscarHint}"
                              materialDesign:HintAssist.IsFloating="False"
                              materialDesign:TextFieldAssist.DecorationVisibility="Hidden"
                              materialDesign:TextFieldAssist.HasClearButton="True"
@@ -50,8 +50,8 @@
             <!-- Botón Desplegable de Filtros y Ordenación -->
             <ToggleButton Grid.Column="1" IsChecked="{Binding PanelFiltrosVisible}"
                           Height="44" Padding="14,0" Cursor="Hand" VerticalAlignment="Center"
-                          ToolTip="{Binding [Gal_FiltrosTip], Source={x:Static loc:LocalizationService.Instance}}"
-                          AutomationProperties.Name="{Binding [Gal_Filtros], Source={x:Static loc:LocalizationService.Instance}}">
+                          ToolTip="{loc:T Gal_FiltrosTip}"
+                          AutomationProperties.Name="{loc:T Gal_Filtros}">
                 <ToggleButton.Style>
                     <Style TargetType="ToggleButton" BasedOn="{StaticResource MaterialDesignOutlinedButton}">
                         <Setter Property="BorderBrush" Value="{DynamicResource Brush.BorderStrong}"/>
@@ -72,7 +72,7 @@
                 </ToggleButton.Style>
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                     <materialDesign:PackIcon Kind="TuneVariant" Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                    <TextBlock Text="{Binding [Gal_Filtros], Source={x:Static loc:LocalizationService.Instance}}" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    <TextBlock Text="{loc:T Gal_Filtros}" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
                     
                     <!-- Badge de conteo de filtros activos -->
                     <Border Background="{DynamicResource Brush.AccentStrong}" CornerRadius="9" Height="18" MinWidth="18" Padding="5,0" Margin="8,0,0,0"
@@ -84,32 +84,32 @@
 
             <!-- Chips de Estado a la derecha (WrapPanel: baja a una 2ª línea en vez de solaparse/recortarse con ventanas angostas) -->
             <WrapPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                <RadioButton Content="{Binding [Hist_FiltroTodos], Source={x:Static loc:LocalizationService.Instance}}" Margin="0,0,6,4" IsChecked="{Binding EsFiltroTodos, Mode=OneWay}" GroupName="FiltroEstado"
+                <RadioButton Content="{loc:T Hist_FiltroTodos}" Margin="0,0,6,4" IsChecked="{Binding EsFiltroTodos, Mode=OneWay}" GroupName="FiltroEstado"
                              Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="Todos"
                              Style="{StaticResource MaterialDesignTabRadioButton}"
                              Height="34" Padding="14,0" FontSize="13" FontWeight="SemiBold"/>
 
-                <RadioButton Content="{Binding [Gal_FiltroViendo], Source={x:Static loc:LocalizationService.Instance}}" Margin="0,0,6,4" IsChecked="{Binding EsFiltroViendo, Mode=OneWay}" GroupName="FiltroEstado"
+                <RadioButton Content="{loc:T Gal_FiltroViendo}" Margin="0,0,6,4" IsChecked="{Binding EsFiltroViendo, Mode=OneWay}" GroupName="FiltroEstado"
                              Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="Viendo"
                              Style="{StaticResource MaterialDesignTabRadioButton}"
                              Height="34" Padding="14,0" FontSize="13" FontWeight="SemiBold"/>
 
-                <RadioButton Content="{Binding [Hist_FiltroCompletados], Source={x:Static loc:LocalizationService.Instance}}" Margin="0,0,6,4" IsChecked="{Binding EsFiltroCompletados, Mode=OneWay}" GroupName="FiltroEstado"
+                <RadioButton Content="{loc:T Hist_FiltroCompletados}" Margin="0,0,6,4" IsChecked="{Binding EsFiltroCompletados, Mode=OneWay}" GroupName="FiltroEstado"
                              Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="Completados"
                              Style="{StaticResource MaterialDesignTabRadioButton}"
                              Height="34" Padding="14,0" FontSize="13" FontWeight="SemiBold"/>
 
-                <RadioButton Content="{Binding [Gal_FiltroPlaneando], Source={x:Static loc:LocalizationService.Instance}}" Margin="0,0,6,4" IsChecked="{Binding EsFiltroPlaneando, Mode=OneWay}" GroupName="FiltroEstado"
+                <RadioButton Content="{loc:T Gal_FiltroPlaneando}" Margin="0,0,6,4" IsChecked="{Binding EsFiltroPlaneando, Mode=OneWay}" GroupName="FiltroEstado"
                              Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="Planeando"
                              Style="{StaticResource MaterialDesignTabRadioButton}"
                              Height="34" Padding="14,0" FontSize="13" FontWeight="SemiBold"/>
 
-                <RadioButton Content="{Binding [Gal_FiltroEnPausa], Source={x:Static loc:LocalizationService.Instance}}" Margin="0,0,6,4" IsChecked="{Binding EsFiltroEnPausa, Mode=OneWay}" GroupName="FiltroEstado"
+                <RadioButton Content="{loc:T Gal_FiltroEnPausa}" Margin="0,0,6,4" IsChecked="{Binding EsFiltroEnPausa, Mode=OneWay}" GroupName="FiltroEstado"
                              Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="EnPausa"
                              Style="{StaticResource MaterialDesignTabRadioButton}"
                              Height="34" Padding="14,0" FontSize="13" FontWeight="SemiBold"/>
 
-                <RadioButton Content="{Binding [Gal_FiltroAbandonados], Source={x:Static loc:LocalizationService.Instance}}" Margin="0,0,0,4" IsChecked="{Binding EsFiltroAbandonados, Mode=OneWay}" GroupName="FiltroEstado"
+                <RadioButton Content="{loc:T Gal_FiltroAbandonados}" Margin="0,0,0,4" IsChecked="{Binding EsFiltroAbandonados, Mode=OneWay}" GroupName="FiltroEstado"
                              Command="{Binding CambiarFiltroEstadoCommand}" CommandParameter="Abandonados"
                              Style="{StaticResource MaterialDesignTabRadioButton}"
                              Height="34" Padding="14,0" FontSize="13" FontWeight="SemiBold"/>
@@ -153,7 +153,7 @@
                     <!-- Selector de Temporada: el valor es el código de AniList (WINTER…); la plantilla lo traduce al mostrarlo -->
                     <ComboBox ItemsSource="{Binding TemporadasDisponibles}"
                               SelectedItem="{Binding TemporadaSeleccionada}"
-                              ToolTip="{Binding [Gal_TemporadaTip], Source={x:Static loc:LocalizationService.Instance}}"
+                              ToolTip="{loc:T Gal_TemporadaTip}"
                               Height="36" Margin="0,0,10,4"
                               VerticalAlignment="Center">
                         <ComboBox.ItemTemplate>
@@ -166,7 +166,7 @@
                     <!-- Selector de Año -->
                     <ComboBox ItemsSource="{Binding AniosDisponibles}"
                               SelectedItem="{Binding AnioSeleccionado}"
-                              ToolTip="{Binding [Gal_AnioTip], Source={x:Static loc:LocalizationService.Instance}}"
+                              ToolTip="{loc:T Gal_AnioTip}"
                               Height="36" Margin="0,0,10,4"
                               VerticalAlignment="Center"/>
 
@@ -179,7 +179,7 @@
                     <!-- Toggle: Solo con episodios pendientes -->
                     <ToggleButton IsChecked="{Binding SoloConEpisodiosPendientes}"
                                   Height="36" Margin="0,0,8,0" Padding="12,0"
-                                  ToolTip="{Binding [Gal_SoloPendientesTip], Source={x:Static loc:LocalizationService.Instance}}"
+                                  ToolTip="{loc:T Gal_SoloPendientesTip}"
                                   Cursor="Hand">
                         <ToggleButton.Style>
                             <Style TargetType="ToggleButton" BasedOn="{StaticResource MaterialDesignOutlinedButton}">
@@ -197,14 +197,14 @@
                         </ToggleButton.Style>
                         <StackPanel Orientation="Horizontal">
                             <materialDesign:PackIcon Kind="ClockAlertOutline" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding [Gal_Pendientes], Source={x:Static loc:LocalizationService.Instance}}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            <TextBlock Text="{loc:T Gal_Pendientes}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
                         </StackPanel>
                     </ToggleButton>
 
                     <!-- Toggle: Solo con carpeta local asociada -->
                     <ToggleButton IsChecked="{Binding SoloConCarpetaLocal}"
                                   Height="36" Margin="0,0,8,0" Padding="12,0"
-                                  ToolTip="{Binding [Gal_SoloCarpetaTip], Source={x:Static loc:LocalizationService.Instance}}"
+                                  ToolTip="{loc:T Gal_SoloCarpetaTip}"
                                   Cursor="Hand">
                         <ToggleButton.Style>
                             <Style TargetType="ToggleButton" BasedOn="{StaticResource MaterialDesignOutlinedButton}">
@@ -222,14 +222,14 @@
                         </ToggleButton.Style>
                         <StackPanel Orientation="Horizontal">
                             <materialDesign:PackIcon Kind="FolderCheckOutline" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding [Gal_ConCarpetaLocal], Source={x:Static loc:LocalizationService.Instance}}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            <TextBlock Text="{loc:T Gal_ConCarpetaLocal}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
                         </StackPanel>
                     </ToggleButton>
 
                     <!-- Toggle: Solo favoritos (favorito individual por anime, no un estado) -->
                     <ToggleButton IsChecked="{Binding SoloFavoritos}"
                                   Height="36" Margin="0,0,8,4" Padding="12,0"
-                                  ToolTip="{Binding [Gal_SoloFavoritosTip], Source={x:Static loc:LocalizationService.Instance}}"
+                                  ToolTip="{loc:T Gal_SoloFavoritosTip}"
                                   Cursor="Hand">
                         <ToggleButton.Style>
                             <Style TargetType="ToggleButton" BasedOn="{StaticResource MaterialDesignOutlinedButton}">
@@ -247,7 +247,7 @@
                         </ToggleButton.Style>
                         <StackPanel Orientation="Horizontal">
                             <materialDesign:PackIcon Kind="Heart" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding [Gal_Favoritos], Source={x:Static loc:LocalizationService.Instance}}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            <TextBlock Text="{loc:T Gal_Favoritos}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
                         </StackPanel>
                     </ToggleButton>
 
@@ -257,10 +257,10 @@
                             Style="{StaticResource MaterialDesignFlatButton}"
                             Foreground="{DynamicResource Brush.Rose}"
                             Height="36" Padding="10,0" Margin="0,0,10,4"
-                            ToolTip="{Binding [Gal_LimpiarFiltrosTip], Source={x:Static loc:LocalizationService.Instance}}">
+                            ToolTip="{loc:T Gal_LimpiarFiltrosTip}">
                         <StackPanel Orientation="Horizontal">
                             <materialDesign:PackIcon Kind="FilterRemoveOutline" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding [Gal_LimpiarFiltros], Source={x:Static loc:LocalizationService.Instance}}" FontSize="12" FontWeight="Bold" VerticalAlignment="Center"/>
+                            <TextBlock Text="{loc:T Gal_LimpiarFiltros}" FontSize="12" FontWeight="Bold" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
                 </WrapPanel>

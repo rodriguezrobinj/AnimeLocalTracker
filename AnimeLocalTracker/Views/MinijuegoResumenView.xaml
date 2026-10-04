@@ -20,7 +20,7 @@
             <Border Background="{DynamicResource Brush.WarningTint}" CornerRadius="32" Width="64" Height="64" Margin="0,0,0,16" HorizontalAlignment="Center">
                 <materialDesign:PackIcon Kind="TrophyAward" Foreground="{DynamicResource Brush.Warning}" Width="34" Height="34" HorizontalAlignment="Center" VerticalAlignment="Center"/>
             </Border>
-            <TextBlock Text="{Binding [Mini_ResumenTitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.Section}" HorizontalAlignment="Center"/>
+            <TextBlock Text="{loc:T Mini_ResumenTitulo}" Style="{StaticResource AppText.Section}" HorizontalAlignment="Center"/>
             <TextBlock Text="{Binding ResumenPuntosTexto}" FontSize="32" FontWeight="Bold" Foreground="{DynamicResource Brush.Warning}" HorizontalAlignment="Center" Margin="0,10,0,0"/>
             <TextBlock Text="{Binding ResumenAciertosTexto}" Style="{StaticResource AppText.Secondary}" HorizontalAlignment="Center" Margin="0,4,0,12"/>
 
@@ -30,7 +30,7 @@
                         Visibility="{Binding EsNuevoRecord, Converter={StaticResource BoolToVis}}">
                     <StackPanel Orientation="Horizontal">
                         <materialDesign:PackIcon Kind="StarCircle" Foreground="{DynamicResource Brush.Warning}" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                        <TextBlock Text="{Binding [Mini_NuevoRecord], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                        <TextBlock Text="{loc:T Mini_NuevoRecord}"
                                    Style="{StaticResource AppText.Micro}" Foreground="{DynamicResource Brush.Warning}" VerticalAlignment="Center"/>
                     </StackPanel>
                 </Border>
@@ -38,7 +38,7 @@
             </StackPanel>
 
             <!-- Ronda a ronda: cuál era la respuesta y si se acertó (10 filas como mucho: un ItemsControl basta) -->
-            <TextBlock Text="{Binding [Mini_ResumenRondas], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+            <TextBlock Text="{loc:T Mini_ResumenRondas}"
                        Style="{StaticResource AppText.Micro}" Foreground="{DynamicResource Brush.TextTertiary}" Margin="0,0,0,6"/>
             <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="210" Margin="0,0,0,22" Width="420">
                 <ItemsControl ItemsSource="{Binding ResumenRondas}">
@@ -69,12 +69,12 @@
             </ScrollViewer>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                 <Button Command="{Binding IniciarPartidaCommand}" Style="{StaticResource MiniBotonPrincipal}" Margin="0,0,10,0"
-                        AutomationProperties.Name="{Binding [Mini_JugarDeNuevo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
-                    <TextBlock Text="{Binding [Mini_JugarDeNuevo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                        AutomationProperties.Name="{loc:T Mini_JugarDeNuevo}">
+                    <TextBlock Text="{loc:T Mini_JugarDeNuevo}"/>
                 </Button>
                 <Button Command="{Binding VolverAlInicioCommand}" Style="{StaticResource MiniBotonSecundario}"
-                        AutomationProperties.Name="{Binding [Mini_Volver], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
-                    <TextBlock Text="{Binding [Mini_Volver], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                        AutomationProperties.Name="{loc:T Mini_Volver}">
+                    <TextBlock Text="{loc:T Mini_Volver}"/>
                 </Button>
             </StackPanel>
         </StackPanel>

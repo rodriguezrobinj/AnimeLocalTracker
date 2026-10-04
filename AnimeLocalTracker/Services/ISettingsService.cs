@@ -31,3 +31,19 @@ public interface ISettingsService
     /// </summary>
     event Action<AppSettings>? ConfiguracionModificada;
 }
+
+public static class SettingsServiceExtensions
+{
+    /// <summary>
+    /// Cambia una o varias preferencias y las guarda: lee los ajustes, aplica <paramref name="cambio"/> y los escribe en disco.
+    /// No hace nada si todavía no hay ajustes cargados. Es el gesto que antes se repetía a mano en cada ViewModel.
+    /// </summary>
+    public static Task ActualizarAsync(this ISettingsService ajustes, Action<AppSettings> cambio)
+    {
+        var config = ajustes.ObtenerConfiguracion();
+        if (config == null) return Task.CompletedTask;
+
+        cambio(config);
+        return ajustes.GuardarConfiguracionAsync(config);
+    }
+}

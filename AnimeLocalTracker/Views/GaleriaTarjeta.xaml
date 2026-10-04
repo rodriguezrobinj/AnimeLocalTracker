@@ -77,7 +77,7 @@
                 </Setter>
             </Style>
         </ContextMenu.Resources>
-        <MenuItem Header="{Binding [Gal_MarcarFavorito], Source={x:Static loc:LocalizationService.Instance}}"
+        <MenuItem Header="{loc:T Gal_MarcarFavorito}"
                   Command="{Binding PlacementTarget.Tag.AlternarFavoritoCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                   CommandParameter="{Binding}"
                   Visibility="{Binding EsFavorito, Converter={StaticResource InverseBoolToVis}}">
@@ -85,7 +85,7 @@
                 <materialDesign:PackIcon Kind="HeartOutline" Foreground="{DynamicResource Brush.Rose}" Width="16" Height="16"/>
             </MenuItem.Icon>
         </MenuItem>
-        <MenuItem Header="{Binding [Gal_QuitarFavorito], Source={x:Static loc:LocalizationService.Instance}}"
+        <MenuItem Header="{loc:T Gal_QuitarFavorito}"
                   Command="{Binding PlacementTarget.Tag.AlternarFavoritoCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                   CommandParameter="{Binding}"
                   Visibility="{Binding EsFavorito, Converter={StaticResource BoolToVis}}">
@@ -94,7 +94,7 @@
             </MenuItem.Icon>
         </MenuItem>
         <Separator/>
-        <MenuItem Header="{Binding [Gal_EliminarAnime], Source={x:Static loc:LocalizationService.Instance}}"
+        <MenuItem Header="{loc:T Gal_EliminarAnime}"
                   Command="{Binding PlacementTarget.Tag.EliminarAnimeCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                   CommandParameter="{Binding}">
             <MenuItem.Icon>
@@ -273,16 +273,16 @@
                         <Button.Style>
                             <Style TargetType="Button">
                                 <Setter Property="Visibility" Value="Collapsed"/>
-                                <Setter Property="ToolTip" Value="{Binding [Gal_MarcarFavorito], Source={x:Static loc:LocalizationService.Instance}}"/>
-                                <Setter Property="AutomationProperties.Name" Value="{Binding [Gal_MarcarFavorito], Source={x:Static loc:LocalizationService.Instance}}"/>
+                                <Setter Property="ToolTip" Value="{loc:T Gal_MarcarFavorito}"/>
+                                <Setter Property="AutomationProperties.Name" Value="{loc:T Gal_MarcarFavorito}"/>
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=materialDesign:Card}}" Value="True">
                                         <Setter Property="Visibility" Value="Visible"/>
                                     </DataTrigger>
                                     <DataTrigger Binding="{Binding EsFavorito}" Value="True">
                                         <Setter Property="Visibility" Value="Visible"/>
-                                        <Setter Property="ToolTip" Value="{Binding [Gal_QuitarFavorito], Source={x:Static loc:LocalizationService.Instance}}"/>
-                                        <Setter Property="AutomationProperties.Name" Value="{Binding [Gal_QuitarFavorito], Source={x:Static loc:LocalizationService.Instance}}"/>
+                                        <Setter Property="ToolTip" Value="{loc:T Gal_QuitarFavorito}"/>
+                                        <Setter Property="AutomationProperties.Name" Value="{loc:T Gal_QuitarFavorito}"/>
                                     </DataTrigger>
                                     <!-- En modo selección un clic en la tarjeta la marca: el corazón no debe interceptarlo -->
                                     <DataTrigger Binding="{Binding DataContext.ModoSeleccion, RelativeSource={RelativeSource AncestorType=ListBox}}" Value="True">

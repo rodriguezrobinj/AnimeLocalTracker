@@ -62,6 +62,11 @@ public sealed class WpfHostFixture : IDisposable
                 app.Resources["AppPrimaryButton"] = new Style(typeof(Button));
                 app.Resources["AppPageRoot"] = new Style(typeof(Grid));
                 app.Resources["AppPageMargen"] = new Style(typeof(Grid));
+                app.Resources["Anim.Rapida"] = new Duration(TimeSpan.FromSeconds(0.12));
+                app.Resources["Anim.Normal"] = new Duration(TimeSpan.FromSeconds(0.2));
+                app.Resources["Anim.Suave"] = new System.Windows.Media.Animation.CubicEase { EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut };
+                app.Resources["Anim.SuaveEntrada"] = new System.Windows.Media.Animation.CubicEase { EasingMode = System.Windows.Media.Animation.EasingMode.EaseIn };
+                app.Resources["Anim.SuaveFuerte"] = new System.Windows.Media.Animation.QuarticEase { EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut };
                 app.Resources["AppChipFiltro"] = new Style(typeof(Button));
                 app.Resources["AppFilaTransparente"] = new Style(typeof(ListBoxItem));
                 app.Resources["AppFilaTransparenteSinFoco"] = new Style(typeof(ListBoxItem));

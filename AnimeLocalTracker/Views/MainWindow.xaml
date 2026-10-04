@@ -5,7 +5,7 @@
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         xmlns:loc="clr-namespace:AnimeLocalTracker.Services"
         xmlns:controls="clr-namespace:AnimeLocalTracker.Controls"
-        Title="{Binding [Win_Titulo], Source={x:Static loc:LocalizationService.Instance}}"
+        Title="{loc:T Win_Titulo}"
         Icon="/Resources/app.ico"
         Height="700" Width="1100"
         WindowStartupLocation="CenterScreen"
@@ -72,7 +72,7 @@
                             <Grid Margin="0,8">
                                 <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="{StaticResource Brush.Accent}" HorizontalAlignment="Left" Margin="-9,0,0,0"
                                            Visibility="{Binding Navigation.EsGaleriaActiva, Converter={StaticResource BoolToVis}}"/>
-                                <Button Command="{Binding NavegarGaleriaCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{Binding [Nav_Galeria], Source={x:Static loc:LocalizationService.Instance}}" AutomationProperties.Name="{Binding [Nav_Galeria], Source={x:Static loc:LocalizationService.Instance}}" TabIndex="1">
+                                <Button Command="{Binding NavegarGaleriaCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{loc:T Nav_Galeria}" AutomationProperties.Name="{loc:T Nav_Galeria}" TabIndex="1">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
                                             <Setter Property="Background" Value="Transparent"/>
@@ -105,7 +105,7 @@
                             <Grid Margin="0,8">
                                 <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="{StaticResource Brush.Accent}" HorizontalAlignment="Left" Margin="-9,0,0,0"
                                            Visibility="{Binding Navigation.EsHistorialActivo, Converter={StaticResource BoolToVis}}"/>
-                                <Button Command="{Binding NavegarHistorialCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{Binding [Nav_Historial], Source={x:Static loc:LocalizationService.Instance}}" AutomationProperties.Name="{Binding [Nav_Historial], Source={x:Static loc:LocalizationService.Instance}}" TabIndex="2">
+                                <Button Command="{Binding NavegarHistorialCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{loc:T Nav_Historial}" AutomationProperties.Name="{loc:T Nav_Historial}" TabIndex="2">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
                                             <Setter Property="Background" Value="Transparent"/>
@@ -138,7 +138,7 @@
                             <Grid Margin="0,8">
                                 <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="{StaticResource Brush.Accent}" HorizontalAlignment="Left" Margin="-9,0,0,0"
                                            Visibility="{Binding Navigation.EsActualizacionesActivo, Converter={StaticResource BoolToVis}}"/>
-                                <Button Command="{Binding NavegarActualizacionesCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{Binding [Nav_Actualizaciones], Source={x:Static loc:LocalizationService.Instance}}" AutomationProperties.Name="{Binding [Nav_Actualizaciones], Source={x:Static loc:LocalizationService.Instance}}" TabIndex="3">
+                                <Button Command="{Binding NavegarActualizacionesCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{loc:T Nav_Actualizaciones}" AutomationProperties.Name="{loc:T Nav_Actualizaciones}" TabIndex="3">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
                                             <Setter Property="Background" Value="Transparent"/>
@@ -171,7 +171,7 @@
                             <Grid Margin="0,8">
                                 <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="{StaticResource Brush.Accent}" HorizontalAlignment="Left" Margin="-9,0,0,0"
                                            Visibility="{Binding Navigation.EsAgregarAnimeActivo, Converter={StaticResource BoolToVis}}"/>
-                                <Button Command="{Binding NavegarAgregarAnimeCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{Binding [Nav_Agregar], Source={x:Static loc:LocalizationService.Instance}}" AutomationProperties.Name="{Binding [Nav_Agregar], Source={x:Static loc:LocalizationService.Instance}}" TabIndex="4">
+                                <Button Command="{Binding NavegarAgregarAnimeCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{loc:T Nav_Agregar}" AutomationProperties.Name="{loc:T Nav_Agregar}" TabIndex="4">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
                                             <Setter Property="Background" Value="Transparent"/>
@@ -204,7 +204,7 @@
                             <Grid Margin="0,8">
                                 <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="{StaticResource Brush.Accent}" HorizontalAlignment="Left" Margin="-9,0,0,0"
                                            Visibility="{Binding Navigation.EsCalendarioActivo, Converter={StaticResource BoolToVis}}"/>
-                                <Button Command="{Binding NavegarCalendarioCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{Binding [Nav_Calendario], Source={x:Static loc:LocalizationService.Instance}}" AutomationProperties.Name="{Binding [Nav_Calendario], Source={x:Static loc:LocalizationService.Instance}}" TabIndex="5">
+                                <Button Command="{Binding NavegarCalendarioCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{loc:T Nav_Calendario}" AutomationProperties.Name="{loc:T Nav_Calendario}" TabIndex="5">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
                                             <Setter Property="Background" Value="Transparent"/>
@@ -237,7 +237,7 @@
                             <Grid Margin="0,8">
                                 <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="{StaticResource Brush.Accent}" HorizontalAlignment="Left" Margin="-9,0,0,0"
                                            Visibility="{Binding Navigation.EsEstadisticasActivo, Converter={StaticResource BoolToVis}}"/>
-                                <Button Command="{Binding NavegarEstadisticasCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{Binding [Nav_Estadisticas], Source={x:Static loc:LocalizationService.Instance}}" AutomationProperties.Name="{Binding [Nav_Estadisticas], Source={x:Static loc:LocalizationService.Instance}}" TabIndex="6">
+                                <Button Command="{Binding NavegarEstadisticasCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{loc:T Nav_Estadisticas}" AutomationProperties.Name="{loc:T Nav_Estadisticas}" TabIndex="6">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
                                             <Setter Property="Background" Value="Transparent"/>
@@ -270,7 +270,7 @@
                             <Grid Margin="0,8">
                                 <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="{StaticResource Brush.Accent}" HorizontalAlignment="Left" Margin="-9,0,0,0"
                                            Visibility="{Binding Navigation.EsLogrosActivo, Converter={StaticResource BoolToVis}}"/>
-                                <Button Command="{Binding NavegarLogrosCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{Binding [Nav_Logros], Source={x:Static loc:LocalizationService.Instance}}" AutomationProperties.Name="{Binding [Nav_Logros], Source={x:Static loc:LocalizationService.Instance}}" TabIndex="7">
+                                <Button Command="{Binding NavegarLogrosCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{loc:T Nav_Logros}" AutomationProperties.Name="{loc:T Nav_Logros}" TabIndex="7">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
                                             <Setter Property="Background" Value="Transparent"/>
@@ -303,7 +303,7 @@
                             <Grid Margin="0,8">
                                 <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="{StaticResource Brush.Accent}" HorizontalAlignment="Left" Margin="-9,0,0,0"
                                            Visibility="{Binding Navigation.EsDescargasActivas, Converter={StaticResource BoolToVis}}"/>
-                                <Button Command="{Binding NavegarDescargasCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{Binding [Nav_Descargas], Source={x:Static loc:LocalizationService.Instance}}" AutomationProperties.Name="{Binding [Nav_Descargas], Source={x:Static loc:LocalizationService.Instance}}" TabIndex="8">
+                                <Button Command="{Binding NavegarDescargasCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{loc:T Nav_Descargas}" AutomationProperties.Name="{loc:T Nav_Descargas}" TabIndex="8">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
                                             <Setter Property="Background" Value="Transparent"/>
@@ -354,7 +354,7 @@
                             <Grid Margin="0,4">
                                 <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="{StaticResource Brush.Accent}" HorizontalAlignment="Left" Margin="-9,0,0,0"
                                            Visibility="{Binding Navigation.EsConfiguracionActiva, Converter={StaticResource BoolToVis}}"/>
-                                <Button Command="{Binding NavegarConfiguracionCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{Binding [Nav_Configuracion], Source={x:Static loc:LocalizationService.Instance}}" AutomationProperties.Name="{Binding [Nav_Configuracion], Source={x:Static loc:LocalizationService.Instance}}" TabIndex="9">
+                                <Button Command="{Binding NavegarConfiguracionCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{loc:T Nav_Configuracion}" AutomationProperties.Name="{loc:T Nav_Configuracion}" TabIndex="9">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
                                             <Setter Property="Background" Value="Transparent"/>
@@ -387,7 +387,7 @@
                             <Grid Margin="0,4">
                                 <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="{StaticResource Brush.Accent}" HorizontalAlignment="Left" Margin="-9,0,0,0"
                                            Visibility="{Binding Navigation.EsAcercaDeActivo, Converter={StaticResource BoolToVis}}"/>
-                                <Button Command="{Binding NavegarAcercaDeCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{Binding [Nav_AcercaDe], Source={x:Static loc:LocalizationService.Instance}}" AutomationProperties.Name="{Binding [Nav_AcercaDe], Source={x:Static loc:LocalizationService.Instance}}" TabIndex="10">
+                                <Button Command="{Binding NavegarAcercaDeCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{loc:T Nav_AcercaDe}" AutomationProperties.Name="{loc:T Nav_AcercaDe}" TabIndex="10">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
                                             <Setter Property="Background" Value="Transparent"/>
@@ -460,8 +460,8 @@
                         <TextBlock Text="AnimeTracker" FontWeight="Bold" Foreground="{DynamicResource MaterialDesignBodyLight}" VerticalAlignment="Center" FontSize="14"/>
                         <Button Command="{Binding BuscarActualizacionesManualCommand}"
                                 WindowChrome.IsHitTestVisibleInChrome="True"
-                                ToolTip="{Binding [Nav_ComprobarUpdates], Source={x:Static loc:LocalizationService.Instance}}"
-                                AutomationProperties.Name="{Binding [Nav_ComprobarUpdates], Source={x:Static loc:LocalizationService.Instance}}"
+                                ToolTip="{loc:T Nav_ComprobarUpdates}"
+                                AutomationProperties.Name="{loc:T Nav_ComprobarUpdates}"
                                 Style="{StaticResource MaterialDesignFlatButton}"
                                 Padding="8,2" Height="22" Margin="12,0,0,0"
                                 Background="{StaticResource Brush.Surface3}" Foreground="{StaticResource Brush.AccentSoft}"
@@ -489,16 +489,16 @@
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
-                        <Button WindowChrome.IsHitTestVisibleInChrome="True" Click="BtnPantallaCompleta_Click" Width="45" Height="45" Style="{StaticResource MaterialDesignFlatButton}" Padding="0" Foreground="{DynamicResource MaterialDesignBodyLight}" ToolTip="{Binding [Nav_PantallaCompleta], Source={x:Static loc:LocalizationService.Instance}}" AutomationProperties.Name="{Binding [Win_BtnPantallaCompleta], Source={x:Static loc:LocalizationService.Instance}}">
+                        <Button WindowChrome.IsHitTestVisibleInChrome="True" Click="BtnPantallaCompleta_Click" Width="45" Height="45" Style="{StaticResource MaterialDesignFlatButton}" Padding="0" Foreground="{DynamicResource MaterialDesignBodyLight}" ToolTip="{loc:T Nav_PantallaCompleta}" AutomationProperties.Name="{loc:T Win_BtnPantallaCompleta}">
                             <materialDesign:PackIcon Kind="Fullscreen" />
                         </Button>
-                        <Button WindowChrome.IsHitTestVisibleInChrome="True" Click="BtnMinimizar_Click" Width="45" Height="45" Style="{StaticResource MaterialDesignFlatButton}" Padding="0" Foreground="{DynamicResource MaterialDesignBodyLight}" AutomationProperties.Name="{Binding [Win_BtnMinimizar], Source={x:Static loc:LocalizationService.Instance}}">
+                        <Button WindowChrome.IsHitTestVisibleInChrome="True" Click="BtnMinimizar_Click" Width="45" Height="45" Style="{StaticResource MaterialDesignFlatButton}" Padding="0" Foreground="{DynamicResource MaterialDesignBodyLight}" AutomationProperties.Name="{loc:T Win_BtnMinimizar}">
                             <materialDesign:PackIcon Kind="WindowMinimize" />
                         </Button>
-                        <Button WindowChrome.IsHitTestVisibleInChrome="True" Click="BtnMaximizar_Click" Width="45" Height="45" Style="{StaticResource MaterialDesignFlatButton}" Padding="0" Foreground="{DynamicResource MaterialDesignBodyLight}" IsEnabled="False" AutomationProperties.Name="{Binding [Win_BtnMaximizar], Source={x:Static loc:LocalizationService.Instance}}">
+                        <Button WindowChrome.IsHitTestVisibleInChrome="True" Click="BtnMaximizar_Click" Width="45" Height="45" Style="{StaticResource MaterialDesignFlatButton}" Padding="0" Foreground="{DynamicResource MaterialDesignBodyLight}" IsEnabled="False" AutomationProperties.Name="{loc:T Win_BtnMaximizar}">
                             <materialDesign:PackIcon Kind="WindowMaximize" />
                         </Button>
-                        <Button WindowChrome.IsHitTestVisibleInChrome="True" Click="BtnCerrar_Click" Width="45" Height="45" Style="{StaticResource MaterialDesignFlatButton}" Padding="0" Foreground="{DynamicResource MaterialDesignBodyLight}" AutomationProperties.Name="{Binding [Win_BtnCerrarApp], Source={x:Static loc:LocalizationService.Instance}}">
+                        <Button WindowChrome.IsHitTestVisibleInChrome="True" Click="BtnCerrar_Click" Width="45" Height="45" Style="{StaticResource MaterialDesignFlatButton}" Padding="0" Foreground="{DynamicResource MaterialDesignBodyLight}" AutomationProperties.Name="{loc:T Win_BtnCerrarApp}">
                             <materialDesign:PackIcon Kind="Close" />
                         </Button>
                     </StackPanel>
@@ -548,11 +548,11 @@
                                     BorderThickness="0,1,0,0" CornerRadius="0,0,16,16" Padding="20,14">
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                                     <Button x:Name="BtnDialogoCancelar" Style="{StaticResource AppDialogGhostButton}" Margin="0,0,10,0"
-                                            Content="{Binding [Dlg_Cancelar], Source={x:Static loc:LocalizationService.Instance}}"
+                                            Content="{loc:T Dlg_Cancelar}"
                                             Command="{Binding DialogService.CancelarDialogoCommand}"
                                             Visibility="{Binding DialogService.DialogoEsConfirmacion, Converter={StaticResource BoolToVis}}"/>
                                     <Button x:Name="BtnDialogoAceptar" Style="{StaticResource AppDialogPrimaryButton}"
-                                            Content="{Binding [Dlg_Aceptar], Source={x:Static loc:LocalizationService.Instance}}"
+                                            Content="{loc:T Dlg_Aceptar}"
                                             Command="{Binding DialogService.AceptarDialogoCommand}"
                                             Background="{Binding DialogService.DialogoColor, Converter={StaticResource DialogoTono}, ConverterParameter=Relleno}"
                                             BorderBrush="{Binding DialogService.DialogoColor, Converter={StaticResource DialogoTono}, ConverterParameter=Relleno}"/>
@@ -572,7 +572,7 @@
                       Style="{StaticResource AppOverlayScrim}" Panel.ZIndex="2001">
                     <Border Style="{StaticResource AppDialogCard}" Width="600" MaxHeight="660"
                             KeyboardNavigation.TabNavigation="Cycle" KeyboardNavigation.ControlTabNavigation="Cycle"
-                            AutomationProperties.Name="{Binding [Sel_Titulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                            AutomationProperties.Name="{loc:T Sel_Titulo}">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
@@ -595,7 +595,7 @@
                                 </Border>
 
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding [Sel_Titulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                    <TextBlock Text="{loc:T Sel_Titulo}"
                                                Style="{StaticResource AppText.Section}" FontSize="18"/>
                                     <TextBlock Text="{Binding SelectorTorrentService.TituloEpisodio}" Style="{StaticResource AppText.Secondary}"
                                                TextTrimming="CharacterEllipsis" Margin="0,3,0,0"/>
@@ -605,7 +605,7 @@
                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                         <TextBlock Text="{Binding SelectorTorrentService.Candidatos.Count, Mode=OneWay}"
                                                    Foreground="{DynamicResource Brush.AccentSoft}" FontSize="12" FontWeight="Bold" VerticalAlignment="Center"/>
-                                        <TextBlock Text="{Binding [Sel_Resultados], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                        <TextBlock Text="{loc:T Sel_Resultados}"
                                                    Foreground="{DynamicResource Brush.TextTertiary}" FontSize="12" Margin="5,0,0,0" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </Border>
@@ -650,7 +650,7 @@
                                                         <WrapPanel Margin="0,9,0,0">
                                                             <!-- Semillas -->
                                                             <Border Style="{StaticResource AppChip}" Background="{DynamicResource Brush.SuccessTint}"
-                                                                    ToolTip="{Binding [Sel_SemillasTip], Source={x:Static loc:LocalizationService.Instance}}">
+                                                                    ToolTip="{loc:T Sel_SemillasTip}">
                                                                 <StackPanel Orientation="Horizontal">
                                                                     <materialDesign:PackIcon Kind="ArrowUpBold" Width="13" Height="13" Foreground="{DynamicResource Brush.Success}" VerticalAlignment="Center"/>
                                                                     <TextBlock Text="{Binding Seeders}" FontSize="12" FontWeight="Bold" Margin="3,0,0,0" VerticalAlignment="Center"
@@ -659,7 +659,7 @@
                                                             </Border>
                                                             <!-- Tamaño -->
                                                             <Border Style="{StaticResource AppChip}" Background="{DynamicResource Brush.Surface3}"
-                                                                    ToolTip="{Binding [Sel_TamanoTip], Source={x:Static loc:LocalizationService.Instance}}">
+                                                                    ToolTip="{loc:T Sel_TamanoTip}">
                                                                 <StackPanel Orientation="Horizontal">
                                                                     <materialDesign:PackIcon Kind="Harddisk" Width="13" Height="13" Foreground="{DynamicResource Brush.TextTertiary}" VerticalAlignment="Center"/>
                                                                     <TextBlock Text="{Binding TamanoTexto}" FontSize="12" FontWeight="SemiBold" Margin="4,0,0,0" VerticalAlignment="Center"
@@ -683,17 +683,17 @@
                                                             <!-- Temporada completa -->
                                                             <Border Style="{StaticResource AppChip}" Background="{DynamicResource Brush.WarningTint}"
                                                                     Visibility="{Binding EsBatch, Converter={StaticResource BoolToVis}}">
-                                                                <TextBlock Text="{Binding [Sel_Batch], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                                <TextBlock Text="{loc:T Sel_Batch}"
                                                                            FontSize="11" FontWeight="Bold" Foreground="{DynamicResource Brush.Warning}"/>
                                                             </Border>
                                                             <!-- Nombre del release que no coincide con el anime/temporada: el usuario decide -->
                                                             <Border Style="{StaticResource AppChip}" Background="{DynamicResource Brush.WarningTint}"
                                                                     Visibility="{Binding Dudoso, Converter={StaticResource BoolToVis}}"
-                                                                    ToolTip="{Binding [Sel_DudosoTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                                                    ToolTip="{loc:T Sel_DudosoTip}">
                                                                 <StackPanel Orientation="Horizontal">
                                                                     <materialDesign:PackIcon Kind="AlertCircleOutline" Width="13" Height="13" Margin="0,0,4,0"
                                                                                              VerticalAlignment="Center" Foreground="{DynamicResource Brush.Warning}"/>
-                                                                    <TextBlock Text="{Binding [Sel_Dudoso], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                                    <TextBlock Text="{loc:T Sel_Dudoso}"
                                                                                FontSize="11" FontWeight="Bold" Foreground="{DynamicResource Brush.Warning}"/>
                                                                 </StackPanel>
                                                             </Border>
@@ -712,10 +712,10 @@
                             <!-- Pie -->
                             <Border Grid.Row="2" Background="{DynamicResource Brush.Surface2}" CornerRadius="0,0,16,16" Padding="26,14,20,14">
                                 <Grid>
-                                    <TextBlock Text="{Binding [Sel_Pista], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                    <TextBlock Text="{loc:T Sel_Pista}"
                                                Style="{StaticResource AppText.Caption}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,130,0"/>
                                     <Button HorizontalAlignment="Right" Style="{StaticResource AppDialogGhostButton}"
-                                            Content="{Binding [Dlg_Cancelar], Source={x:Static loc:LocalizationService.Instance}}"
+                                            Content="{loc:T Dlg_Cancelar}"
                                             Command="{Binding SelectorTorrentService.CancelarSelectorCommand}"/>
                                 </Grid>
                             </Border>
@@ -742,8 +742,8 @@
                         <!-- El título vuelve a la ficha del anime, con su ventana de música abierta -->
                         <Button Grid.Column="1" Command="{Binding MusicaDeFondo.IrALaFichaCommand}" Cursor="Hand" Background="Transparent" BorderThickness="0"
                                 HorizontalAlignment="Left" Padding="0" FocusVisualStyle="{x:Null}" MaxWidth="230"
-                                ToolTip="{Binding [Mus_FondoVolver], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                AutomationProperties.Name="{Binding [Mus_FondoVolver], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                ToolTip="{loc:T Mus_FondoVolver}"
+                                AutomationProperties.Name="{loc:T Mus_FondoVolver}">
                             <Button.Template>
                                 <ControlTemplate TargetType="Button">
                                     <Border Background="Transparent"><ContentPresenter/></Border>
@@ -759,19 +759,19 @@
                         </Button>
                         <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,0,0">
                             <Button Command="{Binding MusicaDeFondo.Activa.TemaAnteriorCommand}" Style="{StaticResource MaterialDesignToolButton}" Width="30" Height="30" Padding="0" Cursor="Hand"
-                                    ToolTip="{Binding [Det_MusicaAnterior], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                    AutomationProperties.Name="{Binding [Det_MusicaAnterior], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                    ToolTip="{loc:T Det_MusicaAnterior}"
+                                    AutomationProperties.Name="{loc:T Det_MusicaAnterior}">
                                 <materialDesign:PackIcon Kind="SkipPrevious" Width="19" Height="19" Foreground="{DynamicResource Brush.TextPrimary}"/>
                             </Button>
                             <Button Command="{Binding MusicaDeFondo.Activa.AlternarTemaActualCommand}" Width="32" Height="32" Padding="0" Cursor="Hand">
                                 <Button.Style>
                                     <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignToolButton}">
-                                        <Setter Property="ToolTip" Value="{Binding [Det_MusicaReproducir], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
-                                        <Setter Property="AutomationProperties.Name" Value="{Binding [Det_MusicaReproducir], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                        <Setter Property="ToolTip" Value="{loc:T Det_MusicaReproducir}"/>
+                                        <Setter Property="AutomationProperties.Name" Value="{loc:T Det_MusicaReproducir}"/>
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding MusicaDeFondo.Activa.MusicaSonando}" Value="True">
-                                                <Setter Property="ToolTip" Value="{Binding [Det_MusicaPausar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
-                                                <Setter Property="AutomationProperties.Name" Value="{Binding [Det_MusicaPausar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                                <Setter Property="ToolTip" Value="{loc:T Det_MusicaPausar}"/>
+                                                <Setter Property="AutomationProperties.Name" Value="{loc:T Det_MusicaPausar}"/>
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
@@ -790,13 +790,13 @@
                                 </materialDesign:PackIcon>
                             </Button>
                             <Button Command="{Binding MusicaDeFondo.Activa.TemaSiguienteCommand}" Style="{StaticResource MaterialDesignToolButton}" Width="30" Height="30" Padding="0" Cursor="Hand"
-                                    ToolTip="{Binding [Det_MusicaSiguiente], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                    AutomationProperties.Name="{Binding [Det_MusicaSiguiente], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                    ToolTip="{loc:T Det_MusicaSiguiente}"
+                                    AutomationProperties.Name="{loc:T Det_MusicaSiguiente}">
                                 <materialDesign:PackIcon Kind="SkipNext" Width="19" Height="19" Foreground="{DynamicResource Brush.TextPrimary}"/>
                             </Button>
                             <Button Command="{Binding MusicaDeFondo.DetenerMusicaCommand}" Style="{StaticResource MaterialDesignToolButton}" Width="30" Height="30" Padding="0" Cursor="Hand" Margin="4,0,0,0"
-                                    ToolTip="{Binding [Mus_FondoDetener], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                    AutomationProperties.Name="{Binding [Mus_FondoDetener], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                    ToolTip="{loc:T Mus_FondoDetener}"
+                                    AutomationProperties.Name="{loc:T Mus_FondoDetener}">
                                 <materialDesign:PackIcon Kind="Close" Width="15" Height="15" Foreground="{DynamicResource Brush.TextTertiary}"/>
                             </Button>
                         </StackPanel>
@@ -815,11 +815,7 @@
                                         <BeginStoryboard>
                                             <Storyboard>
                                                 <DoubleAnimation Storyboard.TargetProperty="Opacity" From="0" To="1" Duration="0:0:0.3"/>
-                                                <ThicknessAnimation Storyboard.TargetProperty="Margin" From="0,0,0,-100" To="0,0,0,30" Duration="0:0:0.3">
-                                                    <ThicknessAnimation.EasingFunction>
-                                                        <CubicEase EasingMode="EaseOut"/>
-                                                    </ThicknessAnimation.EasingFunction>
-                                                </ThicknessAnimation>
+                                                <ThicknessAnimation Storyboard.TargetProperty="Margin" From="0,0,0,-100" To="0,0,0,30" Duration="0:0:0.3" EasingFunction="{StaticResource Anim.Suave}"/>
                                             </Storyboard>
                                         </BeginStoryboard>
                                     </DataTrigger.EnterActions>
@@ -827,11 +823,7 @@
                                         <BeginStoryboard>
                                             <Storyboard>
                                                 <DoubleAnimation Storyboard.TargetProperty="Opacity" From="1" To="0" Duration="0:0:0.3"/>
-                                                <ThicknessAnimation Storyboard.TargetProperty="Margin" From="0,0,0,30" To="0,0,0,-100" Duration="0:0:0.3">
-                                                    <ThicknessAnimation.EasingFunction>
-                                                        <CubicEase EasingMode="EaseIn"/>
-                                                    </ThicknessAnimation.EasingFunction>
-                                                </ThicknessAnimation>
+                                                <ThicknessAnimation Storyboard.TargetProperty="Margin" From="0,0,0,30" To="0,0,0,-100" Duration="0:0:0.3" EasingFunction="{StaticResource Anim.SuaveEntrada}"/>
                                             </Storyboard>
                                         </BeginStoryboard>
                                     </DataTrigger.ExitActions>

@@ -80,7 +80,7 @@
         <!-- HEADER MODERNO CON ÍCONOS -->
         <Grid Grid.Row="0" Margin="0,0,0,20" Panel.ZIndex="10">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <TextBlock Text="{Binding [Gal_Titulo], Source={x:Static loc:LocalizationService.Instance}}" Style="{StaticResource AppText.PageTitle}" VerticalAlignment="Center"/>
+                <TextBlock Text="{loc:T Gal_Titulo}" Style="{StaticResource AppText.PageTitle}" VerticalAlignment="Center"/>
 
                 <!-- BADGE CONTEO BIBLIOTECA -->
                 <Border Style="{StaticResource AppBadge}" Margin="14,0,0,0" VerticalAlignment="Center">
@@ -97,8 +97,8 @@
                 <!-- Botón Qué Veo Hoy (abre el panel con la ruleta) -->
                 <Button Command="{Binding QueVeoHoy.ElegirQueVerHoyCommand}"
                         Style="{StaticResource QueVeoHoyButton}" Margin="0,0,10,0"
-                        ToolTip="{Binding [Gal_QueVerTip], Source={x:Static loc:LocalizationService.Instance}}"
-                        AutomationProperties.Name="{Binding [Gal_QueVeoHoy], Source={x:Static loc:LocalizationService.Instance}}">
+                        ToolTip="{loc:T Gal_QueVerTip}"
+                        AutomationProperties.Name="{loc:T Gal_QueVeoHoy}">
                     <Button.Triggers>
                         <!-- Detalle sutil: el dado da una vuelta al pasar el ratón (solo con el ratón, sin bucles) -->
                         <EventTrigger RoutedEvent="Mouse.MouseEnter">
@@ -106,11 +106,7 @@
                                 <Storyboard>
                                     <DoubleAnimation Storyboard.TargetName="DadoQueVeoHoy"
                                                      Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
-                                                     From="0" To="360" Duration="0:0:0.5" FillBehavior="Stop">
-                                        <DoubleAnimation.EasingFunction>
-                                            <CubicEase EasingMode="EaseOut"/>
-                                        </DoubleAnimation.EasingFunction>
-                                    </DoubleAnimation>
+                                                     From="0" To="360" Duration="0:0:0.5" FillBehavior="Stop" EasingFunction="{StaticResource Anim.Suave}"/>
                                 </Storyboard>
                             </BeginStoryboard>
                         </EventTrigger>
@@ -122,7 +118,7 @@
                                 <RotateTransform Angle="0"/>
                             </materialDesign:PackIcon.RenderTransform>
                         </materialDesign:PackIcon>
-                        <TextBlock Text="{Binding [Gal_QueVeoHoy], Source={x:Static loc:LocalizationService.Instance}}"
+                        <TextBlock Text="{loc:T Gal_QueVeoHoy}"
                                    FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
                     </StackPanel>
                 </Button>
@@ -133,8 +129,8 @@
                               Style="{StaticResource MaterialDesignActionToggleButton}"
                               Background="{DynamicResource Brush.Surface1}" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1"
                               Margin="0,0,10,0"
-                              ToolTip="{Binding [Gal_SeleccionMultiple], Source={x:Static loc:LocalizationService.Instance}}" Width="40" Height="40"
-                              AutomationProperties.Name="{Binding [Gal_SeleccionMultiple], Source={x:Static loc:LocalizationService.Instance}}">
+                              ToolTip="{loc:T Gal_SeleccionMultiple}" Width="40" Height="40"
+                              AutomationProperties.Name="{loc:T Gal_SeleccionMultiple}">
                     <materialDesign:ToggleButtonAssist.OnContent>
                         <materialDesign:PackIcon Kind="Close" Width="18" Height="18" Foreground="White"/>
                     </materialDesign:ToggleButtonAssist.OnContent>
@@ -146,8 +142,8 @@
                         Style="{StaticResource MaterialDesignFloatingActionMiniLightButton}"
                         Background="{DynamicResource Brush.Surface1}" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1"
                         Width="40" Height="40" Padding="0" Margin="0,0,10,0"
-                        ToolTip="{Binding [Gal_ActualizarNube], Source={x:Static loc:LocalizationService.Instance}}"
-                        AutomationProperties.Name="{Binding [Gal_ActualizarNube], Source={x:Static loc:LocalizationService.Instance}}">
+                        ToolTip="{loc:T Gal_ActualizarNube}"
+                        AutomationProperties.Name="{loc:T Gal_ActualizarNube}">
                     <materialDesign:PackIcon Kind="Sync" Width="18" Height="18" Foreground="{DynamicResource Brush.Success}"/>
                 </Button>
 
@@ -155,11 +151,11 @@
                 <Button Command="{Binding ConectarAniListCommand}"
                         Style="{StaticResource AppPrimaryButton}" Height="40" Padding="14,0"
                         Visibility="{Binding EstaConectado, Converter={StaticResource InverseBoolToVis}}"
-                        ToolTip="{Binding [Gal_ConectarTip], Source={x:Static loc:LocalizationService.Instance}}"
-                        AutomationProperties.Name="{Binding [Gal_Conectar], Source={x:Static loc:LocalizationService.Instance}}">
+                        ToolTip="{loc:T Gal_ConectarTip}"
+                        AutomationProperties.Name="{loc:T Gal_Conectar}">
                     <StackPanel Orientation="Horizontal">
                         <materialDesign:PackIcon Kind="CloudUpload" Margin="0,0,8,0" VerticalAlignment="Center" Width="18" Height="18"/>
-                        <TextBlock Text="{Binding [Gal_Conectar], Source={x:Static loc:LocalizationService.Instance}}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="12.5"/>
+                        <TextBlock Text="{loc:T Gal_Conectar}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="12.5"/>
                     </StackPanel>
                 </Button>
 
@@ -195,22 +191,14 @@
                                             <DataTrigger.EnterActions>
                                                 <BeginStoryboard>
                                                     <Storyboard>
-                                                        <DoubleAnimation Storyboard.TargetProperty="Height" From="40" To="86" Duration="0:0:0.25">
-                                                            <DoubleAnimation.EasingFunction>
-                                                                <CubicEase EasingMode="EaseOut"/>
-                                                            </DoubleAnimation.EasingFunction>
-                                                        </DoubleAnimation>
+                                                        <DoubleAnimation Storyboard.TargetProperty="Height" From="40" To="86" Duration="0:0:0.25" EasingFunction="{StaticResource Anim.Suave}"/>
                                                     </Storyboard>
                                                 </BeginStoryboard>
                                             </DataTrigger.EnterActions>
                                             <DataTrigger.ExitActions>
                                                 <BeginStoryboard>
                                                     <Storyboard>
-                                                        <DoubleAnimation Storyboard.TargetProperty="Height" From="86" To="40" Duration="0:0:0.2">
-                                                            <DoubleAnimation.EasingFunction>
-                                                                <CubicEase EasingMode="EaseIn"/>
-                                                            </DoubleAnimation.EasingFunction>
-                                                        </DoubleAnimation>
+                                                        <DoubleAnimation Storyboard.TargetProperty="Height" From="86" To="40" Duration="{StaticResource Anim.Normal}" EasingFunction="{StaticResource Anim.SuaveEntrada}"/>
                                                     </Storyboard>
                                                 </BeginStoryboard>
                                             </DataTrigger.ExitActions>
@@ -227,10 +215,10 @@
                                         Style="{StaticResource MaterialDesignFlatButton}" Foreground="#FF5252"
                                         Height="46" Padding="24,0" Margin="0"
                                         materialDesign:ButtonAssist.CornerRadius="0,0,16,16"
-                                        AutomationProperties.Name="{Binding [Cfg_CerrarSesion], Source={x:Static loc:LocalizationService.Instance}}">
+                                        AutomationProperties.Name="{loc:T Cfg_CerrarSesion}">
                                     <StackPanel Orientation="Horizontal">
                                         <materialDesign:PackIcon Kind="Logout" Margin="0,0,8,0" VerticalAlignment="Center" Width="20" Height="20"/>
-                                        <TextBlock Text="{Binding [Cfg_CerrarSesion], Source={x:Static loc:LocalizationService.Instance}}" VerticalAlignment="Center" FontWeight="Bold"/>
+                                        <TextBlock Text="{loc:T Cfg_CerrarSesion}" VerticalAlignment="Center" FontWeight="Bold"/>
                                     </StackPanel>
                                 </Button>
                             </Grid>
@@ -240,7 +228,7 @@
                     <Button x:Name="UserMenuToggle"
                             Command="{Binding ToggleMenuUsuarioCommand}"
                             Height="40" MinWidth="180" VerticalAlignment="Top"
-                            Cursor="Hand" ToolTip="{Binding [Gal_CuentaSincronizadaTip], Source={x:Static loc:LocalizationService.Instance}}"
+                            Cursor="Hand" ToolTip="{loc:T Gal_CuentaSincronizadaTip}"
                             Background="Transparent" BorderThickness="0" Padding="24,4" Panel.ZIndex="2"
                             AutomationProperties.Name="{Binding NombreUsuarioAniList}">
                         <Button.Template>
@@ -274,22 +262,14 @@
                                                 <DataTrigger.EnterActions>
                                                     <BeginStoryboard>
                                                         <Storyboard>
-                                                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)" From="0" To="180" Duration="0:0:0.2">
-                                                                <DoubleAnimation.EasingFunction>
-                                                                    <CubicEase EasingMode="EaseOut"/>
-                                                                </DoubleAnimation.EasingFunction>
-                                                            </DoubleAnimation>
+                                                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)" From="0" To="180" Duration="{StaticResource Anim.Normal}" EasingFunction="{StaticResource Anim.Suave}"/>
                                                         </Storyboard>
                                                     </BeginStoryboard>
                                                 </DataTrigger.EnterActions>
                                                 <DataTrigger.ExitActions>
                                                     <BeginStoryboard>
                                                         <Storyboard>
-                                                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)" From="180" To="0" Duration="0:0:0.2">
-                                                                <DoubleAnimation.EasingFunction>
-                                                                    <CubicEase EasingMode="EaseIn"/>
-                                                                </DoubleAnimation.EasingFunction>
-                                                            </DoubleAnimation>
+                                                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)" From="180" To="0" Duration="{StaticResource Anim.Normal}" EasingFunction="{StaticResource Anim.SuaveEntrada}"/>
                                                         </Storyboard>
                                                     </BeginStoryboard>
                                                 </DataTrigger.ExitActions>
@@ -335,31 +315,31 @@
             <!-- Los colores de cada destino son los mismos que los de la etiqueta de estado de la tarjeta -->
             <StackPanel Orientation="Horizontal">
                 <TextBlock Text="{Binding SeleccionadosTexto}" Foreground="{DynamicResource Brush.TextSecondary}" VerticalAlignment="Center" Margin="0,0,4,0" FontWeight="SemiBold" FontSize="13"/>
-                <Button Content="{Binding [Gal_SeleccionarTodos], Source={x:Static loc:LocalizationService.Instance}}" Command="{Binding SeleccionarTodosCommand}"
+                <Button Content="{loc:T Gal_SeleccionarTodos}" Command="{Binding SeleccionarTodosCommand}"
                         Style="{StaticResource MaterialDesignFlatButton}" Foreground="{DynamicResource Brush.AccentSoft}" FontWeight="SemiBold" Padding="10,0"/>
 
                 <Border Width="1" Background="{DynamicResource Brush.BorderStrong}" Margin="8,5"/>
 
-                <TextBlock Text="{Binding [Gal_MoverA], Source={x:Static loc:LocalizationService.Instance}}" Foreground="{DynamicResource Brush.TextPrimary}" VerticalAlignment="Center" Margin="4,0,6,0" FontWeight="Bold" FontSize="14"/>
+                <TextBlock Text="{loc:T Gal_MoverA}" Foreground="{DynamicResource Brush.TextPrimary}" VerticalAlignment="Center" Margin="4,0,6,0" FontWeight="Bold" FontSize="14"/>
 
-                <Button Content="{Binding [Gal_FiltroViendo], Source={x:Static loc:LocalizationService.Instance}}" Command="{Binding CategorizarSeleccionadosCommand}" CommandParameter="CURRENT"
+                <Button Content="{loc:T Gal_FiltroViendo}" Command="{Binding CategorizarSeleccionadosCommand}" CommandParameter="CURRENT"
                         Style="{StaticResource MaterialDesignFlatButton}" Foreground="{DynamicResource Brush.Accent}" FontWeight="Bold" Padding="10,0"/>
 
-                <Button Content="{Binding [Hist_FiltroCompletados], Source={x:Static loc:LocalizationService.Instance}}" Command="{Binding CategorizarSeleccionadosCommand}" CommandParameter="COMPLETED"
+                <Button Content="{loc:T Hist_FiltroCompletados}" Command="{Binding CategorizarSeleccionadosCommand}" CommandParameter="COMPLETED"
                         Style="{StaticResource MaterialDesignFlatButton}" Foreground="{DynamicResource Brush.Success}" FontWeight="Bold" Padding="10,0"/>
 
-                <Button Content="{Binding [Gal_FiltroPlaneando], Source={x:Static loc:LocalizationService.Instance}}" Command="{Binding CategorizarSeleccionadosCommand}" CommandParameter="PLANNING"
+                <Button Content="{loc:T Gal_FiltroPlaneando}" Command="{Binding CategorizarSeleccionadosCommand}" CommandParameter="PLANNING"
                         Style="{StaticResource MaterialDesignFlatButton}" Foreground="{DynamicResource Brush.TextPrimary}" FontWeight="Bold" Padding="10,0"/>
 
-                <Button Content="{Binding [Gal_FiltroEnPausa], Source={x:Static loc:LocalizationService.Instance}}" Command="{Binding CategorizarSeleccionadosCommand}" CommandParameter="PAUSED"
+                <Button Content="{loc:T Gal_FiltroEnPausa}" Command="{Binding CategorizarSeleccionadosCommand}" CommandParameter="PAUSED"
                         Style="{StaticResource MaterialDesignFlatButton}" Foreground="{DynamicResource Brush.WarningStrong}" FontWeight="Bold" Padding="10,0"/>
 
-                <Button Content="{Binding [Gal_FiltroAbandonados], Source={x:Static loc:LocalizationService.Instance}}" Command="{Binding CategorizarSeleccionadosCommand}" CommandParameter="DROPPED"
+                <Button Content="{loc:T Gal_FiltroAbandonados}" Command="{Binding CategorizarSeleccionadosCommand}" CommandParameter="DROPPED"
                         Style="{StaticResource MaterialDesignFlatButton}" Foreground="{DynamicResource Brush.Danger}" FontWeight="Bold" Padding="10,0"/>
 
                 <Border Width="1" Background="{DynamicResource Brush.BorderStrong}" Margin="8,5"/>
 
-                <Button Content="{Binding [Gal_Cancelar], Source={x:Static loc:LocalizationService.Instance}}" Command="{Binding ToggleModoSeleccionCommand}"
+                <Button Content="{loc:T Gal_Cancelar}" Command="{Binding ToggleModoSeleccionCommand}"
                         Style="{StaticResource MaterialDesignFlatButton}" Foreground="{DynamicResource Brush.TextSecondary}" FontWeight="Bold" Padding="10,0"/>
             </StackPanel>
         </Border>
@@ -368,12 +348,12 @@
         <StackPanel Grid.Row="2" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,50,0,0"
                     Visibility="{Binding BibliotecaVacia, Converter={StaticResource BoolToVis}}">
             <materialDesign:PackIcon Kind="ArchiveOutline" Width="80" Height="80" Foreground="{DynamicResource Brush.TextTertiary}" HorizontalAlignment="Center" Margin="0,0,0,20" Opacity="0.5"/>
-            <TextBlock Text="{Binding [Gal_VacioTitulo], Source={x:Static loc:LocalizationService.Instance}}" Style="{StaticResource AppEmptyTitle}"/>
-            <TextBlock Text="{Binding [Gal_VacioSub], Source={x:Static loc:LocalizationService.Instance}}" Style="{StaticResource AppEmptyText}" Margin="0,10,0,30"/>
+            <TextBlock Text="{loc:T Gal_VacioTitulo}" Style="{StaticResource AppEmptyTitle}"/>
+            <TextBlock Text="{loc:T Gal_VacioSub}" Style="{StaticResource AppEmptyText}" Margin="0,10,0,30"/>
             <Button Command="{Binding AñadirAnimeManualCommand}" Style="{StaticResource AppPrimaryButton}" Padding="20,10" HorizontalAlignment="Center" Height="Auto">
                 <StackPanel Orientation="Horizontal">
                     <materialDesign:PackIcon Kind="MagnifyPlus" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                    <TextBlock Text="{Binding [Gal_BuscarYAnadir], Source={x:Static loc:LocalizationService.Instance}}" VerticalAlignment="Center" FontWeight="Bold" FontSize="14"/>
+                    <TextBlock Text="{loc:T Gal_BuscarYAnadir}" VerticalAlignment="Center" FontWeight="Bold" FontSize="14"/>
                 </StackPanel>
             </Button>
         </StackPanel>
@@ -382,13 +362,13 @@
         <StackPanel Grid.Row="2" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,50,0,0"
                     Visibility="{Binding SinResultados, Converter={StaticResource BoolToVis}}">
             <materialDesign:PackIcon Kind="MagnifyRemoveOutline" Width="80" Height="80" Foreground="{DynamicResource Brush.TextTertiary}" HorizontalAlignment="Center" Margin="0,0,0,20" Opacity="0.5"/>
-            <TextBlock Text="{Binding [Gal_SinResultadosTitulo], Source={x:Static loc:LocalizationService.Instance}}" Style="{StaticResource AppEmptyTitle}"/>
-            <TextBlock Text="{Binding [Gal_SinResultadosSub], Source={x:Static loc:LocalizationService.Instance}}" Style="{StaticResource AppEmptyText}" Margin="0,10,0,24"/>
+            <TextBlock Text="{loc:T Gal_SinResultadosTitulo}" Style="{StaticResource AppEmptyTitle}"/>
+            <TextBlock Text="{loc:T Gal_SinResultadosSub}" Style="{StaticResource AppEmptyText}" Margin="0,10,0,24"/>
             <Button Command="{Binding LimpiarFiltrosCommand}" Style="{StaticResource AppOutlinedButton}" HorizontalAlignment="Center" Cursor="Hand"
-                    AutomationProperties.Name="{Binding [Gal_LimpiarFiltros], Source={x:Static loc:LocalizationService.Instance}}">
+                    AutomationProperties.Name="{loc:T Gal_LimpiarFiltros}">
                 <StackPanel Orientation="Horizontal">
                     <materialDesign:PackIcon Kind="FilterRemoveOutline" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                    <TextBlock Text="{Binding [Gal_LimpiarFiltros], Source={x:Static loc:LocalizationService.Instance}}" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                    <TextBlock Text="{loc:T Gal_LimpiarFiltros}" VerticalAlignment="Center" FontWeight="SemiBold"/>
                 </StackPanel>
             </Button>
         </StackPanel>
@@ -454,7 +434,7 @@
         </Grid.RowDefinitions>
 
         <StackPanel Grid.Row="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,20">
-            <TextBlock Text="{Binding [Gal_Titulo], Source={x:Static loc:LocalizationService.Instance}}" Style="{StaticResource AppText.PageTitle}" VerticalAlignment="Center"/>
+            <TextBlock Text="{loc:T Gal_Titulo}" Style="{StaticResource AppText.PageTitle}" VerticalAlignment="Center"/>
             <views:SelectorSeccionGaleria Margin="22,0,0,0"/>
         </StackPanel>
 

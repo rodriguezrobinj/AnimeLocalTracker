@@ -55,17 +55,11 @@ public partial class MainViewModel : ObservableObject,
         else Aplicar();
     }
 
-    public void Receive(IdiomaCambiadoMensaje message)
+    public void Receive(IdiomaCambiadoMensaje message) => Core.HiloUi.Ejecutar(() =>
     {
-        var dispatcher = System.Windows.Application.Current?.Dispatcher;
-        void Refrescar()
-        {
-            OnPropertyChanged(nameof(TextoEstadoConexion));
-            OnPropertyChanged(nameof(TextoBadgeConexion));
-        }
-        if (dispatcher != null && !dispatcher.CheckAccess()) dispatcher.InvokeAsync(Refrescar);
-        else Refrescar();
-    }
+        OnPropertyChanged(nameof(TextoEstadoConexion));
+        OnPropertyChanged(nameof(TextoBadgeConexion));
+    });
 
     private readonly INavigationService _navigationService;
     private readonly IAnimeTrackingService _animeTrackingService;

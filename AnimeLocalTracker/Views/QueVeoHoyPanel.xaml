@@ -17,7 +17,7 @@
                     <Setter Property="BorderBrush" Value="{DynamicResource Brush.AccentStrong}"/>
                 </Trigger>
                 <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="ToolTip" Value="{Binding [Gal_QueVerOtroSinOpcionTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                    <Setter Property="ToolTip" Value="{loc:T Gal_QueVerOtroSinOpcionTip}"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -45,14 +45,14 @@
                             <materialDesign:PackIcon Kind="DiceMultiple" Width="20" Height="20" Foreground="{DynamicResource Brush.Accent}"
                                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
-                        <TextBlock Text="{Binding [Gal_QueVeoHoyTitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                        <TextBlock Text="{loc:T Gal_QueVeoHoyTitulo}"
                                    Style="{StaticResource AppText.Section}" FontSize="20" VerticalAlignment="Center"/>
                     </StackPanel>
                     <Button Command="{Binding CerrarQueVerHoyCommand}" HorizontalAlignment="Right" VerticalAlignment="Center"
                             Style="{StaticResource MaterialDesignFlatButton}" Width="36" Height="36" Padding="0" Cursor="Hand"
                             Foreground="{DynamicResource Brush.TextSecondary}"
-                            ToolTip="{Binding [Gal_QueVerCerrar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                            AutomationProperties.Name="{Binding [Gal_QueVerCerrar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                            ToolTip="{loc:T Gal_QueVerCerrar}"
+                            AutomationProperties.Name="{loc:T Gal_QueVerCerrar}">
                         <materialDesign:PackIcon Kind="Close" Width="18" Height="18"/>
                     </Button>
                 </Grid>
@@ -66,7 +66,7 @@
                                 Visibility="{Binding EsFaseBuscandoQueVer, Converter={StaticResource BoolToVis}}">
                         <ProgressBar Style="{StaticResource MaterialDesignCircularProgressBar}" Width="40" Height="40" Margin="0,0,0,14"
                                      IsIndeterminate="True" Value="0" Foreground="{DynamicResource Brush.Accent}"/>
-                        <TextBlock Text="{Binding [Gal_QueVerBuscandoTitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                        <TextBlock Text="{loc:T Gal_QueVerBuscandoTitulo}"
                                    Style="{StaticResource AppText.Secondary}" HorizontalAlignment="Center"/>
                     </StackPanel>
 
@@ -125,7 +125,7 @@
                     <!-- Zona inferior (84 px): "Eligiendo…" mientras gira y el resultado después, en UNA fila -->
                     <Grid Height="84" VerticalAlignment="Bottom" Visibility="{Binding MostrarTiraQueVer, Converter={StaticResource BoolToVis}}">
                         <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Style="{StaticResource AppText.Secondary}"
-                                   Text="{Binding [Gal_QueVerEligiendo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                   Text="{loc:T Gal_QueVerEligiendo}"
                                    Visibility="{Binding EsFaseGirandoQueVer, Converter={StaticResource BoolToVis}}"/>
 
                         <Grid VerticalAlignment="Center" RenderTransformOrigin="0.5,0.5"
@@ -141,11 +141,7 @@
                                                 <BeginStoryboard>
                                                     <Storyboard>
                                                         <DoubleAnimation Storyboard.TargetProperty="Opacity" From="0" To="1" Duration="0:0:0.35"/>
-                                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)" From="12" To="0" Duration="0:0:0.35">
-                                                            <DoubleAnimation.EasingFunction>
-                                                                <QuarticEase EasingMode="EaseOut"/>
-                                                            </DoubleAnimation.EasingFunction>
-                                                        </DoubleAnimation>
+                                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)" From="12" To="0" Duration="0:0:0.35" EasingFunction="{StaticResource Anim.SuaveFuerte}"/>
                                                     </Storyboard>
                                                 </BeginStoryboard>
                                             </Trigger.EnterActions>
@@ -159,7 +155,7 @@
                             </Grid.ColumnDefinitions>
 
                             <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,20,0">
-                                <TextBlock Text="{Binding [Gal_QueVerTuEleccion], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                <TextBlock Text="{loc:T Gal_QueVerTuEleccion}"
                                            Style="{StaticResource AppText.Micro}" Foreground="{DynamicResource Brush.Accent}"/>
                                 <TextBlock Text="{Binding QueVerElegido.Titulo}" Style="{StaticResource AppText.Section}" FontSize="18"
                                            TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="48" Margin="0,2,0,0"
@@ -176,20 +172,20 @@
                                 <Button Command="{Binding VerElegidoQueVerCommand}" Style="{StaticResource AppPrimaryButton}"
                                         Height="40" Padding="18,0" Margin="0,0,10,0" Cursor="Hand"
                                         materialDesign:ButtonAssist.CornerRadius="8"
-                                        AutomationProperties.Name="{Binding [Gal_QueVerVerAhora], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                        AutomationProperties.Name="{loc:T Gal_QueVerVerAhora}">
                                     <StackPanel Orientation="Horizontal">
                                         <materialDesign:PackIcon Kind="PlayCircleOutline" Width="20" Height="20" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                        <TextBlock Text="{Binding [Gal_QueVerVerAhora], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                        <TextBlock Text="{loc:T Gal_QueVerVerAhora}"
                                                    VerticalAlignment="Center" FontWeight="Bold" FontSize="12.5"/>
                                     </StackPanel>
                                 </Button>
                                 <Button Command="{Binding OtroQueVerHoyCommand}" Style="{StaticResource QueVerOtroButton}"
                                         Height="40" Padding="16,0" Cursor="Hand"
                                         materialDesign:ButtonAssist.CornerRadius="8"
-                                        AutomationProperties.Name="{Binding [Gal_QueVerOtro], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                        AutomationProperties.Name="{loc:T Gal_QueVerOtro}">
                                     <StackPanel Orientation="Horizontal">
                                         <materialDesign:PackIcon Kind="DiceMultiple" Width="18" Height="18" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                        <TextBlock Text="{Binding [Gal_QueVerOtro], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                        <TextBlock Text="{loc:T Gal_QueVerOtro}"
                                                    VerticalAlignment="Center" FontWeight="SemiBold" FontSize="12.5"/>
                                     </StackPanel>
                                 </Button>
@@ -222,7 +218,7 @@
                         <Button Command="{Binding CerrarQueVerHoyCommand}" Style="{StaticResource QueVerOtroButton}" Margin="0,16,0,0"
                                 Height="38" Padding="22,0" Cursor="Hand" HorizontalAlignment="Center"
                                 materialDesign:ButtonAssist.CornerRadius="8"
-                                Content="{Binding [Gal_QueVerCerrar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                Content="{loc:T Gal_QueVerCerrar}"/>
                     </StackPanel>
                 </Grid>
             </StackPanel>

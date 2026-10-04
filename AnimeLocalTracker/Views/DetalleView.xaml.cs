@@ -130,7 +130,7 @@ public partial class DetalleView : UserControl
     private void Ficha_PropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName != nameof(DetalleViewModel.Musica)) return;
-        EnHiloDeInterfaz(() =>
+        Core.HiloUi.Ejecutar(() =>
         {
             ObservarMusica(_vmObservado?.Musica);
             MostrarVentanasSiCorresponde();
@@ -143,17 +143,12 @@ public partial class DetalleView : UserControl
 
     private void Musica_PropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(MusicaFichaViewModel.MostrandoPanelMusica)) EnHiloDeInterfaz(MostrarVentanasSiCorresponde);
+        if (e.PropertyName == nameof(MusicaFichaViewModel.MostrandoPanelMusica)) Core.HiloUi.Ejecutar(MostrarVentanasSiCorresponde);
     }
 
     private void Seguimiento_PropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(SeguimientoEditorViewModel.MostrandoEditorSeguimiento)) EnHiloDeInterfaz(MostrarVentanasSiCorresponde);
-    }
-
-    private void EnHiloDeInterfaz(Action accion)
-    {
-        Core.HiloUi.Ejecutar(accion);
+        if (e.PropertyName == nameof(SeguimientoEditorViewModel.MostrandoEditorSeguimiento)) Core.HiloUi.Ejecutar(MostrarVentanasSiCorresponde);
     }
 
     private void MostrarVentanasSiCorresponde()

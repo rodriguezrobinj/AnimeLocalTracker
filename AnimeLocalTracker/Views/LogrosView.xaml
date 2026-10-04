@@ -33,8 +33,8 @@
                 <materialDesign:PackIcon Kind="TrophyAward" Foreground="{StaticResource Brush.WarningStrong}" Width="26" Height="26" HorizontalAlignment="Center" VerticalAlignment="Center"/>
             </Border>
             <StackPanel VerticalAlignment="Center">
-                <TextBlock Text="{Binding [Logro_Titulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.PageTitle}"/>
-                <TextBlock Text="{Binding [Logro_Subtitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="12" Foreground="{StaticResource Brush.TextSecondary}" Margin="0,3,0,0"/>
+                <TextBlock Text="{loc:T Logro_Titulo}" Style="{StaticResource AppText.PageTitle}"/>
+                <TextBlock Text="{loc:T Logro_Subtitulo}" FontSize="12" Foreground="{StaticResource Brush.TextSecondary}" Margin="0,3,0,0"/>
             </StackPanel>
         </StackPanel>
 
@@ -128,15 +128,15 @@
                 <Border Background="{StaticResource Brush.Surface3}" CornerRadius="36" Width="72" Height="72" Margin="0,0,0,16" HorizontalAlignment="Center">
                     <materialDesign:PackIcon Kind="TrophyOutline" Foreground="{StaticResource Brush.IconMuted}" Width="36" Height="36" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
-                <TextBlock Text="{Binding [Logro_VacioTitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppEmptyTitle}"/>
-                <TextBlock Text="{Binding [Logro_VacioSubtitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppEmptyText}" Margin="0,6,0,0" MaxWidth="420"/>
+                <TextBlock Text="{loc:T Logro_VacioTitulo}" Style="{StaticResource AppEmptyTitle}"/>
+                <TextBlock Text="{loc:T Logro_VacioSubtitulo}" Style="{StaticResource AppEmptyText}" Margin="0,6,0,0" MaxWidth="420"/>
             </StackPanel>
 
             <!-- Sin resultados con los filtros actuales -->
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,40,0,40"
                         Visibility="{Binding SinResultados, Converter={StaticResource BoolToVis}}">
                 <materialDesign:PackIcon Kind="FilterVariant" Foreground="{StaticResource Brush.IconMuted}" Width="48" Height="48" HorizontalAlignment="Center" Margin="0,0,0,12"/>
-                <TextBlock Text="{Binding [Logro_SinResultados], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppEmptyText}" FontSize="15" HorizontalAlignment="Center"/>
+                <TextBlock Text="{loc:T Logro_SinResultados}" Style="{StaticResource AppEmptyText}" FontSize="15" HorizontalAlignment="Center"/>
             </StackPanel>
 
             <!-- Lista virtualizada: cabeceras de categoría (string) + tarjetas (LogroItemViewModel) -->

@@ -38,10 +38,10 @@
         <!-- ═══ FILA 0: VOLVER AL MENÚ ═══ -->
         <Button Grid.Row="0" Command="{Binding VolverAlMenuCommand}" Style="{StaticResource MiniBotonSecundario}" HorizontalAlignment="Right" Margin="0,0,0,14"
                 Visibility="{Binding EnMenu, Converter={StaticResource InverseBoolToVis}}"
-                AutomationProperties.Name="{Binding [Mini_VolverAlMenu], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                AutomationProperties.Name="{loc:T Mini_VolverAlMenu}">
             <StackPanel Orientation="Horizontal">
                 <materialDesign:PackIcon Kind="ArrowLeft" Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                <TextBlock Text="{Binding [Mini_VolverAlMenu], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" VerticalAlignment="Center"/>
+                <TextBlock Text="{loc:T Mini_VolverAlMenu}" VerticalAlignment="Center"/>
             </StackPanel>
         </Button>
 
@@ -52,17 +52,17 @@
                  quedan alineados aunque las descripciones midan distinto. -->
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Top"
                         Visibility="{Binding EnMenu, Converter={StaticResource BoolToVis}}">
-                <TextBlock Text="{Binding [Mini_Subtitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.Caption}"
+                <TextBlock Text="{loc:T Mini_Subtitulo}" Style="{StaticResource AppText.Caption}"
                            VerticalAlignment="Center"/>
 
                 <!-- Opción (apagada por defecto): no preguntar por animes que solo están apuntados en "Planeando" -->
                 <ToggleButton IsChecked="{Binding SoloVistos}" Style="{StaticResource MaterialDesignSwitchToggleButton}" Margin="28,0,8,0" Cursor="Hand"
                               VerticalAlignment="Center"
-                              ToolTip="{Binding [Mini_SoloVistosTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                              AutomationProperties.Name="{Binding [Mini_SoloVistos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
-                <TextBlock Text="{Binding [Mini_SoloVistos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.Caption}"
+                              ToolTip="{loc:T Mini_SoloVistosTip}"
+                              AutomationProperties.Name="{loc:T Mini_SoloVistos}"/>
+                <TextBlock Text="{loc:T Mini_SoloVistos}" Style="{StaticResource AppText.Caption}"
                            VerticalAlignment="Center"
-                           ToolTip="{Binding [Mini_SoloVistosTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                           ToolTip="{loc:T Mini_SoloVistosTip}"/>
             </StackPanel>
             <!-- Una sola plantilla para todos los juegos (MinijuegosViewModel.Juegos): icono, título, descripción y récord
                  salen del ViewModel de cada juego. -->
@@ -83,7 +83,7 @@
                                         AutomationProperties.Name="{Binding TituloTexto}">
                                     <StackPanel Orientation="Horizontal">
                                         <materialDesign:PackIcon Kind="Play" Width="20" Height="20" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                        <TextBlock Text="{Binding [Mini_Jugar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{loc:T Mini_Jugar}" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </Button>
                                 <StackPanel>

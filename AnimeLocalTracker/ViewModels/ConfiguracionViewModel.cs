@@ -45,9 +45,7 @@ public partial class ConfiguracionViewModel : ObservableObject
     {
         try
         {
-            var config = _settingsService.ObtenerConfiguracion();
-            config.PluginsHabilitados = valor;
-            await _settingsService.GuardarConfiguracionAsync(config);
+            await _settingsService.ActualizarAsync(c => c.PluginsHabilitados = valor);
             PluginsRequiereReinicio = true; // los .dll solo se cargan al iniciar la app
         }
         catch (Exception ex)
@@ -71,9 +69,7 @@ public partial class ConfiguracionViewModel : ObservableObject
     {
         try
         {
-            var config = _settingsService.ObtenerConfiguracion();
-            config.RegistroDetallado = valor;
-            await _settingsService.GuardarConfiguracionAsync(config);
+            await _settingsService.ActualizarAsync(c => c.RegistroDetallado = valor);
             AppLogger.Info("ConfiguracionViewModel", valor ? "Registro detallado activado." : "Registro detallado desactivado.");
         }
         catch (Exception ex)

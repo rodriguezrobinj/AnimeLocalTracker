@@ -45,7 +45,7 @@
                 <!-- Imagen pixelada: gana detalle con cada pista y sale entera al responder -->
                 <Border Grid.Column="0" Width="230" Height="345" CornerRadius="14" ClipToBounds="True" VerticalAlignment="Top" Margin="0,0,28,0"
                         Background="{DynamicResource Brush.Surface2}" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1"
-                        AutomationProperties.Name="{Binding [Mini_PersonajeAcc], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                        AutomationProperties.Name="{loc:T Mini_PersonajeAcc}">
                     <Grid>
                         <!-- Placeholder DEBAJO de la imagen: se ve si no carga -->
                         <materialDesign:PackIcon Kind="AccountCircleOutline" Foreground="{DynamicResource Brush.TextTertiary}" Width="48" Height="48"

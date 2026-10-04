@@ -314,16 +314,7 @@ public sealed partial class EpisodiosFichaViewModel : ObservableObject,
     }
 
     /// <summary>Cambio de idioma con la ficha abierta: el desplegable de filtro y el aviso de huecos se retraducen.</summary>
-    public void Receive(IdiomaCambiadoMensaje message)
-    {
-        var dispatcher = System.Windows.Application.Current?.Dispatcher;
-        if (dispatcher != null && !dispatcher.CheckAccess())
-        {
-            _ = dispatcher.InvokeAsync(RefrescarTextosTraducidos);
-            return;
-        }
-        RefrescarTextosTraducidos();
-    }
+    public void Receive(IdiomaCambiadoMensaje message) => Core.HiloUi.Ejecutar(RefrescarTextosTraducidos);
 
     private void RefrescarTextosTraducidos()
     {
@@ -1051,19 +1042,12 @@ public sealed partial class EpisodiosFichaViewModel : ObservableObject,
         try
         {
             await Task.Delay(DuracionAvisoDeshacer, ct);
-            EnHiloDeInterfaz(OlvidarMarcadoAnterior);
+            Core.HiloUi.Ejecutar(OlvidarMarcadoAnterior);
         }
         catch (OperationCanceledException)
         {
             // Se deshizo, se descartó o llegó otro marcado: ese aviso ya no cuenta.
         }
-    }
-
-    private static void EnHiloDeInterfaz(Action accion)
-    {
-        var dispatcher = System.Windows.Application.Current?.Dispatcher;
-        if (dispatcher != null && !dispatcher.CheckAccess()) dispatcher.BeginInvoke(accion);
-        else accion();
     }
 
     [RelayCommand]
