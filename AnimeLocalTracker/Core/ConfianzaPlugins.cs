@@ -12,6 +12,9 @@ namespace AnimeLocalTracker.Core;
 /// confiable, quedando fijada su huella SHA-256. Un archivo que cambie después (por ejemplo, reemplazado por otro
 /// programa) ya no coincide con la huella y deja de ejecutarse hasta que el usuario lo confirme otra vez.
 /// Lógica pura: no toca la red ni la UI, para poder probarla con archivos temporales.
+/// Límite conocido: la lista de huellas aprobadas vive en settings.json, con los mismos permisos que la carpeta de
+/// plugins. Esto protege de un archivo dejado o cambiado ahí sin que el usuario lo apruebe, no de un programa del mismo
+/// usuario decidido a reescribir también esa lista (ese programa ya puede ejecutar código por su cuenta).
 /// </summary>
 public static class ConfianzaPlugins
 {
@@ -28,6 +31,9 @@ public static class ConfianzaPlugins
         using var flujo = new FileStream(rutaArchivo, FileMode.Open, FileAccess.Read, FileShare.Read);
         return Convert.ToHexString(SHA256.HashData(flujo));
     }
+
+    /// <summary>Huella SHA-256 (hex mayúsculas) de un contenido ya leído: la de exactamente los bytes que se van a ejecutar.</summary>
+    public static string CalcularSha256(ReadOnlySpan<byte> contenido) => Convert.ToHexString(SHA256.HashData(contenido));
 
     /// <summary>
     /// True si es solo un nombre de archivo (sin carpetas ni "..") y con extensión de plugin. Evita que un nombre como
@@ -87,4 +93,12 @@ public static class ConfianzaPlugins
             return false;
         }
     }
+
+    /// <summary>
+    /// Lo mismo, pero sobre el contenido ya leído. Es la forma de usarlo al ejecutar: se comprueba la huella de unos bytes
+    /// y se ejecutan ESOS bytes. Comprobando la ruta y cargándola después, el archivo podía cambiarse entre un paso y otro.
+    /// </summary>
+    public static bool PuedeEjecutarse(AppSettings configuracion, string nombreArchivo, ReadOnlySpan<byte> contenido)
+        => configuracion.PluginsHabilitados
+           && Evaluar(configuracion, nombreArchivo, CalcularSha256(contenido)) == EstadoConfianzaPlugin.Confiable;
 }

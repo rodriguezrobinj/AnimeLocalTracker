@@ -28,8 +28,8 @@ def ips_de(host: str) -> List[str]:
     return [info[4][0] for info in socket.getaddrinfo(host, 443, type=socket.SOCK_STREAM)]
 
 
-def destino_seguro(url: str) -> bool:
-    """Solo https hacia un servidor de Internet: IP literal privada, nombres de intranet o dominios que resuelvan a una IP privada se rechazan."""
+def forma_segura(url: str) -> bool:
+    """Lo que se sabe sin tocar la red: https, sin usuario/contraseña, y un host que no es una IP privada ni un nombre de intranet."""
     try:
         parsed = urlparse(url)
         host = (parsed.hostname or "").rstrip(".").lower()
@@ -39,8 +39,22 @@ def destino_seguro(url: str) -> bool:
             return ipaddress.ip_address(host).is_global
         except ValueError:
             pass
-        if "." not in host or host.endswith(_SUFIJOS_LOCALES):
-            return False
+        return "." in host and not host.endswith(_SUFIJOS_LOCALES)
+    except Exception:
+        return False
+
+
+def destino_seguro(url: str) -> bool:
+    """Solo https hacia un servidor de Internet: IP literal privada, nombres de intranet o dominios que resuelvan a una IP privada se rechazan."""
+    if not forma_segura(url):
+        return False
+    try:
+        host = (urlparse(url).hostname or "").rstrip(".").lower()
+        try:
+            ipaddress.ip_address(host)
+            return True  # IP literal: forma_segura ya comprobó que es pública
+        except ValueError:
+            pass
         ips = ips_de(host)
         return bool(ips) and all(ipaddress.ip_address(ip).is_global for ip in ips)
     except Exception:

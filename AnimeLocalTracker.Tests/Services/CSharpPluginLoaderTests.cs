@@ -126,7 +126,7 @@ public class CSharpPluginLoaderTests : IDisposable
         CopiarEnsambladoDeTestsComoPlugin();
         var consultados = new List<string>();
 
-        var proveedores = CSharpPluginLoader.CargarProveedoresVideo(_carpeta, esConfiable: ruta => { consultados.Add(Path.GetFileName(ruta)); return false; });
+        var proveedores = CSharpPluginLoader.CargarProveedoresVideo(_carpeta, esConfiable: (nombre, _) => { consultados.Add(nombre); return false; });
 
         proveedores.Should().BeEmpty();
         consultados.Should().Equal("PluginDePrueba.dll");
@@ -137,8 +137,62 @@ public class CSharpPluginLoaderTests : IDisposable
     {
         CopiarEnsambladoDeTestsComoPlugin();
 
-        var proveedores = CSharpPluginLoader.CargarProveedoresVideo(_carpeta, esConfiable: _ => true);
+        var proveedores = CSharpPluginLoader.CargarProveedoresVideo(_carpeta, esConfiable: (_, _) => true);
 
         proveedores.Should().Contain(p => p.Nombre == "PluginFalsoDePrueba");
+    }
+
+    [Fact]
+    public void CargarProveedoresVideo_CargaExactamenteLosBytesQueElPredicadoComprobo()
+    {
+        CopiarEnsambladoDeTestsComoPlugin();
+        string rutaPlugin = Path.Combine(_carpeta, "PluginDePrueba.dll");
+        byte[] enDisco = File.ReadAllBytes(rutaPlugin);
+        byte[]? comprobado = null;
+
+        var proveedores = CSharpPluginLoader.CargarProveedoresVideo(_carpeta, esConfiable: (_, contenido) => { comprobado = contenido; return true; });
+
+        proveedores.Should().Contain(p => p.Nombre == "PluginFalsoDePrueba");
+        comprobado.Should().Equal(enDisco);
+        // Cargado desde memoria: el archivo no queda en uso, así que cambiarlo después ya no cambia lo que se ejecutó.
+        var borrar = () => File.Delete(rutaPlugin);
+        borrar.Should().NotThrow("el plugin se carga de los bytes comprobados, no volviendo a leer la ruta");
+    }
+
+    private static System.Runtime.Loader.AssemblyLoadContext ContextoDe(IProveedorVideo proveedor)
+        => System.Runtime.Loader.AssemblyLoadContext.GetLoadContext(proveedor.GetType().Assembly)!;
+
+    /// <summary>Copia junto al plugin una biblioteca de la que depende (xunit.core: varias clases de este ensamblado la usan).</summary>
+    private void CopiarDependenciaJuntoAlPlugin()
+    {
+        string origen = typeof(FactAttribute).Assembly.Location;
+        File.Copy(origen, Path.Combine(_carpeta, Path.GetFileName(origen)));
+    }
+
+    [Fact]
+    public void UnaDependenciaSinConfianza_NoSeCargaDesdeLaCarpetaDePlugins()
+    {
+        CopiarEnsambladoDeTestsComoPlugin();
+        CopiarDependenciaJuntoAlPlugin();
+
+        var proveedor = CSharpPluginLoader.CargarProveedoresVideo(_carpeta, esConfiable: (nombre, _) => nombre == "PluginDePrueba.dll")
+            .Find(p => p.Nombre == "PluginFalsoDePrueba");
+
+        proveedor.Should().NotBeNull();
+        ContextoDe(proveedor!).Assemblies.Should().NotContain(a => a.GetName().Name == "xunit.core",
+            "una biblioteca dejada junto a un plugin aprobado es código igual que el plugin: sin su propia aprobación no entra");
+    }
+
+    [Fact]
+    public void UnaDependenciaConConfianza_SeCargaConElPlugin()
+    {
+        CopiarEnsambladoDeTestsComoPlugin();
+        CopiarDependenciaJuntoAlPlugin();
+
+        var proveedor = CSharpPluginLoader.CargarProveedoresVideo(_carpeta, esConfiable: (_, _) => true)
+            .Find(p => p.Nombre == "PluginFalsoDePrueba");
+
+        proveedor.Should().NotBeNull();
+        ContextoDe(proveedor!).Assemblies.Should().Contain(a => a.GetName().Name == "xunit.core");
     }
 }

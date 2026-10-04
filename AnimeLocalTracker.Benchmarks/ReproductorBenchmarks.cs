@@ -129,7 +129,7 @@ public Task ActualizarAnimesAsync(IEnumerable<AnimeItem> animes) => Task.Complet
         public Task<bool> ExportarCopiaSeguridadAsync(string rutaDestino) => Task.FromResult(true);
         public Task<bool> RestaurarCopiaSeguridadAsync(string rutaOrigen) => Task.FromResult(true);
         public Task<int> ExportarBibliotecaJsonAsync(string rutaDestino) => Task.FromResult(0);
-        public Task<int> ImportarBibliotecaJsonAsync(string rutaOrigen) => Task.FromResult(0);
+        public Task<ResultadoImportacion> ImportarBibliotecaJsonAsync(string rutaOrigen, string? rutaBaseAnimes = null) => Task.FromResult(default(ResultadoImportacion));
         public Task GuardarRegistroEpisodioAsync(RegistroEpisodio registro) => Task.CompletedTask;
         public Task GuardarFavoritoEpisodioAsync(int aniListId, int numeroEpisodio, bool favorito, string? rutaArchivo) => Task.CompletedTask;
         public Task GuardarRegistrosEpisodioBulkAsync(IEnumerable<RegistroEpisodio> registros) => Task.CompletedTask;

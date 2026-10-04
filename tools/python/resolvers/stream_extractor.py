@@ -4,6 +4,7 @@ import os
 import yt_dlp
 
 from resolvers.browser_stream_extractor import BrowserStreamExtractor, es_dominio_byse
+from resolvers.http_seguro import forma_segura
 from resolvers.mediafire_extractor import MediafireExtractor, es_dominio_mediafire
 from resolvers.packed_extractor import PackedHlsExtractor, es_dominio_packed
 from resolvers.voe_extractor import VoeExtractor, es_dominio_voe
@@ -31,12 +32,12 @@ class StreamExtractor:
 
     @staticmethod
     def _is_safe_http_url(url: str) -> bool:
-        """Solo http/https absolutas. Nunca esquemas locales (file://, ftp://, rutas)."""
-        try:
-            parsed = urlparse(url)
-            return parsed.scheme in ("http", "https") and bool(parsed.netloc)
-        except Exception:
-            return False
+        """
+        Solo https hacia un servidor de Internet: nunca http en claro, esquemas locales (file://, ftp://, rutas), la propia
+        máquina ni la red local. La app ya filtra así antes de llamar; se repite aquí para que el daemon no dependa de quien
+        lo llame. (Las redirecciones que yt-dlp siga por dentro no pasan por aquí.)
+        """
+        return forma_segura(url)
 
     @staticmethod
     def extract_stream_info(url: str, custom_headers: Optional[Dict[str, str]] = None, servidor: Optional[str] = None) -> Dict[str, Any]:
@@ -46,7 +47,7 @@ class StreamExtractor:
         los formatos/URLs devueltos se filtran a https.
         """
         if not StreamExtractor._is_safe_http_url(url):
-            return {"success": False, "error": "URL no permitida (solo http/https)."}
+            return {"success": False, "error": "URL no permitida (solo https hacia servidores públicos)."}
 
         # Byse es una SPA sin nada server-side que scrapear y yt-dlp no tiene
         # extractor para el sitio: se resuelve con el navegador (ver BrowserStreamExtractor).
@@ -157,11 +158,11 @@ class StreamExtractor:
     def download_stream(url: str, output_path: str, custom_headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
         """
         Descarga un stream (HLS/DASH segmentado o archivo directo) con yt-dlp a un
-        archivo local. Bloqueante. Hardening INT-01: URL validada (solo http/https)
+        archivo local. Bloqueante. Hardening INT-01: URL validada (solo https hacia servidores públicos)
         y ruta de salida absoluta (nunca rutas relativas/relativas al cwd).
         """
         if not StreamExtractor._is_safe_http_url(url):
-            return {"success": False, "error": "URL no permitida (solo http/https)."}
+            return {"success": False, "error": "URL no permitida (solo https hacia servidores públicos)."}
         if not os.path.isabs(output_path):
             return {"success": False, "error": "ruta de salida no permitida (debe ser absoluta)."}
 

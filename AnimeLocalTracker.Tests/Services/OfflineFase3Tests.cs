@@ -74,6 +74,31 @@ public class OfflineFase3Tests : IDisposable
     }
 
     [Fact]
+    public async Task LaCola_ConCambiosALaVez_QuedaComoElEstadoFinal()
+    {
+        const int hilos = 16;
+        var sut = Servicio(RutaCola);
+
+        for (int ronda = 0; ronda < 20; ronda++)
+        {
+            for (int episodio = 1; episodio <= hilos; episodio++)
+                await sut.IniciarDescargaEpisodioAsync(7, "Frieren", CarpetaAnime, episodio);
+
+            // Todas las cancelaciones a la vez: cada una guarda la cola, y la última escritura debe ser la más reciente.
+            using var salida = new Barrier(hilos);
+            var cancelaciones = Enumerable.Range(1, hilos).Select(episodio => new Thread(() =>
+            {
+                salida.SignalAndWait();
+                sut.CancelarDescarga(7, episodio);
+            })).ToList();
+            cancelaciones.ForEach(h => h.Start());
+            cancelaciones.ForEach(h => h.Join());
+
+            File.ReadAllText(RutaCola).Should().Be("[]", "todo se canceló: un guardado atrasado no puede dejar descargas que resucitarían al reabrir la app");
+        }
+    }
+
+    [Fact]
     public void UnaDescargaPausada_SeRestauraEnPausa_SinEmpezarADescargar()
     {
         File.WriteAllText(RutaCola, $$"""

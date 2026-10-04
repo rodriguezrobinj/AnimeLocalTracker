@@ -27,6 +27,10 @@ public partial class App : Application
 
     public App()
     {
+        // "Borrar todos mis datos": este proceso solo existe para borrar la carpeta de datos cuando la app que lo lanzó ya
+        // cerró. Va antes que nada: cualquier otra cosa (registro, ajustes, base de datos) volvería a crear archivos ahí.
+        if (BorradoTotalDeDatos.EjecutarSiSePidio(Environment.GetCommandLineArgs())) Environment.Exit(0);
+
         MedidorRendimiento.Hito("entorno .NET listo");
         try
         {
@@ -387,12 +391,16 @@ public partial class App : Application
             // Plugins C# "drop-in": cualquier IProveedorVideo hallado en la carpeta de plugins
             // se suma a los proveedores nativos — el orquestador no distingue entre ambos.
             var proveedores = new List<IProveedorVideo> { sp.GetRequiredService<ProveedorVideoAnimeAv1>(), sp.GetRequiredService<ProveedorVideoJkAnime>() };
-            // SEC-01: un .dll solo se carga si los plugins están activados Y el usuario confió en ese archivo con su
-            // huella SHA-256 actual (Configuración → Plugins). Por defecto no se carga ninguno.
+            // SEC-01: un .dll (y cualquier biblioteca que use) solo se carga si los plugins están activados Y el usuario
+            // confió en ese contenido exacto con su huella SHA-256 (Configuración → Plugins). Por defecto no se carga
+            // ninguno, y con los plugins apagados ni siquiera se leen.
             var settingsPlugins = sp.GetRequiredService<ISettingsService>();
-            proveedores.AddRange(CSharpPluginLoader.CargarProveedoresVideo(
-                AppDataPaths.PluginsFolder,
-                esConfiable: ruta => AnimeLocalTracker.Core.ConfianzaPlugins.PuedeEjecutarse(settingsPlugins.ObtenerConfiguracion(), ruta)));
+            if (settingsPlugins.ObtenerConfiguracion().PluginsHabilitados)
+            {
+                proveedores.AddRange(CSharpPluginLoader.CargarProveedoresVideo(
+                    AppDataPaths.PluginsFolder,
+                    esConfiable: (nombre, contenido) => AnimeLocalTracker.Core.ConfianzaPlugins.PuedeEjecutarse(settingsPlugins.ObtenerConfiguracion(), nombre, contenido)));
+            }
             // El orden de los sitios lo elige el usuario en Configuración: se lee en cada búsqueda (sin reiniciar la app).
             return new OrquestadorMultiProveedor(proveedores, ordenProveedores: () => settingsPlugins.ObtenerConfiguracion().OrdenProveedoresVideo);
         });

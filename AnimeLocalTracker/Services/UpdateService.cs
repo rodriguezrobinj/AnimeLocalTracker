@@ -46,8 +46,9 @@ public class UpdateService : IUpdateService
         try
         {
             var source = new GithubSource(RepoUrl, null, false);
-            // SEC-011: Prevenir downgrades o paquetes sin firma (Velopack requiere firmas nativamente
-            // pero pasamos opciones adicionales para más estrictez si está disponible).
+            // SEC-011: nunca se instala una versión anterior a la actual. OJO: Velopack NO comprueba firmas; solo que el
+            // paquete coincida con la suma publicada en la misma release. La integridad de una actualización descansa en
+            // la cuenta de GitHub que publica y en HTTPS, y las releases salen sin firma Authenticode (SEC-06, pendiente).
             var options = new Velopack.UpdateOptions { AllowVersionDowngrade = false };
             _updateManager = new UpdateManager(source, options);
         }

@@ -36,6 +36,24 @@ public class AnimeLibraryService
         return await _databaseService.ExisteAnimeAsync(aniListId);
     }
 
+    private static readonly string[] NombresReservados =
+        ["CON", "PRN", "AUX", "NUL", .. Enumerable.Range(0, 10).SelectMany(n => new[] { $"COM{n}", $"LPT{n}" })];
+
+    /// <summary>
+    /// Nombre de la carpeta de un anime a partir de su título. Además de cambiar lo que Windows no admite en un nombre,
+    /// nunca devuelve "." ni ".." (la carpeta del anime sería la biblioteca entera o la de encima, y borrar el anime
+    /// borraría eso), ni un nombre terminado en punto o espacio (Windows los recorta y la ruta guardada no coincidiría),
+    /// ni un nombre reservado del sistema (CON, NUL, COM1…).
+    /// </summary>
+    internal static string NombreDeCarpeta(string titulo, int aniListId)
+    {
+        string nombre = string.Join("_", titulo.Split(Path.GetInvalidFileNameChars())).Trim().TrimEnd('.', ' ');
+        if (nombre.Length == 0) return $"Anime {aniListId}";
+
+        string sinExtension = nombre.Split('.')[0].TrimEnd();
+        return NombresReservados.Contains(sinExtension, StringComparer.OrdinalIgnoreCase) ? "_" + nombre : nombre;
+    }
+
     /// <summary>
     /// Crea la carpeta, construye el AnimeItem con los metadatos de AniList, lo persiste
     /// en SQLite y notifica a la galería. Devuelve null si el anime ya existía.
@@ -46,7 +64,7 @@ public class AnimeLibraryService
 
         if (await ExisteEnBibliotecaAsync(animeAPI.Id)) return null;
 
-        string nombreSeguro = string.Join("_", titulo.Split(Path.GetInvalidFileNameChars()));
+        string nombreSeguro = NombreDeCarpeta(titulo, animeAPI.Id);
         string rutaBaseVideos = _settingsService.ObtenerRutaBaseAnimes();
         string nuevaRutaCarpeta = Path.Combine(rutaBaseVideos, nombreSeguro);
 

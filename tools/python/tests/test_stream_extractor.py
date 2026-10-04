@@ -99,3 +99,24 @@ def test_download_stream_no_imprime_el_progreso_de_yt_dlp_por_la_salida_estandar
     opciones = mock_ydl_cls.call_args.args[0]
     assert opciones.get("noprogress") is True
     assert opciones.get("quiet") is True
+
+
+@pytest.mark.parametrize("url", [
+    "http://cdn.example.com/video.mp4",          # http en claro
+    "https://127.0.0.1/video.mp4",               # la propia máquina
+    "https://192.168.1.10/video.mp4",            # la red local
+    "https://169.254.169.254/latest/meta-data",  # metadatos de una nube
+    "https://router/video.mp4",                  # nombre de intranet
+    "https://nas.local/video.mp4",
+    "https://usuario:clave@cdn.example.com/v.mp4",
+    "file:///C:/Windows/win.ini",
+    "",
+])
+def test_resolve_y_download_rechazan_lo_que_no_sea_https_hacia_internet(url, tmp_path):
+    with patch("resolvers.stream_extractor.yt_dlp.YoutubeDL") as mock_ydl_cls:
+        resuelto = StreamExtractor.extract_stream_info(url)
+        descargado = StreamExtractor.download_stream(url, str(tmp_path / "episodio.mp4"))
+
+    assert resuelto["success"] is False
+    assert descargado["success"] is False
+    mock_ydl_cls.assert_not_called()

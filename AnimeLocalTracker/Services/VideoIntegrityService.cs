@@ -9,13 +9,8 @@ namespace AnimeLocalTracker.Services;
 
 public class VideoIntegrityService : IVideoIntegrityService
 {
-    // Preferir el ffprobe embebido (carpeta FFmpeg/ del output); si no está, caer al del
-    // PATH del sistema con el mismo criterio de visibilidad que NativeMethods.AsegurarFfmpegEnPath.
-    private static readonly Lazy<string> RutaFfprobe = new(() =>
-    {
-        string embebido = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "FFmpeg", "ffprobe.exe");
-        return File.Exists(embebido) ? embebido : "ffprobe";
-    });
+    // El ffprobe embebido (carpeta FFmpeg/ del output); el del sistema solo en desarrollo: ver FfmpegLocator.
+    private static readonly Lazy<string> RutaFfprobe = new(() => FfmpegLocator.Ffprobe);
 
     public async Task<ResultadoIntegridad> VerificarArchivoAsync(string rutaArchivo, CancellationToken ct = default)
     {

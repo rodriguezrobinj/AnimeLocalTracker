@@ -522,7 +522,11 @@ public class AnimeThemesDownloadService : IAnimeThemesDownloadService
     /// volver a codificar ni perder calidad, una fracción de segundo por canción).</param>
     internal static List<string> ArgumentosConversion(string rutaOgg, string rutaSalida, AnimeThemeInfo tema, string? rutaPortada, bool copiarAudio = false)
     {
-        var args = new List<string> { "-y", "-hide_banner", "-loglevel", "error", "-i", rutaOgg };
+        var args = new List<string> { "-y", "-hide_banner", "-loglevel", "error" };
+        // Lo descargado se lee como lo que debe ser, un .ogg: sin decírselo, ffmpeg adivina el formato por el contenido y
+        // un servidor comprometido podría mandar una lista de reproducción que le hiciera abrir otras direcciones o archivos.
+        if (!copiarAudio) args.AddRange(["-f", "ogg"]);
+        args.AddRange(["-i", rutaOgg]);
         if (rutaPortada != null) args.AddRange(["-i", rutaPortada]);
 
         args.AddRange(["-map", "0:a:0"]);

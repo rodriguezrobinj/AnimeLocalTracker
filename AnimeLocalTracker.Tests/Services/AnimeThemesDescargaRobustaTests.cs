@@ -340,6 +340,18 @@ public class AnimeThemesDescargaRobustaTests : IDisposable
     }
 
     [Fact]
+    public void ArgumentosConversion_LeeLoDescargadoComoOggSinDejarQueFfmpegAdivineElFormato()
+    {
+        var tema = Tema("OP", "OP1", 1, null);
+
+        string.Join(" ", AnimeThemesDownloadService.ArgumentosConversion("in.ogg", "out.part", tema, null))
+            .Should().Contain("-f ogg -i in.ogg", "un archivo que no sea un .ogg (p. ej. una lista de reproducción) debe fallar, no abrirse");
+        // Al reetiquetar, el origen es el mp3 que la propia app generó.
+        string.Join(" ", AnimeThemesDownloadService.ArgumentosConversion("ya.mp3", "out.part", tema, null, copiarAudio: true))
+            .Should().NotContain("-f ogg");
+    }
+
+    [Fact]
     public async Task Descargar_ConPortada_ElMp3LlevaEtiquetasEImagen()
     {
         string portadas = Path.Combine(_raiz, "Covers");

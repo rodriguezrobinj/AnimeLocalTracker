@@ -55,23 +55,11 @@ public class SkipTimesCoordinator : ISkipTimesCoordinator
     /// directorios desde el ejecutable); en un build empaquetado esa carpeta del repo no existe, así
     /// que se usa la copia sincronizada en AnimeLocalTracker/PythonPlugins/ (incluida por
     /// &lt;None Include="PythonPlugins\**"/&gt; del .csproj — a diferencia de Tools\, esta SÍ va al
-    /// control de versiones). Mantener ambas copias iguales al tocar el algoritmo.
+    /// control de versiones). Mantener ambas copias iguales al tocar el algoritmo. En un build publicado NUNCA se
+    /// buscan carpetas superiores: lo encontrado se ejecuta (ver <see cref="LocalizadorHerramientasPython"/>).
     /// </summary>
     private static readonly Lazy<string?> RutaPluginAudioSkip = new(() =>
-    {
-        string baseDir = AppDomain.CurrentDomain.BaseDirectory;
-
-        var searchDir = new DirectoryInfo(baseDir);
-        for (int i = 0; i < 6 && searchDir != null; i++)
-        {
-            string candidato = Path.Combine(searchDir.FullName, "tools", "python", "audio_skip_plugin.py");
-            if (File.Exists(candidato)) return candidato;
-            searchDir = searchDir.Parent;
-        }
-
-        string empaquetado = Path.Combine(baseDir, "PythonPlugins", "audio_skip_plugin.py");
-        return File.Exists(empaquetado) ? empaquetado : null;
-    });
+        LocalizadorHerramientasPython.PluginAudioSkip(AppDomain.CurrentDomain.BaseDirectory, LocalizadorHerramientasPython.CompilacionDeDesarrollo));
 
     /// <param name="referencias">Consigue (y baja si falta) el audio oficial de los temas; sin él solo se usan las descargas de la Ficha.</param>
     /// <param name="database">Guarda el análisis de cada episodio (segunda vez: al instante y sin red). Sin él no hay caché.</param>

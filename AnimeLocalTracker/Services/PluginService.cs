@@ -106,7 +106,13 @@ public class PluginService : IPluginService
 
         // ...y solo si los plugins están activados y el usuario confió en ESTE contenido exacto (huella SHA-256).
         var configuracion = _settings?.ObtenerConfiguracion() ?? new AppSettings();
-        if (!ConfianzaPlugins.PuedeEjecutarse(configuracion, pluginPath))
+        byte[]? contenido = null;
+        if (configuracion.PluginsHabilitados)
+        {
+            try { contenido = await File.ReadAllBytesAsync(pluginPath, ct); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { /* no se puede leer: no se ejecuta */ }
+        }
+        if (contenido == null || !ConfianzaPlugins.PuedeEjecutarse(configuracion, pluginFileName, contenido))
         {
             AppLogger.Warn("PluginService", $"Plugin '{pluginFileName}' no ejecutado: plugins desactivados o archivo sin confianza/modificado.");
             return default;
@@ -118,11 +124,14 @@ public class PluginService : IPluginService
             return default;
         }
 
+        // La huella viaja con la petición: el daemon ejecuta el archivo solo si lo que lee sigue siendo lo aprobado
+        // (entre esta comprobación y su lectura el archivo podría cambiarse).
         var payload = new
         {
             plugin_path = pluginPath,
             func_name = functionName,
-            args = args
+            args = args,
+            sha256 = ConfianzaPlugins.CalcularSha256(contenido)
         };
 
         var daemonResponse = await _pythonBridge.ExecuteCommandAsync<object, PluginDaemonResponse<TResponse>>("run-plugin", payload, ct);

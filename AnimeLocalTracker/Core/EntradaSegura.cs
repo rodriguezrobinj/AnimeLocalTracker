@@ -37,6 +37,27 @@ public static class EntradaSegura
     }
 
     /// <summary>
+    /// Servidor al que apunta una ruta de red (<c>\\servidor\recurso\…</c>, también con barras <c>/</c> o con el prefijo
+    /// <c>\\?\UNC\</c>), en minúsculas; null si la ruta es local. Solo con tocar una ruta así (comprobar si existe, listar
+    /// la carpeta) Windows se conecta a ese servidor y le presenta las credenciales del usuario: una ruta que llega en un
+    /// archivo de otra persona no puede elegir a qué servidor se conecta la app.
+    /// </summary>
+    public static string? ServidorDeRed(string? ruta)
+    {
+        if (string.IsNullOrWhiteSpace(ruta)) return null;
+
+        string normalizada = ruta.Trim().Replace('/', '\\');
+        if (!normalizada.StartsWith(@"\\", StringComparison.Ordinal)) return null;
+
+        string resto = normalizada[2..];
+        if (resto.StartsWith(@"?\UNC\", StringComparison.OrdinalIgnoreCase)) resto = resto[6..];
+        else if (resto.StartsWith(@"?\", StringComparison.Ordinal) && resto.Length > 3 && resto[3] == ':') return null; // \\?\C:\… es un disco local
+
+        int fin = resto.IndexOf('\\');
+        return (fin < 0 ? resto : resto[..fin]).ToLowerInvariant();
+    }
+
+    /// <summary>
     /// Lee el cuerpo de una respuesta HTTP sin permitir que supere <paramref name="maximoBytes"/>: rechaza pronto si
     /// <c>Content-Length</c> ya lo excede y corta la lectura si el servidor miente o no lo declara.
     /// </summary>

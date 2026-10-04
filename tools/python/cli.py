@@ -89,28 +89,31 @@ def process_command(command: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         plugin_path = payload.get("plugin_path", "")
         func_name = payload.get("func_name", "")
         args_dict = payload.get("args", {})
-        
+        sha256_aprobado = payload.get("sha256")
+
         try:
-            import importlib.util
+            import hashlib
             import os
-            
+            import types
+
             if not os.path.isfile(plugin_path):
                 return {"success": False, "error": f"El archivo de plugin no existe: {plugin_path}"}
-                
+
+            # SEC-01: el archivo se lee UNA vez y se ejecuta exactamente lo leído. La app aprueba un plugin por la huella
+            # de su contenido y la manda con la petición: si entre su comprobación y esta lectura el archivo cambió, no
+            # se ejecuta (cargándolo por su ruta se volvía a leer del disco, ya sin comprobar).
+            with open(plugin_path, "rb") as archivo:
+                codigo = archivo.read()
+            if sha256_aprobado and hashlib.sha256(codigo).hexdigest().lower() != str(sha256_aprobado).lower():
+                return {"success": False, "error": "El plugin cambió desde que se aprobó: no se ejecuta."}
+
+            # La carpeta del plugin NO se añade a sys.path: se quedaba ahí para siempre y cualquier "import" posterior del
+            # daemon podía resolverse con un archivo dejado en esa carpeta, sin pasar por la aprobación.
             module_name = os.path.splitext(os.path.basename(plugin_path))[0]
-            spec = importlib.util.spec_from_file_location(module_name, plugin_path)
-            if spec is None or spec.loader is None:
-                return {"success": False, "error": "No se pudo cargar la especificación del plugin."}
-                
-            plugin_module = importlib.util.module_from_spec(spec)
-            
-            # Agregar temporalmente al path por si requiere dependencias relativas
-            plugin_dir = os.path.dirname(plugin_path)
-            if plugin_dir not in sys.path:
-                sys.path.insert(0, plugin_dir)
-                
-            spec.loader.exec_module(plugin_module)
-            
+            plugin_module = types.ModuleType(module_name)
+            plugin_module.__file__ = plugin_path
+            exec(compile(codigo, plugin_path, "exec"), plugin_module.__dict__)
+
             if not hasattr(plugin_module, func_name):
                 return {"success": False, "error": f"La función '{func_name}' no existe en el plugin '{module_name}'."}
                 
