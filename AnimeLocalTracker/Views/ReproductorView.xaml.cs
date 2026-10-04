@@ -625,6 +625,8 @@ namespace AnimeLocalTracker.Views
         // Los controles viven en una ventana propia de Flyleaf (Overlay) encima del video. Al hacer clic en un botón, el foco pasa a esa
         // ventana y las teclas ya no llegaban a este control: las flechas, espacio, etc. dejaban de funcionar hasta sacar y volver a poner
         // el foco en la app. Ahora esas ventanas pasan sus teclas por el mismo manejador.
+        // Con el ratón pasa igual: un clic en el video lo recibe la ventana Surface y uno en la barra la Overlay, nunca este control;
+        // por eso el "clic fuera cierra el menú" también se engancha aquí.
         private readonly System.Collections.Generic.List<Window> _ventanasConTeclado = new();
 
         private void HostFlyleaf_VentanaCreada(object? sender, EventArgs e) => EngancharTecladoEnVentanasDeFlyleaf();
@@ -636,6 +638,7 @@ namespace AnimeLocalTracker.Views
             {
                 if (ventana == null || _ventanasConTeclado.Contains(ventana)) continue;
                 ventana.PreviewKeyDown += ReproductorView_PreviewKeyDown;
+                ventana.PreviewMouseLeftButtonDown += ReproductorView_PreviewMouseLeftButtonDown;
                 _ventanasConTeclado.Add(ventana);
                 FuenteNativa(ventana)?.AddHook(BordeMiniHook);
             }
@@ -646,6 +649,7 @@ namespace AnimeLocalTracker.Views
             foreach (var ventana in _ventanasConTeclado)
             {
                 ventana.PreviewKeyDown -= ReproductorView_PreviewKeyDown;
+                ventana.PreviewMouseLeftButtonDown -= ReproductorView_PreviewMouseLeftButtonDown;
                 FuenteNativa(ventana)?.RemoveHook(BordeMiniHook);
             }
             _ventanasConTeclado.Clear();
