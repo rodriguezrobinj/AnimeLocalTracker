@@ -3,21 +3,13 @@ using AnimeLocalTracker.Models;
 namespace AnimeLocalTracker.Messages;
 
 // === Mensajes de Navegación ===
-public record NavegarMensaje_Galeria();
-public record NavegarMensaje_AgregarAnime();
+/// <summary>Abrir una pestaña de la barra lateral (ver ViewModels/Pestana.cs). Se envía con <c>Pestanas.X.Abrir()</c>.</summary>
+public record NavegarMensaje_Pestana(AnimeLocalTracker.ViewModels.Pestana Pestana);
 /// <param name="ReproducirTemaClave">Opcional: al abrir la ficha, abrir el panel de música y reproducir ese opening/ending
 /// (tipo|slug|versión). Lo usa "Reproducir" en el historial de descargas.</param>
 public record NavegarMensaje_Detalle(AnimeItem AnimeSeleccionado, string? ReproducirTemaClave = null);
-public record NavegarMensaje_Calendario();
-public record NavegarMensaje_Descargas();
-public record NavegarMensaje_Configuracion();
 /// <summary>Visor de registros (se abre desde Configuración → Registro de diagnóstico).</summary>
 public record NavegarMensaje_VisorRegistros();
-public record NavegarMensaje_AcercaDe();
-public record NavegarMensaje_Estadisticas();
-public record NavegarMensaje_Historial();
-public record NavegarMensaje_Logros();
-public record NavegarMensaje_Actualizaciones();
 public record NavegarMensaje_Reproductor(string RutaVideo, int AnimeId, string TituloAnime, int Episodio, System.Collections.Generic.List<EpisodioItem>? EpisodiosDisponibles = null, string? RutaPortada = null);
 public record NavegarMensaje_VolverDelReproductor();
 

@@ -15,7 +15,7 @@ using AnimeLocalTracker.Messages;
 
 namespace AnimeLocalTracker.ViewModels;
 
-public partial class GaleriaViewModel : ObservableObject, IDisposable,
+public partial class GaleriaViewModel : ObservableObject, IAlEntrarEnPestana, IDisposable,
     IRecipient<UsuarioLogeadoMensaje>,
     IRecipient<AnimeAñadidoMensaje>,
     IRecipient<UsuarioDesconectadoMensaje>,
@@ -917,7 +917,7 @@ public partial class GaleriaViewModel : ObservableObject, IDisposable,
     [RelayCommand]
     private void AñadirAnimeManual()
     {
-        WeakReferenceMessenger.Default.Send(new NavegarMensaje_AgregarAnime());
+        Pestanas.AgregarAnime.Abrir();
     }
 
     /// <summary>Favorito individual por anime: no altera EstadoUsuario ni ningún otro filtro/categoría.</summary>

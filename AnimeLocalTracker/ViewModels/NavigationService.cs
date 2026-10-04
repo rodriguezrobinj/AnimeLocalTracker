@@ -17,46 +17,22 @@ public interface INavigationService : System.ComponentModel.INotifyPropertyChang
     /// su propia ventana flotante (ver MainWindow.EntrarModoPiP) y la ventana principal queda libre para navegar.</summary>
     ReproductorViewModel? ReproductorEnVentanaPrincipal { get; }
 
-    bool EsGaleriaActiva { get; }
-    bool EsAgregarAnimeActivo { get; }
-    bool EsCalendarioActivo { get; }
-    bool EsDescargasActivas { get; }
-    bool EsConfiguracionActiva { get; }
-    bool EsAcercaDeActivo { get; }
-    bool EsEstadisticasActivo { get; }
-    bool EsHistorialActivo { get; }
-    bool EsLogrosActivo { get; }
-    bool EsActualizacionesActivo { get; }
-    bool EsVisorRegistrosActivo { get; }
 
-    GaleriaViewModel ObtenerGaleria();
-    AgregarAnimeViewModel ObtenerAgregarAnime();
-    CalendarioViewModel ObtenerCalendario();
-    DescargasViewModel ObtenerDescargas();
-    ConfiguracionViewModel ObtenerConfiguracion();
-    AcercaDeViewModel ObtenerAcercaDe();
-    EstadisticasViewModel ObtenerEstadisticas();
-    HistorialViewModel ObtenerHistorial();
-    LogrosViewModel ObtenerLogros();
-    ActualizacionesViewModel ObtenerActualizaciones();
+    /// <summary>¿La vista que se está mostrando deja marcada esta pestaña en la barra lateral?</summary>
+    bool EstaActiva(Pestana pestana);
+
+    /// <summary>El ViewModel que se muestra al abrir la pestaña (para construir su vista por adelantado).</summary>
+    ObservableObject ObtenerVista(Pestana pestana);
+
     VisorRegistrosViewModel ObtenerVisorRegistros();
     DetalleViewModel CrearDetalle();
     ReproductorViewModel CrearReproductor();
 }
 
 public sealed partial class NavigationService : ObservableObject, INavigationService,
-    IRecipient<NavegarMensaje_Galeria>,
-    IRecipient<NavegarMensaje_AgregarAnime>,
+    IRecipient<NavegarMensaje_Pestana>,
     IRecipient<NavegarMensaje_Detalle>,
-    IRecipient<NavegarMensaje_Calendario>,
-    IRecipient<NavegarMensaje_Descargas>,
-    IRecipient<NavegarMensaje_Configuracion>,
     IRecipient<NavegarMensaje_VisorRegistros>,
-    IRecipient<NavegarMensaje_AcercaDe>,
-    IRecipient<NavegarMensaje_Estadisticas>,
-    IRecipient<NavegarMensaje_Historial>,
-    IRecipient<NavegarMensaje_Logros>,
-    IRecipient<NavegarMensaje_Actualizaciones>,
     IRecipient<NavegarMensaje_Reproductor>,
     IRecipient<NavegarMensaje_VolverDelReproductor>
 {
@@ -65,17 +41,6 @@ public sealed partial class NavigationService : ObservableObject, INavigationSer
     private ObservableObject? _vistaAnteriorAlReproductor;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(EsGaleriaActiva))]
-    [NotifyPropertyChangedFor(nameof(EsAgregarAnimeActivo))]
-    [NotifyPropertyChangedFor(nameof(EsCalendarioActivo))]
-    [NotifyPropertyChangedFor(nameof(EsDescargasActivas))]
-    [NotifyPropertyChangedFor(nameof(EsConfiguracionActiva))]
-    [NotifyPropertyChangedFor(nameof(EsAcercaDeActivo))]
-    [NotifyPropertyChangedFor(nameof(EsEstadisticasActivo))]
-    [NotifyPropertyChangedFor(nameof(EsHistorialActivo))]
-    [NotifyPropertyChangedFor(nameof(EsLogrosActivo))]
-    [NotifyPropertyChangedFor(nameof(EsActualizacionesActivo))]
-    [NotifyPropertyChangedFor(nameof(EsVisorRegistrosActivo))]
     private ObservableObject _vistaActual = null!;
 
     [ObservableProperty]
@@ -95,18 +60,7 @@ public sealed partial class NavigationService : ObservableObject, INavigationSer
         if (e.PropertyName == nameof(ReproductorViewModel.EsModoMini)) OnPropertyChanged(nameof(ReproductorEnVentanaPrincipal));
     }
 
-    public bool EsGaleriaActiva => VistaActual is GaleriaViewModel || VistaActual is DetalleViewModel;
-    public bool EsAgregarAnimeActivo => VistaActual is AgregarAnimeViewModel;
-    public bool EsCalendarioActivo => VistaActual is CalendarioViewModel;
-    public bool EsDescargasActivas => VistaActual is DescargasViewModel;
-    // El visor de registros se abre desde Configuración: el botón de Configuración sigue marcado.
-    public bool EsConfiguracionActiva => VistaActual is ConfiguracionViewModel || VistaActual is VisorRegistrosViewModel;
-    public bool EsAcercaDeActivo => VistaActual is AcercaDeViewModel;
-    public bool EsEstadisticasActivo => VistaActual is EstadisticasViewModel;
-    public bool EsHistorialActivo => VistaActual is HistorialViewModel;
-    public bool EsLogrosActivo => VistaActual is LogrosViewModel;
-    public bool EsActualizacionesActivo => VistaActual is ActualizacionesViewModel;
-    public bool EsVisorRegistrosActivo => VistaActual is VisorRegistrosViewModel;
+    public bool EstaActiva(Pestana pestana) => pestana.MarcadaPor(VistaActual);
 
     public NavigationService(IServiceProvider serviceProvider)
     {
@@ -114,16 +68,37 @@ public sealed partial class NavigationService : ObservableObject, INavigationSer
         WeakReferenceMessenger.Default.RegisterAll(this);
     }
 
-    public GaleriaViewModel ObtenerGaleria() => _serviceProvider.GetRequiredService<GaleriaViewModel>();
-    public AgregarAnimeViewModel ObtenerAgregarAnime() => _serviceProvider.GetRequiredService<AgregarAnimeViewModel>();
-    public CalendarioViewModel ObtenerCalendario() => _serviceProvider.GetRequiredService<CalendarioViewModel>();
-    public DescargasViewModel ObtenerDescargas() => _serviceProvider.GetRequiredService<DescargasViewModel>();
-    public ConfiguracionViewModel ObtenerConfiguracion() => _serviceProvider.GetRequiredService<ConfiguracionViewModel>();
-    public AcercaDeViewModel ObtenerAcercaDe() => _serviceProvider.GetRequiredService<AcercaDeViewModel>();
-    public EstadisticasViewModel ObtenerEstadisticas() => _serviceProvider.GetRequiredService<EstadisticasViewModel>();
-    public HistorialViewModel ObtenerHistorial() => _serviceProvider.GetRequiredService<HistorialViewModel>();
-    public LogrosViewModel ObtenerLogros() => _serviceProvider.GetRequiredService<LogrosViewModel>();
-    public ActualizacionesViewModel ObtenerActualizaciones() => _serviceProvider.GetRequiredService<ActualizacionesViewModel>();
+    public ObservableObject ObtenerVista(Pestana pestana) => (ObservableObject)_serviceProvider.GetRequiredService(pestana.Vista);
+
+    public void Receive(NavegarMensaje_Pestana message)
+    {
+        // Volver a la Biblioteca desde una ficha que se abrió en el Calendario devuelve al Calendario.
+        if (message.Pestana == Pestanas.Galeria && _vistaAnteriorADetalleCalendario != null && VistaActual is DetalleViewModel)
+        {
+            VistaActual = _vistaAnteriorADetalleCalendario;
+            _vistaAnteriorADetalleCalendario = null;
+            return;
+        }
+
+        _ = AbrirPestanaAsync(message.Pestana);
+    }
+
+    /// <summary>Muestra la vista de la pestaña y, si tiene algo que hacer al entrar (cargar, refrescar), se lo pide. La vista
+    /// queda puesta antes del primer await: quien envía el mensaje ya la ve como actual al volver.</summary>
+    private async Task AbrirPestanaAsync(Pestana pestana)
+    {
+        try
+        {
+            var vista = ObtenerVista(pestana);
+            VistaActual = vista;
+            if (vista is IAlEntrarEnPestana alEntrar) await alEntrar.AlEntrarAsync();
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("NavigationService", $"Error navegando a {pestana.Clave}", ex);
+        }
+    }
+
     public VisorRegistrosViewModel ObtenerVisorRegistros() => _serviceProvider.GetRequiredService<VisorRegistrosViewModel>();
     /// <summary>
     /// Una ficha nueva por visita. Se crea con la fábrica registrada en App: pedida directamente al contenedor, este guarda una
@@ -132,37 +107,6 @@ public sealed partial class NavigationService : ObservableObject, INavigationSer
     public DetalleViewModel CrearDetalle() =>
         _serviceProvider.GetService<Func<DetalleViewModel>>()?.Invoke() ?? _serviceProvider.GetRequiredService<DetalleViewModel>();
     public ReproductorViewModel CrearReproductor() => _serviceProvider.GetRequiredService<ReproductorViewModel>();
-
-    public void Receive(NavegarMensaje_Galeria message)
-    {
-        if (_vistaAnteriorADetalleCalendario != null && VistaActual is DetalleViewModel)
-        {
-            VistaActual = _vistaAnteriorADetalleCalendario;
-            _vistaAnteriorADetalleCalendario = null;
-            return;
-        }
-        var galeria = ObtenerGaleria();
-        VistaActual = galeria;
-        _ = AlEntrarEnGaleriaAsync(galeria);
-    }
-
-    /// <summary>Si la Galería estaba en su sección de minijuegos, la refresca al volver (animes disponibles y récords).</summary>
-    private static async Task AlEntrarEnGaleriaAsync(GaleriaViewModel galeria)
-    {
-        try
-        {
-            await galeria.AlEntrarAsync();
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Error("NavigationService", "Error al entrar en la galería", ex);
-        }
-    }
-
-    public void Receive(NavegarMensaje_AgregarAnime message)
-    {
-        VistaActual = ObtenerAgregarAnime();
-    }
 
     public void Receive(NavegarMensaje_Detalle message)
     {
@@ -185,36 +129,6 @@ public sealed partial class NavigationService : ObservableObject, INavigationSer
         catch (Exception ex)
         {
             AppLogger.Error("NavigationService", "Error al inicializar la vista de detalle", ex);
-        }
-    }
-
-    public void Receive(NavegarMensaje_Calendario message)
-    {
-        var calendarioVm = ObtenerCalendario();
-        VistaActual = calendarioVm;
-        calendarioVm.RefrescarEstadosEmitidos();
-        if (calendarioVm.EstaVacio && !calendarioVm.EstaCargando)
-        {
-            calendarioVm.CargarCalendarioCommand.Execute(null);
-        }
-    }
-
-    public void Receive(NavegarMensaje_Descargas message)
-    {
-        var descargas = ObtenerDescargas();
-        descargas.Refrescar();
-        VistaActual = descargas;
-    }
-
-    public void Receive(NavegarMensaje_Configuracion message)
-    {
-        try
-        {
-            VistaActual = ObtenerConfiguracion();
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Error("NavigationService", "Error navegando a configuración", ex);
         }
     }
 
@@ -242,106 +156,6 @@ public sealed partial class NavigationService : ObservableObject, INavigationSer
         catch (Exception ex)
         {
             AppLogger.Error("NavigationService", "Error navegando al visor de registros", ex);
-        }
-    }
-
-    public void Receive(NavegarMensaje_AcercaDe message)
-    {
-        try 
-        {
-            VistaActual = ObtenerAcercaDe();
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Error("NavigationService", "Error navegando a acerca de", ex);
-        }
-    }
-
-    public void Receive(NavegarMensaje_Estadisticas message)
-    {
-        _ = NavegarEstadisticas();
-    }
-
-    private async Task NavegarEstadisticas()
-    {
-        try
-        {
-            var estadisticasVm = ObtenerEstadisticas();
-            VistaActual = estadisticasVm;
-            if (estadisticasVm.NecesitaRecargar())
-            {
-                await estadisticasVm.CargarEstadisticasAsync();
-            }
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Error("NavigationService", "Error navegando a estadísticas", ex);
-        }
-    }
-
-    public void Receive(NavegarMensaje_Historial message)
-    {
-        _ = NavegarHistorial();
-    }
-
-    private async Task NavegarHistorial()
-    {
-        try
-        {
-            var historialVm = ObtenerHistorial();
-            VistaActual = historialVm;
-            if (historialVm.NecesitaRecargar())
-            {
-                await historialVm.CargarHistorialAsync();
-            }
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Error("NavigationService", "Error navegando a historial", ex);
-        }
-    }
-
-    public void Receive(NavegarMensaje_Logros message)
-    {
-        _ = NavegarLogros();
-    }
-
-    private async Task NavegarLogros()
-    {
-        try
-        {
-            var logrosVm = ObtenerLogros();
-            VistaActual = logrosVm;
-            if (logrosVm.NecesitaRecargar())
-            {
-                await logrosVm.CargarAsync();
-            }
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Error("NavigationService", "Error navegando a logros", ex);
-        }
-    }
-
-    public void Receive(NavegarMensaje_Actualizaciones message)
-    {
-        _ = NavegarActualizaciones();
-    }
-
-    private async Task NavegarActualizaciones()
-    {
-        try
-        {
-            var actualizacionesVm = ObtenerActualizaciones();
-            VistaActual = actualizacionesVm;
-            if (actualizacionesVm.NecesitaRecargar())
-            {
-                await actualizacionesVm.CargarActualizacionesAsync();
-            }
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Error("NavigationService", "Error navegando a actualizaciones", ex);
         }
     }
 
@@ -401,7 +215,7 @@ public sealed partial class NavigationService : ObservableObject, INavigationSer
         }
         else if (VistaActual == null)
         {
-            VistaActual = ObtenerGaleria();
+            VistaActual = ObtenerVista(Pestanas.Galeria);
         }
         // Si no había vista anterior es que el usuario se movió por la app con el mini reproductor abierto: al cerrarlo se queda
         // donde está (antes lo devolvía a la ficha desde la que abrió el episodio).

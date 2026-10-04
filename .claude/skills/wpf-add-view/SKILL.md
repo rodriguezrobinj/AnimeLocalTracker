@@ -1,43 +1,41 @@
 ---
 name: wpf-add-view
-description: Procedimiento canónico para añadir una nueva pestaña/vista a AnimeLocalTracker (mensaje de navegación → NavigationService → DI → DataTemplate → botón en la sidebar), y el patrón de listas grandes virtualizadas. Usar al crear una pestaña/pantalla nueva o al portar una lista existente a ListBox virtualizado.
+description: Procedimiento canónico para añadir una nueva pestaña/vista a AnimeLocalTracker (fila en la tabla de pestañas → DI → DataTemplate), y el patrón de listas grandes virtualizadas. Usar al crear una pestaña/pantalla nueva o al portar una lista existente a ListBox virtualizado.
 ---
 
 # Añadir una vista/pestaña nueva — AnimeLocalTracker
 
-La app navega cambiando `INavigationService.VistaActual` (un `ObservableObject`); `App.xaml` resuelve la vista correcta vía `DataTemplate` por tipo de ViewModel. **No te saltes eslabones de la cadena** — es la fuente #1 de "no pasa nada al hacer clic" en este patrón.
+La app navega cambiando `INavigationService.VistaActual` (un `ObservableObject`); `App.xaml` resuelve la vista correcta vía `DataTemplate` por tipo de ViewModel. Las pestañas de la barra lateral salen de una tabla: **añadir una pestaña no toca `MainWindow.xaml`, `MainViewModel` ni `NavigationService`.**
 
-## Cadena completa (ejemplo real: Historial)
+## Los tres pasos (ejemplo real: Historial)
 
-1. **Mensaje de navegación** — `AnimeLocalTracker/Messages/NavegarMensajes.cs`:
+1. **Fila en la tabla** — `AnimeLocalTracker/ViewModels/Pestana.cs`, en `Pestanas`, y añadirla a `Pestanas.Todas` en la posición que deba ocupar en la barra:
    ```csharp
-   public record NavegarMensaje_Historial();
+   public static readonly Pestana Historial = new("Historial", "History", "Nav_Historial", false, [typeof(HistorialViewModel)]);
    ```
-2. **Contrato en `INavigationService`** — `AnimeLocalTracker/ViewModels/NavigationService.cs`:
-   ```csharp
-   bool EsHistorialActivo { get; }
-   HistorialViewModel ObtenerHistorial();
-   ```
-3. **Implementación** en la misma clase `NavigationService` (que implementa `IRecipient<NavegarMensaje_Historial>`):
-   ```csharp
-   public bool EsHistorialActivo => VistaActual is HistorialViewModel;
-   public HistorialViewModel ObtenerHistorial() => _serviceProvider.GetRequiredService<HistorialViewModel>();
-   // Receive(NavegarMensaje_Historial) navega y (si aplica) carga datos al entrar
-   ```
-4. **DI** en `App.xaml.cs` — registra el ViewModel (`AddSingleton` si mantiene estado entre visitas tipo lista cacheada, `AddTransient` si debe recargar cada vez).
-5. **`DataTemplate` VM→Vista** en `App.xaml`:
+   Clave, icono (nombre de `PackIconKind`), clave de texto (`Nav_X` en `LocalizationService`, ES y EN), si va en el grupo de abajo, y los tipos de ViewModel que la dejan marcada. El primero es la vista que se abre; los demás solo la marcan (la Biblioteca incluye la ficha; Configuración, el visor de registros).
+2. **DI** en `App.xaml.cs` — registra el ViewModel (`AddSingleton` si mantiene estado entre visitas tipo lista cacheada, `AddTransient` si debe recargar cada vez).
+3. **`DataTemplate` VM→Vista** en `App.xaml`:
    ```xml
    <DataTemplate DataType="{x:Type vm:HistorialViewModel}">
        <views:HistorialView />
    </DataTemplate>
    ```
-6. **En `MainViewModel`**: comando de navegación que envía el mensaje —
-   ```csharp
-   [RelayCommand]
-   private void NavegarHistorial() => WeakReferenceMessenger.Default.Send(new NavegarMensaje_Historial());
-   ```
-   (si la vista necesita cargar datos al entrar, hazlo en el `Receive` de `NavigationService`, no en el constructor del ViewModel — así recarga cada vez que se navega a ella, no solo la primera).
-7. **Botón en `MainWindow.xaml`** (sidebar): `Rectangle` indicador de activo (`Visibility` bindeado a `Navigation.EsXActivo`) + `Button` con `Command="{Binding NavegarXCommand}"`, `ToolTip`/`AutomationProperties.Name` localizados (clave `Nav_X` en `LocalizationService`, ES y EN).
+
+Con eso la barra lateral ya muestra el botón (con su `ToolTip`, nombre accesible e indicador de activa) y `NavigationService` sabe abrirla.
+
+- **Cargar datos al entrar:** el ViewModel implementa `IAlEntrarEnPestana` (no lo hagas en el constructor: así recarga cada vez que se navega a ella, no solo la primera):
+  ```csharp
+  public async Task AlEntrarAsync()
+  {
+      if (NecesitaRecargar()) await CargarHistorialAsync();
+  }
+  ```
+- **Navegar a una pestaña desde código:** `Pestanas.Historial.Abrir();` (envía `NavegarMensaje_Pestana`). Dentro de una clase que ya tenga un miembro llamado `Pestanas` (como `DescargasViewModel`), usa el nombre completo `AnimeLocalTracker.ViewModels.Pestanas`.
+- **Que salga un número sobre el botón** (como las descargas en curso): `PestanaItemViewModel.Insignia`, que `MainViewModel` rellena.
+- **Precalentado:** si la pestaña es de uso frecuente, añádela a la lista de `MainWindow.PrecalentarPestanasAsync` con `() => navegacion.ObtenerVista(Pestanas.X)`.
+- **Vistas que no son pestañas** (la ficha, el reproductor, el visor de registros) conservan su propio mensaje `NavegarMensaje_*` y su receptor en `NavigationService`.
+- **Pruebas de vistas:** si la vista usa una clave nueva de `App.xaml`, añádela también a `AnimeLocalTracker.Tests/Views/WpfHostFixture.cs`.
 
 ## La vista de una pestaña se conserva entre visitas
 
@@ -86,4 +84,4 @@ ScrollViewer.VerticalScrollBarVisibility="Auto"
 
 ## Localización
 
-Toda cadena visible al usuario va en `LocalizationService.cs`, con clave en ambos diccionarios (ES y EN) — nunca texto literal en el XAML salvo contenido que no se traduce (números, nombres propios). Patrón de binding: `{Binding [Clave], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}` — el `Mode=OneWay` es obligatorio en propiedades con binding bidireccional por defecto (como `Run.Text`) para evitar excepciones en runtime.
+Toda cadena visible al usuario va en `LocalizationService.cs`, con clave en ambos diccionarios (ES y EN) — nunca texto literal en el XAML salvo contenido que no se traduce (números, nombres propios). Patrón: `{loc:T Clave}` (`Services/TExtension.cs`), que crea el enlace al diccionario siempre unidireccional; no escribir a mano el binding largo `{Binding [Clave], Source={x:Static loc:LocalizationService.Instance}}` (ver `wpf-mvvm.md`, punto 1).

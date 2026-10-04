@@ -453,7 +453,7 @@ public partial class AgregarAnimeViewModel : ObservableObject,
             }
             else
             {
-                WeakReferenceMessenger.Default.Send(new NavegarMensaje_Galeria());
+                Pestanas.Galeria.Abrir();
             }
         }
         catch (Exception ex)

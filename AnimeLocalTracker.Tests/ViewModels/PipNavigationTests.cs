@@ -174,7 +174,7 @@ public class PipNavigationTests : IDisposable
         _spMock.Setup(sp => sp.GetService(typeof(DescargasViewModel))).Returns(mockDescargasVm);
 
         // Act: usuario cambia a pestaa de descargas mientras el reproductor estǭ abierto
-        mainVm.NavegarDescargasCommand.Execute(null);
+        Pestanas.Descargas.Abrir();
 
         // Assert: no se interrumpe la reproduccin, sino que se acopla a la esquina
         repVm.EsModoMini.Should().BeTrue();
@@ -211,7 +211,7 @@ public class PipNavigationTests : IDisposable
         var descargasVm = new DescargasViewModel(_downloadMock.Object);
         _spMock.Setup(sp => sp.GetService(typeof(DescargasViewModel))).Returns(descargasVm);
 
-        mainVm.NavegarDescargasCommand.Execute(null); // el episodio pasa al mini y el usuario sigue por Descargas
+        Pestanas.Descargas.Abrir(); // el episodio pasa al mini y el usuario sigue por Descargas
         CommunityToolkit.Mvvm.Messaging.IMessengerExtensions.Send(CommunityToolkit.Mvvm.Messaging.WeakReferenceMessenger.Default, new NavegarMensaje_VolverDelReproductor());
 
         mainVm.Navigation.ReproductorActivo.Should().BeNull();

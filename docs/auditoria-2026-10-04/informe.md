@@ -106,3 +106,24 @@ Resultado: build con 0 errores y 0 advertencias; 2 733 pruebas en verde (21 nuev
 | F7 `catch` vacíos | **Descartado** | Revisados: son casi todos `catch (OperationCanceledException) { }` o accesos al reproductor que puede estar cerrándose. Un ayudante que los registre solo añadiría ruido. La cifra de "86" del punto F7 incluía esos casos legítimos |
 
 Resultado: build con 0 errores y 0 advertencias; 2 737 pruebas en verde (4 nuevas). Verificado en la app real con perfil aislado: textos en todas las pestañas, cambio de idioma en caliente español → inglés → español (incluidos los textos que construyen los ViewModels), menús del reproductor y reproducción con subtítulos ASS; 0 errores en el registro.
+
+## 9. Estado de la fase 3 (aplicada el 2026-10-04, sin commit)
+
+Plan: `docs/plan-navegacion-por-tabla.md` (etapas A y B, ambas hechas).
+
+| Antes | Ahora |
+|---|---|
+| 10 botones de 33 líneas en `MainWindow.xaml` | Una plantilla (`BotonPestana`) y dos listas que recorren `Pestanas.Todas`. `MainWindow.xaml` pasa de 855 a 567 líneas |
+| 11 propiedades `EsXActivo` | `INavigationService.EstaActiva(Pestana)` y `PestanaItemViewModel.EsActiva` |
+| 10 comandos `NavegarXCommand` | `PestanaItemViewModel.AbrirCommand` y `Pestanas.X.Abrir()` |
+| 10 mensajes `NavegarMensaje_X` y 10 receptores | Un `NavegarMensaje_Pestana` y un receptor. `NavigationService` pasa de 425 a 240 líneas |
+| Lógica de entrada de cada pestaña en `NavigationService` | En cada ViewModel, con `IAlEntrarEnPestana` (Calendario, Descargas, Estadísticas, Historial, Logros, Actualizaciones; la Galería ya la tenía) |
+| 10 métodos `ObtenerX()` en la interfaz | `ObtenerVista(Pestana)` |
+
+Añadir una pestaña: fila en `Pestanas.Todas`, registro en DI y `DataTemplate`. Regla `ui-wpf-vistas.md` (punto 1) y skill `wpf-add-view` reescritos.
+
+Se conserva tal cual: volver a la Biblioteca desde una ficha abierta en el Calendario devuelve al Calendario; la ficha, el reproductor y el visor de registros mantienen su mensaje y su receptor.
+
+Cambio de comportamiento: un fallo al abrir una pestaña (o al cargar sus datos) ahora se registra y la pestaña se muestra igual. Antes, en Calendario, Descargas y "Añadir anime" la excepción subía hasta quien había enviado el mensaje.
+
+Resultado: build con 0 errores y 0 advertencias; 2 751 pruebas en verde (14 nuevas). Verificado en la app real con perfil aislado: las diez pestañas cargan sus datos al entrar, indicador activo arriba y abajo (también dentro de una ficha), `ToolTip`, vuelta del Calendario desde una ficha, precalentado ("14 pestañas preparadas") y tiempos de navegación como antes (1–17 ms); 0 errores en el registro. **No verificado:** la insignia de descargas con una descarga real en curso, y el visor de registros (entrar desde Configuración y volver).

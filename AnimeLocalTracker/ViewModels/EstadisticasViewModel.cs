@@ -22,7 +22,7 @@ namespace AnimeLocalTracker.ViewModels;
 /// Estadísticas personales estilo MAL: resumen general, actividad de los últimos 7 días,
 /// estado de la lista, top de animes más vistos, episodios por año y por género.
 /// </summary>
-public partial class EstadisticasViewModel : ObservableObject, IRecipient<IdiomaCambiadoMensaje>
+public partial class EstadisticasViewModel : ObservableObject, IAlEntrarEnPestana, IRecipient<IdiomaCambiadoMensaje>
 {
     private readonly IDatabaseService _databaseService;
     private readonly IAnimeTrackingService _animeTrackingService;
@@ -111,7 +111,7 @@ public partial class EstadisticasViewModel : ObservableObject, IRecipient<Idioma
     [ObservableProperty] private List<LogroItemViewModel> _logrosProximos = new();
 
     [RelayCommand]
-    private void VerTodosLosLogros() => WeakReferenceMessenger.Default.Send(new NavegarMensaje_Logros());
+    private void VerTodosLosLogros() => Pestanas.Logros.Abrir();
 
     // === TARJETA WRAPPED ===
     [ObservableProperty] private bool _generandoWrapped;
@@ -128,6 +128,12 @@ public partial class EstadisticasViewModel : ObservableObject, IRecipient<Idioma
     // se recarga como mucho una vez cada 30 s (mismo cooldown que Historial/Actualizaciones).
     private static readonly TimeSpan CooldownRecarga = TimeSpan.FromSeconds(30);
     private DateTime _ultimaCargaUtc = DateTime.MinValue;
+    /// <summary>Al abrir la pestaña (ver <see cref="IAlEntrarEnPestana"/>).</summary>
+    public async Task AlEntrarAsync()
+    {
+        if (NecesitaRecargar()) await CargarEstadisticasAsync();
+    }
+
     public bool NecesitaRecargar() =>
         HayError || (DateTime.UtcNow - _ultimaCargaUtc) >= CooldownRecarga;
 

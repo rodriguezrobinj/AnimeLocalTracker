@@ -25,6 +25,53 @@
 
     <Window.Resources>
         <Style TargetType="ScrollBar" BasedOn="{StaticResource MaterialDesignScrollBarMinimal}" />
+        <!-- Botón de la barra lateral: uno por fila de Pestanas.Todas (ViewModels/Pestana.cs). Para añadir una pestaña no se
+             toca este archivo. -->
+        <DataTemplate x:Key="BotonPestana">
+            <Grid>
+                <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="{StaticResource Brush.Accent}" HorizontalAlignment="Left" Margin="-9,0,0,0"
+                           Visibility="{Binding EsActiva, Converter={StaticResource BoolToVis}}"/>
+                <Button Command="{Binding AbrirCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12"
+                        ToolTip="{Binding Texto}" AutomationProperties.Name="{Binding Texto}" TabIndex="{Binding Orden}">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
+                            <Setter Property="Background" Value="Transparent"/>
+                            <Style.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Background" Value="#1B222C"/>
+                                </Trigger>
+                                <DataTrigger Binding="{Binding EsActiva}" Value="True">
+                                    <Setter Property="Background" Value="{StaticResource Brush.Surface3}"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                    <materialDesign:PackIcon Kind="{Binding Icono}" Width="24" Height="24">
+                        <materialDesign:PackIcon.Style>
+                            <Style TargetType="materialDesign:PackIcon">
+                                <Setter Property="Foreground" Value="#6B7280"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding EsActiva}" Value="True">
+                                        <Setter Property="Foreground" Value="{StaticResource Brush.Accent}"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </materialDesign:PackIcon.Style>
+                    </materialDesign:PackIcon>
+                </Button>
+
+                <!-- Insignia con un número (descargas en curso) -->
+                <Border HorizontalAlignment="Right" VerticalAlignment="Top"
+                        Background="{StaticResource Brush.AccentStrong}" BorderBrush="{StaticResource Brush.Surface3}" BorderThickness="1"
+                        CornerRadius="9" MinWidth="18" Height="18" Padding="4,0" Margin="0,-2,-2,0"
+                        IsHitTestVisible="False"
+                        Visibility="{Binding TieneInsignia, Converter={StaticResource BoolToVis}}">
+                    <TextBlock Text="{Binding Insignia}" FontSize="10" FontWeight="Bold" Foreground="White"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+            </Grid>
+        </DataTemplate>
+
     </Window.Resources>
     
     <Grid x:Name="RootLayout">
@@ -56,9 +103,10 @@
 
                         <!-- BOTONES SUPERIORES (con scroll interno si la ventana no tiene alto suficiente) -->
                         <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly">
-                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Top">
-                            <StackPanel.Style>
-                                <Style TargetType="StackPanel">
+                        <ItemsControl ItemsSource="{Binding PestanasSuperiores}" ItemTemplate="{StaticResource BotonPestana}"
+                                      HorizontalAlignment="Center" VerticalAlignment="Top" IsTabStop="False">
+                            <ItemsControl.Style>
+                                <Style TargetType="ItemsControl">
                                     <Setter Property="Margin" Value="0,60,0,0"/>
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding Topmost, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
@@ -66,282 +114,13 @@
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
-                            </StackPanel.Style>
-
-                            <!-- BOTÓN BIBLIOTECA (GALERÍA) -->
-                            <Grid Margin="0,8">
-                                <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="{StaticResource Brush.Accent}" HorizontalAlignment="Left" Margin="-9,0,0,0"
-                                           Visibility="{Binding Navigation.EsGaleriaActiva, Converter={StaticResource BoolToVis}}"/>
-                                <Button Command="{Binding NavegarGaleriaCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{loc:T Nav_Galeria}" AutomationProperties.Name="{loc:T Nav_Galeria}" TabIndex="1">
-                                    <Button.Style>
-                                        <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
-                                            <Setter Property="Background" Value="Transparent"/>
-                                            <Style.Triggers>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter Property="Background" Value="#1B222C"/>
-                                            </Trigger>
-                                                <DataTrigger Binding="{Binding Navigation.EsGaleriaActiva}" Value="True">
-                                                    <Setter Property="Background" Value="{StaticResource Brush.Surface3}"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Button.Style>
-                                    <materialDesign:PackIcon Kind="ViewGallery" Width="24" Height="24">
-                                        <materialDesign:PackIcon.Style>
-                                            <Style TargetType="materialDesign:PackIcon">
-                                                <Setter Property="Foreground" Value="#6B7280"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding Navigation.EsGaleriaActiva}" Value="True">
-                                                        <Setter Property="Foreground" Value="{StaticResource Brush.Accent}"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </materialDesign:PackIcon.Style>
-                                    </materialDesign:PackIcon>
-                                </Button>
-                            </Grid>
-
-                            <!-- BOTÓN HISTORIAL -->
-                            <Grid Margin="0,8">
-                                <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="{StaticResource Brush.Accent}" HorizontalAlignment="Left" Margin="-9,0,0,0"
-                                           Visibility="{Binding Navigation.EsHistorialActivo, Converter={StaticResource BoolToVis}}"/>
-                                <Button Command="{Binding NavegarHistorialCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{loc:T Nav_Historial}" AutomationProperties.Name="{loc:T Nav_Historial}" TabIndex="2">
-                                    <Button.Style>
-                                        <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
-                                            <Setter Property="Background" Value="Transparent"/>
-                                            <Style.Triggers>
-                                                <Trigger Property="IsMouseOver" Value="True">
-                                                    <Setter Property="Background" Value="#1B222C"/>
-                                                </Trigger>
-                                                <DataTrigger Binding="{Binding Navigation.EsHistorialActivo}" Value="True">
-                                                    <Setter Property="Background" Value="{StaticResource Brush.Surface3}"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Button.Style>
-                                    <materialDesign:PackIcon Kind="History" Width="24" Height="24">
-                                        <materialDesign:PackIcon.Style>
-                                            <Style TargetType="materialDesign:PackIcon">
-                                                <Setter Property="Foreground" Value="#6B7280"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding Navigation.EsHistorialActivo}" Value="True">
-                                                        <Setter Property="Foreground" Value="{StaticResource Brush.Accent}"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </materialDesign:PackIcon.Style>
-                                    </materialDesign:PackIcon>
-                                </Button>
-                            </Grid>
-
-                            <!-- BOTÓN ACTUALIZACIONES (EPISODIOS NUEVOS) -->
-                            <Grid Margin="0,8">
-                                <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="{StaticResource Brush.Accent}" HorizontalAlignment="Left" Margin="-9,0,0,0"
-                                           Visibility="{Binding Navigation.EsActualizacionesActivo, Converter={StaticResource BoolToVis}}"/>
-                                <Button Command="{Binding NavegarActualizacionesCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{loc:T Nav_Actualizaciones}" AutomationProperties.Name="{loc:T Nav_Actualizaciones}" TabIndex="3">
-                                    <Button.Style>
-                                        <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
-                                            <Setter Property="Background" Value="Transparent"/>
-                                            <Style.Triggers>
-                                                <Trigger Property="IsMouseOver" Value="True">
-                                                    <Setter Property="Background" Value="#1B222C"/>
-                                                </Trigger>
-                                                <DataTrigger Binding="{Binding Navigation.EsActualizacionesActivo}" Value="True">
-                                                    <Setter Property="Background" Value="{StaticResource Brush.Surface3}"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Button.Style>
-                                    <materialDesign:PackIcon Kind="NewReleases" Width="24" Height="24">
-                                        <materialDesign:PackIcon.Style>
-                                            <Style TargetType="materialDesign:PackIcon">
-                                                <Setter Property="Foreground" Value="#6B7280"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding Navigation.EsActualizacionesActivo}" Value="True">
-                                                        <Setter Property="Foreground" Value="{StaticResource Brush.Accent}"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </materialDesign:PackIcon.Style>
-                                    </materialDesign:PackIcon>
-                                </Button>
-                            </Grid>
-
-                            <!-- BOTÓN AÑADIR ANIME / EXPLORAR -->
-                            <Grid Margin="0,8">
-                                <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="{StaticResource Brush.Accent}" HorizontalAlignment="Left" Margin="-9,0,0,0"
-                                           Visibility="{Binding Navigation.EsAgregarAnimeActivo, Converter={StaticResource BoolToVis}}"/>
-                                <Button Command="{Binding NavegarAgregarAnimeCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{loc:T Nav_Agregar}" AutomationProperties.Name="{loc:T Nav_Agregar}" TabIndex="4">
-                                    <Button.Style>
-                                        <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
-                                            <Setter Property="Background" Value="Transparent"/>
-                                            <Style.Triggers>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter Property="Background" Value="#1B222C"/>
-                                            </Trigger>
-                                                <DataTrigger Binding="{Binding Navigation.EsAgregarAnimeActivo}" Value="True">
-                                                    <Setter Property="Background" Value="{StaticResource Brush.Surface3}"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Button.Style>
-                                    <materialDesign:PackIcon Kind="MagnifyPlus" Width="24" Height="24">
-                                        <materialDesign:PackIcon.Style>
-                                            <Style TargetType="materialDesign:PackIcon">
-                                                <Setter Property="Foreground" Value="#6B7280"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding Navigation.EsAgregarAnimeActivo}" Value="True">
-                                                        <Setter Property="Foreground" Value="{StaticResource Brush.Accent}"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </materialDesign:PackIcon.Style>
-                                    </materialDesign:PackIcon>
-                                </Button>
-                            </Grid>
-
-                            <!-- BOTÓN CALENDARIO -->
-                            <Grid Margin="0,8">
-                                <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="{StaticResource Brush.Accent}" HorizontalAlignment="Left" Margin="-9,0,0,0"
-                                           Visibility="{Binding Navigation.EsCalendarioActivo, Converter={StaticResource BoolToVis}}"/>
-                                <Button Command="{Binding NavegarCalendarioCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{loc:T Nav_Calendario}" AutomationProperties.Name="{loc:T Nav_Calendario}" TabIndex="5">
-                                    <Button.Style>
-                                        <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
-                                            <Setter Property="Background" Value="Transparent"/>
-                                            <Style.Triggers>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter Property="Background" Value="#1B222C"/>
-                                            </Trigger>
-                                                <DataTrigger Binding="{Binding Navigation.EsCalendarioActivo}" Value="True">
-                                                    <Setter Property="Background" Value="{StaticResource Brush.Surface3}"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Button.Style>
-                                    <materialDesign:PackIcon Kind="CalendarClock" Width="24" Height="24">
-                                        <materialDesign:PackIcon.Style>
-                                            <Style TargetType="materialDesign:PackIcon">
-                                                <Setter Property="Foreground" Value="#6B7280"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding Navigation.EsCalendarioActivo}" Value="True">
-                                                        <Setter Property="Foreground" Value="{StaticResource Brush.Accent}"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </materialDesign:PackIcon.Style>
-                                    </materialDesign:PackIcon>
-                                </Button>
-                            </Grid>
-
-                            <!-- BOTÓN ESTADÍSTICAS -->
-                            <Grid Margin="0,8">
-                                <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="{StaticResource Brush.Accent}" HorizontalAlignment="Left" Margin="-9,0,0,0"
-                                           Visibility="{Binding Navigation.EsEstadisticasActivo, Converter={StaticResource BoolToVis}}"/>
-                                <Button Command="{Binding NavegarEstadisticasCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{loc:T Nav_Estadisticas}" AutomationProperties.Name="{loc:T Nav_Estadisticas}" TabIndex="6">
-                                    <Button.Style>
-                                        <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
-                                            <Setter Property="Background" Value="Transparent"/>
-                                            <Style.Triggers>
-                                                <Trigger Property="IsMouseOver" Value="True">
-                                                    <Setter Property="Background" Value="#1B222C"/>
-                                                </Trigger>
-                                                <DataTrigger Binding="{Binding Navigation.EsEstadisticasActivo}" Value="True">
-                                                    <Setter Property="Background" Value="{StaticResource Brush.Surface3}"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Button.Style>
-                                    <materialDesign:PackIcon Kind="ChartBar" Width="24" Height="24">
-                                        <materialDesign:PackIcon.Style>
-                                            <Style TargetType="materialDesign:PackIcon">
-                                                <Setter Property="Foreground" Value="#6B7280"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding Navigation.EsEstadisticasActivo}" Value="True">
-                                                        <Setter Property="Foreground" Value="{StaticResource Brush.Accent}"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </materialDesign:PackIcon.Style>
-                                    </materialDesign:PackIcon>
-                                </Button>
-                            </Grid>
-
-                            <!-- BOTÓN LOGROS -->
-                            <Grid Margin="0,8">
-                                <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="{StaticResource Brush.Accent}" HorizontalAlignment="Left" Margin="-9,0,0,0"
-                                           Visibility="{Binding Navigation.EsLogrosActivo, Converter={StaticResource BoolToVis}}"/>
-                                <Button Command="{Binding NavegarLogrosCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{loc:T Nav_Logros}" AutomationProperties.Name="{loc:T Nav_Logros}" TabIndex="7">
-                                    <Button.Style>
-                                        <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
-                                            <Setter Property="Background" Value="Transparent"/>
-                                            <Style.Triggers>
-                                                <Trigger Property="IsMouseOver" Value="True">
-                                                    <Setter Property="Background" Value="#1B222C"/>
-                                                </Trigger>
-                                                <DataTrigger Binding="{Binding Navigation.EsLogrosActivo}" Value="True">
-                                                    <Setter Property="Background" Value="{StaticResource Brush.Surface3}"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Button.Style>
-                                    <materialDesign:PackIcon Kind="TrophyOutline" Width="24" Height="24">
-                                        <materialDesign:PackIcon.Style>
-                                            <Style TargetType="materialDesign:PackIcon">
-                                                <Setter Property="Foreground" Value="#6B7280"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding Navigation.EsLogrosActivo}" Value="True">
-                                                        <Setter Property="Foreground" Value="{StaticResource Brush.Accent}"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </materialDesign:PackIcon.Style>
-                                    </materialDesign:PackIcon>
-                                </Button>
-                            </Grid>
-
-                            <!-- BOTÓN COLA DE DESCARGAS -->
-                            <Grid Margin="0,8">
-                                <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="{StaticResource Brush.Accent}" HorizontalAlignment="Left" Margin="-9,0,0,0"
-                                           Visibility="{Binding Navigation.EsDescargasActivas, Converter={StaticResource BoolToVis}}"/>
-                                <Button Command="{Binding NavegarDescargasCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{loc:T Nav_Descargas}" AutomationProperties.Name="{loc:T Nav_Descargas}" TabIndex="8">
-                                    <Button.Style>
-                                        <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
-                                            <Setter Property="Background" Value="Transparent"/>
-                                            <Style.Triggers>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter Property="Background" Value="#1B222C"/>
-                                            </Trigger>
-                                                <DataTrigger Binding="{Binding Navigation.EsDescargasActivas}" Value="True">
-                                                    <Setter Property="Background" Value="{StaticResource Brush.Surface3}"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Button.Style>
-                                    <materialDesign:PackIcon Kind="DownloadMultiple" Width="24" Height="24">
-                                        <materialDesign:PackIcon.Style>
-                                            <Style TargetType="materialDesign:PackIcon">
-                                                <Setter Property="Foreground" Value="#6B7280"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding Navigation.EsDescargasActivas}" Value="True">
-                                                        <Setter Property="Foreground" Value="{StaticResource Brush.Accent}"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </materialDesign:PackIcon.Style>
-                                    </materialDesign:PackIcon>
-                                </Button>
-
-                                <!-- BADGE CONTEO DE DESCARGAS -->
-                                <Border HorizontalAlignment="Right" VerticalAlignment="Top" 
-                                        Background="{StaticResource Brush.AccentStrong}" BorderBrush="{StaticResource Brush.Surface3}" BorderThickness="1" 
-                                        CornerRadius="9" MinWidth="18" Height="18" Padding="4,0" Margin="0,-2,-2,0" 
-                                        IsHitTestVisible="False"
-                                        Visibility="{Binding TieneDescargasActivas, Converter={StaticResource BoolToVis}}">
-                                    <TextBlock Text="{Binding ConteoDescargasActivas}" FontSize="10" FontWeight="Bold" Foreground="White" 
-                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                </Border>
-                            </Grid>
-                        </StackPanel>
+                            </ItemsControl.Style>
+                            <ItemsControl.ItemContainerStyle>
+                                <Style TargetType="ContentPresenter">
+                                    <Setter Property="Margin" Value="0,8"/>
+                                </Style>
+                            </ItemsControl.ItemContainerStyle>
+                        </ItemsControl>
                         </ScrollViewer>
 
                         <!-- SEPARADOR DE GRUPO -->
@@ -349,73 +128,14 @@
                                 Background="{StaticResource Brush.Border}" Margin="0,8" IsHitTestVisible="False"/>
 
                         <!-- BOTONES INFERIORES: CONFIGURACIÓN Y ACERCA DE -->
-                        <StackPanel Grid.Row="2" HorizontalAlignment="Center" Margin="0,0,0,15">
-                            <!-- BOTÓN CONFIGURACIÓN -->
-                            <Grid Margin="0,4">
-                                <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="{StaticResource Brush.Accent}" HorizontalAlignment="Left" Margin="-9,0,0,0"
-                                           Visibility="{Binding Navigation.EsConfiguracionActiva, Converter={StaticResource BoolToVis}}"/>
-                                <Button Command="{Binding NavegarConfiguracionCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{loc:T Nav_Configuracion}" AutomationProperties.Name="{loc:T Nav_Configuracion}" TabIndex="9">
-                                    <Button.Style>
-                                        <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
-                                            <Setter Property="Background" Value="Transparent"/>
-                                            <Style.Triggers>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter Property="Background" Value="#1B222C"/>
-                                            </Trigger>
-                                                <DataTrigger Binding="{Binding Navigation.EsConfiguracionActiva}" Value="True">
-                                                    <Setter Property="Background" Value="{StaticResource Brush.Surface3}"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Button.Style>
-                                    <materialDesign:PackIcon Kind="Cog" Width="24" Height="24">
-                                        <materialDesign:PackIcon.Style>
-                                            <Style TargetType="materialDesign:PackIcon">
-                                                <Setter Property="Foreground" Value="#6B7280"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding Navigation.EsConfiguracionActiva}" Value="True">
-                                                        <Setter Property="Foreground" Value="{StaticResource Brush.Accent}"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </materialDesign:PackIcon.Style>
-                                    </materialDesign:PackIcon>
-                                </Button>
-                            </Grid>
-
-                            <!-- BOTÓN ACERCA DE -->
-                            <Grid Margin="0,4">
-                                <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="{StaticResource Brush.Accent}" HorizontalAlignment="Left" Margin="-9,0,0,0"
-                                           Visibility="{Binding Navigation.EsAcercaDeActivo, Converter={StaticResource BoolToVis}}"/>
-                                <Button Command="{Binding NavegarAcercaDeCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{loc:T Nav_AcercaDe}" AutomationProperties.Name="{loc:T Nav_AcercaDe}" TabIndex="10">
-                                    <Button.Style>
-                                        <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
-                                            <Setter Property="Background" Value="Transparent"/>
-                                            <Style.Triggers>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter Property="Background" Value="#1B222C"/>
-                                            </Trigger>
-                                                <DataTrigger Binding="{Binding Navigation.EsAcercaDeActivo}" Value="True">
-                                                    <Setter Property="Background" Value="{StaticResource Brush.Surface3}"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Button.Style>
-                                    <materialDesign:PackIcon Kind="InformationOutline" Width="24" Height="24">
-                                        <materialDesign:PackIcon.Style>
-                                            <Style TargetType="materialDesign:PackIcon">
-                                                <Setter Property="Foreground" Value="#6B7280"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding Navigation.EsAcercaDeActivo}" Value="True">
-                                                        <Setter Property="Foreground" Value="{StaticResource Brush.Accent}"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </materialDesign:PackIcon.Style>
-                                    </materialDesign:PackIcon>
-                                </Button>
-                            </Grid>
-                        </StackPanel>
+                        <ItemsControl Grid.Row="2" ItemsSource="{Binding PestanasInferiores}" ItemTemplate="{StaticResource BotonPestana}"
+                                      HorizontalAlignment="Center" Margin="0,0,0,15" IsTabStop="False">
+                            <ItemsControl.ItemContainerStyle>
+                                <Style TargetType="ContentPresenter">
+                                    <Setter Property="Margin" Value="0,4"/>
+                                </Style>
+                            </ItemsControl.ItemContainerStyle>
+                        </ItemsControl>
                     </Grid>
                 </Border>
 

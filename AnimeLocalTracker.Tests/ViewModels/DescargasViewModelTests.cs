@@ -153,7 +153,7 @@ public class DescargasViewModelTests
         // Arrange
         var sut = CreateSut();
         bool mensajeRecibido = false;
-        WeakReferenceMessenger.Default.Register<NavegarMensaje_Galeria>(this, (r, m) => mensajeRecibido = true);
+        WeakReferenceMessenger.Default.Register<NavegarMensaje_Pestana>(this, (r, m) => mensajeRecibido = m.Pestana == Pestanas.Galeria);
 
         try
         {
@@ -165,7 +165,7 @@ public class DescargasViewModelTests
         }
         finally
         {
-            WeakReferenceMessenger.Default.Unregister<NavegarMensaje_Galeria>(this);
+            WeakReferenceMessenger.Default.Unregister<NavegarMensaje_Pestana>(this);
         }
     }
 }

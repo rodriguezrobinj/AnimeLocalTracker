@@ -159,9 +159,9 @@ public partial class MainWindow : Window, IVentanaPrincipal
             // queda fuera: es la más cara de construir (dibuja el registro de cambios) y la que menos se visita.
             Func<object>[] pestanas =
             [
-                navegacion.ObtenerHistorial, navegacion.ObtenerActualizaciones, navegacion.ObtenerCalendario,
-                navegacion.ObtenerDescargas, navegacion.ObtenerEstadisticas, navegacion.ObtenerLogros,
-                navegacion.ObtenerAgregarAnime, navegacion.ObtenerConfiguracion, navegacion.ObtenerVisorRegistros
+                () => navegacion.ObtenerVista(Pestanas.Historial), () => navegacion.ObtenerVista(Pestanas.Actualizaciones), () => navegacion.ObtenerVista(Pestanas.Calendario),
+                () => navegacion.ObtenerVista(Pestanas.Descargas), () => navegacion.ObtenerVista(Pestanas.Estadisticas), () => navegacion.ObtenerVista(Pestanas.Logros),
+                () => navegacion.ObtenerVista(Pestanas.AgregarAnime), () => navegacion.ObtenerVista(Pestanas.Configuracion), navegacion.ObtenerVisorRegistros
             ];
 
             var reloj = System.Diagnostics.Stopwatch.StartNew();

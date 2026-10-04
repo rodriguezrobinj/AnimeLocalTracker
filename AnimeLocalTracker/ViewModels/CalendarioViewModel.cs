@@ -11,7 +11,7 @@ using CommunityToolkit.Mvvm.Messaging;
 
 namespace AnimeLocalTracker.ViewModels;
 
-public partial class CalendarioViewModel : ObservableObject, IDisposable
+public partial class CalendarioViewModel : ObservableObject, IAlEntrarEnPestana, IDisposable
 {
     private readonly IDatabaseService _databaseService;
     private readonly IAnimeTrackingService _animeTrackingService;
@@ -83,6 +83,14 @@ public partial class CalendarioViewModel : ObservableObject, IDisposable
             app.Dispatcher);
         timer.Start();
         return timer;
+    }
+
+    /// <summary>Al abrir la pestaña (ver <see cref="IAlEntrarEnPestana"/>).</summary>
+    public Task AlEntrarAsync()
+    {
+        RefrescarEstadosEmitidos();
+        if (EstaVacio && !EstaCargando) CargarCalendarioCommand.Execute(null);
+        return Task.CompletedTask;
     }
 
     /// <summary>Revalúa y notifica el estado de emisión de todas las tarjetas visibles.</summary>

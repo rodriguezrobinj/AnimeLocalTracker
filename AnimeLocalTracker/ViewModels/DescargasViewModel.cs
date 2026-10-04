@@ -20,7 +20,7 @@ namespace AnimeLocalTracker.ViewModels;
 /// (completadas y fallidas persistidas, con reproducir / abrir carpeta / reintentar). Incluye también los openings/endings
 /// descargados desde la ficha (AnimeThemes): son descargas como las demás, aunque sin pausa ni prioridad (duran segundos).
 /// </summary>
-public partial class DescargasViewModel : ObservableObject, IRecipient<DescargaProgresoMensaje>, IRecipient<DescargaHistorialActualizadoMensaje>,
+public partial class DescargasViewModel : ObservableObject, IAlEntrarEnPestana, IRecipient<DescargaProgresoMensaje>, IRecipient<DescargaHistorialActualizadoMensaje>,
     IRecipient<DescargaMusicaProgresoMensaje>
 {
     public const string FiltroTodas = "Todas";
@@ -125,6 +125,13 @@ public partial class DescargasViewModel : ObservableObject, IRecipient<DescargaP
         CargarDescargas();
         ActualizarChips();
         _ = CargarHistorialAsync();
+    }
+
+    /// <summary>Al abrir la pestaña (ver <see cref="IAlEntrarEnPestana"/>).</summary>
+    public Task AlEntrarAsync()
+    {
+        Refrescar();
+        return Task.CompletedTask;
     }
 
     /// <summary>Recarga cola e historial (se invoca al entrar en la pestaña).</summary>
@@ -649,6 +656,6 @@ public partial class DescargasViewModel : ObservableObject, IRecipient<DescargaP
     [RelayCommand]
     private void Volver()
     {
-        WeakReferenceMessenger.Default.Send(new NavegarMensaje_Galeria());
+        AnimeLocalTracker.ViewModels.Pestanas.Galeria.Abrir(); // nombre completo: esta clase tiene su propia lista "Pestanas" (los filtros)
     }
 }
