@@ -1001,30 +1001,32 @@ namespace AnimeLocalTracker.Views
             return null;
         }
 
-        // === Menú de subtítulos (toggle real) ===
-        // El toggle se maneja en PreviewMouseDown (no en Click): con StaysOpen="False" el popup
-        // se cerraba por captura del mouse y el mismo clic lo volvía a abrir.
-        private void SubtitlesButton_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        // === Menús flotantes (subtítulos, audio, más opciones, ecualizador): cada botón abre o cierra el suyo (ver _menus) ===
+        // El toggle por ratón va en PreviewMouseDown y no en Click: el Popup se cerraba al capturar el ratón y el mismo clic lo
+        // volvía a abrir. e.Handled = true evita que ese clic llegue además como Click.
+        private void BotonMenu_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            AlternarMenu(SubtitlesPopup);
+            AlternarMenuDe(sender);
             e.Handled = true;
+        }
+
+        // Activación por teclado (Enter/Espacio con el botón enfocado): con el ratón no se llega aquí.
+        private void BotonMenu_Click(object sender, RoutedEventArgs e) => AlternarMenuDe(sender);
+
+        private void AlternarMenuDe(object boton)
+        {
+            foreach (var (menu, botonDelMenu, _) in _menus)
+            {
+                if (!ReferenceEquals(botonDelMenu, boton)) continue;
+                AlternarMenu(menu);
+                break;
+            }
             RegistrarActividad();
         }
 
-        // Activación por teclado (Enter/Espacio con el botón enfocado): el toggle por mouse va por
-        // PreviewMouseLeftButtonDown de arriba, que marca e.Handled=true y evita que este Click
-        // también dispare por clic (solo llega aquí vía teclado).
-        private void SubtitlesButton_Click(object sender, RoutedEventArgs e)
-        {
-            AlternarMenu(SubtitlesPopup);
-            RegistrarActividad();
-        }
-
-        private void SubtitleMenuItem_Click(object sender, RoutedEventArgs e)
-        {
-            // Elegir una opción cierra el menú por completo (el Command se ejecuta igualmente)
-            SubtitlesPopup.IsOpen = false;
-        }
+        /// <summary>Elegir una opción cierra el menú (su Command se ejecuta igualmente; el Modo Noche es un interruptor y también
+        /// cierra). Solo hay un menú abierto a la vez, así que basta con cerrarlos todos.</summary>
+        private void OpcionDeMenu_Click(object sender, RoutedEventArgs e) => CerrarMenus();
 
         /// <summary>
         /// El deslizador de volumen se abre con el ratón encima o con el foco de teclado (para quien navega con Tab). Tras usarlo con el
@@ -1035,56 +1037,6 @@ namespace AnimeLocalTracker.Views
         {
             if (VolumePanel.IsKeyboardFocusWithin && InputManager.Current.MostRecentInputDevice is MouseDevice)
                 OverlayControls.Focus();
-        }
-
-        // === Menú de pistas de audio — mismo patrón de toggle que Subtítulos ===
-        private void AudioButton_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            AlternarMenu(AudioPopup);
-            e.Handled = true;
-            RegistrarActividad();
-        }
-
-        private void AudioButton_Click(object sender, RoutedEventArgs e)
-        {
-            AlternarMenu(AudioPopup);
-            RegistrarActividad();
-        }
-
-        private void AudioMenuItem_Click(object sender, RoutedEventArgs e) => AudioPopup.IsOpen = false;
-
-        // === Menú "Más opciones" (Captura + Modo Noche) — mismo patrón de toggle que Subtítulos ===
-        private void MoreOptionsButton_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            AlternarMenu(MoreOptionsPopup);
-            e.Handled = true;
-            RegistrarActividad();
-        }
-
-        private void MoreOptionsButton_Click(object sender, RoutedEventArgs e)
-        {
-            AlternarMenu(MoreOptionsPopup);
-            RegistrarActividad();
-        }
-
-        private void MoreOptionsMenuItem_Click(object sender, RoutedEventArgs e)
-        {
-            // Modo Noche se queda encendido/apagado (es un toggle); cerramos el menú igual en ambos casos.
-            MoreOptionsPopup.IsOpen = false;
-        }
-
-        // === Ecualizador — mismo patrón de toggle que Subtítulos ===
-        private void EqualizerButton_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            AlternarMenu(EqualizerPopup);
-            e.Handled = true;
-            RegistrarActividad();
-        }
-
-        private void EqualizerButton_Click(object sender, RoutedEventArgs e)
-        {
-            AlternarMenu(EqualizerPopup);
-            RegistrarActividad();
         }
 
         private void ReproductorView_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
