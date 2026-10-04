@@ -15,6 +15,6 @@ Al explicar cambios, diagnósticos, soluciones o nuevas funciones al usuario:
 3. **Enfoque en el beneficio de uso:**
    - Explica brevemente qué problema soluciona en la experiencia del usuario y cómo se visualiza o interactúa con ello en la interfaz.
 4. **Brevedad sin perder claridad:**
-   - Ser conciso es bueno; comprimir el estilo hasta quitar el ejemplo o el motivo no lo es. Por eso el modo `caveman` está apagado en este repo (ver `skills-orquestacion.md`).
+   - Ser conciso es bueno; comprimir el estilo hasta quitar el ejemplo o el motivo no lo es. Por eso el modo `caveman` está apagado por defecto en este repo; solo se enciende si el usuario lo pide y entonces se omiten los ejemplos (ver `skills-orquestacion.md`, punto 7).
 5. **Informar con honestidad:**
    - Si algo no se pudo verificar (por ejemplo, no se probó en la app real), decirlo explícitamente. No declarar "listo" sin la evidencia que exige `repo-build-test`.
