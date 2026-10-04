@@ -666,8 +666,8 @@
                                     FocusVisualStyle="{StaticResource PlayerFocusVisual}"
                                     ToolTip="{loc:T Player_MenuAudio}"
                                     AutomationProperties.Name="{loc:T Player_MenuAudio}"
-                                    PreviewMouseLeftButtonDown="AudioButton_PreviewMouseLeftButtonDown"
-                                    Click="AudioButton_Click"
+                                    PreviewMouseLeftButtonDown="BotonMenu_PreviewMouseLeftButtonDown"
+                                    Click="BotonMenu_Click"
                                     Style="{StaticResource PlayerMenuToolButton}" Width="40" Height="40" Margin="0,0,5,0">
                                 <materialDesign:PackIcon Kind="Translate" Width="24" Height="24" />
                             </Button>
@@ -676,8 +676,8 @@
                                     FocusVisualStyle="{StaticResource PlayerFocusVisual}"
                                     ToolTip="{loc:T Player_Subtitulos}"
                                     AutomationProperties.Name="{loc:T Player_MenuSubtitulos}"
-                                    PreviewMouseLeftButtonDown="SubtitlesButton_PreviewMouseLeftButtonDown"
-                                    Click="SubtitlesButton_Click"
+                                    PreviewMouseLeftButtonDown="BotonMenu_PreviewMouseLeftButtonDown"
+                                    Click="BotonMenu_Click"
                                     Style="{StaticResource PlayerMenuToolButton}" Width="40" Height="40" Margin="0,0,5,0">
                                 <materialDesign:PackIcon Kind="{Binding SubtitulosIcon}" Width="26" Height="26" />
                             </Button>
@@ -687,8 +687,8 @@
                                     FocusVisualStyle="{StaticResource PlayerFocusVisual}"
                                     ToolTip="{loc:T Eq_Titulo}"
                                     AutomationProperties.Name="{loc:T Eq_Titulo}"
-                                    PreviewMouseLeftButtonDown="EqualizerButton_PreviewMouseLeftButtonDown"
-                                    Click="EqualizerButton_Click"
+                                    PreviewMouseLeftButtonDown="BotonMenu_PreviewMouseLeftButtonDown"
+                                    Click="BotonMenu_Click"
                                     Style="{StaticResource PlayerMenuToolButton}" Width="40" Height="40" Margin="0,0,5,0">
                                 <Grid>
                                     <materialDesign:PackIcon Kind="Equalizer" Width="24" Height="24"/>
@@ -711,7 +711,7 @@
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate>
                                                     <Button Command="{Binding DataContext.SeleccionarPistaAudioCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                                            CommandParameter="{Binding}" Click="AudioMenuItem_Click" Style="{StaticResource MenuItemButton}"
+                                                            CommandParameter="{Binding}" Click="OpcionDeMenu_Click" Style="{StaticResource MenuItemButton}"
                                                             AutomationProperties.Name="{Binding Nombre}">
                                                         <StackPanel Orientation="Horizontal">
                                                             <materialDesign:PackIcon Kind="Check" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"
@@ -747,14 +747,14 @@
                                         <TextBlock Text="{loc:T Player_Subtitulos}" Foreground="{StaticResource Brush.TextTertiary}" FontSize="12" FontWeight="Bold" Margin="15,0,0,10" />
 
                                         <!-- Apagar -->
-                                        <Button Content="{loc:T Player_ApagarSubtitulos}" Command="{Binding TurnOffSubtitlesCommand}" Click="SubtitleMenuItem_Click" Style="{StaticResource MenuItemButton}"/>
+                                        <Button Content="{loc:T Player_ApagarSubtitulos}" Command="{Binding TurnOffSubtitlesCommand}" Click="OpcionDeMenu_Click" Style="{StaticResource MenuItemButton}"/>
 
                                         <!-- Lista de streams disponibles -->
                                         <ItemsControl ItemsSource="{Binding Player.Subtitles.Streams}">
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate>
                                                     <Button Command="{Binding DataContext.SelectSubtitleStreamCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                                            CommandParameter="{Binding}" Click="SubtitleMenuItem_Click" Style="{StaticResource MenuItemButton}">
+                                                            CommandParameter="{Binding}" Click="OpcionDeMenu_Click" Style="{StaticResource MenuItemButton}">
                                                         <TextBlock>
                                                             <Run Text="{Binding Language, Mode=OneWay}" />
                                                             <Run Text="—" Foreground="#888888"/>
@@ -767,7 +767,7 @@
 
                                         <!-- Usar mi estilo: solo con una pista ASS/SSA. Encendido = texto plano con el estilo de
                                              Configuración; apagado = estilo original del subtítulo. -->
-                                        <Button Command="{Binding ToggleUsarMiEstiloEnAssCommand}" Click="SubtitleMenuItem_Click" Style="{StaticResource MenuItemButton}"
+                                        <Button Command="{Binding ToggleUsarMiEstiloEnAssCommand}" Click="OpcionDeMenu_Click" Style="{StaticResource MenuItemButton}"
                                                 Visibility="{Binding PistaActualEsAss, Converter={StaticResource BooleanToVisibilityConverter}}">
                                             <StackPanel Orientation="Horizontal">
                                                 <materialDesign:PackIcon Kind="FormatFont" Width="18" Height="18" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="#E5E5E5"/>
@@ -789,8 +789,8 @@
                                     FocusVisualStyle="{StaticResource PlayerFocusVisual}"
                                     ToolTip="{loc:T Player_MasOpciones}"
                                     AutomationProperties.Name="{loc:T Player_MasOpciones}"
-                                    PreviewMouseLeftButtonDown="MoreOptionsButton_PreviewMouseLeftButtonDown"
-                                    Click="MoreOptionsButton_Click"
+                                    PreviewMouseLeftButtonDown="BotonMenu_PreviewMouseLeftButtonDown"
+                                    Click="BotonMenu_Click"
                                     Style="{StaticResource PlayerMenuToolButton}" Width="40" Height="40" Margin="0,0,4,0">
                                 <materialDesign:PackIcon Kind="DotsVertical" Width="24" Height="24" />
                             </Button>
@@ -803,7 +803,7 @@
 
                                     <StackPanel>
                                         <!-- Captura de pantalla HD (Ctrl+S) -->
-                                        <Button Command="{Binding CapturarFrameCommand}" Click="MoreOptionsMenuItem_Click" Style="{StaticResource MenuItemButton}">
+                                        <Button Command="{Binding CapturarFrameCommand}" Click="OpcionDeMenu_Click" Style="{StaticResource MenuItemButton}">
                                             <StackPanel Orientation="Horizontal">
                                                 <materialDesign:PackIcon Kind="CameraOutline" Width="18" Height="18" VerticalAlignment="Center" Margin="0,0,10,0"/>
                                                 <TextBlock Text="{loc:T Player_Captura}" VerticalAlignment="Center"/>
@@ -811,7 +811,7 @@
                                         </Button>
 
                                         <!-- Modo Noche: compresor de rango dinámico del audio (toggle, con check cuando está activo) -->
-                                        <Button Command="{Binding ToggleModoNocheCommand}" Click="MoreOptionsMenuItem_Click" Style="{StaticResource MenuItemButton}">
+                                        <Button Command="{Binding ToggleModoNocheCommand}" Click="OpcionDeMenu_Click" Style="{StaticResource MenuItemButton}">
                                             <StackPanel Orientation="Horizontal">
                                                 <materialDesign:PackIcon Kind="WeatherNight" Width="18" Height="18" VerticalAlignment="Center" Margin="0,0,10,0">
                                                     <materialDesign:PackIcon.Style>
