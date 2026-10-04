@@ -190,7 +190,7 @@ public partial class VisorRegistrosViewModel : ObservableObject, IRecipient<Idio
     internal static string Etiqueta(ArchivoRegistro a)
     {
         var cultura = LocalizationService.Cultura;
-        string tamano = a.Bytes >= 1024 * 1024 ? $"{a.Bytes / 1024d / 1024d:F1} MB" : $"{Math.Max(1, a.Bytes / 1024)} KB";
+        string tamano = Core.Formato.Tamano(a.Bytes);
         switch (a.Tipo)
         {
             case TipoArchivoRegistro.SesionActual:
@@ -493,7 +493,7 @@ public partial class VisorRegistrosViewModel : ObservableObject, IRecipient<Idio
         {
             AppLogger.Flush();
             Directory.CreateDirectory(_carpeta);
-            Process.Start(new ProcessStartInfo { FileName = _carpeta, UseShellExecute = true });
+            Core.Shell.Abrir(_carpeta);
         }
         catch (Exception ex)
         {

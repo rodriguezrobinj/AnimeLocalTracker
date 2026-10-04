@@ -334,7 +334,7 @@ public class ActualizacionesViewModelTests
                 1, 5, 100, isDownloading: false, isCompleted: true, isPaused: false, rutaTemp, null, "One Piece"));
 
             // Assert
-            item.TamanoArchivoFormateado.Should().Be("2 MB");
+            item.TamanoArchivoFormateado.Should().Be($"2{LocalizationService.Cultura.NumberFormat.NumberDecimalSeparator}0 MB", "por debajo de 10 MB el tamaño lleva un decimal");
         }
         finally
         {

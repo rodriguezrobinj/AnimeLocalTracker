@@ -76,20 +76,7 @@
             <Setter Property="Padding" Value="16,12"/>
         </Style>
 
-        <Style x:Key="DescRowContainer" TargetType="ListBoxItem">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Padding" Value="0"/>
-            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ListBoxItem">
-                        <ContentPresenter/>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
+        <Style x:Key="DescRowContainer" TargetType="ListBoxItem" BasedOn="{StaticResource AppFilaTransparente}"/>
     </UserControl.Resources>
 
     <Grid MaxWidth="1248" Style="{StaticResource AppPageRoot}">
@@ -380,7 +367,7 @@
                                                         <Style.Triggers>
                                                             <DataTrigger Binding="{Binding EsMusica}" Value="True">
                                                                 <Setter Property="Kind" Value="MusicNote"/>
-                                                                <Setter Property="Foreground" Value="#C084FC"/>
+                                                                <Setter Property="Foreground" Value="{StaticResource Brush.Music}"/>
                                                             </DataTrigger>
                                                             <DataTrigger Binding="{Binding EnCola}" Value="True">
                                                                 <Setter Property="Kind" Value="ClockOutline"/>
@@ -413,8 +400,8 @@
                                                     <Border Background="#2D1B4E" CornerRadius="6" Padding="7,2" Margin="8,0,0,0" VerticalAlignment="Center"
                                                             Visibility="{Binding EsMusica, Converter={StaticResource BoolToVis}}">
                                                         <StackPanel Orientation="Horizontal">
-                                                            <materialDesign:PackIcon Kind="MusicNote" Width="11" Height="11" Foreground="#C084FC" VerticalAlignment="Center" Margin="0,0,3,0"/>
-                                                            <TextBlock Text="{Binding [Desc_EtiquetaMusica], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="10.5" FontWeight="Bold" Foreground="#C084FC"/>
+                                                            <materialDesign:PackIcon Kind="MusicNote" Width="11" Height="11" Foreground="{StaticResource Brush.Music}" VerticalAlignment="Center" Margin="0,0,3,0"/>
+                                                            <TextBlock Text="{Binding [Desc_EtiquetaMusica], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="10.5" FontWeight="Bold" Foreground="{StaticResource Brush.Music}"/>
                                                         </StackPanel>
                                                     </Border>
                                                 </StackPanel>
@@ -540,8 +527,8 @@
                                             <Border Background="#2D1B4E" CornerRadius="6" Padding="7,2" Margin="8,0,0,0" VerticalAlignment="Center"
                                                     Visibility="{Binding EsMusica, Converter={StaticResource BoolToVis}}">
                                                 <StackPanel Orientation="Horizontal">
-                                                    <materialDesign:PackIcon Kind="MusicNote" Width="11" Height="11" Foreground="#C084FC" VerticalAlignment="Center" Margin="0,0,3,0"/>
-                                                    <TextBlock Text="{Binding [Desc_EtiquetaMusica], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="10.5" FontWeight="Bold" Foreground="#C084FC"/>
+                                                    <materialDesign:PackIcon Kind="MusicNote" Width="11" Height="11" Foreground="{StaticResource Brush.Music}" VerticalAlignment="Center" Margin="0,0,3,0"/>
+                                                    <TextBlock Text="{Binding [Desc_EtiquetaMusica], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="10.5" FontWeight="Bold" Foreground="{StaticResource Brush.Music}"/>
                                                 </StackPanel>
                                             </Border>
                                         </StackPanel>

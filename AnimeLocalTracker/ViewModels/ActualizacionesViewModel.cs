@@ -394,7 +394,7 @@ public partial class ActualizacionesViewModel : ObservableObject, IDisposable,
                 {
                     if (File.Exists(message.RutaArchivo))
                     {
-                        item.TamanoArchivoFormateado = EpisodioItem.FormatearTamano(new FileInfo(message.RutaArchivo).Length);
+                        item.TamanoArchivoFormateado = Core.Formato.Tamano(new FileInfo(message.RutaArchivo).Length);
                     }
                 }
                 catch { }

@@ -68,18 +68,9 @@ public partial class DescargaHistorialItemViewModel : ObservableObject
             : FechaLocal.Date == hoy.AddDays(-1) ? LocalizationService.T("Hist_FechaAyer")
             : FechaLocal.ToString("D", LocalizationService.Cultura);
         HoraTexto = FechaLocal.ToString("t", LocalizationService.Cultura);
-        TamanoTexto = d.Completada && d.TamanoBytes > 0 ? FormatearTamano(d.TamanoBytes) : string.Empty;
+        TamanoTexto = d.Completada && d.TamanoBytes > 0 ? Core.Formato.Tamano(d.TamanoBytes) : string.Empty;
         string queEs = EsMusica ? TemaTitulo : TituloEpisodio;
         DetalleTexto = string.Join("  ·  ", new[] { queEs, TamanoTexto, HoraTexto }.Where(t => !string.IsNullOrEmpty(t)));
-    }
-
-    public static string FormatearTamano(long bytes)
-    {
-        double mb = bytes / 1048576.0;
-        // Un opening/ending pesa 2-3 MB: sin decimal se leería "2 MB" para 2,4 MB. Los episodios (cientos de MB) siguen igual.
-        return mb >= 1024 ? (mb / 1024).ToString("0.0", CultureInfo.InvariantCulture) + " GB"
-            : mb < 10 ? mb.ToString("0.0", CultureInfo.InvariantCulture) + " MB"
-            : mb.ToString("0", CultureInfo.InvariantCulture) + " MB";
     }
 
     public bool ComprobarArchivo() => Completada && !string.IsNullOrWhiteSpace(RutaArchivo) && File.Exists(RutaArchivo);

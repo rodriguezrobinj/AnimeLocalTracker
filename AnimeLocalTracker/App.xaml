@@ -170,6 +170,45 @@
                 <Setter Property="Padding" Value="7,0"/>
             </Style>
             <!-- Contenedor de página: márgenes + animación de entrada (unificado en todas las vistas) -->
+            <!-- Fila de lista sin selección visual (ver ui-wpf-vistas.md, punto 2): solo muestra su contenido. -->
+            <Style x:Key="AppFilaTransparente" TargetType="ListBoxItem">
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="Padding" Value="0"/>
+                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ListBoxItem">
+                            <ContentPresenter/>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+            <!-- Igual, para listas cuyas filas no reciben el foco del teclado. -->
+            <Style x:Key="AppFilaTransparenteSinFoco" TargetType="ListBoxItem">
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="Padding" Value="0"/>
+                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                <Setter Property="Focusable" Value="False"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ListBoxItem">
+                            <ContentPresenter/>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+            <!-- Margen de una página sin la animación de entrada de AppPageRoot (listas virtualizadas). -->
+            <Style x:Key="AppPageMargen" TargetType="Grid">
+                <Setter Property="Margin" Value="95,60,30,30"/>
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding Topmost, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                        <Setter Property="Margin" Value="95,30,30,30"/>
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
             <Style x:Key="AppPageRoot" TargetType="Grid">
                 <Setter Property="Margin" Value="95,60,30,30"/>
                 <Setter Property="RenderTransform">
@@ -304,6 +343,33 @@
                 <Setter Property="materialDesign:ButtonAssist.CornerRadius" Value="8"/>
             </Style>
             <!-- Chip informativo (semillas, tamaño, resolución…): el fondo lo pone quien lo usa -->
+            <!-- Chip de filtro (Actualizaciones, Historial, Logros): activo = borde y texto azules. El ítem enlazado expone EsActivo. -->
+            <Style x:Key="AppChipFiltro" TargetType="Button">
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="Margin" Value="0,0,8,0"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="Raiz" Background="{StaticResource Brush.Surface1}" BorderBrush="{StaticResource Brush.Border}" BorderThickness="1"
+                                    CornerRadius="16" Padding="14,6">
+                                <ContentPresenter x:Name="Texto" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                  TextElement.FontSize="12" TextElement.FontWeight="SemiBold"
+                                                  TextElement.Foreground="{StaticResource Brush.TextSecondary}"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Raiz" Property="Background" Value="#1B222C"/>
+                                </Trigger>
+                                <DataTrigger Binding="{Binding EsActivo}" Value="True">
+                                    <Setter TargetName="Raiz" Property="Background" Value="{StaticResource Brush.Surface3}"/>
+                                    <Setter TargetName="Raiz" Property="BorderBrush" Value="{StaticResource Brush.Accent}"/>
+                                    <Setter TargetName="Texto" Property="TextElement.Foreground" Value="{StaticResource Brush.AccentSoft}"/>
+                                </DataTrigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
             <Style x:Key="AppChip" TargetType="Border">
                 <Setter Property="CornerRadius" Value="7"/>
                 <Setter Property="Padding" Value="8,3"/>

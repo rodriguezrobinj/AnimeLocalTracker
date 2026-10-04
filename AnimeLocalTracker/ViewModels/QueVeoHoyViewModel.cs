@@ -239,9 +239,7 @@ public sealed partial class QueVeoHoyViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
-        _ctsQueVer?.Cancel();
-        _ctsQueVer?.Dispose();
-        _ctsQueVer = null;
+        Core.Cancelacion.Detener(ref _ctsQueVer);
         GC.SuppressFinalize(this);
     }
 

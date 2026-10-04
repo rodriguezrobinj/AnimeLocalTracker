@@ -260,15 +260,6 @@ public sealed class DescargasMusicaTests : IDisposable
         sut.MostrarPausarTodas.Should().BeTrue();
     }
 
-    [Theory]
-    [InlineData(2_354_761L, "2.2 MB")]
-    [InlineData(350L * 1024 * 1024, "350 MB")]
-    [InlineData(3L * 1024 * 1024 * 1024, "3.0 GB")]
-    public void FormatearTamano_UnaCancionLlevaDecimal(long bytes, string esperado)
-    {
-        DescargaHistorialItemViewModel.FormatearTamano(bytes).Should().Be(esperado);
-    }
-
     [Fact]
     public void CancelarTodas_TambienCancelaLasCanciones()
     {

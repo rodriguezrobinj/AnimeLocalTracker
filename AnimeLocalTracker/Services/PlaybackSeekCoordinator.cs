@@ -42,9 +42,7 @@ public class PlaybackSeekCoordinator : IPlaybackSeekCoordinator
         _seekPendiente = segundos;
         _seekPendientePreciso = preciso;
 
-        _seekDebounceCts?.Cancel();
-        _seekDebounceCts?.Dispose();
-        _seekDebounceCts = new CancellationTokenSource();
+        Core.Cancelacion.Reemplazar(ref _seekDebounceCts);
         var ct = _seekDebounceCts.Token;
         var restante = IntervaloMinimoSeek - transcurrido;
         if (restante < TimeSpan.Zero) restante = TimeSpan.Zero;

@@ -164,21 +164,11 @@ public partial class MiniReproductorWindow : Window
     /// <summary>Borde inferior (en píxeles) del área de trabajo del monitor de la ventana: sin la barra de tareas.</summary>
     private static int LimiteInferiorDelMonitor(IntPtr ventana)
     {
-        var info = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
-        return GetMonitorInfo(MonitorFromWindow(ventana, 2 /* MONITOR_DEFAULTTONEAREST */), ref info) ? info.rcWork.Bottom : int.MaxValue;
+        return MonitorDeVentana.Areas(ventana, out _, out var trabajo) ? trabajo.Bottom : int.MaxValue;
     }
 
     [StructLayout(LayoutKind.Sequential)]
     private struct RECT { public int Left, Top, Right, Bottom; }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct MONITORINFO { public int cbSize; public RECT rcMonitor; public RECT rcWork; public uint dwFlags; }
-
-    [DllImport("user32.dll")]
-    private static extern IntPtr MonitorFromWindow(IntPtr ventana, uint opciones);
-
-    [DllImport("user32.dll")]
-    private static extern bool GetMonitorInfo(IntPtr monitor, ref MONITORINFO info);
 
     [DllImport("user32.dll")]
     private static extern bool GetWindowRect(IntPtr ventana, out RECT rect);

@@ -249,14 +249,7 @@ public partial class DescargasViewModel : ObservableObject, IRecipient<DescargaP
     }
     partial void OnTextoBusquedaChanged(string value) => AplicarFiltroHistorial();
 
-    private static void EnUi(Action accion)
-    {
-        var dispatcher = Application.Current?.Dispatcher;
-        if (dispatcher == null || dispatcher.CheckAccess()) accion();
-        else dispatcher.InvokeAsync(accion);
-    }
-
-    public void Receive(DescargaHistorialActualizadoMensaje message) => EnUi(() => _ = CargarHistorialAsync());
+    public void Receive(DescargaHistorialActualizadoMensaje message) => Core.HiloUi.Ejecutar(() => _ = CargarHistorialAsync());
 
     public void Receive(DescargaProgresoMensaje message)
     {
@@ -329,7 +322,7 @@ public partial class DescargasViewModel : ObservableObject, IRecipient<DescargaP
             try
             {
                 await Task.Delay(1500);
-                EnUi(() =>
+                Core.HiloUi.Ejecutar(() =>
                 {
                     ColaDescargas.Remove(item);
                     ActualizarConteo();
@@ -525,7 +518,7 @@ public partial class DescargasViewModel : ObservableObject, IRecipient<DescargaP
                 WeakReferenceMessenger.Default.Send(new NavegarMensaje_Detalle(anime, item.TemaClave));
                 return;
             }
-            Process.Start(new ProcessStartInfo { FileName = item.RutaArchivo, UseShellExecute = true });
+            Core.Shell.Abrir(item.RutaArchivo);
         }
         catch (Exception ex)
         {

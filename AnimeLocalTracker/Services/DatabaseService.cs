@@ -696,22 +696,7 @@ public class DatabaseService : IDatabaseService, IDisposable
 
         if (existente != null)
         {
-            // Si ya existe, actualizamos los campos
-            existente.VistoLocal = registro.VistoLocal;
-            existente.FavoritoLocal = registro.FavoritoLocal;
-            existente.ProgresoSegundos = registro.ProgresoSegundos;
-            existente.TotalSegundos = registro.TotalSegundos;
-            // NULL = sin reproducción real: NO se fabrica "ahora" (un marcado manual no es historial).
-            existente.UltimaReproduccion = registro.UltimaReproduccion ?? existente.UltimaReproduccion;
-            if (!string.IsNullOrWhiteSpace(registro.RutaArchivo))
-            {
-                existente.RutaArchivo = registro.RutaArchivo;
-            }
-            if (!string.IsNullOrWhiteSpace(registro.Resolucion)) existente.Resolucion = registro.Resolucion;
-            if (!string.IsNullOrWhiteSpace(registro.CodecVideo)) existente.CodecVideo = registro.CodecVideo;
-            if (!string.IsNullOrWhiteSpace(registro.Fps)) existente.Fps = registro.Fps;
-            if (registro.Es10Bit) existente.Es10Bit = registro.Es10Bit;
-            if (!string.IsNullOrWhiteSpace(registro.RutaMiniatura)) existente.RutaMiniatura = registro.RutaMiniatura;
+            FusionarRegistro(existente, registro);
 
             await _conexion.UpdateAsync(existente);
         }
@@ -786,22 +771,7 @@ public class DatabaseService : IDatabaseService, IDisposable
         {
             if (existentes.TryGetValue((registro.AniListId, registro.NumeroEpisodio), out var existente))
             {
-                // Mismo merge que GuardarRegistroEpisodioAsync: conservar RutaArchivo si el nuevo viene vacío
-                existente.VistoLocal = registro.VistoLocal;
-                existente.FavoritoLocal = registro.FavoritoLocal;
-                existente.ProgresoSegundos = registro.ProgresoSegundos;
-                existente.TotalSegundos = registro.TotalSegundos;
-                // NULL = sin reproducción real: se conserva la fecha previa (no se inventa "ahora").
-                existente.UltimaReproduccion = registro.UltimaReproduccion ?? existente.UltimaReproduccion;
-                if (!string.IsNullOrWhiteSpace(registro.RutaArchivo))
-                {
-                    existente.RutaArchivo = registro.RutaArchivo;
-                }
-                if (!string.IsNullOrWhiteSpace(registro.Resolucion)) existente.Resolucion = registro.Resolucion;
-                if (!string.IsNullOrWhiteSpace(registro.CodecVideo)) existente.CodecVideo = registro.CodecVideo;
-                if (!string.IsNullOrWhiteSpace(registro.Fps)) existente.Fps = registro.Fps;
-                if (registro.Es10Bit) existente.Es10Bit = registro.Es10Bit;
-                if (!string.IsNullOrWhiteSpace(registro.RutaMiniatura)) existente.RutaMiniatura = registro.RutaMiniatura;
+                FusionarRegistro(existente, registro);
 
                 aActualizar.Add(existente);
             }
@@ -814,6 +784,26 @@ public class DatabaseService : IDatabaseService, IDisposable
 
         if (aInsertar.Count > 0) db.InsertAll(aInsertar, runInTransaction: false);
         if (aActualizar.Count > 0) db.UpdateAll(aActualizar, runInTransaction: false);
+    }
+
+    /// <summary>
+    /// Vuelca un registro recién guardado sobre el que ya existía para ese episodio. Lo que el nuevo no trae se conserva:
+    /// la ruta del archivo, los datos técnicos y la miniatura si vienen vacíos, y la fecha de última reproducción si viene
+    /// a NULL (un marcado manual no es historial: no se fabrica "ahora").
+    /// </summary>
+    private static void FusionarRegistro(RegistroEpisodio existente, RegistroEpisodio registro)
+    {
+        existente.VistoLocal = registro.VistoLocal;
+        existente.FavoritoLocal = registro.FavoritoLocal;
+        existente.ProgresoSegundos = registro.ProgresoSegundos;
+        existente.TotalSegundos = registro.TotalSegundos;
+        existente.UltimaReproduccion = registro.UltimaReproduccion ?? existente.UltimaReproduccion;
+        if (!string.IsNullOrWhiteSpace(registro.RutaArchivo)) existente.RutaArchivo = registro.RutaArchivo;
+        if (!string.IsNullOrWhiteSpace(registro.Resolucion)) existente.Resolucion = registro.Resolucion;
+        if (!string.IsNullOrWhiteSpace(registro.CodecVideo)) existente.CodecVideo = registro.CodecVideo;
+        if (!string.IsNullOrWhiteSpace(registro.Fps)) existente.Fps = registro.Fps;
+        if (registro.Es10Bit) existente.Es10Bit = registro.Es10Bit;
+        if (!string.IsNullOrWhiteSpace(registro.RutaMiniatura)) existente.RutaMiniatura = registro.RutaMiniatura;
     }
 
     public async Task<List<RegistroEpisodio>> ObtenerRegistrosPorAnimeAsync(int aniListId)

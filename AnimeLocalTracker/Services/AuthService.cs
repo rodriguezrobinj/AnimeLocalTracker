@@ -78,7 +78,7 @@ public class AuthService : IAuthService
         var url = $"https://anilist.co/api/v2/oauth/authorize?client_id={ClientId}&response_type=token&state={expectedState}";
         try
         {
-            Process.Start(new ProcessStartInfo { FileName = url, UseShellExecute = true });
+            Core.Shell.Abrir(url);
         }
         catch (Exception ex)
         {

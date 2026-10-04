@@ -135,11 +135,7 @@ public partial class AcercaDeViewModel : ObservableObject, IRecipient<IdiomaCamb
     {
         try
         {
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = RepositorioUrl,
-                UseShellExecute = true
-            });
+            Core.Shell.Abrir(RepositorioUrl);
         }
         catch (Exception ex)
         {

@@ -67,47 +67,12 @@ public sealed class SubtitleCuesExtractorService : ISubtitleCuesExtractorService
         string rutaTemporal = Path.Combine(Path.GetTempPath(), $"AnimeTracker_subs_{Guid.NewGuid():N}.srt");
         try
         {
-            var psi = new ProcessStartInfo
-            {
-                FileName = FfmpegLocator.Ffmpeg,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-            psi.ArgumentList.Add("-y");
-            psi.ArgumentList.Add("-i");
-            psi.ArgumentList.Add(rutaEntrada);
-            if (!esExterna)
-            {
-                psi.ArgumentList.Add("-map");
-                psi.ArgumentList.Add($"0:{streamIndexEmbebido}");
-            }
-            psi.ArgumentList.Add("-f");
-            psi.ArgumentList.Add("srt");
-            psi.ArgumentList.Add(rutaTemporal);
+            var argumentos = new List<string> { "-y", "-i", rutaEntrada };
+            if (!esExterna) argumentos.AddRange(["-map", $"0:{streamIndexEmbebido}"]);
+            argumentos.AddRange(["-f", "srt", rutaTemporal]);
 
-            using var proceso = Process.Start(psi);
-            if (proceso == null) return Array.Empty<SubtitleCue>();
-
-            using var limite = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            limite.CancelAfter(TiempoMaximo);
-
-            try
-            {
-                // Igual que en AudioDurationService: hay que drenar ambos flujos, si no un pipe sin lector cuelga ffmpeg.
-                var salida = proceso.StandardOutput.ReadToEndAsync(limite.Token);
-                var error = proceso.StandardError.ReadToEndAsync(limite.Token);
-                await proceso.WaitForExitAsync(limite.Token);
-                await Task.WhenAll(salida, error);
-
-                if (proceso.ExitCode != 0 || !File.Exists(rutaTemporal)) return Array.Empty<SubtitleCue>();
-            }
-            catch (OperationCanceledException)
-            {
-                try { if (!proceso.HasExited) proceso.Kill(entireProcessTree: true); } catch { /* best-effort */ }
-                throw;
-            }
+            var resultado = await ProcesoExterno.EjecutarAsync(FfmpegLocator.Ffmpeg, argumentos, TiempoMaximo, ct);
+            if (resultado is not { Codigo: 0 } || !File.Exists(rutaTemporal)) return Array.Empty<SubtitleCue>();
 
             string contenido = await File.ReadAllTextAsync(rutaTemporal, ct);
             return SubtitulosSrtParser.Parsear(contenido);

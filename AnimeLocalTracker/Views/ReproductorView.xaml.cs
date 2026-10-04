@@ -191,8 +191,7 @@ namespace AnimeLocalTracker.Views
         {
             if (e.PropertyName is nameof(ReproductorViewModel.SubtitulosAssActivo) or nameof(ReproductorViewModel.SubtitulosHabilitados))
             {
-                if (Dispatcher.CheckAccess()) ActualizarCapaAss();
-                else Dispatcher.InvokeAsync(ActualizarCapaAss);
+                Core.HiloUi.Ejecutar(ActualizarCapaAss);
                 return;
             }
 
@@ -201,8 +200,7 @@ namespace AnimeLocalTracker.Views
                 or nameof(ReproductorViewModel.SubtituloLineaAbajo)
                 or nameof(ReproductorViewModel.SubtituloLineaArriba))
             {
-                if (Dispatcher.CheckAccess()) ActualizarTextoSubtitulos();
-                else Dispatcher.InvokeAsync(ActualizarTextoSubtitulos);
+                Core.HiloUi.Ejecutar(ActualizarTextoSubtitulos);
                 return;
             }
 
@@ -219,8 +217,7 @@ namespace AnimeLocalTracker.Views
 
             if (e.PropertyName == nameof(ReproductorViewModel.OcultarVideoInicio))
             {
-                if (Dispatcher.CheckAccess()) ActualizarTapaVideo();
-                else Dispatcher.InvokeAsync(ActualizarTapaVideo);
+                Core.HiloUi.Ejecutar(ActualizarTapaVideo);
                 return;
             }
 
@@ -261,8 +258,7 @@ namespace AnimeLocalTracker.Views
         {
             if (e.PropertyName != nameof(FlyleafLib.MediaPlayer.Subtitles.SubsText)) return;
 
-            if (Dispatcher.CheckAccess()) ActualizarTextoSubtitulos();
-            else Dispatcher.InvokeAsync(ActualizarTextoSubtitulos);
+            Core.HiloUi.Ejecutar(ActualizarTextoSubtitulos);
         }
 
         private void ActualizarTextoSubtitulos()
@@ -407,8 +403,7 @@ namespace AnimeLocalTracker.Views
                 return;
             }
 
-            if (Dispatcher.CheckAccess()) ActualizarToast();
-            else Dispatcher.InvokeAsync(ActualizarToast);
+            Core.HiloUi.Ejecutar(ActualizarToast);
         }
 
         private void ActualizarToast()
@@ -468,8 +463,7 @@ namespace AnimeLocalTracker.Views
                 return;
             }
 
-            if (Dispatcher.CheckAccess()) ActualizarCuentaAtras();
-            else Dispatcher.InvokeAsync(ActualizarCuentaAtras);
+            Core.HiloUi.Ejecutar(ActualizarCuentaAtras);
         }
 
         private void ActualizarCuentaAtras()

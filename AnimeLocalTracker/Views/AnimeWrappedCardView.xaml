@@ -102,7 +102,7 @@
             <!-- ── 0. HEADER & BRAND ── -->
             <StackPanel Grid.Row="0" HorizontalAlignment="Center" Margin="0,0,0,16">
                 <!-- Pill Badge Brand -->
-                <Border CornerRadius="16" Background="#1AFFFFFF" BorderBrush="#33FFFFFF" BorderThickness="1"
+                <Border CornerRadius="16" Background="#1AFFFFFF" BorderBrush="{StaticResource Brush.RingBase}" BorderThickness="1"
                         Padding="16,6" HorizontalAlignment="Center" Margin="0,0,0,8">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <materialDesign:PackIcon Kind="Sparkles" Foreground="#C4B5FD" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,8,0"/>
@@ -126,7 +126,7 @@
                     </TextBlock.Effect>
                 </TextBlock>
 
-                <TextBlock Text="RESUMEN OFICIAL DE VISIONADO" FontSize="12.5" FontWeight="Bold" Foreground="#94A3B8"
+                <TextBlock Text="RESUMEN OFICIAL DE VISIONADO" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource Brush.TextTertiary}"
                            HorizontalAlignment="Center"/>
             </StackPanel>
 
@@ -170,22 +170,22 @@
                             <TextBlock Text="{Binding ArquetipoTitulo}" FontSize="12.5" FontWeight="Black" Foreground="#F472B6"/>
                         </Border>
 
-                        <TextBlock Text="{Binding ArquetipoDescripcion}" FontSize="11.5" Foreground="#94A3B8" TextTrimming="CharacterEllipsis"/>
+                        <TextBlock Text="{Binding ArquetipoDescripcion}" FontSize="11.5" Foreground="{StaticResource Brush.TextTertiary}" TextTrimming="CharacterEllipsis"/>
                     </StackPanel>
 
                     <!-- Badges Laterales: Rango y Racha -->
                     <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="10,0,0,0">
                         <!-- Badge de Rango -->
-                        <Border CornerRadius="14" Background="#2A2244" BorderBrush="#F59E0B" BorderThickness="1"
+                        <Border CornerRadius="14" Background="#2A2244" BorderBrush="{StaticResource Brush.Warning}" BorderThickness="1"
                                 Padding="14,6" Margin="0,0,0,6" HorizontalAlignment="Right">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <materialDesign:PackIcon Kind="TrophyVariant" Foreground="#FBBF24" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                <materialDesign:PackIcon Kind="TrophyVariant" Foreground="{StaticResource Brush.WarningStrong}" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
                                 <TextBlock Text="{Binding RangoOtakuTexto}" FontSize="12" FontWeight="Black" Foreground="#FDE68A" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Border>
 
                         <!-- Badge de Puntos de Logros -->
-                        <Border CornerRadius="14" Background="#1E293B" BorderBrush="#38BDF8" BorderThickness="1"
+                        <Border CornerRadius="14" Background="{StaticResource Brush.Surface3}" BorderBrush="#38BDF8" BorderThickness="1"
                                 Padding="12,4" HorizontalAlignment="Right">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                 <materialDesign:PackIcon Kind="StarCircle" Foreground="#38BDF8" Width="15" Height="15" VerticalAlignment="Center" Margin="0,0,6,0"/>
@@ -218,7 +218,7 @@
                         <StackPanel Grid.Column="0">
                             <TextBlock Text="{Binding HorasLabel}" FontSize="11" FontWeight="Bold" Foreground="#38BDF8"/>
                             <TextBlock Text="{Binding HorasVistasTexto}" FontSize="38" FontWeight="Black" Foreground="White" Margin="0,2,0,0"/>
-                            <TextBlock Text="tiempo acumulado frente a la pantalla" FontSize="10" Foreground="#64748B"/>
+                            <TextBlock Text="tiempo acumulado frente a la pantalla" FontSize="10" Foreground="{StaticResource Brush.IconMuted}"/>
                         </StackPanel>
                         <Border Grid.Column="1" Width="44" Height="44" CornerRadius="22" Background="#152642" VerticalAlignment="Top">
                             <materialDesign:PackIcon Kind="ClockOutline" Foreground="#38BDF8" Width="24" Height="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
@@ -237,7 +237,7 @@
                         <StackPanel Grid.Column="0">
                             <TextBlock Text="{Binding EpisodiosLabel}" FontSize="11" FontWeight="Bold" Foreground="#A78BFA"/>
                             <TextBlock Text="{Binding EpisodiosVistosTexto}" FontSize="38" FontWeight="Black" Foreground="White" Margin="0,2,0,0"/>
-                            <TextBlock Text="capítulos reproducidos y completados" FontSize="10" Foreground="#64748B"/>
+                            <TextBlock Text="capítulos reproducidos y completados" FontSize="10" Foreground="{StaticResource Brush.IconMuted}"/>
                         </StackPanel>
                         <Border Grid.Column="1" Width="44" Height="44" CornerRadius="22" Background="#241B45" VerticalAlignment="Top">
                             <materialDesign:PackIcon Kind="PlayCircleOutline" Foreground="#A78BFA" Width="24" Height="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
@@ -254,12 +254,12 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
-                            <TextBlock Text="{Binding RachaLabel}" FontSize="11" FontWeight="Bold" Foreground="#F59E0B"/>
+                            <TextBlock Text="{Binding RachaLabel}" FontSize="11" FontWeight="Bold" Foreground="{StaticResource Brush.Warning}"/>
                             <TextBlock Text="{Binding RachaMaximaTexto}" FontSize="32" FontWeight="Black" Foreground="White" Margin="0,2,0,0"/>
-                            <TextBlock Text="días seguidos viendo anime" FontSize="10" Foreground="#64748B"/>
+                            <TextBlock Text="días seguidos viendo anime" FontSize="10" Foreground="{StaticResource Brush.IconMuted}"/>
                         </StackPanel>
                         <Border Grid.Column="1" Width="44" Height="44" CornerRadius="22" Background="#3D2411" VerticalAlignment="Top">
-                            <materialDesign:PackIcon Kind="Fire" Foreground="#F59E0B" Width="24" Height="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            <materialDesign:PackIcon Kind="Fire" Foreground="{StaticResource Brush.Warning}" Width="24" Height="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                     </Grid>
                 </Border>
@@ -273,12 +273,12 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
-                            <TextBlock Text="{Binding GeneroLabel}" FontSize="11" FontWeight="Bold" Foreground="#34D399"/>
+                            <TextBlock Text="{Binding GeneroLabel}" FontSize="11" FontWeight="Bold" Foreground="{StaticResource Brush.Success}"/>
                             <TextBlock Text="{Binding GeneroFavorito}" FontSize="30" FontWeight="Black" Foreground="White" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/>
-                            <TextBlock Text="tu categoría temática predilecta" FontSize="10" Foreground="#64748B"/>
+                            <TextBlock Text="tu categoría temática predilecta" FontSize="10" Foreground="{StaticResource Brush.IconMuted}"/>
                         </StackPanel>
                         <Border Grid.Column="1" Width="44" Height="44" CornerRadius="22" Background="#113527" VerticalAlignment="Top">
-                            <materialDesign:PackIcon Kind="CompassOutline" Foreground="#34D399" Width="24" Height="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            <materialDesign:PackIcon Kind="CompassOutline" Foreground="{StaticResource Brush.Success}" Width="24" Height="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                     </Grid>
                 </Border>
@@ -290,7 +290,7 @@
                 <StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                         <materialDesign:PackIcon Kind="ShapePlus" Foreground="#F472B6" Width="15" Height="15" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                        <TextBlock Text="TOP GÉNEROS MÁS CONSUMIDOS" FontSize="11" FontWeight="Black" Foreground="#CBD5E1"/>
+                        <TextBlock Text="TOP GÉNEROS MÁS CONSUMIDOS" FontSize="11" FontWeight="Black" Foreground="{StaticResource Brush.TextSoft}"/>
                     </StackPanel>
 
                     <ItemsControl ItemsSource="{Binding GenerosTop}">
@@ -308,7 +308,7 @@
                                             <TextBlock Text="{Binding PorcentajeTexto}" FontSize="12" FontWeight="Black" Foreground="{Binding ColorHex}" HorizontalAlignment="Right"/>
                                         </Grid>
                                         <ProgressBar Value="{Binding Porcentaje, Mode=OneWay}" Minimum="0" Maximum="100" Height="6"
-                                                     Background="#1E293B" Foreground="{Binding ColorBrush}" BorderThickness="0"/>
+                                                     Background="{StaticResource Brush.Surface3}" Foreground="{Binding ColorBrush}" BorderThickness="0"/>
                                     </StackPanel>
                                 </Border>
                             </DataTemplate>
@@ -325,7 +325,7 @@
                 </Grid.RowDefinitions>
 
                 <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,12">
-                    <materialDesign:PackIcon Kind="Crown" Foreground="#F59E0B" Width="20" Height="20" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <materialDesign:PackIcon Kind="Crown" Foreground="{StaticResource Brush.Warning}" Width="20" Height="20" VerticalAlignment="Center" Margin="0,0,8,0"/>
                     <TextBlock Text="{Binding TopAnimesLabel}" FontSize="16" FontWeight="Black" Foreground="#F472B6"/>
                 </StackPanel>
 
@@ -351,10 +351,10 @@
                                 <RowDefinition Height="Auto"/> <!-- Título & Detalle -->
                             </Grid.RowDefinitions>
 
-                            <Border Grid.Row="0" CornerRadius="12" Background="#1E293B" BorderBrush="#94A3B8" BorderThickness="1"
+                            <Border Grid.Row="0" CornerRadius="12" Background="{StaticResource Brush.Surface3}" BorderBrush="{StaticResource Brush.TextTertiary}" BorderThickness="1"
                                     Padding="10,4" HorizontalAlignment="Center" Margin="0,0,0,10">
                                 <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="🥈 #2 PLATA" FontSize="11.5" FontWeight="Black" Foreground="#E2E8F0"/>
+                                    <TextBlock Text="🥈 #2 PLATA" FontSize="11.5" FontWeight="Black" Foreground="{StaticResource Brush.TextPrimary}"/>
                                 </StackPanel>
                             </Border>
 
@@ -368,14 +368,14 @@
                             <StackPanel Grid.Row="2">
                                 <TextBlock Text="{Binding Titulo}" FontSize="16" FontWeight="Bold" Foreground="White"
                                            TextAlignment="Center" TextTrimming="CharacterEllipsis" MaxHeight="44" TextWrapping="Wrap"/>
-                                <TextBlock Text="{Binding DetalleTexto}" FontSize="12" FontWeight="SemiBold" Foreground="#94A3B8"
+                                <TextBlock Text="{Binding DetalleTexto}" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource Brush.TextTertiary}"
                                            TextAlignment="Center" Margin="0,3,0,0"/>
                             </StackPanel>
                         </Grid>
                     </Border>
 
                     <!-- 👑 PUESTO #1: ORO CAMPEÓN (CENTRO MAS ALTO Y BRILLANTE) -->
-                    <Border Grid.Column="1" Background="{StaticResource GoldCardBrush}" BorderBrush="#F59E0B" BorderThickness="2.5"
+                    <Border Grid.Column="1" Background="{StaticResource GoldCardBrush}" BorderBrush="{StaticResource Brush.Warning}" BorderThickness="2.5"
                             CornerRadius="24" Padding="16,16" Margin="6,0,6,0" VerticalAlignment="Stretch"
                             Visibility="{Binding HasTop1, Converter={StaticResource BoolToVis}}" DataContext="{Binding Top1}">
                         <Border.Effect>
@@ -388,7 +388,7 @@
                                 <RowDefinition Height="Auto"/> <!-- Título & Detalle -->
                             </Grid.RowDefinitions>
 
-                            <Border Grid.Row="0" CornerRadius="14" Background="#78350F" BorderBrush="#F59E0B" BorderThickness="1.5"
+                            <Border Grid.Row="0" CornerRadius="14" Background="#78350F" BorderBrush="{StaticResource Brush.Warning}" BorderThickness="1.5"
                                     Padding="14,6" HorizontalAlignment="Center" Margin="0,0,0,10">
                                 <StackPanel Orientation="Horizontal">
                                     <materialDesign:PackIcon Kind="Crown" Foreground="#FDE047" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
@@ -396,7 +396,7 @@
                                 </StackPanel>
                             </Border>
 
-                            <Border Grid.Row="1" CornerRadius="16" Background="#241B3B" BorderBrush="#F59E0B" BorderThickness="2" ClipToBounds="True" Margin="0,0,0,10">
+                            <Border Grid.Row="1" CornerRadius="16" Background="#241B3B" BorderBrush="{StaticResource Brush.Warning}" BorderThickness="2" ClipToBounds="True" Margin="0,0,0,10">
                                 <Grid>
                                     <materialDesign:PackIcon Kind="ImageOutline" Foreground="#78350F" Width="44" Height="44" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                     <Image Source="{Binding Portada, TargetNullValue={x:Null}}" Stretch="UniformToFill"/>
@@ -406,7 +406,7 @@
                             <StackPanel Grid.Row="2">
                                 <TextBlock Text="{Binding Titulo}" FontSize="20" FontWeight="Black" Foreground="White"
                                            TextAlignment="Center" TextTrimming="CharacterEllipsis" MaxHeight="52" TextWrapping="Wrap"/>
-                                <Border Background="#451A03" BorderBrush="#F59E0B" BorderThickness="1" CornerRadius="10"
+                                <Border Background="#451A03" BorderBrush="{StaticResource Brush.Warning}" BorderThickness="1" CornerRadius="10"
                                         Padding="10,4" HorizontalAlignment="Center" Margin="0,6,0,0">
                                     <TextBlock Text="{Binding DetalleTexto}" FontSize="13" FontWeight="Black" Foreground="#FDE047"/>
                                 </Border>
@@ -456,7 +456,7 @@
             <!-- ── 5. FOOTER WATERMARK ── -->
             <StackPanel Grid.Row="5" HorizontalAlignment="Center">
                 <TextBlock Text="✨ GENERADO CON ANIMELOCALTRACKER • COLECCIÓN LOCAL Y PRIVADA"
-                           FontSize="11" FontWeight="Bold" Foreground="#64748B"/>
+                           FontSize="11" FontWeight="Bold" Foreground="{StaticResource Brush.IconMuted}"/>
             </StackPanel>
         </Grid>
     </Grid>

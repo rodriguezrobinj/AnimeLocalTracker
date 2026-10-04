@@ -284,21 +284,7 @@ public partial class AgregarAnimeViewModel : ObservableObject,
             var tendencias = await _animeTrackingService.ObtenerAnimesTendenciaAsync(cts.Token);
             if (cts.Token.IsCancellationRequested) return;
 
-            Resultados.Clear();
-            foreach (var media in tendencias)
-            {
-                Resultados.Add(new AnimeBusquedaItem
-                {
-                    Media = media,
-                    EstaEnBiblioteca = _animesEnBibliotecaIds.Contains(media.Id)
-                });
-            }
-
-            BusquedaSinResultados = Resultados.Count == 0;
-            ActualizarEstadoConexion();
-            ActualizarTemporadasYAniosDisponibles();
-            ActualizarGenerosDisponibles();
-            RefrescarFiltroTemporada();
+            MostrarResultados(tendencias);
         }
         catch (OperationCanceledException)
         {
@@ -320,6 +306,27 @@ public partial class AgregarAnimeViewModel : ObservableObject,
             }
             cts.Dispose();
         }
+    }
+
+    /// <summary>Pinta la lista (tendencias o resultados de una búsqueda) y refresca lo que depende de ella: el aviso de
+    /// "sin resultados", el estado de conexión y los filtros de temporada, año y género.</summary>
+    private void MostrarResultados(IEnumerable<AniListMedia> medias)
+    {
+        Resultados.Clear();
+        foreach (var media in medias)
+        {
+            Resultados.Add(new AnimeBusquedaItem
+            {
+                Media = media,
+                EstaEnBiblioteca = _animesEnBibliotecaIds.Contains(media.Id)
+            });
+        }
+
+        BusquedaSinResultados = Resultados.Count == 0;
+        ActualizarEstadoConexion();
+        ActualizarTemporadasYAniosDisponibles();
+        ActualizarGenerosDisponibles();
+        RefrescarFiltroTemporada();
     }
 
     private async Task EjecutarBusquedaEnVivoAsync(string busqueda)
@@ -347,21 +354,7 @@ public partial class AgregarAnimeViewModel : ObservableObject,
             var resultados = await _animeTrackingService.BuscarAnimesEnVivoAsync(busqueda.Trim(), cts.Token);
             if (cts.Token.IsCancellationRequested) return;
 
-            Resultados.Clear();
-            foreach (var media in resultados)
-            {
-                Resultados.Add(new AnimeBusquedaItem
-                {
-                    Media = media,
-                    EstaEnBiblioteca = _animesEnBibliotecaIds.Contains(media.Id)
-                });
-            }
-
-            BusquedaSinResultados = Resultados.Count == 0;
-            ActualizarEstadoConexion();
-            ActualizarTemporadasYAniosDisponibles();
-            ActualizarGenerosDisponibles();
-            RefrescarFiltroTemporada();
+            MostrarResultados(resultados);
         }
         catch (OperationCanceledException)
         {

@@ -70,7 +70,7 @@
 
                             <!-- BOTÓN BIBLIOTECA (GALERÍA) -->
                             <Grid Margin="0,8">
-                                <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"
+                                <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="{StaticResource Brush.Accent}" HorizontalAlignment="Left" Margin="-9,0,0,0"
                                            Visibility="{Binding Navigation.EsGaleriaActiva, Converter={StaticResource BoolToVis}}"/>
                                 <Button Command="{Binding NavegarGaleriaCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{Binding [Nav_Galeria], Source={x:Static loc:LocalizationService.Instance}}" AutomationProperties.Name="{Binding [Nav_Galeria], Source={x:Static loc:LocalizationService.Instance}}" TabIndex="1">
                                     <Button.Style>
@@ -81,7 +81,7 @@
                                                 <Setter Property="Background" Value="#1B222C"/>
                                             </Trigger>
                                                 <DataTrigger Binding="{Binding Navigation.EsGaleriaActiva}" Value="True">
-                                                    <Setter Property="Background" Value="#1E293B"/>
+                                                    <Setter Property="Background" Value="{StaticResource Brush.Surface3}"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
@@ -92,7 +92,7 @@
                                                 <Setter Property="Foreground" Value="#6B7280"/>
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding Navigation.EsGaleriaActiva}" Value="True">
-                                                        <Setter Property="Foreground" Value="#60A5FA"/>
+                                                        <Setter Property="Foreground" Value="{StaticResource Brush.Accent}"/>
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
@@ -103,7 +103,7 @@
 
                             <!-- BOTÓN HISTORIAL -->
                             <Grid Margin="0,8">
-                                <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"
+                                <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="{StaticResource Brush.Accent}" HorizontalAlignment="Left" Margin="-9,0,0,0"
                                            Visibility="{Binding Navigation.EsHistorialActivo, Converter={StaticResource BoolToVis}}"/>
                                 <Button Command="{Binding NavegarHistorialCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{Binding [Nav_Historial], Source={x:Static loc:LocalizationService.Instance}}" AutomationProperties.Name="{Binding [Nav_Historial], Source={x:Static loc:LocalizationService.Instance}}" TabIndex="2">
                                     <Button.Style>
@@ -114,7 +114,7 @@
                                                     <Setter Property="Background" Value="#1B222C"/>
                                                 </Trigger>
                                                 <DataTrigger Binding="{Binding Navigation.EsHistorialActivo}" Value="True">
-                                                    <Setter Property="Background" Value="#1E293B"/>
+                                                    <Setter Property="Background" Value="{StaticResource Brush.Surface3}"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
@@ -125,7 +125,7 @@
                                                 <Setter Property="Foreground" Value="#6B7280"/>
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding Navigation.EsHistorialActivo}" Value="True">
-                                                        <Setter Property="Foreground" Value="#60A5FA"/>
+                                                        <Setter Property="Foreground" Value="{StaticResource Brush.Accent}"/>
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
@@ -136,7 +136,7 @@
 
                             <!-- BOTÓN ACTUALIZACIONES (EPISODIOS NUEVOS) -->
                             <Grid Margin="0,8">
-                                <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"
+                                <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="{StaticResource Brush.Accent}" HorizontalAlignment="Left" Margin="-9,0,0,0"
                                            Visibility="{Binding Navigation.EsActualizacionesActivo, Converter={StaticResource BoolToVis}}"/>
                                 <Button Command="{Binding NavegarActualizacionesCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{Binding [Nav_Actualizaciones], Source={x:Static loc:LocalizationService.Instance}}" AutomationProperties.Name="{Binding [Nav_Actualizaciones], Source={x:Static loc:LocalizationService.Instance}}" TabIndex="3">
                                     <Button.Style>
@@ -147,7 +147,7 @@
                                                     <Setter Property="Background" Value="#1B222C"/>
                                                 </Trigger>
                                                 <DataTrigger Binding="{Binding Navigation.EsActualizacionesActivo}" Value="True">
-                                                    <Setter Property="Background" Value="#1E293B"/>
+                                                    <Setter Property="Background" Value="{StaticResource Brush.Surface3}"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
@@ -158,7 +158,7 @@
                                                 <Setter Property="Foreground" Value="#6B7280"/>
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding Navigation.EsActualizacionesActivo}" Value="True">
-                                                        <Setter Property="Foreground" Value="#60A5FA"/>
+                                                        <Setter Property="Foreground" Value="{StaticResource Brush.Accent}"/>
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
@@ -169,7 +169,7 @@
 
                             <!-- BOTÓN AÑADIR ANIME / EXPLORAR -->
                             <Grid Margin="0,8">
-                                <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"
+                                <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="{StaticResource Brush.Accent}" HorizontalAlignment="Left" Margin="-9,0,0,0"
                                            Visibility="{Binding Navigation.EsAgregarAnimeActivo, Converter={StaticResource BoolToVis}}"/>
                                 <Button Command="{Binding NavegarAgregarAnimeCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{Binding [Nav_Agregar], Source={x:Static loc:LocalizationService.Instance}}" AutomationProperties.Name="{Binding [Nav_Agregar], Source={x:Static loc:LocalizationService.Instance}}" TabIndex="4">
                                     <Button.Style>
@@ -180,7 +180,7 @@
                                                 <Setter Property="Background" Value="#1B222C"/>
                                             </Trigger>
                                                 <DataTrigger Binding="{Binding Navigation.EsAgregarAnimeActivo}" Value="True">
-                                                    <Setter Property="Background" Value="#1E293B"/>
+                                                    <Setter Property="Background" Value="{StaticResource Brush.Surface3}"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
@@ -191,7 +191,7 @@
                                                 <Setter Property="Foreground" Value="#6B7280"/>
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding Navigation.EsAgregarAnimeActivo}" Value="True">
-                                                        <Setter Property="Foreground" Value="#60A5FA"/>
+                                                        <Setter Property="Foreground" Value="{StaticResource Brush.Accent}"/>
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
@@ -202,7 +202,7 @@
 
                             <!-- BOTÓN CALENDARIO -->
                             <Grid Margin="0,8">
-                                <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"
+                                <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="{StaticResource Brush.Accent}" HorizontalAlignment="Left" Margin="-9,0,0,0"
                                            Visibility="{Binding Navigation.EsCalendarioActivo, Converter={StaticResource BoolToVis}}"/>
                                 <Button Command="{Binding NavegarCalendarioCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{Binding [Nav_Calendario], Source={x:Static loc:LocalizationService.Instance}}" AutomationProperties.Name="{Binding [Nav_Calendario], Source={x:Static loc:LocalizationService.Instance}}" TabIndex="5">
                                     <Button.Style>
@@ -213,7 +213,7 @@
                                                 <Setter Property="Background" Value="#1B222C"/>
                                             </Trigger>
                                                 <DataTrigger Binding="{Binding Navigation.EsCalendarioActivo}" Value="True">
-                                                    <Setter Property="Background" Value="#1E293B"/>
+                                                    <Setter Property="Background" Value="{StaticResource Brush.Surface3}"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
@@ -224,7 +224,7 @@
                                                 <Setter Property="Foreground" Value="#6B7280"/>
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding Navigation.EsCalendarioActivo}" Value="True">
-                                                        <Setter Property="Foreground" Value="#60A5FA"/>
+                                                        <Setter Property="Foreground" Value="{StaticResource Brush.Accent}"/>
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
@@ -235,7 +235,7 @@
 
                             <!-- BOTÓN ESTADÍSTICAS -->
                             <Grid Margin="0,8">
-                                <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"
+                                <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="{StaticResource Brush.Accent}" HorizontalAlignment="Left" Margin="-9,0,0,0"
                                            Visibility="{Binding Navigation.EsEstadisticasActivo, Converter={StaticResource BoolToVis}}"/>
                                 <Button Command="{Binding NavegarEstadisticasCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{Binding [Nav_Estadisticas], Source={x:Static loc:LocalizationService.Instance}}" AutomationProperties.Name="{Binding [Nav_Estadisticas], Source={x:Static loc:LocalizationService.Instance}}" TabIndex="6">
                                     <Button.Style>
@@ -246,7 +246,7 @@
                                                     <Setter Property="Background" Value="#1B222C"/>
                                                 </Trigger>
                                                 <DataTrigger Binding="{Binding Navigation.EsEstadisticasActivo}" Value="True">
-                                                    <Setter Property="Background" Value="#1E293B"/>
+                                                    <Setter Property="Background" Value="{StaticResource Brush.Surface3}"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
@@ -257,7 +257,7 @@
                                                 <Setter Property="Foreground" Value="#6B7280"/>
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding Navigation.EsEstadisticasActivo}" Value="True">
-                                                        <Setter Property="Foreground" Value="#60A5FA"/>
+                                                        <Setter Property="Foreground" Value="{StaticResource Brush.Accent}"/>
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
@@ -268,7 +268,7 @@
 
                             <!-- BOTÓN LOGROS -->
                             <Grid Margin="0,8">
-                                <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"
+                                <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="{StaticResource Brush.Accent}" HorizontalAlignment="Left" Margin="-9,0,0,0"
                                            Visibility="{Binding Navigation.EsLogrosActivo, Converter={StaticResource BoolToVis}}"/>
                                 <Button Command="{Binding NavegarLogrosCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{Binding [Nav_Logros], Source={x:Static loc:LocalizationService.Instance}}" AutomationProperties.Name="{Binding [Nav_Logros], Source={x:Static loc:LocalizationService.Instance}}" TabIndex="7">
                                     <Button.Style>
@@ -279,7 +279,7 @@
                                                     <Setter Property="Background" Value="#1B222C"/>
                                                 </Trigger>
                                                 <DataTrigger Binding="{Binding Navigation.EsLogrosActivo}" Value="True">
-                                                    <Setter Property="Background" Value="#1E293B"/>
+                                                    <Setter Property="Background" Value="{StaticResource Brush.Surface3}"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
@@ -290,7 +290,7 @@
                                                 <Setter Property="Foreground" Value="#6B7280"/>
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding Navigation.EsLogrosActivo}" Value="True">
-                                                        <Setter Property="Foreground" Value="#60A5FA"/>
+                                                        <Setter Property="Foreground" Value="{StaticResource Brush.Accent}"/>
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
@@ -301,7 +301,7 @@
 
                             <!-- BOTÓN COLA DE DESCARGAS -->
                             <Grid Margin="0,8">
-                                <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"
+                                <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="{StaticResource Brush.Accent}" HorizontalAlignment="Left" Margin="-9,0,0,0"
                                            Visibility="{Binding Navigation.EsDescargasActivas, Converter={StaticResource BoolToVis}}"/>
                                 <Button Command="{Binding NavegarDescargasCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{Binding [Nav_Descargas], Source={x:Static loc:LocalizationService.Instance}}" AutomationProperties.Name="{Binding [Nav_Descargas], Source={x:Static loc:LocalizationService.Instance}}" TabIndex="8">
                                     <Button.Style>
@@ -312,7 +312,7 @@
                                                 <Setter Property="Background" Value="#1B222C"/>
                                             </Trigger>
                                                 <DataTrigger Binding="{Binding Navigation.EsDescargasActivas}" Value="True">
-                                                    <Setter Property="Background" Value="#1E293B"/>
+                                                    <Setter Property="Background" Value="{StaticResource Brush.Surface3}"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
@@ -323,7 +323,7 @@
                                                 <Setter Property="Foreground" Value="#6B7280"/>
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding Navigation.EsDescargasActivas}" Value="True">
-                                                        <Setter Property="Foreground" Value="#60A5FA"/>
+                                                        <Setter Property="Foreground" Value="{StaticResource Brush.Accent}"/>
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
@@ -333,7 +333,7 @@
 
                                 <!-- BADGE CONTEO DE DESCARGAS -->
                                 <Border HorizontalAlignment="Right" VerticalAlignment="Top" 
-                                        Background="#3B82F6" BorderBrush="#1E293B" BorderThickness="1" 
+                                        Background="{StaticResource Brush.AccentStrong}" BorderBrush="{StaticResource Brush.Surface3}" BorderThickness="1" 
                                         CornerRadius="9" MinWidth="18" Height="18" Padding="4,0" Margin="0,-2,-2,0" 
                                         IsHitTestVisible="False"
                                         Visibility="{Binding TieneDescargasActivas, Converter={StaticResource BoolToVis}}">
@@ -346,13 +346,13 @@
 
                         <!-- SEPARADOR DE GRUPO -->
                         <Border Grid.Row="1" HorizontalAlignment="Center" Width="28" Height="1"
-                                Background="#262D38" Margin="0,8" IsHitTestVisible="False"/>
+                                Background="{StaticResource Brush.Border}" Margin="0,8" IsHitTestVisible="False"/>
 
                         <!-- BOTONES INFERIORES: CONFIGURACIÓN Y ACERCA DE -->
                         <StackPanel Grid.Row="2" HorizontalAlignment="Center" Margin="0,0,0,15">
                             <!-- BOTÓN CONFIGURACIÓN -->
                             <Grid Margin="0,4">
-                                <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"
+                                <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="{StaticResource Brush.Accent}" HorizontalAlignment="Left" Margin="-9,0,0,0"
                                            Visibility="{Binding Navigation.EsConfiguracionActiva, Converter={StaticResource BoolToVis}}"/>
                                 <Button Command="{Binding NavegarConfiguracionCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{Binding [Nav_Configuracion], Source={x:Static loc:LocalizationService.Instance}}" AutomationProperties.Name="{Binding [Nav_Configuracion], Source={x:Static loc:LocalizationService.Instance}}" TabIndex="9">
                                     <Button.Style>
@@ -363,7 +363,7 @@
                                                 <Setter Property="Background" Value="#1B222C"/>
                                             </Trigger>
                                                 <DataTrigger Binding="{Binding Navigation.EsConfiguracionActiva}" Value="True">
-                                                    <Setter Property="Background" Value="#1E293B"/>
+                                                    <Setter Property="Background" Value="{StaticResource Brush.Surface3}"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
@@ -374,7 +374,7 @@
                                                 <Setter Property="Foreground" Value="#6B7280"/>
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding Navigation.EsConfiguracionActiva}" Value="True">
-                                                        <Setter Property="Foreground" Value="#60A5FA"/>
+                                                        <Setter Property="Foreground" Value="{StaticResource Brush.Accent}"/>
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
@@ -385,7 +385,7 @@
 
                             <!-- BOTÓN ACERCA DE -->
                             <Grid Margin="0,4">
-                                <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Left" Margin="-9,0,0,0"
+                                <Rectangle Width="3" Height="22" RadiusX="1.5" RadiusY="1.5" Fill="{StaticResource Brush.Accent}" HorizontalAlignment="Left" Margin="-9,0,0,0"
                                            Visibility="{Binding Navigation.EsAcercaDeActivo, Converter={StaticResource BoolToVis}}"/>
                                 <Button Command="{Binding NavegarAcercaDeCommand}" Width="45" Height="45" materialDesign:ButtonAssist.CornerRadius="12" ToolTip="{Binding [Nav_AcercaDe], Source={x:Static loc:LocalizationService.Instance}}" AutomationProperties.Name="{Binding [Nav_AcercaDe], Source={x:Static loc:LocalizationService.Instance}}" TabIndex="10">
                                     <Button.Style>
@@ -396,7 +396,7 @@
                                                 <Setter Property="Background" Value="#1B222C"/>
                                             </Trigger>
                                                 <DataTrigger Binding="{Binding Navigation.EsAcercaDeActivo}" Value="True">
-                                                    <Setter Property="Background" Value="#1E293B"/>
+                                                    <Setter Property="Background" Value="{StaticResource Brush.Surface3}"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
@@ -407,7 +407,7 @@
                                                 <Setter Property="Foreground" Value="#6B7280"/>
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding Navigation.EsAcercaDeActivo}" Value="True">
-                                                        <Setter Property="Foreground" Value="#60A5FA"/>
+                                                        <Setter Property="Foreground" Value="{StaticResource Brush.Accent}"/>
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
@@ -456,7 +456,7 @@
                 <!-- BARRA DE TÍTULO CUSTOM -->
                 <Grid Grid.Column="0" Grid.ColumnSpan="2" x:Name="BarraTitulo" Height="45" Background="Transparent" VerticalAlignment="Top" Panel.ZIndex="20">
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="15,0,0,0">
-                        <materialDesign:PackIcon Kind="PlayCircle" Foreground="#3B82F6" Width="20" Height="20" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <materialDesign:PackIcon Kind="PlayCircle" Foreground="{StaticResource Brush.AccentStrong}" Width="20" Height="20" VerticalAlignment="Center" Margin="0,0,8,0"/>
                         <TextBlock Text="AnimeTracker" FontWeight="Bold" Foreground="{DynamicResource MaterialDesignBodyLight}" VerticalAlignment="Center" FontSize="14"/>
                         <Button Command="{Binding BuscarActualizacionesManualCommand}"
                                 WindowChrome.IsHitTestVisibleInChrome="True"
@@ -464,7 +464,7 @@
                                 AutomationProperties.Name="{Binding [Nav_ComprobarUpdates], Source={x:Static loc:LocalizationService.Instance}}"
                                 Style="{StaticResource MaterialDesignFlatButton}"
                                 Padding="8,2" Height="22" Margin="12,0,0,0"
-                                Background="#1E293B" Foreground="#93C5FD"
+                                Background="{StaticResource Brush.Surface3}" Foreground="{StaticResource Brush.AccentSoft}"
                                 materialDesign:ButtonAssist.CornerRadius="11">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="Update" Width="13" Height="13" VerticalAlignment="Center" Margin="0,0,4,0"/>
@@ -475,15 +475,15 @@
                         <!-- Estado de conexión: sin internet (la app sigue con lo guardado) o cambios esperando a subirse a AniList.
                              Un solo distintivo aquí en vez de avisos en cada pestaña; el detalle, en el tooltip. -->
                         <Border WindowChrome.IsHitTestVisibleInChrome="True" Height="22" CornerRadius="11" Padding="8,0" Margin="8,0,0,0"
-                                Background="#1E293B" VerticalAlignment="Center"
+                                Background="{StaticResource Brush.Surface3}" VerticalAlignment="Center"
                                 Visibility="{Binding IndicadorConexionVisible, Converter={StaticResource BoolToVis}}"
                                 ToolTip="{Binding TextoEstadoConexion}" AutomationProperties.Name="{Binding TextoEstadoConexion}">
                             <StackPanel Orientation="Horizontal">
-                                <materialDesign:PackIcon Kind="WifiOff" Width="13" Height="13" Foreground="#94A3B8" VerticalAlignment="Center" Margin="0,0,4,0"
+                                <materialDesign:PackIcon Kind="WifiOff" Width="13" Height="13" Foreground="{StaticResource Brush.TextTertiary}" VerticalAlignment="Center" Margin="0,0,4,0"
                                                          Visibility="{Binding SinConexion, Converter={StaticResource BoolToVis}}"/>
-                                <materialDesign:PackIcon Kind="CloudUploadOutline" Width="13" Height="13" Foreground="#93C5FD" VerticalAlignment="Center" Margin="0,0,4,0"
+                                <materialDesign:PackIcon Kind="CloudUploadOutline" Width="13" Height="13" Foreground="{StaticResource Brush.AccentSoft}" VerticalAlignment="Center" Margin="0,0,4,0"
                                                          Visibility="{Binding SinConexion, Converter={StaticResource InverseBoolToVis}}"/>
-                                <TextBlock Text="{Binding TextoBadgeConexion}" FontSize="11" FontWeight="SemiBold" Foreground="#94A3B8" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding TextoBadgeConexion}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource Brush.TextTertiary}" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Border>
                     </StackPanel>
@@ -839,7 +839,7 @@
                             </Style.Triggers>
                         </Style>
                     </Border.Style>
-                    <materialDesign:Card UniformCornerRadius="10" Background="#161B22" Padding="20,15" materialDesign:ElevationAssist.Elevation="Dp8">
+                    <materialDesign:Card UniformCornerRadius="10" Background="{StaticResource Brush.Surface2}" Padding="20,15" materialDesign:ElevationAssist.Elevation="Dp8">
                         <StackPanel Orientation="Horizontal">
                             <materialDesign:PackIcon Kind="{Binding DialogService.ToastIcono}" Foreground="{Binding DialogService.ToastColor}" Width="28" Height="28" VerticalAlignment="Center" Margin="0,0,15,0"/>
                             <StackPanel VerticalAlignment="Center">

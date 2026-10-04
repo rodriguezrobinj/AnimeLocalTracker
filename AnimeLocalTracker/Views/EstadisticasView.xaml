@@ -46,22 +46,22 @@
         <!-- ENCABEZADO -->
         <Grid Grid.Row="0" Margin="0,0,0,20">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <Border Background="#1E293B" CornerRadius="12" Width="48" Height="48" Margin="0,0,14,0" VerticalAlignment="Center">
-                    <materialDesign:PackIcon Kind="ChartDonut" Foreground="#93C5FD" Width="24" Height="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                <Border Background="{StaticResource Brush.Surface3}" CornerRadius="12" Width="48" Height="48" Margin="0,0,14,0" VerticalAlignment="Center">
+                    <materialDesign:PackIcon Kind="ChartDonut" Foreground="{StaticResource Brush.AccentSoft}" Width="24" Height="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
                 <StackPanel VerticalAlignment="Center">
                     <TextBlock Text="{Binding [Stats_Titulo], Source={x:Static loc:LocalizationService.Instance}}" Style="{StaticResource AppText.PageTitle}"/>
-                    <TextBlock Text="{Binding [Stats_Subtitulo], Source={x:Static loc:LocalizationService.Instance}}" FontSize="12" Foreground="#9CA3AF" Margin="0,3,0,0"/>
+                    <TextBlock Text="{Binding [Stats_Subtitulo], Source={x:Static loc:LocalizationService.Instance}}" FontSize="12" Foreground="{StaticResource Brush.TextSecondary}" Margin="0,3,0,0"/>
                 </StackPanel>
             </StackPanel>
         </Grid>
 
         <!-- BANNER DE ERROR (EST-03) -->
-        <Border Grid.Row="1" Background="#3A1416" BorderBrush="#F87171" BorderThickness="1" CornerRadius="12"
+        <Border Grid.Row="1" Background="#3A1416" BorderBrush="{StaticResource Brush.Danger}" BorderThickness="1" CornerRadius="12"
                 Padding="16,12" Margin="0,0,24,14" VerticalAlignment="Top"
                 Visibility="{Binding HayError, Converter={StaticResource BoolToVis}}">
             <StackPanel Orientation="Horizontal">
-                <materialDesign:PackIcon Kind="AlertCircle" Foreground="#F87171" Width="20" Height="20" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                <materialDesign:PackIcon Kind="AlertCircle" Foreground="{StaticResource Brush.Danger}" Width="20" Height="20" Margin="0,0,10,0" VerticalAlignment="Center"/>
                 <TextBlock Text="{Binding MensajeError}" Foreground="#FECACA" FontSize="13" VerticalAlignment="Center" TextWrapping="Wrap"/>
             </StackPanel>
         </Border>
@@ -78,27 +78,27 @@
                         <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <Border Grid.Row="0" Grid.Column="0" Background="#121212" BorderBrush="#262D38" BorderThickness="1" CornerRadius="14" Padding="18,14" Margin="0,0,8,8">
+                    <Border Grid.Row="0" Grid.Column="0" Background="#121212" BorderBrush="{StaticResource Brush.Border}" BorderThickness="1" CornerRadius="14" Padding="18,14" Margin="0,0,8,8">
                         <StackPanel>
                             <StackPanel Orientation="Horizontal">
-                                <materialDesign:PackIcon Kind="AnimationPlay" Foreground="#60A5FA" Width="18" Height="18" VerticalAlignment="Center"/>
+                                <materialDesign:PackIcon Kind="AnimationPlay" Foreground="{StaticResource Brush.Accent}" Width="18" Height="18" VerticalAlignment="Center"/>
                                 <TextBlock Text="{Binding [Stats_EpisodiosVistos], Source={x:Static loc:LocalizationService.Instance}}" FontSize="10" Foreground="#6B7280" FontWeight="Bold" Margin="8,0,0,0"/>
                             </StackPanel>
                             <TextBlock Text="{Binding TotalEpisodiosVistos}" FontSize="30" FontWeight="Bold" Foreground="White" Margin="0,6,0,0"/>
                         </StackPanel>
                     </Border>
 
-                    <Border Grid.Row="0" Grid.Column="1" Background="#121212" BorderBrush="#262D38" BorderThickness="1" CornerRadius="14" Padding="18,14" Margin="8,0,8,8">
+                    <Border Grid.Row="0" Grid.Column="1" Background="#121212" BorderBrush="{StaticResource Brush.Border}" BorderThickness="1" CornerRadius="14" Padding="18,14" Margin="8,0,8,8">
                         <StackPanel>
                             <StackPanel Orientation="Horizontal">
-                                <materialDesign:PackIcon Kind="ClockOutline" Foreground="#34D399" Width="18" Height="18" VerticalAlignment="Center"/>
+                                <materialDesign:PackIcon Kind="ClockOutline" Foreground="{StaticResource Brush.Success}" Width="18" Height="18" VerticalAlignment="Center"/>
                                 <TextBlock Text="{Binding [Stats_HorasReproducidas], Source={x:Static loc:LocalizationService.Instance}}" FontSize="10" Foreground="#6B7280" FontWeight="Bold" Margin="8,0,0,0"/>
                             </StackPanel>
                             <TextBlock Text="{Binding HorasVistasTexto}" FontSize="30" FontWeight="Bold" Foreground="White" Margin="0,6,0,0"/>
                         </StackPanel>
                     </Border>
 
-                    <Border Grid.Row="0" Grid.Column="2" Background="#121212" BorderBrush="#262D38" BorderThickness="1" CornerRadius="14" Padding="18,14" Margin="8,0,8,8">
+                    <Border Grid.Row="0" Grid.Column="2" Background="#121212" BorderBrush="{StaticResource Brush.Border}" BorderThickness="1" CornerRadius="14" Padding="18,14" Margin="8,0,8,8">
                         <StackPanel>
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="ViewGallery" Foreground="#A78BFA" Width="18" Height="18" VerticalAlignment="Center"/>
@@ -108,52 +108,52 @@
                         </StackPanel>
                     </Border>
 
-                    <Border Grid.Row="0" Grid.Column="3" Background="#121212" BorderBrush="#262D38" BorderThickness="1" CornerRadius="14" Padding="18,14" Margin="8,0,0,8">
+                    <Border Grid.Row="0" Grid.Column="3" Background="#121212" BorderBrush="{StaticResource Brush.Border}" BorderThickness="1" CornerRadius="14" Padding="18,14" Margin="8,0,0,8">
                         <StackPanel>
                             <StackPanel Orientation="Horizontal">
-                                <materialDesign:PackIcon Kind="TrophyOutline" Foreground="#FBBF24" Width="18" Height="18" VerticalAlignment="Center"/>
+                                <materialDesign:PackIcon Kind="TrophyOutline" Foreground="{StaticResource Brush.WarningStrong}" Width="18" Height="18" VerticalAlignment="Center"/>
                                 <TextBlock Text="{Binding [Stats_BibliotecaCompletada], Source={x:Static loc:LocalizationService.Instance}}" FontSize="10" Foreground="#6B7280" FontWeight="Bold" Margin="8,0,0,0"/>
                             </StackPanel>
                             <TextBlock Text="{Binding PorcentajeCompletadoTexto}" FontSize="30" FontWeight="Bold" Foreground="White" Margin="0,6,0,0"/>
                         </StackPanel>
                     </Border>
 
-                    <Border Grid.Row="1" Grid.Column="0" Background="#121212" BorderBrush="#262D38" BorderThickness="1" CornerRadius="14" Padding="18,12" Margin="0,0,8,0">
+                    <Border Grid.Row="1" Grid.Column="0" Background="#121212" BorderBrush="{StaticResource Brush.Border}" BorderThickness="1" CornerRadius="14" Padding="18,12" Margin="0,0,8,0">
                         <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="ProgressClock" Foreground="#F59E0B" Width="16" Height="16" VerticalAlignment="Center"/>
+                            <materialDesign:PackIcon Kind="ProgressClock" Foreground="{StaticResource Brush.Warning}" Width="16" Height="16" VerticalAlignment="Center"/>
                             <StackPanel Margin="8,0,0,0">
                                 <TextBlock Text="{Binding AnimesEnProceso}" FontSize="18" FontWeight="Bold" Foreground="White"/>
-                                <TextBlock Text="{Binding [Stats_AMedioVer], Source={x:Static loc:LocalizationService.Instance}}" FontSize="10" Foreground="#9CA3AF"/>
+                                <TextBlock Text="{Binding [Stats_AMedioVer], Source={x:Static loc:LocalizationService.Instance}}" FontSize="10" Foreground="{StaticResource Brush.TextSecondary}"/>
                             </StackPanel>
                         </StackPanel>
                     </Border>
 
-                    <Border Grid.Row="1" Grid.Column="1" Background="#121212" BorderBrush="#262D38" BorderThickness="1" CornerRadius="14" Padding="18,12" Margin="8,0">
+                    <Border Grid.Row="1" Grid.Column="1" Background="#121212" BorderBrush="{StaticResource Brush.Border}" BorderThickness="1" CornerRadius="14" Padding="18,12" Margin="8,0">
                         <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="HeartOutline" Foreground="#F87171" Width="16" Height="16" VerticalAlignment="Center"/>
+                            <materialDesign:PackIcon Kind="HeartOutline" Foreground="{StaticResource Brush.Danger}" Width="16" Height="16" VerticalAlignment="Center"/>
                             <StackPanel Margin="8,0,0,0">
                                 <TextBlock Text="{Binding TotalFavoritos}" FontSize="18" FontWeight="Bold" Foreground="White"/>
-                                <TextBlock Text="{Binding [Stats_EpisodiosFavoritos], Source={x:Static loc:LocalizationService.Instance}}" FontSize="10" Foreground="#9CA3AF"/>
+                                <TextBlock Text="{Binding [Stats_EpisodiosFavoritos], Source={x:Static loc:LocalizationService.Instance}}" FontSize="10" Foreground="{StaticResource Brush.TextSecondary}"/>
                             </StackPanel>
                         </StackPanel>
                     </Border>
 
-                    <Border Grid.Row="1" Grid.Column="2" Background="#121212" BorderBrush="#262D38" BorderThickness="1" CornerRadius="14" Padding="18,12" Margin="8,0">
+                    <Border Grid.Row="1" Grid.Column="2" Background="#121212" BorderBrush="{StaticResource Brush.Border}" BorderThickness="1" CornerRadius="14" Padding="18,12" Margin="8,0">
                         <StackPanel Orientation="Horizontal">
                             <materialDesign:PackIcon Kind="DownloadCircle" Foreground="#38BDF8" Width="16" Height="16" VerticalAlignment="Center"/>
                             <StackPanel Margin="8,0,0,0">
                                 <TextBlock Text="{Binding TotalDescargados}" FontSize="18" FontWeight="Bold" Foreground="White"/>
-                                <TextBlock Text="{Binding [Stats_EpisodiosDescargados], Source={x:Static loc:LocalizationService.Instance}}" FontSize="10" Foreground="#9CA3AF"/>
+                                <TextBlock Text="{Binding [Stats_EpisodiosDescargados], Source={x:Static loc:LocalizationService.Instance}}" FontSize="10" Foreground="{StaticResource Brush.TextSecondary}"/>
                             </StackPanel>
                         </StackPanel>
                     </Border>
 
-                    <Border Grid.Row="1" Grid.Column="3" Background="#121212" BorderBrush="#262D38" BorderThickness="1" CornerRadius="14" Padding="18,12" Margin="8,0,0,0">
+                    <Border Grid.Row="1" Grid.Column="3" Background="#121212" BorderBrush="{StaticResource Brush.Border}" BorderThickness="1" CornerRadius="14" Padding="18,12" Margin="8,0,0,0">
                         <StackPanel Orientation="Horizontal">
                             <materialDesign:PackIcon Kind="Timelapse" Foreground="#F472B6" Width="16" Height="16" VerticalAlignment="Center"/>
                             <StackPanel Margin="8,0,0,0">
                                 <TextBlock Text="{Binding DuracionPromedioTexto}" FontSize="18" FontWeight="Bold" Foreground="White"/>
-                                <TextBlock Text="{Binding [Stats_DuracionPromedio], Source={x:Static loc:LocalizationService.Instance}}" FontSize="10" Foreground="#9CA3AF"/>
+                                <TextBlock Text="{Binding [Stats_DuracionPromedio], Source={x:Static loc:LocalizationService.Instance}}" FontSize="10" Foreground="{StaticResource Brush.TextSecondary}"/>
                             </StackPanel>
                         </StackPanel>
                     </Border>
@@ -165,7 +165,7 @@
                         <ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
-                    <Border Grid.Column="0" Background="#14181E" BorderBrush="#262D38" BorderThickness="1" CornerRadius="14" Padding="14,10" Margin="0,0,8,0">
+                    <Border Grid.Column="0" Background="{StaticResource Brush.Surface1}" BorderBrush="{StaticResource Brush.Border}" BorderThickness="1" CornerRadius="14" Padding="14,10" Margin="0,0,8,0">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/>
@@ -176,56 +176,56 @@
                             <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
                                 <TextBlock Text="{Binding [Stats_GeneroFavorito], Source={x:Static loc:LocalizationService.Instance}}" FontSize="9" Foreground="#6B7280" FontWeight="Bold"/>
                                 <TextBlock Text="{Binding GeneroFavorito}" FontSize="15" FontWeight="Bold" Foreground="White" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/>
-                                <TextBlock Text="{Binding GeneroFavoritoDetalle}" FontSize="10" Foreground="#9CA3AF" Margin="0,1,0,0" TextTrimming="CharacterEllipsis"/>
+                                <TextBlock Text="{Binding GeneroFavoritoDetalle}" FontSize="10" Foreground="{StaticResource Brush.TextSecondary}" Margin="0,1,0,0" TextTrimming="CharacterEllipsis"/>
                             </StackPanel>
                         </Grid>
                     </Border>
 
-                    <Border Grid.Column="1" Background="#14181E" BorderBrush="#262D38" BorderThickness="1" CornerRadius="14" Padding="14,10" Margin="8,0">
+                    <Border Grid.Column="1" Background="{StaticResource Brush.Surface1}" BorderBrush="{StaticResource Brush.Border}" BorderThickness="1" CornerRadius="14" Padding="14,10" Margin="8,0">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
                             <Border Background="#1E2A4A" CornerRadius="10" Width="36" Height="36" VerticalAlignment="Center">
-                                <materialDesign:PackIcon Kind="Crown" Foreground="#60A5FA" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                <materialDesign:PackIcon Kind="Crown" Foreground="{StaticResource Brush.Accent}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
                                 <TextBlock Text="{Binding [Stats_AnimeMasVisto], Source={x:Static loc:LocalizationService.Instance}}" FontSize="9" Foreground="#6B7280" FontWeight="Bold"/>
                                 <TextBlock Text="{Binding AnimeMasVisto}" FontSize="15" FontWeight="Bold" Foreground="White" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/>
-                                <TextBlock Text="{Binding AnimeMasVistoDetalle}" FontSize="10" Foreground="#9CA3AF" Margin="0,1,0,0" TextTrimming="CharacterEllipsis"/>
+                                <TextBlock Text="{Binding AnimeMasVistoDetalle}" FontSize="10" Foreground="{StaticResource Brush.TextSecondary}" Margin="0,1,0,0" TextTrimming="CharacterEllipsis"/>
                             </StackPanel>
                         </Grid>
                     </Border>
 
-                    <Border Grid.Column="2" Background="#14181E" BorderBrush="#262D38" BorderThickness="1" CornerRadius="14" Padding="14,10" Margin="8,0">
+                    <Border Grid.Column="2" Background="{StaticResource Brush.Surface1}" BorderBrush="{StaticResource Brush.Border}" BorderThickness="1" CornerRadius="14" Padding="14,10" Margin="8,0">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
                             <Border Background="#1E2A2A" CornerRadius="10" Width="36" Height="36" VerticalAlignment="Center">
-                                <materialDesign:PackIcon Kind="CalendarStar" Foreground="#34D399" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                <materialDesign:PackIcon Kind="CalendarStar" Foreground="{StaticResource Brush.Success}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
                                 <TextBlock Text="{Binding [Stats_AnioMasActivo], Source={x:Static loc:LocalizationService.Instance}}" FontSize="9" Foreground="#6B7280" FontWeight="Bold"/>
                                 <TextBlock Text="{Binding MejorAnio}" FontSize="15" FontWeight="Bold" Foreground="White" Margin="0,2,0,0"/>
-                                <TextBlock Text="{Binding MejorAnioDetalle}" FontSize="10" Foreground="#9CA3AF" Margin="0,1,0,0" TextTrimming="CharacterEllipsis"/>
+                                <TextBlock Text="{Binding MejorAnioDetalle}" FontSize="10" Foreground="{StaticResource Brush.TextSecondary}" Margin="0,1,0,0" TextTrimming="CharacterEllipsis"/>
                             </StackPanel>
                         </Grid>
                     </Border>
 
-                    <Border Grid.Column="3" Background="#14181E" BorderBrush="#262D38" BorderThickness="1" CornerRadius="14" Padding="14,10" Margin="8,0,0,0">
+                    <Border Grid.Column="3" Background="{StaticResource Brush.Surface1}" BorderBrush="{StaticResource Brush.Border}" BorderThickness="1" CornerRadius="14" Padding="14,10" Margin="8,0,0,0">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
                             <Border Background="#2A241E" CornerRadius="10" Width="36" Height="36" VerticalAlignment="Center">
-                                <materialDesign:PackIcon Kind="Speedometer" Foreground="#FBBF24" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                <materialDesign:PackIcon Kind="Speedometer" Foreground="{StaticResource Brush.WarningStrong}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
                                 <TextBlock Text="{Binding [Stats_Ritmo], Source={x:Static loc:LocalizationService.Instance}}" FontSize="9" Foreground="#6B7280" FontWeight="Bold"/>
                                 <TextBlock FontSize="15" FontWeight="Bold" Foreground="White" Margin="0,2,0,0">
                                     <Run Text="{Binding HorasPorMes}"/><Run Text="{Binding [Stats_PorMes], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
-                                </TextBlock>                                <TextBlock FontSize="10" Foreground="#9CA3AF" Margin="0,1,0,0">
+                                </TextBlock>                                <TextBlock FontSize="10" Foreground="{StaticResource Brush.TextSecondary}" Margin="0,1,0,0">
                                     <Run Text="{Binding [Stats_RachaActual], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/><Run Text="{Binding RachaActual}"/>
                                 </TextBlock>
                             </StackPanel>
@@ -239,18 +239,18 @@
                         <ColumnDefinition Width="*"/><ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
-                    <Border Grid.Column="0" Background="#121212" BorderBrush="#262D38" BorderThickness="1" CornerRadius="14" Padding="22,18" Margin="0,0,8,0">
+                    <Border Grid.Column="0" Background="#121212" BorderBrush="{StaticResource Brush.Border}" BorderThickness="1" CornerRadius="14" Padding="22,18" Margin="0,0,8,0">
                         <StackPanel>
                             <TextBlock Text="{Binding [Stats_DistribucionLista], Source={x:Static loc:LocalizationService.Instance}}" FontSize="14" FontWeight="Bold" Foreground="White" Margin="0,0,0,4"/>
-                            <TextBlock Text="{Binding [Stats_PorEstado], Source={x:Static loc:LocalizationService.Instance}}" FontSize="11" Foreground="#9CA3AF" Margin="0,0,0,14"/>
+                            <TextBlock Text="{Binding [Stats_PorEstado], Source={x:Static loc:LocalizationService.Instance}}" FontSize="11" Foreground="{StaticResource Brush.TextSecondary}" Margin="0,0,0,14"/>
                             <ctl:DonutChart ItemsSource="{Binding DonutEstado}" CentroTexto="{Binding DonutEstadoCentro}" CentroSubtexto="{Binding [Stats_DonutCentroAnimes], Source={x:Static loc:LocalizationService.Instance}}"/>
                         </StackPanel>
                     </Border>
 
-                    <Border Grid.Column="1" Background="#121212" BorderBrush="#262D38" BorderThickness="1" CornerRadius="14" Padding="22,18" Margin="8,0,0,0">
+                    <Border Grid.Column="1" Background="#121212" BorderBrush="{StaticResource Brush.Border}" BorderThickness="1" CornerRadius="14" Padding="22,18" Margin="8,0,0,0">
                         <StackPanel>
                             <TextBlock Text="{Binding [Stats_AnalisisGenero], Source={x:Static loc:LocalizationService.Instance}}" FontSize="14" FontWeight="Bold" Foreground="White" Margin="0,0,0,4"/>
-                            <TextBlock Text="{Binding [Stats_GeneroSub], Source={x:Static loc:LocalizationService.Instance}}" FontSize="11" Foreground="#9CA3AF" Margin="0,0,0,14"/>
+                            <TextBlock Text="{Binding [Stats_GeneroSub], Source={x:Static loc:LocalizationService.Instance}}" FontSize="11" Foreground="{StaticResource Brush.TextSecondary}" Margin="0,0,0,14"/>
                             <ctl:DonutChart ItemsSource="{Binding DonutGeneros}" CentroTexto="{Binding DonutGenerosCentro}" CentroSubtexto="{Binding DonutGenerosSubcentro}"/>
                         </StackPanel>
                     </Border>
@@ -262,12 +262,12 @@
                         <ColumnDefinition Width="*"/><ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
-                    <Border Grid.Column="0" Background="#121212" BorderBrush="#262D38" BorderThickness="1" CornerRadius="14" Padding="22,18" Margin="0,0,8,0">
+                    <Border Grid.Column="0" Background="#121212" BorderBrush="{StaticResource Brush.Border}" BorderThickness="1" CornerRadius="14" Padding="22,18" Margin="0,0,8,0">
                         <StackPanel>
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                                 <TextBlock Text="{Binding [Stats_Actividad7Dias], Source={x:Static loc:LocalizationService.Instance}}" FontSize="14" FontWeight="Bold" Foreground="White"/>
                             </StackPanel>
-                            <TextBlock FontSize="11" Foreground="#9CA3AF" Margin="0,0,0,4">
+                            <TextBlock FontSize="11" Foreground="{StaticResource Brush.TextSecondary}" Margin="0,0,0,4">
                                 <Run Text="{Binding PromedioDiarioTexto}"/>
                                 <Run Text="{Binding [Stats_PromedioDiarioSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
                                 <Run Text="{Binding RachaMaxima}"/>
@@ -282,7 +282,7 @@
                                                 <ColumnDefinition Width="40"/>
                                             </Grid.ColumnDefinitions>
                                             <TextBlock Text="{Binding Etiqueta}" Foreground="#D1D5DB" FontSize="12" VerticalAlignment="Center"/>
-                                            <Border Grid.Column="1" Background="#1E293B" CornerRadius="4" Height="18" VerticalAlignment="Center">
+                                            <Border Grid.Column="1" Background="{StaticResource Brush.Surface3}" CornerRadius="4" Height="18" VerticalAlignment="Center">
                                                 <Border CornerRadius="4" Width="{Binding AnchoBarra}" HorizontalAlignment="Left">
                                                     <Border.Background>
                                                         <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
@@ -300,10 +300,10 @@
                         </StackPanel>
                     </Border>
 
-                    <Border Grid.Column="1" Background="#121212" BorderBrush="#262D38" BorderThickness="1" CornerRadius="14" Padding="22,18" Margin="8,0,0,0">
+                    <Border Grid.Column="1" Background="#121212" BorderBrush="{StaticResource Brush.Border}" BorderThickness="1" CornerRadius="14" Padding="22,18" Margin="8,0,0,0">
                         <StackPanel>
                             <TextBlock Text="{Binding [Stats_TopAnimes], Source={x:Static loc:LocalizationService.Instance}}" FontSize="14" FontWeight="Bold" Foreground="White" Margin="0,0,0,4"/>
-                            <TextBlock Text="{Binding [Stats_TopAnimesSub], Source={x:Static loc:LocalizationService.Instance}}" FontSize="11" Foreground="#9CA3AF" Margin="0,0,0,12"/>
+                            <TextBlock Text="{Binding [Stats_TopAnimesSub], Source={x:Static loc:LocalizationService.Instance}}" FontSize="11" Foreground="{StaticResource Brush.TextSecondary}" Margin="0,0,0,12"/>
                             <ItemsControl ItemsSource="{Binding TopAnimes}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
@@ -313,13 +313,13 @@
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="88"/>
                                             </Grid.ColumnDefinitions>
-                                            <Border Width="24" Height="24" CornerRadius="12" Background="#1E293B" VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding Posicion}" Foreground="#93C5FD" FontSize="11" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            <Border Width="24" Height="24" CornerRadius="12" Background="{StaticResource Brush.Surface3}" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Posicion}" Foreground="{StaticResource Brush.AccentSoft}" FontSize="11" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                             </Border>
                                             <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,12,0">
                                                 <TextBlock Text="{Binding Titulo}" Foreground="White" FontSize="12.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
-                                                <TextBlock Text="{Binding DetalleTexto}" Foreground="#94A3B8" FontSize="10.5" TextTrimming="CharacterEllipsis" Margin="0,1,0,0"/>
-                                                <Border Background="#1E293B" CornerRadius="4" Height="8" Margin="0,5,0,0" HorizontalAlignment="Stretch">
+                                                <TextBlock Text="{Binding DetalleTexto}" Foreground="{StaticResource Brush.TextTertiary}" FontSize="10.5" TextTrimming="CharacterEllipsis" Margin="0,1,0,0"/>
+                                                <Border Background="{StaticResource Brush.Surface3}" CornerRadius="4" Height="8" Margin="0,5,0,0" HorizontalAlignment="Stretch">
                                                     <Border CornerRadius="4" Width="{Binding AnchoBarra}" HorizontalAlignment="Left">
                                                         <Border.Background>
                                                             <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
@@ -340,10 +340,10 @@
                 </Grid>
 
                 <!-- ══ FILA 5: POR AÑO ══ -->
-                <Border Background="#121212" BorderBrush="#262D38" BorderThickness="1" CornerRadius="14" Padding="22,18" Margin="0,0,0,20">
+                <Border Background="#121212" BorderBrush="{StaticResource Brush.Border}" BorderThickness="1" CornerRadius="14" Padding="22,18" Margin="0,0,0,20">
                     <StackPanel>
                         <TextBlock Text="{Binding [Stats_PorAnio], Source={x:Static loc:LocalizationService.Instance}}" FontSize="14" FontWeight="Bold" Foreground="White" Margin="0,0,0,4"/>
-                        <TextBlock Text="{Binding [Stats_PorAnioSub], Source={x:Static loc:LocalizationService.Instance}}" FontSize="11" Foreground="#9CA3AF" Margin="0,0,0,12"/>
+                        <TextBlock Text="{Binding [Stats_PorAnioSub], Source={x:Static loc:LocalizationService.Instance}}" FontSize="11" Foreground="{StaticResource Brush.TextSecondary}" Margin="0,0,0,12"/>
                         <ItemsControl ItemsSource="{Binding VistosPorAnio}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
@@ -354,7 +354,7 @@
                                             <ColumnDefinition Width="50"/>
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Text="{Binding Etiqueta}" Foreground="#D1D5DB" FontSize="12" VerticalAlignment="Center"/>
-                                        <Border Grid.Column="1" Background="#1E293B" CornerRadius="4" Height="18" VerticalAlignment="Center">
+                                        <Border Grid.Column="1" Background="{StaticResource Brush.Surface3}" CornerRadius="4" Height="18" VerticalAlignment="Center">
                                             <Border CornerRadius="4" Width="{Binding AnchoBarra}" HorizontalAlignment="Left">
                                                 <Border.Background>
                                                     <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
@@ -364,7 +364,7 @@
                                                 </Border.Background>
                                             </Border>
                                         </Border>
-                                        <TextBlock Grid.Column="2" Text="{Binding Valor}" Foreground="#93C5FD" FontSize="12" FontWeight="Bold" TextAlignment="Right" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="2" Text="{Binding Valor}" Foreground="{StaticResource Brush.AccentSoft}" FontSize="12" FontWeight="Bold" TextAlignment="Right" VerticalAlignment="Center"/>
                                     </Grid>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
@@ -373,7 +373,7 @@
                 </Border>
 
                 <!-- ══ FILA 6: LOGROS (resumen compacto; el catálogo completo vive en la pestaña Logros) ══ -->
-                <Border Background="#121212" BorderBrush="#262D38" BorderThickness="1" CornerRadius="14" Padding="22,18" Margin="0,0,0,16"
+                <Border Background="#121212" BorderBrush="{StaticResource Brush.Border}" BorderThickness="1" CornerRadius="14" Padding="22,18" Margin="0,0,0,16"
                         Visibility="{Binding HayLogros, Converter={StaticResource BoolToVis}}">
                     <StackPanel>
                         <Grid Margin="0,0,0,14">
@@ -383,10 +383,10 @@
                             </Grid.ColumnDefinitions>
                             <StackPanel VerticalAlignment="Center">
                                 <TextBlock Text="{Binding [Stats_Logros], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="14" FontWeight="Bold" Foreground="White" Margin="0,0,0,4"/>
-                                <TextBlock Text="{Binding [Stats_LogrosSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="11" Foreground="#9CA3AF"/>
+                                <TextBlock Text="{Binding [Stats_LogrosSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="11" Foreground="{StaticResource Brush.TextSecondary}"/>
                             </StackPanel>
                             <Button Grid.Column="1" Command="{Binding VerTodosLosLogrosCommand}" VerticalAlignment="Center" Cursor="Hand"
-                                    Style="{StaticResource MaterialDesignOutlinedButton}" BorderBrush="#60A5FA" Foreground="#93C5FD"
+                                    Style="{StaticResource MaterialDesignOutlinedButton}" BorderBrush="{StaticResource Brush.Accent}" Foreground="{StaticResource Brush.AccentSoft}"
                                     Height="34" Padding="14,0" materialDesign:ButtonAssist.CornerRadius="10"
                                     AutomationProperties.Name="{Binding [Stats_LogrosVerTodos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
                                 <StackPanel Orientation="Horizontal">
@@ -404,13 +404,13 @@
                             </Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0" Margin="0,0,24,0" VerticalAlignment="Center">
                                 <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="{Binding LogrosRangoNombre}" FontSize="18" FontWeight="Bold" Foreground="#FBBF24"/>
-                                    <TextBlock Text="{Binding LogrosPuntosTexto}" FontSize="12" Foreground="#9CA3AF" VerticalAlignment="Bottom" Margin="10,0,0,2"/>
-                                    <TextBlock Text="{Binding LogrosNivelesTexto}" FontSize="12" Foreground="#9CA3AF" VerticalAlignment="Bottom" Margin="10,0,0,2"/>
+                                    <TextBlock Text="{Binding LogrosRangoNombre}" FontSize="18" FontWeight="Bold" Foreground="{StaticResource Brush.WarningStrong}"/>
+                                    <TextBlock Text="{Binding LogrosPuntosTexto}" FontSize="12" Foreground="{StaticResource Brush.TextSecondary}" VerticalAlignment="Bottom" Margin="10,0,0,2"/>
+                                    <TextBlock Text="{Binding LogrosNivelesTexto}" FontSize="12" Foreground="{StaticResource Brush.TextSecondary}" VerticalAlignment="Bottom" Margin="10,0,0,2"/>
                                 </StackPanel>
                                 <ProgressBar Minimum="0" Maximum="100" Value="{Binding LogrosProgresoRango, Mode=OneWay}" Height="6" Margin="0,8,0,4"
-                                             Foreground="#FBBF24" Background="#262D38" BorderThickness="0"/>
-                                <TextBlock Text="{Binding LogrosSiguienteRangoTexto}" FontSize="11" Foreground="#9CA3AF"/>
+                                             Foreground="{StaticResource Brush.WarningStrong}" Background="{StaticResource Brush.Border}" BorderThickness="0"/>
+                                <TextBlock Text="{Binding LogrosSiguienteRangoTexto}" FontSize="11" Foreground="{StaticResource Brush.TextSecondary}"/>
                             </StackPanel>
                             <ItemsControl Grid.Column="1" ItemsSource="{Binding LogrosContadores}" VerticalAlignment="Center">
                                 <ItemsControl.ItemsPanel>
@@ -420,7 +420,7 @@
                                     <DataTemplate>
                                         <StackPanel Margin="10,0,0,0" HorizontalAlignment="Center" MinWidth="52">
                                             <TextBlock Text="{Binding Cantidad}" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center" Foreground="{Binding Color}"/>
-                                            <TextBlock Text="{Binding Nombre}" FontSize="10" HorizontalAlignment="Center" Foreground="#9CA3AF"/>
+                                            <TextBlock Text="{Binding Nombre}" FontSize="10" HorizontalAlignment="Center" Foreground="{StaticResource Brush.TextSecondary}"/>
                                         </StackPanel>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
@@ -428,7 +428,7 @@
                         </Grid>
 
                         <!-- Los 3 logros más cercanos a desbloquearse -->
-                        <TextBlock Text="{Binding [Stats_LogrosProximos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="12" FontWeight="Bold" Foreground="#93C5FD" Margin="0,0,0,8"/>
+                        <TextBlock Text="{Binding [Stats_LogrosProximos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource Brush.AccentSoft}" Margin="0,0,0,8"/>
                         <ItemsControl ItemsSource="{Binding LogrosProximos}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
@@ -437,24 +437,24 @@
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <Border Background="#14181E" BorderBrush="#262D38" BorderThickness="1" CornerRadius="12" Padding="14,12" Margin="0,0,10,0">
+                                    <Border Background="{StaticResource Brush.Surface1}" BorderBrush="{StaticResource Brush.Border}" BorderThickness="1" CornerRadius="12" Padding="14,12" Margin="0,0,10,0">
                                         <StackPanel>
                                             <StackPanel Orientation="Horizontal">
-                                                <Border Background="#1E293B" CornerRadius="10" Width="36" Height="36">
+                                                <Border Background="{StaticResource Brush.Surface3}" CornerRadius="10" Width="36" Height="36">
                                                     <materialDesign:PackIcon Kind="{Binding Icono}" Foreground="{Binding Color}" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                                 </Border>
                                                 <TextBlock Text="{Binding Titulo}" Foreground="White" FontSize="13" FontWeight="Bold" Margin="10,0,0,0"
                                                            VerticalAlignment="Center" TextWrapping="Wrap"/>
                                             </StackPanel>
-                                            <TextBlock Text="{Binding Descripcion}" Foreground="#9CA3AF" FontSize="10.5" TextWrapping="Wrap" Margin="0,8,0,8"/>
+                                            <TextBlock Text="{Binding Descripcion}" Foreground="{StaticResource Brush.TextSecondary}" FontSize="10.5" TextWrapping="Wrap" Margin="0,8,0,8"/>
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
                                                 <ProgressBar Minimum="0" Maximum="100" Value="{Binding ProgresoPorcentaje, Mode=OneWay}" Height="6"
-                                                             VerticalAlignment="Center" Foreground="{Binding Color}" Background="#262D38" BorderThickness="0"/>
-                                                <TextBlock Grid.Column="1" Text="{Binding ProgresoTexto}" FontSize="10.5" FontWeight="SemiBold" Foreground="#E2E8F0" Margin="8,0,0,0"/>
+                                                             VerticalAlignment="Center" Foreground="{Binding Color}" Background="{StaticResource Brush.Border}" BorderThickness="0"/>
+                                                <TextBlock Grid.Column="1" Text="{Binding ProgresoTexto}" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource Brush.TextPrimary}" Margin="8,0,0,0"/>
                                             </Grid>
                                         </StackPanel>
                                     </Border>
@@ -465,7 +465,7 @@
                 </Border>
 
                 <!-- ══ FILA 7: TARJETA WRAPPED ══ -->
-                <Border Background="#121212" BorderBrush="#262D38" BorderThickness="1" CornerRadius="14" Padding="22,18" Margin="0,0,0,20">
+                <Border Background="#121212" BorderBrush="{StaticResource Brush.Border}" BorderThickness="1" CornerRadius="14" Padding="22,18" Margin="0,0,0,20">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/>
@@ -475,7 +475,7 @@
                         </Border>
                         <StackPanel Grid.Column="1" Margin="14,0,0,0" VerticalAlignment="Center">
                             <TextBlock Text="{Binding [Stats_Wrapped], Source={x:Static loc:LocalizationService.Instance}}" FontSize="14" FontWeight="Bold" Foreground="White"/>
-                            <TextBlock Text="{Binding [Stats_WrappedSub], Source={x:Static loc:LocalizationService.Instance}}" FontSize="11" Foreground="#9CA3AF" Margin="0,3,0,0"/>
+                            <TextBlock Text="{Binding [Stats_WrappedSub], Source={x:Static loc:LocalizationService.Instance}}" FontSize="11" Foreground="{StaticResource Brush.TextSecondary}" Margin="0,3,0,0"/>
                         </StackPanel>
                         <Button Grid.Column="2" Command="{Binding GenerarTarjetaResumenCommand}" VerticalAlignment="Center"
                                 Style="{StaticResource MaterialDesignRaisedButton}" Background="#8B5CF6" BorderBrush="#8B5CF6" Foreground="White"

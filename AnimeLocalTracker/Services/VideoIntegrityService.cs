@@ -21,30 +21,12 @@ public class VideoIntegrityService : IVideoIntegrityService
 
         try
         {
-            var psi = new ProcessStartInfo
-            {
-                FileName = RutaFfprobe.Value,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-            psi.ArgumentList.Add("-v");
-            psi.ArgumentList.Add("error");
-            psi.ArgumentList.Add("-show_entries");
-            psi.ArgumentList.Add("format=duration");
-            psi.ArgumentList.Add("-of");
-            psi.ArgumentList.Add("default=noprint_wrappers=1:nokey=1");
-            psi.ArgumentList.Add(rutaArchivo);
+            string[] argumentos = ["-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", rutaArchivo];
+            var resultado = await Core.ProcesoExterno.EjecutarAsync(RutaFfprobe.Value, argumentos, null, ct);
+            if (resultado == null) return ResultadoIntegridad.NoSePudoVerificar;
 
-            using var proceso = Process.Start(psi);
-            if (proceso == null) return ResultadoIntegridad.NoSePudoVerificar;
-
-            Task<string> tareaError = proceso.StandardError.ReadToEndAsync(ct);
-            Task<string> tareaSalida = proceso.StandardOutput.ReadToEndAsync(ct);
-            await proceso.WaitForExitAsync(ct);
-            string salidaError = await tareaError;
-            string salida = await tareaSalida;
+            string salidaError = resultado.Error;
+            string salida = resultado.Salida;
 
             // El código de salida es la señal real de "no se pudo leer el contenedor" (probado:
             // un mp4 con moov atom faltante da exit=1). El contenido de stderr NO sirve para
@@ -57,7 +39,7 @@ public class VideoIntegrityService : IVideoIntegrityService
                 AppLogger.Debug("VideoIntegrityService", $"ffprobe stderr (no decisivo) para '{rutaArchivo}': {salidaError.Trim()}");
             }
 
-            if (proceso.ExitCode != 0)
+            if (resultado.Codigo != 0)
             {
                 return ResultadoIntegridad.Corrupto;
             }

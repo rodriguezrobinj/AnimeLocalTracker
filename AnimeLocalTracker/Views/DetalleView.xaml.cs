@@ -153,8 +153,7 @@ public partial class DetalleView : UserControl
 
     private void EnHiloDeInterfaz(Action accion)
     {
-        if (Dispatcher.CheckAccess()) accion();
-        else Dispatcher.InvokeAsync(accion);
+        Core.HiloUi.Ejecutar(accion);
     }
 
     private void MostrarVentanasSiCorresponde()
