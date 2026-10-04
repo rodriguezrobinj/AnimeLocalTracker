@@ -86,6 +86,15 @@ public class PythonEpisodeEnricherTests : IDisposable
     }
 
     [Fact]
+    public void EnLasPruebas_LasMiniaturasNoVanALaCarpetaDeDatosDelUsuario()
+    {
+        // Las pruebas que crean miniaturas (esta clase y la ficha) las dejaban en Thumbnails real: una falsa por corrida.
+        // TestInitializer apunta la carpeta de miniaturas a una temporal para toda la suite.
+        PythonEpisodeEnricher.ObtenerRutaMiniaturaEsperada(@"C:\Anime\Falso\Episodio 01.mp4")
+            .Should().NotStartWith(AnimeLocalTracker.Services.AppDataPaths.DataRoot);
+    }
+
+    [Fact]
     public void ObtenerRutaMiniaturaSiExiste_ConMiniaturaTruncadaCacheada_DeberiaEliminarlaYDevolverNull()
     {
         // Simula el escenario reportado: una miniatura corrupta ya escrita en el caché

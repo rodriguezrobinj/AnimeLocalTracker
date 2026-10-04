@@ -56,13 +56,17 @@ public class PythonEpisodeEnricher
         }
     }
 
+    /// <summary>Carpeta donde se guardan las miniaturas. Solo la cambian las pruebas (a una temporal, ver TestInitializer): con
+    /// la real dejaban miniaturas falsas entre los datos del usuario, una por cada corrida de la suite.</summary>
+    internal static string CarpetaMiniaturas { get; set; } = AppDataPaths.ThumbnailsDir;
+
     /// <summary>
     /// Calcula la ruta esperada de la miniatura de forma determinista y persistente (SHA-256 de la ruta).
     /// </summary>
     public static string ObtenerRutaMiniaturaEsperada(string rutaCompleta)
     {
         if (string.IsNullOrWhiteSpace(rutaCompleta)) return string.Empty;
-        var thumbsDir = AppDataPaths.ThumbnailsDir;
+        var thumbsDir = CarpetaMiniaturas;
 
         byte[] hash = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(rutaCompleta.ToLowerInvariant()));
         string hex = Convert.ToHexString(hash).ToLowerInvariant();
@@ -152,7 +156,7 @@ public class PythonEpisodeEnricher
             // Ya hay una miniatura válida y con contenido real: nada que hacer.
             if (EsMiniaturaValida(outPath) && !EsFrameDemasiadoVacio(outPath)) return true;
 
-            Directory.CreateDirectory(AppDataPaths.ThumbnailsDir);
+            Directory.CreateDirectory(CarpetaMiniaturas);
 
             bool huboExito = false;
             foreach (var timestamp in TimestampsCandidatos)

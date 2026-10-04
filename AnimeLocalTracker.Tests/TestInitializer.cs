@@ -11,6 +11,10 @@ namespace AnimeLocalTracker.Tests
         {
             var tempDir = Path.Combine(Path.GetTempPath(), "AnimeLocalTrackerTests", "Logs");
             Environment.SetEnvironmentVariable("ANIMELOCALTRACKER_LOG_DIR", tempDir);
+
+            // Las miniaturas que crean las pruebas no deben caer en la carpeta de datos real del usuario.
+            AnimeLocalTracker.Services.Python.PythonEpisodeEnricher.CarpetaMiniaturas =
+                Path.Combine(Path.GetTempPath(), "AnimeLocalTrackerTests", "Thumbnails");
         }
     }
 }
