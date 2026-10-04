@@ -45,7 +45,7 @@
                 <ProgressBar Style="{StaticResource MaterialDesignCircularProgressBar}"
                              IsIndeterminate="True" Width="44" Height="44" Value="0" Foreground="{DynamicResource Brush.Accent}"
                              HorizontalAlignment="Center"/>
-                <TextBlock Text="{Binding [Mini_OpEd_Preparando], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                <TextBlock Text="{loc:T Mini_OpEd_Preparando}"
                            Style="{StaticResource AppText.Secondary}" Margin="0,14,0,0" HorizontalAlignment="Center"/>
             </StackPanel>
 
@@ -96,10 +96,10 @@
                         </Border>
 
                         <Button Command="{Binding EscucharCommand}" Style="{StaticResource MiniBotonSecundario}" Margin="0,12,0,0"
-                                AutomationProperties.Name="{Binding [Mini_OpEd_Escuchar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                AutomationProperties.Name="{loc:T Mini_OpEd_Escuchar}">
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                 <materialDesign:PackIcon Kind="Replay" Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="{Binding [Mini_OpEd_Escuchar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" VerticalAlignment="Center"/>
+                                <TextBlock Text="{loc:T Mini_OpEd_Escuchar}" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
 
@@ -116,12 +116,12 @@
                             </Grid.ColumnDefinitions>
                             <materialDesign:PackIcon Kind="VolumeHigh" Width="18" Height="18" Foreground="{DynamicResource Brush.TextSecondary}" VerticalAlignment="Center" Margin="0,0,10,0"/>
                             <Slider Grid.Column="1" Minimum="0" Maximum="1" Value="{Binding Volumen, Delay=250}" VerticalAlignment="Center" Cursor="Hand"
-                                    ToolTip="{Binding [Mini_OpEd_Volumen], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                    AutomationProperties.Name="{Binding [Mini_OpEd_Volumen], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                    ToolTip="{loc:T Mini_OpEd_Volumen}"
+                                    AutomationProperties.Name="{loc:T Mini_OpEd_Volumen}"/>
                         </Grid>
 
                         <!-- El clip no se pudo reproducir: se dice, en vez de dejar el altavoz encendido sin sonar nada -->
-                        <TextBlock Text="{Binding [Mini_OpEd_AudioFallido], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                        <TextBlock Text="{loc:T Mini_OpEd_AudioFallido}"
                                    Style="{StaticResource AppText.Caption}" Foreground="{DynamicResource Brush.Danger}" TextWrapping="Wrap" Margin="0,10,0,0"
                                    Visibility="{Binding AudioFallido, Converter={StaticResource BoolToVis}}"/>
                     </StackPanel>

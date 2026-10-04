@@ -31,7 +31,7 @@
             <Border Background="{DynamicResource Brush.Surface3}" CornerRadius="36" Width="72" Height="72" Margin="0,0,0,16" HorizontalAlignment="Center">
                 <materialDesign:PackIcon Kind="{Binding IconoSinAnimes}" Foreground="{DynamicResource Brush.TextTertiary}" Width="36" Height="36" HorizontalAlignment="Center" VerticalAlignment="Center"/>
             </Border>
-            <TextBlock Text="{Binding [Mini_NoHayAnimesTitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppEmptyTitle}"/>
+            <TextBlock Text="{loc:T Mini_NoHayAnimesTitulo}" Style="{StaticResource AppEmptyTitle}"/>
             <TextBlock Text="{Binding SinAnimesTexto}" Style="{StaticResource AppEmptyText}" Margin="0,6,0,0" MaxWidth="420" TextWrapping="Wrap"/>
         </StackPanel>
 
@@ -58,10 +58,10 @@
                 </Border>
 
                 <Button Command="{Binding IniciarPartidaCommand}" Style="{StaticResource MiniBotonPrincipal}" HorizontalAlignment="Center"
-                        AutomationProperties.Name="{Binding [Mini_Jugar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                        AutomationProperties.Name="{loc:T Mini_Jugar}">
                     <StackPanel Orientation="Horizontal">
                         <materialDesign:PackIcon Kind="Play" Width="20" Height="20" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                        <TextBlock Text="{Binding [Mini_Jugar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" VerticalAlignment="Center"/>
+                        <TextBlock Text="{loc:T Mini_Jugar}" VerticalAlignment="Center"/>
                     </StackPanel>
                 </Button>
             </StackPanel>

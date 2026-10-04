@@ -91,10 +91,10 @@
                                         <Storyboard>
                                             <DoubleAnimation Storyboard.TargetName="ThumbEllipse"
                                                              Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
-                                                             To="1.6" Duration="0:0:0.12"/>
+                                                             To="1.6" Duration="{StaticResource Anim.Rapida}"/>
                                             <DoubleAnimation Storyboard.TargetName="ThumbEllipse"
                                                              Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
-                                                             To="1.6" Duration="0:0:0.12"/>
+                                                             To="1.6" Duration="{StaticResource Anim.Rapida}"/>
                                         </Storyboard>
                                     </BeginStoryboard>
                                 </DataTrigger.EnterActions>
@@ -103,10 +103,10 @@
                                         <Storyboard>
                                             <DoubleAnimation Storyboard.TargetName="ThumbEllipse"
                                                              Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
-                                                             To="1.0" Duration="0:0:0.12"/>
+                                                             To="1.0" Duration="{StaticResource Anim.Rapida}"/>
                                             <DoubleAnimation Storyboard.TargetName="ThumbEllipse"
                                                              Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
-                                                             To="1.0" Duration="0:0:0.12"/>
+                                                             To="1.0" Duration="{StaticResource Anim.Rapida}"/>
                                         </Storyboard>
                                     </BeginStoryboard>
                                 </DataTrigger.ExitActions>
@@ -172,16 +172,16 @@
                                 <Trigger.EnterActions>
                                     <BeginStoryboard>
                                         <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="BackgroundTrack" Storyboard.TargetProperty="Height" To="5" Duration="0:0:0.12"/>
-                                            <DoubleAnimation Storyboard.TargetName="Marcadores" Storyboard.TargetProperty="Grosor" To="5" Duration="0:0:0.12"/>
+                                            <DoubleAnimation Storyboard.TargetName="BackgroundTrack" Storyboard.TargetProperty="Height" To="5" Duration="{StaticResource Anim.Rapida}"/>
+                                            <DoubleAnimation Storyboard.TargetName="Marcadores" Storyboard.TargetProperty="Grosor" To="5" Duration="{StaticResource Anim.Rapida}"/>
                                         </Storyboard>
                                     </BeginStoryboard>
                                 </Trigger.EnterActions>
                                 <Trigger.ExitActions>
                                     <BeginStoryboard>
                                         <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="BackgroundTrack" Storyboard.TargetProperty="Height" To="3" Duration="0:0:0.12"/>
-                                            <DoubleAnimation Storyboard.TargetName="Marcadores" Storyboard.TargetProperty="Grosor" To="3" Duration="0:0:0.12"/>
+                                            <DoubleAnimation Storyboard.TargetName="BackgroundTrack" Storyboard.TargetProperty="Height" To="3" Duration="{StaticResource Anim.Rapida}"/>
+                                            <DoubleAnimation Storyboard.TargetName="Marcadores" Storyboard.TargetProperty="Grosor" To="3" Duration="{StaticResource Anim.Rapida}"/>
                                         </Storyboard>
                                     </BeginStoryboard>
                                 </Trigger.ExitActions>
@@ -267,6 +267,18 @@
 
         <!-- Estilo premium compartido por los menús flotantes del reproductor (Subtítulos y
              Más opciones): antes vivía duplicado dentro de los Resources de cada Popup. -->
+        <!-- Panel de los menús flotantes del reproductor (subtítulos, audio, más opciones, ecualizador). -->
+        <Style x:Key="PlayerMenuPanel" TargetType="Border">
+            <Setter Property="Background" Value="#F2141414"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect Color="Black" BlurRadius="15" ShadowDepth="5" Opacity="0.5"/>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style TargetType="Button" x:Key="MenuItemButton">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="#E5E5E5"/>
@@ -355,7 +367,7 @@
                         <Button Grid.Column="0" Command="{Binding CerrarCommand}" Focusable="True"
                                 FocusVisualStyle="{StaticResource PlayerFocusVisual}"
                                 Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="50" Height="50" Margin="0,0,15,0"
-                                AutomationProperties.Name="{Binding [Player_VolverFicha], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                AutomationProperties.Name="{loc:T Player_VolverFicha}">
                             <materialDesign:PackIcon Kind="ArrowLeft" Width="36" Height="36" />
                         </Button>
                         <!-- Titulos Netflix Style -->
@@ -411,7 +423,7 @@
                                 HorizontalAlignment="Right" Margin="0,0,0,14"
                                 Background="#E616181F" Foreground="White" BorderBrush="#55FFFFFF" BorderThickness="1"
                                 Padding="16,8" Cursor="Hand" materialDesign:ButtonAssist.CornerRadius="8"
-                                ToolTip="{Binding [Player_SaltarSegmento], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                ToolTip="{loc:T Player_SaltarSegmento}">
                             <Button.Effect>
                                 <DropShadowEffect Color="Black" BlurRadius="14" ShadowDepth="3" Opacity="0.7"/>
                             </Button.Effect>
@@ -441,7 +453,7 @@
                                 </Canvas>
                                 <Slider x:Name="SliderTiempo" Minimum="0" Maximum="{Binding TotalSeconds}" Value="{Binding CurrentSeconds, Mode=TwoWay}"
                                         Style="{StaticResource TimelineSliderStyle}"
-                                        AutomationProperties.Name="{Binding [Player_ProgresoEpisodio], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                        AutomationProperties.Name="{loc:T Player_ProgresoEpisodio}"
                                         IsMoveToPointEnabled="True" Focusable="True"
                                         primitives:Thumb.DragStarted="Slider_DragStarted"
                                         primitives:Thumb.DragDelta="Slider_DragDelta"
@@ -495,8 +507,8 @@
                             <!-- Play/Pause -->
                             <Button Grid.Column="2" Command="{Binding TogglePlayPauseCommand}" Focusable="True"
                                     FocusVisualStyle="{StaticResource PlayerFocusVisual}"
-                                    ToolTip="{Binding [Player_PlayPausaTooltip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                    AutomationProperties.Name="{Binding [Atajo_PlayPausa], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                    ToolTip="{loc:T Player_PlayPausaTooltip}"
+                                    AutomationProperties.Name="{loc:T Atajo_PlayPausa}"
                                     Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,2,0">
                                 <materialDesign:PackIcon Kind="{Binding PlayPauseIcon}" Width="28" Height="28" />
                             </Button>
@@ -523,11 +535,11 @@
                             <!-- Contenedor Volumen Animado -->
                             <StackPanel Grid.Column="5" Orientation="Horizontal" x:Name="VolumePanel" Background="Transparent" Margin="0,0,10,0"
                                         MouseLeave="VolumePanel_MouseLeave">
-                                <Button Command="{Binding ToggleMuteCommand}" Focusable="True" FocusVisualStyle="{StaticResource PlayerFocusVisual}" Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" AutomationProperties.Name="{Binding [Player_SilenciarToggle], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                <Button Command="{Binding ToggleMuteCommand}" Focusable="True" FocusVisualStyle="{StaticResource PlayerFocusVisual}" Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" AutomationProperties.Name="{loc:T Player_SilenciarToggle}">
                                     <materialDesign:PackIcon Kind="{Binding VolumenIcon}" Width="24" Height="24" />
                                 </Button>
                                 <Slider x:Name="SliderVolumen" Minimum="0" Maximum="100" Value="{Binding Volumen, Mode=TwoWay}"
-                                        AutomationProperties.Name="{Binding [Player_Volumen], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                        AutomationProperties.Name="{loc:T Player_Volumen}"
                                         VerticalAlignment="Center" Focusable="True"
                                         FocusVisualStyle="{StaticResource PlayerFocusVisual}" Cursor="Hand"
                                         IsMoveToPointEnabled="True">
@@ -600,18 +612,18 @@
                                                     <DataTrigger.EnterActions>
                                                         <BeginStoryboard>
                                                             <Storyboard>
-                                                                <DoubleAnimation Storyboard.TargetProperty="Width" To="80" Duration="0:0:0.2" />
-                                                                <ThicknessAnimation Storyboard.TargetProperty="Margin" To="5,0,10,0" Duration="0:0:0.2" />
-                                                                <DoubleAnimation Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.2" />
+                                                                <DoubleAnimation Storyboard.TargetProperty="Width" To="80" Duration="{StaticResource Anim.Normal}" />
+                                                                <ThicknessAnimation Storyboard.TargetProperty="Margin" To="5,0,10,0" Duration="{StaticResource Anim.Normal}" />
+                                                                <DoubleAnimation Storyboard.TargetProperty="Opacity" To="1" Duration="{StaticResource Anim.Normal}" />
                                                             </Storyboard>
                                                         </BeginStoryboard>
                                                     </DataTrigger.EnterActions>
                                                     <DataTrigger.ExitActions>
                                                         <BeginStoryboard>
                                                             <Storyboard>
-                                                                <DoubleAnimation Storyboard.TargetProperty="Width" To="0" Duration="0:0:0.2" />
-                                                                <ThicknessAnimation Storyboard.TargetProperty="Margin" To="0,0,0,0" Duration="0:0:0.2" />
-                                                                <DoubleAnimation Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.2" />
+                                                                <DoubleAnimation Storyboard.TargetProperty="Width" To="0" Duration="{StaticResource Anim.Normal}" />
+                                                                <ThicknessAnimation Storyboard.TargetProperty="Margin" To="0,0,0,0" Duration="{StaticResource Anim.Normal}" />
+                                                                <DoubleAnimation Storyboard.TargetProperty="Opacity" To="0" Duration="{StaticResource Anim.Normal}" />
                                                             </Storyboard>
                                                         </BeginStoryboard>
                                                     </DataTrigger.ExitActions>
@@ -622,18 +634,18 @@
                                                     <DataTrigger.EnterActions>
                                                         <BeginStoryboard>
                                                             <Storyboard>
-                                                                <DoubleAnimation Storyboard.TargetProperty="Width" To="80" Duration="0:0:0.2" />
-                                                                <ThicknessAnimation Storyboard.TargetProperty="Margin" To="5,0,10,0" Duration="0:0:0.2" />
-                                                                <DoubleAnimation Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.2" />
+                                                                <DoubleAnimation Storyboard.TargetProperty="Width" To="80" Duration="{StaticResource Anim.Normal}" />
+                                                                <ThicknessAnimation Storyboard.TargetProperty="Margin" To="5,0,10,0" Duration="{StaticResource Anim.Normal}" />
+                                                                <DoubleAnimation Storyboard.TargetProperty="Opacity" To="1" Duration="{StaticResource Anim.Normal}" />
                                                             </Storyboard>
                                                         </BeginStoryboard>
                                                     </DataTrigger.EnterActions>
                                                     <DataTrigger.ExitActions>
                                                         <BeginStoryboard>
                                                             <Storyboard>
-                                                                <DoubleAnimation Storyboard.TargetProperty="Width" To="0" Duration="0:0:0.2" />
-                                                                <ThicknessAnimation Storyboard.TargetProperty="Margin" To="0,0,0,0" Duration="0:0:0.2" />
-                                                                <DoubleAnimation Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.2" />
+                                                                <DoubleAnimation Storyboard.TargetProperty="Width" To="0" Duration="{StaticResource Anim.Normal}" />
+                                                                <ThicknessAnimation Storyboard.TargetProperty="Margin" To="0,0,0,0" Duration="{StaticResource Anim.Normal}" />
+                                                                <DoubleAnimation Storyboard.TargetProperty="Opacity" To="0" Duration="{StaticResource Anim.Normal}" />
                                                             </Storyboard>
                                                         </BeginStoryboard>
                                                     </DataTrigger.ExitActions>
@@ -652,8 +664,8 @@
                             <StackPanel Grid.Column="8" Orientation="Horizontal">
                             <Button x:Name="AudioButton" Focusable="True"
                                     FocusVisualStyle="{StaticResource PlayerFocusVisual}"
-                                    ToolTip="{Binding [Player_MenuAudio], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                    AutomationProperties.Name="{Binding [Player_MenuAudio], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                    ToolTip="{loc:T Player_MenuAudio}"
+                                    AutomationProperties.Name="{loc:T Player_MenuAudio}"
                                     PreviewMouseLeftButtonDown="AudioButton_PreviewMouseLeftButtonDown"
                                     Click="AudioButton_Click"
                                     Style="{StaticResource PlayerMenuToolButton}" Width="40" Height="40" Margin="0,0,5,0">
@@ -662,8 +674,8 @@
 
                             <Button x:Name="SubtitlesButton" Focusable="True"
                                     FocusVisualStyle="{StaticResource PlayerFocusVisual}"
-                                    ToolTip="{Binding [Player_Subtitulos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                    AutomationProperties.Name="{Binding [Player_MenuSubtitulos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                    ToolTip="{loc:T Player_Subtitulos}"
+                                    AutomationProperties.Name="{loc:T Player_MenuSubtitulos}"
                                     PreviewMouseLeftButtonDown="SubtitlesButton_PreviewMouseLeftButtonDown"
                                     Click="SubtitlesButton_Click"
                                     Style="{StaticResource PlayerMenuToolButton}" Width="40" Height="40" Margin="0,0,5,0">
@@ -673,8 +685,8 @@
                             <!-- Ecualizador: botón propio (antes escondido en Más opciones). El punto azul indica que está encendido. -->
                             <Button x:Name="EqualizerButton" Focusable="True"
                                     FocusVisualStyle="{StaticResource PlayerFocusVisual}"
-                                    ToolTip="{Binding [Eq_Titulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                    AutomationProperties.Name="{Binding [Eq_Titulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                    ToolTip="{loc:T Eq_Titulo}"
+                                    AutomationProperties.Name="{loc:T Eq_Titulo}"
                                     PreviewMouseLeftButtonDown="EqualizerButton_PreviewMouseLeftButtonDown"
                                     Click="EqualizerButton_Click"
                                     Style="{StaticResource PlayerMenuToolButton}" Width="40" Height="40" Margin="0,0,5,0">
@@ -692,12 +704,9 @@
                                    PlacementTarget="{Binding Source={x:Reference AudioButton}}" Placement="Top"
                                    VerticalOffset="-4" Opened="Menu_Opened" Closed="Menu_Closed" PopupAnimation="Fade" AllowsTransparency="True">
                                 <StackPanel>
-                                <Border Background="#F2141414" BorderThickness="0" CornerRadius="8" Padding="10" MinWidth="200">
-                                    <Border.Effect>
-                                        <DropShadowEffect Color="Black" BlurRadius="15" ShadowDepth="5" Opacity="0.5"/>
-                                    </Border.Effect>
+                                <Border Style="{StaticResource PlayerMenuPanel}" Padding="10" MinWidth="200">
                                     <StackPanel>
-                                        <TextBlock Text="{Binding [Player_Audio], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Foreground="{StaticResource Brush.TextTertiary}" FontSize="12" FontWeight="Bold" Margin="15,0,0,10" />
+                                        <TextBlock Text="{loc:T Player_Audio}" Foreground="{StaticResource Brush.TextTertiary}" FontSize="12" FontWeight="Bold" Margin="15,0,0,10" />
                                         <ItemsControl ItemsSource="{Binding PistasAudio}">
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate>
@@ -714,10 +723,10 @@
                                             </ItemsControl.ItemTemplate>
                                         </ItemsControl>
                                         <!-- Con una sola pista (o ninguna) el menú lo explica en vez de parecer roto -->
-                                        <TextBlock Text="{Binding [Player_AudioUnicaPista], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                        <TextBlock Text="{loc:T Player_AudioUnicaPista}"
                                                    Visibility="{Binding HayUnaSolaPistaAudio, Converter={StaticResource BooleanToVisibilityConverter}}"
                                                    Foreground="{StaticResource Brush.TextTertiary}" FontSize="12" TextWrapping="Wrap" MaxWidth="240" Margin="15,8,10,0"/>
-                                        <TextBlock Text="{Binding [Player_AudioSinPistas], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                        <TextBlock Text="{loc:T Player_AudioSinPistas}"
                                                    Visibility="{Binding SinPistasAudio, Converter={StaticResource BooleanToVisibilityConverter}}"
                                                    Foreground="{StaticResource Brush.TextTertiary}" FontSize="12" TextWrapping="Wrap" MaxWidth="240" Margin="15,0,10,0"/>
                                     </StackPanel>
@@ -732,16 +741,13 @@
                                    PlacementTarget="{Binding Source={x:Reference SubtitlesButton}}" Placement="Top"
                                    VerticalOffset="-4" Opened="Menu_Opened" Closed="Menu_Closed" PopupAnimation="Fade" AllowsTransparency="True">
                                 <StackPanel>
-                                <Border Background="#F2141414" BorderThickness="0" CornerRadius="8" Padding="10" MinWidth="200">
-                                    <Border.Effect>
-                                        <DropShadowEffect Color="Black" BlurRadius="15" ShadowDepth="5" Opacity="0.5"/>
-                                    </Border.Effect>
+                                <Border Style="{StaticResource PlayerMenuPanel}" Padding="10" MinWidth="200">
                                     
                                     <StackPanel>
-                                        <TextBlock Text="{Binding [Player_Subtitulos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Foreground="{StaticResource Brush.TextTertiary}" FontSize="12" FontWeight="Bold" Margin="15,0,0,10" />
+                                        <TextBlock Text="{loc:T Player_Subtitulos}" Foreground="{StaticResource Brush.TextTertiary}" FontSize="12" FontWeight="Bold" Margin="15,0,0,10" />
 
                                         <!-- Apagar -->
-                                        <Button Content="{Binding [Player_ApagarSubtitulos], Source={x:Static loc:LocalizationService.Instance}}" Command="{Binding TurnOffSubtitlesCommand}" Click="SubtitleMenuItem_Click" Style="{StaticResource MenuItemButton}"/>
+                                        <Button Content="{loc:T Player_ApagarSubtitulos}" Command="{Binding TurnOffSubtitlesCommand}" Click="SubtitleMenuItem_Click" Style="{StaticResource MenuItemButton}"/>
 
                                         <!-- Lista de streams disponibles -->
                                         <ItemsControl ItemsSource="{Binding Player.Subtitles.Streams}">
@@ -765,7 +771,7 @@
                                                 Visibility="{Binding PistaActualEsAss, Converter={StaticResource BooleanToVisibilityConverter}}">
                                             <StackPanel Orientation="Horizontal">
                                                 <materialDesign:PackIcon Kind="FormatFont" Width="18" Height="18" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="#E5E5E5"/>
-                                                <TextBlock Text="{Binding [Player_UsarMiEstilo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" VerticalAlignment="Center"/>
+                                                <TextBlock Text="{loc:T Player_UsarMiEstilo}" VerticalAlignment="Center"/>
                                                 <materialDesign:PackIcon Kind="Check" Width="16" Height="16" Margin="10,0,0,0" VerticalAlignment="Center" Foreground="#818CF8"
                                                                           Visibility="{Binding UsarMiEstiloEnAss, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                                             </StackPanel>
@@ -781,8 +787,8 @@
                                  más a la barra. Mismo patrón de Popup manual que Subtítulos. -->
                             <Button x:Name="MoreOptionsButton" Grid.Column="9" Focusable="True"
                                     FocusVisualStyle="{StaticResource PlayerFocusVisual}"
-                                    ToolTip="{Binding [Player_MasOpciones], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                    AutomationProperties.Name="{Binding [Player_MasOpciones], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                    ToolTip="{loc:T Player_MasOpciones}"
+                                    AutomationProperties.Name="{loc:T Player_MasOpciones}"
                                     PreviewMouseLeftButtonDown="MoreOptionsButton_PreviewMouseLeftButtonDown"
                                     Click="MoreOptionsButton_Click"
                                     Style="{StaticResource PlayerMenuToolButton}" Width="40" Height="40" Margin="0,0,4,0">
@@ -793,17 +799,14 @@
                                    PlacementTarget="{Binding Source={x:Reference MoreOptionsButton}}" Placement="Top"
                                    VerticalOffset="-4" Opened="Menu_Opened" Closed="Menu_Closed" PopupAnimation="Fade" AllowsTransparency="True">
                                 <StackPanel>
-                                <Border Background="#F2141414" BorderThickness="0" CornerRadius="8" Padding="10" MinWidth="200">
-                                    <Border.Effect>
-                                        <DropShadowEffect Color="Black" BlurRadius="15" ShadowDepth="5" Opacity="0.5"/>
-                                    </Border.Effect>
+                                <Border Style="{StaticResource PlayerMenuPanel}" Padding="10" MinWidth="200">
 
                                     <StackPanel>
                                         <!-- Captura de pantalla HD (Ctrl+S) -->
                                         <Button Command="{Binding CapturarFrameCommand}" Click="MoreOptionsMenuItem_Click" Style="{StaticResource MenuItemButton}">
                                             <StackPanel Orientation="Horizontal">
                                                 <materialDesign:PackIcon Kind="CameraOutline" Width="18" Height="18" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                                                <TextBlock Text="{Binding [Player_Captura], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" VerticalAlignment="Center"/>
+                                                <TextBlock Text="{loc:T Player_Captura}" VerticalAlignment="Center"/>
                                             </StackPanel>
                                         </Button>
 
@@ -822,7 +825,7 @@
                                                         </Style>
                                                     </materialDesign:PackIcon.Style>
                                                 </materialDesign:PackIcon>
-                                                <TextBlock Text="{Binding [Player_ModoNoche], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" VerticalAlignment="Center"/>
+                                                <TextBlock Text="{loc:T Player_ModoNoche}" VerticalAlignment="Center"/>
                                                 <materialDesign:PackIcon Kind="Check" Width="16" Height="16" Margin="10,0,0,0" VerticalAlignment="Center" Foreground="#818CF8"
                                                                           Visibility="{Binding ModoNocheActivo, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                                             </StackPanel>
@@ -840,10 +843,7 @@
                                    PlacementTarget="{Binding Source={x:Reference EqualizerButton}}" Placement="Top"
                                    VerticalOffset="-4" Opened="Menu_Opened" Closed="Menu_Closed" PopupAnimation="Fade" AllowsTransparency="True">
                                 <StackPanel>
-                                    <Border Background="#F2141414" BorderThickness="0" CornerRadius="8" Padding="16,12,16,14" Width="580">
-                                        <Border.Effect>
-                                            <DropShadowEffect Color="Black" BlurRadius="15" ShadowDepth="5" Opacity="0.5"/>
-                                        </Border.Effect>
+                                    <Border Style="{StaticResource PlayerMenuPanel}" Padding="16,12,16,14" Width="580">
                                         <StackPanel>
                                             <Grid Margin="0,0,0,10">
                                                 <Grid.ColumnDefinitions>
@@ -852,17 +852,17 @@
                                                 </Grid.ColumnDefinitions>
                                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                                     <materialDesign:PackIcon Kind="Equalizer" Width="18" Height="18" Foreground="{StaticResource Brush.Accent}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                                    <TextBlock Text="{Binding [Eq_Titulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                    <TextBlock Text="{loc:T Eq_Titulo}"
                                                                Foreground="White" FontSize="14" FontWeight="Bold" VerticalAlignment="Center"/>
                                                     <TextBlock Text="{Binding NombrePresetEcualizador}" Foreground="{StaticResource Brush.TextTertiary}" FontSize="12" Margin="10,1,0,0" VerticalAlignment="Center"/>
                                                 </StackPanel>
                                                 <ToggleButton Grid.Column="1" IsChecked="{Binding EcualizadorActivo, Mode=TwoWay}" Cursor="Hand"
                                                               Style="{StaticResource MaterialDesignSwitchToggleButton}"
-                                                              ToolTip="{Binding [Eq_Activar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                                              AutomationProperties.Name="{Binding [Eq_Activar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                                              ToolTip="{loc:T Eq_Activar}"
+                                                              AutomationProperties.Name="{loc:T Eq_Activar}"/>
                                             </Grid>
 
-                                            <TextBlock Text="{Binding [Eq_Ajustes], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                            <TextBlock Text="{loc:T Eq_Ajustes}"
                                                        Foreground="{StaticResource Brush.TextTertiary}" FontSize="11" FontWeight="Bold" Margin="0,0,0,6"/>
                                             <ItemsControl ItemsSource="{Binding PresetsEcualizador}" Margin="0,0,0,6">
                                                 <ItemsControl.ItemsPanel>
@@ -925,13 +925,13 @@
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
-                                                <TextBlock Text="{Binding [Eq_Pista], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                <TextBlock Text="{loc:T Eq_Pista}"
                                                            Foreground="{StaticResource Brush.TextTertiary}" FontSize="11" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,10,0"/>
                                                 <Button Grid.Column="1" Command="{Binding RestablecerEcualizadorCommand}" Style="{StaticResource MenuItemButton}" Padding="10,6"
-                                                        AutomationProperties.Name="{Binding [Eq_Restablecer], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                                        AutomationProperties.Name="{loc:T Eq_Restablecer}">
                                                     <StackPanel Orientation="Horizontal">
                                                         <materialDesign:PackIcon Kind="Restore" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                                        <TextBlock Text="{Binding [Eq_Restablecer], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="12" VerticalAlignment="Center"/>
+                                                        <TextBlock Text="{loc:T Eq_Restablecer}" FontSize="12" VerticalAlignment="Center"/>
                                                     </StackPanel>
                                                 </Button>
                                             </Grid>
@@ -944,8 +944,8 @@
                             <!-- Modo Mini Reproductor -->
                             <Button Grid.Column="10" Command="{Binding MinimizarAMiniCommand}" Focusable="True"
                                     FocusVisualStyle="{StaticResource PlayerFocusVisual}"
-                                    ToolTip="{Binding [Player_Mini], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                    AutomationProperties.Name="{Binding [Player_ModoFlotante], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                    ToolTip="{loc:T Player_Mini}"
+                                    AutomationProperties.Name="{loc:T Player_ModoFlotante}"
                                     Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,4,0">
                                 <materialDesign:PackIcon Kind="PictureInPictureBottomRight" Width="26" Height="26" />
                             </Button>
@@ -953,8 +953,8 @@
                             <!-- Fullscreen con ícono dinámico -->
                             <Button Grid.Column="12" Command="{Binding ToggleFullscreenCommand}" Focusable="True"
                                     FocusVisualStyle="{StaticResource PlayerFocusVisual}"
-                                    ToolTip="{Binding [Player_PantallaCompletaTooltip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                    AutomationProperties.Name="{Binding [Atajo_PantallaCompleta], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                    ToolTip="{loc:T Player_PantallaCompletaTooltip}"
+                                    AutomationProperties.Name="{loc:T Atajo_PantallaCompleta}"
                                     Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="40" Height="40" Margin="0,0,0,0">
                                 <materialDesign:PackIcon Kind="{Binding FullscreenIcon}" Width="26" Height="26" />
                             </Button>
@@ -962,8 +962,8 @@
                             <!-- Cajón lateral de episodios (tecla L) -->
                             <Button x:Name="CajonButton" Grid.Column="11" Command="{Binding ToggleCajonEpisodiosCommand}" Focusable="True"
                                     FocusVisualStyle="{StaticResource PlayerFocusVisual}"
-                                    ToolTip="{Binding [Player_CajonEpisodiosTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                    AutomationProperties.Name="{Binding [Player_CajonEpisodiosTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                    ToolTip="{loc:T Player_CajonEpisodiosTip}"
+                                    AutomationProperties.Name="{loc:T Player_CajonEpisodiosTip}"
                                     Style="{StaticResource PlayerMenuToolButton}" Width="40" Height="40" Margin="0,0,4,0">
                                 <materialDesign:PackIcon Kind="PlaylistPlay" Width="26" Height="26" />
                             </Button>
@@ -1000,18 +1000,18 @@
                             <!-- BOTÓN RESTAURAR FORMATO HABITUAL (REQUERIDO) -->
                             <Button Grid.Column="1" Command="{Binding RestaurarFormatoHabitualCommand}" Focusable="True"
                                     FocusVisualStyle="{StaticResource PlayerFocusVisual}"
-                                    ToolTip="{Binding [Player_RestaurarFormato], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                    ToolTip="{loc:T Player_RestaurarFormato}"
                                     Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="30" Height="30" Margin="0,0,2,0"
-                                    AutomationProperties.Name="{Binding [Player_RestaurarFormatoNombre], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                    AutomationProperties.Name="{loc:T Player_RestaurarFormatoNombre}">
                                 <materialDesign:PackIcon Kind="Fullscreen" Width="18" Height="18" />
                             </Button>
 
                             <!-- Botón Cerrar Mini Reproductor -->
                             <Button Grid.Column="2" Command="{Binding CerrarCommand}" Focusable="True"
                                     FocusVisualStyle="{StaticResource PlayerFocusVisual}"
-                                    ToolTip="{Binding [Player_Cerrar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                    ToolTip="{loc:T Player_Cerrar}"
                                     Style="{StaticResource MaterialDesignToolButton}" Foreground="#EF4444" Width="30" Height="30"
-                                    AutomationProperties.Name="{Binding [Player_Cerrar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                    AutomationProperties.Name="{loc:T Player_Cerrar}">
                                 <materialDesign:PackIcon Kind="Close" Width="18" Height="18" />
                             </Button>
                         </Grid>
@@ -1036,7 +1036,7 @@
                             <!-- Scrubber interactivo -->
                             <Slider Grid.Row="0" Minimum="0" Maximum="{Binding TotalSeconds}" Value="{Binding CurrentSeconds, Mode=TwoWay}"
                                     Style="{StaticResource TimelineSliderStyle}" Height="18" Margin="0,0,0,2"
-                                    AutomationProperties.Name="{Binding [Player_ProgresoEpisodio], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                    AutomationProperties.Name="{loc:T Player_ProgresoEpisodio}"
                                     IsMoveToPointEnabled="True" Focusable="True"
                                     primitives:Thumb.DragStarted="Slider_DragStarted"
                                     primitives:Thumb.DragDelta="Slider_DragDelta"
@@ -1056,8 +1056,8 @@
                                 <!-- Play/Pausa -->
                                 <Button Grid.Column="0" Command="{Binding TogglePlayPauseCommand}" Focusable="True"
                                         FocusVisualStyle="{StaticResource PlayerFocusVisual}"
-                                        ToolTip="{Binding [Player_PlayPausaTooltip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                        AutomationProperties.Name="{Binding [Atajo_PlayPausa], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                        ToolTip="{loc:T Player_PlayPausaTooltip}"
+                                        AutomationProperties.Name="{loc:T Atajo_PlayPausa}"
                                         Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="28" Height="28" Margin="0,0,2,0">
                                     <materialDesign:PackIcon Kind="{Binding PlayPauseIcon}" Width="20" Height="20" />
                                 </Button>
@@ -1087,8 +1087,8 @@
                                 <!-- Botón Mute -->
                                 <Button Grid.Column="5" Command="{Binding ToggleMuteCommand}" Focusable="True"
                                         FocusVisualStyle="{StaticResource PlayerFocusVisual}"
-                                        ToolTip="{Binding [Player_SilenciarTooltip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                        AutomationProperties.Name="{Binding [Player_SilenciarToggle], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                        ToolTip="{loc:T Player_SilenciarTooltip}"
+                                        AutomationProperties.Name="{loc:T Player_SilenciarToggle}"
                                         Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="28" Height="28">
                                     <materialDesign:PackIcon Kind="{Binding VolumenIcon}" Width="18" Height="18" />
                                 </Button>
@@ -1111,9 +1111,7 @@
                                     <DataTrigger.EnterActions>
                                         <BeginStoryboard>
                                             <Storyboard>
-                                                <DoubleAnimation Storyboard.TargetProperty="RenderTransform.X" To="0" Duration="0:0:0.22">
-                                                    <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
-                                                </DoubleAnimation>
+                                                <DoubleAnimation Storyboard.TargetProperty="RenderTransform.X" To="0" Duration="0:0:0.22" EasingFunction="{StaticResource Anim.Suave}"/>
                                             </Storyboard>
                                         </BeginStoryboard>
                                     </DataTrigger.EnterActions>
@@ -1140,7 +1138,7 @@
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <TextBlock Text="{Binding [Player_CajonEpisodios], Source={x:Static loc:LocalizationService.Instance}}" Foreground="White" FontSize="15" FontWeight="Bold" VerticalAlignment="Center"/>
+                            <TextBlock Text="{loc:T Player_CajonEpisodios}" Foreground="White" FontSize="15" FontWeight="Bold" VerticalAlignment="Center"/>
                             <Button Grid.Column="1" Command="{Binding ToggleCajonEpisodiosCommand}" Focusable="True"
                                     Style="{StaticResource MaterialDesignToolButton}" Foreground="White" Width="30" Height="30">
                                 <materialDesign:PackIcon Kind="Close" Width="18" Height="18"/>
@@ -1186,14 +1184,14 @@
                                                     <!-- Favorito: el mismo marcador azul que en la ficha -->
                                                     <materialDesign:PackIcon DockPanel.Dock="Right" Kind="Bookmark" Foreground="{StaticResource Brush.Accent}" Width="15" Height="15"
                                                                              VerticalAlignment="Center" Margin="6,0,4,0"
-                                                                             ToolTip="{Binding [Player_EpisodioFavorito], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                                             ToolTip="{loc:T Player_EpisodioFavorito}"
                                                                              Visibility="{Binding Favorito, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                                                     <TextBlock x:Name="TituloFila" Text="{Binding TituloVisual}" Foreground="White" FontSize="12.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
                                                 </DockPanel>
                                                 <TextBlock Text="{Binding BadgeTecnico}" Foreground="{StaticResource Brush.TextSecondary}" FontSize="10" Margin="0,2,0,0"/>
                                                 <StackPanel x:Name="EtiquetaReproduciendo" Orientation="Horizontal" Margin="0,3,0,0" Visibility="Collapsed">
                                                     <materialDesign:PackIcon Kind="VolumeHigh" Width="12" Height="12" Foreground="{StaticResource Brush.Accent}" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                                                    <TextBlock Text="{Binding [Player_Reproduciendo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                    <TextBlock Text="{loc:T Player_Reproduciendo}"
                                                                Foreground="{StaticResource Brush.Accent}" FontSize="10" FontWeight="Bold"/>
                                                 </StackPanel>
                                             </StackPanel>
@@ -1249,7 +1247,7 @@
                         <DropShadowEffect Color="Black" BlurRadius="16" ShadowDepth="4" Opacity="0.7"/>
                     </Border.Effect>
                     <StackPanel Width="260">
-                        <TextBlock Text="{Binding [Player_SiguienteEpisodioEn], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                        <TextBlock Text="{loc:T Player_SiguienteEpisodioEn}"
                                    Foreground="{StaticResource Brush.TextSecondary}" FontSize="11" FontWeight="SemiBold"/>
                         <TextBlock x:Name="CuentaAtrasTitulo" Foreground="White" FontSize="14" FontWeight="Bold" Margin="0,2,0,10" TextTrimming="CharacterEllipsis"/>
                         <!-- "Te saltas el episodio 4 (no está descargado)": el siguiente con archivo no es el que sigue -->
@@ -1270,7 +1268,7 @@
                             </Grid.ColumnDefinitions>
                             <Button Grid.Column="0" Click="BtnCancelarAutoPlay_Click" HorizontalAlignment="Left"
                                     Style="{StaticResource MenuItemButton}" Padding="10,6"
-                                    Content="{Binding [Player_Cancelar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                    Content="{loc:T Player_Cancelar}"/>
                             <Button x:Name="BtnReproducirAhoraCuentaAtras" Grid.Column="1" Click="BtnReproducirAhoraCuentaAtras_Click"
                                     Style="{StaticResource AppPrimaryButton}" Padding="14,6" materialDesign:ButtonAssist.CornerRadius="6">
                                 <StackPanel Orientation="Horizontal">

@@ -19,10 +19,10 @@
     </UserControl.Resources>
 
     <Border Background="{DynamicResource Brush.Surface1}" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1" CornerRadius="10" Padding="3"
-            AutomationProperties.Name="{Binding [Gal_SeccionesAcc], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+            AutomationProperties.Name="{loc:T Gal_SeccionesAcc}">
         <StackPanel Orientation="Horizontal">
             <Button Command="{Binding MostrarBibliotecaCommand}" Margin="0,0,2,0"
-                    AutomationProperties.Name="{Binding [Gal_SeccionBiblioteca], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                    AutomationProperties.Name="{loc:T Gal_SeccionBiblioteca}">
                 <Button.Style>
                     <Style TargetType="Button" BasedOn="{StaticResource SeccionGaleriaBoton}">
                         <Style.Triggers>
@@ -35,11 +35,11 @@
                 </Button.Style>
                 <StackPanel Orientation="Horizontal">
                     <materialDesign:PackIcon Kind="ViewGridOutline" Width="16" Height="16" Margin="0,0,7,0" VerticalAlignment="Center"/>
-                    <TextBlock Text="{Binding [Gal_SeccionBiblioteca], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="12.5" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    <TextBlock Text="{loc:T Gal_SeccionBiblioteca}" FontSize="12.5" FontWeight="SemiBold" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
             <Button Command="{Binding MostrarMinijuegosCommand}"
-                    AutomationProperties.Name="{Binding [Gal_SeccionMinijuegos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                    AutomationProperties.Name="{loc:T Gal_SeccionMinijuegos}">
                 <Button.Style>
                     <Style TargetType="Button" BasedOn="{StaticResource SeccionGaleriaBoton}">
                         <Style.Triggers>
@@ -52,7 +52,7 @@
                 </Button.Style>
                 <StackPanel Orientation="Horizontal">
                     <materialDesign:PackIcon Kind="GamepadVariantOutline" Width="16" Height="16" Margin="0,0,7,0" VerticalAlignment="Center"/>
-                    <TextBlock Text="{Binding [Gal_SeccionMinijuegos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="12.5" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    <TextBlock Text="{loc:T Gal_SeccionMinijuegos}" FontSize="12.5" FontWeight="SemiBold" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
         </StackPanel>

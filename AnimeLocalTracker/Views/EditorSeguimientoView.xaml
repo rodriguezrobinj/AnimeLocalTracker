@@ -402,19 +402,19 @@
                     </Border>
 
                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                        <TextBlock Text="{Binding [Det_ActualizarAniListTitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="15.5" FontWeight="Bold" Foreground="White"/>
+                        <TextBlock Text="{loc:T Det_ActualizarAniListTitulo}" FontSize="15.5" FontWeight="Bold" Foreground="White"/>
                         <TextBlock Text="{Binding Anime.Titulo}" FontSize="11.5" Foreground="{StaticResource Brush.TextTertiary}" Margin="0,1,0,0" TextTrimming="CharacterEllipsis"/>
                     </StackPanel>
 
                     <Button Grid.Column="2" Command="{Binding CerrarEditorSeguimientoCommand}"
                             Style="{StaticResource MaterialDesignIconButton}" Width="32" Height="32" Padding="0" Cursor="Hand"
-                            ToolTip="{Binding [Det_CerrarVentanaTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" AutomationProperties.Name="{Binding [Det_CerrarVentanaTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                            ToolTip="{loc:T Det_CerrarVentanaTip}" AutomationProperties.Name="{loc:T Det_CerrarVentanaTip}">
                         <materialDesign:PackIcon Kind="Close" Width="18" Height="18" Foreground="{StaticResource Brush.TextSecondary}"/>
                     </Button>
                 </Grid>
 
                 <!-- ESTADO: chips de un clic -->
-                <TextBlock Text="{Binding [Det_Estado], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource SegLabel}"/>
+                <TextBlock Text="{loc:T Det_Estado}" Style="{StaticResource SegLabel}"/>
                 <ItemsControl ItemsSource="{Binding EstadosChips}" HorizontalAlignment="Center" Margin="0,6,0,6">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate><WrapPanel Orientation="Horizontal"/></ItemsPanelTemplate>
@@ -439,7 +439,7 @@
 
                     <!-- Episodios vistos -->
                     <StackPanel Grid.Column="0">
-                        <TextBlock Text="{Binding [Det_EpisodiosVistos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource SegLabel}"/>
+                        <TextBlock Text="{loc:T Det_EpisodiosVistos}" Style="{StaticResource SegLabel}"/>
                         <Border Background="{StaticResource Brush.Surface1}" BorderBrush="{StaticResource Brush.BorderStrong}" BorderThickness="1" CornerRadius="10" Height="40" Margin="0,6,0,0">
                             <Grid>
                                 <Grid.ColumnDefinitions>
@@ -448,7 +448,7 @@
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <Button Grid.Column="0" Command="{Binding DecrementarProgresoCommand}" Style="{StaticResource SegStepBtn}"
-                                        ToolTip="{Binding [Det_SegMenosTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" AutomationProperties.Name="{Binding [Det_SegMenosTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                        ToolTip="{loc:T Det_SegMenosTip}" AutomationProperties.Name="{loc:T Det_SegMenosTip}">
                                     <materialDesign:PackIcon Kind="Minus" Width="16" Height="16"/>
                                 </Button>
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
@@ -457,11 +457,11 @@
                                              Foreground="White" FontSize="15" FontWeight="Bold" TextAlignment="Center"
                                              CaretBrush="{StaticResource Brush.Accent}" VerticalContentAlignment="Center"
                                              materialDesign:TextFieldAssist.DecorationVisibility="Hidden"
-                                             AutomationProperties.Name="{Binding [Det_EpisodiosVistos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                             AutomationProperties.Name="{loc:T Det_EpisodiosVistos}"/>
                                     <TextBlock Text="{Binding EditTotalEpisodiosTexto}" FontSize="13" Foreground="{StaticResource Brush.TextTertiary}" Margin="5,0,0,0" VerticalAlignment="Center"/>
                                 </StackPanel>
                                 <Button Grid.Column="2" Command="{Binding IncrementarProgresoCommand}" Style="{StaticResource SegStepBtn}"
-                                        ToolTip="{Binding [Det_SegMasTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" AutomationProperties.Name="{Binding [Det_SegMasTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                        ToolTip="{loc:T Det_SegMasTip}" AutomationProperties.Name="{loc:T Det_SegMasTip}">
                                     <materialDesign:PackIcon Kind="Plus" Width="16" Height="16"/>
                                 </Button>
                             </Grid>
@@ -470,7 +470,7 @@
 
                     <!-- Puntuación -->
                     <StackPanel Grid.Column="2">
-                        <TextBlock Text="{Binding [Det_Puntuacion], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource SegLabel}"/>
+                        <TextBlock Text="{loc:T Det_Puntuacion}" Style="{StaticResource SegLabel}"/>
                         <Border Background="{StaticResource Brush.Surface1}" BorderBrush="{StaticResource Brush.BorderStrong}" BorderThickness="1" CornerRadius="10" Height="40" Margin="0,6,0,0" Padding="12,0">
                             <Grid>
                                 <Grid.ColumnDefinitions>
@@ -480,7 +480,7 @@
                                 <Slider Grid.Column="0" Minimum="0" Maximum="100" Value="{Binding EditPuntaje, UpdateSourceTrigger=PropertyChanged}"
                                         Style="{StaticResource CleanScoreSlider}" IsSnapToTickEnabled="True" TickFrequency="1"
                                         VerticalAlignment="Center" Margin="0,0,10,0"
-                                        AutomationProperties.Name="{Binding [Det_Puntuacion], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                        AutomationProperties.Name="{loc:T Det_Puntuacion}"/>
                                 <TextBlock Grid.Column="1" Text="{Binding EditPuntajeTexto}" FontWeight="Bold" FontSize="15" Foreground="{StaticResource Brush.AccentSoft}"
                                            MinWidth="26" TextAlignment="Right" VerticalAlignment="Center"/>
                             </Grid>
@@ -497,9 +497,9 @@
                     </Grid.ColumnDefinitions>
 
                     <StackPanel Grid.Column="0">
-                        <TextBlock Text="{Binding [Det_FechaInicio], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource SegLabel}"/>
+                        <TextBlock Text="{loc:T Det_FechaInicio}" Style="{StaticResource SegLabel}"/>
                         <Button Margin="0,6,0,0" Command="{Binding AbrirCalendarioInicioCommand}" Style="{StaticResource SegDateField}"
-                                AutomationProperties.Name="{Binding [Det_FechaInicio], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                AutomationProperties.Name="{loc:T Det_FechaInicio}">
                             <Grid>
                                 <TextBlock Text="{Binding EditFechaInicioTexto}" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12.5" Foreground="White"/>
                                 <materialDesign:PackIcon Kind="CalendarMonthOutline" Width="17" Height="17" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="{StaticResource Brush.TextTertiary}"/>
@@ -508,9 +508,9 @@
                     </StackPanel>
 
                     <StackPanel Grid.Column="2">
-                        <TextBlock Text="{Binding [Det_FechaFin], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource SegLabel}"/>
+                        <TextBlock Text="{loc:T Det_FechaFin}" Style="{StaticResource SegLabel}"/>
                         <Button Margin="0,6,0,0" Command="{Binding AbrirCalendarioFinCommand}" Style="{StaticResource SegDateField}"
-                                AutomationProperties.Name="{Binding [Det_FechaFin], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                AutomationProperties.Name="{loc:T Det_FechaFin}">
                             <Grid>
                                 <TextBlock Text="{Binding EditFechaFinTexto}" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12.5" Foreground="White"/>
                                 <materialDesign:PackIcon Kind="CalendarMonthOutline" Width="17" Height="17" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="{StaticResource Brush.TextTertiary}"/>
@@ -526,7 +526,7 @@
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
-                    <Button Grid.Column="0" Content="{Binding [Gal_Cancelar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Command="{Binding CerrarEditorSeguimientoCommand}"
+                    <Button Grid.Column="0" Content="{loc:T Gal_Cancelar}" Command="{Binding CerrarEditorSeguimientoCommand}"
                             Style="{StaticResource MaterialDesignOutlinedButton}"
                             BorderBrush="#374151" Foreground="{StaticResource Brush.TextSecondary}" Height="42" Padding="18,0" FontSize="13"
                             materialDesign:ButtonAssist.CornerRadius="10" Cursor="Hand"/>
@@ -537,7 +537,7 @@
                             materialDesign:ButtonAssist.CornerRadius="10" Cursor="Hand">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Center">
                             <materialDesign:PackIcon Kind="CloudUpload" Width="18" Height="18" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                            <TextBlock Text="{Binding [Det_GuardarAniList], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontWeight="Bold" FontSize="13" VerticalAlignment="Center"/>
+                            <TextBlock Text="{loc:T Det_GuardarAniList}" FontWeight="Bold" FontSize="13" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
                 </Grid>
@@ -568,7 +568,7 @@
                     <TextBlock Grid.Column="1" Text="{Binding CalendarioTitulo}" FontSize="15" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
                     <Button Grid.Column="2" Command="{Binding CerrarCalendarioFechaCommand}"
                             Style="{StaticResource MaterialDesignIconButton}" Width="30" Height="30" Padding="0" Cursor="Hand"
-                            ToolTip="{Binding [Det_CerrarVentanaTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" AutomationProperties.Name="{Binding [Det_CerrarVentanaTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                            ToolTip="{loc:T Det_CerrarVentanaTip}" AutomationProperties.Name="{loc:T Det_CerrarVentanaTip}">
                         <materialDesign:PackIcon Kind="Close" Width="17" Height="17" Foreground="{StaticResource Brush.TextSecondary}"/>
                     </Button>
                 </Grid>
@@ -585,9 +585,9 @@
                             Style="{StaticResource MaterialDesignFlatButton}" Foreground="{StaticResource Brush.Danger}" Height="38" Padding="12,0" Cursor="Hand"
                             materialDesign:ButtonAssist.CornerRadius="10"
                             Visibility="{Binding CalendarioTieneFecha, Converter={StaticResource BoolToVis}}">
-                        <TextBlock Text="{Binding [Det_SegQuitarFecha], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="12.5" FontWeight="SemiBold"/>
+                        <TextBlock Text="{loc:T Det_SegQuitarFecha}" FontSize="12.5" FontWeight="SemiBold"/>
                     </Button>
-                    <Button Grid.Column="1" Content="{Binding [Gal_Cancelar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Command="{Binding CerrarCalendarioFechaCommand}"
+                    <Button Grid.Column="1" Content="{loc:T Gal_Cancelar}" Command="{Binding CerrarCalendarioFechaCommand}"
                             Style="{StaticResource MaterialDesignOutlinedButton}"
                             BorderBrush="#374151" Foreground="{StaticResource Brush.TextSecondary}" Height="38" Padding="16,0" FontSize="12.5"
                             materialDesign:ButtonAssist.CornerRadius="10" Cursor="Hand"/>

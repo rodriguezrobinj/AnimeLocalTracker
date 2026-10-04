@@ -32,8 +32,8 @@
                     <materialDesign:PackIcon Kind="MagnifyPlus" Foreground="{StaticResource Brush.AccentSoft}" Width="24" Height="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
                 <StackPanel VerticalAlignment="Center">
-                    <TextBlock Text="{Binding [Add_Titulo], Source={x:Static loc:LocalizationService.Instance}}" Style="{StaticResource AppText.PageTitle}"/>
-                    <TextBlock Text="{Binding [Add_Subtitulo], Source={x:Static loc:LocalizationService.Instance}}" FontSize="12" Foreground="{StaticResource Brush.TextSecondary}" Margin="0,2,0,0"/>
+                    <TextBlock Text="{loc:T Add_Titulo}" Style="{StaticResource AppText.PageTitle}"/>
+                    <TextBlock Text="{loc:T Add_Subtitulo}" FontSize="12" Foreground="{StaticResource Brush.TextSecondary}" Margin="0,2,0,0"/>
                 </StackPanel>
             </StackPanel>
 
@@ -55,7 +55,7 @@
                              VerticalAlignment="Center" FontSize="14" Foreground="White"
                              BorderThickness="0" Background="Transparent" 
                              CaretBrush="{StaticResource Brush.Accent}"
-                             materialDesign:HintAssist.Hint="{Binding [Add_BuscarHint], Source={x:Static loc:LocalizationService.Instance}}"
+                             materialDesign:HintAssist.Hint="{loc:T Add_BuscarHint}"
                              materialDesign:HintAssist.Foreground="#6B7280"
                              materialDesign:TextFieldAssist.DecorationVisibility="Collapsed" />
 
@@ -63,8 +63,8 @@
                     <Button Grid.Column="2" Command="{Binding LimpiarBusquedaCommand}"
                             Style="{StaticResource MaterialDesignToolButton}"
                             Foreground="{StaticResource Brush.TextSecondary}" Width="28" Height="28" Padding="0"
-                            ToolTip="{Binding [Add_LimpiarBusquedaTip], Source={x:Static loc:LocalizationService.Instance}}"
-                            AutomationProperties.Name="{Binding [Add_LimpiarBusquedaTip], Source={x:Static loc:LocalizationService.Instance}}"
+                            ToolTip="{loc:T Add_LimpiarBusquedaTip}"
+                            AutomationProperties.Name="{loc:T Add_LimpiarBusquedaTip}"
                             Visibility="{Binding TieneTextoBusqueda, Converter={StaticResource BoolToVis}}">
                         <materialDesign:PackIcon Kind="Close" Width="18" Height="18"/>
                     </Button>
@@ -105,7 +105,7 @@
                      solo traduce lo que se MUESTRA (mismo patrón que GaleriaView). -->
                 <ComboBox ItemsSource="{Binding GenerosDisponibles}"
                           SelectedItem="{Binding GeneroSeleccionado}"
-                          ToolTip="{Binding [Add_GeneroTip], Source={x:Static loc:LocalizationService.Instance}}"
+                          ToolTip="{loc:T Add_GeneroTip}"
                           Height="34" Margin="0,0,8,0" VerticalAlignment="Center">
                     <ComboBox.ItemTemplate>
                         <DataTemplate>
@@ -116,7 +116,7 @@
                 <!-- El valor es el código de AniList (WINTER…); la plantilla lo traduce al mostrarlo -->
                 <ComboBox ItemsSource="{Binding TemporadasDisponibles}"
                           SelectedItem="{Binding TemporadaSeleccionada}"
-                          ToolTip="{Binding [Add_TemporadaTip], Source={x:Static loc:LocalizationService.Instance}}"
+                          ToolTip="{loc:T Add_TemporadaTip}"
                           Height="34" Margin="0,0,8,0" VerticalAlignment="Center">
                     <ComboBox.ItemTemplate>
                         <DataTemplate>
@@ -126,13 +126,13 @@
                 </ComboBox>
                 <ComboBox ItemsSource="{Binding AniosDisponibles}"
                           SelectedItem="{Binding AnioSeleccionado}"
-                          ToolTip="{Binding [Add_AnioTip], Source={x:Static loc:LocalizationService.Instance}}"
+                          ToolTip="{loc:T Add_AnioTip}"
                           Height="34" Margin="0,0,8,0" VerticalAlignment="Center"/>
                 <Button Command="{Binding LimpiarFiltrosCommand}"
                         Visibility="{Binding HayFiltrosActivos, Converter={StaticResource BoolToVis}}"
                         Style="{StaticResource MaterialDesignIconButton}" Width="34" Height="34" Padding="0" Cursor="Hand"
-                        ToolTip="{Binding [Add_LimpiarFiltrosTemporada], Source={x:Static loc:LocalizationService.Instance}}"
-                        AutomationProperties.Name="{Binding [Add_LimpiarFiltrosTemporada], Source={x:Static loc:LocalizationService.Instance}}">
+                        ToolTip="{loc:T Add_LimpiarFiltrosTemporada}"
+                        AutomationProperties.Name="{loc:T Add_LimpiarFiltrosTemporada}">
                     <materialDesign:PackIcon Kind="FilterRemoveOutline" Width="18" Height="18" Foreground="{StaticResource Brush.TextSecondary}"/>
                 </Button>
             </StackPanel>
@@ -148,7 +148,7 @@
                 <ProgressBar Style="{StaticResource MaterialDesignCircularProgressBar}"
                              Value="0" IsIndeterminate="True"
                              Foreground="{StaticResource Brush.Accent}" Width="48" Height="48"/>
-                <TextBlock Text="{Binding [Add_Cargando], Source={x:Static loc:LocalizationService.Instance}}" Foreground="{StaticResource Brush.TextSecondary}" FontSize="14" Margin="0,16,0,0" HorizontalAlignment="Center" FontWeight="SemiBold"/>
+                <TextBlock Text="{loc:T Add_Cargando}" Foreground="{StaticResource Brush.TextSecondary}" FontSize="14" Margin="0,16,0,0" HorizontalAlignment="Center" FontWeight="SemiBold"/>
             </StackPanel>
 
             <!-- Sin conexión: buscar/tendencias necesitan internet (no es "sin resultados").
@@ -158,8 +158,8 @@
                 <Border Background="{StaticResource Brush.Surface3}" CornerRadius="40" Width="80" Height="80" HorizontalAlignment="Center" Margin="0,0,0,16">
                     <materialDesign:PackIcon Kind="WifiOff" Width="40" Height="40" Foreground="{StaticResource Brush.TextTertiary}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
-                <TextBlock Text="{Binding [Add_SinConexionTitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="18" Foreground="{StaticResource Brush.TextPrimary}" FontWeight="Bold" HorizontalAlignment="Center"/>
-                <TextBlock Text="{Binding [Add_SinConexionSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                <TextBlock Text="{loc:T Add_SinConexionTitulo}" FontSize="18" Foreground="{StaticResource Brush.TextPrimary}" FontWeight="Bold" HorizontalAlignment="Center"/>
+                <TextBlock Text="{loc:T Add_SinConexionSub}"
                            FontSize="13" Foreground="{StaticResource Brush.TextSecondary}" HorizontalAlignment="Center" Margin="0,6,0,0" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="420"/>
                 <Button Command="{Binding CargarTendenciasCommand}" Cursor="Hand"
                         Style="{StaticResource MaterialDesignOutlinedButton}"
@@ -167,7 +167,7 @@
                         HorizontalAlignment="Center">
                     <StackPanel Orientation="Horizontal">
                         <materialDesign:PackIcon Kind="Refresh" Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                        <TextBlock Text="{Binding [Add_Reintentar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                        <TextBlock Text="{loc:T Add_Reintentar}" VerticalAlignment="Center" FontWeight="SemiBold"/>
                     </StackPanel>
                 </Button>
             </StackPanel>
@@ -178,8 +178,8 @@
                 <Border Background="{StaticResource Brush.Surface3}" CornerRadius="40" Width="80" Height="80" HorizontalAlignment="Center" Margin="0,0,0,16">
                     <materialDesign:PackIcon Kind="MagnifyClose" Width="40" Height="40" Foreground="#6B7280" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
-                <TextBlock Text="{Binding [Add_SinResultadosTitulo], Source={x:Static loc:LocalizationService.Instance}}" FontSize="18" Foreground="{StaticResource Brush.TextPrimary}" FontWeight="Bold" HorizontalAlignment="Center"/>
-                <TextBlock Text="{Binding [Add_SinResultadosSub], Source={x:Static loc:LocalizationService.Instance}}"
+                <TextBlock Text="{loc:T Add_SinResultadosTitulo}" FontSize="18" Foreground="{StaticResource Brush.TextPrimary}" FontWeight="Bold" HorizontalAlignment="Center"/>
+                <TextBlock Text="{loc:T Add_SinResultadosSub}"
                            FontSize="13" Foreground="{StaticResource Brush.TextSecondary}" HorizontalAlignment="Center" Margin="0,6,0,0" TextAlignment="Center"/>
                 <Button Command="{Binding LimpiarFiltrosCommand}"
                         Visibility="{Binding SinResultadosFiltrados, Converter={StaticResource BoolToVis}}"
@@ -188,7 +188,7 @@
                         HorizontalAlignment="Center">
                     <StackPanel Orientation="Horizontal">
                         <materialDesign:PackIcon Kind="FilterRemoveOutline" Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                        <TextBlock Text="{Binding [Add_LimpiarFiltrosTemporada], Source={x:Static loc:LocalizationService.Instance}}" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                        <TextBlock Text="{loc:T Add_LimpiarFiltrosTemporada}" VerticalAlignment="Center" FontWeight="SemiBold"/>
                     </StackPanel>
                 </Button>
                 <Button Command="{Binding CargarTendenciasCommand}"
@@ -198,7 +198,7 @@
                         HorizontalAlignment="Center">
                     <StackPanel Orientation="Horizontal">
                         <materialDesign:PackIcon Kind="Fire" Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                        <TextBlock Text="{Binding [Add_VerTendencias], Source={x:Static loc:LocalizationService.Instance}}" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                        <TextBlock Text="{loc:T Add_VerTendencias}" VerticalAlignment="Center" FontWeight="SemiBold"/>
                     </StackPanel>
                 </Button>
             </StackPanel>
@@ -262,18 +262,14 @@
                                             <Trigger.EnterActions>
                                                 <BeginStoryboard>
                                                     <Storyboard>
-                                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)" To="-4" Duration="0:0:0.12">
-                                                            <DoubleAnimation.EasingFunction>
-                                                                <CubicEase EasingMode="EaseOut"/>
-                                                            </DoubleAnimation.EasingFunction>
-                                                        </DoubleAnimation>
+                                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)" To="-4" Duration="{StaticResource Anim.Rapida}" EasingFunction="{StaticResource Anim.Suave}"/>
                                                     </Storyboard>
                                                 </BeginStoryboard>
                                             </Trigger.EnterActions>
                                             <Trigger.ExitActions>
                                                 <BeginStoryboard>
                                                     <Storyboard>
-                                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)" To="0" Duration="0:0:0.12"/>
+                                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)" To="0" Duration="{StaticResource Anim.Rapida}"/>
                                                     </Storyboard>
                                                 </BeginStoryboard>
                                             </Trigger.ExitActions>
@@ -376,12 +372,12 @@
                                                 Visibility="{Binding EstaEnBiblioteca, Converter={StaticResource InverseBoolToVis}}"
                                                 Background="{StaticResource Brush.AccentStrong}" BorderBrush="{StaticResource Brush.Accent}" BorderThickness="1" Foreground="White"
                                                 Height="34" Padding="10,0" materialDesign:ButtonAssist.CornerRadius="8"
-                                                Cursor="Hand" ToolTip="{Binding [Add_AnadirBibliotecaTip], Source={x:Static loc:LocalizationService.Instance}}">
+                                                Cursor="Hand" ToolTip="{loc:T Add_AnadirBibliotecaTip}">
                                             <Grid>
                                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center"
                                                             Visibility="{Binding EstaGuardando, Converter={StaticResource InverseBoolToVis}}">
                                                     <materialDesign:PackIcon Kind="PlusCircleOutline" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                                    <TextBlock Text="{Binding [Add_AnadirBiblioteca], Source={x:Static loc:LocalizationService.Instance}}" FontSize="11.5" FontWeight="Bold" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="{loc:T Add_AnadirBiblioteca}" FontSize="11.5" FontWeight="Bold" VerticalAlignment="Center"/>
                                                 </StackPanel>
                                                 
                                                 <ProgressBar Style="{StaticResource MaterialDesignCircularProgressBar}" 
@@ -396,10 +392,10 @@
                                                 Visibility="{Binding EstaEnBiblioteca, Converter={StaticResource BoolToVis}}"
                                                 Background="#132E22" BorderBrush="#10B981" BorderThickness="1" Foreground="{StaticResource Brush.Success}"
                                                 Height="34" Padding="10,0" materialDesign:ButtonAssist.CornerRadius="8"
-                                                Cursor="Hand" ToolTip="{Binding [Add_VerBibliotecaTip], Source={x:Static loc:LocalizationService.Instance}}">
+                                                Cursor="Hand" ToolTip="{loc:T Add_VerBibliotecaTip}">
                                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                                 <materialDesign:PackIcon Kind="CheckCircle" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0" Foreground="{StaticResource Brush.Success}"/>
-                                                <TextBlock Text="{Binding [Add_EnBiblioteca], Source={x:Static loc:LocalizationService.Instance}}" FontSize="11.5" FontWeight="Bold" VerticalAlignment="Center"/>
+                                                <TextBlock Text="{loc:T Add_EnBiblioteca}" FontSize="11.5" FontWeight="Bold" VerticalAlignment="Center"/>
                                             </StackPanel>
                                         </Button>
                                     </Grid>

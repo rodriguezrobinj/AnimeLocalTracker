@@ -94,3 +94,15 @@ Ahorro estimado: ≈900–1 100 líneas de XAML y ≈400–600 de C# en las fase
 | V4 botón de icono | Sin hacer | No hay una forma de quitar la repetición del `ToolTip` y el nombre accesible que sea más simple que lo que hay |
 
 Resultado: build con 0 errores y 0 advertencias; 2 733 pruebas en verde (21 nuevas de formato, cancelación y procesos; 3 de formato se movieron de sitio). Verificado en la app real con perfil aislado: las pestañas, la ficha y el reproductor cargan y se ven igual; la ventana maximiza sin tapar la barra de tareas; la extracción de subtítulos y la lectura de fotogramas clave siguen funcionando; 0 errores en el registro. La réplica de recursos de las pruebas de vistas (`WpfHostFixture`) necesitó las claves nuevas de `App.xaml`.
+
+## 8. Estado de la fase 2 (aplicada el 2026-10-04, sin commit)
+
+| Punto | Estado | Detalle |
+|---|---|---|
+| V2 `{loc:T}` | **Hecho** | `Services/TExtension.cs`: `{loc:T Clave}` devuelve el mismo binding de siempre, siempre unidireccional. Sustituidos los 848 bindings en 27 archivos. Quedan 5 con forma de elemento (`<Binding …>` dentro de bindings múltiples), que no admiten la extensión |
+| F3 cambio de idioma | **Hecho** | 8 de los 13 `Receive(IdiomaCambiadoMensaje)` solo saltaban al hilo de interfaz y refrescaban: ahora son `HiloUi.Ejecutar(Refrescar…)`. Los otros 5 hacen trabajo propio. De paso se quitaron tres copias privadas de `EnHiloDeInterfaz` (ficha, reproductor, vista de detalle) |
+| F6 guardar preferencias | **Hecho en parte** | `ISettingsService.ActualizarAsync(cambio)` (método de extensión: la interfaz no cambia y las pruebas con Moq siguen igual). Convertidos 5 sitios. No se convirtieron los que comparan antes de guardar para no escribir en disco sin necesidad (modo noche, "Usar mi estilo", idioma de audio) ni el guardado completo de Configuración |
+| V7 animaciones | **Hecho** | En `App.xaml`: `Anim.Rapida` (0,12 s), `Anim.Normal` (0,2 s), `Anim.Suave`, `Anim.SuaveEntrada`, `Anim.SuaveFuerte`; 42 usos en 6 archivos. `PlayerMenuPanel` unifica el panel de los 4 menús del reproductor. Fuera: los diccionarios de recursos (`CustomComboBox`, `GaleriaTarjeta`) y las 7 animaciones creadas en code-behind |
+| F7 `catch` vacíos | **Descartado** | Revisados: son casi todos `catch (OperationCanceledException) { }` o accesos al reproductor que puede estar cerrándose. Un ayudante que los registre solo añadiría ruido. La cifra de "86" del punto F7 incluía esos casos legítimos |
+
+Resultado: build con 0 errores y 0 advertencias; 2 737 pruebas en verde (4 nuevas). Verificado en la app real con perfil aislado: textos en todas las pestañas, cambio de idioma en caliente español → inglés → español (incluidos los textos que construyen los ViewModels), menús del reproductor y reproducción con subtítulos ASS; 0 errores en el registro.

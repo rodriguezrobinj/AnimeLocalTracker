@@ -90,7 +90,7 @@
         <!-- ═══ FILA 0: título + acciones ═══ -->
         <DockPanel Grid.Row="0" Margin="0,0,0,16" LastChildFill="False">
             <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center">
-                <TextBlock Text="{Binding [Desc_Titulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.PageTitle}" VerticalAlignment="Center"/>
+                <TextBlock Text="{loc:T Desc_Titulo}" Style="{StaticResource AppText.PageTitle}" VerticalAlignment="Center"/>
                 <Border Style="{StaticResource AppBadge}" Margin="14,0,0,0" VerticalAlignment="Center"
                         Visibility="{Binding TieneDescargas, Converter={StaticResource BoolToVis}}">
                     <TextBlock Text="{Binding ConteoActivas}" Style="{StaticResource AppText.Caption}" FontWeight="Bold" Foreground="{DynamicResource Brush.Accent}"
@@ -120,10 +120,10 @@
                         <TextBlock FontWeight="SemiBold" FontSize="13.5" VerticalAlignment="Center">
                             <TextBlock.Style>
                                 <Style TargetType="TextBlock">
-                                    <Setter Property="Text" Value="{Binding [Desc_PausarTodas], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                    <Setter Property="Text" Value="{loc:T Desc_PausarTodas}"/>
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding TodasPausadas}" Value="True">
-                                            <Setter Property="Text" Value="{Binding [Desc_ReanudarTodas], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                            <Setter Property="Text" Value="{loc:T Desc_ReanudarTodas}"/>
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
@@ -137,8 +137,8 @@
                     <Button x:Name="MenuOpcionesBtn" Width="40" Height="40"
                             Click="MenuOpcionesBtn_Click"
                             Cursor="Hand"
-                            ToolTip="{Binding [Desc_MasOpcionesTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                            AutomationProperties.Name="{Binding [Desc_MasOpcionesTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                            ToolTip="{loc:T Desc_MasOpcionesTip}"
+                            AutomationProperties.Name="{loc:T Desc_MasOpcionesTip}">
                         <Button.Template>
                             <ControlTemplate TargetType="Button">
                                 <Border x:Name="btnBorder" Background="{DynamicResource Brush.Surface3}" BorderBrush="{DynamicResource Brush.BorderStrong}"
@@ -170,7 +170,7 @@
                                     <Button Command="{Binding CancelarTodasCommand}" Click="CerrarMenuOpciones_Click" Style="{StaticResource DescMenuBtn}">
                                         <StackPanel Orientation="Horizontal">
                                             <materialDesign:PackIcon Kind="TrashCanOutline" Width="18" Height="18" Foreground="{DynamicResource Brush.Danger}" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                                            <TextBlock Text="{Binding [Desc_CancelarTodas], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Foreground="{DynamicResource Brush.Danger}" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{loc:T Desc_CancelarTodas}" Foreground="{DynamicResource Brush.Danger}" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
                                         </StackPanel>
                                     </Button>
                                 </StackPanel>
@@ -179,19 +179,19 @@
                                     <Button Command="{Binding ReintentarFallidasCommand}" Click="CerrarMenuOpciones_Click" Style="{StaticResource DescMenuBtn}">
                                         <StackPanel Orientation="Horizontal">
                                             <materialDesign:PackIcon Kind="Reload" Width="18" Height="18" Foreground="{DynamicResource Brush.Accent}" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                                            <TextBlock Text="{Binding [Desc_ReintentarFallidas], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Foreground="{DynamicResource Brush.TextPrimary}" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{loc:T Desc_ReintentarFallidas}" Foreground="{DynamicResource Brush.TextPrimary}" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
                                         </StackPanel>
                                     </Button>
                                     <Button Command="{Binding LimpiarFallidasCommand}" Click="CerrarMenuOpciones_Click" Style="{StaticResource DescMenuBtn}">
                                         <StackPanel Orientation="Horizontal">
                                             <materialDesign:PackIcon Kind="AlertCircleOutline" Width="18" Height="18" Foreground="{DynamicResource Brush.Warning}" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                                            <TextBlock Text="{Binding [Desc_LimpiarFallidas], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Foreground="{DynamicResource Brush.TextPrimary}" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{loc:T Desc_LimpiarFallidas}" Foreground="{DynamicResource Brush.TextPrimary}" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
                                         </StackPanel>
                                     </Button>
                                     <Button Command="{Binding LimpiarHistorialCommand}" Click="CerrarMenuOpciones_Click" Style="{StaticResource DescMenuBtn}">
                                         <StackPanel Orientation="Horizontal">
                                             <materialDesign:PackIcon Kind="TrashCanOutline" Width="18" Height="18" Foreground="{DynamicResource Brush.Danger}" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                                            <TextBlock Text="{Binding [Desc_LimpiarHistorial], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Foreground="{DynamicResource Brush.Danger}" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{loc:T Desc_LimpiarHistorial}" Foreground="{DynamicResource Brush.Danger}" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
                                         </StackPanel>
                                     </Button>
                                 </StackPanel>
@@ -219,13 +219,13 @@
                     <TextBox Grid.Column="1" Text="{Binding TextoBusqueda, UpdateSourceTrigger=PropertyChanged}"
                              Background="Transparent" BorderThickness="0" Foreground="{DynamicResource Brush.TextPrimary}" FontSize="12.5"
                              VerticalAlignment="Center" CaretBrush="{DynamicResource Brush.Accent}"
-                             AutomationProperties.Name="{Binding [Desc_Buscar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                             materialDesign:HintAssist.Hint="{Binding [Desc_Buscar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                             AutomationProperties.Name="{loc:T Desc_Buscar}"
+                             materialDesign:HintAssist.Hint="{loc:T Desc_Buscar}"
                              materialDesign:TextFieldAssist.DecorationVisibility="Hidden"/>
                     <Button Grid.Column="2" Command="{Binding LimpiarBusquedaCommand}"
                             Style="{StaticResource MaterialDesignIconButton}" Width="20" Height="20" Padding="0" Cursor="Hand"
-                            ToolTip="{Binding [Desc_LimpiarBusquedaTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                            AutomationProperties.Name="{Binding [Desc_LimpiarBusquedaTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                            ToolTip="{loc:T Desc_LimpiarBusquedaTip}"
+                            AutomationProperties.Name="{loc:T Desc_LimpiarBusquedaTip}"
                             Visibility="{Binding HayBusqueda, Converter={StaticResource BoolToVis}}">
                         <materialDesign:PackIcon Kind="CloseCircle" Foreground="{DynamicResource Brush.TextSecondary}" Width="14" Height="14"/>
                     </Button>
@@ -285,25 +285,25 @@
             <Border Style="{StaticResource DescStatCard}">
                 <StackPanel>
                     <TextBlock Text="{Binding ConteoActivas}" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource Brush.Accent}"/>
-                    <TextBlock Text="{Binding [Desc_ResActivas], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.Caption}"/>
+                    <TextBlock Text="{loc:T Desc_ResActivas}" Style="{StaticResource AppText.Caption}"/>
                 </StackPanel>
             </Border>
             <Border Style="{StaticResource DescStatCard}">
                 <StackPanel>
                     <TextBlock Text="{Binding ConteoEnCola}" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource Brush.TextPrimary}"/>
-                    <TextBlock Text="{Binding [Desc_ResEnCola], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.Caption}"/>
+                    <TextBlock Text="{loc:T Desc_ResEnCola}" Style="{StaticResource AppText.Caption}"/>
                 </StackPanel>
             </Border>
             <Border Style="{StaticResource DescStatCard}">
                 <StackPanel>
                     <TextBlock Text="{Binding VelocidadTotalTexto}" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource Brush.TextPrimary}"/>
-                    <TextBlock Text="{Binding [Desc_ResVelocidad], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.Caption}"/>
+                    <TextBlock Text="{loc:T Desc_ResVelocidad}" Style="{StaticResource AppText.Caption}"/>
                 </StackPanel>
             </Border>
             <Border Style="{StaticResource DescStatCard}">
                 <StackPanel>
                     <TextBlock Text="{Binding CompletadasHoy}" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource Brush.Success}"/>
-                    <TextBlock Text="{Binding [Desc_ResHoy], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.Caption}"/>
+                    <TextBlock Text="{loc:T Desc_ResHoy}" Style="{StaticResource AppText.Caption}"/>
                 </StackPanel>
             </Border>
         </UniformGrid>
@@ -401,7 +401,7 @@
                                                             Visibility="{Binding EsMusica, Converter={StaticResource BoolToVis}}">
                                                         <StackPanel Orientation="Horizontal">
                                                             <materialDesign:PackIcon Kind="MusicNote" Width="11" Height="11" Foreground="{StaticResource Brush.Music}" VerticalAlignment="Center" Margin="0,0,3,0"/>
-                                                            <TextBlock Text="{Binding [Desc_EtiquetaMusica], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="10.5" FontWeight="Bold" Foreground="{StaticResource Brush.Music}"/>
+                                                            <TextBlock Text="{loc:T Desc_EtiquetaMusica}" FontSize="10.5" FontWeight="Bold" Foreground="{StaticResource Brush.Music}"/>
                                                         </StackPanel>
                                                     </Border>
                                                 </StackPanel>
@@ -425,8 +425,8 @@
                                         <!-- Saltar la cola: solo si está esperando un slot -->
                                         <Button Command="{Binding DataContext.PriorizarCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                 CommandParameter="{Binding}" Style="{StaticResource DescIconBtn}"
-                                                ToolTip="{Binding [Desc_Priorizar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                                AutomationProperties.Name="{Binding [Desc_Priorizar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                ToolTip="{loc:T Desc_Priorizar}"
+                                                AutomationProperties.Name="{loc:T Desc_Priorizar}"
                                                 Visibility="{Binding EnCola, Converter={StaticResource BoolToVis}}">
                                             <materialDesign:PackIcon Kind="ArrowCollapseUp" Foreground="{DynamicResource Brush.AccentSoft}" Width="20" Height="20"/>
                                         </Button>
@@ -435,8 +435,8 @@
                                         <Button Command="{Binding DataContext.AlternarPausaDescargaCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                 CommandParameter="{Binding}" Style="{StaticResource DescIconBtn}"
                                                 Visibility="{Binding EsMusica, Converter={StaticResource InverseBoolToVis}}"
-                                                ToolTip="{Binding [Desc_PausarReanudarTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                                AutomationProperties.Name="{Binding [Desc_PausarReanudarTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                                ToolTip="{loc:T Desc_PausarReanudarTip}"
+                                                AutomationProperties.Name="{loc:T Desc_PausarReanudarTip}">
                                             <materialDesign:PackIcon Foreground="{DynamicResource Brush.Accent}" Width="22" Height="22">
                                                 <materialDesign:PackIcon.Style>
                                                     <Style TargetType="materialDesign:PackIcon">
@@ -453,8 +453,8 @@
 
                                         <Button Command="{Binding DataContext.CancelarDescargaCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                 CommandParameter="{Binding}" Style="{StaticResource DescIconBtn}"
-                                                ToolTip="{Binding [Desc_CancelarTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                                AutomationProperties.Name="{Binding [Desc_CancelarTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                                ToolTip="{loc:T Desc_CancelarTip}"
+                                                AutomationProperties.Name="{loc:T Desc_CancelarTip}">
                                             <materialDesign:PackIcon Kind="TrashCanOutline" Foreground="{DynamicResource Brush.Danger}" Width="20" Height="20"/>
                                         </Button>
                                     </StackPanel>
@@ -470,8 +470,8 @@
                     <Border Background="{DynamicResource Brush.Surface3}" CornerRadius="40" Width="80" Height="80" HorizontalAlignment="Center" Margin="0,0,0,16">
                         <materialDesign:PackIcon Kind="CloudDownloadOutline" Width="40" Height="40" Foreground="{DynamicResource Brush.TextTertiary}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
-                    <TextBlock Text="{Binding [Desc_VacioTitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppEmptyTitle}" Margin="0,0,0,6"/>
-                    <TextBlock Text="{Binding [Desc_VacioSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppEmptyText}"/>
+                    <TextBlock Text="{loc:T Desc_VacioTitulo}" Style="{StaticResource AppEmptyTitle}" Margin="0,0,0,6"/>
+                    <TextBlock Text="{loc:T Desc_VacioSub}" Style="{StaticResource AppEmptyText}"/>
                 </StackPanel>
             </Grid>
 
@@ -528,7 +528,7 @@
                                                     Visibility="{Binding EsMusica, Converter={StaticResource BoolToVis}}">
                                                 <StackPanel Orientation="Horizontal">
                                                     <materialDesign:PackIcon Kind="MusicNote" Width="11" Height="11" Foreground="{StaticResource Brush.Music}" VerticalAlignment="Center" Margin="0,0,3,0"/>
-                                                    <TextBlock Text="{Binding [Desc_EtiquetaMusica], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="10.5" FontWeight="Bold" Foreground="{StaticResource Brush.Music}"/>
+                                                    <TextBlock Text="{loc:T Desc_EtiquetaMusica}" FontSize="10.5" FontWeight="Bold" Foreground="{StaticResource Brush.Music}"/>
                                                 </StackPanel>
                                             </Border>
                                         </StackPanel>
@@ -540,7 +540,7 @@
                                                    TextTrimming="CharacterEllipsis" Margin="0,4,0,0"
                                                    Visibility="{Binding EsFallida, Converter={StaticResource BoolToVis}}"/>
                                         <!-- Archivo perdido -->
-                                        <TextBlock Text="{Binding [Desc_ArchivoNoExiste], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                        <TextBlock Text="{loc:T Desc_ArchivoNoExiste}"
                                                    Foreground="{DynamicResource Brush.Warning}" Margin="0,4,0,0">
                                             <TextBlock.Style>
                                                 <Style TargetType="TextBlock" BasedOn="{StaticResource AppText.Caption}">
@@ -566,12 +566,12 @@
                                             <Button.Style>
                                                 <Style TargetType="Button" BasedOn="{StaticResource DescIconBtn}">
                                                     <Setter Property="Visibility" Value="Collapsed"/>
-                                                    <Setter Property="ToolTip" Value="{Binding [Desc_Reproducir], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
-                                                    <Setter Property="AutomationProperties.Name" Value="{Binding [Desc_Reproducir], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                                    <Setter Property="ToolTip" Value="{loc:T Desc_Reproducir}"/>
+                                                    <Setter Property="AutomationProperties.Name" Value="{loc:T Desc_Reproducir}"/>
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding EsMusica}" Value="True">
-                                                            <Setter Property="ToolTip" Value="{Binding [Desc_EscucharEnFicha], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
-                                                            <Setter Property="AutomationProperties.Name" Value="{Binding [Desc_EscucharEnFicha], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                                            <Setter Property="ToolTip" Value="{loc:T Desc_EscucharEnFicha}"/>
+                                                            <Setter Property="AutomationProperties.Name" Value="{loc:T Desc_EscucharEnFicha}"/>
                                                         </DataTrigger>
                                                         <MultiDataTrigger>
                                                             <MultiDataTrigger.Conditions>
@@ -589,7 +589,7 @@
                                         <!-- Reintentar: fallidas o con el archivo perdido -->
                                         <Button Command="{Binding DataContext.ReintentarCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                 CommandParameter="{Binding}"
-                                                ToolTip="{Binding [Desc_Reintentar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" AutomationProperties.Name="{Binding [Desc_Reintentar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                                ToolTip="{loc:T Desc_Reintentar}" AutomationProperties.Name="{loc:T Desc_Reintentar}">
                                             <Button.Style>
                                                 <Style TargetType="Button" BasedOn="{StaticResource DescIconBtn}">
                                                     <Setter Property="Visibility" Value="Collapsed"/>
@@ -608,13 +608,13 @@
 
                                         <Button Command="{Binding DataContext.AbrirCarpetaCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                 CommandParameter="{Binding}" Style="{StaticResource DescIconBtn}"
-                                                ToolTip="{Binding [Desc_AbrirCarpeta], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" AutomationProperties.Name="{Binding [Desc_AbrirCarpeta], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                                ToolTip="{loc:T Desc_AbrirCarpeta}" AutomationProperties.Name="{loc:T Desc_AbrirCarpeta}">
                                             <materialDesign:PackIcon Kind="FolderOpenOutline" Foreground="{DynamicResource Brush.TextSecondary}" Width="21" Height="21"/>
                                         </Button>
 
                                         <Button Command="{Binding DataContext.QuitarDelHistorialCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                 CommandParameter="{Binding}" Style="{StaticResource DescIconBtn}"
-                                                ToolTip="{Binding [Desc_QuitarHistorial], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" AutomationProperties.Name="{Binding [Desc_QuitarHistorial], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                                ToolTip="{loc:T Desc_QuitarHistorial}" AutomationProperties.Name="{loc:T Desc_QuitarHistorial}">
                                             <materialDesign:PackIcon Kind="CloseCircleOutline" Foreground="{DynamicResource Brush.TextTertiary}" Width="20" Height="20"/>
                                         </Button>
                                     </StackPanel>
@@ -648,15 +648,15 @@
                     <Border Background="{DynamicResource Brush.Surface3}" CornerRadius="40" Width="80" Height="80" HorizontalAlignment="Center" Margin="0,0,0,16">
                         <materialDesign:PackIcon Kind="History" Width="40" Height="40" Foreground="{DynamicResource Brush.TextTertiary}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
-                    <TextBlock Text="{Binding [Desc_VacioHistorialTitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppEmptyTitle}" Margin="0,0,0,6"/>
-                    <TextBlock Text="{Binding [Desc_VacioHistorialSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppEmptyText}" MaxWidth="420" TextWrapping="Wrap"/>
+                    <TextBlock Text="{loc:T Desc_VacioHistorialTitulo}" Style="{StaticResource AppEmptyTitle}" Margin="0,0,0,6"/>
+                    <TextBlock Text="{loc:T Desc_VacioHistorialSub}" Style="{StaticResource AppEmptyText}" MaxWidth="420" TextWrapping="Wrap"/>
                 </StackPanel>
 
                 <!-- Sin resultados para el filtro/búsqueda -->
                 <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center"
                             Visibility="{Binding SinResultados, Converter={StaticResource BoolToVis}}">
                     <materialDesign:PackIcon Kind="FileSearchOutline" Width="40" Height="40" Foreground="{DynamicResource Brush.TextTertiary}" HorizontalAlignment="Center" Margin="0,0,0,10"/>
-                    <TextBlock Text="{Binding [Desc_SinResultados], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppEmptyText}"/>
+                    <TextBlock Text="{loc:T Desc_SinResultados}" Style="{StaticResource AppEmptyText}"/>
                 </StackPanel>
             </Grid>
         </Grid>

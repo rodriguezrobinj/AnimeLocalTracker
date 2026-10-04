@@ -133,10 +133,7 @@ public sealed partial class AdivinaOpEdViewModel : MinijuegoViewModelBase, IDisp
     {
         try
         {
-            var config = _settings?.ObtenerConfiguracion();
-            if (config == null) return;
-            config.VolumenMusica = Math.Clamp(valor, 0, 1);
-            await _settings!.GuardarConfiguracionAsync(config);
+            if (_settings != null) await _settings.ActualizarAsync(c => c.VolumenMusica = Math.Clamp(valor, 0, 1));
         }
         catch (Exception ex)
         {

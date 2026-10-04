@@ -33,8 +33,8 @@
                     <materialDesign:PackIcon Kind="NewReleases" Foreground="{StaticResource Brush.Accent}" Width="26" Height="26" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
                 <StackPanel VerticalAlignment="Center">
-                    <TextBlock Text="{Binding [Act_Titulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.PageTitle}"/>
-                    <TextBlock Text="{Binding [Act_Subtitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="12" Foreground="{StaticResource Brush.TextSecondary}" Margin="0,3,0,0"/>
+                    <TextBlock Text="{loc:T Act_Titulo}" Style="{StaticResource AppText.PageTitle}"/>
+                    <TextBlock Text="{loc:T Act_Subtitulo}" FontSize="12" Foreground="{StaticResource Brush.TextSecondary}" Margin="0,3,0,0"/>
                 </StackPanel>
             </StackPanel>
 
@@ -67,8 +67,8 @@
                         Style="{StaticResource MaterialDesignOutlinedButton}" Padding="0"
                         Foreground="{DynamicResource Brush.TextPrimary}" BorderBrush="{DynamicResource Brush.BorderStrong}"
                         materialDesign:ButtonAssist.CornerRadius="10"
-                        ToolTip="{Binding [Act_BotonActualizar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                        AutomationProperties.Name="{Binding [Act_BotonActualizar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                        ToolTip="{loc:T Act_BotonActualizar}"
+                        AutomationProperties.Name="{loc:T Act_BotonActualizar}">
                     <materialDesign:PackIcon Kind="Refresh" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Button>
             </StackPanel>
@@ -86,7 +86,7 @@
                     </Border>
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="{Binding TotalNuevos}" FontSize="24" FontWeight="Bold" Foreground="White"/>
-                        <TextBlock Text="{Binding [Act_Resumen_Nuevos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="11.5" Foreground="{StaticResource Brush.TextTertiary}"/>
+                        <TextBlock Text="{loc:T Act_Resumen_Nuevos}" FontSize="11.5" Foreground="{StaticResource Brush.TextTertiary}"/>
                     </StackPanel>
                 </StackPanel>
             </Border>
@@ -99,7 +99,7 @@
                     </Border>
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="{Binding TotalPorDescargar}" FontSize="24" FontWeight="Bold" Foreground="White"/>
-                        <TextBlock Text="{Binding [Act_Resumen_PorDescargar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="11.5" Foreground="{StaticResource Brush.TextTertiary}"/>
+                        <TextBlock Text="{loc:T Act_Resumen_PorDescargar}" FontSize="11.5" Foreground="{StaticResource Brush.TextTertiary}"/>
                     </StackPanel>
                 </StackPanel>
             </Border>
@@ -112,7 +112,7 @@
                     </Border>
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="{Binding TotalListos}" FontSize="24" FontWeight="Bold" Foreground="White"/>
-                        <TextBlock Text="{Binding [Act_Resumen_Listos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="11.5" Foreground="{StaticResource Brush.TextTertiary}"/>
+                        <TextBlock Text="{loc:T Act_Resumen_Listos}" FontSize="11.5" Foreground="{StaticResource Brush.TextTertiary}"/>
                     </StackPanel>
                 </StackPanel>
             </Border>
@@ -147,15 +147,15 @@
                 <Border Background="{StaticResource Brush.Surface3}" CornerRadius="36" Width="72" Height="72" Margin="0,0,0,16" HorizontalAlignment="Center">
                     <materialDesign:PackIcon Kind="NewReleases" Foreground="{StaticResource Brush.IconMuted}" Width="36" Height="36" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
-                <TextBlock Text="{Binding [Act_VacioTitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppEmptyTitle}"/>
-                <TextBlock Text="{Binding [Act_VacioSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppEmptyText}" Margin="0,6,0,0"/>
+                <TextBlock Text="{loc:T Act_VacioTitulo}" Style="{StaticResource AppEmptyTitle}"/>
+                <TextBlock Text="{loc:T Act_VacioSub}" Style="{StaticResource AppEmptyText}" Margin="0,6,0,0"/>
             </StackPanel>
 
             <!-- SIN RESULTADOS CON EL FILTRO ACTUAL -->
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,40,0,40"
                         Visibility="{Binding SinResultados, Converter={StaticResource BoolToVis}}">
                 <materialDesign:PackIcon Kind="FilterVariant" Foreground="{StaticResource Brush.IconMuted}" Width="48" Height="48" HorizontalAlignment="Center" Margin="0,0,0,12"/>
-                <TextBlock Text="{Binding [Act_SinResultados], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppEmptyText}" FontSize="15" HorizontalAlignment="Center"/>
+                <TextBlock Text="{loc:T Act_SinResultados}" Style="{StaticResource AppEmptyText}" FontSize="15" HorizontalAlignment="Center"/>
             </StackPanel>
 
             <!-- LISTA VIRTUALIZADA CON CABECERAS DE FECHA -->
@@ -199,8 +199,8 @@
                                         CommandParameter="{Binding}"
                                         Width="66" Height="94" MinHeight="94"
                                         Background="Transparent" BorderThickness="0" Padding="0" Margin="0"
-                                        Cursor="Hand" ToolTip="{Binding [Act_VerAnime], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                        AutomationProperties.Name="{Binding [Act_VerAnime], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                        Cursor="Hand" ToolTip="{loc:T Act_VerAnime}"
+                                        AutomationProperties.Name="{loc:T Act_VerAnime}"
                                         VerticalAlignment="Center">
                                     <Border x:Name="Portada" Width="66" Height="94" CornerRadius="10" ClipToBounds="True" Background="{StaticResource Brush.Surface3}">
                                         <Grid>
@@ -222,7 +222,7 @@
                                             CommandParameter="{Binding}"
                                             Background="Transparent" BorderThickness="0" Padding="0" Margin="0"
                                             Cursor="Hand" HorizontalAlignment="Left" HorizontalContentAlignment="Left"
-                                            ToolTip="{Binding [Act_VerAnime], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                            ToolTip="{loc:T Act_VerAnime}">
                                         <TextBlock Text="{Binding TituloAnime}" FontWeight="Bold" FontSize="15" Foreground="{StaticResource Brush.TextPrimary}"
                                                    TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"/>
                                     </Button>

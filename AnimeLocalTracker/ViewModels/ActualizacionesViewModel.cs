@@ -647,17 +647,7 @@ public partial class ActualizacionesViewModel : ObservableObject, IDisposable,
         else _ = CargarActualizacionesAsync();
     }
 
-    public void Receive(IdiomaCambiadoMensaje message)
-    {
-        var dispatcher = System.Windows.Application.Current?.Dispatcher;
-        if (dispatcher != null && !dispatcher.CheckAccess())
-        {
-            dispatcher.Invoke(RefrescarTextos);
-            return;
-        }
-
-        RefrescarTextos();
-    }
+    public void Receive(IdiomaCambiadoMensaje message) => Core.HiloUi.Ejecutar(RefrescarTextos);
 
     private void RefrescarTextos()
     {

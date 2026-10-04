@@ -120,17 +120,8 @@ public partial class LogrosViewModel : ObservableObject, IRecipient<IdiomaCambia
         AplicarFiltros();
     }
 
-    public void Receive(IdiomaCambiadoMensaje message)
-    {
-        // Los textos de tarjetas, chips y resumen se construyen con LocalizationService.T(): rehacerlos.
-        var dispatcher = System.Windows.Application.Current?.Dispatcher;
-        if (dispatcher != null && !dispatcher.CheckAccess())
-        {
-            dispatcher.Invoke(Reconstruir);
-            return;
-        }
-        Reconstruir();
-    }
+    // Los textos de tarjetas, chips y resumen se construyen con LocalizationService.T(): rehacerlos.
+    public void Receive(IdiomaCambiadoMensaje message) => Core.HiloUi.Ejecutar(Reconstruir);
 
     private void Reconstruir()
     {

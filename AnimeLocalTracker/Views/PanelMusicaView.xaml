@@ -87,8 +87,8 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <StackPanel Grid.Column="0">
-                <TextBlock Text="{Binding [Det_MusicaPanelTitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontWeight="Bold" FontSize="14" Foreground="White"/>
-                <TextBlock Text="{Binding [Det_MusicaPanelSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="11" Foreground="{StaticResource Brush.TextTertiary}" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                <TextBlock Text="{loc:T Det_MusicaPanelTitulo}" FontWeight="Bold" FontSize="14" Foreground="White"/>
+                <TextBlock Text="{loc:T Det_MusicaPanelSub}" FontSize="11" Foreground="{StaticResource Brush.TextTertiary}" TextWrapping="Wrap" Margin="0,2,0,0"/>
                 <!-- Enlaces externos (AniPlaylist: Spotify, Apple Music y Deezer); cada fuente es un proveedor registrado en DI -->
                 <ItemsControl ItemsSource="{Binding EnlacesMusica}" Margin="0,8,0,0" Focusable="False">
                     <ItemsControl.ItemsPanel>
@@ -108,7 +108,7 @@
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                     <materialDesign:PackIcon Kind="OpenInNew" Width="13" Height="13" Foreground="{StaticResource Brush.Music}" VerticalAlignment="Center" Margin="0,0,5,0"/>
                                     <TextBlock FontSize="11" Foreground="{StaticResource Brush.MusicSoft}" FontWeight="SemiBold" VerticalAlignment="Center">
-                                        <Run Text="{Binding [Det_MusicaVerEn], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                        <Run Text="{loc:T Det_MusicaVerEn}"/>
                                         <Run Text="{Binding Nombre, Mode=OneWay}"/>
                                     </TextBlock>
                                 </StackPanel>
@@ -122,14 +122,14 @@
                 <materialDesign:PackIcon Kind="VolumeHigh" Width="16" Height="16" Foreground="{StaticResource Brush.TextTertiary}" VerticalAlignment="Center" Margin="0,0,6,0"/>
                 <Slider Style="{StaticResource MusicaSlider}" Minimum="0" Maximum="1" Value="{Binding VolumenMusica, Mode=TwoWay}" Width="90" VerticalAlignment="Center"
                         SmallChange="0.05" LargeChange="0.2" Foreground="{StaticResource Brush.Music}"
-                        ToolTip="{Binding [Det_MusicaVolumen], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                        AutomationProperties.Name="{Binding [Det_MusicaVolumen], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                        ToolTip="{loc:T Det_MusicaVolumen}"
+                        AutomationProperties.Name="{loc:T Det_MusicaVolumen}"/>
             </StackPanel>
             <!-- Reproducción continua: al terminar un tema pasa al siguiente que se pueda escuchar -->
             <Button Grid.Column="2" Command="{Binding AlternarReproduccionContinuaMusicaCommand}" Style="{StaticResource MaterialDesignToolButton}"
                     Width="28" Height="28" VerticalAlignment="Top" Cursor="Hand"
-                    ToolTip="{Binding [Det_MusicaContinuaTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                    AutomationProperties.Name="{Binding [Det_MusicaContinua], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                    ToolTip="{loc:T Det_MusicaContinuaTip}"
+                    AutomationProperties.Name="{loc:T Det_MusicaContinua}">
                 <materialDesign:PackIcon Kind="PlaylistPlay" Width="18" Height="18">
                     <materialDesign:PackIcon.Style>
                         <Style TargetType="materialDesign:PackIcon">
@@ -146,8 +146,8 @@
             <!-- Seguir sonando fuera de la ficha (el mismo ajuste que en Configuración) -->
             <Button Grid.Column="3" Command="{Binding AlternarSeguirFueraDeLaFichaCommand}" Style="{StaticResource MaterialDesignToolButton}"
                     Width="28" Height="28" VerticalAlignment="Top" Cursor="Hand"
-                    ToolTip="{Binding [Det_MusicaSeguirFueraTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                    AutomationProperties.Name="{Binding [Det_MusicaSeguirFuera], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                    ToolTip="{loc:T Det_MusicaSeguirFueraTip}"
+                    AutomationProperties.Name="{loc:T Det_MusicaSeguirFuera}">
                 <materialDesign:PackIcon Width="17" Height="17">
                     <materialDesign:PackIcon.Style>
                         <Style TargetType="materialDesign:PackIcon">
@@ -164,7 +164,7 @@
                 </materialDesign:PackIcon>
             </Button>
             <Button Grid.Column="4" Command="{Binding ToggleMusicaCommand}" Style="{StaticResource MaterialDesignToolButton}" Width="28" Height="28" VerticalAlignment="Top"
-                    AutomationProperties.Name="{Binding [Det_MusicaCerrarPanel], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                    AutomationProperties.Name="{loc:T Det_MusicaCerrarPanel}">
                 <materialDesign:PackIcon Kind="Close" Width="16" Height="16" Foreground="{StaticResource Brush.TextTertiary}"/>
             </Button>
         </Grid>
@@ -179,22 +179,22 @@
                         <TextBlock FontSize="11" Foreground="{StaticResource Brush.TextTertiary}" VerticalAlignment="Center" Margin="0,0,10,0"
                                    Visibility="{Binding TieneTemasMusicales, Converter={StaticResource BoolToVis}}">
                             <Run Text="{Binding TemasGuardados, Mode=OneWay}" Foreground="{StaticResource Brush.MusicSoft}" FontWeight="SemiBold"/><Run Text=" / "/><Run Text="{Binding TotalTemas, Mode=OneWay}"/>
-                            <Run Text="{Binding [Det_MusicaGuardados], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                            <Run Text="{loc:T Det_MusicaGuardados}"/>
                         </TextBlock>
                         <Button Command="{Binding DescargarTodosCommand}" Style="{StaticResource DetChipButton}" Margin="0,0,6,0" Cursor="Hand"
                                 IsEnabled="{Binding HayConexion}"
                                 Visibility="{Binding MostrarProgresoDescargaTodos, Converter={StaticResource InverseBoolToVis}}"
-                                ToolTip="{Binding [Det_MusicaDescargarTodosTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                AutomationProperties.Name="{Binding [Det_MusicaDescargarTodos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                ToolTip="{loc:T Det_MusicaDescargarTodosTip}"
+                                AutomationProperties.Name="{loc:T Det_MusicaDescargarTodos}">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="DownloadMultiple" Width="14" Height="14" Foreground="{StaticResource Brush.Accent}" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                                <TextBlock Text="{Binding [Det_MusicaDescargarTodos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource Brush.AccentSoft}" VerticalAlignment="Center"/>
+                                <TextBlock Text="{loc:T Det_MusicaDescargarTodos}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource Brush.AccentSoft}" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
                         <Button Command="{Binding DescargarTodosCommand}" Style="{StaticResource DetChipButton}" Margin="0,0,6,0" Cursor="Hand"
                                 Visibility="{Binding MostrarProgresoDescargaTodos, Converter={StaticResource BoolToVis}}"
-                                ToolTip="{Binding [Det_MusicaDescargarTodosCancelar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                AutomationProperties.Name="{Binding [Det_MusicaDescargarTodosCancelar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                ToolTip="{loc:T Det_MusicaDescargarTodosCancelar}"
+                                AutomationProperties.Name="{loc:T Det_MusicaDescargarTodosCancelar}">
                             <StackPanel Orientation="Horizontal">
                                 <ProgressBar Style="{StaticResource MaterialDesignCircularProgressBar}" IsIndeterminate="True" Width="13" Height="13" Foreground="{StaticResource Brush.Accent}" Margin="0,0,6,0"/>
                                 <TextBlock Text="{Binding ProgresoDescargaTodosTexto}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource Brush.AccentSoft}" VerticalAlignment="Center"/>
@@ -202,26 +202,26 @@
                             </StackPanel>
                         </Button>
                         <Button Command="{Binding AbrirCarpetaMusicaCommand}" Style="{StaticResource MaterialDesignToolButton}" Width="28" Height="28" Cursor="Hand"
-                                ToolTip="{Binding [Det_MusicaAbrirCarpeta], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                AutomationProperties.Name="{Binding [Det_MusicaAbrirCarpeta], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                ToolTip="{loc:T Det_MusicaAbrirCarpeta}"
+                                AutomationProperties.Name="{loc:T Det_MusicaAbrirCarpeta}">
                             <materialDesign:PackIcon Kind="FolderMusicOutline" Width="17" Height="17" Foreground="{StaticResource Brush.TextTertiary}"/>
                         </Button>
                     </StackPanel>
                 <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center"
                             Visibility="{Binding MostrarFiltroTemasMusicales, Converter={StaticResource BoolToVis}}">
-                    <RadioButton Content="{Binding [Filtro_Todos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Margin="0,0,6,0"
+                    <RadioButton Content="{loc:T Filtro_Todos}" Margin="0,0,6,0"
                                  IsChecked="{Binding EsFiltroTemasTodos, Mode=OneWay}" GroupName="FiltroTemasMusicales"
                                  Command="{Binding CambiarFiltroTemasCommand}" CommandParameter="Todos"
                                  Style="{StaticResource MaterialDesignTabRadioButton}" BorderBrush="{StaticResource Brush.Music}" Height="28" Padding="12,0" FontSize="11.5" FontWeight="SemiBold"/>
-                    <RadioButton Content="{Binding [Det_MusicaFiltroOpenings], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Margin="0,0,6,0"
+                    <RadioButton Content="{loc:T Det_MusicaFiltroOpenings}" Margin="0,0,6,0"
                                  IsChecked="{Binding EsFiltroTemasOpenings, Mode=OneWay}" GroupName="FiltroTemasMusicales"
                                  Command="{Binding CambiarFiltroTemasCommand}" CommandParameter="Openings"
                                  Style="{StaticResource MaterialDesignTabRadioButton}" BorderBrush="{StaticResource Brush.Music}" Height="28" Padding="12,0" FontSize="11.5" FontWeight="SemiBold"/>
-                    <RadioButton Content="{Binding [Det_MusicaFiltroEndings], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                    <RadioButton Content="{loc:T Det_MusicaFiltroEndings}"
                                  IsChecked="{Binding EsFiltroTemasEndings, Mode=OneWay}" GroupName="FiltroTemasMusicales"
                                  Command="{Binding CambiarFiltroTemasCommand}" CommandParameter="Endings" Margin="0,0,6,0"
                                  Style="{StaticResource MaterialDesignTabRadioButton}" BorderBrush="{StaticResource Brush.Music}" Height="28" Padding="12,0" FontSize="11.5" FontWeight="SemiBold"/>
-                    <RadioButton Content="{Binding [Det_MusicaFiltroGuardados], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                    <RadioButton Content="{loc:T Det_MusicaFiltroGuardados}"
                                  IsChecked="{Binding EsFiltroTemasGuardados, Mode=OneWay}" GroupName="FiltroTemasMusicales"
                                  Command="{Binding CambiarFiltroTemasCommand}" CommandParameter="Guardados"
                                  Style="{StaticResource MaterialDesignTabRadioButton}" BorderBrush="{StaticResource Brush.Music}" Height="28" Padding="12,0" FontSize="11.5" FontWeight="SemiBold"/>
@@ -235,7 +235,7 @@
                         Visibility="{Binding SinConexion, Converter={StaticResource BoolToVis}}">
                     <StackPanel Orientation="Horizontal">
                         <materialDesign:PackIcon Kind="WifiOff" Width="15" Height="15" Foreground="{StaticResource Brush.Warning}" VerticalAlignment="Top" Margin="0,1,8,0"/>
-                        <TextBlock Text="{Binding [Det_MusicaSinConexion], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="11.5" Foreground="{StaticResource Brush.WarningSoft}" TextWrapping="Wrap" MaxWidth="600"/>
+                        <TextBlock Text="{loc:T Det_MusicaSinConexion}" FontSize="11.5" Foreground="{StaticResource Brush.WarningSoft}" TextWrapping="Wrap" MaxWidth="600"/>
                     </StackPanel>
                 </Border>
 
@@ -253,19 +253,19 @@
                                  BorderThickness="0" Background="Transparent" Padding="0" Foreground="White" FontSize="12" CaretBrush="{StaticResource Brush.Music}"
                                  VerticalAlignment="Center" VerticalContentAlignment="Center"
                                  materialDesign:TextFieldAssist.DecorationVisibility="Hidden"
-                                 materialDesign:HintAssist.Hint="{Binding [Det_MusicaBuscar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                 materialDesign:HintAssist.Hint="{loc:T Det_MusicaBuscar}"
                                  materialDesign:HintAssist.IsFloating="False"
-                                 AutomationProperties.Name="{Binding [Det_MusicaBuscar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                 AutomationProperties.Name="{loc:T Det_MusicaBuscar}"/>
                         <Button Grid.Column="2" Command="{Binding LimpiarBusquedaTemasCommand}" Style="{StaticResource MaterialDesignToolButton}" Width="24" Height="24" Padding="0" Cursor="Hand"
                                 Visibility="{Binding HayBusquedaTemas, Converter={StaticResource BoolToVis}}"
-                                ToolTip="{Binding [Det_MusicaBuscarLimpiar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                AutomationProperties.Name="{Binding [Det_MusicaBuscarLimpiar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                ToolTip="{loc:T Det_MusicaBuscarLimpiar}"
+                                AutomationProperties.Name="{loc:T Det_MusicaBuscarLimpiar}">
                             <materialDesign:PackIcon Kind="Close" Width="14" Height="14" Foreground="{StaticResource Brush.TextTertiary}"/>
                         </Button>
                     </Grid>
                 </Border>
 
-                <TextBlock Grid.Row="4" Text="{Binding [Det_MusicaSinResultados], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="12" Foreground="{StaticResource Brush.TextTertiary}"
+                <TextBlock Grid.Row="4" Text="{loc:T Det_MusicaSinResultados}" FontSize="12" Foreground="{StaticResource Brush.TextTertiary}"
                            HorizontalAlignment="Center" Margin="0,18,0,18"
                            Visibility="{Binding SinResultadosDeTemas, Converter={StaticResource BoolToVis}}"/>
 
@@ -309,8 +309,8 @@
                                             <Button DockPanel.Dock="Left" Command="{Binding DataContext.RevelarSpoilerTemaCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}"
                                                     Style="{StaticResource MaterialDesignToolButton}" Width="22" Height="22" Padding="0" Margin="0,0,4,0" Cursor="Hand" VerticalAlignment="Center"
                                                     Visibility="{Binding OcultoPorSpoiler, Converter={StaticResource BoolToVis}}"
-                                                    ToolTip="{Binding [Det_MusicaSpoilerMostrar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                                    AutomationProperties.Name="{Binding [Det_MusicaSpoilerMostrar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                                    ToolTip="{loc:T Det_MusicaSpoilerMostrar}"
+                                                    AutomationProperties.Name="{loc:T Det_MusicaSpoilerMostrar}">
                                                 <materialDesign:PackIcon Kind="EyeOutline" Width="15" Height="15" Foreground="{StaticResource Brush.Warning}"/>
                                             </Button>
                                             <TextBlock Text="{Binding TituloVisible}" FontWeight="SemiBold" FontSize="12.5" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
@@ -339,7 +339,7 @@
                                             <!-- Solo escuchable: aún no está guardado en la carpeta de música -->
                                             <Border Background="{StaticResource Brush.WarningTint}" CornerRadius="6" Padding="6,1" Margin="0,0,8,0" VerticalAlignment="Center"
                                                     Visibility="{Binding EsSoloVistaPrevia, Converter={StaticResource BoolToVis}}">
-                                                <TextBlock Text="{Binding [Det_MusicaEsVistaPrevia], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                <TextBlock Text="{loc:T Det_MusicaEsVistaPrevia}"
                                                            FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource Brush.Warning}"/>
                                             </Border>
                                         </StackPanel>
@@ -349,7 +349,7 @@
                                         <!-- Duración del archivo, leída antes de reproducirlo (solo si ya hay archivo: guardado o vista previa) -->
                                         <StackPanel Orientation="Horizontal" Margin="0,0,10,0" VerticalAlignment="Center"
                                                     Visibility="{Binding TieneDuracionArchivo, Converter={StaticResource BoolToVis}}"
-                                                    ToolTip="{Binding [Det_MusicaDuracion], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                    ToolTip="{loc:T Det_MusicaDuracion}"
                                                     AutomationProperties.Name="{Binding DuracionArchivoTexto}">
                                             <materialDesign:PackIcon Kind="ClockOutline" Width="12" Height="12" Foreground="{StaticResource Brush.TextTertiary}" VerticalAlignment="Center" Margin="0,0,4,0"/>
                                             <TextBlock Text="{Binding DuracionArchivoTexto}" FontSize="10.5" Foreground="{StaticResource Brush.TextTertiary}" VerticalAlignment="Center"/>
@@ -357,7 +357,7 @@
                                         <!-- Peso aproximado antes de descargar (lo da AnimeThemes) -->
                                         <StackPanel Orientation="Horizontal" Margin="0,0,10,0" VerticalAlignment="Center"
                                                     Visibility="{Binding MostrarTamano, Converter={StaticResource BoolToVis}}"
-                                                    ToolTip="{Binding [Det_MusicaTamano], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
+                                                    ToolTip="{loc:T Det_MusicaTamano}"
                                                     AutomationProperties.Name="{Binding TamanoTexto}">
                                             <materialDesign:PackIcon Kind="HarddiskPlus" Width="12" Height="12" Foreground="{StaticResource Brush.TextTertiary}" VerticalAlignment="Center" Margin="0,0,4,0"/>
                                             <TextBlock Text="{Binding TamanoTexto}" FontSize="10.5" Foreground="{StaticResource Brush.TextTertiary}" VerticalAlignment="Center"/>
@@ -371,16 +371,16 @@
                                         <Button Command="{Binding DataContext.PrevisualizarTemaCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}"
                                                 Style="{StaticResource MaterialDesignToolButton}" Width="30" Height="30" Cursor="Hand"
                                                 Visibility="{Binding PuedePrevisualizar, Converter={StaticResource BoolToVis}}"
-                                                ToolTip="{Binding [Det_MusicaPrevisualizar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                                AutomationProperties.Name="{Binding [Det_MusicaPrevisualizar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                                ToolTip="{loc:T Det_MusicaPrevisualizar}"
+                                                AutomationProperties.Name="{loc:T Det_MusicaPrevisualizar}">
                                             <materialDesign:PackIcon Kind="Headphones" Width="18" Height="18" Foreground="{StaticResource Brush.Music}"/>
                                         </Button>
 
                                         <!-- Preparando la vista previa: avance real -->
                                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,4,0"
                                                     Visibility="{Binding PreparandoVistaPrevia, Converter={StaticResource BoolToVis}}"
-                                                    AutomationProperties.Name="{Binding [Det_MusicaPreparando], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                                    ToolTip="{Binding [Det_MusicaPreparando], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                                    AutomationProperties.Name="{loc:T Det_MusicaPreparando}"
+                                                    ToolTip="{loc:T Det_MusicaPreparando}">
                                             <TextBlock Text="{Binding ProgresoPreparacionPorcentaje, StringFormat={}{0:0} %}" FontSize="10.5" Foreground="{StaticResource Brush.TextTertiary}" VerticalAlignment="Center" Margin="0,0,6,0"/>
                                             <ProgressBar Style="{StaticResource MaterialDesignCircularProgressBar}" Minimum="0" Maximum="100"
                                                          Value="{Binding ProgresoPreparacionPorcentaje, Mode=OneWay}" Width="18" Height="18" Foreground="{StaticResource Brush.Music}"/>
@@ -392,16 +392,16 @@
                                                 Visibility="{Binding PuedeDescargar, Converter={StaticResource BoolToVis}}">
                                             <Button.Style>
                                                 <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignToolButton}">
-                                                    <Setter Property="ToolTip" Value="{Binding [Det_MusicaDescargar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
-                                                    <Setter Property="AutomationProperties.Name" Value="{Binding [Det_MusicaDescargar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                                    <Setter Property="ToolTip" Value="{loc:T Det_MusicaDescargar}"/>
+                                                    <Setter Property="AutomationProperties.Name" Value="{loc:T Det_MusicaDescargar}"/>
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding EsSoloVistaPrevia}" Value="True">
-                                                            <Setter Property="ToolTip" Value="{Binding [Det_MusicaGuardar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
-                                                            <Setter Property="AutomationProperties.Name" Value="{Binding [Det_MusicaGuardar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                                            <Setter Property="ToolTip" Value="{loc:T Det_MusicaGuardar}"/>
+                                                            <Setter Property="AutomationProperties.Name" Value="{loc:T Det_MusicaGuardar}"/>
                                                         </DataTrigger>
                                                         <DataTrigger Binding="{Binding EsperandoEnCola}" Value="True">
-                                                            <Setter Property="ToolTip" Value="{Binding [Det_MusicaEnCola], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
-                                                            <Setter Property="AutomationProperties.Name" Value="{Binding [Det_MusicaEnCola], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                                            <Setter Property="ToolTip" Value="{loc:T Det_MusicaEnCola}"/>
+                                                            <Setter Property="AutomationProperties.Name" Value="{loc:T Det_MusicaEnCola}"/>
                                                         </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>
@@ -437,12 +437,12 @@
                                                 Visibility="{Binding PuedeReproducir, Converter={StaticResource BoolToVis}}">
                                             <Button.Style>
                                                 <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignToolButton}">
-                                                    <Setter Property="ToolTip" Value="{Binding [Det_MusicaReproducir], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
-                                                    <Setter Property="AutomationProperties.Name" Value="{Binding [Det_MusicaReproducir], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                                    <Setter Property="ToolTip" Value="{loc:T Det_MusicaReproducir}"/>
+                                                    <Setter Property="AutomationProperties.Name" Value="{loc:T Det_MusicaReproducir}"/>
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding Reproduciendo}" Value="True">
-                                                            <Setter Property="ToolTip" Value="{Binding [Det_MusicaPausar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
-                                                            <Setter Property="AutomationProperties.Name" Value="{Binding [Det_MusicaPausar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                                            <Setter Property="ToolTip" Value="{loc:T Det_MusicaPausar}"/>
+                                                            <Setter Property="AutomationProperties.Name" Value="{loc:T Det_MusicaPausar}"/>
                                                         </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>
@@ -464,8 +464,8 @@
                                         <Button Command="{Binding DataContext.EliminarTemaCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}"
                                                 Style="{StaticResource MaterialDesignToolButton}" Width="30" Height="30" Cursor="Hand"
                                                 Visibility="{Binding Descargado, Converter={StaticResource BoolToVis}}"
-                                                ToolTip="{Binding [Det_MusicaEliminar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                                AutomationProperties.Name="{Binding [Det_MusicaEliminar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                                ToolTip="{loc:T Det_MusicaEliminar}"
+                                                AutomationProperties.Name="{loc:T Det_MusicaEliminar}">
                                             <materialDesign:PackIcon Kind="TrashCanOutline" Width="16" Height="16" Foreground="{StaticResource Brush.Danger}"/>
                                         </Button>
                                     </StackPanel>
@@ -484,7 +484,7 @@
                                             SmallChange="2" LargeChange="10"
                                             ValueChanged="BarraTema_ValueChanged"
                                             Thumb.DragStarted="BarraTema_DragStarted" Thumb.DragCompleted="BarraTema_DragCompleted"
-                                            AutomationProperties.Name="{Binding [Det_MusicaBarra], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                            AutomationProperties.Name="{loc:T Det_MusicaBarra}"/>
                                     <TextBlock Grid.Column="2" Text="{Binding DuracionTexto}" FontSize="10.5" Foreground="{StaticResource Brush.TextTertiary}" VerticalAlignment="Center" MinWidth="34" TextAlignment="Right"/>
                                 </Grid>
                             </Grid>
@@ -509,15 +509,15 @@
                         <!-- El título lleva la lista hasta la fila del tema -->
                         <Button Grid.Column="1" Command="{Binding MostrarTemaActualCommand}" Cursor="Hand" Background="Transparent" BorderThickness="0"
                                 HorizontalAlignment="Left" Padding="0" FocusVisualStyle="{x:Null}"
-                                ToolTip="{Binding [Det_MusicaIrAlTema], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                AutomationProperties.Name="{Binding [Det_MusicaSonandoAhora], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                ToolTip="{loc:T Det_MusicaIrAlTema}"
+                                AutomationProperties.Name="{loc:T Det_MusicaSonandoAhora}">
                             <Button.Template>
                                 <ControlTemplate TargetType="Button">
                                     <Border Background="Transparent"><ContentPresenter/></Border>
                                 </ControlTemplate>
                             </Button.Template>
                             <StackPanel>
-                                <TextBlock Text="{Binding [Det_MusicaSonandoAhora], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="9.5" Foreground="{StaticResource Brush.TextTertiary}"/>
+                                <TextBlock Text="{loc:T Det_MusicaSonandoAhora}" FontSize="9.5" Foreground="{StaticResource Brush.TextTertiary}"/>
                                 <TextBlock Text="{Binding TemaActual.TituloVisible}" FontSize="12.5" FontWeight="SemiBold" Foreground="White" TextTrimming="CharacterEllipsis"/>
                             </StackPanel>
                         </Button>
@@ -526,8 +526,8 @@
                         </TextBlock>
                         <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
                         <Button Command="{Binding AlternarAleatorioMusicaCommand}" Style="{StaticResource MaterialDesignToolButton}" Width="30" Height="30" Padding="0" Cursor="Hand"
-                                ToolTip="{Binding [Det_MusicaAleatorioTip], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                AutomationProperties.Name="{Binding [Det_MusicaAleatorio], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                ToolTip="{loc:T Det_MusicaAleatorioTip}"
+                                AutomationProperties.Name="{loc:T Det_MusicaAleatorio}">
                             <materialDesign:PackIcon Kind="ShuffleVariant" Width="17" Height="17">
                                 <materialDesign:PackIcon.Style>
                                     <Style TargetType="materialDesign:PackIcon">
@@ -542,19 +542,19 @@
                             </materialDesign:PackIcon>
                         </Button>
                         <Button Command="{Binding TemaAnteriorCommand}" Style="{StaticResource MaterialDesignToolButton}" Width="30" Height="30" Padding="0" Cursor="Hand"
-                                ToolTip="{Binding [Det_MusicaAnterior], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                AutomationProperties.Name="{Binding [Det_MusicaAnterior], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                ToolTip="{loc:T Det_MusicaAnterior}"
+                                AutomationProperties.Name="{loc:T Det_MusicaAnterior}">
                             <materialDesign:PackIcon Kind="SkipPrevious" Width="19" Height="19" Foreground="{StaticResource Brush.TextPrimary}"/>
                         </Button>
                         <Button Command="{Binding AlternarTemaActualCommand}" Width="34" Height="34" Padding="0" Cursor="Hand">
                             <Button.Style>
                                 <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignToolButton}">
-                                    <Setter Property="ToolTip" Value="{Binding [Det_MusicaReproducir], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
-                                    <Setter Property="AutomationProperties.Name" Value="{Binding [Det_MusicaReproducir], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                    <Setter Property="ToolTip" Value="{loc:T Det_MusicaReproducir}"/>
+                                    <Setter Property="AutomationProperties.Name" Value="{loc:T Det_MusicaReproducir}"/>
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding MusicaSonando}" Value="True">
-                                            <Setter Property="ToolTip" Value="{Binding [Det_MusicaPausar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
-                                            <Setter Property="AutomationProperties.Name" Value="{Binding [Det_MusicaPausar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"/>
+                                            <Setter Property="ToolTip" Value="{loc:T Det_MusicaPausar}"/>
+                                            <Setter Property="AutomationProperties.Name" Value="{loc:T Det_MusicaPausar}"/>
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
@@ -573,13 +573,13 @@
                             </materialDesign:PackIcon>
                         </Button>
                         <Button Command="{Binding TemaSiguienteCommand}" Style="{StaticResource MaterialDesignToolButton}" Width="30" Height="30" Padding="0" Cursor="Hand"
-                                ToolTip="{Binding [Det_MusicaSiguiente], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                AutomationProperties.Name="{Binding [Det_MusicaSiguiente], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                ToolTip="{loc:T Det_MusicaSiguiente}"
+                                AutomationProperties.Name="{loc:T Det_MusicaSiguiente}">
                             <materialDesign:PackIcon Kind="SkipNext" Width="19" Height="19" Foreground="{StaticResource Brush.TextPrimary}"/>
                         </Button>
                         <Button Command="{Binding AlternarRepetirMusicaCommand}" Style="{StaticResource MaterialDesignToolButton}" Width="30" Height="30" Padding="0" Cursor="Hand"
-                                ToolTip="{Binding [Det_MusicaRepetir], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                AutomationProperties.Name="{Binding [Det_MusicaRepetir], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
+                                ToolTip="{loc:T Det_MusicaRepetir}"
+                                AutomationProperties.Name="{loc:T Det_MusicaRepetir}">
                             <materialDesign:PackIcon Kind="RepeatOnce" Width="17" Height="17">
                                 <materialDesign:PackIcon.Style>
                                     <Style TargetType="materialDesign:PackIcon">

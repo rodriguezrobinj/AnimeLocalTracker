@@ -768,11 +768,11 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             try
             {
                 await Task.Delay(500, cts.Token);
-                var config = _settingsService.ObtenerConfiguracion();
-                if (config == null) return;
-                config.EcualizadorActivo = activo;
-                config.EcualizadorGanancias = ganancias;
-                await _settingsService.GuardarConfiguracionAsync(config);
+                await _settingsService.ActualizarAsync(c =>
+                {
+                    c.EcualizadorActivo = activo;
+                    c.EcualizadorGanancias = ganancias;
+                });
             }
             catch (OperationCanceledException) { }
             catch (Exception ex) { AppLogger.Debug("ReproductorViewModel", $"No se pudo guardar el ecualizador: {ex.Message}"); }
@@ -1453,7 +1453,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             return new OpcionPistaAudio(st, OpcionPistaAudio.ConstruirNombre(idioma, st.Title, i + 1), idioma, st.StreamIndex == actual);
         }).ToList();
 
-        EnHiloDeInterfaz(() =>
+        Core.HiloUi.Ejecutar(() =>
         {
             PistasAudio.Clear();
             foreach (var o in opciones) PistasAudio.Add(o);
@@ -1475,7 +1475,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     {
         if (Player == null || opcion.Pista is not FlyleafLib.MediaFramework.MediaStream.AudioStream pista) return;
 
-        EnHiloDeInterfaz(() => { foreach (var o in PistasAudio) o.EsActual = ReferenceEquals(o, opcion) || o.Pista == opcion.Pista; });
+        Core.HiloUi.Ejecutar(() => { foreach (var o in PistasAudio) o.EsActual = ReferenceEquals(o, opcion) || o.Pista == opcion.Pista; });
 
         if (recordar && !string.IsNullOrWhiteSpace(opcion.Idioma) && _settingsService?.ObtenerConfiguracion() is { } config
             && !string.Equals(config.IdiomaAudioPreferido, opcion.Idioma, StringComparison.OrdinalIgnoreCase))
@@ -1494,13 +1494,6 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             _cambiandoPistaAudio = false;
             AppLogger.Warn("ReproductorViewModel", $"No se pudo cambiar la pista de audio: {ex.Message}");
         }
-    }
-
-    private static void EnHiloDeInterfaz(Action accion)
-    {
-        var dispatcher = System.Windows.Application.Current?.Dispatcher;
-        if (dispatcher == null || dispatcher.CheckAccess()) accion();
-        else dispatcher.InvokeAsync(accion);
     }
 
     [RelayCommand]

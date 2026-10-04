@@ -84,6 +84,14 @@
             <!--  SISTEMA DE DISEÑO (tokens canónicos = paleta de DetalleView)  -->
             <!--  Superficies slate-oscuro, acento azul, texto en 3 jerarquías.  -->
             <!-- ═══════════════════════════════════════════════════════════════ -->
+            <!-- Animaciones con nombre: una sola duración y una sola curva por tipo de gesto, para que toda la app se mueva igual.
+                 Rápida = respuesta a pasar el ratón o pulsar; Normal = aparecer/desaparecer un panel. -->
+            <Duration x:Key="Anim.Rapida">0:0:0.12</Duration>
+            <Duration x:Key="Anim.Normal">0:0:0.2</Duration>
+            <CubicEase x:Key="Anim.Suave" EasingMode="EaseOut"/>
+            <CubicEase x:Key="Anim.SuaveEntrada" EasingMode="EaseIn"/>
+            <QuarticEase x:Key="Anim.SuaveFuerte" EasingMode="EaseOut"/>
+
             <SolidColorBrush x:Key="Brush.Surface1" Color="#14181E" />       <!-- tarjetas -->
             <SolidColorBrush x:Key="Brush.Surface2" Color="#161B22" />       <!-- paneles elevados -->
             <SolidColorBrush x:Key="Brush.Surface3" Color="#1E293B" />       <!-- chips / hover con acento -->
@@ -224,16 +232,8 @@
                         <Trigger.EnterActions>
                             <BeginStoryboard>
                                 <Storyboard>
-                                    <DoubleAnimation Storyboard.TargetProperty="Opacity" From="0" To="1" Duration="0:0:0.2">
-                                        <DoubleAnimation.EasingFunction>
-                                            <QuarticEase EasingMode="EaseOut"/>
-                                        </DoubleAnimation.EasingFunction>
-                                    </DoubleAnimation>
-                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)" From="25" To="0" Duration="0:0:0.2">
-                                        <DoubleAnimation.EasingFunction>
-                                            <QuarticEase EasingMode="EaseOut"/>
-                                        </DoubleAnimation.EasingFunction>
-                                    </DoubleAnimation>
+                                    <DoubleAnimation Storyboard.TargetProperty="Opacity" From="0" To="1" Duration="{StaticResource Anim.Normal}" EasingFunction="{StaticResource Anim.SuaveFuerte}"/>
+                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)" From="25" To="0" Duration="{StaticResource Anim.Normal}" EasingFunction="{StaticResource Anim.SuaveFuerte}"/>
                                 </Storyboard>
                             </BeginStoryboard>
                         </Trigger.EnterActions>
@@ -302,17 +302,9 @@
                         <Trigger.EnterActions>
                             <BeginStoryboard>
                                 <Storyboard>
-                                    <DoubleAnimation Storyboard.TargetProperty="Opacity" From="0" To="1" Duration="0:0:0.2"/>
-                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" From="0.94" To="1" Duration="0:0:0.22">
-                                        <DoubleAnimation.EasingFunction>
-                                            <CubicEase EasingMode="EaseOut"/>
-                                        </DoubleAnimation.EasingFunction>
-                                    </DoubleAnimation>
-                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" From="0.94" To="1" Duration="0:0:0.22">
-                                        <DoubleAnimation.EasingFunction>
-                                            <CubicEase EasingMode="EaseOut"/>
-                                        </DoubleAnimation.EasingFunction>
-                                    </DoubleAnimation>
+                                    <DoubleAnimation Storyboard.TargetProperty="Opacity" From="0" To="1" Duration="{StaticResource Anim.Normal}"/>
+                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" From="0.94" To="1" Duration="0:0:0.22" EasingFunction="{StaticResource Anim.Suave}"/>
+                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" From="0.94" To="1" Duration="0:0:0.22" EasingFunction="{StaticResource Anim.Suave}"/>
                                 </Storyboard>
                             </BeginStoryboard>
                         </Trigger.EnterActions>
