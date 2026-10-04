@@ -285,6 +285,7 @@ public partial class App : Application
         services.AddSingleton<IPlaybackWindowModeCoordinator, PlaybackWindowModeCoordinator>();
         services.AddSingleton<ISubtitleCoordinator, SubtitleCoordinator>();
         services.AddSingleton<ISubtitleCuesExtractorService, SubtitleCuesExtractorService>();
+        services.AddTransient<ISubtitleAssRenderer, SubtitleAssRenderer>(); // uno por reproductor: cada ViewModel cierra el suyo
         services.AddSingleton<IPlaybackVolumeCoordinator, PlaybackVolumeCoordinator>();
 
         // Fase 3 del refactor: coalescing de seek — sí tiene estado por sesión de reproducción
