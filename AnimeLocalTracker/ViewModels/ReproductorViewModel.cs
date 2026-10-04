@@ -30,6 +30,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     private readonly IPlaybackWindowModeCoordinator _windowModeCoordinator;
     private readonly ISubtitleCoordinator _subtitleCoordinator;
     private readonly ISubtitleCuesExtractorService _subtitleCuesExtractor;
+    private readonly ISubtitleAssRenderer _assRenderer;
     private readonly IPlaybackVolumeCoordinator _volumeCoordinator;
     private readonly IPlaybackSeekCoordinator _seekCoordinator;
     private readonly IFotogramasClaveService _fotogramasClaveService;
@@ -317,6 +318,10 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         _subtitleCues = Array.Empty<Models.SubtitleCue>();
         SubtituloLineaAbajo = string.Empty;
         SubtituloLineaArriba = string.Empty;
+
+        _pistaTextoActual = null;
+        PistaActualEsAss = false;
+        CerrarDibujoAss();
     }
 
     /// <summary>
@@ -333,6 +338,11 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         {
             _subtitleCoordinator.Deshabilitar(Player); // por si Flyleaf tenía abierta otra pista (de imagen)
             IniciarCargaCuesSubtitulos(_rutaVideo, texto.StreamIndex, null, texto);
+
+            // Si además es ASS/SSA se prepara el dibujo con su estilo original; mientras tanto (y si falla) se ve el texto plano.
+            _pistaTextoActual = texto;
+            PistaActualEsAss = texto.CodecID is Flyleaf.FFmpeg.AVCodecID.Ass or Flyleaf.FFmpeg.AVCodecID.Ssa;
+            IniciarDibujoAssSiCorresponde();
             return;
         }
 
@@ -416,6 +426,139 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         var (abajo, arriba) = Core.SubtitulosSolapadosResolver.Resolver(_subtitleCues, TimeSpan.FromSeconds(curSeconds));
         SubtituloLineaAbajo = abajo ?? string.Empty;
         SubtituloLineaArriba = arriba ?? string.Empty;
+    }
+
+    // ── Subtítulos ASS/SSA con su estilo original (ver docs/investigacion-subtitulos-ass.md) ──
+
+    /// <summary>La vista le pide los fotogramas; el ViewModel decide cuándo se abre y se cierra.</summary>
+    public ISubtitleAssRenderer DibujanteAss => _assRenderer;
+
+    /// <summary>El dibujante está listo y manda sobre el texto plano: la vista muestra la capa de imagen solo con esto en true.</summary>
+    [ObservableProperty] private bool _subtitulosAssActivo;
+
+    /// <summary>La pista elegida es ASS/SSA: el menú de subtítulos ofrece "Usar mi estilo".</summary>
+    [ObservableProperty] private bool _pistaActualEsAss;
+
+    private CancellationTokenSource? _assCts;
+    private bool _assListo;
+    private FlyleafLib.MediaFramework.MediaStream.SubtitlesStream? _pistaTextoActual;
+
+    private bool _usarMiEstiloEnAss;
+    /// <summary>
+    /// Con una pista ASS, ver el texto plano con el estilo de Configuración en vez del original del subtítulo. Se guarda como
+    /// preferencia. El dibujante no se cierra al encenderlo: así volver al estilo original es inmediato.
+    /// </summary>
+    public bool UsarMiEstiloEnAss
+    {
+        get => _usarMiEstiloEnAss;
+        set
+        {
+            if (!SetProperty(ref _usarMiEstiloEnAss, value)) return;
+
+            GuardarUsarMiEstiloEnAss(value);
+            if (value) SubtitulosAssActivo = false;
+            else if (_assListo) SubtitulosAssActivo = true;
+            else IniciarDibujoAssSiCorresponde();
+        }
+    }
+
+    [RelayCommand]
+    private void ToggleUsarMiEstiloEnAss() => UsarMiEstiloEnAss = !UsarMiEstiloEnAss;
+
+    private void GuardarUsarMiEstiloEnAss(bool valor)
+    {
+        if (_settingsService == null) return;
+        var config = _settingsService.ObtenerConfiguracion();
+        if (config == null || config.UsarMiEstiloEnAss == valor) return;
+        config.UsarMiEstiloEnAss = valor;
+        _ = _settingsService.GuardarConfiguracionAsync(config);
+    }
+
+    /// <summary>Abre el dibujante para la pista de texto actual si es ASS/SSA incrustada y el usuario no pidió su estilo.</summary>
+    private void IniciarDibujoAssSiCorresponde()
+    {
+        var pista = _pistaTextoActual;
+        var player = Player;
+        if (pista == null || player == null) return;
+
+        bool esAss = pista.CodecID is Flyleaf.FFmpeg.AVCodecID.Ass or Flyleaf.FFmpeg.AVCodecID.Ssa;
+        if (!Core.SubtitulosAss.DebeDibujarse(esAss, pista.IsBitmap, pista.ExternalStream != null, UsarMiEstiloEnAss)) return;
+
+        // ponytail: pantalla principal en unidades de WPF. Con la escala de Windows por encima del 100 % se dibuja algo por
+        // debajo de los píxeles reales; si se nota borroso, usar los píxeles del monitor donde está la ventana.
+        var (anchoVideo, altoVideo) = TamanoDelVideo(player);
+        var (ancho, alto) = Core.SubtitulosAss.TamanoDibujo(
+            anchoVideo, altoVideo,
+            (int)SystemParameters.PrimaryScreenWidth, (int)SystemParameters.PrimaryScreenHeight);
+        int indice = Core.SubtitulosAss.IndiceEntreSubtitulos(
+            player.Subtitles.Streams.Where(s => s.ExternalStream == null).Select(s => s.StreamIndex), pista.StreamIndex);
+        if (ancho == 0 || indice < 0)
+        {
+            AppLogger.Debug("ReproductorViewModel", $"Dibujo ASS no disponible (tamaño {ancho}x{alto}, pista {indice}): se queda el texto plano.");
+            return;
+        }
+
+        IniciarDibujoAss(_rutaVideo, indice, ancho, alto);
+    }
+
+    /// <summary>Tamaño del video abierto. Justo al abrir (cuando se elige la pista de subtítulos) Player.Video aún vale 0x0, porque
+    /// se rellena con el primer fotograma: entonces se toma de la pista de video del contenedor, que ya está leída.</summary>
+    private static (int Ancho, int Alto) TamanoDelVideo(Player player)
+    {
+        int ancho = player.Video?.Width ?? 0, alto = player.Video?.Height ?? 0;
+        if (ancho > 0 && alto > 0) return (ancho, alto);
+
+        var pista = player.VideoDemuxer?.VideoStream ?? player.VideoDemuxer?.VideoStreams?.FirstOrDefault();
+        return pista == null ? (0, 0) : ((int)pista.Width, (int)pista.Height);
+    }
+
+    internal void IniciarDibujoAss(string ruta, int indice, int ancho, int alto)
+    {
+        CerrarDibujoAss();
+
+        var cts = new CancellationTokenSource();
+        _assCts = cts;
+        _ = AbrirDibujoAssAsync(ruta, indice, ancho, alto, cts);
+    }
+
+    private async Task AbrirDibujoAssAsync(string ruta, int indice, int ancho, int alto, CancellationTokenSource cts)
+    {
+        try
+        {
+            var reloj = Stopwatch.StartNew();
+            bool listo = await _assRenderer.AbrirAsync(ruta, indice, ancho, alto, cts.Token);
+            if (cts.IsCancellationRequested || !ReferenceEquals(_assCts, cts)) return; // se abrió otra pista/video mientras tanto
+
+            AppLogger.Debug("ReproductorViewModel", $"[Perf] Dibujo ASS {(listo ? "listo" : "no disponible")} en {reloj.ElapsedMilliseconds} ms ({ancho}x{alto}, pista {indice}).");
+            _assListo = listo;
+            SubtitulosAssActivo = listo && !UsarMiEstiloEnAss;
+        }
+        catch (OperationCanceledException)
+        {
+            // Se abrió otra pista/video: el nuevo pedido ya está en curso.
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn("ReproductorViewModel", $"No se pudo preparar el dibujo ASS: {ex.Message}");
+        }
+    }
+
+    internal void CerrarDibujoAss()
+    {
+        _assCts?.Cancel();
+        _assCts?.Dispose();
+        _assCts = null;
+
+        _assListo = false;
+        SubtitulosAssActivo = false;
+        _assRenderer.Cerrar();
+    }
+
+    /// <summary>La vista avisa de que un fotograma falló: ese episodio sigue en texto plano, sin reintentos.</summary>
+    public void NotificarFalloDibujoAss()
+    {
+        AppLogger.Warn("ReproductorViewModel", "El dibujo ASS falló a mitad de episodio: se vuelve al texto plano.");
+        CerrarDibujoAss();
     }
 
     private bool _modoNocheActivo = false;
@@ -692,7 +835,8 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         ISubtitleCuesExtractorService? subtitleCuesExtractorService = null,
         IPlaybackVolumeCoordinator? volumeCoordinator = null,
         IPlaybackSeekCoordinator? seekCoordinator = null,
-        IFotogramasClaveService? fotogramasClaveService = null)
+        IFotogramasClaveService? fotogramasClaveService = null,
+        ISubtitleAssRenderer? subtitleAssRenderer = null)
     {
         _databaseService = databaseService;
         _settingsService = settingsService;
@@ -708,6 +852,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         _windowModeCoordinator = windowModeCoordinator ?? new PlaybackWindowModeCoordinator(ventanaPrincipal);
         _subtitleCoordinator = subtitleCoordinator ?? new SubtitleCoordinator();
         _subtitleCuesExtractor = subtitleCuesExtractorService ?? new SubtitleCuesExtractorService();
+        _assRenderer = subtitleAssRenderer ?? new SubtitleAssRenderer();
         _volumeCoordinator = volumeCoordinator ?? new PlaybackVolumeCoordinator();
         _seekCoordinator = seekCoordinator ?? new PlaybackSeekCoordinator();
         _fotogramasClaveService = fotogramasClaveService ?? new FotogramasClaveService();
@@ -739,6 +884,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                 _modoNocheActivo = config.ModoNocheActivo;
                 CargarEcualizador(config);
                 _estiloSubtitulos = (config.EstiloSubtitulos ?? new EstiloSubtitulos()).Normalizar();
+                _usarMiEstiloEnAss = config.UsarMiEstiloEnAss;
             }
         }
 
@@ -2646,6 +2792,8 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         if (_disposeHecho) return;
         _disposeHecho = true;
         GC.SuppressFinalize(this);
+
+        CerrarDibujoAss();
 
         if (_smtc != null)
         {

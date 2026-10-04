@@ -1,11 +1,13 @@
 using System;
 using System.ComponentModel;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using AnimeLocalTracker.Services;
 using AnimeLocalTracker.ViewModels;
@@ -67,7 +69,11 @@ namespace AnimeLocalTracker.Views
 
         private void EnlazarSubtitulos(ReproductorViewModel? vm)
         {
-            if (ReferenceEquals(_vmSubtitulos, vm)) return;
+            if (ReferenceEquals(_vmSubtitulos, vm))
+            {
+                ActualizarCapaAss(); // la vista aparece con el modo ASS ya activo (mini reproductor): se lee el estado actual
+                return;
+            }
 
             if (_vmSubtitulos != null) _vmSubtitulos.PropertyChanged -= VmSubtitulos_PropertyChanged;
             _vmSubtitulos = vm;
@@ -75,6 +81,7 @@ namespace AnimeLocalTracker.Views
 
             EnlazarSubtitulosDelPlayer(vm?.Player?.Subtitles);
             ActualizarTapaVideo();
+            ActualizarCapaAss();
         }
 
         private void ActualizarTapaVideo() =>
@@ -182,6 +189,13 @@ namespace AnimeLocalTracker.Views
 
         private void VmSubtitulos_PropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
+            if (e.PropertyName is nameof(ReproductorViewModel.SubtitulosAssActivo) or nameof(ReproductorViewModel.SubtitulosHabilitados))
+            {
+                if (Dispatcher.CheckAccess()) ActualizarCapaAss();
+                else Dispatcher.InvokeAsync(ActualizarCapaAss);
+                return;
+            }
+
             if (e.PropertyName is nameof(ReproductorViewModel.EstiloSubtitulos)
                 or nameof(ReproductorViewModel.SubtitulosDobleLineaActivo)
                 or nameof(ReproductorViewModel.SubtituloLineaAbajo)
@@ -253,6 +267,14 @@ namespace AnimeLocalTracker.Views
 
         private void ActualizarTextoSubtitulos()
         {
+            if (_assCapaActiva)
+            {
+                // La capa ASS ya dibuja estas líneas con su estilo: el texto plano se oculta para no verlas dos veces.
+                SubtitulosVista.Texto = string.Empty;
+                SubtitulosVistaArriba.Texto = string.Empty;
+                return;
+            }
+
             // Con la pista completa ya extraída (ver ReproductorViewModel.CargarCuesSubtitulosSiCorresponde) se
             // confía en las dos líneas resueltas por la app, que sí distinguen cuándo hay dos hablando a la vez.
             // Si todavía no terminó de extraerse (o falló), se sigue mostrando el texto único de Flyleaf abajo,
@@ -270,6 +292,96 @@ namespace AnimeLocalTracker.Views
 
             SubtitulosVista.Estilo = _vmSubtitulos?.EstiloSubtitulos;
             SubtitulosVistaArriba.Estilo = _vmSubtitulos?.EstiloSubtitulos;
+        }
+
+        // === Capa de subtítulos ASS (ver SubtitulosAssImagen en el XAML y docs/investigacion-subtitulos-ass.md) ===
+        // El ViewModel es el dueño del dibujante; esta vista solo le pide el fotograma del instante actual y lo pinta.
+        // Cada instancia de la vista (ventana principal y mini reproductor) tiene su propio bitmap y solo dibuja mientras se ve.
+        private WriteableBitmap? _assBitmap;
+        private byte[]? _assBufer;
+        private bool _assCapaActiva;
+        private bool _assDibujando;
+        private long _assUltimoTick = -1;
+
+        private void ActualizarCapaAss()
+        {
+            var vm = _vmSubtitulos;
+            bool activa = vm is { SubtitulosAssActivo: true, SubtitulosHabilitados: true } && IsLoaded && IsVisible
+                          && vm.DibujanteAss.Ancho > 0 && vm.DibujanteAss.Alto > 0;
+
+            if (_assCapaActiva)
+            {
+                CompositionTarget.Rendering -= CapaAss_Rendering;
+                SubtitulosAssImagen.Visibility = Visibility.Collapsed;
+                SubtitulosAssImagen.Source = null;
+                _assBitmap = null;
+                _assBufer = null;
+            }
+
+            _assCapaActiva = activa;
+            if (activa)
+            {
+                var dibujante = vm!.DibujanteAss;
+                _assBitmap = new WriteableBitmap(dibujante.Ancho, dibujante.Alto, 96, 96, PixelFormats.Pbgra32, null);
+                _assBufer = new byte[dibujante.Ancho * dibujante.Alto * 4];
+                _assUltimoTick = -1;
+                SubtitulosAssImagen.Source = _assBitmap;
+                SubtitulosAssImagen.Visibility = Visibility.Visible;
+                CompositionTarget.Rendering += CapaAss_Rendering;
+            }
+
+            ActualizarTextoSubtitulos();
+        }
+
+        /// <summary>
+        /// En cada fotograma de la interfaz: si el video avanzó (o saltó), se pide el dibujo de ese instante a un hilo de fondo y
+        /// al volver se copia al bitmap la franja que cambió. Mientras hay un dibujo en curso no se pide otro: el siguiente toma
+        /// el instante más reciente, así un cartel pesado salta fotogramas del subtítulo en vez de acumular retraso. En pausa el
+        /// tiempo no cambia y no se dibuja nada.
+        /// </summary>
+        private async void CapaAss_Rendering(object? sender, EventArgs e)
+        {
+            var vm = _vmSubtitulos;
+            var player = vm?.Player;
+            var bitmap = _assBitmap;
+            var bufer = _assBufer;
+            if (_assDibujando || vm == null || player == null || bitmap == null || bufer == null) return;
+
+            long tick = player.CurTime;
+            if (tick == _assUltimoTick) return;
+            _assUltimoTick = tick;
+
+            _assDibujando = true;
+            try
+            {
+                var dibujante = vm.DibujanteAss;
+                var instante = TimeSpan.FromTicks(tick);
+                var (ok, filaInicial, filas) = await Task.Run(() =>
+                {
+                    bool dibujado = dibujante.Renderizar(instante, bufer, out int desde, out int cuantas);
+                    return (dibujado, desde, cuantas);
+                });
+
+                if (!ReferenceEquals(bitmap, _assBitmap)) return; // la capa se apagó o cambió de episodio mientras se dibujaba
+                if (!ok)
+                {
+                    vm.NotificarFalloDibujoAss();
+                    return;
+                }
+                if (filas == 0) return; // nada cambió en pantalla: no se toca el bitmap
+
+                // Solo se copia la franja de filas que cambió (un diálogo son unas decenas de filas, no el fotograma entero).
+                int paso = bitmap.PixelWidth * 4;
+                bitmap.WritePixels(new Int32Rect(0, filaInicial, bitmap.PixelWidth, filas), bufer, paso, filaInicial * paso);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Debug("ReproductorView", $"No se pudo pintar la capa de subtítulos ASS: {ex.Message}");
+            }
+            finally
+            {
+                _assDibujando = false;
+            }
         }
 
         /// <summary>Se suscribe a los cambios del toast de IDialogService (y se desuscribe del anterior).</summary>
@@ -394,6 +506,8 @@ namespace AnimeLocalTracker.Views
             {
                 Mouse.OverrideCursor = null;
             }
+
+            ActualizarCapaAss(); // oculta: se deja de dibujar; visible otra vez: se retoma
         }
 
         private void ReproductorView_Loaded(object sender, RoutedEventArgs e)

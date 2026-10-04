@@ -43,7 +43,9 @@
 
     <ItemGroup>
       <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
-      <PackageReference Include="Flyleaf.FFmpeg" Version="9.0.0" />
+      <!-- Con alias: FlyleafLib usa Flyleaf.FFmpeg.Bindings, que define los mismos tipos (Flyleaf.FFmpeg.Raw…) y es el que tiene
+           cargadas las bibliotecas. Sin el alias, el código que los nombra (Services/SubtitleAssRenderer.cs) no compila (CS0433). -->
+      <PackageReference Include="Flyleaf.FFmpeg" Version="9.0.0" Aliases="FFmpegExtendido" />
       <PackageReference Include="FlyleafLib" Version="3.11.3" />
       <PackageReference Include="FlyleafLib.Controls.WPF" Version="1.7.3" />
       <!-- Parche en caliente del lector de subtítulos ASS de FlyleafLib (ver Services/ParcheSubtitulosFlyleaf.cs). -->

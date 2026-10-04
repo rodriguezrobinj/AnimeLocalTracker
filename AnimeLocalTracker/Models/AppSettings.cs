@@ -9,6 +9,9 @@ public class AppSettings
     public string RutaBaseAnimes { get; set; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), "Anime");
     public bool AutoSkipIntroOutro { get; set; } = false;
     public bool SubtitulosPorDefecto { get; set; } = true;
+    /// <summary>Con una pista ASS/SSA, mostrar el texto plano con el estilo de Configuración en vez del estilo original
+    /// del subtítulo (interruptor "Usar mi estilo" del menú de subtítulos del reproductor).</summary>
+    public bool UsarMiEstiloEnAss { get; set; }
     /// <summary>Idioma de audio que el usuario eligió la última vez en el reproductor ("ja", "en"…): en archivos con varias
     /// pistas se pone esa sola. Null = la pista que marque el archivo.</summary>
     public string? IdiomaAudioPreferido { get; set; }

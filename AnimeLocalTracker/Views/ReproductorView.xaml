@@ -317,6 +317,11 @@
                     <ctl:SubtitleTextView x:Name="SubtitulosVista" MaxWidth="1200"/>
                 </Viewbox>
 
+                <!-- Subtítulos ASS/SSA con su estilo original: una imagen del tamaño del video que dibuja libass (ver
+                     docs/investigacion-subtitulos-ass.md). Se estira igual que el video para que los carteles coincidan con su
+                     letrero. Como el texto de arriba, la llena y la muestra el code-behind (ActualizarCapaAss), no un Binding. -->
+                <Image x:Name="SubtitulosAssImagen" Stretch="Uniform" IsHitTestVisible="False" Visibility="Collapsed"/>
+
                 <!-- Tapa el video mientras abre y, al reanudar, hasta que el salto al punto guardado se asienta: sin ella se veía
                      un instante el 0:00. Va FUERA de OverlayControls porque esos controles se desvanecen tras 3 s sin mover el
                      ratón (al pasar solo al siguiente episodio la tapa quedaba invisible), y en esta raíz un Binding se queda pegado:
@@ -753,6 +758,18 @@
                                                 </DataTemplate>
                                             </ItemsControl.ItemTemplate>
                                         </ItemsControl>
+
+                                        <!-- Usar mi estilo: solo con una pista ASS/SSA. Encendido = texto plano con el estilo de
+                                             Configuración; apagado = estilo original del subtítulo. -->
+                                        <Button Command="{Binding ToggleUsarMiEstiloEnAssCommand}" Click="SubtitleMenuItem_Click" Style="{StaticResource MenuItemButton}"
+                                                Visibility="{Binding PistaActualEsAss, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                            <StackPanel Orientation="Horizontal">
+                                                <materialDesign:PackIcon Kind="FormatFont" Width="18" Height="18" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="#E5E5E5"/>
+                                                <TextBlock Text="{Binding [Player_UsarMiEstilo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" VerticalAlignment="Center"/>
+                                                <materialDesign:PackIcon Kind="Check" Width="16" Height="16" Margin="10,0,0,0" VerticalAlignment="Center" Foreground="#818CF8"
+                                                                          Visibility="{Binding UsarMiEstiloEnAss, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                                            </StackPanel>
+                                        </Button>
                                     </StackPanel>
                                 </Border>
                                 <Path x:Name="SubtitlesPopupFlecha" Style="{StaticResource FlechaMenu}"/>
