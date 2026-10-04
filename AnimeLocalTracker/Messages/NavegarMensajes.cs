@@ -18,6 +18,9 @@ public record NavegarMensaje_VolverDelReproductor();
 // === Mensajes de Estado / Notificaciones ===
 /// <param name="SoloProgreso">True en el guardado periódico del reproductor (cada 3 s): solo cambió la posición, nunca el "visto".</param>
 public record EpisodioActualizadoMensaje(int AnimeId, int NumeroEpisodio, bool VistoLocal, double ProgresoSegundos = 0, double TotalSegundos = 0, bool SoloProgreso = false);
+/// <summary>El archivo de video de un episodio se borró del disco desde la app: quien muestre su tamaño, su miniatura o el
+/// botón de "ver" debe quitarlos. Visto y progreso no cambian (el historial es permanente).</summary>
+public record ArchivoEpisodioEliminadoMensaje(int AnimeId, int NumeroEpisodio);
 public record AnimeAñadidoMensaje(AnimeItem NuevoAnime);
 public record UsuarioLogeadoMensaje();
 public record UsuarioDesconectadoMensaje();

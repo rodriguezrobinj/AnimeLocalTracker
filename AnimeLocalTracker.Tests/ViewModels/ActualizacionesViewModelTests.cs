@@ -407,4 +407,61 @@ public class ActualizacionesViewModelTests
             try { File.Delete(rutaTemp); } catch { }
         }
     }
+
+    private void UnEpisodioEmitido(List<EpisodioItem>? enDisco = null)
+    {
+        _dbMock.Setup(d => d.ObtenerAnimesLigerosAsync()).ReturnsAsync(new List<AnimeItem>
+        {
+            new() { AniListId = 1, Titulo = "One Piece", Estado = "RELEASING", RutaCarpeta = @"C:\Anime\OnePiece", UrlPortada = "cover.png" }
+        });
+        _dbMock.Setup(d => d.ObtenerTodosLosRegistrosAsync()).ReturnsAsync(new List<RegistroEpisodio>());
+        _trackingMock.Setup(t => t.ObtenerCalendarioEmisionAsync(It.IsAny<List<int>>(), It.IsAny<long>(), It.IsAny<long>()))
+            .ReturnsAsync((true, new List<AiringEpisode>
+            {
+                new() { AniListId = 1, NumeroEpisodio = 1120, FechaEmision = DateTime.UtcNow.AddHours(-3) }
+            }));
+        if (enDisco != null) _fileScannerMock.Setup(f => f.EscanearEpisodiosAsync(@"C:\Anime\OnePiece")).ReturnsAsync(enDisco);
+    }
+
+    // Una descarga que no manda avances (en cola, en pausa, sin internet o descifrando al 100 %) solo se conoce preguntando
+    // al servicio: sin eso, al volver a la pestaña la tarjeta ofrecía "Descargar" un episodio que ya se estaba bajando.
+    [Fact]
+    public async Task Cargar_ConUnaDescargaEnMarcha_LaTarjetaSaleDescargando()
+    {
+        UnEpisodioEmitido();
+        double progreso = 100;
+        _downloadMock.Setup(d => d.EstaDescargando(1, 1120, out progreso)).Returns(true);
+        var sut = CrearSut();
+
+        await sut.CargarActualizacionesAsync();
+
+        var item = sut.Items.Single();
+        item.IsDownloading.Should().BeTrue();
+        item.DownloadProgress.Should().Be(100);
+        item.Estado.Should().Be(EstadoActualizacion.Descargando);
+        item.MostrarAccion.Should().BeFalse("mientras se descarga no se ofrece el botón de descargar");
+        sut.PuedeDescargarPendientes.Should().BeFalse("lo que ya se está bajando no cuenta como pendiente");
+    }
+
+    [Fact]
+    public async Task ArchivoEliminado_LaTarjetaDejaDeMostrarloSinRecargar()
+    {
+        UnEpisodioEmitido(new List<EpisodioItem>
+        {
+            new() { NumeroEpisodio = 1120, RutaCompleta = @"C:\Anime\OnePiece\ep1120.mkv", Descargado = true, TamanoArchivoFormateado = "1,2 GB" }
+        });
+        var sut = CrearSut();
+        await sut.CargarActualizacionesAsync();
+        sut.Items.Single().Descargado.Should().BeTrue();
+        sut.Items.Single().TamanoArchivoFormateado.Should().Be("1,2 GB");
+
+        WeakReferenceMessenger.Default.Send(new ArchivoEpisodioEliminadoMensaje(1, 1120));
+
+        var item = sut.Items.Single();
+        item.Descargado.Should().BeFalse();
+        item.RutaArchivo.Should().BeEmpty();
+        item.TamanoArchivoFormateado.Should().BeEmpty();
+        item.Estado.Should().Be(EstadoActualizacion.SinDescargar);
+        sut.TotalPorDescargar.Should().Be(1, "el contador de pendientes se actualiza con la tarjeta");
+    }
 }

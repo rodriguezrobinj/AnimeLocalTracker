@@ -65,20 +65,14 @@ public partial class ActualizacionItemViewModel : ObservableObject
     private double _totalSegundos;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(EstaEnEspera))]
-    [NotifyPropertyChangedFor(nameof(ProgresoDescargaActivo))]
     [NotifyPropertyChangedFor(nameof(Estado))]
     [NotifyPropertyChangedFor(nameof(PorDescargar))]
     private bool _isDownloading;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(EstaEnEspera))]
-    [NotifyPropertyChangedFor(nameof(ProgresoDescargaActivo))]
     [NotifyPropertyChangedFor(nameof(Estado))]
     private double _downloadProgress;
 
-    public bool EstaEnEspera => IsDownloading && DownloadProgress <= 0.0;
-    public bool ProgresoDescargaActivo => IsDownloading && DownloadProgress > 0.0;
 
     // === Progreso de reproducción (igual que EpisodioItem en la Ficha) ===
     public double PorcentajeProgreso => TotalSegundos > 0 ? Math.Clamp(ProgresoSegundos / TotalSegundos, 0.0, 1.0) : 0.0;
@@ -175,6 +169,14 @@ public partial class ActualizacionItemViewModel : ObservableObject
 
     public bool MostrarAccionPrimaria => MostrarAccion && AccionEsPrimaria;
     public bool MostrarAccionSecundaria => MostrarAccion && !AccionEsPrimaria;
+
+    /// <summary>El archivo ya no está en disco: se quita lo que dependía de él. Visto y progreso se conservan.</summary>
+    public void QuitarArchivo()
+    {
+        Descargado = false;
+        RutaArchivo = string.Empty;
+        TamanoArchivoFormateado = string.Empty;
+    }
 
     /// <summary>Vuelve a leer todos los textos localizados (al cambiar de idioma con la pestaña ya cargada).</summary>
     public void RefrescarTextos() => OnPropertyChanged(string.Empty);

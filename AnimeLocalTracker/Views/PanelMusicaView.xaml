@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
              xmlns:loc="clr-namespace:AnimeLocalTracker.Services"
+             xmlns:ctl="clr-namespace:AnimeLocalTracker.Controls"
              TextElement.Foreground="{DynamicResource MaterialDesignBody}"
              Visibility="{Binding MostrandoPanelMusica, Converter={StaticResource BoolToVis}}">
     <!-- Ventana flotante de Openings & Endings (AnimeThemes.moe) de la ficha. DataContext: MusicaFichaViewModel.
@@ -420,14 +421,9 @@
                                                         </Style>
                                                     </materialDesign:PackIcon.Style>
                                                 </materialDesign:PackIcon>
-                                                <ProgressBar Style="{StaticResource MaterialDesignCircularProgressBar}" Minimum="0" Maximum="100"
-                                                             Value="{Binding ProgresoDescargaPorcentaje, Mode=OneWay}" Width="18" Height="18" Foreground="{StaticResource Brush.Accent}"
-                                                             Visibility="{Binding Descargando, Converter={StaticResource BoolToVis}}"/>
-                                                <!-- En la cola de "Descargar todos": aro base + giro de espera -->
-                                                <Grid Visibility="{Binding EsperandoEnCola, Converter={StaticResource BoolToVis}}">
-                                                    <Ellipse Width="18" Height="18" Stroke="{StaticResource Brush.RingBase}" StrokeThickness="2"/>
-                                                    <ProgressBar Style="{StaticResource MaterialDesignCircularProgressBar}" IsIndeterminate="True" Width="18" Height="18" Foreground="{StaticResource Brush.TextTertiary}"/>
-                                                </Grid>
+                                                <!-- Descargando, convirtiendo o en la cola de "Descargar todos" -->
+                                                <ctl:IndicadorDescarga Width="18" Height="18" Progreso="{Binding ProgresoDescargaPorcentaje}"
+                                                                       Visibility="{Binding MostrarIconoDescarga, Converter={StaticResource InverseBoolToVis}}"/>
                                             </Grid>
                                         </Button>
 

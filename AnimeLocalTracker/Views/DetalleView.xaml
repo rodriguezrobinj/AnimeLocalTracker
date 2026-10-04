@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
              xmlns:loc="clr-namespace:AnimeLocalTracker.Services"
+             xmlns:ctl="clr-namespace:AnimeLocalTracker.Controls"
              TextElement.Foreground="{DynamicResource MaterialDesignBody}"
              Background="#121212">
     <UserControl.Resources>
@@ -1033,24 +1034,7 @@
                                             <Grid Width="34" Height="34" VerticalAlignment="Center" HorizontalAlignment="Center"
                                                   ToolTip="{loc:T Det_DescargandoTip}"
                                                   Visibility="{Binding IsDownloading, Converter={StaticResource BoolToVis}}">
-                                                
-                                                <Ellipse Width="24" Height="24" Stroke="{StaticResource Brush.RingBase}" StrokeThickness="3" 
-                                                         VerticalAlignment="Center" HorizontalAlignment="Center"/>
-
-                                                <ProgressBar Width="24" Height="24" Foreground="{StaticResource Brush.Accent}"
-                                                             Style="{StaticResource MaterialDesignCircularProgressBar}"
-                                                             IsIndeterminate="True"
-                                                             Visibility="{Binding EstaEnEspera, Converter={StaticResource BoolToVis}}"
-                                                             VerticalAlignment="Center" HorizontalAlignment="Center"
-                                                             materialDesign:TransitionAssist.DisableTransitions="True"/>
-
-                                                <ProgressBar Value="{Binding DownloadProgress}" Minimum="0" Maximum="100" 
-                                                             Style="{StaticResource MaterialDesignCircularProgressBar}"
-                                                             Width="24" Height="24" Foreground="{StaticResource Brush.Accent}"
-                                                             IsIndeterminate="False"
-                                                             Visibility="{Binding ProgresoDescargaActivo, Converter={StaticResource BoolToVis}}"
-                                                             VerticalAlignment="Center" HorizontalAlignment="Center"
-                                                             materialDesign:TransitionAssist.DisableTransitions="True"/>
+                                                <ctl:IndicadorDescarga Width="24" Height="24" Progreso="{Binding DownloadProgress}"/>
                                             </Grid>
 
                                             <!-- 3. NO DESCARGADO: BOTÓN DE DESCARGAR -->

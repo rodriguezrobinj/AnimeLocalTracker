@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
              xmlns:loc="clr-namespace:AnimeLocalTracker.Services"
+             xmlns:ctl="clr-namespace:AnimeLocalTracker.Controls"
              xmlns:vm="clr-namespace:AnimeLocalTracker.ViewModels"
              xmlns:sys="clr-namespace:System;assembly=System.Runtime"
              TextElement.Foreground="{DynamicResource MaterialDesignBody}"
@@ -286,18 +287,7 @@
 
                                     <!-- Descargando: círculo de progreso en lugar del botón -->
                                     <Grid Width="130" Height="38" Visibility="{Binding IsDownloading, Converter={StaticResource BoolToVis}}">
-                                        <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
-                                            <Ellipse Width="26" Height="26" Stroke="{StaticResource Brush.RingBase}" StrokeThickness="3"/>
-                                            <ProgressBar Width="26" Height="26" Foreground="{StaticResource Brush.Accent}"
-                                                         Style="{StaticResource MaterialDesignCircularProgressBar}" IsIndeterminate="True"
-                                                         Visibility="{Binding EstaEnEspera, Converter={StaticResource BoolToVis}}"
-                                                         materialDesign:TransitionAssist.DisableTransitions="True"/>
-                                            <ProgressBar Value="{Binding DownloadProgress, Mode=OneWay}" Minimum="0" Maximum="100"
-                                                         Style="{StaticResource MaterialDesignCircularProgressBar}"
-                                                         Width="26" Height="26" Foreground="{StaticResource Brush.Accent}" IsIndeterminate="False"
-                                                         Visibility="{Binding ProgresoDescargaActivo, Converter={StaticResource BoolToVis}}"
-                                                         materialDesign:TransitionAssist.DisableTransitions="True"/>
-                                        </Grid>
+                                        <ctl:IndicadorDescarga Width="26" Height="26" Progreso="{Binding DownloadProgress}"/>
                                     </Grid>
 
                                     

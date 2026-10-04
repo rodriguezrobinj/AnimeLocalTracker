@@ -5,9 +5,11 @@ using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using AnimeLocalTracker.Messages;
 using AnimeLocalTracker.Models;
 using AnimeLocalTracker.Services;
 using AnimeLocalTracker.ViewModels;
+using CommunityToolkit.Mvvm.Messaging;
 using FluentAssertions;
 using Moq;
 using Xunit;
@@ -210,6 +212,22 @@ public class DetalleExtrasTests : IDisposable
         _db.Verify(d => d.ConservarRegistroTrasEliminarArchivoAsync(It.IsAny<int>(), It.IsAny<int>()), Times.Never);
     }
 
+    [Fact]
+    public async Task LiberarEspacio_AvisaDeCadaArchivoBorrado()
+    {
+        _dialogos.Setup(d => d.MostrarDialogoAsync(It.IsAny<string>(), It.IsAny<string>(), true, It.IsAny<string>(), It.IsAny<string>())).ReturnsAsync(true);
+        var sut = await FichaConEpisodiosAsync((1, 64, true), (2, 64, true), (3, 64, false));
+        var avisos = new List<ArchivoEpisodioEliminadoMensaje>();
+        WeakReferenceMessenger.Default.Register<ArchivoEpisodioEliminadoMensaje>(this, (_, m) => avisos.Add(m));
+        try
+        {
+            await sut.LiberarEspacioCommand.ExecuteAsync(null);
+        }
+        finally { WeakReferenceMessenger.Default.UnregisterAll(this); }
+
+        avisos.Should().BeEquivalentTo(new[] { new ArchivoEpisodioEliminadoMensaje(7, 1), new ArchivoEpisodioEliminadoMensaje(7, 2) });
+    }
+
     // ── Borrar un solo episodio ──
 
     [Fact]
@@ -226,6 +244,39 @@ public class DetalleExtrasTests : IDisposable
         episodio.Descargado.Should().BeFalse();
         episodio.Visto.Should().BeTrue("borrar el archivo no borra que se vio");
         _db.Verify(d => d.ConservarRegistroTrasEliminarArchivoAsync(7, 1), Times.Once);
+    }
+
+    // El episodio recién emitido se añade a la lista después de cargarla. Es justo el que se suele estar bajando desde
+    // Actualizaciones: su fila debe salir con el aro de descarga y no con el botón de descargar.
+    [Fact]
+    public async Task FilaAnadidaPorEmision_ConDescargaEnMarcha_SaleDescargando()
+    {
+        var sut = await FichaConEpisodiosAsync((1, 8, false));
+        double progreso = 40;
+        _descargas.Setup(d => d.EstaDescargando(7, 2, out progreso)).Returns(true);
+
+        sut.Episodios.AnadirFilasHasta(2);
+
+        var fila = sut.Episodios.Todos.Single(e => e.NumeroEpisodio == 2);
+        fila.IsDownloading.Should().BeTrue();
+        fila.DownloadProgress.Should().Be(40);
+    }
+
+    // Otras pantallas (Actualizaciones) muestran el tamaño y el botón de "ver" de ese mismo archivo: deben enterarse.
+    [Fact]
+    public async Task EliminarEpisodio_AvisaDelArchivoBorrado()
+    {
+        _dialogos.Setup(d => d.MostrarDialogoAsync(It.IsAny<string>(), It.IsAny<string>(), true, It.IsAny<string>(), It.IsAny<string>())).ReturnsAsync(true);
+        var sut = await FichaConEpisodiosAsync((1, 64, true), (2, 64, false));
+        var avisos = new List<ArchivoEpisodioEliminadoMensaje>();
+        WeakReferenceMessenger.Default.Register<ArchivoEpisodioEliminadoMensaje>(this, (_, m) => avisos.Add(m));
+        try
+        {
+            await sut.Episodios.EliminarEpisodioCommand.ExecuteAsync(sut.Episodios.Todos.Single(e => e.NumeroEpisodio == 1));
+        }
+        finally { WeakReferenceMessenger.Default.UnregisterAll(this); }
+
+        avisos.Should().ContainSingle().Which.Should().Be(new ArchivoEpisodioEliminadoMensaje(7, 1));
     }
 
     [Fact]
