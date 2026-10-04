@@ -187,9 +187,7 @@ public partial class DetalleViewModel : ObservableObject,
 
         // Navegación rápida entre fichas (flechas, clics seguidos): se cancelan las cargas de
         // fondo de la ficha anterior en vez de dejarlas terminar para un anime que ya no se ve.
-        _ctsCargaFicha?.Cancel();
-        _ctsCargaFicha?.Dispose();
-        _ctsCargaFicha = new CancellationTokenSource();
+        Core.Cancelacion.Reemplazar(ref _ctsCargaFicha);
         var ctFicha = _ctsCargaFicha.Token;
 
         // 2. Lo demás, en segundo plano: miniaturas y datos técnicos de los archivos, cuenta atrás, espacio en disco,
@@ -305,7 +303,7 @@ public partial class DetalleViewModel : ObservableObject,
         string url = $"https://anilist.co/anime/{AnimeSeleccionado.AniListId}";
         try
         {
-            Process.Start(new ProcessStartInfo { FileName = url, UseShellExecute = true });
+            Core.Shell.Abrir(url);
         }
         catch (Exception ex)
         {

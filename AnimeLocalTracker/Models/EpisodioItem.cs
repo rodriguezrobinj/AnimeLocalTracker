@@ -168,19 +168,6 @@ public partial class EpisodioItem : ObservableObject
         }
     }
 
-    public static string FormatearTamano(long len)
-    {
-        if (len >= 1024L * 1024 * 1024)
-            return $"{len / (1024.0 * 1024.0 * 1024.0):F1} GB";
-        if (len >= 1024L * 1024)
-            return $"{len / (1024.0 * 1024.0):F0} MB";
-        if (len >= 1024L)
-            return $"{len / 1024.0:F0} KB";
-        if (len >= 0)
-            return $"{len} B";
-        return string.Empty;
-    }
-
     /// <summary>
     /// El archivo del episodio ya no está en disco (se borró): se limpia lo que dependía de él. Visto, progreso, favorito y
     /// fecha de reproducción se conservan: el historial es permanente.
@@ -199,7 +186,7 @@ public partial class EpisodioItem : ObservableObject
 
     public void CalcularTamanoArchivo(long len)
     {
-        TamanoArchivoFormateado = FormatearTamano(len);
+        TamanoArchivoFormateado = Core.Formato.Tamano(len);
     }
 
     public void CalcularTamanoArchivo()

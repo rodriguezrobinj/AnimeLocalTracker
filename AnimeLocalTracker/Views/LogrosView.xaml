@@ -10,44 +10,14 @@
 
     <UserControl.Resources>
         <!-- Chip de filtro (categoría / estado): activo = borde y texto azul de la paleta -->
-        <Style x:Key="LogroChipStyle" TargetType="Button">
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Focusable" Value="True"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="Raiz" Background="#14181E" BorderBrush="#262D38" BorderThickness="1"
-                                CornerRadius="16" Padding="14,6" Margin="0,0,8,8">
-                            <ContentPresenter x:Name="Texto" HorizontalAlignment="Center" VerticalAlignment="Center"
-                                              TextElement.FontSize="12" TextElement.FontWeight="SemiBold"
-                                              TextElement.Foreground="#9CA3AF"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Raiz" Property="Background" Value="#1B222C"/>
-                            </Trigger>
-                            <DataTrigger Binding="{Binding EsActivo}" Value="True">
-                                <Setter TargetName="Raiz" Property="Background" Value="#1E293B"/>
-                                <Setter TargetName="Raiz" Property="BorderBrush" Value="#60A5FA"/>
-                                <Setter TargetName="Texto" Property="TextElement.Foreground" Value="#93C5FD"/>
-                            </DataTrigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
+        <Style x:Key="LogroChipStyle" TargetType="Button" BasedOn="{StaticResource AppChipFiltro}">
+            <Setter Property="Margin" Value="0,0,8,8"/> <!-- aquí los chips ocupan varias filas -->
         </Style>
     </UserControl.Resources>
 
     <Grid MaxWidth="1280">
         <Grid.Style>
-            <Style TargetType="Grid">
-                <Setter Property="Margin" Value="95,60,30,30"/>
-                <Style.Triggers>
-                    <DataTrigger Binding="{Binding Topmost, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
-                        <Setter Property="Margin" Value="95,30,30,30"/>
-                    </DataTrigger>
-                </Style.Triggers>
-            </Style>
+            <StaticResource ResourceKey="AppPageMargen"/>
         </Grid.Style>
 
         <Grid.RowDefinitions>
@@ -59,12 +29,12 @@
 
         <!-- ═══ FILA 0: ENCABEZADO ═══ -->
         <StackPanel Grid.Row="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,18">
-            <Border Background="#1E293B" CornerRadius="12" Width="48" Height="48" Margin="0,0,14,0" VerticalAlignment="Center">
-                <materialDesign:PackIcon Kind="TrophyAward" Foreground="#FBBF24" Width="26" Height="26" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            <Border Background="{StaticResource Brush.Surface3}" CornerRadius="12" Width="48" Height="48" Margin="0,0,14,0" VerticalAlignment="Center">
+                <materialDesign:PackIcon Kind="TrophyAward" Foreground="{StaticResource Brush.WarningStrong}" Width="26" Height="26" HorizontalAlignment="Center" VerticalAlignment="Center"/>
             </Border>
             <StackPanel VerticalAlignment="Center">
                 <TextBlock Text="{Binding [Logro_Titulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.PageTitle}"/>
-                <TextBlock Text="{Binding [Logro_Subtitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="12" Foreground="#9CA3AF" Margin="0,3,0,0"/>
+                <TextBlock Text="{Binding [Logro_Subtitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="12" Foreground="{StaticResource Brush.TextSecondary}" Margin="0,3,0,0"/>
             </StackPanel>
         </StackPanel>
 
@@ -81,19 +51,19 @@
                 <!-- Rango -->
                 <StackPanel Grid.Column="0" Margin="0,0,24,0" VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{Binding RangoNombre}" FontSize="20" FontWeight="Bold" Foreground="#FBBF24"/>
-                        <TextBlock Text="{Binding PuntosTexto}" FontSize="12" Foreground="#9CA3AF" VerticalAlignment="Bottom" Margin="10,0,0,3"/>
+                        <TextBlock Text="{Binding RangoNombre}" FontSize="20" FontWeight="Bold" Foreground="{StaticResource Brush.WarningStrong}"/>
+                        <TextBlock Text="{Binding PuntosTexto}" FontSize="12" Foreground="{StaticResource Brush.TextSecondary}" VerticalAlignment="Bottom" Margin="10,0,0,3"/>
                     </StackPanel>
                     <ProgressBar Minimum="0" Maximum="100" Value="{Binding ProgresoRango, Mode=OneWay}" Height="6" Margin="0,8,0,4"
-                                 Foreground="#FBBF24" Background="#262D38" BorderThickness="0"/>
-                    <TextBlock Text="{Binding SiguienteRangoTexto}" FontSize="11" Foreground="#9CA3AF" TextWrapping="Wrap"/>
+                                 Foreground="{StaticResource Brush.WarningStrong}" Background="{StaticResource Brush.Border}" BorderThickness="0"/>
+                    <TextBlock Text="{Binding SiguienteRangoTexto}" FontSize="11" Foreground="{StaticResource Brush.TextSecondary}" TextWrapping="Wrap"/>
                 </StackPanel>
 
                 <!-- Progreso total -->
                 <StackPanel Grid.Column="1" Margin="0,0,24,0" VerticalAlignment="Center">
                     <TextBlock Text="{Binding NivelesTexto}" FontSize="14" FontWeight="SemiBold" Foreground="White"/>
                     <ProgressBar Minimum="0" Maximum="100" Value="{Binding ProgresoTotal, Mode=OneWay}" Height="6" Margin="0,8,0,0"
-                                 Foreground="#60A5FA" Background="#262D38" BorderThickness="0"/>
+                                 Foreground="{StaticResource Brush.Accent}" Background="{StaticResource Brush.Border}" BorderThickness="0"/>
                 </StackPanel>
 
                 <!-- Niveles conseguidos por dificultad -->
@@ -106,7 +76,7 @@
                             <StackPanel Margin="10,0,0,0" HorizontalAlignment="Center" MinWidth="52">
                                 <TextBlock Text="{Binding Cantidad}" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center"
                                            Foreground="{Binding Color}"/>
-                                <TextBlock Text="{Binding Nombre}" FontSize="10" HorizontalAlignment="Center" Foreground="#9CA3AF"/>
+                                <TextBlock Text="{Binding Nombre}" FontSize="10" HorizontalAlignment="Center" Foreground="{StaticResource Brush.TextSecondary}"/>
                             </StackPanel>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
@@ -148,15 +118,15 @@
         <Grid Grid.Row="3">
             <ProgressBar Style="{StaticResource MaterialDesignCircularProgressBar}"
                          IsIndeterminate="True" Width="44" Height="44"
-                         Value="0" Foreground="#60A5FA"
+                         Value="0" Foreground="{StaticResource Brush.Accent}"
                          HorizontalAlignment="Center" VerticalAlignment="Center"
                          Visibility="{Binding EstaCargando, Converter={StaticResource BoolToVis}}"/>
 
             <!-- Vacío (no se pudieron evaluar los logros) -->
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,40,0,40"
                         Visibility="{Binding EstaVacio, Converter={StaticResource BoolToVis}}">
-                <Border Background="#1E293B" CornerRadius="36" Width="72" Height="72" Margin="0,0,0,16" HorizontalAlignment="Center">
-                    <materialDesign:PackIcon Kind="TrophyOutline" Foreground="#64748B" Width="36" Height="36" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                <Border Background="{StaticResource Brush.Surface3}" CornerRadius="36" Width="72" Height="72" Margin="0,0,0,16" HorizontalAlignment="Center">
+                    <materialDesign:PackIcon Kind="TrophyOutline" Foreground="{StaticResource Brush.IconMuted}" Width="36" Height="36" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
                 <TextBlock Text="{Binding [Logro_VacioTitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppEmptyTitle}"/>
                 <TextBlock Text="{Binding [Logro_VacioSubtitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppEmptyText}" Margin="0,6,0,0" MaxWidth="420"/>
@@ -165,7 +135,7 @@
             <!-- Sin resultados con los filtros actuales -->
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,40,0,40"
                         Visibility="{Binding SinResultados, Converter={StaticResource BoolToVis}}">
-                <materialDesign:PackIcon Kind="FilterVariant" Foreground="#64748B" Width="48" Height="48" HorizontalAlignment="Center" Margin="0,0,0,12"/>
+                <materialDesign:PackIcon Kind="FilterVariant" Foreground="{StaticResource Brush.IconMuted}" Width="48" Height="48" HorizontalAlignment="Center" Margin="0,0,0,12"/>
                 <TextBlock Text="{Binding [Logro_SinResultados], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppEmptyText}" FontSize="15" HorizontalAlignment="Center"/>
             </StackPanel>
 
@@ -181,25 +151,12 @@
                      SelectionMode="Single"
                      Visibility="{Binding TieneElementos, Converter={StaticResource BoolToVis}}">
                 <ListBox.ItemContainerStyle>
-                    <Style TargetType="ListBoxItem">
-                        <Setter Property="Background" Value="Transparent"/>
-                        <Setter Property="BorderThickness" Value="0"/>
-                        <Setter Property="Padding" Value="0"/>
-                        <Setter Property="Focusable" Value="False"/>
-                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                        <Setter Property="Template">
-                            <Setter.Value>
-                                <ControlTemplate TargetType="ListBoxItem">
-                                    <ContentPresenter/>
-                                </ControlTemplate>
-                            </Setter.Value>
-                        </Setter>
-                    </Style>
+                    <StaticResource ResourceKey="AppFilaTransparenteSinFoco"/>
                 </ListBox.ItemContainerStyle>
 
                 <ListBox.Resources>
                     <DataTemplate DataType="{x:Type sys:String}">
-                        <TextBlock Text="{Binding}" FontSize="12" FontWeight="Bold" Foreground="#93C5FD" Margin="1,14,0,8"/>
+                        <TextBlock Text="{Binding}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource Brush.AccentSoft}" Margin="1,14,0,8"/>
                     </DataTemplate>
 
                     <DataTemplate DataType="{x:Type vm:LogroItemViewModel}">
@@ -227,7 +184,7 @@
                                 </Grid.ColumnDefinitions>
 
                                 <!-- Icono de la familia -->
-                                <Border Grid.Column="0" Background="#1E293B" CornerRadius="12" Width="52" Height="52" VerticalAlignment="Top" Margin="0,0,14,0">
+                                <Border Grid.Column="0" Background="{StaticResource Brush.Surface3}" CornerRadius="12" Width="52" Height="52" VerticalAlignment="Top" Margin="0,0,14,0">
                                     <materialDesign:PackIcon Kind="{Binding Icono}" Foreground="{Binding Color}" Width="26" Height="26"
                                                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 </Border>
@@ -235,7 +192,7 @@
                                 <!-- Título, descripción, progreso y marcas de nivel -->
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                     <TextBlock Text="{Binding Titulo}" FontSize="14" FontWeight="Bold" Foreground="White" TextTrimming="CharacterEllipsis"/>
-                                    <TextBlock Text="{Binding Descripcion}" FontSize="11.5" Foreground="#9CA3AF" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                    <TextBlock Text="{Binding Descripcion}" FontSize="11.5" Foreground="{StaticResource Brush.TextSecondary}" TextWrapping="Wrap" Margin="0,2,0,0"/>
 
                                     <Grid Margin="0,10,0,0">
                                         <Grid.ColumnDefinitions>
@@ -243,9 +200,9 @@
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <ProgressBar Grid.Column="0" Minimum="0" Maximum="100" Value="{Binding ProgresoPorcentaje, Mode=OneWay}"
-                                                     Height="6" VerticalAlignment="Center" Foreground="{Binding Color}" Background="#262D38" BorderThickness="0"
+                                                     Height="6" VerticalAlignment="Center" Foreground="{Binding Color}" Background="{StaticResource Brush.Border}" BorderThickness="0"
                                                      Visibility="{Binding MostrarProgreso, Converter={StaticResource BoolToVis}}"/>
-                                        <TextBlock Grid.Column="1" Text="{Binding ProgresoTexto}" FontSize="11" FontWeight="SemiBold" Foreground="#E2E8F0"
+                                        <TextBlock Grid.Column="1" Text="{Binding ProgresoTexto}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource Brush.TextPrimary}"
                                                    Margin="10,0,0,0" VerticalAlignment="Center"/>
                                     </Grid>
 
@@ -265,8 +222,8 @@
                                 <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right">
                                     <TextBlock Text="{Binding NivelNombre}" FontSize="14" FontWeight="Bold" HorizontalAlignment="Right"
                                                Foreground="{Binding NivelColor}"/>
-                                    <TextBlock Text="{Binding PuntosTexto}" FontSize="11" Foreground="#9CA3AF" HorizontalAlignment="Right" Margin="0,2,0,0"/>
-                                    <TextBlock Text="{Binding FechaTexto}" FontSize="10.5" Foreground="#94A3B8" HorizontalAlignment="Right" Margin="0,4,0,0"
+                                    <TextBlock Text="{Binding PuntosTexto}" FontSize="11" Foreground="{StaticResource Brush.TextSecondary}" HorizontalAlignment="Right" Margin="0,2,0,0"/>
+                                    <TextBlock Text="{Binding FechaTexto}" FontSize="10.5" Foreground="{StaticResource Brush.TextTertiary}" HorizontalAlignment="Right" Margin="0,4,0,0"
                                                TextWrapping="Wrap" TextAlignment="Right"
                                                Visibility="{Binding TieneFecha, Converter={StaticResource BoolToVis}}"/>
                                 </StackPanel>

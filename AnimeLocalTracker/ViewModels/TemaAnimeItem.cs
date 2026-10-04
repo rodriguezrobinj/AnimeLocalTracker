@@ -58,10 +58,7 @@ public partial class TemaAnimeItem : ObservableObject, IRecipient<IdiomaCambiado
     /// <summary>Peso aproximado de la descarga ("2,5 MB"). Solo mientras no está guardado y si AnimeThemes lo dice.</summary>
     public bool MostrarTamano => !Descargado && Info.TamanoBytes is > 0;
 
-    public string TamanoTexto => FormatearTamano(Info.TamanoBytes ?? 0);
-
-    internal static string FormatearTamano(long bytes) =>
-        (bytes / (1024d * 1024d)).ToString("0.0", LocalizationService.Cultura) + " MB";
+    public string TamanoTexto => Core.Formato.Tamano(Info.TamanoBytes ?? 0);
 
     /// <summary>En la cola de "Descargar todos", esperando su turno.</summary>
     [ObservableProperty]

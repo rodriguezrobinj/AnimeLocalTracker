@@ -94,7 +94,7 @@ public partial class ConfiguracionViewModel : ObservableObject
         {
             AppLogger.Flush(); // que lo último ya esté en el archivo al abrirlo
             Directory.CreateDirectory(AppLogger.Carpeta);
-            Process.Start(new ProcessStartInfo { FileName = AppLogger.Carpeta, UseShellExecute = true });
+            Core.Shell.Abrir(AppLogger.Carpeta);
         }
         catch (Exception ex)
         {
@@ -600,11 +600,7 @@ public partial class ConfiguracionViewModel : ObservableObject
         {
             if (Directory.Exists(RutaBaseAnimes))
             {
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = RutaBaseAnimes,
-                    UseShellExecute = true
-                });
+                Core.Shell.Abrir(RutaBaseAnimes);
             }
             else
             {
@@ -630,11 +626,7 @@ public partial class ConfiguracionViewModel : ObservableObject
             var ruta = AppDataPaths.PluginsFolder;
             if (Directory.Exists(ruta))
             {
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = ruta,
-                    UseShellExecute = true
-                });
+                Core.Shell.Abrir(ruta);
             }
         }
         catch (Exception ex)

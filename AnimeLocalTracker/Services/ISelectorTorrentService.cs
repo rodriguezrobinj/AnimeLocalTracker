@@ -30,7 +30,7 @@ public sealed class CandidatoTorrentItem
     public CandidatoTorrentItem(CandidatoTorrent original)
     {
         Original = original;
-        TamanoTexto = FormatearTamano(original.TamanoBytes);
+        TamanoTexto = Core.Formato.Tamano(original.TamanoBytes);
         Grupo = ExtraerGrupo(original.Titulo);
         Resolucion = ExtraerResolucion(original.Titulo);
     }
@@ -57,13 +57,6 @@ public sealed class CandidatoTorrentItem
         return m.Success ? m.Groups["r"].Value + "p" : null;
     }
 
-    private static string FormatearTamano(long bytes)
-    {
-        double gb = bytes / 1024.0 / 1024.0 / 1024.0;
-        if (gb >= 1.0) return $"{gb:F1} GB";
-        double mb = bytes / 1024.0 / 1024.0;
-        return $"{mb:F0} MB";
-    }
 }
 
 /// <summary>

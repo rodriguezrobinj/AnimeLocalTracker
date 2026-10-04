@@ -9,44 +9,11 @@
              Background="Transparent">
 
     <UserControl.Resources>
-        <!-- Chip de filtro: activo = borde y texto azules (igual que en Actualizaciones/Logros) -->
-        <Style x:Key="HistChipStyle" TargetType="Button">
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="Raiz" Background="#14181E" BorderBrush="#262D38" BorderThickness="1"
-                                CornerRadius="16" Padding="14,6" Margin="0,0,8,0">
-                            <ContentPresenter x:Name="Texto" HorizontalAlignment="Center" VerticalAlignment="Center"
-                                              TextElement.FontSize="12" TextElement.FontWeight="SemiBold"
-                                              TextElement.Foreground="#9CA3AF"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Raiz" Property="Background" Value="#1B222C"/>
-                            </Trigger>
-                            <DataTrigger Binding="{Binding EsActivo}" Value="True">
-                                <Setter TargetName="Raiz" Property="Background" Value="#1E293B"/>
-                                <Setter TargetName="Raiz" Property="BorderBrush" Value="#60A5FA"/>
-                                <Setter TargetName="Texto" Property="TextElement.Foreground" Value="#93C5FD"/>
-                            </DataTrigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
     </UserControl.Resources>
 
     <Grid MaxWidth="1280">
         <Grid.Style>
-            <Style TargetType="Grid">
-                <Setter Property="Margin" Value="95,60,30,30"/>
-                <Style.Triggers>
-                    <DataTrigger Binding="{Binding Topmost, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
-                        <Setter Property="Margin" Value="95,30,30,30"/>
-                    </DataTrigger>
-                </Style.Triggers>
-            </Style>
+            <StaticResource ResourceKey="AppPageMargen"/>
         </Grid.Style>
 
         <Grid.RowDefinitions>
@@ -70,12 +37,12 @@
             </Grid.ColumnDefinitions>
 
             <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                <Border Background="#1E293B" CornerRadius="12" Width="48" Height="48" Margin="0,0,14,0" VerticalAlignment="Center">
-                    <materialDesign:PackIcon Kind="History" Foreground="#60A5FA" Width="26" Height="26" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                <Border Background="{StaticResource Brush.Surface3}" CornerRadius="12" Width="48" Height="48" Margin="0,0,14,0" VerticalAlignment="Center">
+                    <materialDesign:PackIcon Kind="History" Foreground="{StaticResource Brush.Accent}" Width="26" Height="26" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
                 <StackPanel VerticalAlignment="Center">
                     <TextBlock Text="{Binding [Hist_Titulo], Source={x:Static loc:LocalizationService.Instance}}" Style="{StaticResource AppText.PageTitle}"/>
-                    <TextBlock Text="{Binding [Hist_Subtitulo], Source={x:Static loc:LocalizationService.Instance}}" FontSize="12" Foreground="#9CA3AF" Margin="0,3,0,0"/>
+                    <TextBlock Text="{Binding [Hist_Subtitulo], Source={x:Static loc:LocalizationService.Instance}}" FontSize="12" Foreground="{StaticResource Brush.TextSecondary}" Margin="0,3,0,0"/>
                 </StackPanel>
             </StackPanel>
 
@@ -89,12 +56,12 @@
             <Border Background="{DynamicResource Brush.Surface1}" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1"
                     CornerRadius="14" Padding="18,14" Margin="0,0,10,0">
                 <StackPanel Orientation="Horizontal">
-                    <Border Background="#1E293B" CornerRadius="10" Width="42" Height="42" Margin="0,0,14,0">
-                        <materialDesign:PackIcon Kind="History" Foreground="#60A5FA" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    <Border Background="{StaticResource Brush.Surface3}" CornerRadius="10" Width="42" Height="42" Margin="0,0,14,0">
+                        <materialDesign:PackIcon Kind="History" Foreground="{StaticResource Brush.Accent}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="{Binding TotalElementos}" FontSize="24" FontWeight="Bold" Foreground="White"/>
-                        <TextBlock Text="{Binding [Hist_Resumen_Capitulos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="11.5" Foreground="#94A3B8"/>
+                        <TextBlock Text="{Binding [Hist_Resumen_Capitulos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="11.5" Foreground="{StaticResource Brush.TextTertiary}"/>
                     </StackPanel>
                 </StackPanel>
             </Border>
@@ -102,11 +69,11 @@
                     CornerRadius="14" Padding="18,14" Margin="0,0,10,0">
                 <StackPanel Orientation="Horizontal">
                     <Border Background="#3A2F12" CornerRadius="10" Width="42" Height="42" Margin="0,0,14,0">
-                        <materialDesign:PackIcon Kind="ProgressClock" Foreground="#FBBF24" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <materialDesign:PackIcon Kind="ProgressClock" Foreground="{StaticResource Brush.WarningStrong}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="{Binding TotalEnProgreso}" FontSize="24" FontWeight="Bold" Foreground="White"/>
-                        <TextBlock Text="{Binding [Hist_Resumen_EnProgreso], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="11.5" Foreground="#94A3B8"/>
+                        <TextBlock Text="{Binding [Hist_Resumen_EnProgreso], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="11.5" Foreground="{StaticResource Brush.TextTertiary}"/>
                     </StackPanel>
                 </StackPanel>
             </Border>
@@ -114,11 +81,11 @@
                     CornerRadius="14" Padding="18,14">
                 <StackPanel Orientation="Horizontal">
                     <Border Background="#123A2E" CornerRadius="10" Width="42" Height="42" Margin="0,0,14,0">
-                        <materialDesign:PackIcon Kind="ClockCheckOutline" Foreground="#34D399" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <materialDesign:PackIcon Kind="ClockCheckOutline" Foreground="{StaticResource Brush.Success}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="{Binding TiempoVistoTexto}" FontSize="24" FontWeight="Bold" Foreground="White"/>
-                        <TextBlock Text="{Binding [Hist_Resumen_Tiempo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="11.5" Foreground="#94A3B8"/>
+                        <TextBlock Text="{Binding [Hist_Resumen_Tiempo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="11.5" Foreground="{StaticResource Brush.TextTertiary}"/>
                     </StackPanel>
                 </StackPanel>
             </Border>
@@ -127,7 +94,7 @@
         <!-- Filtros (chips con contador) + búsqueda -->
         <DockPanel Grid.Row="2" LastChildFill="True" Margin="0,0,0,4">
         <Border DockPanel.Dock="Right" Width="280" Height="36" Margin="12,0,0,0" VerticalAlignment="Center"
-                Background="#14181E" BorderBrush="#262D38" BorderThickness="1"
+                Background="{StaticResource Brush.Surface1}" BorderBrush="{StaticResource Brush.Border}" BorderThickness="1"
                 CornerRadius="18" Padding="12,0">
             <Grid VerticalAlignment="Center">
                 <Grid.ColumnDefinitions>
@@ -139,8 +106,8 @@
                 <materialDesign:PackIcon Grid.Column="0" Kind="Magnify" Foreground="#6B7280" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
 
                 <TextBox Grid.Column="1" Text="{Binding TextoBusqueda, UpdateSourceTrigger=PropertyChanged}"
-                         Background="Transparent" BorderThickness="0" Foreground="#E2E8F0" FontSize="12.5"
-                         VerticalAlignment="Center" CaretBrush="#60A5FA"
+                         Background="Transparent" BorderThickness="0" Foreground="{StaticResource Brush.TextPrimary}" FontSize="12.5"
+                         VerticalAlignment="Center" CaretBrush="{StaticResource Brush.Accent}"
                          materialDesign:HintAssist.Hint="{Binding [Hist_BuscarPlaceholder], Source={x:Static loc:LocalizationService.Instance}}"
                          materialDesign:TextFieldAssist.DecorationVisibility="Hidden"/>
 
@@ -150,7 +117,7 @@
                         Click="LimpiarBusqueda_Click"
                         Style="{StaticResource MaterialDesignIconButton}" Width="20" Height="20" Padding="0"
                         Visibility="{Binding TextoBusqueda.Length, Converter={StaticResource ZeroToVis}}">
-                    <materialDesign:PackIcon Kind="CloseCircle" Foreground="#9CA3AF" Width="14" Height="14"/>
+                    <materialDesign:PackIcon Kind="CloseCircle" Foreground="{StaticResource Brush.TextSecondary}" Width="14" Height="14"/>
                 </Button>
             </Grid>
         </Border>
@@ -160,7 +127,7 @@
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
                 <DataTemplate>
-                    <Button Content="{Binding Etiqueta}" Style="{StaticResource HistChipStyle}"
+                    <Button Content="{Binding Etiqueta}" Style="{StaticResource AppChipFiltro}"
                             Command="{Binding DataContext.CambiarFiltroCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                             CommandParameter="{Binding Clave}"
                             AutomationProperties.Name="{Binding Etiqueta}"/>
@@ -176,7 +143,7 @@
             <!-- 1. SPINNER DE CARGA -->
             <ProgressBar Style="{StaticResource MaterialDesignCircularProgressBar}"
                          IsIndeterminate="True" Width="44" Height="44"
-                         Value="0" Foreground="#60A5FA"
+                         Value="0" Foreground="{StaticResource Brush.Accent}"
                          HorizontalAlignment="Center" VerticalAlignment="Center"
                          Visibility="{Binding EstaCargando, Converter={StaticResource BoolToVis}}"/>
 
@@ -184,8 +151,8 @@
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"
                         Visibility="{Binding EstaVacio, Converter={StaticResource BoolToVis}}"
                         Margin="0,40,0,40">
-                <Border Background="#1E293B" CornerRadius="36" Width="72" Height="72" Margin="0,0,0,16" HorizontalAlignment="Center">
-                    <materialDesign:PackIcon Kind="History" Foreground="#64748B" Width="36" Height="36" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                <Border Background="{StaticResource Brush.Surface3}" CornerRadius="36" Width="72" Height="72" Margin="0,0,0,16" HorizontalAlignment="Center">
+                    <materialDesign:PackIcon Kind="History" Foreground="{StaticResource Brush.IconMuted}" Width="36" Height="36" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
                 <TextBlock Text="{Binding [Hist_VacioTitulo], Source={x:Static loc:LocalizationService.Instance}}" Style="{StaticResource AppEmptyTitle}"/>
                 <TextBlock Text="{Binding [Hist_VacioSubtitulo], Source={x:Static loc:LocalizationService.Instance}}" Style="{StaticResource AppEmptyText}" Margin="0,6,0,20" MaxWidth="420"/>
@@ -203,7 +170,7 @@
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"
                         Visibility="{Binding SinResultadosBusqueda, Converter={StaticResource BoolToVis}}"
                         Margin="0,40,0,40">
-                <materialDesign:PackIcon Kind="MagnifyClose" Foreground="#64748B" Width="48" Height="48" HorizontalAlignment="Center" Margin="0,0,0,12"/>
+                <materialDesign:PackIcon Kind="MagnifyClose" Foreground="{StaticResource Brush.IconMuted}" Width="48" Height="48" HorizontalAlignment="Center" Margin="0,0,0,12"/>
                 <TextBlock Text="{Binding [Hist_SinResultados], Source={x:Static loc:LocalizationService.Instance}}" Style="{StaticResource AppEmptyText}" FontSize="15" HorizontalAlignment="Center"/>
             </StackPanel>
 
@@ -222,25 +189,12 @@
                      SelectionMode="Single"
                      Visibility="{Binding TieneElementos, Converter={StaticResource BoolToVis}}">
                 <ListBox.ItemContainerStyle>
-                    <Style TargetType="ListBoxItem">
-                        <Setter Property="Background" Value="Transparent"/>
-                        <Setter Property="BorderThickness" Value="0"/>
-                        <Setter Property="Padding" Value="0"/>
-                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
-                        <Setter Property="Template">
-                            <Setter.Value>
-                                <ControlTemplate TargetType="ListBoxItem">
-                                    <ContentPresenter/>
-                                </ControlTemplate>
-                            </Setter.Value>
-                        </Setter>
-                    </Style>
+                    <StaticResource ResourceKey="AppFilaTransparente"/>
                 </ListBox.ItemContainerStyle>
                 <!-- Plantillas implícitas por tipo: cabecera de fecha (string) y tarjeta (item) -->
                 <ListBox.Resources>
                     <DataTemplate DataType="{x:Type sys:String}">
-                        <TextBlock Text="{Binding}" FontSize="12" FontWeight="Bold" Foreground="#93C5FD" Margin="1,14,0,8"/>
+                        <TextBlock Text="{Binding}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource Brush.AccentSoft}" Margin="1,14,0,8"/>
                     </DataTemplate>
 
                     <DataTemplate DataType="{x:Type vm:HistorialItemViewModel}">
@@ -263,7 +217,7 @@
                                         CommandParameter="{Binding}"
                                         ToolTip="{Binding [Hist_Reanudar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
                                         AutomationProperties.Name="{Binding [Hist_Reanudar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
-                                    <Border CornerRadius="10" Background="#1E293B" ClipToBounds="True">
+                                    <Border CornerRadius="10" Background="{StaticResource Brush.Surface3}" ClipToBounds="True">
                                         <Grid>
                                             <Border Style="{StaticResource ShimmerEffectStyle}">
                                                 <materialDesign:PackIcon Kind="MoviePlayOutline" Foreground="#475569" Width="30" Height="30" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False"/>
@@ -287,16 +241,16 @@
                                             Background="Transparent" BorderThickness="0" Padding="0" Height="Auto" MinHeight="0"
                                             ToolTip="{Binding [Hist_VerAnime], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
                                             AutomationProperties.Name="{Binding TituloAnime}">
-                                        <TextBlock Text="{Binding TituloAnime}" FontWeight="Bold" FontSize="15" Foreground="#E2E8F0"
+                                        <TextBlock Text="{Binding TituloAnime}" FontWeight="Bold" FontSize="15" Foreground="{StaticResource Brush.TextPrimary}"
                                                    TextTrimming="CharacterEllipsis" MaxWidth="560"/>
                                     </Button>
 
                                     <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                                        <Border Background="#1E293B" CornerRadius="6" Padding="7,2" Margin="0,0,10,0" VerticalAlignment="Center">
-                                            <TextBlock Text="{Binding EpisodioCorto}" FontSize="11" FontWeight="Bold" Foreground="#93C5FD"/>
+                                        <Border Background="{StaticResource Brush.Surface3}" CornerRadius="6" Padding="7,2" Margin="0,0,10,0" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding EpisodioCorto}" FontSize="11" FontWeight="Bold" Foreground="{StaticResource Brush.AccentSoft}"/>
                                         </Border>
-                                        <materialDesign:PackIcon Kind="ClockOutline" Foreground="#94A3B8" Width="13" Height="13" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                                        <TextBlock Text="{Binding FechaRelativaTexto}" Foreground="#94A3B8" FontSize="12" VerticalAlignment="Center"/>
+                                        <materialDesign:PackIcon Kind="ClockOutline" Foreground="{StaticResource Brush.TextTertiary}" Width="13" Height="13" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                        <TextBlock Text="{Binding FechaRelativaTexto}" Foreground="{StaticResource Brush.TextTertiary}" FontSize="12" VerticalAlignment="Center"/>
                                     </StackPanel>
 
                                     <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
@@ -305,7 +259,7 @@
                                             <TextBlock Text="{Binding EstadoTexto}" FontSize="11.5" FontWeight="SemiBold"
                                                        Foreground="{Binding EstadoColor}" Margin="10,3" VerticalAlignment="Center"/>
                                         </Grid>
-                                        <TextBlock Text="{Binding ProgresoFormateado}" FontSize="12" Foreground="#94A3B8" VerticalAlignment="Center"
+                                        <TextBlock Text="{Binding ProgresoFormateado}" FontSize="12" Foreground="{StaticResource Brush.TextTertiary}" VerticalAlignment="Center"
                                                    Visibility="{Binding MostrarProgreso, Converter={StaticResource BoolToVis}}"/>
                                     </StackPanel>
                                 </StackPanel>

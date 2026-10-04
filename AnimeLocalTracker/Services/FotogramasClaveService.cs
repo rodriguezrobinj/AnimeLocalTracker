@@ -76,40 +76,18 @@ public sealed class FotogramasClaveService : IFotogramasClaveService
 
     private static async Task<IReadOnlyList<double>?> LeerAsync(string rutaVideo, CancellationToken ct)
     {
-        var psi = new ProcessStartInfo
-        {
-            FileName = FfmpegLocator.Ffprobe,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-        foreach (var arg in new[] { "-v", "error", "-select_streams", "v:0", "-show_entries", "packet=pts_time,flags", "-of", "csv=p=0", rutaVideo })
-            psi.ArgumentList.Add(arg);
-
+        string[] argumentos = ["-v", "error", "-select_streams", "v:0", "-show_entries", "packet=pts_time,flags", "-of", "csv=p=0", rutaVideo];
         try
         {
-            using var proceso = Process.Start(psi);
-            if (proceso == null) return null;
+            var resultado = await Core.ProcesoExterno.EjecutarAsync(FfmpegLocator.Ffprobe, argumentos, TiempoMaximo, ct);
+            if (resultado is not { Codigo: 0 }) return null;
 
-            using var limite = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            limite.CancelAfter(TiempoMaximo);
-            try
-            {
-                // Hay que drenar los dos flujos, si no un pipe lleno cuelga ffprobe.
-                var salida = proceso.StandardOutput.ReadToEndAsync(limite.Token);
-                var error = proceso.StandardError.ReadToEndAsync(limite.Token);
-                await proceso.WaitForExitAsync(limite.Token);
-                await Task.WhenAll(salida, error);
-                if (proceso.ExitCode != 0) return null;
-                var instantes = Parsear(salida.Result);
-                return instantes.Count > 0 ? instantes : null;
-            }
-            catch (OperationCanceledException)
-            {
-                try { if (!proceso.HasExited) proceso.Kill(entireProcessTree: true); } catch { /* best-effort */ }
-                return null;
-            }
+            var instantes = Parsear(resultado.Salida);
+            return instantes.Count > 0 ? instantes : null;
+        }
+        catch (OperationCanceledException)
+        {
+            return null;
         }
         catch (Exception ex)
         {

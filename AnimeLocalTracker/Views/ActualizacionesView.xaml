@@ -8,46 +8,9 @@
              TextElement.Foreground="{DynamicResource MaterialDesignBody}"
              Background="Transparent">
 
-    <UserControl.Resources>
-        <!-- Chip de filtro: activo = borde y texto azules de la paleta (igual que en Logros) -->
-        <Style x:Key="ActChipStyle" TargetType="Button">
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Focusable" Value="True"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="Raiz" Background="#14181E" BorderBrush="#262D38" BorderThickness="1"
-                                CornerRadius="16" Padding="14,6" Margin="0,0,8,0">
-                            <ContentPresenter x:Name="Texto" HorizontalAlignment="Center" VerticalAlignment="Center"
-                                              TextElement.FontSize="12" TextElement.FontWeight="SemiBold"
-                                              TextElement.Foreground="#9CA3AF"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Raiz" Property="Background" Value="#1B222C"/>
-                            </Trigger>
-                            <DataTrigger Binding="{Binding EsActivo}" Value="True">
-                                <Setter TargetName="Raiz" Property="Background" Value="#1E293B"/>
-                                <Setter TargetName="Raiz" Property="BorderBrush" Value="#60A5FA"/>
-                                <Setter TargetName="Texto" Property="TextElement.Foreground" Value="#93C5FD"/>
-                            </DataTrigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-    </UserControl.Resources>
-
     <Grid MaxWidth="1280">
         <Grid.Style>
-            <Style TargetType="Grid">
-                <Setter Property="Margin" Value="95,60,30,30"/>
-                <Style.Triggers>
-                    <DataTrigger Binding="{Binding Topmost, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
-                        <Setter Property="Margin" Value="95,30,30,30"/>
-                    </DataTrigger>
-                </Style.Triggers>
-            </Style>
+            <StaticResource ResourceKey="AppPageMargen"/>
         </Grid.Style>
 
         <Grid.RowDefinitions>
@@ -66,12 +29,12 @@
             </Grid.ColumnDefinitions>
 
             <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                <Border Background="#1E293B" CornerRadius="12" Width="48" Height="48" Margin="0,0,14,0" VerticalAlignment="Center">
-                    <materialDesign:PackIcon Kind="NewReleases" Foreground="#60A5FA" Width="26" Height="26" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                <Border Background="{StaticResource Brush.Surface3}" CornerRadius="12" Width="48" Height="48" Margin="0,0,14,0" VerticalAlignment="Center">
+                    <materialDesign:PackIcon Kind="NewReleases" Foreground="{StaticResource Brush.Accent}" Width="26" Height="26" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
                 <StackPanel VerticalAlignment="Center">
                     <TextBlock Text="{Binding [Act_Titulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppText.PageTitle}"/>
-                    <TextBlock Text="{Binding [Act_Subtitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="12" Foreground="#9CA3AF" Margin="0,3,0,0"/>
+                    <TextBlock Text="{Binding [Act_Subtitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="12" Foreground="{StaticResource Brush.TextSecondary}" Margin="0,3,0,0"/>
                 </StackPanel>
             </StackPanel>
 
@@ -123,7 +86,7 @@
                     </Border>
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="{Binding TotalNuevos}" FontSize="24" FontWeight="Bold" Foreground="White"/>
-                        <TextBlock Text="{Binding [Act_Resumen_Nuevos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="11.5" Foreground="#94A3B8"/>
+                        <TextBlock Text="{Binding [Act_Resumen_Nuevos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="11.5" Foreground="{StaticResource Brush.TextTertiary}"/>
                     </StackPanel>
                 </StackPanel>
             </Border>
@@ -131,12 +94,12 @@
             <Border Background="{DynamicResource Brush.Surface1}" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1"
                     CornerRadius="14" Padding="18,14" Margin="0,0,10,0">
                 <StackPanel Orientation="Horizontal">
-                    <Border Background="#1E293B" CornerRadius="10" Width="42" Height="42" Margin="0,0,14,0">
-                        <materialDesign:PackIcon Kind="CloudDownloadOutline" Foreground="#60A5FA" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    <Border Background="{StaticResource Brush.Surface3}" CornerRadius="10" Width="42" Height="42" Margin="0,0,14,0">
+                        <materialDesign:PackIcon Kind="CloudDownloadOutline" Foreground="{StaticResource Brush.Accent}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="{Binding TotalPorDescargar}" FontSize="24" FontWeight="Bold" Foreground="White"/>
-                        <TextBlock Text="{Binding [Act_Resumen_PorDescargar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="11.5" Foreground="#94A3B8"/>
+                        <TextBlock Text="{Binding [Act_Resumen_PorDescargar], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="11.5" Foreground="{StaticResource Brush.TextTertiary}"/>
                     </StackPanel>
                 </StackPanel>
             </Border>
@@ -145,11 +108,11 @@
                     CornerRadius="14" Padding="18,14">
                 <StackPanel Orientation="Horizontal">
                     <Border Background="#123A2E" CornerRadius="10" Width="42" Height="42" Margin="0,0,14,0">
-                        <materialDesign:PackIcon Kind="PlayCircleOutline" Foreground="#34D399" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <materialDesign:PackIcon Kind="PlayCircleOutline" Foreground="{StaticResource Brush.Success}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="{Binding TotalListos}" FontSize="24" FontWeight="Bold" Foreground="White"/>
-                        <TextBlock Text="{Binding [Act_Resumen_Listos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="11.5" Foreground="#94A3B8"/>
+                        <TextBlock Text="{Binding [Act_Resumen_Listos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" FontSize="11.5" Foreground="{StaticResource Brush.TextTertiary}"/>
                     </StackPanel>
                 </StackPanel>
             </Border>
@@ -162,7 +125,7 @@
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
                 <DataTemplate>
-                    <Button Content="{Binding Etiqueta}" Style="{StaticResource ActChipStyle}"
+                    <Button Content="{Binding Etiqueta}" Style="{StaticResource AppChipFiltro}"
                             Command="{Binding DataContext.SeleccionarFiltroCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                             CommandParameter="{Binding Clave}"
                             AutomationProperties.Name="{Binding Etiqueta}"/>
@@ -174,15 +137,15 @@
         <Grid Grid.Row="3">
             <!-- CARGANDO -->
             <ProgressBar Style="{StaticResource MaterialDesignCircularProgressBar}" IsIndeterminate="True"
-                         Width="44" Height="44" Value="0" Foreground="#60A5FA"
+                         Width="44" Height="44" Value="0" Foreground="{StaticResource Brush.Accent}"
                          HorizontalAlignment="Center" VerticalAlignment="Center"
                          Visibility="{Binding EstaCargando, Converter={StaticResource BoolToVis}}"/>
 
             <!-- VACÍO -->
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="460"
                          Visibility="{Binding EstaVacio, Converter={StaticResource BoolToVis}}">
-                <Border Background="#1E293B" CornerRadius="36" Width="72" Height="72" Margin="0,0,0,16" HorizontalAlignment="Center">
-                    <materialDesign:PackIcon Kind="NewReleases" Foreground="#64748B" Width="36" Height="36" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                <Border Background="{StaticResource Brush.Surface3}" CornerRadius="36" Width="72" Height="72" Margin="0,0,0,16" HorizontalAlignment="Center">
+                    <materialDesign:PackIcon Kind="NewReleases" Foreground="{StaticResource Brush.IconMuted}" Width="36" Height="36" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
                 <TextBlock Text="{Binding [Act_VacioTitulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppEmptyTitle}"/>
                 <TextBlock Text="{Binding [Act_VacioSub], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppEmptyText}" Margin="0,6,0,0"/>
@@ -191,7 +154,7 @@
             <!-- SIN RESULTADOS CON EL FILTRO ACTUAL -->
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,40,0,40"
                         Visibility="{Binding SinResultados, Converter={StaticResource BoolToVis}}">
-                <materialDesign:PackIcon Kind="FilterVariant" Foreground="#64748B" Width="48" Height="48" HorizontalAlignment="Center" Margin="0,0,0,12"/>
+                <materialDesign:PackIcon Kind="FilterVariant" Foreground="{StaticResource Brush.IconMuted}" Width="48" Height="48" HorizontalAlignment="Center" Margin="0,0,0,12"/>
                 <TextBlock Text="{Binding [Act_SinResultados], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Style="{StaticResource AppEmptyText}" FontSize="15" HorizontalAlignment="Center"/>
             </StackPanel>
 
@@ -207,26 +170,13 @@
                      SelectionMode="Single"
                      Visibility="{Binding TieneResultados, Converter={StaticResource BoolToVis}}">
                 <ListBox.ItemContainerStyle>
-                    <Style TargetType="ListBoxItem">
-                        <Setter Property="Background" Value="Transparent"/>
-                        <Setter Property="BorderThickness" Value="0"/>
-                        <Setter Property="Padding" Value="0"/>
-                        <Setter Property="Focusable" Value="False"/>
-                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                        <Setter Property="Template">
-                            <Setter.Value>
-                                <ControlTemplate TargetType="ListBoxItem">
-                                    <ContentPresenter/>
-                                </ControlTemplate>
-                            </Setter.Value>
-                        </Setter>
-                    </Style>
+                    <StaticResource ResourceKey="AppFilaTransparenteSinFoco"/>
                 </ListBox.ItemContainerStyle>
 
                 <ListBox.Resources>
                     <!-- CABECERA DE FECHA (Hoy / Ayer / Hace N días) -->
                     <DataTemplate DataType="{x:Type sys:String}">
-                        <TextBlock Text="{Binding}" FontSize="12" FontWeight="Bold" Foreground="#93C5FD" Margin="1,14,0,8"
+                        <TextBlock Text="{Binding}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource Brush.AccentSoft}" Margin="1,14,0,8"
                                    Focusable="False" IsHitTestVisible="False"/>
                     </DataTemplate>
 
@@ -252,7 +202,7 @@
                                         Cursor="Hand" ToolTip="{Binding [Act_VerAnime], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
                                         AutomationProperties.Name="{Binding [Act_VerAnime], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
                                         VerticalAlignment="Center">
-                                    <Border x:Name="Portada" Width="66" Height="94" CornerRadius="10" ClipToBounds="True" Background="#1E293B">
+                                    <Border x:Name="Portada" Width="66" Height="94" CornerRadius="10" ClipToBounds="True" Background="{StaticResource Brush.Surface3}">
                                         <Grid>
                                             <!-- Placeholder DEBAJO de la imagen: se ve si la portada falla o aún carga -->
                                             <Border Style="{StaticResource ShimmerEffectStyle}">
@@ -273,18 +223,18 @@
                                             Background="Transparent" BorderThickness="0" Padding="0" Margin="0"
                                             Cursor="Hand" HorizontalAlignment="Left" HorizontalContentAlignment="Left"
                                             ToolTip="{Binding [Act_VerAnime], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
-                                        <TextBlock Text="{Binding TituloAnime}" FontWeight="Bold" FontSize="15" Foreground="#E2E8F0"
+                                        <TextBlock Text="{Binding TituloAnime}" FontWeight="Bold" FontSize="15" Foreground="{StaticResource Brush.TextPrimary}"
                                                    TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"/>
                                     </Button>
 
                                     <StackPanel Orientation="Horizontal" Margin="0,7,0,0">
-                                        <Border Background="#1E293B" CornerRadius="6" Padding="7,2" VerticalAlignment="Center">
-                                            <TextBlock Text="{Binding EpisodioCorto}" Foreground="#93C5FD" FontSize="11" FontWeight="Bold"/>
+                                        <Border Background="{StaticResource Brush.Surface3}" CornerRadius="6" Padding="7,2" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding EpisodioCorto}" Foreground="{StaticResource Brush.AccentSoft}" FontSize="11" FontWeight="Bold"/>
                                         </Border>
-                                        <TextBlock Text="{Binding FechaTexto}" FontSize="12" Foreground="#94A3B8" VerticalAlignment="Center" Margin="9,0,0,0"/>
-                                        <TextBlock Text=" · " Foreground="#94A3B8" FontSize="12" VerticalAlignment="Center"
+                                        <TextBlock Text="{Binding FechaTexto}" FontSize="12" Foreground="{StaticResource Brush.TextTertiary}" VerticalAlignment="Center" Margin="9,0,0,0"/>
+                                        <TextBlock Text=" · " Foreground="{StaticResource Brush.TextTertiary}" FontSize="12" VerticalAlignment="Center"
                                                    Visibility="{Binding Descargado, Converter={StaticResource BoolToVis}}"/>
-                                        <TextBlock Text="{Binding TamanoArchivoFormateado}" FontSize="12" Foreground="#94A3B8" VerticalAlignment="Center"
+                                        <TextBlock Text="{Binding TamanoArchivoFormateado}" FontSize="12" Foreground="{StaticResource Brush.TextTertiary}" VerticalAlignment="Center"
                                                    Visibility="{Binding Descargado, Converter={StaticResource BoolToVis}}"/>
                                     </StackPanel>
 
@@ -299,7 +249,7 @@
                                                            FontSize="11.5" FontWeight="SemiBold" VerticalAlignment="Center"/>
                                             </StackPanel>
                                         </Grid>
-                                        <TextBlock Text="{Binding ProgresoFormateado}" Foreground="#94A3B8" FontSize="11.5"
+                                        <TextBlock Text="{Binding ProgresoFormateado}" Foreground="{StaticResource Brush.TextTertiary}" FontSize="11.5"
                                                    VerticalAlignment="Center" Margin="10,0,0,0"
                                                    Visibility="{Binding TieneProgresoGuardado, Converter={StaticResource BoolToVis}}"/>
                                     </StackPanel>
@@ -337,14 +287,14 @@
                                     <!-- Descargando: círculo de progreso en lugar del botón -->
                                     <Grid Width="130" Height="38" Visibility="{Binding IsDownloading, Converter={StaticResource BoolToVis}}">
                                         <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
-                                            <Ellipse Width="26" Height="26" Stroke="#33FFFFFF" StrokeThickness="3"/>
-                                            <ProgressBar Width="26" Height="26" Foreground="#60A5FA"
+                                            <Ellipse Width="26" Height="26" Stroke="{StaticResource Brush.RingBase}" StrokeThickness="3"/>
+                                            <ProgressBar Width="26" Height="26" Foreground="{StaticResource Brush.Accent}"
                                                          Style="{StaticResource MaterialDesignCircularProgressBar}" IsIndeterminate="True"
                                                          Visibility="{Binding EstaEnEspera, Converter={StaticResource BoolToVis}}"
                                                          materialDesign:TransitionAssist.DisableTransitions="True"/>
                                             <ProgressBar Value="{Binding DownloadProgress, Mode=OneWay}" Minimum="0" Maximum="100"
                                                          Style="{StaticResource MaterialDesignCircularProgressBar}"
-                                                         Width="26" Height="26" Foreground="#60A5FA" IsIndeterminate="False"
+                                                         Width="26" Height="26" Foreground="{StaticResource Brush.Accent}" IsIndeterminate="False"
                                                          Visibility="{Binding ProgresoDescargaActivo, Converter={StaticResource BoolToVis}}"
                                                          materialDesign:TransitionAssist.DisableTransitions="True"/>
                                         </Grid>

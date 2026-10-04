@@ -81,13 +81,13 @@ public partial class DetalleViewModel
         if (cancellationToken.IsCancellationRequested || !ReferenceEquals(anime, AnimeSeleccionado)) return; // se cambió de ficha mientras se calculaba
 
         TieneEspacioEnDisco = nTotal > 0;
-        EspacioEnDiscoTexto = nTotal > 0 ? EpisodioItem.FormatearTamano(total) : string.Empty;
-        EspacioEnDiscoTooltip = string.Format(LocalizationService.T("Det_EspacioTooltipFormato"), nTotal, EpisodioItem.FormatearTamano(total));
+        EspacioEnDiscoTexto = nTotal > 0 ? Core.Formato.Tamano(total) : string.Empty;
+        EspacioEnDiscoTooltip = string.Format(LocalizationService.T("Det_EspacioTooltipFormato"), nTotal, Core.Formato.Tamano(total));
         _bytesLiberables = vistos;
         _episodiosLiberables = nVistos;
         HayEspacioLiberable = nVistos > 0;
         LiberarEspacioDescripcion = nVistos > 0
-            ? string.Format(LocalizationService.T("Det_LiberarEspacioDescFormato"), nVistos, EpisodioItem.FormatearTamano(vistos))
+            ? string.Format(LocalizationService.T("Det_LiberarEspacioDescFormato"), nVistos, Core.Formato.Tamano(vistos))
             : LocalizationService.T("Det_LiberarEspacioNadaDesc");
     }
 
@@ -105,7 +105,7 @@ public partial class DetalleViewModel
 
         bool confirmar = await _dialogService.MostrarDialogoAsync(
             LocalizationService.T("Det_LiberarEspacioTitulo"),
-            string.Format(LocalizationService.T("Det_LiberarEspacioConfirmacionFormato"), vistos.Count, EpisodioItem.FormatearTamano(_bytesLiberables)),
+            string.Format(LocalizationService.T("Det_LiberarEspacioConfirmacionFormato"), vistos.Count, Core.Formato.Tamano(_bytesLiberables)),
             true, "DeleteSweepOutline", "#EF4444");
         if (!confirmar) return;
 
@@ -163,7 +163,7 @@ public partial class DetalleViewModel
 
         _dialogService.MostrarToast(
             LocalizationService.T("Det_LiberarEspacioTitulo"),
-            string.Format(LocalizationService.T("Det_LiberarEspacioHechoFormato"), borrados, EpisodioItem.FormatearTamano(liberados)),
+            string.Format(LocalizationService.T("Det_LiberarEspacioHechoFormato"), borrados, Core.Formato.Tamano(liberados)),
             "CheckCircleOutline", "#4CAF50");
     }
 
@@ -232,7 +232,7 @@ public partial class DetalleViewModel
 
         try
         {
-            Process.Start(new ProcessStartInfo { FileName = url, UseShellExecute = true });
+            Core.Shell.Abrir(url);
         }
         catch (Exception ex)
         {

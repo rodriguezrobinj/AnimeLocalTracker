@@ -271,9 +271,7 @@ public sealed partial class MusicaFichaViewModel : ObservableObject, IDisposable
         if (_settingsService == null) return;
 
         _ajustesMusicaPendientes = true;
-        _ctsGuardadoAjustesMusica?.Cancel();
-        _ctsGuardadoAjustesMusica?.Dispose();
-        _ctsGuardadoAjustesMusica = new CancellationTokenSource();
+        Core.Cancelacion.Reemplazar(ref _ctsGuardadoAjustesMusica);
 
         _ = GuardarAjustesMusicaTrasRetrasoAsync(conRetraso ? RetrasoGuardadoAjustesMusica : TimeSpan.Zero, _ctsGuardadoAjustesMusica.Token);
     }
@@ -683,7 +681,7 @@ public sealed partial class MusicaFichaViewModel : ObservableObject, IDisposable
         // Las vistas previas ya preparadas no se bajan: se guardan (moverlas es instantáneo), así que no pesan.
         var aBajar = pendientes.Where(t => !t.VistaPreviaLista).ToList();
         string mensaje = aBajar.All(t => t.Info.TamanoBytes is > 0)
-            ? string.Format(LocalizationService.T("Det_MusicaDescargarTodosMsjFormato"), pendientes.Count, TemaAnimeItem.FormatearTamano(aBajar.Sum(t => t.Info.TamanoBytes ?? 0)))
+            ? string.Format(LocalizationService.T("Det_MusicaDescargarTodosMsjFormato"), pendientes.Count, Core.Formato.Tamano(aBajar.Sum(t => t.Info.TamanoBytes ?? 0)))
             : string.Format(LocalizationService.T("Det_MusicaDescargarTodosMsjSinTamanoFormato"), pendientes.Count);
         if (!await _dialogService.MostrarDialogoAsync(LocalizationService.T("Det_MusicaDescargarTodosTitulo"), mensaje, true, "DownloadMultiple", "#2563EB")) return;
 

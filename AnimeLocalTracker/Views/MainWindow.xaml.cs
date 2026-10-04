@@ -293,17 +293,13 @@ public partial class MainWindow : Window, IVentanaPrincipal
         if (msg == 0x0024 && !IsFullScreen)
         {
             var mmi = Marshal.PtrToStructure<MINMAXINFO>(lParam);
-            IntPtr monitor = MonitorFromWindow(hwnd, 2); // MONITOR_DEFAULTTONEAREST
-            if (monitor != IntPtr.Zero)
+            if (MonitorDeVentana.Areas(hwnd, out var monitor, out var trabajo))
             {
-                var mi = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
-                GetMonitorInfo(monitor, ref mi);
-
-                // rcWork = área útil sin la barra de tareas
-                mmi.ptMaxPosition.x = Math.Abs(mi.rcWork.left - mi.rcMonitor.left);
-                mmi.ptMaxPosition.y = Math.Abs(mi.rcWork.top  - mi.rcMonitor.top);
-                mmi.ptMaxSize.x     = Math.Abs(mi.rcWork.right  - mi.rcWork.left);
-                mmi.ptMaxSize.y     = Math.Abs(mi.rcWork.bottom - mi.rcWork.top);
+                // trabajo = área útil sin la barra de tareas
+                mmi.ptMaxPosition.x = Math.Abs(trabajo.Left - monitor.Left);
+                mmi.ptMaxPosition.y = Math.Abs(trabajo.Top  - monitor.Top);
+                mmi.ptMaxSize.x     = Math.Abs(trabajo.Right  - trabajo.Left);
+                mmi.ptMaxSize.y     = Math.Abs(trabajo.Bottom - trabajo.Top);
             }
             Marshal.StructureToPtr(mmi, lParam, true);
             handled = true;
@@ -496,13 +492,6 @@ public partial class MainWindow : Window, IVentanaPrincipal
     //  Win32 interop structs
     // ═══════════════════════════════════════════════════════════════
 
-    [DllImport("user32.dll")]
-    private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint dwFlags);
-
-    [DllImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
-
     [StructLayout(LayoutKind.Sequential)]
     private struct MINMAXINFO
     {
@@ -516,15 +505,4 @@ public partial class MainWindow : Window, IVentanaPrincipal
     [StructLayout(LayoutKind.Sequential)]
     private struct POINT { public int x, y; }
 
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
-    private struct MONITORINFO
-    {
-        public int  cbSize;
-        public RECT rcMonitor;
-        public RECT rcWork;
-        public uint dwFlags;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct RECT { public int left, top, right, bottom; }
 }

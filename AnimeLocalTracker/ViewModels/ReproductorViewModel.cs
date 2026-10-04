@@ -310,9 +310,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     /// <summary>Olvida la pista extraída (episodio nuevo o cambio de pista) y cancela la extracción que estuviera en curso.</summary>
     private void ReiniciarCuesSubtitulos()
     {
-        _subtitleCuesCts?.Cancel();
-        _subtitleCuesCts?.Dispose();
-        _subtitleCuesCts = null;
+        Core.Cancelacion.Detener(ref _subtitleCuesCts);
 
         SubtitulosDobleLineaActivo = false;
         _subtitleCues = Array.Empty<Models.SubtitleCue>();
@@ -545,9 +543,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
     internal void CerrarDibujoAss()
     {
-        _assCts?.Cancel();
-        _assCts?.Dispose();
-        _assCts = null;
+        Core.Cancelacion.Detener(ref _assCts);
 
         _assListo = false;
         SubtitulosAssActivo = false;
@@ -1773,9 +1769,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         var siguiente = _siguienteEpisodioCache ?? ObtenerSiguienteEpisodio();
         if (animeId <= 0 || siguiente == null || siguiente.NumeroEpisodio <= 0 || string.IsNullOrWhiteSpace(siguiente.RutaCompleta)) return;
 
-        _preanalisisCts?.Cancel();
-        _preanalisisCts?.Dispose();
-        _preanalisisCts = new CancellationTokenSource();
+        Core.Cancelacion.Reemplazar(ref _preanalisisCts);
         _ = PreanalizarSiguienteAsync(animeId, siguiente.NumeroEpisodio, siguiente.RutaCompleta, ctEpisodio, _preanalisisCts.Token);
     }
 
@@ -1820,9 +1814,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         _ = CargarFavoritoAsync(version);
 
         // Cancelar rastreo previo
-        _trackingCts?.Cancel();
-        _trackingCts?.Dispose();
-        _trackingCts = new CancellationTokenSource();
+        Core.Cancelacion.Reemplazar(ref _trackingCts);
 
         // 1. Asegurar que Player existe antes de configurar el nuevo archivo. No se detiene antes el video anterior: la apertura de
         //    Flyleaf ya lo reinicia en su propio hilo, y el Stop() previo repetía ese trabajo en el de la interfaz (~200 ms bloqueada
@@ -1896,9 +1888,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         _seekCoordinator.Reiniciar();
 
         // Cancelar detección de skips previa
-        _skipCts?.Cancel();
-        _skipCts?.Dispose();
-        _skipCts = new CancellationTokenSource();
+        Core.Cancelacion.Reemplazar(ref _skipCts);
         var currentSkipCts = _skipCts;
 
         Interlocked.Exchange(ref _skipTimes, new List<AniSkipResult>());
@@ -2816,9 +2806,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
         try
         {
-            _subtitleCuesCts?.Cancel();
-            _subtitleCuesCts?.Dispose();
-            _subtitleCuesCts = null;
+            Core.Cancelacion.Detener(ref _subtitleCuesCts);
         }
         catch (Exception ex)
         {
@@ -2827,12 +2815,8 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
         try
         {
-            _skipCts?.Cancel();
-            _skipCts?.Dispose();
-            _skipCts = null;
-            _preanalisisCts?.Cancel();
-            _preanalisisCts?.Dispose();
-            _preanalisisCts = null;
+            Core.Cancelacion.Detener(ref _skipCts);
+            Core.Cancelacion.Detener(ref _preanalisisCts);
         }
         catch { }
 

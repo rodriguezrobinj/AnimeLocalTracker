@@ -21,7 +21,7 @@ public sealed class EnlacesMusicaService : IEnlacesMusicaService
     private readonly Action<string> _abrirUrl;
 
     public EnlacesMusicaService(IEnumerable<IProveedorEnlacesMusica> proveedores)
-        : this(proveedores, url => Process.Start(new ProcessStartInfo { FileName = url, UseShellExecute = true })?.Dispose())
+        : this(proveedores, url => Core.Shell.Abrir(url))
     {
     }
 

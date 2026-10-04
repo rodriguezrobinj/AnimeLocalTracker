@@ -96,37 +96,9 @@ public sealed class AudioDurationService : IAudioDurationService, IDisposable
 
     private static async Task<string?> EjecutarFfprobeAsync(string ruta, CancellationToken ct)
     {
-        var psi = new ProcessStartInfo
-        {
-            FileName = FfmpegLocator.Ffprobe,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-        foreach (var arg in new[] { "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", ruta })
-            psi.ArgumentList.Add(arg);
-
-        using var proceso = Process.Start(psi);
-        if (proceso == null) return null;
-
-        using var limite = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        limite.CancelAfter(TiempoMaximo);
-
-        try
-        {
-            // Se drenan los dos flujos a la vez: un pipe redirigido sin lector puede colgar el proceso (visto con ffmpeg).
-            var salida = proceso.StandardOutput.ReadToEndAsync(limite.Token);
-            var error = proceso.StandardError.ReadToEndAsync(limite.Token);
-            await proceso.WaitForExitAsync(limite.Token);
-            await Task.WhenAll(salida, error);
-            return proceso.ExitCode == 0 ? salida.Result : null;
-        }
-        catch (OperationCanceledException)
-        {
-            try { if (!proceso.HasExited) proceso.Kill(entireProcessTree: true); } catch { /* best-effort */ }
-            throw;
-        }
+        string[] argumentos = ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", ruta];
+        var resultado = await Core.ProcesoExterno.EjecutarAsync(FfmpegLocator.Ffprobe, argumentos, TiempoMaximo, ct);
+        return resultado is { Codigo: 0 } ? resultado.Salida : null;
     }
 
     public void Dispose() => _limite.Dispose();

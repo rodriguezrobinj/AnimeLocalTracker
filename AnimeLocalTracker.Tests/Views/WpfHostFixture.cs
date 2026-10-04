@@ -61,6 +61,10 @@ public sealed class WpfHostFixture : IDisposable
                 app.Resources["AppEmptyText"] = new Style(typeof(TextBlock));
                 app.Resources["AppPrimaryButton"] = new Style(typeof(Button));
                 app.Resources["AppPageRoot"] = new Style(typeof(Grid));
+                app.Resources["AppPageMargen"] = new Style(typeof(Grid));
+                app.Resources["AppChipFiltro"] = new Style(typeof(Button));
+                app.Resources["AppFilaTransparente"] = new Style(typeof(ListBoxItem));
+                app.Resources["AppFilaTransparenteSinFoco"] = new Style(typeof(ListBoxItem));
                 app.Resources["AppBadge"] = new Style(typeof(Border));
                 app.Resources["AppCard"] = new Style(typeof(Border));
                 app.Resources["AppText.Caption"] = new Style(typeof(TextBlock));

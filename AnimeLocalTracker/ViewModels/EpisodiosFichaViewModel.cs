@@ -1035,9 +1035,7 @@ public sealed partial class EpisodiosFichaViewModel : ObservableObject,
         ActualizarTextoDeshacer();
         PuedeDeshacerMarcado = true;
 
-        _ctsAvisoDeshacer?.Cancel();
-        _ctsAvisoDeshacer?.Dispose();
-        _ctsAvisoDeshacer = new CancellationTokenSource();
+        Core.Cancelacion.Reemplazar(ref _ctsAvisoDeshacer);
         _ = OcultarAvisoDeshacerTrasUnRatoAsync(_ctsAvisoDeshacer.Token);
     }
 

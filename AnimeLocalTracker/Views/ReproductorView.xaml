@@ -25,7 +25,7 @@
             <Setter Property="Control.Template">
                 <Setter.Value>
                     <ControlTemplate>
-                        <Rectangle Margin="-2" Stroke="#3B82F6" StrokeThickness="2"
+                        <Rectangle Margin="-2" Stroke="{StaticResource Brush.AccentStrong}" StrokeThickness="2"
                                    RadiusX="6" RadiusY="6" SnapsToDevicePixels="True" />
                     </ControlTemplate>
                 </Setter.Value>
@@ -214,8 +214,8 @@
             <Setter Property="Foreground" Value="White"/>
             <Style.Triggers>
                 <Trigger Property="Tag" Value="activo">
-                    <Setter Property="Foreground" Value="#60A5FA"/>
-                    <Setter Property="Background" Value="#2960A5FA"/>
+                    <Setter Property="Foreground" Value="{StaticResource Brush.Accent}"/>
+                    <Setter Property="Background" Value="{StaticResource Brush.AccentTint}"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -233,9 +233,9 @@
 
         <!-- Chip de ajuste predefinido del ecualizador (resaltado el que está puesto). -->
         <Style x:Key="ChipPresetEcualizador" TargetType="Button">
-            <Setter Property="Foreground" Value="#E2E8F0"/>
-            <Setter Property="Background" Value="#1E293B"/>
-            <Setter Property="BorderBrush" Value="#2D3748"/>
+            <Setter Property="Foreground" Value="{StaticResource Brush.TextPrimary}"/>
+            <Setter Property="Background" Value="{StaticResource Brush.Surface3}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource Brush.BorderStrong}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="10,4"/>
             <Setter Property="Margin" Value="0,0,6,6"/>
@@ -252,11 +252,11 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Fondo" Property="BorderBrush" Value="#60A5FA"/>
+                                <Setter TargetName="Fondo" Property="BorderBrush" Value="{StaticResource Brush.Accent}"/>
                             </Trigger>
                             <DataTrigger Binding="{Binding EsActual}" Value="True">
                                 <Setter TargetName="Fondo" Property="Background" Value="#2563EB"/>
-                                <Setter TargetName="Fondo" Property="BorderBrush" Value="#60A5FA"/>
+                                <Setter TargetName="Fondo" Property="BorderBrush" Value="{StaticResource Brush.Accent}"/>
                                 <Setter Property="Foreground" Value="White"/>
                             </DataTrigger>
                         </ControlTemplate.Triggers>
@@ -284,7 +284,7 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="#33FFFFFF"/>
+                                <Setter Property="Background" Value="{StaticResource Brush.RingBase}"/>
                                 <Setter Property="Foreground" Value="White"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -329,7 +329,7 @@
                 <Grid x:Name="TapaVideo" Background="Black" IsHitTestVisible="False" Visibility="Collapsed">
                     <ProgressBar Style="{StaticResource MaterialDesignCircularProgressBar}"
                                  IsIndeterminate="True" Width="44" Height="44"
-                                 Value="0" Foreground="#60A5FA"
+                                 Value="0" Foreground="{StaticResource Brush.Accent}"
                                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Grid>
 
@@ -376,7 +376,7 @@
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding EpisodioEsFavorito}" Value="True">
                                                 <Setter Property="Kind" Value="Bookmark"/>
-                                                <Setter Property="Foreground" Value="#60A5FA"/>
+                                                <Setter Property="Foreground" Value="{StaticResource Brush.Accent}"/>
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
@@ -680,7 +680,7 @@
                                     Style="{StaticResource PlayerMenuToolButton}" Width="40" Height="40" Margin="0,0,5,0">
                                 <Grid>
                                     <materialDesign:PackIcon Kind="Equalizer" Width="24" Height="24"/>
-                                    <Ellipse Width="7" Height="7" Fill="#60A5FA" Stroke="#141414" StrokeThickness="1"
+                                    <Ellipse Width="7" Height="7" Fill="{StaticResource Brush.Accent}" Stroke="#141414" StrokeThickness="1"
                                              HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-2,-3,0"
                                              Visibility="{Binding EcualizadorActivo, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                                 </Grid>
@@ -697,7 +697,7 @@
                                         <DropShadowEffect Color="Black" BlurRadius="15" ShadowDepth="5" Opacity="0.5"/>
                                     </Border.Effect>
                                     <StackPanel>
-                                        <TextBlock Text="{Binding [Player_Audio], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Foreground="#94A3B8" FontSize="12" FontWeight="Bold" Margin="15,0,0,10" />
+                                        <TextBlock Text="{Binding [Player_Audio], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Foreground="{StaticResource Brush.TextTertiary}" FontSize="12" FontWeight="Bold" Margin="15,0,0,10" />
                                         <ItemsControl ItemsSource="{Binding PistasAudio}">
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate>
@@ -716,10 +716,10 @@
                                         <!-- Con una sola pista (o ninguna) el menú lo explica en vez de parecer roto -->
                                         <TextBlock Text="{Binding [Player_AudioUnicaPista], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
                                                    Visibility="{Binding HayUnaSolaPistaAudio, Converter={StaticResource BooleanToVisibilityConverter}}"
-                                                   Foreground="#94A3B8" FontSize="12" TextWrapping="Wrap" MaxWidth="240" Margin="15,8,10,0"/>
+                                                   Foreground="{StaticResource Brush.TextTertiary}" FontSize="12" TextWrapping="Wrap" MaxWidth="240" Margin="15,8,10,0"/>
                                         <TextBlock Text="{Binding [Player_AudioSinPistas], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
                                                    Visibility="{Binding SinPistasAudio, Converter={StaticResource BooleanToVisibilityConverter}}"
-                                                   Foreground="#94A3B8" FontSize="12" TextWrapping="Wrap" MaxWidth="240" Margin="15,0,10,0"/>
+                                                   Foreground="{StaticResource Brush.TextTertiary}" FontSize="12" TextWrapping="Wrap" MaxWidth="240" Margin="15,0,10,0"/>
                                     </StackPanel>
                                 </Border>
                                 <Path x:Name="AudioPopupFlecha" Style="{StaticResource FlechaMenu}"/>
@@ -738,7 +738,7 @@
                                     </Border.Effect>
                                     
                                     <StackPanel>
-                                        <TextBlock Text="{Binding [Player_Subtitulos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Foreground="#94A3B8" FontSize="12" FontWeight="Bold" Margin="15,0,0,10" />
+                                        <TextBlock Text="{Binding [Player_Subtitulos], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}" Foreground="{StaticResource Brush.TextTertiary}" FontSize="12" FontWeight="Bold" Margin="15,0,0,10" />
 
                                         <!-- Apagar -->
                                         <Button Content="{Binding [Player_ApagarSubtitulos], Source={x:Static loc:LocalizationService.Instance}}" Command="{Binding TurnOffSubtitlesCommand}" Click="SubtitleMenuItem_Click" Style="{StaticResource MenuItemButton}"/>
@@ -851,10 +851,10 @@
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
                                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                    <materialDesign:PackIcon Kind="Equalizer" Width="18" Height="18" Foreground="#60A5FA" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                                    <materialDesign:PackIcon Kind="Equalizer" Width="18" Height="18" Foreground="{StaticResource Brush.Accent}" VerticalAlignment="Center" Margin="0,0,8,0"/>
                                                     <TextBlock Text="{Binding [Eq_Titulo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
                                                                Foreground="White" FontSize="14" FontWeight="Bold" VerticalAlignment="Center"/>
-                                                    <TextBlock Text="{Binding NombrePresetEcualizador}" Foreground="#94A3B8" FontSize="12" Margin="10,1,0,0" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="{Binding NombrePresetEcualizador}" Foreground="{StaticResource Brush.TextTertiary}" FontSize="12" Margin="10,1,0,0" VerticalAlignment="Center"/>
                                                 </StackPanel>
                                                 <ToggleButton Grid.Column="1" IsChecked="{Binding EcualizadorActivo, Mode=TwoWay}" Cursor="Hand"
                                                               Style="{StaticResource MaterialDesignSwitchToggleButton}"
@@ -863,7 +863,7 @@
                                             </Grid>
 
                                             <TextBlock Text="{Binding [Eq_Ajustes], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                                       Foreground="#94A3B8" FontSize="11" FontWeight="Bold" Margin="0,0,0,6"/>
+                                                       Foreground="{StaticResource Brush.TextTertiary}" FontSize="11" FontWeight="Bold" Margin="0,0,0,6"/>
                                             <ItemsControl ItemsSource="{Binding PresetsEcualizador}" Margin="0,0,0,6">
                                                 <ItemsControl.ItemsPanel>
                                                     <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
@@ -885,9 +885,9 @@
                                                 </Grid.ColumnDefinitions>
                                                 <!-- Escala en dB a la izquierda de los deslizadores -->
                                                 <Grid Width="30" Height="130" Margin="0,18,4,0" VerticalAlignment="Top">
-                                                    <TextBlock Text="+12" Foreground="#94A3B8" FontSize="10" VerticalAlignment="Top" HorizontalAlignment="Right"/>
-                                                    <TextBlock Text="0" Foreground="#94A3B8" FontSize="10" VerticalAlignment="Center" HorizontalAlignment="Right"/>
-                                                    <TextBlock Text="-12" Foreground="#94A3B8" FontSize="10" VerticalAlignment="Bottom" HorizontalAlignment="Right"/>
+                                                    <TextBlock Text="+12" Foreground="{StaticResource Brush.TextTertiary}" FontSize="10" VerticalAlignment="Top" HorizontalAlignment="Right"/>
+                                                    <TextBlock Text="0" Foreground="{StaticResource Brush.TextTertiary}" FontSize="10" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+                                                    <TextBlock Text="-12" Foreground="{StaticResource Brush.TextTertiary}" FontSize="10" VerticalAlignment="Bottom" HorizontalAlignment="Right"/>
                                                 </Grid>
                                                 <ItemsControl Grid.Column="1" ItemsSource="{Binding BandasEcualizador}">
                                                     <ItemsControl.Style>
@@ -908,12 +908,12 @@
                                                                 <TextBlock Text="{Binding TextoGanancia}" Foreground="White" FontSize="11" FontWeight="SemiBold"
                                                                            HorizontalAlignment="Center" Margin="0,0,0,4"/>
                                                                 <Slider Orientation="Vertical" Height="130" Minimum="-12" Maximum="12" SmallChange="1" LargeChange="3"
-                                                                        TickFrequency="1" IsSnapToTickEnabled="True" Foreground="#60A5FA" Cursor="Hand"
+                                                                        TickFrequency="1" IsSnapToTickEnabled="True" Foreground="{StaticResource Brush.Accent}" Cursor="Hand"
                                                                         HorizontalAlignment="Center"
                                                                         Value="{Binding Ganancia, Mode=TwoWay}"
                                                                         ToolTip="{Binding TextoGanancia}"
                                                                         AutomationProperties.Name="{Binding Etiqueta, StringFormat={}{0} Hz}"/>
-                                                                <TextBlock Text="{Binding Etiqueta}" Foreground="#94A3B8" FontSize="11" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                                                                <TextBlock Text="{Binding Etiqueta}" Foreground="{StaticResource Brush.TextTertiary}" FontSize="11" HorizontalAlignment="Center" Margin="0,4,0,0"/>
                                                             </StackPanel>
                                                         </DataTemplate>
                                                     </ItemsControl.ItemTemplate>
@@ -926,7 +926,7 @@
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
                                                 <TextBlock Text="{Binding [Eq_Pista], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                                           Foreground="#94A3B8" FontSize="11" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                                           Foreground="{StaticResource Brush.TextTertiary}" FontSize="11" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,10,0"/>
                                                 <Button Grid.Column="1" Command="{Binding RestablecerEcualizadorCommand}" Style="{StaticResource MenuItemButton}" Padding="10,6"
                                                         AutomationProperties.Name="{Binding [Eq_Restablecer], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}">
                                                     <StackPanel Orientation="Horizontal">
@@ -1099,7 +1099,7 @@
 
                 <!-- CAJÓN LATERAL DE EPISODIOS (tecla L) -->
                 <Border HorizontalAlignment="Right" Width="340"
-                        Background="#EE0B0F14" BorderBrush="#262D38" BorderThickness="1,0,0,0"
+                        Background="#EE0B0F14" BorderBrush="{StaticResource Brush.Border}" BorderThickness="1,0,0,0"
                         Visibility="{Binding CajonEpisodiosAbierto, Converter={StaticResource BoolToVis}}">
                     <Border.RenderTransform>
                         <TranslateTransform X="340"/>
@@ -1173,28 +1173,28 @@
                                                 <Grid.Clip>
                                                     <RectangleGeometry Rect="0,0,72,42" RadiusX="6" RadiusY="6"/>
                                                 </Grid.Clip>
-                                                <Border CornerRadius="6" Background="#1F242C">
+                                                <Border CornerRadius="6" Background="{StaticResource Brush.SurfaceControl}">
                                                     <Image Source="{Binding RutaMiniatura, TargetNullValue={x:Null}}" Stretch="UniformToFill"/>
                                                 </Border>
                                                 <!-- Encima de la miniatura del que se está viendo: velo + icono de reproducción -->
-                                                <Border x:Name="MarcaMiniatura" CornerRadius="6" Background="#99000000" BorderBrush="#60A5FA" BorderThickness="1.5" Visibility="Collapsed">
+                                                <Border x:Name="MarcaMiniatura" CornerRadius="6" Background="{StaticResource Brush.Scrim}" BorderBrush="{StaticResource Brush.Accent}" BorderThickness="1.5" Visibility="Collapsed">
                                                     <materialDesign:PackIcon Kind="Play" Width="22" Height="22" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                                 </Border>
                                             </Grid>
                                             <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
                                                 <DockPanel>
                                                     <!-- Favorito: el mismo marcador azul que en la ficha -->
-                                                    <materialDesign:PackIcon DockPanel.Dock="Right" Kind="Bookmark" Foreground="#60A5FA" Width="15" Height="15"
+                                                    <materialDesign:PackIcon DockPanel.Dock="Right" Kind="Bookmark" Foreground="{StaticResource Brush.Accent}" Width="15" Height="15"
                                                                              VerticalAlignment="Center" Margin="6,0,4,0"
                                                                              ToolTip="{Binding [Player_EpisodioFavorito], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
                                                                              Visibility="{Binding Favorito, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                                                     <TextBlock x:Name="TituloFila" Text="{Binding TituloVisual}" Foreground="White" FontSize="12.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
                                                 </DockPanel>
-                                                <TextBlock Text="{Binding BadgeTecnico}" Foreground="#9CA3AF" FontSize="10" Margin="0,2,0,0"/>
+                                                <TextBlock Text="{Binding BadgeTecnico}" Foreground="{StaticResource Brush.TextSecondary}" FontSize="10" Margin="0,2,0,0"/>
                                                 <StackPanel x:Name="EtiquetaReproduciendo" Orientation="Horizontal" Margin="0,3,0,0" Visibility="Collapsed">
-                                                    <materialDesign:PackIcon Kind="VolumeHigh" Width="12" Height="12" Foreground="#60A5FA" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                                    <materialDesign:PackIcon Kind="VolumeHigh" Width="12" Height="12" Foreground="{StaticResource Brush.Accent}" VerticalAlignment="Center" Margin="0,0,4,0"/>
                                                     <TextBlock Text="{Binding [Player_Reproduciendo], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                                               Foreground="#60A5FA" FontSize="10" FontWeight="Bold"/>
+                                                               Foreground="{StaticResource Brush.Accent}" FontSize="10" FontWeight="Bold"/>
                                                 </StackPanel>
                                             </StackPanel>
                                         </Grid>
@@ -1204,12 +1204,12 @@
                                             <Setter TargetName="Fila" Property="Background" Value="#14FFFFFF"/>
                                         </Trigger>
                                         <DataTrigger Binding="{Binding EsReproduciendose}" Value="True">
-                                            <Setter TargetName="Fila" Property="Background" Value="#2960A5FA"/>
-                                            <Setter TargetName="Fila" Property="BorderBrush" Value="#60A5FA"/>
+                                            <Setter TargetName="Fila" Property="Background" Value="{StaticResource Brush.AccentTint}"/>
+                                            <Setter TargetName="Fila" Property="BorderBrush" Value="{StaticResource Brush.Accent}"/>
                                             <Setter TargetName="MarcaMiniatura" Property="Visibility" Value="Visible"/>
                                             <Setter TargetName="EtiquetaReproduciendo" Property="Visibility" Value="Visible"/>
                                             <Setter TargetName="TituloFila" Property="FontWeight" Value="Bold"/>
-                                            <Setter TargetName="TituloFila" Property="Foreground" Value="#93C5FD"/>
+                                            <Setter TargetName="TituloFila" Property="Foreground" Value="{StaticResource Brush.AccentSoft}"/>
                                         </DataTrigger>
                                     </DataTemplate.Triggers>
                                 </DataTemplate>
@@ -1226,7 +1226,7 @@
                      contenido del FlyleafHost los bindings se quedan congelados (ver memoria del proyecto). -->
                 <Border x:Name="ToastReproductor" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,70,0,0"
                         Opacity="0" IsHitTestVisible="False" AutomationProperties.LiveSetting="Assertive">
-                    <materialDesign:Card UniformCornerRadius="10" Background="#161B22" Padding="20,15" materialDesign:ElevationAssist.Elevation="Dp8">
+                    <materialDesign:Card UniformCornerRadius="10" Background="{StaticResource Brush.Surface2}" Padding="20,15" materialDesign:ElevationAssist.Elevation="Dp8">
                         <StackPanel Orientation="Horizontal">
                             <materialDesign:PackIcon x:Name="ToastRepIcono" Kind="InformationOutline" Foreground="White" Width="28" Height="28"
                                                      VerticalAlignment="Center" Margin="0,0,15,0"/>
@@ -1243,24 +1243,24 @@
                      justo cuando el episodio termina y el mouse lleva rato quieto) y con texto empujado
                      desde el code-behind, no por Binding (bindings congelados en la raíz del FlyleafHost). -->
                 <Border x:Name="CuentaAtrasSiguiente" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,20,90"
-                        Background="#F2141414" BorderBrush="#33FFFFFF" BorderThickness="1" CornerRadius="10" Padding="16"
+                        Background="#F2141414" BorderBrush="{StaticResource Brush.RingBase}" BorderThickness="1" CornerRadius="10" Padding="16"
                         Opacity="0" IsHitTestVisible="False">
                     <Border.Effect>
                         <DropShadowEffect Color="Black" BlurRadius="16" ShadowDepth="4" Opacity="0.7"/>
                     </Border.Effect>
                     <StackPanel Width="260">
                         <TextBlock Text="{Binding [Player_SiguienteEpisodioEn], Source={x:Static loc:LocalizationService.Instance}, Mode=OneWay}"
-                                   Foreground="#9CA3AF" FontSize="11" FontWeight="SemiBold"/>
+                                   Foreground="{StaticResource Brush.TextSecondary}" FontSize="11" FontWeight="SemiBold"/>
                         <TextBlock x:Name="CuentaAtrasTitulo" Foreground="White" FontSize="14" FontWeight="Bold" Margin="0,2,0,10" TextTrimming="CharacterEllipsis"/>
                         <!-- "Te saltas el episodio 4 (no está descargado)": el siguiente con archivo no es el que sigue -->
-                        <Border x:Name="CuentaAtrasAviso" Background="#29F59E0B" CornerRadius="6" Padding="8,6" Margin="0,-2,0,10" Visibility="Collapsed">
+                        <Border x:Name="CuentaAtrasAviso" Background="{StaticResource Brush.WarningTint}" CornerRadius="6" Padding="8,6" Margin="0,-2,0,10" Visibility="Collapsed">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
-                                <materialDesign:PackIcon Kind="AlertOutline" Foreground="#F59E0B" Width="15" Height="15" VerticalAlignment="Top" Margin="0,1,6,0"/>
-                                <TextBlock x:Name="CuentaAtrasAvisoTexto" Grid.Column="1" Foreground="#F59E0B" FontSize="12" TextWrapping="Wrap"/>
+                                <materialDesign:PackIcon Kind="AlertOutline" Foreground="{StaticResource Brush.Warning}" Width="15" Height="15" VerticalAlignment="Top" Margin="0,1,6,0"/>
+                                <TextBlock x:Name="CuentaAtrasAvisoTexto" Grid.Column="1" Foreground="{StaticResource Brush.Warning}" FontSize="12" TextWrapping="Wrap"/>
                             </Grid>
                         </Border>
                         <Grid>
