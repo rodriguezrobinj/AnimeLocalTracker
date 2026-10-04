@@ -29,14 +29,20 @@ public class UpdateService : IUpdateService
     private bool _isUpdating = false;
 
     public UpdateService(IDialogService dialogService, HttpClient? httpClient = null)
+        : this(dialogService, httpClient, AppDataPaths.ReleaseInfoPath)
+    {
+        // ARQ-02: la caché de release vive en la carpeta de datos segura del usuario
+        // (Roaming podía viajar con el perfil y mezclarse con la instalación).
+        AppDataPaths.MigrarArchivoDesdeRoaming("release_info.json", _releaseCachePath);
+    }
+
+    /// <summary>Permite apuntar la caché de la release a otra ruta (pruebas): con la de por defecto, las pruebas leían y
+    /// escribían release_info.json en la carpeta de datos real del usuario.</summary>
+    internal UpdateService(IDialogService dialogService, HttpClient? httpClient, string rutaCacheRelease)
     {
         _dialogService = dialogService;
         _httpClient = httpClient ?? new HttpClient();
-
-        // ARQ-02: la caché de release vive en la carpeta de datos segura del usuario
-        // (Roaming podía viajar con el perfil y mezclarse con la instalación).
-        _releaseCachePath = AppDataPaths.ReleaseInfoPath;
-        AppDataPaths.MigrarArchivoDesdeRoaming("release_info.json", _releaseCachePath);
+        _releaseCachePath = rutaCacheRelease;
 
         InicializarManager();
     }

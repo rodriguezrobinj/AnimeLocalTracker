@@ -180,14 +180,22 @@ public class DetalleExtrasTests : IDisposable
         string miniatura = AnimeLocalTracker.Services.Python.PythonEpisodeEnricher.ObtenerRutaMiniaturaEsperada(Path.Combine(_carpeta, "Episodio 01.mp4"));
         Directory.CreateDirectory(Path.GetDirectoryName(miniatura)!);
         await File.WriteAllBytesAsync(miniatura, new byte[16]);
-        using var bloqueo = new FileStream(miniatura, FileMode.Open, FileAccess.Read, FileShare.None);
+        try
+        {
+            using (new FileStream(miniatura, FileMode.Open, FileAccess.Read, FileShare.None))
+            {
+                await sut.LiberarEspacioCommand.ExecuteAsync(null);
+            }
 
-        await sut.LiberarEspacioCommand.ExecuteAsync(null);
-
-        File.Exists(Path.Combine(_carpeta, "Episodio 01.mp4")).Should().BeFalse();
-        sut.Episodios.EpisodiosDelAnime.Single(e => e.NumeroEpisodio == 1).Descargado.Should().BeFalse("el video ya no está: la lista debe reflejarlo");
-        sut.Episodios.EpisodiosDelAnime.Single(e => e.NumeroEpisodio == 2).Descargado.Should().BeFalse();
-        _db.Verify(d => d.ConservarRegistroTrasEliminarArchivoAsync(7, 1), Times.Once);
+            File.Exists(Path.Combine(_carpeta, "Episodio 01.mp4")).Should().BeFalse();
+            sut.Episodios.EpisodiosDelAnime.Single(e => e.NumeroEpisodio == 1).Descargado.Should().BeFalse("el video ya no está: la lista debe reflejarlo");
+            sut.Episodios.EpisodiosDelAnime.Single(e => e.NumeroEpisodio == 2).Descargado.Should().BeFalse();
+            _db.Verify(d => d.ConservarRegistroTrasEliminarArchivoAsync(7, 1), Times.Once);
+        }
+        finally
+        {
+            try { File.Delete(miniatura); } catch { /* best-effort: no dejar una miniatura falsa por cada corrida */ }
+        }
     }
 
     [Fact]
