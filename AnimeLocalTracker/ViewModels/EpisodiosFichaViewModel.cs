@@ -255,7 +255,10 @@ public sealed partial class EpisodiosFichaViewModel : ObservableObject,
 
         for (int numero = _todosLosEpisodios.Count + 1; numero <= numeroEpisodio; numero++)
         {
-            _todosLosEpisodios.Add(new EpisodioItem { NumeroEpisodio = numero });
+            // El episodio recién emitido es el que se suele estar bajando (desde Actualizaciones o por la descarga automática):
+            // sin preguntar, su fila ofrecía "descargar" mientras la descarga estaba en cola, en pausa o terminando.
+            bool descargando = _downloadService.EstaDescargando(Anime?.AniListId ?? 0, numero, out double progreso);
+            _todosLosEpisodios.Add(new EpisodioItem { NumeroEpisodio = numero, IsDownloading = descargando, DownloadProgress = progreso });
         }
         AplicarFiltrosYOrdenamiento();
     }
@@ -871,6 +874,7 @@ public sealed partial class EpisodiosFichaViewModel : ObservableObject,
 
         // 4. Reiniciar en la UI solo lo relativo al archivo (visto/progreso/fecha se conservan)
         episodio.QuitarArchivo();
+        WeakReferenceMessenger.Default.Send(new ArchivoEpisodioEliminadoMensaje(Anime?.AniListId ?? 0, episodio.NumeroEpisodio));
 
         AplicarFiltrosYOrdenamiento();
         ArchivosCambiados?.Invoke();

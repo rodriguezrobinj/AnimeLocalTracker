@@ -1,0 +1,17 @@
+<UserControl x:Class="AnimeLocalTracker.Controls.IndicadorDescarga"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes">
+    <!-- Dibujado a 24 px y escalado al tamaño (Width/Height) que le dé quien lo usa. -->
+    <Viewbox>
+        <Grid Width="24" Height="24">
+            <Ellipse Stroke="{StaticResource Brush.RingBase}" StrokeThickness="3"/>
+            <ProgressBar x:Name="Espera" Width="24" Height="24" IsIndeterminate="True"
+                         Style="{StaticResource MaterialDesignCircularProgressBar}" Foreground="{StaticResource Brush.Accent}"
+                         materialDesign:TransitionAssist.DisableTransitions="True"/>
+            <ProgressBar x:Name="Avance" Width="24" Height="24" Minimum="0" Maximum="100" Visibility="Collapsed"
+                         Style="{StaticResource MaterialDesignCircularProgressBar}" Foreground="{StaticResource Brush.Accent}"
+                         materialDesign:TransitionAssist.DisableTransitions="True"/>
+        </Grid>
+    </Viewbox>
+</UserControl>

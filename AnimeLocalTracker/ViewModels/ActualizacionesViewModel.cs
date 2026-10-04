@@ -20,7 +20,7 @@ namespace AnimeLocalTracker.ViewModels;
 /// </summary>
 public partial class ActualizacionesViewModel : ObservableObject, IAlEntrarEnPestana, IDisposable,
     IRecipient<DescargaProgresoMensaje>, IRecipient<EpisodioActualizadoMensaje>, IRecipient<IdiomaCambiadoMensaje>,
-    IRecipient<ConexionRecuperadaMensaje>
+    IRecipient<ConexionRecuperadaMensaje>, IRecipient<ArchivoEpisodioEliminadoMensaje>
 {
     // Claves de los filtros (chips)
     public const string FiltroTodos = "Todos";
@@ -251,6 +251,10 @@ public partial class ActualizacionesViewModel : ObservableObject, IAlEntrarEnPes
 
                 bool descargado = dicDescargados.TryGetValue((ep.AniListId, ep.NumeroEpisodio), out var epInfo);
                 dicRegistros.TryGetValue((ep.AniListId, ep.NumeroEpisodio), out var registro);
+                // Una descarga que no manda avances (en cola, en pausa, sin internet o descifrando al 100 %) solo se conoce
+                // preguntando: sin esto, al recargar la pestaña la tarjeta ofrecía "Descargar" algo que ya se estaba bajando.
+                double progresoDescarga = 0;
+                bool descargando = !descargado && _downloadService.EstaDescargando(ep.AniListId, ep.NumeroEpisodio, out progresoDescarga);
 
                 lista.Add(new ActualizacionItemViewModel
                 {
@@ -261,6 +265,8 @@ public partial class ActualizacionesViewModel : ObservableObject, IAlEntrarEnPes
                     RutaPortada = dicPortadas[ep.AniListId] ?? string.Empty,
                     FechaEmision = ep.FechaEmision,
                     Descargado = descargado,
+                    IsDownloading = descargando,
+                    DownloadProgress = progresoDescarga,
                     RutaArchivo = epInfo?.RutaCompleta ?? string.Empty,
                     TamanoArchivoFormateado = epInfo?.TamanoArchivoFormateado ?? string.Empty,
                     Visto = registro?.VistoLocal ?? false,
@@ -326,9 +332,8 @@ public partial class ActualizacionesViewModel : ObservableObject, IAlEntrarEnPes
 
         if (!System.IO.File.Exists(item.RutaArchivo))
         {
-            item.Descargado = false;
-            item.RutaArchivo = string.Empty;
-            item.TamanoArchivoFormateado = string.Empty;
+            item.QuitarArchivo();
+            ActualizarResumenYFiltro();
             return;
         }
 
@@ -642,6 +647,15 @@ public partial class ActualizacionesViewModel : ObservableObject, IAlEntrarEnPes
         if (message.TotalSegundos > 0) item.TotalSegundos = message.TotalSegundos;
         ActualizarResumenYFiltro();
     }
+
+    /// <summary>El archivo se borró desde la ficha: la tarjeta deja de mostrar su tamaño y vuelve a ofrecer la descarga.</summary>
+    public void Receive(ArchivoEpisodioEliminadoMensaje message) => Core.HiloUi.Ejecutar(() =>
+    {
+        var item = Items.FirstOrDefault(i => i.AniListId == message.AnimeId && i.NumeroEpisodio == message.NumeroEpisodio);
+        if (item == null) return;
+        item.QuitarArchivo();
+        ActualizarResumenYFiltro();
+    });
 
     /// <summary>Los textos de las tarjetas, chips y botones se construyen localizados: al cambiar de idioma se rehacen.</summary>
     /// <summary>Volvió la conexión mientras se mostraba la copia guardada: el feed se trae al día solo.</summary>

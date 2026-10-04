@@ -5,11 +5,13 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using AnimeLocalTracker.Messages;
 using AnimeLocalTracker.Models;
 using AnimeLocalTracker.Services;
 using AnimeLocalTracker.Services.Python;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using CommunityToolkit.Mvvm.Messaging;
 
 namespace AnimeLocalTracker.ViewModels;
 
@@ -156,6 +158,7 @@ public partial class DetalleViewModel
             catch (Exception ex) { AppLogger.Debug("DetalleViewModel", $"No se pudo conservar el registro del episodio: {ex.Message}"); }
 
             episodio.QuitarArchivo();
+            WeakReferenceMessenger.Default.Send(new ArchivoEpisodioEliminadoMensaje(anime.AniListId, episodio.NumeroEpisodio));
         }
 
         Episodios.Refrescar();

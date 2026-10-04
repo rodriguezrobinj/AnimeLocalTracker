@@ -39,13 +39,9 @@ public partial class EpisodioItem : ObservableObject
     private string _tamanoArchivoFormateado = string.Empty;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(EstaEnEspera))]
-    [NotifyPropertyChangedFor(nameof(ProgresoDescargaActivo))]
     private bool _isDownloading;
     
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(EstaEnEspera))]
-    [NotifyPropertyChangedFor(nameof(ProgresoDescargaActivo))]
     private double _downloadProgress;
 
     [ObservableProperty]
@@ -139,8 +135,6 @@ public partial class EpisodioItem : ObservableObject
         }
     }
 
-    public bool EstaEnEspera => IsDownloading && DownloadProgress <= 0.0;
-    public bool ProgresoDescargaActivo => IsDownloading && DownloadProgress > 0.0;
 
     public double PorcentajeProgreso => TotalSegundos > 0 ? Math.Clamp(ProgresoSegundos / TotalSegundos, 0.0, 1.0) : 0.0;
     
