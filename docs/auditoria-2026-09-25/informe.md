@@ -4,7 +4,7 @@
 **Equipo de pruebas:** Windows 10 Pro 19045, 1366×768, red doméstica, biblioteca real del usuario (205 animes, 3 301 episodios).
 **Tipo:** solo lectura. No se corrigió nada en el código de la app; lo único que se añadió al repo es esta carpeta.
 
-Esta auditoría **no repite** la del 2026-09-14 (`auditoria_AnimeLocalTracker_resultados_2026-09-14_23-25-46/`): parte de ella,
+Esta auditoría **no repite** la del 2026-09-14 (`docs/auditoria-2026-09-14/`): parte de ella,
 verifica qué cambió y añade lo que aquella no pudo medir (perfilado real en Release, memoria en uso, seguridad de la
 superficie nueva: torrents, navegador headless, plugins). Los datos crudos están en [`evidencia/`](evidencia/).
 

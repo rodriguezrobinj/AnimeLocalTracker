@@ -1,7 +1,7 @@
 # Investigación: minijuegos dentro de la app
 
 > **Estado:** investigación hecha el 2026-09-25 contra el código del repo y con pruebas reales de las APIs externas.
-> Amplía la propuesta #118 ("Anime Music Quiz") de `PROPUESTAS_NUEVAS_FUNCIONES.md`.
+> Amplía la propuesta #118 ("Anime Music Quiz") de `propuestas-nuevas-funciones.md`.
 >
 > **Implementado el 2026-09-26 (sin commit todavía): "Adivina el anime" por pistas** — pestaña *Minijuegos*
 > (`MinijuegosViewModel`/`MinijuegosView`, lógica pura en `Services/Minijuegos/AdivinaAnimeJuego.cs`): 10 rondas de 4

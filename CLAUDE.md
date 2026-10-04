@@ -13,7 +13,7 @@ Reglas de arquitectura y convenciones del proyecto (compartidas con otras herram
 
 ## Cómo trabajar (resumen)
 
-Hay varios plugins de skills instalados (superpowers, agent-skills, ponytail, caveman, ui-ux-pro-max, taste-skill, Emil Kowalski, figma, dotnet-*). **La jerarquía y el dueño de cada tarea están en `skills-orquestacion.md`; léelo antes de activar skills de proceso.** Lo esencial:
+Hay varios plugins de skills activos (superpowers, ponytail, ui-ux-pro-max, Emil Kowalski, microsoft-docs, dotnet-*, y `caveman`, apagado por defecto: solo se enciende con `/caveman`). `agent-skills`, `figma` y `taste-skill` están desactivados. **La jerarquía y el dueño de cada tarea están en `skills-orquestacion.md`; léelo antes de activar skills de proceso.** Lo esencial:
 
 - Precedencia: instrucción del usuario > `CLAUDE.md`/reglas > skills del repo > superpowers > plugins de dominio > plugins de estilo.
 - Proceso pesado (brainstorming, plan escrito) solo para funciones nuevas o cambios multi-módulo; los cambios pequeños se hacen directo.
