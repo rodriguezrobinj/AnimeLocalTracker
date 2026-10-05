@@ -378,13 +378,16 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                 _subtitulosHabilitados = config.SubtitulosPorDefecto;
                 _subtitulosIcon = config.SubtitulosPorDefecto ? "Subtitles" : "SubtitlesOutline";
                 _modoNocheActivo = config.ModoNocheActivo;
-                CargarEcualizador(config);
+                _volumen = Math.Clamp(config.VolumenReproductor, 0, 100);
+                _volumenAGuardar = _volumen;
+                _volumenIcon = _volumeCoordinator.CalcularIcono(_volumen, false);
+                CargarEcualizador(config.EcualizadorActivo, config.EcualizadorGanancias);
                 _estiloSubtitulos = (config.EstiloSubtitulos ?? new EstiloSubtitulos()).Normalizar();
                 _usarMiEstiloEnAss = config.UsarMiEstiloEnAss;
             }
         }
 
-        if (BandasEcualizador.Count == 0) CargarEcualizador(null); // sin ajustes: ecualizador plano y apagado
+        if (BandasEcualizador.Count == 0) CargarEcualizador(false, null); // sin ajustes: ecualizador plano y apagado
     }
 
     /// <summary>
@@ -408,6 +411,13 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         }
 
         ActualizarVolumenIcon();
+        // Se recuerda para el próximo video. Silenciar pone la barra a cero: eso no se guarda (el siguiente video no debe
+        // empezar mudo sin que se note por qué).
+        if (!IsMuted && value > 0)
+        {
+            _volumenAGuardar = value;
+            GuardarAudioEnDiferido();
+        }
     }
 
     [RelayCommand]
@@ -1305,6 +1315,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         EstablecerListaDeEpisodiosSiCorresponde(listaEpisodios);
         ActualizarEstadosNavegacionEpisodios();
         _ = CargarFavoritoAsync(version);
+        CargarAudioDelAmbito(animeId, episodio, version);
 
         // Cancelar rastreo previo
         Core.Cancelacion.Reemplazar(ref _trackingCts);

@@ -141,6 +141,7 @@ public partial class ConfiguracionViewModel : ObservableObject
     [ObservableProperty] private int _pasosSaltoSegundos = 10;
     [ObservableProperty] private bool _evitarSuspensionPantalla = true;
     [ObservableProperty] private string _accionFinEpisodio = AccionFinEpisodioValores.AutoPlayCuentaAtras;
+    [ObservableProperty] private string _ambitoAjustesAudio = AmbitoAudio.Global;
     [ObservableProperty] private string _preferenciaAudioAnimeAv1 = "";
     [ObservableProperty] private bool _busquedaTorrentHabilitada;
     [ObservableProperty] private string _grupoFansubPreferidoTorrent = "";
@@ -427,6 +428,7 @@ public partial class ConfiguracionViewModel : ObservableObject
         PasosSaltoSegundos = config.PasosSaltoSegundos is 5 or 10 or 30 or 60 ? config.PasosSaltoSegundos : 10;
         EvitarSuspensionPantalla = config.EvitarSuspensionPantalla;
         AccionFinEpisodio = string.IsNullOrWhiteSpace(config.AccionFinEpisodio) ? AccionFinEpisodioValores.AutoPlayCuentaAtras : config.AccionFinEpisodio;
+        AmbitoAjustesAudio = AmbitoAudio.Normalizar(config.AmbitoAjustesAudio);
         PreferenciaAudioAnimeAv1 = config.PreferenciaAudioAnimeAv1 ?? "";
         CargarLista(OrdenServidores, AnimeLocalTracker.Models.OrdenServidores.DesdeAjuste(config.ServidorPreferidoAnimeAv1));
         CargarLista(OrdenProveedores, AnimeLocalTracker.Models.OrdenProveedores.DesdeAjuste(config.OrdenProveedoresVideo));
@@ -645,6 +647,7 @@ public partial class ConfiguracionViewModel : ObservableObject
             config.PasosSaltoSegundos = PasosSaltoSegundos;
             config.EvitarSuspensionPantalla = EvitarSuspensionPantalla;
             config.AccionFinEpisodio = AccionFinEpisodio;
+            config.AmbitoAjustesAudio = AmbitoAudio.Normalizar(AmbitoAjustesAudio);
             config.PreferenciaAudioAnimeAv1 = string.IsNullOrEmpty(PreferenciaAudioAnimeAv1) ? null : PreferenciaAudioAnimeAv1;
             config.ServidorPreferidoAnimeAv1 = AnimeLocalTracker.Models.OrdenServidores.ParaAjuste(OrdenServidores.Select(s => s.Nombre));
             config.OrdenProveedoresVideo = AnimeLocalTracker.Models.OrdenProveedores.ParaAjuste(OrdenProveedores.Select(s => s.Nombre));
