@@ -26,6 +26,13 @@ public class AppSettings
     /// <summary>Escalado inteligente (RTX Video Super Resolution / Intel): "Automatico", "Activado" o "Desactivado".</summary>
     public string EscaladoInteligenteVideo { get; set; } = "Automatico";
 
+    /// <summary>Volumen del reproductor de video (0 a 100). Se recuerda de un video al siguiente y entre sesiones.</summary>
+    public int VolumenReproductor { get; set; } = 100;
+
+    /// <summary>A qué se aplican el volumen, el ecualizador y el Modo Noche del reproductor: a todo, a cada anime o a cada
+    /// capítulo. Ver <see cref="AmbitoAudio"/>.</summary>
+    public string AmbitoAjustesAudio { get; set; } = AmbitoAudio.Global;
+
     // === Ecualizador del reproductor ===
     public bool EcualizadorActivo { get; set; }
     /// <summary>Ganancia (dB, -12..+12) de cada una de las 10 bandas (31 Hz … 16 kHz).</summary>
@@ -191,6 +198,38 @@ public static class AccionFinEpisodioValores
     public const string PausarYSalirFicha = "PausarYSalirFicha";
     /// <summary>Se queda en pantalla completa, pausado en el último fotograma.</summary>
     public const string PermanecerPausado = "PermanecerPausado";
+}
+
+/// <summary>Valores válidos de <see cref="AppSettings.AmbitoAjustesAudio"/> y las dos reglas que salen de él.</summary>
+public static class AmbitoAudio
+{
+    /// <summary>Los mismos ajustes de sonido para todos los videos (se guardan en los ajustes de la app).</summary>
+    public const string Global = "Global";
+    /// <summary>Cada anime recuerda los suyos.</summary>
+    public const string PorAnime = "PorAnime";
+    /// <summary>Cada capítulo recuerda los suyos.</summary>
+    public const string PorCapitulo = "PorCapitulo";
+
+    public static string Normalizar(string? valor) => valor is PorAnime or PorCapitulo ? valor : Global;
+
+    /// <summary>Episodios bajo los que buscar lo guardado, del más concreto al más general (0 = el anime entero). Vacío: no
+    /// hay nada propio que buscar y valen los ajustes globales.</summary>
+    public static int[] EpisodiosDondeBuscar(string? ambito, int animeId, int episodio) =>
+        animeId <= 0 ? [] : Normalizar(ambito) switch
+        {
+            PorCapitulo => episodio > 0 ? [episodio, 0] : [0],
+            PorAnime => [0],
+            _ => []
+        };
+
+    /// <summary>Episodio bajo el que se guarda un cambio (0 = el anime entero); null = en los ajustes globales.</summary>
+    public static int? EpisodioDondeGuardar(string? ambito, int animeId, int episodio) =>
+        animeId <= 0 ? null : Normalizar(ambito) switch
+        {
+            PorCapitulo => System.Math.Max(0, episodio),
+            PorAnime => 0,
+            _ => null
+        };
 }
 
 /// <summary>Valores válidos de <see cref="AppSettings.PreferenciaAudioAnimeAv1"/> — coinciden

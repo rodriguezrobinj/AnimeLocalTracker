@@ -99,6 +99,9 @@ public interface IDatabaseService
     Task GuardarMediaAnimeAv1Async(MediaAnimeAv1Verificado media);
 
     // === PREFERENCIAS DE EMISIÓN (avisar / descargar automáticamente) y DATOS EXTRA de AniList (etiquetas de la ficha) ===
+    /// <summary>Sonido guardado para ese anime (episodio 0) o para ese capítulo; null si no hay.</summary>
+    Task<AjusteAudio?> ObtenerAjusteAudioAsync(int aniListId, int numeroEpisodio);
+    Task GuardarAjusteAudioAsync(AjusteAudio ajuste);
     Task<PreferenciaEmision?> ObtenerPreferenciaEmisionAsync(int aniListId);
     Task GuardarPreferenciaEmisionAsync(PreferenciaEmision preferencia);
     Task<List<PreferenciaEmision>> ObtenerPreferenciasEmisionActivasAsync();

@@ -546,6 +546,17 @@
                                     </ctl:SettingRow>
                                     <Border Style="{StaticResource CfgDivider}"/>
 
+                                    <ctl:SettingRow Title="{loc:T Cfg_AmbitoAudio}"
+                                                    Description="{loc:T Cfg_AmbitoAudioSub}">
+                                        <ComboBox SelectedValue="{Binding AmbitoAjustesAudio}" SelectedValuePath="Tag" Height="36" MinWidth="230"
+                                                  AutomationProperties.Name="{loc:T Cfg_AmbitoAudio}">
+                                            <ComboBoxItem Content="{loc:T Cfg_AmbitoAudio_Global}" Tag="Global"/>
+                                            <ComboBoxItem Content="{loc:T Cfg_AmbitoAudio_PorAnime}" Tag="PorAnime"/>
+                                            <ComboBoxItem Content="{loc:T Cfg_AmbitoAudio_PorCapitulo}" Tag="PorCapitulo"/>
+                                        </ComboBox>
+                                    </ctl:SettingRow>
+                                    <Border Style="{StaticResource CfgDivider}"/>
+
                                     <ctl:SettingRow Title="{loc:T Cfg_PreferenciaAudio}"
                                                     Description="{loc:T Cfg_PreferenciaAudioSub}">
                                         <ComboBox SelectedValue="{Binding PreferenciaAudioAnimeAv1}" SelectedValuePath="Tag" Height="36" MinWidth="230"

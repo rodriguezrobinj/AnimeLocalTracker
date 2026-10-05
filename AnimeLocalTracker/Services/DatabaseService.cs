@@ -101,8 +101,12 @@ public class DatabaseService : IDatabaseService, IDisposable
         (18, "seguimiento local por anime (editor de la Ficha sin conexión y cambios pendientes de AniList)", CrearTablaSeguimientoLocalAsync),
         // Columna nueva del modelo: sqlite-net la añade con ALTER TABLE ADD COLUMN (misma vía que la v4). Los animes que ya
         // estaban quedan con NULL.
-        (19, "fecha de alta de cada anime (orden \"Añadidos recientemente\" de la Galería)", AgregarColumnasTemporadaFavoritoAsync)
+        (19, "fecha de alta de cada anime (orden \"Añadidos recientemente\" de la Galería)", AgregarColumnasTemporadaFavoritoAsync),
+        (20, "sonido del reproductor por anime o por capítulo (volumen, ecualizador y Modo Noche)", CrearTablaAjusteAudioAsync)
     };
+
+    /// <summary>v20: <see cref="AjusteAudio"/> (clave primaria = "anime_episodio"; se lee siempre por clave, sin índice).</summary>
+    private static Task CrearTablaAjusteAudioAsync(SQLiteAsyncConnection conexion) => conexion.CreateTableAsync<AjusteAudio>();
 
     /// <summary>v18: <see cref="SeguimientoLocal"/> (clave primaria = AniListId; los pendientes son pocos, sin índice).</summary>
     private static Task CrearTablaSeguimientoLocalAsync(SQLiteAsyncConnection conexion) => conexion.CreateTableAsync<SeguimientoLocal>();
@@ -912,6 +916,7 @@ public class DatabaseService : IDatabaseService, IDisposable
             db.Execute("DELETE FROM DescargaHistorial;");
             db.Execute("DELETE FROM ProximaEmisionLocal;");
             db.Execute("DELETE FROM PreferenciaEmision;");
+            db.Execute("DELETE FROM AjusteAudio;");
             db.Execute("DELETE FROM DatosExtraAnime;");
             db.Execute("DELETE FROM PartidaMinijuego;");
             db.Execute("DELETE FROM PersonajeAnime;");
@@ -1084,6 +1089,18 @@ public class DatabaseService : IDatabaseService, IDisposable
                 db.Execute("INSERT OR REPLACE INTO PersonajesAnimeSync (AnimeId, FechaUtc) VALUES (?, ?);", animeId, ahora);
             }
         });
+    }
+
+    public async Task<AjusteAudio?> ObtenerAjusteAudioAsync(int aniListId, int numeroEpisodio)
+    {
+        return await _conexion.FindAsync<AjusteAudio>(AjusteAudio.ClaveDe(aniListId, numeroEpisodio));
+    }
+
+    public async Task GuardarAjusteAudioAsync(AjusteAudio ajuste)
+    {
+        if (ajuste == null || ajuste.AniListId <= 0) return;
+        ajuste.Clave = AjusteAudio.ClaveDe(ajuste.AniListId, ajuste.NumeroEpisodio);
+        await _conexion.InsertOrReplaceAsync(ajuste);
     }
 
     public async Task<PreferenciaEmision?> ObtenerPreferenciaEmisionAsync(int aniListId)

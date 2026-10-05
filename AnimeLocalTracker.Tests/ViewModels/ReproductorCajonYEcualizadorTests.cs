@@ -115,6 +115,175 @@ public class ReproductorCajonYEcualizadorTests
         }
     }
 
+    // ── Volumen ──
+
+    [Fact]
+    public void ElVolumenGuardado_SeUsaAlAbrirOtroVideo()
+    {
+        _config = new AppSettings { VolumenReproductor = 35 };
+
+        using var sut = CrearSut();
+
+        sut.Volumen.Should().Be(35);
+    }
+
+    [Fact]
+    public async Task CambiarElVolumen_LoGuarda()
+    {
+        using var sut = CrearSut();
+
+        sut.Volumen = 40;
+        await Task.Delay(900);
+
+        _config.VolumenReproductor.Should().Be(40);
+    }
+
+    // Silenciar pone la barra a cero: eso no es "quiero el volumen a cero en el próximo video".
+    [Fact]
+    public async Task Silenciar_NoGuardaElCero()
+    {
+        _config = new AppSettings { VolumenReproductor = 60 };
+        using var sut = CrearSut();
+
+        sut.ToggleMute();
+        await Task.Delay(900);
+
+        sut.Volumen.Should().Be(0);
+        _config.VolumenReproductor.Should().Be(60);
+    }
+
+    // ── Sonido por anime o por capítulo ──
+
+    private void HayAudioGuardado(int anime, int episodio, int volumen, string preset, bool noche) =>
+        _db.Setup(d => d.ObtenerAjusteAudioAsync(anime, episodio)).ReturnsAsync(new AjusteAudio
+        {
+            Clave = AjusteAudio.ClaveDe(anime, episodio), AniListId = anime, NumeroEpisodio = episodio, Volumen = volumen,
+            EcualizadorActivo = true, Ganancias = EcualizadorAudio.Presets.Single(p => p.Clave == preset).Ganancias.ToList(), ModoNoche = noche,
+        });
+
+    private async Task<ReproductorViewModel> AbrirAsync(int episodio = 3)
+    {
+        var lista = Lista(3, 4);
+        var sut = CrearSut();
+        sut.CargarVideo(lista[0].RutaCompleta, 101, "Frieren", episodio, lista);
+        await sut.TareaAudio;
+        return sut;
+    }
+
+    [Fact]
+    public async Task Global_NoBuscaNadaPorAnime_YElModoNocheSeGuardaEnLosAjustes()
+    {
+        _config = new AppSettings { VolumenReproductor = 80 };
+        using var sut = await AbrirAsync();
+
+        sut.ModoNocheActivo = true;
+        await Task.Delay(900);
+
+        sut.Volumen.Should().Be(80);
+        _config.ModoNocheActivo.Should().BeTrue();
+        _db.Verify(d => d.ObtenerAjusteAudioAsync(It.IsAny<int>(), It.IsAny<int>()), Times.Never);
+        _db.Verify(d => d.GuardarAjusteAudioAsync(It.IsAny<AjusteAudio>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task PorAnime_AbreConLoGuardadoParaEseAnime_YNoLoVuelveAGuardar()
+    {
+        _config = new AppSettings { AmbitoAjustesAudio = AmbitoAudio.PorAnime, VolumenReproductor = 80 };
+        HayAudioGuardado(101, 0, volumen: 30, preset: "Cine", noche: true);
+
+        using var sut = await AbrirAsync();
+        await Task.Delay(900);
+
+        sut.Volumen.Should().Be(30);
+        sut.EcualizadorActivo.Should().BeTrue();
+        sut.PresetEcualizador.Should().Be("Cine");
+        sut.PresetsEcualizador.Where(p => p.EsActual).Select(p => p.Clave).Should().Equal("Cine");
+        sut.ModoNocheActivo.Should().BeTrue();
+        _config.VolumenReproductor.Should().Be(80, "lo del anime no toca lo global");
+        _db.Verify(d => d.GuardarAjusteAudioAsync(It.IsAny<AjusteAudio>()), Times.Never);
+        _ajustes.Verify(s => s.GuardarConfiguracionAsync(It.IsAny<AppSettings>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task PorAnime_SinNadaGuardado_EmpiezaConLosAjustesGlobales()
+    {
+        var voces = EcualizadorAudio.Presets.Single(p => p.Clave == "VocesClaras").Ganancias.ToList();
+        _config = new AppSettings { AmbitoAjustesAudio = AmbitoAudio.PorAnime, VolumenReproductor = 45, EcualizadorActivo = true, EcualizadorGanancias = voces };
+
+        using var sut = await AbrirAsync();
+
+        sut.Volumen.Should().Be(45);
+        sut.EcualizadorActivo.Should().BeTrue();
+        sut.PresetEcualizador.Should().Be("VocesClaras");
+    }
+
+    [Fact]
+    public async Task PorAnime_UnCambio_SeGuardaSoloEnEseAnime()
+    {
+        _config = new AppSettings { AmbitoAjustesAudio = AmbitoAudio.PorAnime, VolumenReproductor = 80 };
+        using var sut = await AbrirAsync();
+
+        sut.Volumen = 40;
+        await Task.Delay(900);
+
+        _db.Verify(d => d.GuardarAjusteAudioAsync(It.Is<AjusteAudio>(a =>
+            a.Clave == AjusteAudio.ClaveDe(101, 0) && a.AniListId == 101 && a.NumeroEpisodio == 0 && a.Volumen == 40)), Times.Once);
+        _config.VolumenReproductor.Should().Be(80);
+        _ajustes.Verify(s => s.GuardarConfiguracionAsync(It.IsAny<AppSettings>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task PorCapitulo_PrefiereLoDelCapitulo_YAlPasarAOtroSinAjustesTomaLosDelAnime()
+    {
+        _config = new AppSettings { AmbitoAjustesAudio = AmbitoAudio.PorCapitulo, VolumenReproductor = 80 };
+        HayAudioGuardado(101, 0, volumen: 30, preset: "Cine", noche: false);
+        HayAudioGuardado(101, 3, volumen: 55, preset: "Musica", noche: true);
+
+        using var sut = await AbrirAsync(episodio: 3);
+        sut.Volumen.Should().Be(55);
+        sut.PresetEcualizador.Should().Be("Musica");
+        sut.ModoNocheActivo.Should().BeTrue();
+
+        sut.SiguienteEpisodio(); // el 4 no tiene ajustes propios
+        await sut.TareaAudio;
+
+        sut.Episodio.Should().Be(4);
+        sut.Volumen.Should().Be(30);
+        sut.PresetEcualizador.Should().Be("Cine");
+        sut.ModoNocheActivo.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task PorCapitulo_ElModoNoche_SeGuardaEnEseCapitulo()
+    {
+        _config = new AppSettings { AmbitoAjustesAudio = AmbitoAudio.PorCapitulo };
+        using var sut = await AbrirAsync(episodio: 3);
+
+        sut.ModoNocheActivo = true;
+        await Task.Delay(900);
+
+        _db.Verify(d => d.GuardarAjusteAudioAsync(It.Is<AjusteAudio>(a => a.AniListId == 101 && a.NumeroEpisodio == 3 && a.ModoNoche)), Times.Once);
+        _config.ModoNocheActivo.Should().BeFalse();
+    }
+
+    // Con el video silenciado, cargar los ajustes del siguiente capítulo no debe devolverle el sonido.
+    [Fact]
+    public async Task PorCapitulo_SiEstaSilenciado_SigueSilenciadoAlCambiarDeCapitulo()
+    {
+        _config = new AppSettings { AmbitoAjustesAudio = AmbitoAudio.PorCapitulo };
+        HayAudioGuardado(101, 4, volumen: 70, preset: "Cine", noche: false);
+        using var sut = await AbrirAsync(episodio: 3);
+        sut.ToggleMute();
+
+        sut.SiguienteEpisodio();
+        await sut.TareaAudio;
+
+        sut.IsMuted.Should().BeTrue();
+        sut.Volumen.Should().Be(0);
+        sut.ToggleMute();
+        sut.Volumen.Should().Be(70, "al quitar el silencio vuelve con el volumen de ese capítulo");
+    }
+
     // ── Ecualizador ──
 
     [Fact]
