@@ -158,4 +158,66 @@ public class EpisodiosOrganizadorTests
 
         resultado.Should().Be(4000, "un total negativo no es un dato oficial real: se cae al mismo camino que 'desconocido'");
     }
+
+    // ── Descargar temporada ──
+
+    private static List<EpisodioItem> Filas(int hasta) =>
+        Enumerable.Range(1, hasta).Select(n => new EpisodioItem { NumeroEpisodio = n }).ToList();
+
+    [Fact]
+    public void CalcularPendientesTemporada_CarpetaVacia_DevuelveTodosLosEmitidos()
+    {
+        EpisodiosOrganizador.CalcularPendientesTemporada(Filas(5), ultimoEmitido: 5).Should().Equal(1, 2, 3, 4, 5);
+    }
+
+    [Fact]
+    public void CalcularPendientesTemporada_SerieEnEmision_SoloCuentaLosYaEmitidos()
+    {
+        // 24 filas en la lista, pero solo 9 episodios han salido.
+        EpisodiosOrganizador.CalcularPendientesTemporada(Filas(24), ultimoEmitido: 9).Should().Equal(1, 2, 3, 4, 5, 6, 7, 8, 9);
+    }
+
+    [Fact]
+    public void CalcularPendientesTemporada_ExcluyeDescargadosEnDescargaYVistos()
+    {
+        var episodios = Filas(5);
+        episodios[0].Descargado = true;      // 1: ya está en disco
+        episodios[1].IsDownloading = true;   // 2: ya se está descargando
+        episodios[2].Visto = true;           // 3: ya visto (y liberado)
+
+        EpisodiosOrganizador.CalcularPendientesTemporada(episodios, ultimoEmitido: 5).Should().Equal(4, 5);
+    }
+
+    [Fact]
+    public void CalcularPendientesTemporada_TotalDesconocido_NoDevuelveNada()
+    {
+        EpisodiosOrganizador.CalcularPendientesTemporada(Filas(5), ultimoEmitido: 0).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void CalcularPendientesTemporada_TodoVistoYSoloElUltimoEnDisco_NoOfreceRedescargar()
+    {
+        // El caso de One Piece: todo visto y liberado salvo el último, que sigue en disco.
+        var episodios = Filas(50);
+        foreach (var e in episodios) e.Visto = true;
+        episodios[^1].Descargado = true;
+
+        EpisodiosOrganizador.CalcularPendientesTemporada(episodios, ultimoEmitido: 50).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void EstimarBytes_PromediaLosArchivosQueYaHayEnDisco()
+    {
+        EpisodiosOrganizador.EstimarBytes([1000L, 3000L], pendientes: 3).Should().Be(6000);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(5)]
+    public void EstimarBytes_SinArchivosDeReferenciaOSinPendientes_NoInventaUnaCifra(int pendientes)
+    {
+        var tamanos = pendientes == 0 ? new[] { 1000L } : System.Array.Empty<long>();
+
+        EpisodiosOrganizador.EstimarBytes(tamanos, pendientes).Should().BeNull();
+    }
 }

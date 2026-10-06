@@ -609,6 +609,19 @@
                     </Grid.RowDefinitions>
 
                     <StackPanel Grid.Row="0">
+                        <!-- DESCARGAR TEMPORADA: los episodios ya emitidos que aún no están en disco ni se han visto -->
+                        <Button Command="{Binding Episodios.DescargarTemporadaCommand}"
+                                Style="{StaticResource MaterialDesignOutlinedButton}"
+                                BorderBrush="{StaticResource Brush.AccentSoft}" Foreground="{StaticResource Brush.AccentSoft}"
+                                HorizontalAlignment="Left" Height="32" Padding="12,0" Margin="0,0,0,10" Cursor="Hand"
+                                Visibility="{Binding Episodios.HayPendientesTemporada, Converter={StaticResource BoolToVis}}"
+                                AutomationProperties.Name="{Binding Episodios.DescargarTemporadaTexto}">
+                            <StackPanel Orientation="Horizontal">
+                                <materialDesign:PackIcon Kind="DownloadMultiple" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                <TextBlock Text="{Binding Episodios.DescargarTemporadaTexto}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="12"/>
+                            </StackPanel>
+                        </Button>
+
                         <!-- BANNER EPISODIOS FALTANTES (huecos silenciosos en la carpeta local) -->
                         <Border CornerRadius="8" Background="#1F1708" BorderBrush="#B45309" BorderThickness="1"
                                 Padding="12,8" Margin="0,0,0,10"

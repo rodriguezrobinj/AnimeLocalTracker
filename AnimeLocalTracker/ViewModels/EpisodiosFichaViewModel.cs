@@ -154,6 +154,28 @@ public sealed partial class EpisodiosFichaViewModel : ObservableObject,
     [ObservableProperty] private string _episodiosFaltantesTexto = string.Empty;
     private List<int> _numerosEpisodiosFaltantes = new();
 
+    // === DESCARGAR TEMPORADA (los episodios ya emitidos que aún no están en disco ni se han visto) ===
+    /// <summary>Último episodio ya emitido (lo calcula la ficha con <see cref="IEmisionMonitorService.UltimoEmitido"/>); 0 si no se sabe.</summary>
+    [ObservableProperty] private int _ultimoEmitido;
+    [ObservableProperty] private bool _hayPendientesTemporada;
+    [ObservableProperty] private string _descargarTemporadaTexto = string.Empty;
+    private List<int> _numerosPendientesTemporada = new();
+
+    partial void OnUltimoEmitidoChanged(int value) => ActualizarPendientesTemporada();
+
+    /// <summary>Recalcula qué episodios pondría en cola "Descargar temporada" y el texto del botón.</summary>
+    private void ActualizarPendientesTemporada()
+    {
+        _numerosPendientesTemporada = Core.EpisodiosOrganizador.CalcularPendientesTemporada(_todosLosEpisodios, UltimoEmitido);
+        int n = _numerosPendientesTemporada.Count;
+
+        HayPendientesTemporada = n > 0;
+        // "Temporada completa" solo si todos los episodios emitidos están pendientes; si ya tienes alguno, "los que faltan".
+        DescargarTemporadaTexto = n == 0
+            ? string.Empty
+            : string.Format(LocalizationService.T(n == UltimoEmitido ? "Det_TemporadaCompletaFormato" : "Det_TemporadaFaltanFormato"), n);
+    }
+
     // === DOCTOR DE INTEGRIDAD DE VIDEO ===
     [ObservableProperty] private bool _verificandoIntegridad;
 
@@ -391,6 +413,7 @@ public sealed partial class EpisodiosFichaViewModel : ObservableObject,
                 episodio.IsDownloading = message.IsDownloading;
                 episodio.DownloadProgress = message.Progreso;
                 ActualizarAccionPrincipal();
+                if (!message.IsDownloading) ActualizarPendientesTemporada(); // terminó, falló o se canceló: vuelve (o no) a estar pendiente
 
                 if (message.IsCompleted)
                 {
@@ -719,6 +742,7 @@ public sealed partial class EpisodiosFichaViewModel : ObservableObject,
     /// Detecta huecos reales (episodios sin archivo local y sin ver, por debajo del episodio descargado
     /// más alto): un hueco silencioso que haría saltarte una trama por accidente. Ver
     /// <see cref="Core.EpisodiosOrganizador.CalcularFaltantes"/> para lo que NO cuenta como hueco.
+    /// También refresca el botón "Descargar temporada": se recalcula siempre que cambia el estado de la lista.
     /// </summary>
     private void ActualizarEpisodiosFaltantes()
     {
@@ -728,6 +752,8 @@ public sealed partial class EpisodiosFichaViewModel : ObservableObject,
         EpisodiosFaltantesTexto = HayEpisodiosFaltantes
             ? string.Format(LocalizationService.T("Det_FaltantesBannerFormato"), _numerosEpisodiosFaltantes.Count, FormatearListaEpisodios(_numerosEpisodiosFaltantes))
             : string.Empty;
+
+        ActualizarPendientesTemporada();
     }
 
     private static string FormatearListaEpisodios(List<int> numeros)
@@ -769,6 +795,95 @@ public sealed partial class EpisodiosFichaViewModel : ObservableObject,
         {
             await DescargarEpisodioAsync(episodio);
         }
+    }
+
+    /// <summary>
+    /// Espacio libre (bytes) de la unidad donde está la carpeta; null si no se puede saber (ruta vacía, de red o inválida).
+    /// Ajustable solo en pruebas.
+    /// </summary>
+    internal Func<string, long?> EspacioLibreDe { get; set; } = EspacioLibreEnDisco;
+
+    private static long? EspacioLibreEnDisco(string carpeta)
+    {
+        try { return new DriveInfo(Path.GetPathRoot(carpeta)!).AvailableFreeSpace; }
+        catch (Exception) { return null; } // sin unidad reconocible: simplemente no se avisa del espacio
+    }
+
+    /// <summary>
+    /// Pone en cola los episodios ya emitidos que faltan (ver <see cref="Core.EpisodiosOrganizador.CalcularPendientesTemporada"/>),
+    /// en orden y con la misma cola que una descarga suelta (respeta el límite de descargas simultáneas).
+    /// </summary>
+    [RelayCommand]
+    private async Task DescargarTemporadaAsync()
+    {
+        if (Anime == null) return;
+
+        var numeros = _numerosPendientesTemporada.ToHashSet();
+        var pendientes = _todosLosEpisodios
+            .Where(e => numeros.Contains(e.NumeroEpisodio) && !e.Descargado && !e.IsDownloading && !e.Visto)
+            .OrderBy(e => e.NumeroEpisodio)
+            .ToList();
+        if (pendientes.Count == 0) return;
+
+        if (string.IsNullOrWhiteSpace(Anime.RutaCarpeta))
+        {
+            await _dialogService.MostrarDialogoAsync(
+                LocalizationService.T("Det_AutoDescargaSinCarpetaTitulo"),
+                LocalizationService.T("Det_TemporadaSinCarpetaMsj"),
+                false, "FolderAlertOutline", "#F59E0B");
+            return;
+        }
+
+        if (pendientes.Count > UmbralConfirmarDescargaFaltantes)
+        {
+            bool confirmar = await _dialogService.MostrarDialogoAsync(
+                LocalizationService.T("Det_TemporadaTitulo"),
+                await ComponerConfirmacionTemporadaAsync(pendientes.Count, Anime.RutaCarpeta),
+                true, "DownloadMultiple", "#2563EB");
+            if (!confirmar) return;
+        }
+
+        foreach (var episodio in pendientes)
+        {
+            await DescargarEpisodioAsync(episodio);
+        }
+
+        ActualizarPendientesTemporada();
+    }
+
+    /// <summary>Texto de la confirmación: cuántos episodios, el espacio estimado y, si no cabe en el disco, un aviso.</summary>
+    private async Task<string> ComponerConfirmacionTemporadaAsync(int cantidad, string carpeta)
+    {
+        var archivos = _todosLosEpisodios
+            .Where(e => e.Descargado && !string.IsNullOrWhiteSpace(e.RutaCompleta))
+            .Select(e => e.RutaCompleta)
+            .ToList();
+
+        // Accesos a disco fuera del hilo de interfaz.
+        var (tamanos, libre) = await Task.Run(() =>
+        {
+            var lista = new List<long>();
+            foreach (var ruta in archivos)
+            {
+                try
+                {
+                    var info = new FileInfo(ruta);
+                    if (info.Exists) lista.Add(info.Length);
+                }
+                catch (IOException) { /* archivo en uso o desaparecido: no cuenta */ }
+            }
+            return (lista, EspacioLibreDe(carpeta));
+        });
+
+        if (Core.EpisodiosOrganizador.EstimarBytes(tamanos, cantidad) is not { } bytes)
+            return string.Format(LocalizationService.T("Det_DescargarFaltantesConfirmacionFormato"), cantidad);
+
+        string texto = string.Format(LocalizationService.T("Det_TemporadaConfirmacionFormato"), cantidad, Core.Formato.Tamano(bytes));
+        if (libre is { } disponible && bytes > disponible)
+        {
+            texto += "\n\n" + string.Format(LocalizationService.T("Det_TemporadaAvisoEspacioFormato"), Core.Formato.Tamano(bytes), Core.Formato.Tamano(disponible));
+        }
+        return texto;
     }
 
     /// <summary>

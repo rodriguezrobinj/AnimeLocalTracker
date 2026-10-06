@@ -101,4 +101,31 @@ public static class EpisodiosOrganizador
             .OrderBy(n => n)
             .ToList();
     }
+
+    /// <summary>
+    /// Episodios que "Descargar temporada" pone en cola: los ya emitidos (1..<paramref name="ultimoEmitido"/>) que no están en
+    /// disco, no se están descargando y no se han visto. Los vistos no cuentan por la misma razón que en
+    /// <see cref="CalcularFaltantes"/> (ver y liberar el archivo es lo normal; con "Eliminar tras ver" activo, volver a ofrecer
+    /// lo recién borrado sería absurdo). Sin episodio emitido conocido (<paramref name="ultimoEmitido"/> ≤ 0) no hay nada.
+    /// </summary>
+    public static List<int> CalcularPendientesTemporada(IReadOnlyCollection<EpisodioItem> episodios, int ultimoEmitido)
+    {
+        if (ultimoEmitido <= 0) return [];
+
+        return episodios
+            .Where(e => e.NumeroEpisodio >= 1 && e.NumeroEpisodio <= ultimoEmitido && !e.Descargado && !e.IsDownloading && !e.Visto)
+            .Select(e => e.NumeroEpisodio)
+            .OrderBy(n => n)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Espacio estimado para <paramref name="pendientes"/> episodios: tamaño medio de los archivos que ya hay en disco por el
+    /// número de pendientes. Null si no hay ningún archivo de referencia (no se inventa una cifra).
+    /// </summary>
+    public static long? EstimarBytes(IReadOnlyCollection<long> tamanosDescargados, int pendientes)
+    {
+        if (pendientes <= 0 || tamanosDescargados.Count == 0) return null;
+        return (long)(tamanosDescargados.Average() * pendientes);
+    }
 }

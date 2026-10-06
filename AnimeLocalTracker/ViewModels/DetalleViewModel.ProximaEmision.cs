@@ -108,6 +108,7 @@ public partial class DetalleViewModel
         if (_monitorEmision == null || !ReferenceEquals(anime, AnimeSeleccionado)) return;
 
         int emitido = _monitorEmision.UltimoEmitido(proxima, anime, DateTime.UtcNow);
+        Episodios.UltimoEmitido = emitido; // alimenta el botón "Descargar temporada"
         if (emitido <= Episodios.Todos.Count) return;
 
         Episodios.AnadirFilasHasta(emitido);
