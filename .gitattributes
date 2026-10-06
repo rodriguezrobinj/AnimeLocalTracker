@@ -1,0 +1,6 @@
+# Finales de línea normalizados (LF en el repositorio) sea cual sea la configuración de cada máquina
+* text=auto
+
+*.png binary
+*.bmp binary
+*.ico binary

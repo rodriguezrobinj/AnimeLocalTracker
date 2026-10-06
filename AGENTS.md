@@ -17,27 +17,26 @@ Aplicación de escritorio **Windows** (.NET 8 WPF, MVVM). Stack: SQLite (WAL, sq
 - **Datos de usuario SIEMPRE en `%LocalAppData%\AnimeLocalTrackerData`** (AppDataPaths), nunca en el directorio de instalación.
 - Backups = snapshot atómico con `VACUUM INTO` (nunca `File.Copy` de la DB abierta).
 - Import JSON nunca toca la nube (registros importados → `SincronizadoEnNube = true`).
-- UI: bindings localizados `{Binding [Clave], Source={x:Static loc:LocalizationService.Instance}}` — **solo en propiedades OneWay** (`Run.Text` es TwoWay: añadir `Mode=OneWay`). Toda clave nueva debe existir en ES y EN (`LocalizationService`).
+- UI: textos traducidos en XAML con `{loc:T Clave}` (`Services/TExtension.cs`); no escribir a mano el `{Binding [Clave], Source=...}` (detalles en `.agents/rules/wpf-mvvm.md`). Toda clave nueva debe existir en ES y EN (`LocalizationService`).
 - El daemon Python se mata en `ProcessExit` (`PythonBridgeService`) — no eliminar.
 - Release: tag `v*` → pipeline (SCA bloqueante → vpk → delta → pre-release). La versión la define el tag; `AnimeLocalTracker.csproj` `<Version>` es para builds locales. `global.json` fija SDK 8.x (los runners traen SDK 10 → analizadores CA distintos).
 - **Fechas**: guardar SIEMPRE UTC (`DateTime.UtcNow`). sqlite-net devuelve `Kind=Unspecified`: tratarlas como UTC (`Kind != Local ? ToLocalTime()`) antes de mostrar/agrupar.
 - **Historial/Actualizaciones**: el "historial" refleja visionado REAL — solo la reproducción registra `UltimaReproduccion`; un marcado manual NO debe fabricar fecha (NULL no se rellena en la capa de datos). Borrar un archivo del disco conserva el registro. Los feeds de episodios usan `ListBox` virtualizado (nunca `ItemsControl` dentro de `ScrollViewer`).
 - **Cada commit debe compilar**: no commitear cambios parciales que dependan de archivos nuevos sin versionar (el repo debe poder clonarse y compilar en HEAD).
-- Nueva pestaña/vista = seguir la cadena completa: `NavegarMensaje_*` → `INavigationService` → DI singleton → `DataTemplate` en `App.xaml` → flag `Es*Activo` + comando en `MainViewModel` → botón en `MainWindow.xaml` con `ToolTip` localizado.
+- Nueva pestaña/vista = una fila en `Pestanas.Todas` (`ViewModels/Pestana.cs`) → ViewModel singleton en DI (`App.xaml.cs`) → `DataTemplate` en `App.xaml`. No se tocan `MainWindow.xaml`, `MainViewModel` ni `NavigationService` (detalles en `.agents/rules/ui-wpf-vistas.md`).
 
 ## Convenciones
 
 - Commits en español, conventional commits (`feat(área): ...`, `fix(área): ...`), con el ID del hallazgo cuando aplique.
-- Tests en `AnimeLocalTracker.Tests` (xUnit + FluentAssertions + Moq). No romper la suite (**362 tests**; al añadir features, añadir tests — el conteo aparece en README).
-- Logs de la app: `%LocalAppData%\AnimeLocalTrackerData\Logs\app.log` — consultar antes de diagnosticar bugs.
+- Tests en `AnimeLocalTracker.Tests` (xUnit + FluentAssertions + Moq). No romper la suite (al añadir features, añadir tests — el conteo aparece en README).
+- Logs de la app: `%LocalAppData%\AnimeLocalTrackerData\Logs\` (`sesiones\` con un archivo por arranque y `errores.log`) — consultar antes de diagnosticar bugs.
 
-## Documentación local (NO versionada, vive solo en disco)
+## Documentación
 
-- `AUDITORIA_BLOQUE1_SEGURIDAD_ARQUITECTURA.md` … `AUDITORIA_BLOQUE4_UX_LEGAL_MARKETING.md` — auditorías por bloque con hallazgos `file:line`.
-- `NOTA_CAMBIOS_REMEDIACION_BLOQUE1.md` … `_BLOQUE4.md` — antes/después con ejemplos de uso.
-- `RESUMEN_EJECUTIVO_REMEDIACION.md` — matriz de estado de los 4 bloques.
+- `docs/auditoria-*/` — auditorías con hallazgos `file:line` y su evidencia.
+- `docs/investigacion-*.md` y `docs/plan-*.md` — investigaciones y planes por tema.
 
-Para tareas estructurales grandes, leer el bloque correspondiente antes de tocar código.
+Para tareas estructurales grandes, leer el documento correspondiente antes de tocar código.
 
 ## Eficiencia de Tokens y Comunicación
 
@@ -50,5 +49,5 @@ Para tareas estructurales grandes, leer el bloque correspondiente antes de tocar
 
 ## Reglas Modulares y Skills (.agents/)
 
-- Reglas activas: `.agents/rules/` (`wpf-mvvm.md`, `polyglot-ffi.md`, `persistence.md`, `comunicacion-explicaciones.md`, `ui-wpf-vistas.md`).
-- Skill de verificación de build y pruebas: `.agents/skills/repo-build-test/SKILL.md`.
+- Reglas activas: `.agents/rules/` (`wpf-mvvm.md`, `polyglot-ffi.md`, `persistence.md`, `comunicacion-explicaciones.md`, `ui-wpf-vistas.md`, `skills-orquestacion.md`).
+- Skills del repo en `.claude/skills/`: `repo-build-test` (build y pruebas), `wpf-add-view`, `wpf-visual-verification`.
