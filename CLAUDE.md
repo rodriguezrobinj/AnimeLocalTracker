@@ -24,6 +24,8 @@ Hay varios plugins de skills activos (superpowers, ponytail, ui-ux-pro-max, Emil
 
 Antes de dar por terminado cualquier cambio en C#/XAML, usa el skill `repo-build-test` (`.claude/skills/repo-build-test/SKILL.md`) — documenta un flake conocido del SDK de WPF que puede reportar "OK" con errores ocultos, y cómo evitar falsos positivos/negativos al compilar y correr la suite de pruebas.
 
+La verificación es proporcional al cambio: si no se tocó C#/XAML (investigar, responder preguntas, documentos) no se compila ni se prueba; mientras se trabaja, compilar la app y correr las pruebas de lo tocado; la suite completa, una sola vez al cerrar la tarea o antes de subir. Sin doble pasada: se compila una vez y solo se reintenta si falla.
+
 ## UI
 
 - Al crear o modificar una pestaña/vista (o portar una lista a virtualizada), usa el skill `wpf-add-view` (`.claude/skills/wpf-add-view/SKILL.md`) — la cadena completa mensaje→NavigationService→DI→DataTemplate→botón, patrón de `ListBox` virtualizado, y las convenciones de accesibilidad/color/localización ya establecidas.

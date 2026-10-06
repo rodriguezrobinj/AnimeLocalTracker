@@ -1,9 +1,12 @@
 # ============================================================
 #  Build robusto para AnimeLocalTracker
-#  Soluciona el flake conocido del SDK WPF: el proyecto temporal
-#  *_wpftmp compila con los .g.cs del obj, y si el obj está
-#  limpio el PRIMER build falla (CS2001/CS0103). La doble pasada
-#  garantiza éxito siempre: pasada 1 puebla obj, pasada 2 compila.
+#  Protege del flake conocido del SDK WPF: el proyecto temporal
+#  *_wpftmp compila con los .g.cs del obj y a veces falla sin que
+#  el código tenga errores (CS2001/CS0103), sobre todo si otra
+#  compilación toca el mismo obj. Se compila UNA vez y solo se
+#  reintenta si falla: en 30 de 30 ejecuciones de CI con obj limpio
+#  (27-09 a 06-10 de 2026) la primera compilación funcionó, así que
+#  la antigua doble pasada incondicional solo repetía el trabajo.
 # ============================================================
 
 param(
@@ -50,19 +53,13 @@ function Invoke-Build {
     return $true
 }
 
-# Pasada 1: puebla obj (puede fallar si obj estaba limpio — normal, no fatal)
-Write-Host "== Pasada 1 (poblar obj) ==" -ForegroundColor Yellow
-$pasada1 = Invoke-Build "pasada 1"
-if (-not $pasada1) {
-    Write-Host "[build] Pasada 1 falló (esperado si obj estaba limpio); reintento con pasada 2..." -ForegroundColor DarkYellow
-}
-
-# Pasada 2: compila de verdad
-Write-Host "== Pasada 2 (compilación) ==" -ForegroundColor Yellow
-$pasada2 = Invoke-Build "pasada 2"
-if (-not $pasada2) {
-    Write-Host "[build] ERROR: la pasada 2 falló." -ForegroundColor Red
-    exit 1
+Write-Host "== Compilación ==" -ForegroundColor Yellow
+if (-not (Invoke-Build "compilación")) {
+    Write-Host "[build] La compilación falló; se reintenta una vez (posible flake wpftmp)..." -ForegroundColor DarkYellow
+    if (-not (Invoke-Build "reintento")) {
+        Write-Host "[build] ERROR: el reintento también falló." -ForegroundColor Red
+        exit 1
+    }
 }
 
 # Verificación de artefactos: el build puede reportar "OK" sin generar el ensamblado de
@@ -177,7 +174,7 @@ Write-Host "[build] OK ($Configuration)" -ForegroundColor Green
 
 if ($RunTests) {
     Write-Host "== Tests ==" -ForegroundColor Yellow
-    # --no-build: reutiliza los binarios de la pasada 2. Evita que VSTest recompile
+    # --no-build: reutiliza los binarios recién compilados. Evita que VSTest recompile
     # el proyecto principal (WPF) con un graph distinto → BG1002/CS2001 intermitente.
     $testArgs = @("test", "$root\AnimeLocalTracker.Tests", "-c", $Configuration, "--no-build", "--nologo", "-v", "q", "-nodeReuse:false")
     if ($Coverage) {

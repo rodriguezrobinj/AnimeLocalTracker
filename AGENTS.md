@@ -4,9 +4,11 @@ Aplicación de escritorio **Windows** (.NET 8 WPF, MVVM). Stack: SQLite (WAL, sq
 
 ## Comandos
 
-- Build (doble pasada, obligatorio): `powershell -ExecutionPolicy Bypass -File .\build.ps1 -RunTests`
-- **Verificación final recomendada tras tocar código** (el doble pase puede reportar "OK" con errores ocultos del proyecto WPF): `dotnet build AnimeLocalTracker/AnimeLocalTracker.csproj -c Debug --no-incremental` y `dotnet build AnimeLocalTracker.Tests/AnimeLocalTracker.Tests.csproj -c Debug --no-incremental`
-- Solo tests: `dotnet test AnimeLocalTracker.Tests/AnimeLocalTracker.Tests.csproj -c Debug --no-build`
+- Verificación **proporcional al cambio** (procedimiento y flakes conocidos en `.claude/skills/repo-build-test/SKILL.md`):
+  - Sin tocar C#/XAML (documentos, reglas, configuración del repo): no hace falta compilar ni probar.
+  - Mientras se trabaja: `dotnet build AnimeLocalTracker/AnimeLocalTracker.csproj -c Debug` y las pruebas de lo tocado: `dotnet test AnimeLocalTracker.Tests/AnimeLocalTracker.Tests.csproj -c Debug --no-restore -p:BuildProjectReferences=false --filter "FullyQualifiedName~NombreDeLaClaseTests"`
+  - Al cerrar la tarea o antes de subir: la suite completa, una vez (el mismo `dotnet test` sin `--filter`).
+- Build completo como en CI/release: `powershell -ExecutionPolicy Bypass -File .\build.ps1 -RunTests` (compila una vez y reintenta solo si falla; no hace falta para el trabajo diario).
 - Compila con `TreatWarningsAsErrors` + analyzers CA: **0 warnings obligatorio** (no editar `Directory.Build.props` ni `.editorconfig` sin entenderlos).
 - SCA: `dotnet list AnimeLocalTracker/AnimeLocalTracker.csproj package --vulnerable --include-transitive` (+ el de Tests).
 - CI (local, si `gh` está instalado): `gh run list --limit 1` · `gh run view <id> --log-failed`

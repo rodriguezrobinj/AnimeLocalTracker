@@ -19,7 +19,7 @@ Una skill de nivel inferior nunca puede relajar una regla de nivel superior. Si 
 
 | Tarea | Dueño | Notas |
 |---|---|---|
-| Compilar y correr tests | `repo-build-test` | Obligatorio antes de dar por terminado cualquier cambio C#/XAML. Las skills de `dotnet-test`/`dotnet-msbuild` ayudan a diagnosticar, pero no sustituyen su procedimiento. |
+| Compilar y correr tests | `repo-build-test` | Obligatorio antes de dar por terminado cualquier cambio C#/XAML, en la medida que fija el skill (pruebas afectadas mientras se trabaja; suite completa una vez al cerrar la tarea o antes de subir). Sin cambios de código no aplica. Las skills de `dotnet-test`/`dotnet-msbuild` ayudan a diagnosticar, pero no sustituyen su procedimiento. |
 | Nueva pestaña/vista o lista virtualizada | `wpf-add-view` | Más `ui-wpf-vistas.md`. |
 | Verificar UI en la app real | `wpf-visual-verification` | |
 | Diseñar una función nueva con decisiones abiertas | `superpowers:brainstorming` | Solo si hay decisiones de diseño reales (ver punto 4). |

@@ -1,11 +1,23 @@
 ---
 name: repo-build-test
-description: Compila AnimeLocalTracker y corre la suite de pruebas de forma confiable, evitando el falso "OK" del flake conocido del SDK WPF (_wpftmp). Usar tras cualquier cambio en C#/XAML antes de darlo por terminado.
+description: Compila AnimeLocalTracker y corre las pruebas de forma confiable y proporcional al cambio (pruebas afectadas mientras se trabaja, suite completa una vez al cerrar la tarea), evitando el falso "OK" del flake conocido del SDK WPF (_wpftmp). Usar tras cualquier cambio en C#/XAML antes de darlo por terminado.
 ---
 
 # Build y verificación de pruebas — AnimeLocalTracker
 
 Procedimiento para verificar la compilación y los tests tras cualquier cambio, sin caer en el falso positivo del flake de build conocido en este repo.
+
+## Cuánto verificar (proporcional al cambio)
+
+| Situación | Qué se hace |
+|---|---|
+| No se tocó C#/XAML (investigar, responder preguntas, documentos, reglas, `.gitignore`, workflows) | Nada: ni compilar ni probar. Si la investigación necesita ver la app en marcha, solo el paso 1; si es sobre una prueba que falla, solo esa prueba. |
+| Mientras se trabaja en un cambio de C#/XAML | Paso 1 (compilar la app, 0 advertencias) y las pruebas de lo tocado (paso 4 con `--filter`). |
+| Al cerrar la tarea, o antes de un commit/push | Paso 1 y la suite completa (paso 4 sin filtro), **una vez**. |
+
+- La suite completa no se repite en cada paso intermedio: se corre una vez al final. Si no está claro qué pruebas cubren el cambio (servicio compartido, modelo, migración de base de datos), se corre completa.
+- No hay doble pasada: se compila una vez y solo se reintenta si falla (pasos 2 y 3). En 30 de 30 ejecuciones de CI con `obj` limpio (27-09 a 06-10 de 2026) la primera compilación funcionó.
+- Referencia de tiempos en la máquina de desarrollo: compilar la app, 4 s sin cambios y unos 40 s con cambios; compilar las pruebas, unos 40 s; una clase de pruebas, unos 12 s; la suite completa en CI, 1 min 40 s.
 
 ## El flake conocido (por qué este skill existe)
 
@@ -30,6 +42,7 @@ El SDK de WPF compila cada proyecto en dos fases: primero genera los `.g.cs` des
    ```
    dotnet test AnimeLocalTracker.Tests/AnimeLocalTracker.Tests.csproj -c Debug --no-restore -p:BuildProjectReferences=false
    ```
+   Para correr solo las pruebas de lo tocado, añadir `--filter "FullyQualifiedName~NombreDeLaClaseTests"` (varias clases: `--filter "FullyQualifiedName~UnaTests|FullyQualifiedName~OtraTests"`).
    Si ese flag no aplica (p. ej. tras cambiar el `.csproj` de Tests), usar `dotnet test ... -c Debug` normal y aplicar el mismo procedimiento de reintento/limpieza de `obj` si falla con `CS2001`.
 5. **Nunca mates procesos `dotnet`/`MSBuild`/`testhost` a mitad de una corrida de tests que sigue produciendo output.** Si necesitas cancelar, espera a que la corrida termine sola o a que quede sin producir output por varios minutos — matarla a mitad de ejecución puede dejar un `System.Windows.Application.Current` compartido en mal estado y producir fallos cruzados (`InvalidOperationException: El subproceso que realiza la llamada no puede obtener acceso a este objeto...`) en tests que no tienen nada que ver con tu cambio. Si eso pasa, es contaminación del entorno, no una regresión — limpia procesos colgados (paso 6) y vuelve a correr todo limpio antes de concluir que algo se rompió.
 6. Si un build/test se queda sin producir NINGÚN output por varios minutos (ni siquiera la línea inicial "Determinando los proyectos..."), probablemente hay una invocación de `dotnet` anterior colgada compitiendo por el mismo lock. Verificar y limpiar:
@@ -55,9 +68,9 @@ El SDK de WPF compila cada proyecto en dos fases: primero genera los `.g.cs` des
 ## Criterios de éxito
 
 1. **0 errores, 0 advertencias** en el build directo del proyecto principal.
-2. **Toda la suite pasa** (xUnit + FluentAssertions + Moq). El total de tests solo debe subir o mantenerse — si añadiste tests y el total no sube, el binario de test está stale: limpiar `obj`/`bin` de `AnimeLocalTracker.Tests` también y recompilar.
+2. **Pasan las pruebas que tocan** según la tabla de arriba: las afectadas mientras se trabaja, toda la suite al cerrar la tarea (xUnit + FluentAssertions + Moq). El total de tests solo debe subir o mantenerse — si añadiste tests y el total no sube, el binario de test está stale: limpiar `obj`/`bin` de `AnimeLocalTracker.Tests` también y recompilar.
 3. Si el build o los tests fallan por una razón que SÍ es tu código: corregir la causa antes de reportar éxito. No "aprobar" con un build en verde si una corrida no-incremental o los tests siguen fallando por el mismo motivo.
 
 ## Alternativa: `build.ps1`
 
-El repo tiene `.\build.ps1 -RunTests`, que hace doble pasada y además gestiona la descarga de `ffmpeg.exe`/`ffprobe.exe` embebidos si faltan. Es más lento pero más completo (útil antes de empaquetar una release). Para iteración rápida durante desarrollo, el procedimiento de arriba con `dotnet build`/`dotnet test` directos es más rápido y suficiente.
+El repo tiene `.\build.ps1 -RunTests`, que compila app y pruebas de forma no incremental (reintenta una vez si falla) y además gestiona la descarga de `ffmpeg.exe`/`ffprobe.exe` embebidos si faltan. Es más lento pero más completo (útil antes de empaquetar una release). Para iteración rápida durante desarrollo, el procedimiento de arriba con `dotnet build`/`dotnet test` directos es más rápido y suficiente.
