@@ -141,6 +141,56 @@ public partial class ConfiguracionViewModel : ObservableObject
     [ObservableProperty] private int _pasosSaltoSegundos = 10;
     [ObservableProperty] private bool _evitarSuspensionPantalla = true;
     [ObservableProperty] private string _accionFinEpisodio = AccionFinEpisodioValores.AutoPlayCuentaAtras;
+
+    // === ELIMINAR EL VIDEO TRAS VERLO ===
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(EsConsumoLigero))]
+    private string _modoEliminarTrasVer = ModoEliminarTrasVerValores.Apagado;
+
+    [ObservableProperty] private int _episodiosAConservar = 3;
+
+    /// <summary>Solo con este modo tiene sentido pedir cuántos episodios se conservan.</summary>
+    public bool EsConsumoLigero => ModoEliminarTrasVer == ModoEliminarTrasVerValores.ConsumoLigero;
+
+    private bool _cargandoModoBorrado;
+    private string _modoBorradoAceptado = ModoEliminarTrasVerValores.Apagado;
+
+    partial void OnModoEliminarTrasVerChanged(string value)
+    {
+        if (_cargandoModoBorrado) return;
+        _ = ConfirmarModoEliminarTrasVerAsync(value);
+    }
+
+    /// <summary>
+    /// Elegir un modo que borra videos avisa de que es definitivo: si el usuario no acepta, el selector vuelve al valor anterior.
+    /// </summary>
+    private async Task ConfirmarModoEliminarTrasVerAsync(string nuevo)
+    {
+        try
+        {
+            bool acepta = true;
+            if (nuevo != ModoEliminarTrasVerValores.Apagado)
+            {
+                acepta = await _dialogService.MostrarDialogoAsync(
+                    LocalizationService.T("Cfg_EliminarTrasVerAvisoTitulo"),
+                    LocalizationService.T("Cfg_EliminarTrasVerAvisoMsj"),
+                    true, "DeleteAlertOutline", "#EF4444");
+            }
+
+            _cargandoModoBorrado = true;
+            try
+            {
+                if (acepta) _modoBorradoAceptado = nuevo;
+                else ModoEliminarTrasVer = _modoBorradoAceptado;
+            }
+            finally { _cargandoModoBorrado = false; }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn("ConfiguracionViewModel", $"No se pudo confirmar el modo de borrado tras ver: {ex.Message}");
+        }
+    }
+
     [ObservableProperty] private string _ambitoAjustesAudio = AmbitoAudio.Global;
     [ObservableProperty] private string _preferenciaAudioAnimeAv1 = "";
     [ObservableProperty] private bool _busquedaTorrentHabilitada;
@@ -428,6 +478,11 @@ public partial class ConfiguracionViewModel : ObservableObject
         PasosSaltoSegundos = config.PasosSaltoSegundos is 5 or 10 or 30 or 60 ? config.PasosSaltoSegundos : 10;
         EvitarSuspensionPantalla = config.EvitarSuspensionPantalla;
         AccionFinEpisodio = string.IsNullOrWhiteSpace(config.AccionFinEpisodio) ? AccionFinEpisodioValores.AutoPlayCuentaAtras : config.AccionFinEpisodio;
+        _cargandoModoBorrado = true;
+        ModoEliminarTrasVer = ModoEliminarTrasVerValores.Normalizar(config.ModoEliminarTrasVer);
+        _modoBorradoAceptado = ModoEliminarTrasVer;
+        _cargandoModoBorrado = false;
+        EpisodiosAConservar = Math.Clamp(config.EpisodiosAConservar, 1, 10);
         AmbitoAjustesAudio = AmbitoAudio.Normalizar(config.AmbitoAjustesAudio);
         PreferenciaAudioAnimeAv1 = config.PreferenciaAudioAnimeAv1 ?? "";
         CargarLista(OrdenServidores, AnimeLocalTracker.Models.OrdenServidores.DesdeAjuste(config.ServidorPreferidoAnimeAv1));
@@ -647,6 +702,8 @@ public partial class ConfiguracionViewModel : ObservableObject
             config.PasosSaltoSegundos = PasosSaltoSegundos;
             config.EvitarSuspensionPantalla = EvitarSuspensionPantalla;
             config.AccionFinEpisodio = AccionFinEpisodio;
+            config.ModoEliminarTrasVer = ModoEliminarTrasVerValores.Normalizar(ModoEliminarTrasVer);
+            config.EpisodiosAConservar = Math.Clamp(EpisodiosAConservar, 1, 10);
             config.AmbitoAjustesAudio = AmbitoAudio.Normalizar(AmbitoAjustesAudio);
             config.PreferenciaAudioAnimeAv1 = string.IsNullOrEmpty(PreferenciaAudioAnimeAv1) ? null : PreferenciaAudioAnimeAv1;
             config.ServidorPreferidoAnimeAv1 = AnimeLocalTracker.Models.OrdenServidores.ParaAjuste(OrdenServidores.Select(s => s.Nombre));

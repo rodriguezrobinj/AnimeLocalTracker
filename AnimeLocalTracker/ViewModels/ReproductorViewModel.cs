@@ -300,6 +300,19 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     private string _rutaVideo = string.Empty;
     public string RutaVideo => _rutaVideo;
 
+    /// <summary>"Eliminar tras ver": se le avisa al terminar de ver un episodio (al cerrar el reproductor o pasar a otro).</summary>
+    private readonly ILimpiadorDeEpisodios? _limpiadorDeEpisodios;
+
+    /// <summary>
+    /// Avisa al servicio de que el episodio se vio de verdad reproduciéndolo (nunca por un marcado manual). No se espera: el
+    /// servicio comprueba por su cuenta que la marca de "visto" esté guardada y registra sus propios errores.
+    /// </summary>
+    private void NotificarEpisodioTerminadoParaLimpieza(int animeId, int episodio)
+    {
+        if (_limpiadorDeEpisodios == null || animeId <= 0 || episodio <= 0) return;
+        _ = _limpiadorDeEpisodios.AplicarTrasVerAsync(animeId, episodio);
+    }
+
     private string? _rutaPortada;
 
     private bool _fueMarcadoComoVisto = false;
@@ -332,9 +345,11 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         IPlaybackVolumeCoordinator? volumeCoordinator = null,
         IPlaybackSeekCoordinator? seekCoordinator = null,
         IFotogramasClaveService? fotogramasClaveService = null,
-        ISubtitleAssRenderer? subtitleAssRenderer = null)
+        ISubtitleAssRenderer? subtitleAssRenderer = null,
+        ILimpiadorDeEpisodios? limpiadorDeEpisodios = null)
     {
         _databaseService = databaseService;
+        _limpiadorDeEpisodios = limpiadorDeEpisodios;
         _settingsService = settingsService;
         _logrosService = logrosService;
         DialogService = dialogService;
@@ -1427,6 +1442,9 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
     private void AsignarMetadatosDeEpisodio(string rutaVideo, int animeId, int episodio, string tituloAnime, string? rutaPortada)
     {
+        // Se pasa a otro episodio (autoplay, siguiente, anterior, el cajón): el que se deja, si se vio, ya terminó.
+        if (_fueMarcadoComoVisto && (animeId != _animeId || episodio != _episodio)) NotificarEpisodioTerminadoParaLimpieza(_animeId, _episodio);
+
         _rutaVideo = rutaVideo;
         _animeId = animeId;
         _episodio = episodio;
@@ -2286,6 +2304,9 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         if (_disposeHecho) return;
         _disposeHecho = true;
         GC.SuppressFinalize(this);
+
+        // "Eliminar tras ver": el reproductor también se libera al navegar a otra pestaña, no solo al pulsar salir.
+        if (_fueMarcadoComoVisto) NotificarEpisodioTerminadoParaLimpieza(_animeId, _episodio);
 
         CerrarDibujoAss();
 

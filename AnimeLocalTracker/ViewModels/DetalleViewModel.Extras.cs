@@ -119,34 +119,17 @@ public partial class DetalleViewModel
             long tamano = 0;
             bool ok = await Task.Run(() =>
             {
-                // Lo único que decide si el episodio "ya no está" es el archivo de VIDEO.
+                // Lo único que decide si el episodio "ya no está" es el archivo de VIDEO (la miniatura es opcional: ver BorradoDeEpisodio).
                 try
                 {
-                    if (File.Exists(ruta))
-                    {
-                        tamano = new FileInfo(ruta).Length;
-                        AnimeLocalTracker.Core.BorradoDeArchivos.BorrarConReintentos(ruta);
-                    }
+                    tamano = AnimeLocalTracker.Core.BorradoDeEpisodio.BorrarVideoYMiniatura(ruta);
+                    return true;
                 }
                 catch (Exception ex)
                 {
                     AppLogger.Debug("DetalleViewModel", $"No se pudo borrar el episodio {episodio.NumeroEpisodio}: {ex.Message}");
                     return false;
                 }
-
-                // La miniatura es opcional: la propia ficha la tiene abierta (imagen en pantalla) y Windows puede negar el
-                // borrado. Si su fallo se tratara como fallo del episodio, el video ya borrado seguiría apareciendo en la
-                // lista hasta recargar la pestaña.
-                try
-                {
-                    string miniatura = PythonEpisodeEnricher.ObtenerRutaMiniaturaEsperada(ruta);
-                    if (File.Exists(miniatura)) File.Delete(miniatura);
-                }
-                catch (Exception ex)
-                {
-                    AppLogger.Debug("DetalleViewModel", $"No se pudo borrar la miniatura del episodio {episodio.NumeroEpisodio}: {ex.Message}");
-                }
-                return true;
             });
             if (!ok) continue;
 

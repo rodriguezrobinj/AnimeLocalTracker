@@ -26,6 +26,7 @@ public sealed partial class EpisodiosFichaViewModel : ObservableObject,
     IRecipient<EpisodioActualizadoMensaje>,
     IRecipient<DescargaProgresoMensaje>,
     IRecipient<IdiomaCambiadoMensaje>,
+    IRecipient<ArchivoEpisodioEliminadoMensaje>,
     IDisposable
 {
     private readonly IDatabaseService _databaseService;
@@ -77,6 +78,7 @@ public sealed partial class EpisodiosFichaViewModel : ObservableObject,
         WeakReferenceMessenger.Default.Register<EpisodioActualizadoMensaje>(this);
         WeakReferenceMessenger.Default.Register<DescargaProgresoMensaje>(this);
         WeakReferenceMessenger.Default.Register<IdiomaCambiadoMensaje>(this);
+        WeakReferenceMessenger.Default.Register<ArchivoEpisodioEliminadoMensaje>(this);
 
         // Fase 2d: el botón "elegir torrent manualmente" solo tiene sentido si la
         // búsqueda por torrent está activa — se mantiene sincronizado con Configuración.
@@ -340,6 +342,21 @@ public sealed partial class EpisodiosFichaViewModel : ObservableObject,
 
     /// <summary>Cambio de idioma con la ficha abierta: el desplegable de filtro y el aviso de huecos se retraducen.</summary>
     public void Receive(IdiomaCambiadoMensaje message) => Core.HiloUi.Ejecutar(RefrescarTextosTraducidos);
+
+    /// <summary>
+    /// Un video se borró desde fuera de esta lista (p. ej. "Eliminar tras ver" al cerrar el reproductor): la fila deja de
+    /// figurar como descargada. El borrado manual ya la limpió antes de avisar, así que aquí no hace nada.
+    /// </summary>
+    public void Receive(ArchivoEpisodioEliminadoMensaje message) => Core.HiloUi.Ejecutar(() =>
+    {
+        if (Anime == null || Anime.AniListId != message.AnimeId) return;
+        var episodio = _todosLosEpisodios.FirstOrDefault(e => e.NumeroEpisodio == message.NumeroEpisodio);
+        if (episodio is not { Descargado: true }) return;
+
+        episodio.QuitarArchivo();
+        AplicarFiltrosYOrdenamiento();
+        ArchivosCambiados?.Invoke();
+    });
 
     private void RefrescarTextosTraducidos()
     {
@@ -946,9 +963,8 @@ public sealed partial class EpisodiosFichaViewModel : ObservableObject,
         if (!confirmar) return;
 
         string rutaArchivo = episodio.RutaCompleta;
-        string rutaMiniatura = PythonEpisodeEnricher.ObtenerRutaMiniaturaEsperada(rutaArchivo);
 
-        // 1. Borrar el archivo de video. Fuera del hilo de la interfaz y con reintentos: recién abierta la ficha, la
+        // 1. Borrar el video y su miniatura. Fuera del hilo de la interfaz y con reintentos: recién abierta la ficha, la
         //    extracción de miniaturas lo tiene abierto unos instantes. Si no se pudo, se avisa y el episodio se queda como
         //    estaba (antes se daba por quitado aunque el archivo siguiera en el disco, ocupando espacio sin verse).
         int intentos = IntentosBorradoEpisodio;
@@ -956,7 +972,7 @@ public sealed partial class EpisodiosFichaViewModel : ObservableObject,
         {
             try
             {
-                if (File.Exists(rutaArchivo)) AnimeLocalTracker.Core.BorradoDeArchivos.BorrarConReintentos(rutaArchivo, intentos);
+                AnimeLocalTracker.Core.BorradoDeEpisodio.BorrarVideoYMiniatura(rutaArchivo, intentos);
                 return true;
             }
             catch (Exception ex)
@@ -973,10 +989,7 @@ public sealed partial class EpisodiosFichaViewModel : ObservableObject,
             return;
         }
 
-        // 2. Borrar su miniatura (opcional: la ficha puede tenerla abierta en pantalla)
-        try { if (File.Exists(rutaMiniatura)) File.Delete(rutaMiniatura); } catch { }
-
-        // 3. Conservar el registro en la base de datos: el historial es un registro
+        // 2. Conservar el registro en la base de datos: el historial es un registro
         //    permanente — borrar el archivo NO debe borrar que se vio el episodio.
         try
         {
@@ -987,7 +1000,7 @@ public sealed partial class EpisodiosFichaViewModel : ObservableObject,
             AppLogger.Debug("EpisodiosFichaViewModel", $"No se pudo conservar el registro del episodio: {ex.Message}");
         }
 
-        // 4. Reiniciar en la UI solo lo relativo al archivo (visto/progreso/fecha se conservan)
+        // 3. Reiniciar en la UI solo lo relativo al archivo (visto/progreso/fecha se conservan)
         episodio.QuitarArchivo();
         WeakReferenceMessenger.Default.Send(new ArchivoEpisodioEliminadoMensaje(Anime?.AniListId ?? 0, episodio.NumeroEpisodio));
 

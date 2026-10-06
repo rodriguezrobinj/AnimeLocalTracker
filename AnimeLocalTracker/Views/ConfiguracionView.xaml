@@ -994,6 +994,38 @@
                                             <ComboBoxItem Content="30 minutos" Tag="30"/>
                                         </ComboBox>
                                     </ctl:SettingRow>
+                                    <Border Style="{StaticResource CfgDivider}"/>
+
+                                    <ctl:SettingRow Title="{loc:T Cfg_EliminarTrasVer}"
+                                                    Description="{loc:T Cfg_EliminarTrasVerSub}">
+                                        <ComboBox SelectedValue="{Binding ModoEliminarTrasVer}" SelectedValuePath="Tag" Height="36" MinWidth="230"
+                                                  AutomationProperties.Name="{loc:T Cfg_EliminarTrasVer}">
+                                            <ComboBoxItem Content="{loc:T Cfg_EliminarTrasVer_Apagado}" Tag="Apagado"/>
+                                            <ComboBoxItem Content="{loc:T Cfg_EliminarTrasVer_Automatico}" Tag="Automatico"/>
+                                            <ComboBoxItem Content="{loc:T Cfg_EliminarTrasVer_AlCompletar}" Tag="AlCompletarSerie"/>
+                                            <ComboBoxItem Content="{loc:T Cfg_EliminarTrasVer_ConsumoLigero}" Tag="ConsumoLigero"/>
+                                        </ComboBox>
+                                    </ctl:SettingRow>
+
+                                    <Border Style="{StaticResource CfgDivider}"
+                                            Visibility="{Binding EsConsumoLigero, Converter={StaticResource BoolToVis}}"/>
+                                    <ctl:SettingRow Title="{loc:T Cfg_EpisodiosAConservar}"
+                                                    Description="{loc:T Cfg_EpisodiosAConservarSub}"
+                                                    Visibility="{Binding EsConsumoLigero, Converter={StaticResource BoolToVis}}">
+                                        <ComboBox SelectedValue="{Binding EpisodiosAConservar}" SelectedValuePath="Content" Height="36" MinWidth="80"
+                                                  AutomationProperties.Name="{loc:T Cfg_EpisodiosAConservar}">
+                                            <ComboBoxItem Content="1"/>
+                                            <ComboBoxItem Content="2"/>
+                                            <ComboBoxItem Content="3"/>
+                                            <ComboBoxItem Content="4"/>
+                                            <ComboBoxItem Content="5"/>
+                                            <ComboBoxItem Content="6"/>
+                                            <ComboBoxItem Content="7"/>
+                                            <ComboBoxItem Content="8"/>
+                                            <ComboBoxItem Content="9"/>
+                                            <ComboBoxItem Content="10"/>
+                                        </ComboBox>
+                                    </ctl:SettingRow>
                                 </StackPanel>
                             </Border>
 

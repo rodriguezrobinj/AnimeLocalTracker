@@ -103,6 +103,12 @@ public class AppSettings
     /// <summary>Qué hacer al terminar un episodio: uno de los valores de <see cref="AccionFinEpisodioValores"/>.</summary>
     public string AccionFinEpisodio { get; set; } = AccionFinEpisodioValores.AutoPlayCuentaAtras;
 
+    /// <summary>Qué hacer con el video de un episodio ya visto: uno de los valores de <see cref="ModoEliminarTrasVerValores"/>.</summary>
+    public string ModoEliminarTrasVer { get; set; } = ModoEliminarTrasVerValores.Apagado;
+
+    /// <summary>Con el modo "consumo ligero": cuántos episodios vistos se conservan en disco (los de número más alto), de 1 a 10.</summary>
+    public int EpisodiosAConservar { get; set; } = 3;
+
     /// <summary>Pista de audio preferida al descargar de AnimeAV1: uno de los valores de
     /// <see cref="PreferenciaAudioValores"/>, o null/vacío = sin preferencia (comportamiento
     /// de siempre: se toma la primera pista que el sitio publique). Es una preferencia con
@@ -198,6 +204,22 @@ public static class AccionFinEpisodioValores
     public const string PausarYSalirFicha = "PausarYSalirFicha";
     /// <summary>Se queda en pantalla completa, pausado en el último fotograma.</summary>
     public const string PermanecerPausado = "PermanecerPausado";
+}
+
+/// <summary>Valores válidos de <see cref="AppSettings.ModoEliminarTrasVer"/>.</summary>
+public static class ModoEliminarTrasVerValores
+{
+    /// <summary>No se borra nada (predeterminado).</summary>
+    public const string Apagado = "Apagado";
+    /// <summary>Al terminar de ver un episodio se borra su video.</summary>
+    public const string Automatico = "Automatico";
+    /// <summary>Al ver el último episodio de la serie se pregunta una vez y se borran todos los vistos.</summary>
+    public const string AlCompletarSerie = "AlCompletarSerie";
+    /// <summary>Se conservan solo los N episodios vistos de número más alto; el resto se borra.</summary>
+    public const string ConsumoLigero = "ConsumoLigero";
+
+    /// <summary>Un valor desconocido o vacío (ajustes antiguos o editados a mano) equivale a Apagado: nunca se borra por error.</summary>
+    public static string Normalizar(string? valor) => valor is Automatico or AlCompletarSerie or ConsumoLigero ? valor : Apagado;
 }
 
 /// <summary>Valores válidos de <see cref="AppSettings.AmbitoAjustesAudio"/> y las dos reglas que salen de él.</summary>

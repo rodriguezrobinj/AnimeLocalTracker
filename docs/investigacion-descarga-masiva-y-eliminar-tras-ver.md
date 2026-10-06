@@ -43,11 +43,11 @@ Propuestas #1 y #3 de `docs/propuestas-nuevas-funciones.md`. Son dos funciones i
 
 Ejemplo con N = 3: vistos del 1 al 8 → al cerrar el 8 se borran del 1 al 5 y quedan el 6, 7 y 8.
 
-**Disparo:** al terminar de ver, no al cruzar el umbral (el archivo está abierto). Dos enganches de pocas líneas en `ReproductorViewModel` que delegan en el servicio:
-- `SalirDelReproductor`, tras `Dispose()`.
-- `IrAEpisodio`, para el episodio que se deja; el archivo anterior puede seguir abierto unos instantes, y `BorradoDeArchivos.BorrarConReintentos` (15 × 200 ms) lo cubre. **A verificar en la implementación.**
+**Disparo:** al terminar de ver, no al cruzar el umbral (el archivo está abierto). Dos enganches de una línea en `ReproductorViewModel` que delegan en el servicio:
+- `Dispose()`: el reproductor es idempotente y se libera también al navegar a otra pestaña, no solo al pulsar salir (la idea inicial de enganchar `SalirDelReproductor` se descartó por eso).
+- `AsignarMetadatosDeEpisodio`: todo cambio de episodio pasa por ahí (autoplay, siguiente, anterior, el cajón).
 
-Solo se dispara si el episodio quedó marcado como visto **reproduciéndolo** en esa sesión (`_fueMarcadoComoVisto`). Un marcado manual no borra nada.
+Solo se dispara si el episodio quedó marcado como visto **reproduciéndolo** en esa sesión (`_fueMarcadoComoVisto`). Un marcado manual no borra nada. Además, el servicio **comprueba en la base de datos** que el episodio figure como visto (esperando hasta 10 s, porque el guardado local es asíncrono) y, si no llega, no borra. Empieza con una pausa de 1 s y el borrado reintenta 15 × 200 ms (`BorradoDeArchivos`) para dar tiempo al reproductor a soltar el archivo.
 
 **Protecciones (todos los modos):**
 - Solo archivos dentro de `RutaCarpeta` del anime.
@@ -69,6 +69,7 @@ Excepciones por anime, "preguntar tras cada episodio", deshacer y Papelera. "Al 
 
 ## 7. Puntos abiertos para el plan
 
-- Comportamiento exacto al pasar de episodio con `IrAEpisodio` (el archivo anterior sigue abierto mientras se abre el siguiente).
-- Dónde exactamente va el selector en Configuración (General o Descargas) y su aviso.
-- Cómo se detecta "último episodio" en series con `TotalEpisodios` desconocido: en ese caso "Al completar la serie" no actúa.
+- **Resuelto:** el selector va en Configuración → Descargas, con el aviso de borrado definitivo al elegir un modo que borra; "consumo ligero" admite de 1 a 10 episodios.
+- **Resuelto:** con `TotalEpisodios` desconocido, "Al completar la serie" no actúa.
+- **Sin resolver por lectura de código:** si Flyleaf suelta el archivo a tiempo al cerrar. Se comprueba en la app real con un perfil aislado y un video de prueba (plan de implementación, Tarea 5).
+- Plan de implementación: `docs/plan-eliminar-tras-ver.md`.

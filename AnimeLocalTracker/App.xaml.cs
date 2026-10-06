@@ -245,6 +245,9 @@ public partial class App : Application
         // Persistencia del progreso de reproducción (reanudar, guardar, auto-tracking)
         services.AddSingleton<IPlaybackStateService, PlaybackStateService>();
 
+        // "Eliminar tras ver": borra el video de los episodios ya vistos según el modo de Configuración
+        services.AddSingleton<ILimpiadorDeEpisodios, LimpiadorDeEpisodios>();
+
         // SMT-01: Controles Multimedia del Sistema (SMTC) — teclas de medios/auriculares
         // Bluetooth y overlay nativo de Windows. Un único SMTC por ventana principal.
         services.AddSingleton<ISystemMediaControlsService, SystemMediaControlsService>();

@@ -116,6 +116,33 @@ public class DetalleEpisodiosSeguridadTests
         _descargas.Verify(d => d.IniciarDescargaEpisodioAsync(Id, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<IEnumerable<string>?>()), Times.Exactly(descargasEsperadas));
     }
 
+    // ── Archivo eliminado desde fuera de la lista ("Eliminar tras ver") ──
+
+    [Fact]
+    public async Task ArchivoEliminadoDesdeFuera_LaFilaDejaDeFigurarComoDescargada()
+    {
+        var sut = await AbrirFichaAsync(total: 4, enDisco: [1, 2, 3, 4], vistos: [1, 2, 3, 4]);
+        sut.Episodios.Todos.First(e => e.NumeroEpisodio == 2).Descargado.Should().BeTrue();
+
+        WeakReferenceMessenger.Default.Send(new ArchivoEpisodioEliminadoMensaje(Id, 2));
+
+        var fila = sut.Episodios.Todos.First(e => e.NumeroEpisodio == 2);
+        fila.Descargado.Should().BeFalse();
+        fila.RutaCompleta.Should().BeEmpty();
+        fila.Visto.Should().BeTrue("borrar el archivo no borra que se vio");
+        sut.Episodios.Todos.First(e => e.NumeroEpisodio == 3).Descargado.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ArchivoEliminadoDeOtroAnime_NoTocaEstaFicha()
+    {
+        var sut = await AbrirFichaAsync(total: 3, enDisco: [1, 2, 3], vistos: []);
+
+        WeakReferenceMessenger.Default.Send(new ArchivoEpisodioEliminadoMensaje(Id + 1, 2));
+
+        sut.Episodios.Todos.First(e => e.NumeroEpisodio == 2).Descargado.Should().BeTrue();
+    }
+
     // ── Filtro por clave fija (no por el texto traducido del desplegable) ──
 
     [Fact]
