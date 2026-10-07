@@ -421,21 +421,13 @@ public class DatabaseService : IDatabaseService, IDisposable
     /// El historial es un registro permanente: al borrar el archivo del disco se limpia
     /// todo lo relacionado con el archivo (ruta, miniatura y metadatos técnicos), pero se
     /// CONSERVAN visto, progreso, favorito, sincronización y fecha de reproducción.
+    /// Afecta a todas las filas del episodio: dos guardados simultáneos pueden haber dejado más de una.
     /// </summary>
     public async Task ConservarRegistroTrasEliminarArchivoAsync(int aniListId, int numeroEpisodio)
     {
-        var existente = await _conexion.Table<RegistroEpisodio>()
-            .FirstOrDefaultAsync(r => r.AniListId == aniListId && r.NumeroEpisodio == numeroEpisodio);
-        if (existente == null) return;
-
-        existente.RutaArchivo = string.Empty;
-        existente.RutaMiniatura = null;
-        existente.Resolucion = string.Empty;
-        existente.CodecVideo = string.Empty;
-        existente.Fps = string.Empty;
-        existente.Es10Bit = false;
-
-        await _conexion.UpdateAsync(existente);
+        await _conexion.ExecuteAsync(
+            "UPDATE RegistroEpisodio SET RutaArchivo = '', RutaMiniatura = NULL, Resolucion = '', CodecVideo = '', Fps = '', Es10Bit = 0 " +
+            "WHERE AniListId = ? AND NumeroEpisodio = ?", aniListId, numeroEpisodio);
     }
 
     /// <summary>
