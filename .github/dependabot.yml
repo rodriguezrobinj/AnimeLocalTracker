@@ -12,6 +12,11 @@ updates:
       flyleaf:
         patterns:
           - "Flyleaf*"
+    ignore:
+      # Fijado a una compilación de CI porque FlyleafLib.Controls.WPF lo exige (ver el comentario en AnimeLocalTracker.csproj):
+      # que Dependabot no proponga otra compilación de CI sin revisar.
+      - dependency-name: "MaterialDesignThemes"
+      - dependency-name: "MaterialDesignColors"
 
   - package-ecosystem: "cargo"
     directory: "/native/animetracker_core"

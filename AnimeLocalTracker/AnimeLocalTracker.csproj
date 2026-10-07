@@ -50,6 +50,11 @@
       <PackageReference Include="FlyleafLib.Controls.WPF" Version="1.7.3" />
       <!-- Parche en caliente del lector de subtítulos ASS de FlyleafLib (ver Services/ParcheSubtitulosFlyleaf.cs). -->
       <PackageReference Include="Lib.Harmony" Version="2.4.2" />
+      <!-- Compilación de integración continua A PROPÓSITO: todas las versiones de FlyleafLib.Controls.WPF (1.7.3 a 1.7.11, la última)
+           dependen de MaterialDesignThemes >= 5.3.3-ci1443, y la estable más reciente (5.3.2) es anterior: NuGet la rechaza con
+           NU1605 (comprobado el 2026-10-06). Es un paquete oficial del repositorio MaterialDesignInXAML en nuget.org (no se puede
+           borrar de allí). No bajar a una estable ni subir a 5.4.0-ci* sin que Flyleaf lo pida: ci1462 ya cambió iconos (Rewind10,
+           FastForward10). Revisar cuando FlyleafLib.Controls.WPF dependa de una versión estable. -->
       <PackageReference Include="MaterialDesignThemes" Version="5.3.3-ci1462" />
       <PackageReference Include="MdXaml" Version="1.27.0" />
       <!-- Descargas por torrent (Nyaa.si, MVP): MIT, activamente mantenida. -->
