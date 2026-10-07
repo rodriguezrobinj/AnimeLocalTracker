@@ -74,6 +74,14 @@ public sealed class LimpiadorDeEpisodios : ILimpiadorDeEpisodios
 
             if (modo == ModoEliminarTrasVerValores.AlCompletarSerie && !await ConfirmarAsync(anime, aBorrar.Select(n => archivos[n]).ToList()).ConfigureAwait(false)) return;
 
+            // Se vuelve a leer: entre la primera comprobación y aquí pasó el escaneo del disco y, en "Al completar la serie", el
+            // diálogo de confirmación abierto. Si en ese rato se activó "Conservar los videos", no se borra.
+            if (await _database.ObtenerConservarVideosAsync(aniListId).ConfigureAwait(false))
+            {
+                AppLogger.Debug("LimpiadorDeEpisodios", $"{anime.Titulo} pasó a 'Conservar los videos' antes de borrar: no se borra nada.");
+                return;
+            }
+
             await BorrarAsync(anime, aBorrar.Select(n => (Numero: n, Ruta: archivos[n])).ToList()).ConfigureAwait(false);
         }
         catch (Exception ex)

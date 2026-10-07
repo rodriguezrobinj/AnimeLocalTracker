@@ -175,6 +175,8 @@ public partial class DetalleViewModel : ObservableObject,
         EstaConectado = _authService.EstaAutenticado();
         AnimeSeleccionado = anime;
         EsFavoritoAnime = anime.EsFavorito;
+        // Manda la base de datos, no la copia con la que llega el anime (la Galería pudo leerlo antes de activar la protección).
+        anime.ConservarVideos = await _databaseService.ObtenerConservarVideosAsync(anime.AniListId);
         ConservarVideosAnime = anime.ConservarVideos;
         var reloj = Stopwatch.StartNew();
 
@@ -307,20 +309,22 @@ public partial class DetalleViewModel : ObservableObject,
     [RelayCommand]
     private async Task AlternarConservarVideosAsync()
     {
-        if (AnimeSeleccionado == null) return;
+        // El anime sobre el que se pulsó: si el guardado falla, AnimeSeleccionado puede ser ya otro.
+        var anime = AnimeSeleccionado;
+        if (anime == null) return;
 
-        bool nuevo = !AnimeSeleccionado.ConservarVideos;
-        AnimeSeleccionado.ConservarVideos = nuevo;
+        bool nuevo = !ConservarVideosAnime;
+        anime.ConservarVideos = nuevo;
         ConservarVideosAnime = nuevo;
         try
         {
-            await _databaseService.ActualizarAnimeAsync(AnimeSeleccionado);
+            await _databaseService.GuardarConservarVideosAsync(anime.AniListId, nuevo);
         }
         catch (Exception ex)
         {
-            AppLogger.Warn("DetalleViewModel", $"No se pudo guardar 'Conservar los videos' de {AnimeSeleccionado.Titulo}: {ex.Message}");
-            AnimeSeleccionado.ConservarVideos = !nuevo;
-            ConservarVideosAnime = !nuevo;
+            AppLogger.Warn("DetalleViewModel", $"No se pudo guardar 'Conservar los videos' de {anime.Titulo}: {ex.Message}");
+            anime.ConservarVideos = !nuevo;
+            if (ReferenceEquals(AnimeSeleccionado, anime)) ConservarVideosAnime = !nuevo;
             await _dialogService.MostrarDialogoAsync(LocalizationService.T("Det_ConservarVideos"), LocalizationService.T("Det_ConservarVideosErrorMsj"), false, "AlertCircleOutline", "#F59E0B");
         }
     }

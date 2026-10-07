@@ -245,6 +245,24 @@ public sealed class LimpiadorDeEpisodiosTests : IDisposable
     }
 
     [Fact]
+    public async Task SiSeProtegeMientrasEsperaLaConfirmacion_NoBorraNada()
+    {
+        var sut = Preparar(ModoEliminarTrasVerValores.AlCompletarSerie, conArchivo: [1, 2, 3], vistos: [1, 2, 3], total: 3);
+        // El diálogo está abierto: el usuario activa "Conservar los videos" antes de pulsar Aceptar.
+        _dialogos.Setup(d => d.MostrarDialogoAsync(It.IsAny<string>(), It.IsAny<string>(), true, It.IsAny<string>(), It.IsAny<string>()))
+            .Returns(() =>
+            {
+                _db.Setup(d => d.ObtenerConservarVideosAsync(Id)).ReturnsAsync(true);
+                return Task.FromResult(true);
+            });
+
+        await sut.AplicarTrasVerAsync(Id, 3);
+
+        Enumerable.Range(1, 3).Should().OnlyContain(n => Existe(n), "la protección se activó antes de borrar");
+        VerificarRegistroConservado();
+    }
+
+    [Fact]
     public async Task AnimeSinProteger_ConElMismoEscenario_SiBorra()
     {
         // Control: el mismo escenario sin la protección sí borra, así que la prueba anterior no pasa por casualidad.

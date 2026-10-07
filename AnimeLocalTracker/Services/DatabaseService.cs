@@ -351,6 +351,9 @@ public class DatabaseService : IDatabaseService, IDisposable
 
     public async Task GuardarAnimeAsync(AnimeItem anime)
     {
+        // Reemplazar la fila de un anime que ya existía no puede apagarle la protección de "Conservar los videos".
+        if (!anime.ConservarVideos) anime.ConservarVideos = await ObtenerConservarVideosAsync(anime.AniListId);
+
         // InsertOrReplace actualiza el registro si el AniListId ya existe, o lo inserta si es nuevo
         await _conexion.InsertOrReplaceAsync(anime);
     }
@@ -886,6 +889,9 @@ public class DatabaseService : IDatabaseService, IDisposable
     
     public async Task ActualizarAnimeAsync(AnimeItem anime)
     {
+        // La protección de "Conservar los videos" no se toca desde aquí: la copia en memoria puede ser vieja (la Galería guarda
+        // la fila entera, también en el refresco automático de AniList). Manda la base de datos y la copia se pone al día.
+        anime.ConservarVideos = await ObtenerConservarVideosAsync(anime.AniListId);
         await _conexion.UpdateAsync(anime);
     }
 
@@ -894,8 +900,21 @@ public class DatabaseService : IDatabaseService, IDisposable
         var lista = animes?.ToList();
         if (lista == null || lista.Count == 0) return;
 
+        var protegidos = (await _conexion.QueryScalarsAsync<int>("SELECT AniListId FROM AnimeItem WHERE ConservarVideos = 1")).ToHashSet();
+        foreach (var anime in lista) anime.ConservarVideos = protegidos.Contains(anime.AniListId);
+
         // PERF-06: UpdateAll en una sola transacción (los animes ya existen en la BD).
         await _conexion.UpdateAllAsync(lista);
+    }
+
+    public async Task GuardarConservarVideosAsync(int aniListId, bool conservar)
+    {
+        await _conexion.ExecuteAsync("UPDATE AnimeItem SET ConservarVideos = ? WHERE AniListId = ?", conservar ? 1 : 0, aniListId);
+    }
+
+    public async Task<bool> ObtenerConservarVideosAsync(int aniListId)
+    {
+        return await _conexion.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM AnimeItem WHERE AniListId = ? AND ConservarVideos = 1", aniListId) > 0;
     }
 
     /// <summary>

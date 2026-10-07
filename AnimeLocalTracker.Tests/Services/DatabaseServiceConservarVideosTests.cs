@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using AnimeLocalTracker.Models;
 using AnimeLocalTracker.Services;
@@ -37,13 +38,82 @@ public class DatabaseServiceConservarVideosTests : IDisposable
             var anime = (await sut.ObtenerAnimePorIdAsync(1))!;
             anime.ConservarVideos.Should().BeFalse("por defecto ningún anime está protegido");
 
-            anime.ConservarVideos = true;
-            await sut.ActualizarAnimeAsync(anime);
+            await sut.GuardarConservarVideosAsync(1, true);
         }
 
         using var reabierta = new DatabaseService(_rutaDb);
         await reabierta.InicializarBaseDatosAsync();
         (await reabierta.ObtenerAnimePorIdAsync(1))!.ConservarVideos.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task GuardarYObtener_SoloCambianEsaColumna()
+    {
+        using var sut = new DatabaseService(_rutaDb);
+        await sut.InicializarBaseDatosAsync();
+        await sut.GuardarAnimeAsync(new AnimeItem { AniListId = 1, Titulo = "Frieren", EsFavorito = true });
+
+        (await sut.ObtenerConservarVideosAsync(1)).Should().BeFalse();
+        await sut.GuardarConservarVideosAsync(1, true);
+
+        (await sut.ObtenerConservarVideosAsync(1)).Should().BeTrue();
+        var anime = (await sut.ObtenerAnimePorIdAsync(1))!;
+        anime.Titulo.Should().Be("Frieren");
+        anime.EsFavorito.Should().BeTrue("solo cambia esa columna");
+        (await sut.ObtenerConservarVideosAsync(99)).Should().BeFalse("un anime que no existe no está protegido");
+    }
+
+    // Una pantalla con una copia vieja del anime (la Galería guarda la fila entera, también en el refresco automático de AniList)
+    // no puede apagar la protección: la única forma de cambiarla es GuardarConservarVideosAsync.
+
+    [Fact]
+    public async Task ActualizarAnime_ConUnaCopiaVieja_NoApagaLaProteccion()
+    {
+        using var sut = new DatabaseService(_rutaDb);
+        await sut.InicializarBaseDatosAsync();
+        await sut.GuardarAnimeAsync(new AnimeItem { AniListId = 1, Titulo = "Frieren" });
+        var copiaVieja = (await sut.ObtenerAnimePorIdAsync(1))!;
+        await sut.GuardarConservarVideosAsync(1, true);
+
+        copiaVieja.EsFavorito = true;
+        await sut.ActualizarAnimeAsync(copiaVieja);
+
+        (await sut.ObtenerConservarVideosAsync(1)).Should().BeTrue("una copia vieja no puede apagar la protección");
+        copiaVieja.ConservarVideos.Should().BeTrue("la copia en memoria se pone al día");
+        (await sut.ObtenerAnimePorIdAsync(1))!.EsFavorito.Should().BeTrue("el resto de cambios sí se guardan");
+    }
+
+    [Fact]
+    public async Task ActualizarAnimes_ConCopiasViejas_NoApagaLaProteccion()
+    {
+        using var sut = new DatabaseService(_rutaDb);
+        await sut.InicializarBaseDatosAsync();
+        await sut.GuardarAnimeAsync(new AnimeItem { AniListId = 1, Titulo = "Protegido" });
+        await sut.GuardarAnimeAsync(new AnimeItem { AniListId = 2, Titulo = "Normal" });
+        var copias = await sut.ObtenerTodosLosAnimesAsync();
+        await sut.GuardarConservarVideosAsync(1, true);
+
+        foreach (var copia in copias) copia.EsFavorito = true;
+        await sut.ActualizarAnimesAsync(copias);
+
+        (await sut.ObtenerConservarVideosAsync(1)).Should().BeTrue();
+        (await sut.ObtenerConservarVideosAsync(2)).Should().BeFalse("el otro anime no se protege por error");
+        copias.Single(a => a.AniListId == 1).ConservarVideos.Should().BeTrue();
+        (await sut.ObtenerAnimePorIdAsync(2))!.EsFavorito.Should().BeTrue("el resto de cambios sí se guardan");
+    }
+
+    [Fact]
+    public async Task GuardarAnime_SobreUnoQueYaExisteProtegido_NoApagaLaProteccion()
+    {
+        using var sut = new DatabaseService(_rutaDb);
+        await sut.InicializarBaseDatosAsync();
+        await sut.GuardarAnimeAsync(new AnimeItem { AniListId = 1, Titulo = "Frieren" });
+        await sut.GuardarConservarVideosAsync(1, true);
+
+        await sut.GuardarAnimeAsync(new AnimeItem { AniListId = 1, Titulo = "Frieren (de nuevo)" }); // InsertOrReplace
+
+        (await sut.ObtenerConservarVideosAsync(1)).Should().BeTrue();
+        (await sut.ObtenerAnimePorIdAsync(1))!.Titulo.Should().Be("Frieren (de nuevo)");
     }
 
     [Fact]

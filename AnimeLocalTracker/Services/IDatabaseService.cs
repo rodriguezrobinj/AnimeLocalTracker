@@ -50,6 +50,16 @@ public interface IDatabaseService
     Task MarcarEpisodiosSincronizadosAsync(IEnumerable<int> ids);
     Task ActualizarAnimeAsync(AnimeItem anime);
 
+    /// <summary>
+    /// "Conservar los videos": la única forma de cambiar la protección. Escribe solo esa columna; <see cref="ActualizarAnimeAsync"/>,
+    /// <see cref="ActualizarAnimesAsync"/> y <see cref="GuardarAnimeAsync"/> nunca la apagan (una pantalla con una copia vieja del
+    /// anime no puede quitarla sin que nadie se entere).
+    /// </summary>
+    Task GuardarConservarVideosAsync(int aniListId, bool conservar);
+
+    /// <summary>Lo que dice la base de datos ahora: es la fuente de verdad de la protección, no la copia que tenga cada pantalla.</summary>
+    Task<bool> ObtenerConservarVideosAsync(int aniListId);
+
     // === ESCRITURAS MASIVAS (PERF-06): una transacción por lote en vez de N escrituras ===
     Task ActualizarAnimesAsync(IEnumerable<AnimeItem> animes);
 
