@@ -52,6 +52,7 @@ public class LocalizationServiceTests
         "Cfg_EliminarTrasVer_AlCompletar", "Cfg_EliminarTrasVer_ConsumoLigero", "Cfg_EpisodiosAConservar", "Cfg_EpisodiosAConservarSub",
         "Cfg_EliminarTrasVerAvisoTitulo", "Cfg_EliminarTrasVerAvisoMsj",
         "Lim_CompletarTitulo", "Lim_CompletarMsjFormato", "Lim_LiberadoTitulo", "Lim_LiberadoMsjFormato",
+        "Det_ConservarVideos", "Det_ConservarVideosDesc", "Det_ConservarVideosErrorMsj",
     ];
 
     [Fact]

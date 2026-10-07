@@ -119,6 +119,13 @@ public partial class AnimeItem : ObservableObject
     /// </summary>
     public System.DateTime? FechaAgregadoUtc { get; set; }
 
+    /// <summary>
+    /// "Conservar los videos": con esto activo, ningún modo de "Eliminar el video tras verlo" borra nada de este anime
+    /// (ni pregunta). Solo protege del borrado automático: borrar a mano un episodio o "Liberar espacio" siguen funcionando.
+    /// Migración v21; los animes que ya estaban quedan sin proteger.
+    /// </summary>
+    public bool ConservarVideos { get; set; }
+
     /// <summary>Tu estado con el anime, como lo enseña la tarjeta de la Galería (antes mostraba si seguía en emisión).</summary>
     [Ignore]
     [JsonIgnore]

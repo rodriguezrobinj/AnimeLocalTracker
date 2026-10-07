@@ -109,6 +109,9 @@ public partial class DetalleViewModel : ObservableObject,
     [ObservableProperty] private bool _sinopsisExpandida = false;
     [ObservableProperty] private bool _esFavoritoAnime = false;
 
+    /// <summary>Interruptor "Conservar los videos" del anime abierto (persiste en AnimeItem.ConservarVideos).</summary>
+    [ObservableProperty] private bool _conservarVideosAnime;
+
     [ObservableProperty] private bool _estaConectado;
 
     public DetalleViewModel(
@@ -172,6 +175,7 @@ public partial class DetalleViewModel : ObservableObject,
         EstaConectado = _authService.EstaAutenticado();
         AnimeSeleccionado = anime;
         EsFavoritoAnime = anime.EsFavorito;
+        ConservarVideosAnime = anime.ConservarVideos;
         var reloj = Stopwatch.StartNew();
 
         // 1. La lista de episodios: base de datos y disco, sin internet. Se lee fuera del hilo de la interfaz y se muestra aquí,
@@ -294,6 +298,31 @@ public partial class DetalleViewModel : ObservableObject,
         AnimeSeleccionado.EsFavorito = !AnimeSeleccionado.EsFavorito;
         EsFavoritoAnime = AnimeSeleccionado.EsFavorito;
         await _databaseService.ActualizarAnimeAsync(AnimeSeleccionado);
+    }
+
+    /// <summary>
+    /// "Conservar los videos": con la protección activa, "Eliminar el video tras verlo" no borra nada de este anime. Si el guardado
+    /// falla el interruptor vuelve a como estaba y se avisa: mostrar "protegido" sin estarlo llevaría a perder videos.
+    /// </summary>
+    [RelayCommand]
+    private async Task AlternarConservarVideosAsync()
+    {
+        if (AnimeSeleccionado == null) return;
+
+        bool nuevo = !AnimeSeleccionado.ConservarVideos;
+        AnimeSeleccionado.ConservarVideos = nuevo;
+        ConservarVideosAnime = nuevo;
+        try
+        {
+            await _databaseService.ActualizarAnimeAsync(AnimeSeleccionado);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn("DetalleViewModel", $"No se pudo guardar 'Conservar los videos' de {AnimeSeleccionado.Titulo}: {ex.Message}");
+            AnimeSeleccionado.ConservarVideos = !nuevo;
+            ConservarVideosAnime = !nuevo;
+            await _dialogService.MostrarDialogoAsync(LocalizationService.T("Det_ConservarVideos"), LocalizationService.T("Det_ConservarVideosErrorMsj"), false, "AlertCircleOutline", "#F59E0B");
+        }
     }
 
     [RelayCommand]

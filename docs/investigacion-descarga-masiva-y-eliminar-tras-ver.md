@@ -58,7 +58,7 @@ Solo se dispara si el episodio quedó marcado como visto **reproduciéndolo** en
 
 ## 5. Fuera de alcance
 
-Excepciones por anime, "preguntar tras cada episodio", deshacer y Papelera. "Al completar la serie" no recuerda un "Conservar": volverá a preguntar la próxima vez que se cierre el último episodio.
+"Preguntar tras cada episodio", deshacer y Papelera. Las excepciones por anime se resolvieron con el interruptor "Conservar los videos" de la ficha (`docs/plan-conservar-videos.md`): con él activo ningún modo borra ni pregunta por ese anime. Sin el interruptor, "Al completar la serie" no recuerda un "Cancelar": volverá a preguntar la próxima vez que se cierre el último episodio.
 
 ## 6. Pruebas
 

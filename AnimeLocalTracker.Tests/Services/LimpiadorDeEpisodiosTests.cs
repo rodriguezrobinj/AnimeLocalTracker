@@ -53,13 +53,13 @@ public sealed class LimpiadorDeEpisodiosTests : IDisposable
 
     /// <summary>Prepara el anime: esos episodios con archivo en la carpeta, esos marcados como vistos y ese modo.</summary>
     private LimpiadorDeEpisodios Preparar(string modo, int[] conArchivo, int[] vistos, int total = 12, int conservar = 3,
-        IEnumerable<EpisodioItem>? extraEscaneados = null, bool confirma = true)
+        IEnumerable<EpisodioItem>? extraEscaneados = null, bool confirma = true, bool conservarVideos = false)
     {
         var escaneados = conArchivo.Select(n => new EpisodioItem { NumeroEpisodio = n, RutaCompleta = Archivo(n) }).ToList();
         if (extraEscaneados != null) escaneados.AddRange(extraEscaneados);
 
         _ajustes.Setup(a => a.ObtenerConfiguracion()).Returns(new AppSettings { ModoEliminarTrasVer = modo, EpisodiosAConservar = conservar });
-        _db.Setup(d => d.ObtenerAnimePorIdAsync(Id)).ReturnsAsync(new AnimeItem { AniListId = Id, Titulo = "Frieren", TotalEpisodios = total, RutaCarpeta = _carpeta });
+        _db.Setup(d => d.ObtenerAnimePorIdAsync(Id)).ReturnsAsync(new AnimeItem { AniListId = Id, Titulo = "Frieren", TotalEpisodios = total, RutaCarpeta = _carpeta, ConservarVideos = conservarVideos });
         _db.Setup(d => d.ObtenerRegistrosPorAnimeAsync(Id))
             .ReturnsAsync(vistos.Select(n => new RegistroEpisodio { AniListId = Id, NumeroEpisodio = n, VistoLocal = true }).ToList());
         _escaner.Setup(e => e.EscanearEpisodiosAsync(_carpeta)).ReturnsAsync(escaneados);
@@ -225,5 +225,33 @@ public sealed class LimpiadorDeEpisodiosTests : IDisposable
 
         await aplicar.Should().NotThrowAsync();
         Existe(1).Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(ModoEliminarTrasVerValores.Automatico)]
+    [InlineData(ModoEliminarTrasVerValores.ConsumoLigero)]
+    [InlineData(ModoEliminarTrasVerValores.AlCompletarSerie)]
+    public async Task AnimeProtegido_NoSeBorraNadaEnNingunModo(string modo)
+    {
+        // 6 episodios vistos con archivo y el 6 es el último: cualquiera de los tres modos habría borrado algo.
+        var sut = Preparar(modo, conArchivo: [1, 2, 3, 4, 5, 6], vistos: [1, 2, 3, 4, 5, 6], total: 6, conservar: 1, conservarVideos: true);
+
+        await sut.AplicarTrasVerAsync(Id, 6);
+
+        Enumerable.Range(1, 6).Should().OnlyContain(n => Existe(n), "el anime está protegido");
+        VerificarRegistroConservado(); // ningún registro tocado
+        _dialogos.Verify(d => d.MostrarDialogoAsync(It.IsAny<string>(), It.IsAny<string>(), true, It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+        _dialogos.Verify(d => d.MostrarToast(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task AnimeSinProteger_ConElMismoEscenario_SiBorra()
+    {
+        // Control: el mismo escenario sin la protección sí borra, así que la prueba anterior no pasa por casualidad.
+        var sut = Preparar(ModoEliminarTrasVerValores.Automatico, conArchivo: [1, 2, 3], vistos: [1, 2, 3], conservarVideos: false);
+
+        await sut.AplicarTrasVerAsync(Id, 3);
+
+        Existe(3).Should().BeFalse();
     }
 }

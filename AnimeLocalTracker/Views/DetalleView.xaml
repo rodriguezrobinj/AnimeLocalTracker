@@ -879,6 +879,23 @@
                                             </StackPanel>
                                         </Grid>
                                     </Button>
+                                    <Button Command="{Binding AlternarConservarVideosCommand}" Style="{StaticResource DetMenuItem}"
+                                            AutomationProperties.Name="{loc:T Det_ConservarVideos}">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <materialDesign:PackIcon Grid.Column="0" Kind="ShieldLockOutline" Width="20" Height="20" Foreground="{StaticResource Brush.Success}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <TextBlock Text="{loc:T Det_ConservarVideos}" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource Brush.TextPrimary}"/>
+                                                <TextBlock Text="{loc:T Det_ConservarVideosDesc}" FontSize="11" Foreground="{StaticResource Brush.TextTertiary}" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                            </StackPanel>
+                                            <materialDesign:PackIcon Grid.Column="2" Kind="Check" Width="18" Height="18" Foreground="{StaticResource Brush.Success}" VerticalAlignment="Center" Margin="12,0,0,0"
+                                                                     Visibility="{Binding ConservarVideosAnime, Converter={StaticResource BoolToVis}}"/>
+                                        </Grid>
+                                    </Button>
                                     <Border Height="1" Background="{StaticResource Brush.BorderControl}" Margin="8,4"/>
                                     <Button Command="{Binding EliminarAnimeActualCommand}" Style="{StaticResource DetMenuItem}">
                                         <Grid>

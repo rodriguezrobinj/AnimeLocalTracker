@@ -102,7 +102,9 @@ public class DatabaseService : IDatabaseService, IDisposable
         // Columna nueva del modelo: sqlite-net la añade con ALTER TABLE ADD COLUMN (misma vía que la v4). Los animes que ya
         // estaban quedan con NULL.
         (19, "fecha de alta de cada anime (orden \"Añadidos recientemente\" de la Galería)", AgregarColumnasTemporadaFavoritoAsync),
-        (20, "sonido del reproductor por anime o por capítulo (volumen, ecualizador y Modo Noche)", CrearTablaAjusteAudioAsync)
+        (20, "sonido del reproductor por anime o por capítulo (volumen, ecualizador y Modo Noche)", CrearTablaAjusteAudioAsync),
+        // Columna nueva del modelo (misma vía que la v4 y la v19). Los animes que ya estaban quedan sin proteger.
+        (21, "conservar los videos de un anime (protege del borrado de \"Eliminar tras ver\")", AgregarColumnasTemporadaFavoritoAsync)
     };
 
     /// <summary>v20: <see cref="AjusteAudio"/> (clave primaria = "anime_episodio"; se lee siempre por clave, sin índice).</summary>
@@ -580,7 +582,9 @@ public class DatabaseService : IDatabaseService, IDisposable
         // IMP-05: el archivo puede venir de otra persona. Una ruta de red (\\servidor\…) hace que Windows se conecte a ese
         // servidor con las credenciales del usuario en cuanto la app mira la carpeta, así que solo se conservan las de
         // servidores que esta biblioteca YA usa (sus animes o su carpeta base); el resto entra sin carpeta.
-        var carpetasActuales = (await _conexion.Table<AnimeItem>().ToListAsync()).ToDictionary(a => a.AniListId, a => a.RutaCarpeta);
+        var animesActuales = await _conexion.Table<AnimeItem>().ToListAsync();
+        var carpetasActuales = animesActuales.ToDictionary(a => a.AniListId, a => a.RutaCarpeta);
+        var protegidosActuales = animesActuales.Where(a => a.ConservarVideos).Select(a => a.AniListId).ToHashSet();
         var servidoresPropios = carpetasActuales.Values
             .Select(EntradaSegura.ServidorDeRed)
             .Append(EntradaSegura.ServidorDeRed(rutaBaseAnimes))
@@ -620,6 +624,9 @@ public class DatabaseService : IDatabaseService, IDisposable
             AppLogger.Warn("DatabaseService", $"Import: {idsDuplicados} AniListId duplicados en el JSON; se conserva la última entrada de cada uno.");
         }
         var animesUnicos = agrupadosPorId.Select(g => g.Last()).ToList();
+
+        // Una protección que ya existe aquí nunca se quita al importar (el archivo puede ser anterior a la función o de otra persona).
+        foreach (var anime in animesUnicos.Where(a => protegidosActuales.Contains(a.AniListId))) anime.ConservarVideos = true;
 
         // IMP-03: todo o nada — una sola transacción; cualquier fallo revierte el lote completo
         await _conexion.RunInTransactionAsync(db =>

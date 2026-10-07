@@ -49,6 +49,11 @@ public sealed class LimpiadorDeEpisodios : ILimpiadorDeEpisodios
 
             var anime = await _database.ObtenerAnimePorIdAsync(aniListId).ConfigureAwait(false);
             if (anime == null || string.IsNullOrWhiteSpace(anime.RutaCarpeta)) return;
+            if (anime.ConservarVideos)
+            {
+                AppLogger.Debug("LimpiadorDeEpisodios", $"{anime.Titulo} tiene activado 'Conservar los videos': no se borra nada.");
+                return;
+            }
 
             var registros = await EsperarMarcaDeVistoAsync(aniListId, episodioTerminado).ConfigureAwait(false);
             if (registros == null)
