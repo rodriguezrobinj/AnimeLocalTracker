@@ -61,39 +61,36 @@ public class ConfiguracionEliminarTrasVerTests
     }
 
     [Fact]
-    public async Task ElegirUnModoQueBorra_Aceptando_LoDejaElegido()
+    public void ElegirUnModoQueBorra_Aceptando_LoDejaElegido()
     {
         ResponderAviso(true);
         var sut = CrearSut(new AppSettings());
 
-        sut.ModoEliminarTrasVer = ModoEliminarTrasVerValores.Automatico;
-        await Task.Delay(50); // el aviso se resuelve fuera del setter
+        sut.ModoEliminarTrasVer = ModoEliminarTrasVerValores.Automatico; // el mock devuelve una tarea ya completada: el aviso se resuelve en esta misma llamada
 
         sut.ModoEliminarTrasVer.Should().Be(ModoEliminarTrasVerValores.Automatico);
         VerificarAvisos(Times.Once());
     }
 
     [Fact]
-    public async Task ElegirUnModoQueBorra_Rechazando_VuelveAlAnterior()
+    public void ElegirUnModoQueBorra_Rechazando_VuelveAlAnterior()
     {
         ResponderAviso(false);
         var sut = CrearSut(new AppSettings());
 
         sut.ModoEliminarTrasVer = ModoEliminarTrasVerValores.Automatico;
-        await Task.Delay(50);
 
         sut.ModoEliminarTrasVer.Should().Be(ModoEliminarTrasVerValores.Apagado);
         VerificarAvisos(Times.Once());
     }
 
     [Fact]
-    public async Task ApagarElModo_NoPregunta()
+    public void ApagarElModo_NoPregunta()
     {
         ResponderAviso(true);
         var sut = CrearSut(new AppSettings { ModoEliminarTrasVer = ModoEliminarTrasVerValores.Automatico });
 
         sut.ModoEliminarTrasVer = ModoEliminarTrasVerValores.Apagado;
-        await Task.Delay(50);
 
         sut.ModoEliminarTrasVer.Should().Be(ModoEliminarTrasVerValores.Apagado);
         VerificarAvisos(Times.Never());
@@ -107,7 +104,6 @@ public class ConfiguracionEliminarTrasVerTests
         var sut = CrearSut(config);
 
         sut.ModoEliminarTrasVer = ModoEliminarTrasVerValores.ConsumoLigero;
-        await Task.Delay(50);
         sut.EpisodiosAConservar = 4;
         await sut.GuardarPreferenciasAsync();
 
