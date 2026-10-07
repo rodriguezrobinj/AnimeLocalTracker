@@ -35,10 +35,11 @@ public class DatabaseServiceConservarRegistroTests : IDisposable
         await _sut.InicializarBaseDatosAsync();
         var visto = new DateTime(2026, 10, 6, 22, 0, 0, DateTimeKind.Utc);
 
-        // Dos guardados a la vez pueden dejar dos filas del mismo episodio (ya pasa en bases reales): una con lo visto
-        // y otra con la ruta, la miniatura y los datos técnicos.
+        // Las bases anteriores a v22 pueden tener dos filas del mismo episodio (una con lo visto y otra con la ruta, la miniatura y
+        // los datos técnicos): se quita el índice único para simular una de ellas.
         using (var conexion = new SQLiteConnection(_rutaDb))
         {
+            conexion.Execute("DROP INDEX IF EXISTS IX_RegistroEpisodio_AnimeEp;");
             conexion.Insert(new RegistroEpisodio { AniListId = 10, NumeroEpisodio = 1, VistoLocal = true, TotalSegundos = 30, UltimaReproduccion = visto });
             conexion.Insert(new RegistroEpisodio
             {

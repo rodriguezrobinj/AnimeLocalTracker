@@ -104,7 +104,10 @@ public class DatabaseService : IDatabaseService, IDisposable
         (19, "fecha de alta de cada anime (orden \"Añadidos recientemente\" de la Galería)", AgregarColumnasTemporadaFavoritoAsync),
         (20, "sonido del reproductor por anime o por capítulo (volumen, ecualizador y Modo Noche)", CrearTablaAjusteAudioAsync),
         // Columna nueva del modelo (misma vía que la v4 y la v19). Los animes que ya estaban quedan sin proteger.
-        (21, "conservar los videos de un anime (protege del borrado de \"Eliminar tras ver\")", AgregarColumnasTemporadaFavoritoAsync)
+        (21, "conservar los videos de un anime (protege del borrado de \"Eliminar tras ver\")", AgregarColumnasTemporadaFavoritoAsync),
+        // Un episodio con dos filas era posible por una carrera entre guardados (v22 la cierra): se unen las que ya hay (con copia
+        // previa de la base) y el índice (AniListId, NumeroEpisodio) pasa a ser único.
+        (22, "episodios sin filas repetidas (se unen) + índice único por (anime, episodio)", DeduplicarRegistrosEpisodioAsync)
     };
 
     /// <summary>v20: <see cref="AjusteAudio"/> (clave primaria = "anime_episodio"; se lee siempre por clave, sin índice).</summary>
@@ -286,6 +289,80 @@ public class DatabaseService : IDatabaseService, IDisposable
     private static async Task AgregarColumnasTemporadaFavoritoAsync(SQLiteAsyncConnection conexion)
     {
         await conexion.CreateTableAsync<AnimeItem>();
+    }
+
+    /// <summary>
+    /// v22: une las filas repetidas de un mismo episodio (ver <see cref="UnirFilasRepetidas"/>) y convierte el índice por
+    /// (AniListId, NumeroEpisodio) en único. Si hay algo que unir, antes se guarda una copia de la base junto a ella
+    /// (<c>Backupsiblioteca.antes-de-v22.db</c>): la unión borra filas y no se puede deshacer sin ella.
+    /// </summary>
+    private static async Task DeduplicarRegistrosEpisodioAsync(SQLiteAsyncConnection conexion)
+    {
+        var repetidas = await conexion.QueryAsync<RegistroEpisodio>(
+            "SELECT r.* FROM RegistroEpisodio r JOIN (SELECT AniListId, NumeroEpisodio FROM RegistroEpisodio " +
+            "GROUP BY AniListId, NumeroEpisodio HAVING COUNT(*) > 1) d " +
+            "ON d.AniListId = r.AniListId AND d.NumeroEpisodio = r.NumeroEpisodio " +
+            "ORDER BY r.AniListId, r.NumeroEpisodio, r.Id");
+
+        if (repetidas.Count > 0)
+        {
+            await CopiaAntesDeUnirFilasAsync(conexion);
+            var grupos = repetidas.GroupBy(r => (r.AniListId, r.NumeroEpisodio)).ToList();
+            await conexion.RunInTransactionAsync(db =>
+            {
+                foreach (var grupo in grupos)
+                {
+                    var filas = grupo.OrderBy(r => r.Id).ToList();
+                    db.Update(UnirFilasRepetidas(filas));
+                    foreach (var sobrante in filas.Skip(1)) db.Delete<RegistroEpisodio>(sobrante.Id);
+                }
+            });
+            AppLogger.Info("DatabaseService", $"Episodios con filas repetidas unidos: {grupos.Count} (se borraron {repetidas.Count - grupos.Count} filas sobrantes).");
+        }
+
+        await conexion.ExecuteAsync("DROP INDEX IF EXISTS IX_RegistroEpisodio_AnimeEp;");
+        await conexion.ExecuteAsync("CREATE UNIQUE INDEX IX_RegistroEpisodio_AnimeEp ON RegistroEpisodio(AniListId, NumeroEpisodio);");
+    }
+
+    private static async Task CopiaAntesDeUnirFilasAsync(SQLiteAsyncConnection conexion)
+    {
+        string carpeta = Path.Combine(Path.GetDirectoryName(conexion.DatabasePath)!, "Backups");
+        Directory.CreateDirectory(carpeta);
+        string destino = Path.Combine(carpeta, "biblioteca.antes-de-v22.db");
+        if (File.Exists(destino)) File.Delete(destino);
+        await conexion.ExecuteAsync($"VACUUM INTO '{destino.Replace("'", "''")}'");
+    }
+
+    /// <summary>
+    /// Une las filas de UN episodio (ordenadas por Id) en la más antigua, que es la que sobrevive. Reglas: visto y favorito si lo
+    /// era alguna; sincronizado solo si lo estaban todas las filas vistas (un 'visto' sin enviar a AniList se sigue enviando);
+    /// fecha de reproducción la más reciente (nunca se inventa) y progreso el de esa reproducción; ruta, miniatura y datos técnicos
+    /// los de la fila más nueva que los tenga.
+    /// </summary>
+    internal static RegistroEpisodio UnirFilasRepetidas(IReadOnlyList<RegistroEpisodio> filas)
+    {
+        var unida = filas[0];
+        var vistas = filas.Where(f => f.VistoLocal).ToList();
+        unida.VistoLocal = vistas.Count > 0;
+        unida.FavoritoLocal = filas.Any(f => f.FavoritoLocal);
+        unida.SincronizadoEnNube = vistas.Count > 0 ? vistas.All(f => f.SincronizadoEnNube) : filas.Any(f => f.SincronizadoEnNube);
+        unida.Es10Bit = filas.Any(f => f.Es10Bit);
+
+        var reciente = filas.Where(f => f.UltimaReproduccion != null).OrderByDescending(f => f.UltimaReproduccion).ThenByDescending(f => f.Id).FirstOrDefault()
+                       ?? filas.OrderByDescending(f => f.ProgresoSegundos).ThenByDescending(f => f.Id).First();
+        unida.UltimaReproduccion = filas.Max(f => f.UltimaReproduccion);
+        unida.ProgresoSegundos = reciente.ProgresoSegundos;
+        unida.TotalSegundos = reciente.TotalSegundos > 0 ? reciente.TotalSegundos : filas.Max(f => f.TotalSegundos);
+
+        static string? MasNuevo(IReadOnlyList<RegistroEpisodio> filas, Func<RegistroEpisodio, string?> campo)
+            => filas.OrderByDescending(f => f.Id).Select(campo).FirstOrDefault(v => !string.IsNullOrWhiteSpace(v));
+
+        unida.RutaArchivo = MasNuevo(filas, f => f.RutaArchivo) ?? string.Empty;
+        unida.Resolucion = MasNuevo(filas, f => f.Resolucion);
+        unida.CodecVideo = MasNuevo(filas, f => f.CodecVideo);
+        unida.Fps = MasNuevo(filas, f => f.Fps);
+        unida.RutaMiniatura = MasNuevo(filas, f => f.RutaMiniatura);
+        return unida;
     }
 
     /// <summary>
@@ -696,22 +773,26 @@ public class DatabaseService : IDatabaseService, IDisposable
     
     public async Task GuardarRegistroEpisodioAsync(RegistroEpisodio registro)
     {
-        // Buscamos si ya existe un registro previo para este anime y este capítulo
-        var existente = await _conexion.Table<RegistroEpisodio>()
-            .FirstOrDefaultAsync(r => r.AniListId == registro.AniListId && r.NumeroEpisodio == registro.NumeroEpisodio);
-
-        if (existente != null)
+        // Buscar e insertar/actualizar en UNA sola operación sobre la conexión. Antes eran dos (un SELECT y luego un INSERT): otra
+        // petición (reproductor, miniaturas, ficha) podía colarse en medio y dejar dos filas del mismo episodio (39 en la base
+        // real al revisarla el 2026-10-07). Solo se busca esta fila: guardar el progreso ocurre cada pocos segundos.
+        await _conexion.RunInTransactionAsync(db =>
         {
-            FusionarRegistro(existente, registro);
+            var existente = db.Table<RegistroEpisodio>()
+                .FirstOrDefault(r => r.AniListId == registro.AniListId && r.NumeroEpisodio == registro.NumeroEpisodio);
 
-            await _conexion.UpdateAsync(existente);
-        }
-        else
-        {
-            // Si es la primera vez, insertamos el nuevo registro (la fecha solo la pone
-            // quien reproduce de verdad; los marcados manuales quedan sin fecha).
-            await _conexion.InsertAsync(registro);
-        }
+            if (existente != null)
+            {
+                FusionarRegistro(existente, registro);
+                db.Update(existente);
+            }
+            else
+            {
+                // Si es la primera vez, insertamos el nuevo registro (la fecha solo la pone
+                // quien reproduce de verdad; los marcados manuales quedan sin fecha).
+                db.Insert(registro);
+            }
+        });
     }
 
     /// <summary>
@@ -721,25 +802,28 @@ public class DatabaseService : IDatabaseService, IDisposable
     /// </summary>
     public async Task GuardarFavoritoEpisodioAsync(int aniListId, int numeroEpisodio, bool favorito, string? rutaArchivo)
     {
-        var existente = await _conexion.Table<RegistroEpisodio>()
-            .FirstOrDefaultAsync(r => r.AniListId == aniListId && r.NumeroEpisodio == numeroEpisodio);
+        await _conexion.RunInTransactionAsync(db =>
+        {
+            var existente = db.Table<RegistroEpisodio>()
+                .FirstOrDefault(r => r.AniListId == aniListId && r.NumeroEpisodio == numeroEpisodio);
 
-        if (existente != null)
-        {
-            existente.FavoritoLocal = favorito;
-            if (string.IsNullOrWhiteSpace(existente.RutaArchivo) && !string.IsNullOrWhiteSpace(rutaArchivo)) existente.RutaArchivo = rutaArchivo;
-            await _conexion.UpdateAsync(existente);
-        }
-        else
-        {
-            await _conexion.InsertAsync(new RegistroEpisodio
+            if (existente != null)
             {
-                AniListId = aniListId,
-                NumeroEpisodio = numeroEpisodio,
-                RutaArchivo = rutaArchivo ?? string.Empty,
-                FavoritoLocal = favorito,
-            });
-        }
+                existente.FavoritoLocal = favorito;
+                if (string.IsNullOrWhiteSpace(existente.RutaArchivo) && !string.IsNullOrWhiteSpace(rutaArchivo)) existente.RutaArchivo = rutaArchivo;
+                db.Update(existente);
+            }
+            else
+            {
+                db.Insert(new RegistroEpisodio
+                {
+                    AniListId = aniListId,
+                    NumeroEpisodio = numeroEpisodio,
+                    RutaArchivo = rutaArchivo ?? string.Empty,
+                    FavoritoLocal = favorito,
+                });
+            }
+        });
     }
 
     public async Task GuardarRegistrosEpisodioBulkAsync(IEnumerable<RegistroEpisodio> registros)
@@ -771,19 +855,26 @@ public class DatabaseService : IDatabaseService, IDisposable
 
         // (la fecha de reproducción la fija el llamador; aquí no se fabrica "ahora")
         var aInsertar = new List<RegistroEpisodio>();
-        var aActualizar = new List<RegistroEpisodio>();
+        var aActualizar = new HashSet<RegistroEpisodio>();
+        var nuevosDelLote = new Dictionary<(int, int), RegistroEpisodio>();
 
         foreach (var registro in registros)
         {
-            if (existentes.TryGetValue((registro.AniListId, registro.NumeroEpisodio), out var existente))
+            var clave = (registro.AniListId, registro.NumeroEpisodio);
+            if (existentes.TryGetValue(clave, out var existente))
             {
                 FusionarRegistro(existente, registro);
-
                 aActualizar.Add(existente);
+            }
+            else if (nuevosDelLote.TryGetValue(clave, out var nuevo))
+            {
+                // El mismo episodio repetido dentro del lote (JSON con repeticiones, listas armadas a mano): se une en una sola fila.
+                FusionarRegistro(nuevo, registro);
             }
             else
             {
                 // Registro nuevo: sin fecha (la pone solo la reproducción real).
+                nuevosDelLote[clave] = registro;
                 aInsertar.Add(registro);
             }
         }
