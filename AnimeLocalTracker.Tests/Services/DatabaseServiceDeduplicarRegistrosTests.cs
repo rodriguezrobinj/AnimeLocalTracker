@@ -30,7 +30,10 @@ public class DatabaseServiceDeduplicarRegistrosTests : IDisposable
         try { Directory.Delete(_carpeta, recursive: true); } catch { /* ignore */ }
     }
 
-    private string Copia => Path.Combine(_carpeta, "Backups", "biblioteca.antes-de-v22.db");
+    /// <summary>Copias que deja la migración antes de unir filas (el nombre lleva la fecha).</summary>
+    private string[] Copias => Directory.Exists(Path.Combine(_carpeta, "Backups"))
+        ? Directory.GetFiles(Path.Combine(_carpeta, "Backups"), "biblioteca.antes-de-v22.*.db")
+        : [];
 
     /// <summary>Deja una base como la de antes de v22: sin índice único, con esas filas y en la versión 21.</summary>
     private async Task CrearBaseAntiguaAsync(params RegistroEpisodio[] filas)
@@ -187,9 +190,62 @@ public class DatabaseServiceDeduplicarRegistrosTests : IDisposable
 
         await MigrarYLeerAsync();
 
-        File.Exists(Copia).Should().BeTrue("antes de unir filas se guarda una copia de la base");
-        using var copia = new SQLiteConnection(Copia);
+        Copias.Should().ContainSingle("antes de unir filas se guarda una copia de la base");
+        using var copia = new SQLiteConnection(Copias[0]);
         copia.ExecuteScalar<int>("SELECT COUNT(*) FROM RegistroEpisodio;").Should().Be(2, "la copia conserva las dos filas tal como estaban");
+    }
+
+    [Fact]
+    public void Union_LasFilasMasNuevasSonLasDeLaListaNoLasDeId()
+    {
+        // Un lote importado trae todos los Id a 0: el orden de la lista es el de antigüedad.
+        var unida = DatabaseService.UnirFilasRepetidas([
+            new RegistroEpisodio { RutaArchivo = @"C:\viejo\ep.mp4", ProgresoSegundos = 10 },
+            new RegistroEpisodio { RutaArchivo = @"C:\nuevo\ep.mp4", ProgresoSegundos = 10 },
+        ]);
+
+        unida.RutaArchivo.Should().Be(@"C:\nuevo\ep.mp4");
+    }
+
+    [Fact]
+    public async Task Migracion_SiYaHabiaUnaCopiaPrevia_NoLaPisa()
+    {
+        await CrearBaseAntiguaAsync(
+            new RegistroEpisodio { AniListId = 1, NumeroEpisodio = 1, VistoLocal = true },
+            new RegistroEpisodio { AniListId = 1, NumeroEpisodio = 1 });
+        await MigrarYLeerAsync();
+        SQLiteAsyncConnection.ResetPool();
+        var primera = Copias.Single();
+
+        // Se restaura algo con duplicados y v22 vuelve a correr.
+        await CrearBaseAntiguaAsync(
+            new RegistroEpisodio { AniListId = 1, NumeroEpisodio = 1 });
+        await MigrarYLeerAsync();
+
+        Copias.Should().HaveCount(2).And.Contain(primera, "la copia de la primera vez sigue ahí");
+    }
+
+    [Fact]
+    public async Task Migracion_SiNoSePuedeHacerLaCopia_LaAppAbreSinUnirNiBorrarNada_YLoReintentaDespues()
+    {
+        await CrearBaseAntiguaAsync(
+            new RegistroEpisodio { AniListId = 1, NumeroEpisodio = 1, VistoLocal = true },
+            new RegistroEpisodio { AniListId = 1, NumeroEpisodio = 1 });
+        // Un archivo llamado "Backups" impide crear la carpeta de copias (como un disco lleno o una carpeta bloqueada).
+        string bloqueo = Path.Combine(_carpeta, "Backups");
+        File.WriteAllText(bloqueo, "x");
+
+        var filas = await MigrarYLeerAsync();
+
+        filas.Should().HaveCount(2, "sin copia previa no se borra ninguna fila");
+        SQLiteAsyncConnection.ResetPool();
+        using (var conexion = new SQLiteConnection(_rutaDb))
+            conexion.ExecuteScalar<int>("PRAGMA user_version;").Should().Be(21, "la migración queda pendiente");
+
+        File.Delete(bloqueo);
+        SQLiteAsyncConnection.ResetPool();
+        (await MigrarYLeerAsync()).Should().ContainSingle().Which.VistoLocal.Should().BeTrue();
+        Copias.Should().ContainSingle();
     }
 
     [Fact]
@@ -202,7 +258,7 @@ public class DatabaseServiceDeduplicarRegistrosTests : IDisposable
         var filas = await MigrarYLeerAsync();
 
         filas.Should().HaveCount(2);
-        File.Exists(Copia).Should().BeFalse("no había nada que unir");
+        Copias.Should().BeEmpty("no había nada que unir");
     }
 
     [Fact]

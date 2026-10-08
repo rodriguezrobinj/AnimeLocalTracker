@@ -87,6 +87,26 @@ public class DatabaseServiceRegistrosConcurrentesTests : IDisposable
     }
 
     [Fact]
+    public async Task GuardarEnLote_ElOrdenDeLasFilasRepetidasNoHacePerderElVisto()
+    {
+        using var sut = new DatabaseService(_rutaDb);
+        await sut.InicializarBaseDatosAsync();
+
+        // Un respaldo viejo: primero la fila vista y después una solo de miniatura (sin ver, sin progreso).
+        await sut.GuardarRegistrosEpisodioBulkAsync(new List<RegistroEpisodio>
+        {
+            new() { AniListId = 10, NumeroEpisodio = 9, VistoLocal = true, FavoritoLocal = true, ProgresoSegundos = 1200, TotalSegundos = 1400 },
+            new() { AniListId = 10, NumeroEpisodio = 9, RutaMiniatura = @"C:\t\ep9.jpg" },
+        });
+
+        var fila = (await sut.ObtenerRegistrosPorAnimeAsync(10)).Should().ContainSingle().Subject;
+        fila.VistoLocal.Should().BeTrue();
+        fila.FavoritoLocal.Should().BeTrue();
+        fila.ProgresoSegundos.Should().Be(1200);
+        fila.RutaMiniatura.Should().Be(@"C:\t\ep9.jpg");
+    }
+
+    [Fact]
     public async Task ImportarUnJsonConElMismoEpisodioRepetido_NoFallaYLoFusiona()
     {
         using var sut = new DatabaseService(_rutaDb);
