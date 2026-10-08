@@ -54,5 +54,5 @@ Para tareas estructurales grandes, leer el documento correspondiente antes de to
 ## Reglas Modulares y Skills (.agents/)
 
 - Reglas activas: `.agents/rules/` (`wpf-mvvm.md`, `polyglot-ffi.md`, `persistence.md`, `comunicacion-explicaciones.md`, `ui-wpf-vistas.md`, `skills-orquestacion.md`).
-- Skills del repo en `.claude/skills/` (cada `SKILL.md` es un procedimiento legible por cualquier agente): `repo-build-test` (build y pruebas), `wpf-add-view`, `wpf-visual-verification`, `perfil-aislado` (probar la app sin tocar datos reales), `migracion-db` (cambios de esquema SQLite), `commit-es` (commit y subida: español con tildes, solo a `main`, sin firma de Claude).
+- Skills del repo en `.claude/skills/` (cada `SKILL.md` es un procedimiento legible por cualquier agente): `repo-build-test` (build y pruebas), `wpf-add-view`, `wpf-visual-verification`, `perfil-aislado` (probar la app sin tocar datos reales), `migracion-db` (cambios de esquema SQLite), `commit-es` (commit y subida: español con tildes, solo a `main`, sin firma de Claude), `localizacion` (texto ES/EN) y `nucleo-poliglota` (núcleo Rust y daemon Python).
 - Guardarraíles para Claude Code en `.claude/hooks/` (bloquean `--borrar-datos`, cerrar la app por nombre, `git push` fuera de `main` y escribir en la carpeta de datos real); prueba: `python .claude/hooks/test_hooks.py`.
