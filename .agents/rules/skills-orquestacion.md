@@ -2,7 +2,7 @@
 
 Hay muchas skills instaladas con territorios que se solapan. Esta regla fija **quién manda en cada cosa** para que no se pisen. Ante la duda, gana la fuente más arriba en la jerarquía.
 
-**Plugins desactivados (2026-10-03, en `~/.claude/settings.json`):** `agent-skills`, `figma` y `taste-skill`. No se desinstalaron; si se reactivan alguno, hay que volver a darle un dueño en esta regla. `caveman` se reactivó el mismo día a petición del usuario (dueño en el punto 7).
+**Plugins desactivados (2026-10-03, en `~/.claude/settings.json`):** `agent-skills`, `figma` y `taste-skill`. No se desinstalaron; si se reactivan alguno, hay que volver a darle un dueño en esta regla. `caveman` se reactivó el mismo día a petición del usuario (dueño en el punto 7). El 2026-10-08 se desactivó también `github`: su servidor MCP exige `GITHUB_PERSONAL_ACCESS_TOKEN` (no definido, falla con "Authorization header is badly formatted") y `gh` ya cubre CI, releases y consultas con la sesión del usuario, sin guardar un token en el entorno. El servidor `binlog` de `dotnet-msbuild` tampoco conecta (arranca con `dotnet dnx`, que pide el SDK 10 y la máquina tiene el 8): es opcional, el resto del plugin funciona.
 
 ## 1. Jerarquía de precedencia (de mayor a menor)
 
