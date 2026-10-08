@@ -15,6 +15,8 @@ REGLAS = [
     (".cs", r"\[\s*DllImport\b", None, "[DllImport] está prohibido: usa [LibraryImport] (polyglot-ffi.md)."),
     (".cs", r"\bDebug\.WriteLine\b", None, "No uses Debug.WriteLine: registra con AppLogger."),
     (".cs", r"\bDateTime\.Now\b", None, "DateTime.Now: lo que se guarda va en UTC (DateTime.UtcNow); para mostrar, convierte con LocalizationService.Cultura (persistence.md)."),
+    (".cs", r"\bCreateTable(?:Async)?\s*<", r"/Services/DatabaseService\.cs$", "CreateTable suelto: el esquema evoluciona solo con la lista Migraciones de DatabaseService (skill migracion-db, persistence.md #6)."),
+    (".cs", r"\[\s*Indexed\b", None, "[Indexed] solo aplica a bases NUEVAS y duplica índices (DB-01): crea el índice en una migración con CREATE INDEX IF NOT EXISTS (skill migracion-db)."),
     (".cs", r"new\s+ProcessStartInfo\b", r"/Core/", "ProcessStartInfo suelto: usa Core/ProcesoExterno.EjecutarAsync (o Core/Shell.Abrir para abrir carpetas/URL)."),
     (".xaml", r"Source\s*=\s*\{x:Static\s+loc:LocalizationService\.Instance\}", None, "Binding largo de localización: escribe {loc:T Clave} (solo en un <Binding> dentro de MultiBinding va la forma larga, con Mode=OneWay)."),
     (".xaml", r"\b(?:Foreground|Background|Fill|Stroke|BorderBrush)\s*=\s*\"#[0-9A-Fa-f]{3,8}\"", r"/App\.xaml$|/Themes/", "Color literal: usa un pincel de la paleta de App.xaml (Brush.*/AppText.*) en vez de inventar uno (ui-wpf-vistas.md)."),
@@ -40,6 +42,8 @@ def revisar(ruta, texto):
     extension = ".cs" if ruta.endswith(".cs") else ".xaml" if ruta.endswith(".xaml") else None
     if extension is None:
         return []
+    if extension == ".cs":
+        texto = re.sub(r"//[^\n]*", "", texto)  # los comentarios que citan una regla ("sin [Indexed]…") no la incumplen
     avisos = [aviso for ext, patron, exento, aviso in REGLAS
               if ext == extension and not (exento and re.search(exento, ruta)) and re.search(patron, texto)]
     if extension == ".cs":

@@ -34,6 +34,11 @@ La verificación es proporcional al cambio: si no se tocó C#/XAML (investigar, 
 - Además: `attribution` vacío (sin línea de coautor en commits/PR) y `deny` para leer el token de AniList o editar la carpeta de datos real.
 - Si un bloqueo estorba de verdad, se ajusta el hook (con su prueba: `python .claude/hooks/test_hooks.py`), no se rodea.
 
+## Base de datos y pruebas en la app real
+
+- Al cambiar el esquema de SQLite (columna, tabla, índice, corrección o borrado de datos), usa el skill `migracion-db` (`.claude/skills/migracion-db/SKILL.md`) — tipo de migración, patrón de prueba con "base vieja", migraciones destructivas con copia previa y verificación sobre una copia de la base real.
+- Para lanzar la app en vivo (verificar UI, reproductor, descargas, borrados o una migración) usa el skill `perfil-aislado` (`.claude/skills/perfil-aislado/SKILL.md`): arranca con una copia temporal de la biblioteca y sin sesión de AniList. Nunca lances `AnimeLocalTracker.exe` directamente: usaría los datos reales del usuario.
+
 ## UI
 
 - Al crear o modificar una pestaña/vista (o portar una lista a virtualizada), usa el skill `wpf-add-view` (`.claude/skills/wpf-add-view/SKILL.md`) — la cadena completa mensaje→NavigationService→DI→DataTemplate→botón, patrón de `ListBox` virtualizado, y las convenciones de accesibilidad/color/localización ya establecidas.
