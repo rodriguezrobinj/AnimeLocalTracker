@@ -353,10 +353,9 @@ public class DatabaseService : IDatabaseService, IDisposable
     /// </summary>
     private static async Task CopiaAntesDeUnirFilasAsync(SQLiteAsyncConnection conexion)
     {
-        string carpeta = Path.Combine(Path.GetDirectoryName(conexion.DatabasePath)!, "Backups");
-        Directory.CreateDirectory(carpeta);
-        string destino = Path.Combine(carpeta, $"biblioteca.antes-de-v22.{DateTime.UtcNow:yyyyMMdd-HHmmssfff}.db");
-        await conexion.ExecuteAsync($"VACUUM INTO '{destino.Replace("'", "''")}'");
+        string destino = Path.Combine(Path.GetDirectoryName(conexion.DatabasePath)!, "Backups",
+            $"biblioteca.antes-de-v22.{DateTime.UtcNow:yyyyMMdd-HHmmssfff}.db");
+        if (!await CrearSnapshotAtomicoAsync(conexion, destino)) throw new IOException("la copia no se creó");
     }
 
     /// <summary>Una migración que no puede aplicarse ahora sin riesgo: se reintenta en el próximo arranque (user_version no avanza).</summary>
@@ -425,7 +424,7 @@ public class DatabaseService : IDatabaseService, IDisposable
                 }
 
                 string destino = Path.Combine(backupDir, "biblioteca.backup.1.db");
-                if (!await CrearSnapshotAtomicoAsync(destino)) return;
+                if (!await CrearSnapshotAtomicoAsync(_conexion, destino)) return;
 
                 AppLogger.Info("DatabaseService", $"Backup de la biblioteca creado: {destino}");
             });
@@ -441,11 +440,11 @@ public class DatabaseService : IDatabaseService, IDisposable
     /// genera una copia íntegra leyendo la base + WAL en un solo paso, sin checkpoint
     /// manual (BAK-01/BAK-04) y sin bloquear escrituras concurrentes.
     /// </summary>
-    private async Task<bool> CrearSnapshotAtomicoAsync(string rutaDestino)
+    private static async Task<bool> CrearSnapshotAtomicoAsync(SQLiteAsyncConnection? conexion, string rutaDestino)
     {
-        if (_conexion == null) return false;
+        if (conexion == null) return false;
 
-        string dbPath = _conexion.DatabasePath;
+        string dbPath = conexion.DatabasePath;
         if (!File.Exists(dbPath) || new FileInfo(dbPath).Length == 0) return false;
 
         var destinoDir = Path.GetDirectoryName(rutaDestino);
@@ -454,7 +453,7 @@ public class DatabaseService : IDatabaseService, IDisposable
         // VACUUM INTO no puede ejecutarse dentro de una transacción; escapar comillas.
         string destinoSql = rutaDestino.Replace("'", "''");
         if (File.Exists(rutaDestino)) File.Delete(rutaDestino);
-        await _conexion.ExecuteAsync($"VACUUM INTO '{destinoSql}'");
+        await conexion.ExecuteAsync($"VACUUM INTO '{destinoSql}'");
         return File.Exists(rutaDestino);
     }
 
@@ -611,7 +610,7 @@ public class DatabaseService : IDatabaseService, IDisposable
         try
         {
             // BAK-02: la copia corre en un hilo de fondo, no en la UI
-            return await Task.Run(async () => await CrearSnapshotAtomicoAsync(rutaDestino));
+            return await Task.Run(async () => await CrearSnapshotAtomicoAsync(_conexion, rutaDestino));
         }
         catch (Exception ex)
         {
