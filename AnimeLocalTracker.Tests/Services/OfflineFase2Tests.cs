@@ -27,7 +27,7 @@ public class OfflineFase2Tests : IDisposable
     public void Dispose()
     {
         GC.SuppressFinalize(this);
-        try { Directory.Delete(_carpeta, true); } catch { /* best-effort */ }
+        ArchivosTemporales.BorrarCarpeta(_carpeta);
     }
 
     private static long Unix(DateTime utc) => new DateTimeOffset(utc).ToUnixTimeSeconds();

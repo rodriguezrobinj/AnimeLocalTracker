@@ -486,7 +486,7 @@ public class DatabaseServiceUpsertTests : IDisposable
         {
             // Act: exportar e importar en una base nueva
             await _sut.ExportarBibliotecaJsonAsync(jsonPath);
-            var sut2 = new DatabaseService(db2Path);
+            using var sut2 = new DatabaseService(db2Path);
             await sut2.InicializarBaseDatosAsync();
             int importados = (await sut2.ImportarBibliotecaJsonAsync(jsonPath)).Animes;
 
@@ -519,6 +519,7 @@ public class DatabaseServiceUpsertTests : IDisposable
         // no copiando el archivo WAL crudo de una conexión abierta
         var snapshot = Path.Combine(Path.GetTempPath(), $"AnimeTracker_RestoreSnap_{Guid.NewGuid():N}.db");
         (await sutOrigen.ExportarCopiaSeguridadAsync(snapshot)).Should().BeTrue();
+        sutOrigen.Dispose();  // cierra la base de origen para poder borrarla al terminar
         try
         {
             // Act

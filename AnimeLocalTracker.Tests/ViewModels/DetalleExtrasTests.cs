@@ -32,7 +32,7 @@ public class DetalleExtrasTests : IDisposable
     public void Dispose()
     {
         GC.SuppressFinalize(this);
-        try { Directory.Delete(_carpeta, recursive: true); } catch { /* ignore */ }
+        ArchivosTemporales.BorrarCarpeta(_carpeta);
     }
 
     private DetalleViewModel CrearSut(IDatosExtraService? datosExtra = null) => new(

@@ -28,7 +28,7 @@ public class UpdateServiceTests : IDisposable
 
     public void Dispose()
     {
-        try { Directory.Delete(_carpeta, recursive: true); } catch { /* best-effort */ }
+        ArchivosTemporales.BorrarCarpeta(_carpeta);
         GC.SuppressFinalize(this);
     }
 

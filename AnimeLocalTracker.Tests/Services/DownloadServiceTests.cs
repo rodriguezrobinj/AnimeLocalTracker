@@ -16,8 +16,18 @@ using Xunit;
 
 namespace AnimeLocalTracker.Tests.Services;
 
-public class DownloadServiceTests
+public class DownloadServiceTests : IDisposable
 {
+    // Carpeta destino de las pruebas que solo comprueban la cola de descargas: el servicio la crea y nadie más la borraba.
+    private readonly string _carpetaCola = Path.Combine(Path.GetTempPath(), $"AnimeTracker_Cola_{Guid.NewGuid():N}");
+
+    public void Dispose()
+    {
+        GC.SuppressFinalize(this);
+        _sut.CancelarTodas();  // las descargas en cola recrean su carpeta destino si siguen vivas
+        ArchivosTemporales.BorrarCarpeta(_carpetaCola);
+    }
+
     private readonly Mock<IHttpClientFactory> _httpClientFactoryMock = new();
     private readonly Mock<IVideoSourceResolver> _sourceResolverMock = new();
     private readonly Mock<ISettingsService> _settingsServiceMock = new();
@@ -455,7 +465,7 @@ public class DownloadServiceTests
         var tareas = new List<Task>();
         for (int i = 1; i <= 4; i++)
         {
-            tareas.Add(_sut.IniciarDescargaEpisodioAsync(100 + i, $"Anime {i}", System.IO.Path.Combine(System.IO.Path.GetTempPath(), "AltTest"), i));
+            tareas.Add(_sut.IniciarDescargaEpisodioAsync(100 + i, $"Anime {i}", Path.Combine(_carpetaCola, "AltTest"), i));
         }
 
         // Esperar a que se alcancen 2 concurrentes
@@ -501,7 +511,7 @@ public class DownloadServiceTests
         var tareas = new List<Task>();
         for (int i = 1; i <= 3; i++)
         {
-            tareas.Add(_sut.IniciarDescargaEpisodioAsync(200 + i, $"Anime {i}", System.IO.Path.Combine(System.IO.Path.GetTempPath(), "AltTest2"), i));
+            tareas.Add(_sut.IniciarDescargaEpisodioAsync(200 + i, $"Anime {i}", Path.Combine(_carpetaCola, "AltTest2"), i));
         }
 
         // Esperar a que la primera descarga esté resolviendo (slot 1 ocupado)
@@ -523,7 +533,7 @@ public class DownloadServiceTests
     public async Task IniciarDescargaEpisodioAsync_ConMismoEpisodio_NoDeberiaDuplicar()
     {
         // Arrange
-        string carpeta = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "AltTest3");
+        string carpeta = Path.Combine(_carpetaCola, "AltTest3");
         _sut.ActualizarLimiteDescargas(4);
 
         // Act: iniciar el mismo episodio dos veces

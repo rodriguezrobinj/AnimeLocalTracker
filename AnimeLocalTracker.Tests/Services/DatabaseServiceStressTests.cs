@@ -25,14 +25,11 @@ public class DatabaseServiceStressTests : IDisposable
     public void Dispose()
     {
         GC.SuppressFinalize(this);
-        try
+        _sut.Dispose();  // cierra la conexión: sin esto el .db no se puede borrar y quedan el -wal y el -shm
+        foreach (string sufijo in new[] { "", "-wal", "-shm" })
         {
-            if (File.Exists(_tempDbPath))
-            {
-                File.Delete(_tempDbPath);
-            }
+            try { if (File.Exists(_tempDbPath + sufijo)) File.Delete(_tempDbPath + sufijo); } catch { }
         }
-        catch { }
     }
 
     [Fact]

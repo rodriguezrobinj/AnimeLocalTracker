@@ -25,7 +25,7 @@ public sealed class PersonajePixeladoConverterTests : IDisposable
     public void Dispose()
     {
         GC.SuppressFinalize(this);
-        try { Directory.Delete(_carpeta, true); } catch { /* ignore */ }
+        ArchivosTemporales.BorrarCarpeta(_carpeta);  // WPF suelta el archivo que no pudo decodificar un instante después
     }
 
     private static void GuardarPng(string ruta, int ancho, int alto)
