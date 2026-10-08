@@ -13,20 +13,16 @@ Este proyecto no tiene UI automation tests; la verificación de cambios visuales
 
 ## 1. Compilar y lanzar
 
-Usa el skill `repo-build-test` para compilar sin caer en el flake conocido. Luego:
+Usa el skill `repo-build-test` para compilar sin caer en el flake conocido. Luego **lanza la app con el skill `perfil-aislado`** (`crear` → `iniciar`): arranca con una copia temporal de la biblioteca, sin tocar la BD, los ajustes ni la cuenta de AniList reales. No lances el exe directamente con `Start-Process`: usaría los datos reales del usuario.
+
+`iniciar` imprime `PID=<n>`; úsalo en los pasos siguientes:
 
 ```powershell
-$exe = 'C:\Users\HP\RiderProjects\AnimeLocalTracker\AnimeLocalTracker\bin\Debug\net8.0-windows10.0.26100.0\AnimeLocalTracker.exe'
-$p = Start-Process -FilePath $exe -PassThru
-Start-Sleep -Seconds 5
+$p = Get-Process -Id <PID impreso por iniciar>
 Write-Output "PID=$($p.Id) HasExited=$($p.HasExited)"
 ```
 
-Antes de relanzar tras recompilar, cierra **solo la instancia que lanzaste tú, por su PID** — dos instancias compitiendo por el mismo `settings.json`/DB o por el mismo `MainWindowHandle` da resultados confusos:
-```powershell
-Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
-```
-Nunca por nombre (`Get-Process AnimeLocalTracker | Stop-Process`, `taskkill /IM`): puede ser tu app real con un episodio en marcha. El hook `.claude/hooks/guardia_comandos.py` lo bloquea. Si ya había una instancia antes de lanzar, anota su PID y no la toques.
+Para relanzar tras recompilar, `cerrar` el perfil y vuelve a `iniciar` (cierra solo el PID que lanzó el script) — dos instancias compitiendo por el mismo `MainWindowHandle` da resultados confusos, y con una app real abierta la segunda se cierra sola. Nunca por nombre (`Get-Process AnimeLocalTracker | Stop-Process`, `taskkill /IM`): puede ser tu app real con un episodio en marcha. El hook `.claude/hooks/guardia_comandos.py` lo bloquea. Si ya había una instancia antes de lanzar, no la toques.
 
 ## 2. Capturar pantalla
 
