@@ -29,6 +29,10 @@ public class DatabaseService : IDatabaseService, IDisposable
     // dispone los singletons en el cierre de ServiceProvider)
     public void Dispose()
     {
+        // Cerrar la conexión: abierta, Windows no deja borrar la base ni sus -wal/-shm (las pruebas dejaban cientos de bases en
+        // %TEMP%), y el cierre limpio vuelca el WAL al archivo principal. Si algo la usa después, sqlite-net abre otra al vuelo.
+        try { _conexion?.CloseAsync().GetAwaiter().GetResult(); }
+        catch (Exception ex) { AppLogger.Warn("DatabaseService", $"No se pudo cerrar la base de datos al desechar el servicio: {ex.Message}"); }
         _initLock.Dispose();
         GC.SuppressFinalize(this);
     }
