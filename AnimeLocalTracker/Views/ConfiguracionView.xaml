@@ -988,10 +988,10 @@
                                                     Description="{loc:T Cfg_IntervaloSyncSub}">
                                         <ComboBox SelectedValue="{Binding IntervaloSincronizacionMinutos}" SelectedValuePath="Tag" Height="36" MinWidth="140"
                                                   AutomationProperties.Name="{loc:T Cfg_IntervaloSync}">
-                                            <ComboBoxItem Content="2 minutos" Tag="2"/>
-                                            <ComboBoxItem Content="5 minutos" Tag="5"/>
-                                            <ComboBoxItem Content="10 minutos" Tag="10"/>
-                                            <ComboBoxItem Content="30 minutos" Tag="30"/>
+                                            <ComboBoxItem Content="{loc:T Cfg_IntervaloSync2Min}" Tag="2"/>
+                                            <ComboBoxItem Content="{loc:T Cfg_IntervaloSync5Min}" Tag="5"/>
+                                            <ComboBoxItem Content="{loc:T Cfg_IntervaloSync10Min}" Tag="10"/>
+                                            <ComboBoxItem Content="{loc:T Cfg_IntervaloSync30Min}" Tag="30"/>
                                         </ComboBox>
                                     </ctl:SettingRow>
                                     <Border Style="{StaticResource CfgDivider}"/>

@@ -14,6 +14,27 @@ public class VigilanteEstancamientoTorrentTests
     private static readonly DateTime Inicio = new(2026, 9, 27, 12, 0, 0, DateTimeKind.Utc);
 
     [Fact]
+    public void Registrar_ElMotivoSaleEnElIdiomaDeLaApp()
+    {
+        try
+        {
+            LocalizationService.Instance.Idioma = "en";
+
+            new VigilanteEstancamientoTorrent(0, Inicio).Registrar(0, Inicio + VigilanteEstancamientoTorrent.MaximoSinPrimerDato)
+                .Should().Be("Nobody is sharing this torrent (no data in 5 min).");
+
+            var conDatos = new VigilanteEstancamientoTorrent(0, Inicio);
+            conDatos.Registrar(10, Inicio.AddMinutes(1));
+            conDatos.Registrar(10, Inicio.AddMinutes(1) + VigilanteEstancamientoTorrent.MaximoSinAvance)
+                .Should().Be("The torrent stopped progressing (10 min without receiving data).");
+        }
+        finally
+        {
+            LocalizationService.Instance.Idioma = "es";
+        }
+    }
+
+    [Fact]
     public void Registrar_SinRecibirNadaDurante5Minutos_LoDaPorEstancado()
     {
         var vigilante = new VigilanteEstancamientoTorrent(0, Inicio);

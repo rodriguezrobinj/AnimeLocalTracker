@@ -565,7 +565,7 @@ public partial class EstadisticasViewModel : ObservableObject, IAlEntrarEnPestan
             AnioTexto = DateTime.Now.Year.ToString(),
             NombreUsuario = nombreUsuario,
             Avatar = avatar,
-            RangoOtakuTexto = string.IsNullOrWhiteSpace(LogrosRangoNombre) ? "AFICIONADO" : LogrosRangoNombre.ToUpperInvariant(),
+            RangoOtakuTexto = string.IsNullOrWhiteSpace(LogrosRangoNombre) ? LocalizationService.T("Logro_Rango_1").ToUpperInvariant() : LogrosRangoNombre.ToUpperInvariant(),
             PuntosLogrosTexto = string.IsNullOrWhiteSpace(LogrosPuntosTexto) ? "0 PTS" : LogrosPuntosTexto.ToUpperInvariant(),
             ArquetipoTitulo = arquetipo,
             ArquetipoDescripcion = arquetipoDesc,
@@ -587,33 +587,23 @@ public partial class EstadisticasViewModel : ObservableObject, IAlEntrarEnPestan
 
     internal static (string Titulo, string Descripcion) DeterminarArquetipo(string? generoFavorito, int episodios)
     {
-        if (episodios < 5)
-            return ("🌱 EXPLORADOR NOVATO", "Dando los primeros pasos en el inmenso multiverso del anime.");
+        static (string, string) Arq(string clave) => (LocalizationService.T(clave), LocalizationService.T(clave + "Desc"));
 
-        if (episodios >= 1000)
-            return ("👑 TITÁN DEL ANIME", "Tu biblioteca es una fortaleza y tu pasión por el anime no tiene límites.");
+        if (episodios < 5) return Arq("Stats_ArqNovato");
+        if (episodios >= 1000) return Arq("Stats_ArqTitan");
 
         string gen = (generoFavorito ?? "").Trim().ToLowerInvariant();
-        if (gen.Contains("fantas") || gen.Contains("adventur") || gen.Contains("aventura"))
-            return ("🔮 VIAJERO DE FANTASÍA", "Mundos mágicos, hechizos antiguos y viajes legendarios sin fin.");
-        if (gen.Contains("acci") || gen.Contains("action") || gen.Contains("shounen") || gen.Contains("shonen"))
-            return ("⚡ DEVORADOR DE SHONEN", "Adrenalina pura, superación personal y batallas épicas inolvidables.");
-        if (gen.Contains("romance") || gen.Contains("shoujo"))
-            return ("💖 ROMÁNTICO INCURABLE", "Vives cada declaración y mirada intensa con el corazón en un puño.");
-        if (gen.Contains("comedia") || gen.Contains("comedy"))
-            return ("🎭 COLECCIONISTA DE RISAS", "El humor desternillante y las situaciones absurdas son tu templo.");
-        if (gen.Contains("sci-fi") || gen.Contains("ciencia") || gen.Contains("mecha"))
-            return ("🚀 PIONERO CYBERPUNK", "Futuros distópicos, tecnología estelar y misterios cósmicos.");
-        if (gen.Contains("drama") || gen.Contains("psicol") || gen.Contains("psychological"))
-            return ("🧠 EXPLORADOR PSICOLÓGICO", "Historias profundas que desafían la mente y conmueven el alma.");
-        if (gen.Contains("slice") || gen.Contains("vida") || gen.Contains("iyashikei"))
-            return ("☕ MAESTRO DEL IYASHIKEI", "La paz, la calidez cotidiana y los pequeños momentos de la vida.");
-        if (gen.Contains("misterio") || gen.Contains("thriller") || gen.Contains("suspens"))
-            return ("🔍 ESTRATEGA IMPLACABLE", "Descifras cada sospecha y giro argumental antes del clímax.");
-        if (gen.Contains("deporte") || gen.Contains("sport"))
-            return ("🏆 ESPÍRITU COMPETITIVO", "Pasión, trabajo en equipo y sudor para alcanzar la gloria.");
+        if (gen.Contains("fantas") || gen.Contains("adventur") || gen.Contains("aventura")) return Arq("Stats_ArqFantasia");
+        if (gen.Contains("acci") || gen.Contains("action") || gen.Contains("shounen") || gen.Contains("shonen")) return Arq("Stats_ArqShonen");
+        if (gen.Contains("romance") || gen.Contains("shoujo")) return Arq("Stats_ArqRomance");
+        if (gen.Contains("comedia") || gen.Contains("comedy")) return Arq("Stats_ArqComedia");
+        if (gen.Contains("sci-fi") || gen.Contains("ciencia") || gen.Contains("mecha")) return Arq("Stats_ArqCienciaFiccion");
+        if (gen.Contains("drama") || gen.Contains("psicol") || gen.Contains("psychological")) return Arq("Stats_ArqPsicologico");
+        if (gen.Contains("slice") || gen.Contains("vida") || gen.Contains("iyashikei")) return Arq("Stats_ArqIyashikei");
+        if (gen.Contains("misterio") || gen.Contains("thriller") || gen.Contains("suspens")) return Arq("Stats_ArqMisterio");
+        if (gen.Contains("deporte") || gen.Contains("sport")) return Arq("Stats_ArqDeporte");
 
-        return ("✨ MAESTRO DEL BINGE-WATCHING", "Una devoción imparable por las grandes historias animadas.");
+        return Arq("Stats_ArqBinge");
     }
 
     // Las portadas del Top (casi siempre una ruta LOCAL ya cacheada por la Galería) se cargan

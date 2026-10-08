@@ -340,4 +340,34 @@ public class EstadisticasViewModelTests
         titulo.Should().Be(tituloEsperado);
         descripcion.Should().NotBeNullOrWhiteSpace();
     }
+
+    [Theory]
+    [InlineData("Fantasía", 50, "🔮 FANTASY WANDERER", "Magical worlds, ancient spells and endless legendary journeys.")]
+    [InlineData("Action", 50, "⚡ SHONEN DEVOURER", "Pure adrenaline, self-improvement and unforgettable epic battles.")]
+    [InlineData("Romance", 50, "💖 HOPELESS ROMANTIC", "You live every confession and intense glance with your heart in your throat.")]
+    [InlineData("Comedia", 50, "🎭 LAUGH COLLECTOR", "Hilarious humor and absurd situations are your sanctuary.")]
+    [InlineData("Sci-Fi", 50, "🚀 CYBERPUNK PIONEER", "Dystopian futures, stellar technology and cosmic mysteries.")]
+    [InlineData("Drama", 50, "🧠 PSYCHOLOGICAL EXPLORER", "Deep stories that challenge the mind and move the soul.")]
+    [InlineData("Slice of Life", 50, "☕ IYASHIKEI MASTER", "Peace, everyday warmth and the little moments of life.")]
+    [InlineData("Misterio", 50, "🔍 RELENTLESS STRATEGIST", "You decode every suspicion and plot twist before the climax.")]
+    [InlineData("Deporte", 50, "🏆 COMPETITIVE SPIRIT", "Passion, teamwork and sweat to reach glory.")]
+    [InlineData("Desconocido", 50, "✨ BINGE-WATCHING MASTER", "Unstoppable devotion to great animated stories.")]
+    [InlineData("Acción", 2, "🌱 NOVICE EXPLORER", "Taking your first steps into the vast multiverse of anime.")]
+    [InlineData("Acción", 1500, "👑 ANIME TITAN", "Your library is a fortress and your passion for anime knows no limits.")]
+    public void DeterminarArquetipo_EnIngles_DevuelveLosTextosEnIngles(string genero, int episodios, string tituloEsperado, string descripcionEsperada)
+    {
+        try
+        {
+            LocalizationService.Instance.Idioma = "en";
+
+            var (titulo, descripcion) = EstadisticasViewModel.DeterminarArquetipo(genero, episodios);
+
+            titulo.Should().Be(tituloEsperado);
+            descripcion.Should().Be(descripcionEsperada);
+        }
+        finally
+        {
+            LocalizationService.Instance.Idioma = "es";
+        }
+    }
 }

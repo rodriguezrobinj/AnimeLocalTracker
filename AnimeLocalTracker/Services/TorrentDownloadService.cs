@@ -104,9 +104,9 @@ public sealed class VigilanteEstancamientoTorrent
 
         var quieto = ahoraUtc - _ultimoAvance;
         if (!_huboAvance && quieto >= MaximoSinPrimerDato)
-            return $"Nadie está compartiendo este torrent (sin datos en {MaximoSinPrimerDato.TotalMinutes:0} min).";
+            return string.Format(LocalizationService.T("Desc_TorrentSinSemillasFormato"), (int)MaximoSinPrimerDato.TotalMinutes);
         if (_huboAvance && quieto >= MaximoSinAvance)
-            return $"El torrent dejó de avanzar ({MaximoSinAvance.TotalMinutes:0} min sin recibir datos).";
+            return string.Format(LocalizationService.T("Desc_TorrentEstancadoFormato"), (int)MaximoSinAvance.TotalMinutes);
         return null;
     }
 }
@@ -164,7 +164,7 @@ public class TorrentDownloadService : ITorrentDownloadService, IDisposable
         CancellationToken ct = default)
     {
         if (!Core.UrlSeguridad.EsUrlNyaaPermitida(torrentUrl))
-            return new ResultadoTorrent(false, null, "URL de torrent no permitida.");
+            return new ResultadoTorrent(false, null, LocalizationService.T("Desc_TorrentUrlNoPermitida"));
 
         TorrentManager? manager = null;
         bool dejandoSembrando = false;
@@ -176,7 +176,7 @@ public class TorrentDownloadService : ITorrentDownloadService, IDisposable
             {
                 using var res = await _httpClient.SendAsync(req, ct);
                 if (!res.IsSuccessStatusCode)
-                    return new ResultadoTorrent(false, null, $"No se pudo descargar el .torrent (HTTP {(int) res.StatusCode}).");
+                    return new ResultadoTorrent(false, null, string.Format(LocalizationService.T("Desc_TorrentHttpFormato"), (int)res.StatusCode));
                 // SEC-03: un .torrent real pesa KB; el tope evita que un Nyaa comprometido (o un MITM) llene la memoria.
                 torrentBytes = await Core.EntradaSegura.LeerAcotadoAsync(res.Content, MaxTorrentBytes, ct);
             }
@@ -205,8 +205,8 @@ public class TorrentDownloadService : ITorrentDownloadService, IDisposable
             {
                 await _engine.RemoveAsync(manager);
                 return new ResultadoTorrent(false, null, SeleccionArchivoTorrent.ContarVideos(archivosDelTorrent) == 0
-                    ? "El torrent no tiene ningún archivo de video reconocible."
-                    : $"El torrent no tiene ningún archivo reconocible como el episodio {numeroEpisodio}.");
+                    ? LocalizationService.T("Desc_TorrentSinVideo")
+                    : string.Format(LocalizationService.T("Desc_TorrentSinEpisodioFormato"), numeroEpisodio));
             }
 
             var archivoElegido = manager.Files.First(f => f.Path == rutaElegida);
@@ -230,7 +230,7 @@ public class TorrentDownloadService : ITorrentDownloadService, IDisposable
                     AppLogger.Warn("TorrentDownloadService", $"El torrent entró en estado de error: {motivo}");
                     await DetenerYQuitarAsync(manager);
                     manager = null;
-                    return new ResultadoTorrent(false, null, $"Error del torrent: {motivo}");
+                    return new ResultadoTorrent(false, null, string.Format(LocalizationService.T("Desc_TorrentErrorFormato"), motivo));
                 }
 
                 double progresoPedido = ProgresoDeLoPedido(manager);
@@ -267,10 +267,10 @@ public class TorrentDownloadService : ITorrentDownloadService, IDisposable
             if (!Core.EntradaSegura.EstaDentroDe(carpetaTemporal, rutaFinal))
             {
                 AppLogger.Warn("TorrentDownloadService", "El torrent apunta a una ruta fuera de la carpeta temporal; se descarta.");
-                return new ResultadoTorrent(false, null, "El torrent contiene una ruta de archivo no válida.");
+                return new ResultadoTorrent(false, null, LocalizationService.T("Desc_TorrentRutaInvalida"));
             }
             if (!File.Exists(rutaFinal))
-                return new ResultadoTorrent(false, null, "El torrent terminó pero no se encontró el archivo descargado.");
+                return new ResultadoTorrent(false, null, LocalizationService.T("Desc_TorrentSinArchivoFinal"));
 
             string? carpetaDestino = Path.GetDirectoryName(rutaDestinoEsperada);
             if (!string.IsNullOrEmpty(carpetaDestino)) Directory.CreateDirectory(carpetaDestino);

@@ -330,7 +330,7 @@ public class AnimeThemesDownloadService : IAnimeThemesDownloadService
                 TamanoBytes = tamano,
                 FechaUtc = DateTime.UtcNow,
                 Completada = ruta != null,
-                Error = ruta != null ? null : visible.Error ?? "No se pudo descargar",
+                Error = ruta != null ? null : visible.Error ?? LocalizationService.T("Desc_MusicaErrorDescarga"),
                 Tipo = DescargaHistorial.TipoMusica,
                 TemaClave = visible.TemaClave,
                 TemaTitulo = visible.TemaTitulo
@@ -429,7 +429,7 @@ public class AnimeThemesDownloadService : IAnimeThemesDownloadService
             trabajo.Informar(PesoDeLaDescarga);
             bool convertido = await ConvertirAMp3Async(rutaTemporalOgg, rutaFinal, tema, aniListId, ct);
             if (convertido) trabajo.Informar(1.0);
-            else if (trabajo.Visible != null) trabajo.Visible.Error = "No se pudo convertir a mp3";
+            else if (trabajo.Visible != null) trabajo.Visible.Error = LocalizationService.T("Desc_MusicaErrorConvertir");
             return convertido ? rutaFinal : null;
         }
         catch (OperationCanceledException)

@@ -774,7 +774,7 @@ public class DownloadService : IDownloadService
                             // FUN-016: trazabilidad del ciclo de descarga en app.log (antes solo Debug)
                             AppLogger.Warn("DownloadService", $"No se encontró enlace para '{state.AnimeTitulo}' Ep {state.NumeroEpisodio}.");
                             _activeDownloads.TryRemove(key, out _); GuardarColaPendiente();
-                            string errorNoEncontrado = $"No se encontró el episodio {state.NumeroEpisodio} en el servidor.";
+                            string errorNoEncontrado = string.Format(LocalizationService.T("Desc_ErrorEpisodioNoEncontradoFormato"), state.NumeroEpisodio);
                             WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, 0, isDownloading: false, isCompleted: false, isPaused: false, "", errorNoEncontrado, state.AnimeTitulo));
                             // Descarga automática: el episodio puede tardar horas en aparecer en el servidor; cada intento
                             // fallido no debe llenar el historial (el monitor reintenta con espera creciente).
@@ -1005,7 +1005,7 @@ public class DownloadService : IDownloadService
                 if (!exito)
                 {
                     _activeDownloads.TryRemove(key, out _); GuardarColaPendiente();
-                    string error = string.IsNullOrWhiteSpace(motivo) ? "No se pudo descargar el torrent elegido." : motivo;
+                    string error = string.IsNullOrWhiteSpace(motivo) ? LocalizationService.T("Desc_ErrorTorrentElegido") : motivo;
                     WeakReferenceMessenger.Default.Send(new DescargaProgresoMensaje(state.AniListId, state.NumeroEpisodio, 0, isDownloading: false, isCompleted: false, isPaused: false, "", error, state.AnimeTitulo));
                     RegistrarEnHistorial(state, completada: false, error);
                 }
@@ -1895,7 +1895,7 @@ public class DownloadService : IDownloadService
         public int? TopeConexiones { get; }
 
         public ServidorSaturadoException(System.Net.HttpStatusCode estado, TimeSpan? esperaSugerida, int? topeConexiones = null)
-            : base($"El servidor está saturado ({(int)estado}).", null, estado)
+            : base(string.Format(LocalizationService.T("Desc_ErrorServidorSaturadoFormato"), (int)estado), null, estado)
         {
             EsperaSugerida = esperaSugerida;
             TopeConexiones = topeConexiones;
