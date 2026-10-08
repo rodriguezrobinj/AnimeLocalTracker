@@ -41,6 +41,7 @@ La verificación es proporcional al cambio: si no se tocó C#/XAML (investigar, 
 
 ## UI
 
+- Al añadir o cambiar cualquier texto visible (etiqueta, tooltip, diálogo, mensaje de estado, fecha), usa el skill `localizacion` (`.claude/skills/localizacion/SKILL.md`) — claves ES/EN, `{loc:T}`, marcadores, cambio de idioma en caliente y cómo buscar texto sin traducir.
 - Al crear o modificar una pestaña/vista (o portar una lista a virtualizada), usa el skill `wpf-add-view` (`.claude/skills/wpf-add-view/SKILL.md`) — la cadena completa mensaje→NavigationService→DI→DataTemplate→botón, patrón de `ListBox` virtualizado, y las convenciones de accesibilidad/color/localización ya establecidas.
 - Al verificar visualmente un cambio de UI o de comportamiento de ventana (compilar, lanzar, capturar pantalla, simular clicks), usa el skill `wpf-visual-verification` (`.claude/skills/wpf-visual-verification/SKILL.md`) — evita perder tiempo con las trampas ya conocidas del entorno (foco/z-order poco fiable, animaciones de `WindowState`, controles que se ocultan por inactividad).
 

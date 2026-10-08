@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text.RegularExpressions;
 using AnimeLocalTracker.Services;
 using FluentAssertions;
@@ -54,6 +55,29 @@ public class LocalizationServiceTests
         "Lim_CompletarTitulo", "Lim_CompletarMsjFormato", "Lim_LiberadoTitulo", "Lim_LiberadoMsjFormato",
         "Det_ConservarVideos", "Det_ConservarVideosDesc", "Det_ConservarVideosErrorMsj",
     ];
+
+    private static Dictionary<string, string> Diccionario(string campo) =>
+        (Dictionary<string, string>)typeof(LocalizationService).GetField(campo, BindingFlags.NonPublic | BindingFlags.Static)!.GetValue(null)!;
+
+    /// <summary>
+    /// Guarda general (no depende de una lista de claves): toda clave existe en español y en inglés y lleva los mismos marcadores
+    /// {n}. Se comparan los índices, no el formato: una fecha puede ser {0:dd/MM/yyyy} en español y {0:MM/dd/yyyy} en inglés.
+    /// </summary>
+    [Fact]
+    public void TodasLasClaves_ExistenEnLosDosIdiomas_ConLosMismosMarcadores()
+    {
+        static HashSet<string> Indices(string texto) => Regex.Matches(texto, @"\{(\d+)").Select(m => m.Groups[1].Value).ToHashSet();
+        var es = Diccionario("Es");
+        var en = Diccionario("En");
+
+        var problemas = new List<string>();
+        problemas.AddRange(es.Keys.Except(en.Keys).Select(k => $"{k}: falta en inglés"));
+        problemas.AddRange(en.Keys.Except(es.Keys).Select(k => $"{k}: falta en español"));
+        problemas.AddRange(es.Keys.Intersect(en.Keys).Where(k => !Indices(es[k]).SetEquals(Indices(en[k]))).Select(k => $"{k}: los marcadores {{n}} no coinciden"));
+
+        problemas.Should().BeEmpty();
+        es.Should().HaveCountGreaterThan(1000, "se está leyendo el diccionario completo");
+    }
 
     [Fact]
     public void ClavesNuevas_ExistenEnLosDosIdiomas_NoSonCopiaYLlevanLosMismosMarcadores()
