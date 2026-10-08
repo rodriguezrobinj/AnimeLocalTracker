@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
+  "permissions": {
+    "allow": [
+      "Bash(dotnet build *)",
+      "Bash(dotnet test *)",
+      "Bash(git status)",
+      "Bash(git status *)",
+      "Bash(git diff)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git show *)",
+      "Bash(gh run list *)",
+      "Bash(gh run view *)",
+      "Bash(gh release list *)",
+      "Bash(python .claude/hooks/test_hooks.py)",
+      "PowerShell(dotnet build *)",
+      "PowerShell(dotnet test *)",
+      "PowerShell(git status)",
+      "PowerShell(git status *)",
+      "PowerShell(git diff)",
+      "PowerShell(git diff *)",
+      "PowerShell(git log *)",
+      "PowerShell(git show *)",
+      "PowerShell(gh run list *)",
+      "PowerShell(gh run view *)",
+      "PowerShell(gh release list *)"
+    ],
+    "deny": [
+      "Read(~/AppData/Local/AnimeLocalTrackerData/anilist_token*)",
+      "Edit(~/AppData/Local/AnimeLocalTrackerData/**)",
+      "Write(~/AppData/Local/AnimeLocalTrackerData/**)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python",
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/guardia_comandos.py"],
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python",
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/aviso_reglas.py"],
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

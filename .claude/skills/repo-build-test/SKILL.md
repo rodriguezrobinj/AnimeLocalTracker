@@ -47,8 +47,9 @@ El SDK de WPF compila cada proyecto en dos fases: primero genera los `.g.cs` des
 5. **Nunca mates procesos `dotnet`/`MSBuild`/`testhost` a mitad de una corrida de tests que sigue produciendo output.** Si necesitas cancelar, espera a que la corrida termine sola o a que quede sin producir output por varios minutos — matarla a mitad de ejecución puede dejar un `System.Windows.Application.Current` compartido en mal estado y producir fallos cruzados (`InvalidOperationException: El subproceso que realiza la llamada no puede obtener acceso a este objeto...`) en tests que no tienen nada que ver con tu cambio. Si eso pasa, es contaminación del entorno, no una regresión — limpia procesos colgados (paso 6) y vuelve a correr todo limpio antes de concluir que algo se rompió.
 6. Si un build/test se queda sin producir NINGÚN output por varios minutos (ni siquiera la línea inicial "Determinando los proyectos..."), probablemente hay una invocación de `dotnet` anterior colgada compitiendo por el mismo lock. Verificar y limpiar:
    ```
-   Get-Process dotnet,MSBuild,VBCSCompiler,AnimeLocalTracker,testhost -ErrorAction SilentlyContinue | Stop-Process -Force
+   Get-Process dotnet,MSBuild,VBCSCompiler,testhost -ErrorAction SilentlyContinue | Stop-Process -Force
    ```
+   (Sin `AnimeLocalTracker` en la lista: ese proceso puede ser la app real del usuario. Si una instancia lanzada por ti bloquea el build, ciérrala por su PID.)
    y volver a intentar desde el paso 1.
 7. **Variante con mensaje explícito de archivo bloqueado** (distinta del flake silencioso de arriba): si el build SÍ produce output pero falla repetidamente (3+ veces seguidas, sin converger) con
    `error MC1000: ... 'The process cannot access the file '...View.g.cs' because it is being used by another process'`,

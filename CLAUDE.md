@@ -26,6 +26,14 @@ Antes de dar por terminado cualquier cambio en C#/XAML, usa el skill `repo-build
 
 La verificación es proporcional al cambio: si no se tocó C#/XAML (investigar, responder preguntas, documentos) no se compila ni se prueba; mientras se trabaja, compilar la app y correr las pruebas de lo tocado; la suite completa, una sola vez al cerrar la tarea o antes de subir. Sin doble pasada: se compila una vez y solo se reintenta si falla.
 
+## Guardarraíles (hooks y ajustes del proyecto)
+
+`.claude/settings.json` (compartido) activa dos hooks en Python (`.claude/hooks/`) que convierten en bloqueos reglas que antes solo estaban escritas:
+- `guardia_comandos.py` (antes de ejecutar Bash/PowerShell): bloquea `--borrar-datos`, cerrar `AnimeLocalTracker` por nombre (solo por PID), `git push` con fuerza o a otra rama que no sea `main` (tags y `HEAD` piden confirmación), commits con firma de Claude y borrar/mover/sobrescribir en `%LocalAppData%\AnimeLocalTrackerData`.
+- `aviso_reglas.py` (después de editar `.cs`/`.xaml` del proyecto principal): avisa de `DllImport`, `async void` suelto, `DateTime.Now`, `Debug.WriteLine`, `ProcessStartInfo` fuera de `Core/`, binding largo de localización, colores literales y `RepeatBehavior="Forever"`. No bloquea.
+- Además: `attribution` vacío (sin línea de coautor en commits/PR) y `deny` para leer el token de AniList o editar la carpeta de datos real.
+- Si un bloqueo estorba de verdad, se ajusta el hook (con su prueba: `python .claude/hooks/test_hooks.py`), no se rodea.
+
 ## UI
 
 - Al crear o modificar una pestaña/vista (o portar una lista a virtualizada), usa el skill `wpf-add-view` (`.claude/skills/wpf-add-view/SKILL.md`) — la cadena completa mensaje→NavigationService→DI→DataTemplate→botón, patrón de `ListBox` virtualizado, y las convenciones de accesibilidad/color/localización ya establecidas.

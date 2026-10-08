@@ -22,10 +22,11 @@ Start-Sleep -Seconds 5
 Write-Output "PID=$($p.Id) HasExited=$($p.HasExited)"
 ```
 
-Antes de relanzar tras recompilar, mata la instancia anterior — dos instancias compitiendo por el mismo `settings.json`/DB o por el mismo `MainWindowHandle` da resultados confusos:
+Antes de relanzar tras recompilar, cierra **solo la instancia que lanzaste tú, por su PID** — dos instancias compitiendo por el mismo `settings.json`/DB o por el mismo `MainWindowHandle` da resultados confusos:
 ```powershell
-Get-Process AnimeLocalTracker -ErrorAction SilentlyContinue | Stop-Process -Force
+Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
 ```
+Nunca por nombre (`Get-Process AnimeLocalTracker | Stop-Process`, `taskkill /IM`): puede ser tu app real con un episodio en marcha. El hook `.claude/hooks/guardia_comandos.py` lo bloquea. Si ya había una instancia antes de lanzar, anota su PID y no la toques.
 
 ## 2. Capturar pantalla
 
@@ -78,7 +79,7 @@ public class WinInfoXYZ {
     [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
 }
 '@
-$proc = Get-Process AnimeLocalTracker
+$proc = Get-Process -Id $p.Id   # el PID que lanzaste tú, no el primero que se llame así
 $rect = New-Object WinInfoXYZ+RECT
 [WinInfoXYZ]::GetWindowRect($proc.MainWindowHandle, [ref]$rect) | Out-Null
 Write-Output "Left=$($rect.Left) Top=$($rect.Top) W=$($rect.Right-$rect.Left) H=$($rect.Bottom-$rect.Top)"
