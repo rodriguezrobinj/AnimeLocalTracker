@@ -275,8 +275,8 @@ public sealed class LocalizationService : INotifyPropertyChanged
         ["Cfg_BtnRestaurar"] = "Restaurar copia",
         ["Cfg_RestaurarBackup"] = "Restaurar copia de seguridad",
         ["Cfg_RestaurarConfirmacion"] = "Se reemplazará la biblioteca actual por la copia seleccionada. ¿Continuar?",
-        ["Cfg_RestaurarOk"] = "Biblioteca restaurada correctamente.",
-        ["Cfg_RestaurarError"] = "No se pudo restaurar la copia (archivo inválido o corrupto).",
+        ["Cfg_RestaurarOk"] = "Biblioteca restaurada correctamente. La que tenías antes quedó guardada en la carpeta Backups, por si quieres deshacerlo.",
+        ["Cfg_RestaurarError"] = "No se pudo restaurar la copia (archivo inválido, corrupto o de una versión más nueva de la app). Tu biblioteca actual no se modificó.",
 
         // === HISTORIAL ===
         ["Hist_Titulo"] = "Historial de Reproducción",
@@ -1626,8 +1626,8 @@ public sealed class LocalizationService : INotifyPropertyChanged
         ["Cfg_BtnRestaurar"] = "Restore backup",
         ["Cfg_RestaurarBackup"] = "Restore backup",
         ["Cfg_RestaurarConfirmacion"] = "The current library will be replaced by the selected backup. Continue?",
-        ["Cfg_RestaurarOk"] = "Library restored successfully.",
-        ["Cfg_RestaurarError"] = "Could not restore the backup (invalid or corrupt file).",
+        ["Cfg_RestaurarOk"] = "Library restored successfully. Your previous library was saved in the Backups folder in case you want to undo it.",
+        ["Cfg_RestaurarError"] = "Could not restore the backup (invalid, corrupt or from a newer version of the app). Your current library was not changed.",
 
         // === HISTORIAL ===
         ["Hist_Titulo"] = "Watch History",

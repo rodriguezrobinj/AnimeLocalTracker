@@ -21,7 +21,7 @@ El hook `aviso_reglas.py` avisa si escribes `CreateTable`/`[Indexed]` fuera de `
 
 ## 2. Reglas de la entrada
 
-- Versión = la mayor + 1. **Nunca** editar, reordenar ni reutilizar una entrada ya publicada (hay bases en cualquier versión; restaurar un respaldo viejo vuelve a ejecutar las migraciones sobre datos con la forma antigua).
+- Versión = la mayor + 1. **Nunca** editar, reordenar ni reutilizar una entrada ya publicada (hay bases en cualquier versión; restaurar un respaldo viejo ejecuta las migraciones sobre una copia de trabajo de ese respaldo, con datos de la forma antigua, antes de volcarla a la base viva).
 - Comentario `/// v<N>: …` con el *por qué* y qué pasa con las filas existentes, y descripción de una línea en la tabla, como las demás.
 - Idempotente: `IF NOT EXISTS`, `CreateTableAsync`. Si la acción se corta a medias y se reintenta, no debe fallar ni duplicar.
 - Fechas en UTC. sqlite-net devuelve `DateTime` con `Kind = Unspecified`: no compares `Kind`.

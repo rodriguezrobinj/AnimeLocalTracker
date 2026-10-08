@@ -17,19 +17,25 @@ namespace AnimeLocalTracker.Tests.Services;
 /// </summary>
 public class DatabaseServiceUpsertTests : IDisposable
 {
+    private readonly string _carpeta;
     private readonly string _tempDbPath;
     private readonly DatabaseService _sut;
 
     public DatabaseServiceUpsertTests()
     {
-        _tempDbPath = Path.Combine(Path.GetTempPath(), $"AnimeTracker_Upsert_{Guid.NewGuid():N}.db");
+        // Carpeta propia: restaurar una copia deja otra de "deshacer" en Backups junto a la base, y no debe caer en %TEMP%\Backups.
+        _carpeta = Path.Combine(Path.GetTempPath(), $"AnimeTracker_Upsert_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(_carpeta);
+        _tempDbPath = Path.Combine(_carpeta, "biblioteca.db");
         _sut = new DatabaseService(_tempDbPath);
     }
 
     public void Dispose()
     {
         GC.SuppressFinalize(this);
-        try { if (File.Exists(_tempDbPath)) File.Delete(_tempDbPath); } catch { }
+        _sut.Dispose();
+        SQLiteAsyncConnection.ResetPool();
+        try { Directory.Delete(_carpeta, recursive: true); } catch { }
     }
 
     [Fact]

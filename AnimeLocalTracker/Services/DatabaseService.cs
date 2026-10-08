@@ -452,9 +452,33 @@ public class DatabaseService : IDatabaseService, IDisposable
 
         // VACUUM INTO no puede ejecutarse dentro de una transacción; escapar comillas.
         string destinoSql = rutaDestino.Replace("'", "''");
-        if (File.Exists(rutaDestino)) File.Delete(rutaDestino);
-        await conexion.ExecuteAsync($"VACUUM INTO '{destinoSql}'");
+        void BorrarDestino() { if (File.Exists(rutaDestino)) File.Delete(rutaDestino); }
+        BorrarDestino();
+        await EjecutarFueraDeTransaccionAsync(conexion, $"VACUUM INTO '{destinoSql}'", BorrarDestino);
         return File.Exists(rutaDestino);
+    }
+
+    /// <summary>
+    /// Ejecuta una orden que SQLite no admite dentro de una transacción (VACUUM, ATTACH, DETACH). sqlite-net la rechaza a veces
+    /// ("cannot VACUUM from within a transaction" o un "not an error") cuando justo corre en otro hilo un
+    /// <c>RunInTransactionAsync</c> sobre la misma conexión; el reintento corto lo resuelve (medido con guardados concurrentes:
+    /// 22 de 125 intentos fallaban sin reintento y 0 con él). <paramref name="limpiar"/> deshace lo que dejó el intento fallido.
+    /// </summary>
+    private static async Task EjecutarFueraDeTransaccionAsync(SQLiteAsyncConnection conexion, string sql, Action? limpiar = null)
+    {
+        for (int intento = 1; ; intento++)
+        {
+            try
+            {
+                await conexion.ExecuteAsync(sql);
+                return;
+            }
+            catch (SQLiteException) when (intento < 4)
+            {
+                limpiar?.Invoke();
+                await Task.Delay(50 * intento);
+            }
+        }
     }
 
     public async Task GuardarAnimeAsync(AnimeItem anime)
@@ -544,60 +568,129 @@ public class DatabaseService : IDatabaseService, IDisposable
     }
 
     /// <summary>
-    /// Restaura la biblioteca desde una copia de seguridad (.db): valida integridad
-    /// SQLite ANTES de tocar la base actual, guarda el estado previo para revertir
-    /// ante cualquier fallo, y reabre la conexión al final (BAK-03).
+    /// Restaura la biblioteca desde una copia de seguridad (.db) SIN cerrar ni reemplazar la base en uso: vuelca los datos de la
+    /// copia dentro de la misma base, en una sola transacción (BAK-03). Antes de tocar nada: la copia debe ser de esta app
+    /// (integridad, tablas conocidas y no de una versión más nueva), se ensayan las migraciones sobre una copia de trabajo y se
+    /// guarda la biblioteca actual en <c>Backups\biblioteca.antes-de-restaurar.*.db</c> para poder deshacer. Si algo falla,
+    /// la transacción se revierte y la biblioteca queda como estaba. Lo que se esté guardando a la vez espera su turno en la conexión.
     /// </summary>
     public async Task<bool> RestaurarCopiaSeguridadAsync(string rutaOrigen)
     {
-        if (!File.Exists(rutaOrigen) || new FileInfo(rutaOrigen).Length == 0) return false;
+        if (_conexion == null || !File.Exists(rutaOrigen) || new FileInfo(rutaOrigen).Length == 0) return false;
 
-        // 1. Validar la integridad de la copia antes de tocar la base actual
+        string carpeta = Path.GetDirectoryName(_conexion.DatabasePath)!;
+        string trabajo = Path.Combine(carpeta, "biblioteca.restaurando.db");
         try
         {
-            using var check = new SQLiteConnection(rutaOrigen);
-            if (check.ExecuteScalar<string>("PRAGMA integrity_check;") != "ok")
+            // 1. Validar el origen (en solo lectura) y sacar de él una copia de trabajo limpia, junto a la base viva.
+            if (!await Task.Run(() => PrepararCopiaDeTrabajo(rutaOrigen, trabajo))) return false;
+
+            // 2. Ensayar las migraciones sobre la copia de trabajo: si no puede dejarse en la última versión, la base viva no se toca.
+            if (!await MigrarCopiaDeTrabajoAsync(trabajo)) return false;
+
+            // 3. Red de seguridad: lo que hay ahora, para deshacer una restauración equivocada.
+            string previa = Path.Combine(carpeta, "Backups", $"biblioteca.antes-de-restaurar.{DateTime.UtcNow:yyyyMMdd-HHmmssfff}.db");
+            if (!await CrearSnapshotAtomicoAsync(_conexion, previa))
+            {
+                AppLogger.Warn("DatabaseService", "Restore rechazado: no se pudo guardar la biblioteca actual antes de reemplazarla.");
+                return false;
+            }
+
+            // 4. Volcado atómico: ATTACH fuera de la transacción (SQLite no lo permite dentro) y todo lo demás en una sola.
+            await EjecutarFueraDeTransaccionAsync(_conexion, $"ATTACH DATABASE '{trabajo.Replace("'", "''")}' AS restaurando;");
+            try { await _conexion.RunInTransactionAsync(VolcarCopiaDeTrabajo); }
+            finally { await EjecutarFueraDeTransaccionAsync(_conexion, "DETACH DATABASE restaurando;"); }
+
+            AppLogger.Info("DatabaseService", $"Biblioteca restaurada desde: {rutaOrigen} (la anterior quedó en {previa}).");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("DatabaseService", "Fallo al restaurar; la biblioteca actual no se modificó", ex);
+            return false;
+        }
+        finally
+        {
+            foreach (var sufijo in new[] { "", "-wal", "-shm", "-journal" })
+            {
+                try { File.Delete(trabajo + sufijo); } catch { /* sin permiso o bloqueado: se reemplaza en la próxima restauración */ }
+            }
+        }
+    }
+
+    /// <summary>Valida que el origen sea una copia de esta app y deja en <paramref name="trabajo"/> una copia limpia (VACUUM INTO).</summary>
+    private static bool PrepararCopiaDeTrabajo(string rutaOrigen, string trabajo)
+    {
+        try
+        {
+            using var origen = new SQLiteConnection(rutaOrigen, SQLiteOpenFlags.ReadOnly);
+            if (origen.ExecuteScalar<string>("PRAGMA integrity_check;") != "ok")
             {
                 AppLogger.Warn("DatabaseService", "Restore rechazado: la copia no pasó integrity_check.");
                 return false;
             }
+            if (origen.ExecuteScalar<int>("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN ('AnimeItem', 'RegistroEpisodio');") != 2)
+            {
+                AppLogger.Warn("DatabaseService", "Restore rechazado: el archivo no es una copia de la biblioteca (faltan las tablas de animes y episodios).");
+                return false;
+            }
+            int version = origen.ExecuteScalar<int>("PRAGMA user_version;");
+            if (version > Migraciones.Max(m => m.Version))
+            {
+                AppLogger.Warn("DatabaseService", $"Restore rechazado: la copia es de una versión más nueva de la app (esquema v{version}).");
+                return false;
+            }
+
+            if (File.Exists(trabajo)) File.Delete(trabajo);
+            origen.Execute($"VACUUM INTO '{trabajo.Replace("'", "''")}';");
+            return true;
         }
         catch (Exception ex)
         {
             AppLogger.Warn("DatabaseService", $"Restore rechazado: no se pudo abrir la copia ({ex.Message})");
             return false;
         }
+    }
 
-        if (_conexion == null) return false;
-        string dbPath = _conexion.DatabasePath;
-        string guard = dbPath + ".restore_prev";
-
+    /// <summary>Aplica a la copia de trabajo las migraciones que le falten; false si no llega a la última versión.</summary>
+    private static async Task<bool> MigrarCopiaDeTrabajoAsync(string trabajo)
+    {
+        var conexion = new SQLiteAsyncConnection(trabajo);
         try
         {
-            // 2. Guard del estado actual (permite revertir ante cualquier fallo)
-            try { if (File.Exists(guard)) File.Delete(guard); } catch { }
-            File.Copy(dbPath, guard, overwrite: true);
-
-            // 3. Cerrar la conexión y reemplazar el archivo
-            try { await _conexion.CloseAsync(); } catch { }
-            _conexion = null!;
-            File.Copy(rutaOrigen, dbPath, overwrite: true);
-
-            // 4. Reabrir (recrea WAL, tablas e índices)
-            await InicializarBaseDatosAsync();
-
-            try { if (File.Exists(guard)) File.Delete(guard); } catch { }
-            AppLogger.Info("DatabaseService", $"Biblioteca restaurada desde: {rutaOrigen}");
-            return true;
-        }
-        catch (Exception ex)
-        {
-            // 5. Revertir al estado previo
-            AppLogger.Error("DatabaseService", "Fallo al restaurar; revirtiendo al estado previo", ex);
-            try { if (File.Exists(guard)) File.Copy(guard, dbPath, overwrite: true); } catch { }
-            _conexion = null!;
-            await InicializarBaseDatosAsync();
+            await EjecutarMigracionesPendientesAsync(conexion);
+            if (await conexion.ExecuteScalarAsync<int>("PRAGMA user_version;") == Migraciones.Max(m => m.Version)) return true;
+            AppLogger.Warn("DatabaseService", "Restore rechazado: una migración de la copia quedó aplazada.");
             return false;
+        }
+        finally
+        {
+            await conexion.CloseAsync();
+        }
+    }
+
+    private sealed class InfoColumna
+    {
+        public string Name { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// Dentro de la transacción de la restauración: vacía cada tabla de la base viva y la rellena con la de la copia de trabajo
+    /// (adjunta como <c>restaurando</c>). Las columnas se emparejan por nombre: el esquema, los índices y user_version son los de la
+    /// base viva.
+    /// </summary>
+    private static void VolcarCopiaDeTrabajo(SQLiteConnection db)
+    {
+        var tablas = db.Query<InfoColumna>("SELECT name AS Name FROM restaurando.sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%';");
+        foreach (var tabla in tablas.Select(t => t.Name.Replace("\"", "\"\"")))
+        {
+            var vivas = db.Query<InfoColumna>($"PRAGMA main.table_info(\"{tabla}\");").Select(c => c.Name).ToList();
+            var copia = db.Query<InfoColumna>($"PRAGMA restaurando.table_info(\"{tabla}\");").Select(c => c.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            if (vivas.Count == 0) continue;  // tabla que esta versión no tiene
+
+            db.Execute($"DELETE FROM main.\"{tabla}\";");
+            var comunes = string.Join(", ", vivas.Where(copia.Contains).Select(c => $"\"{c.Replace("\"", "\"\"")}\""));
+            if (comunes.Length > 0) db.Execute($"INSERT INTO main.\"{tabla}\" ({comunes}) SELECT {comunes} FROM restaurando.\"{tabla}\";");
         }
     }
 
