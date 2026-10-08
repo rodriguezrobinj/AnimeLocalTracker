@@ -17,7 +17,7 @@ Hay varios plugins de skills activos (superpowers, ponytail, ui-ux-pro-max, Emil
 
 - Precedencia: instrucción del usuario > `CLAUDE.md`/reglas > skills del repo > superpowers > plugins de dominio > plugins de estilo.
 - Proceso pesado (brainstorming, plan escrito) solo para funciones nuevas o cambios multi-módulo; los cambios pequeños se hacen directo.
-- Sin commit ni push sin orden; al subir, solo a `main`. Sin ramas, worktrees ni subagentes por iniciativa propia.
+- Sin commit ni push sin orden; al subir, solo a `main`. Sin ramas, worktrees ni subagentes por iniciativa propia. Para commitear y subir usa el skill `commit-es` (`.claude/skills/commit-es/SKILL.md`): mensaje en español con tildes, sin firma de Claude.
 - Responder siempre en español.
 
 ## Build y tests

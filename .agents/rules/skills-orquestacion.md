@@ -8,7 +8,7 @@ Hay muchas skills instaladas con territorios que se solapan. Esta regla fija **q
 
 1. La instrucción explícita del usuario en la conversación.
 2. `CLAUDE.md` y las reglas de `.agents/rules/`.
-3. Skills del repo: `repo-build-test`, `wpf-add-view`, `wpf-visual-verification`, `perfil-aislado`, `migracion-db`.
+3. Skills del repo: `repo-build-test`, `wpf-add-view`, `wpf-visual-verification`, `perfil-aislado`, `migracion-db`, `commit-es`.
 4. `superpowers` (proceso: cómo trabajar).
 5. Plugins de dominio (qué saber sobre un tema): `dotnet-test`, `dotnet-msbuild`, `microsoft-docs`.
 6. Plugins de estilo (cómo sonar o cómo se ve): `ponytail`, `ui-ux-pro-max`, skill de Emil Kowalski (`emil-design-eng`).
@@ -23,6 +23,7 @@ Una skill de nivel inferior nunca puede relajar una regla de nivel superior. Si 
 | Nueva pestaña/vista o lista virtualizada | `wpf-add-view` | Más `ui-wpf-vistas.md`. |
 | Verificar UI en la app real | `wpf-visual-verification` | Se lanza siempre con `perfil-aislado`. |
 | Lanzar la app para probar cualquier cosa (UI, reproductor, descargas, borrados, migraciones) | `perfil-aislado` | Nunca el exe directo: usaría los datos reales del usuario. |
+| Hacer commit y subir (solo si el usuario lo pide) | `commit-es` | Mensaje en español con tildes, sin firma de Claude, solo a `main`. |
 | Cambiar el esquema de la base de datos (columna, tabla, índice, datos) | `migracion-db` | Más `persistence.md` #6. Se verifica sobre una copia de la base real con `perfil-aislado`. |
 | Diseñar una función nueva con decisiones abiertas | `superpowers:brainstorming` | Solo si hay decisiones de diseño reales (ver punto 4). |
 | Plan de varios pasos | `superpowers:writing-plans` | |
