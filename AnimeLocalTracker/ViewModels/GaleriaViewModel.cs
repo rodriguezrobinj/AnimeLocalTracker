@@ -552,7 +552,7 @@ public partial class GaleriaViewModel : ObservableObject, IAlEntrarEnPestana, ID
                 _ = despachadorArranque!.BeginInvoke(System.Windows.Threading.DispatcherPriority.ContextIdle, () => { _ = CargarPortadasFaltantesEnSegundoPlanoAsync(animes); });
             else
                 _ = CargarPortadasFaltantesEnSegundoPlanoAsync(animes);
-            _ = CargarTemporadasYAniosFaltantesEnSegundoPlanoAsync(animes);
+            _ = CompletarDatosDeAniListEnSegundoPlanoAsync(animes);
 
             await CargarPerfilUsuarioAsync();
             OnPropertyChanged(nameof(BibliotecaVacia)); QueVeoHoy.AlCambiarLaBiblioteca();
@@ -569,63 +569,39 @@ public partial class GaleriaViewModel : ObservableObject, IAlEntrarEnPestana, ID
     }
 
     /// <summary>
-    /// Backfill en segundo plano de Temporada/AnioLanzamiento para animes que ya estaban
-    /// en la biblioteca ANTES de esta funcionalidad (por eso los combos de la galería
-    /// aparecían vacíos: nunca se capturó esa info al añadirlos). Mismo patrón que
-    /// CargarPortadasFaltantesEnSegundoPlanoAsync: no bloquea el arranque de la galería.
+    /// Al abrir la app, pregunta a AniList (en segundo plano, una consulta por cada 50 animes) por los que tienen algo que nadie
+    /// más revisa:
+    /// - los que no están ni en emisión ni terminados (sin estrenar, en pausa, sin dato): el estado solo se refrescaba con el botón
+    ///   Actualizar, así que un anime que ya se había estrenado seguía "sin estrenar", con 0 episodios y fuera de Actualizaciones;
+    /// - los que no tienen temporada ni año (añadidos antes de guardarse ese dato: los combos de la galería salían vacíos).
     /// </summary>
-    private async Task CargarTemporadasYAniosFaltantesEnSegundoPlanoAsync(IEnumerable<AnimeItem> animes)
+    private async Task CompletarDatosDeAniListEnSegundoPlanoAsync(IEnumerable<AnimeItem> animes)
     {
-        var faltantes = animes.Where(a => string.IsNullOrWhiteSpace(a.Temporada) && a.AnioLanzamiento <= 0).ToList();
-        if (faltantes.Count == 0) return;
+        var pendientes = animes
+            .Where(a => a.Estado is not ("RELEASING" or "FINISHED" or "CANCELLED") || (string.IsNullOrWhiteSpace(a.Temporada) && a.AnioLanzamiento <= 0))
+            .ToList();
+        if (pendientes.Count == 0) return;
 
         try
         {
-            var datos = await _animeTrackingService.ObtenerAnimesPorIdsLoteAsync(faltantes.Select(a => a.AniListId));
-            if (datos.Count == 0) return;
+            var datos = await _animeTrackingService.ObtenerAnimesPorIdsLoteAsync(pendientes.Select(a => a.AniListId));
+            if (datos is not { Count: > 0 }) return;
 
-            var actualizaciones = new List<(AnimeItem Anime, string Temporada, int Anio)>();
-            foreach (var anime in faltantes)
+            // Sin cuenta: aquí solo interesa lo que es del anime, no tu estado con él.
+            async Task AplicarAsync()
             {
-                if (!datos.TryGetValue(anime.AniListId, out var media)) continue;
-
-                string temporada = media.Season ?? string.Empty;
-                int anio = media.StartDate?.Year ?? 0;
-                if (string.IsNullOrEmpty(temporada) && anio <= 0) continue;
-
-                actualizaciones.Add((anime, temporada, anio));
+                var (modificados, emisiones) = AplicarDatosDeAniList(pendientes, datos, conCuenta: false, new HashSet<int>());
+                await GuardarDatosDeAniListAsync(modificados, emisiones);
             }
 
-            if (actualizaciones.Count == 0) return;
-
-            void AplicarCambios()
-            {
-                foreach (var (anime, temporada, anio) in actualizaciones)
-                {
-                    anime.Temporada = temporada;
-                    anime.AnioLanzamiento = anio;
-                }
-                ActualizarTemporadasYAniosDisponibles();
-                BibliotecaFiltrada?.Refresh();
-            }
-
-            // RND-03: mutar propiedades de AnimeItem (enlazadas a la UI) requiere el hilo
-            // de UI; la escritura en BD, no.
+            // RND-03: mutar propiedades de AnimeItem (enlazadas a la UI) requiere el hilo de UI.
             var dispatcher = System.Windows.Application.Current?.Dispatcher;
-            if (dispatcher != null && !dispatcher.CheckAccess())
-            {
-                await dispatcher.InvokeAsync(AplicarCambios);
-            }
-            else
-            {
-                AplicarCambios();
-            }
-
-            await _databaseService.ActualizarAnimesAsync(actualizaciones.Select(a => a.Anime));
+            if (dispatcher != null && !dispatcher.CheckAccess()) await await dispatcher.InvokeAsync(AplicarAsync);
+            else await AplicarAsync();
         }
         catch (Exception ex)
         {
-            AppLogger.Debug("GaleriaViewModel", $"Error al completar temporada/año en segundo plano: {ex.Message}");
+            AppLogger.Debug("GaleriaViewModel", $"Error al completar los datos de AniList en segundo plano: {ex.Message}");
         }
     }
 
@@ -1052,9 +1028,24 @@ public partial class GaleriaViewModel : ObservableObject, IAlEntrarEnPestana, ID
         var estadosSinEnviar = (await _databaseService.ObtenerSeguimientosPendientesAsync() ?? new List<SeguimientoLocal>())
             .Select(s => s.AniListId).ToHashSet();
 
+        var (modificados, proximasEmisiones) = AplicarDatosDeAniList(listaAnimes, datosLote, token != null, estadosSinEnviar);
+        await GuardarDatosDeAniListAsync(modificados, proximasEmisiones);
+
+        TextoProgreso = LocalizationService.T("Gal_ActualizacionCompletada");
+        await Task.Delay(PausaAviso);
+    }
+
+    /// <summary>
+    /// Vuelca en los animes lo que acaba de responder AniList: episodios emitidos, estado de emisión, temporada y año si faltaban
+    /// y, con cuenta, tu estado con el anime. Devuelve los que cambiaron y la hora del próximo episodio de cada uno, para guardarlos.
+    /// En el hilo de la interfaz: los AnimeItem están enlazados a las tarjetas.
+    /// </summary>
+    private static (List<AnimeItem> Modificados, List<ProximaEmisionLocal> Emisiones) AplicarDatosDeAniList(
+        IEnumerable<AnimeItem> animes, Dictionary<int, AniListMedia> datosLote, bool conCuenta, HashSet<int> estadosSinEnviar)
+    {
         var modificados = new List<Models.AnimeItem>();
         var proximasEmisiones = new List<Models.ProximaEmisionLocal>();
-        foreach (var anime in listaAnimes)
+        foreach (var anime in animes)
         {
             if (!datosLote.TryGetValue(anime.AniListId, out var datosFrescos)) continue;
 
@@ -1083,7 +1074,7 @@ public partial class GaleriaViewModel : ObservableObject, IAlEntrarEnPestana, ID
 
             // El estado personal del usuario viene embebido en la misma consulta loteada
             // (mediaListEntry del usuario autenticado): sin llamadas extra por anime.
-            if (token != null && !estadosSinEnviar.Contains(anime.AniListId)
+            if (conCuenta && !estadosSinEnviar.Contains(anime.AniListId)
                 && datosFrescos.MediaListEntry != null && !string.IsNullOrEmpty(datosFrescos.MediaListEntry.Status))
             {
                 if (!string.Equals(anime.EstadoUsuario, datosFrescos.MediaListEntry.Status, StringComparison.Ordinal))
@@ -1101,6 +1092,11 @@ public partial class GaleriaViewModel : ObservableObject, IAlEntrarEnPestana, ID
             if (cambio) modificados.Add(anime);
         }
 
+        return (modificados, proximasEmisiones);
+    }
+
+    private async Task GuardarDatosDeAniListAsync(List<AnimeItem> modificados, List<ProximaEmisionLocal> proximasEmisiones)
+    {
         // Todas en una transacción (antes, una escritura suelta por anime en emisión).
         try { await _databaseService.GuardarProximasEmisionesAsync(proximasEmisiones); }
         catch (Exception ex) { AppLogger.Debug("GaleriaViewModel", $"No se pudieron guardar las próximas emisiones: {ex.Message}"); }
@@ -1111,9 +1107,6 @@ public partial class GaleriaViewModel : ObservableObject, IAlEntrarEnPestana, ID
             ActualizarTemporadasYAniosDisponibles();
             BibliotecaFiltrada?.Refresh();
         }
-
-        TextoProgreso = LocalizationService.T("Gal_ActualizacionCompletada");
-        await Task.Delay(PausaAviso);
     }
 
     [RelayCommand]

@@ -19,6 +19,14 @@ public class AnimeItemTarjetaTests
     public void EstadoUsuarioVisual_DiceTuEstadoConElAnime(string estado, string esperado) =>
         new AnimeItem { EstadoUsuario = estado }.EstadoUsuarioVisual.Should().Be(esperado);
 
+    [Theory]
+    [InlineData("RELEASING", "En Emisión")]
+    [InlineData("FINISHED", "Finalizado")]
+    [InlineData("NOT_YET_RELEASED", "Próximamente")] // antes "Desconocido": un anime sin estrenar no es un dato que falte
+    [InlineData("UNKNOWN", "Desconocido")]
+    public void EstadoVisual_DiceElEstadoDeEmision(string estado, string esperado) =>
+        new AnimeItem { Estado = estado }.EstadoVisual.Should().Be(esperado);
+
     [Fact]
     public void AlCambiarElEstado_LaTarjetaSeEntera()
     {

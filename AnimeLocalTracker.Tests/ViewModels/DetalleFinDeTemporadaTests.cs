@@ -42,16 +42,16 @@ public class DetalleFinDeTemporadaTests : IDisposable
     private static ProximaEmision YaEmitido(int episodio) => new(episodio, DateTime.UtcNow.AddMinutes(-5));
     private static ProximaEmision AunNoSale(int episodio) => new(episodio, DateTime.UtcNow.AddDays(2));
 
-    private async Task<DetalleViewModel> AbrirFichaAsync(ProximaEmision? proxima)
+    private async Task<DetalleViewModel> AbrirFichaAsync(ProximaEmision? proxima, string estado = "RELEASING")
     {
         _escaner.Setup(e => e.EscanearEpisodiosAsync(_carpeta)).ReturnsAsync(new List<EpisodioItem>());
         _db.Setup(d => d.ObtenerRegistrosPorAnimeAsync(7)).ReturnsAsync(new List<RegistroEpisodio>());
         double p = 0;
         _descargas.Setup(d => d.EstaDescargando(It.IsAny<int>(), It.IsAny<int>(), out p)).Returns(false);
-        _proxima.Setup(s => s.ObtenerAsync(7, "RELEASING", It.IsAny<bool>())).ReturnsAsync(proxima);
+        _proxima.Setup(s => s.ObtenerAsync(7, estado, It.IsAny<bool>())).ReturnsAsync(proxima);
 
         var sut = CrearSut();
-        await sut.InicializarAsync(new AnimeItem { AniListId = 7, Titulo = "Frieren", RutaCarpeta = _carpeta, Estado = "RELEASING", TotalEpisodios = 12 });
+        await sut.InicializarAsync(new AnimeItem { AniListId = 7, Titulo = "Frieren", RutaCarpeta = _carpeta, Estado = estado, TotalEpisodios = estado == "RELEASING" ? 12 : 0 });
         await EsperarAsync(() => _proxima.Invocations.Count > 0);
         await Task.Delay(150); // la carga de la cuenta atrás va en segundo plano: no hay condición positiva que esperar
         return sut;
@@ -116,6 +116,30 @@ public class DetalleFinDeTemporadaTests : IDisposable
     public async Task SiTodaviaHayUnEpisodioPorSalir_NoPreguntaPorElEstado()
     {
         await AbrirFichaAsync(AunNoSale(13));
+
+        _tracking.Verify(t => t.ObtenerAnimePorIdAsync(It.IsAny<int>()), Times.Never);
+    }
+
+    // Sin estrenar: tras el estreno AniList ya programa el episodio 2 (aún por salir), así que nunca "pasaba la hora" y la ficha
+    // seguía en "sin estrenar" hasta pulsar Actualizar.
+
+    [Fact]
+    public async Task SiEstabaSinEstrenarYYaEstaProgramadoElEpisodio2_PasaAEnEmision()
+    {
+        _tracking.Setup(t => t.ObtenerAnimePorIdAsync(7)).ReturnsAsync(new AniListMedia { Status = "RELEASING" });
+
+        var sut = await AbrirFichaAsync(AunNoSale(2), "NOT_YET_RELEASED");
+        await EsperarAsync(() => sut.AnimeSeleccionado!.Estado == "RELEASING");
+
+        sut.AnimeSeleccionado!.Estado.Should().Be("RELEASING");
+        sut.TieneContadorProximo.Should().BeTrue("el episodio 2 sigue teniendo su cuenta atrás");
+        _db.Verify(d => d.ActualizarAnimeAsync(It.Is<AnimeItem>(a => a.Estado == "RELEASING")), Times.AtLeastOnce);
+    }
+
+    [Fact]
+    public async Task SiSigueSinEstrenarYFaltaElEpisodio1_NoPreguntaPorElEstado()
+    {
+        await AbrirFichaAsync(AunNoSale(1), "NOT_YET_RELEASED");
 
         _tracking.Verify(t => t.ObtenerAnimePorIdAsync(It.IsAny<int>()), Times.Never);
     }

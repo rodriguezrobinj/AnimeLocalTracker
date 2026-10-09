@@ -89,6 +89,10 @@ Actions + Velopack); las notas curadas de cada release se mantienen aquí.
   pantalla (Narrator).
 
 ### Corregido
+- Un anime añadido antes de su estreno se quedaba «sin estrenar» después de estrenarse (0 episodios, fuera de
+  Actualizaciones y con el estado «Desconocido» en la Ficha) hasta pulsar «Actualizar»: el estado de emisión solo se
+  refrescaba a mano. Ahora, al abrir la app, se pregunta a AniList por los que estaban sin estrenar (una sola consulta en
+  segundo plano) y la Ficha también se da cuenta si la dejas abierta. Los que siguen sin estrenar dicen «Próximamente».
 - El opening no se detectaba cuando empezaba pasado el minuto 8 (episodios dobles o con una apertura larga; Sasaki to
   Pii-chan Season 2, episodio 1, de 47 minutos, lo trae a los 8:21): solo se buscaba en los primeros 8 minutos. Ahora,
   si no aparece ahí, se busca hasta la mitad del episodio. Los episodios que quedaron guardados sin opening se vuelven

@@ -75,10 +75,14 @@ public partial class DetalleViewModel
     /// Ya salió el último episodio programado y no hay otro por delante: puede que la temporada haya terminado. El estado
     /// ("En emisión") solo se refrescaba con el botón Actualizar, así que aquí se pregunta a AniList (una consulta, como mucho
     /// cada 15 min como el resto de revisiones tras una emisión) y, si ya no está en emisión, se guarda y se retira el contador.
+    /// Lo mismo al revés: un anime guardado como "sin estrenar" cuyo próximo episodio ya es el 2 o posterior ya se estrenó (tras el
+    /// estreno AniList programa el siguiente, así que la hora nunca "pasaba" y se quedaba sin estrenar).
     /// </summary>
     private async Task RevalidarEstadoSiNoQuedaEmisionAsync(AnimeItem anime, ProximaEmision? proxima)
     {
-        if (proxima == null || proxima.EmisionUtc > DateTime.UtcNow) return;
+        if (proxima == null) return;
+        bool estrenadoSinSaberlo = anime.Estado == "NOT_YET_RELEASED" && proxima.Episodio > 1;
+        if (proxima.EmisionUtc > DateTime.UtcNow && !estrenadoSinSaberlo) return;
         if (DateTime.UtcNow - _ultimaRevalidacionEstadoUtc < ProximaEmisionService.RevisionTrasEmision) return;
         _ultimaRevalidacionEstadoUtc = DateTime.UtcNow; // también si la consulta falla: sin red no se reintenta en cada tick
 

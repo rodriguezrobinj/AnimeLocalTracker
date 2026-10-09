@@ -145,7 +145,10 @@ public class AniListMedia
     // ====== PROPIEDADES DE APOYO PARA LA UI (BÚSQUEDA) ======
     
     [JsonIgnore]
-    public string FormattedStatus => Status switch
+    public string FormattedStatus => TextoEstado(Status);
+
+    /// <summary>Estado de emisión de AniList en el idioma de la app (también para el guardado en la biblioteca: <see cref="AnimeItem.EstadoVisual"/>).</summary>
+    public static string TextoEstado(string? estado) => estado switch
     {
         "RELEASING" => AnimeLocalTracker.Services.LocalizationService.T("Media_EstadoEnEmision"),
         "FINISHED" => AnimeLocalTracker.Services.LocalizationService.T("Media_EstadoFinalizado"),

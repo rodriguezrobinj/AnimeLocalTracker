@@ -103,11 +103,7 @@ public partial class AnimeItem : ObservableObject
     // === PROPIEDADES VISUALES (NO SE GUARDAN EN SQLITE) ===
     [Ignore] 
     [JsonIgnore]
-    public string EstadoVisual => Estado == "RELEASING"
-        ? AnimeLocalTracker.Services.LocalizationService.T("Media_EstadoEnEmision")
-        : (Estado == "FINISHED"
-            ? AnimeLocalTracker.Services.LocalizationService.T("Media_EstadoFinalizado")
-            : AnimeLocalTracker.Services.LocalizationService.T("Media_EstadoDesconocido"));
+    public string EstadoVisual => AniListMedia.TextoEstado(Estado); // antes solo conocía dos: un anime sin estrenar salía "Desconocido"
 
     [Ignore]
     [JsonIgnore]

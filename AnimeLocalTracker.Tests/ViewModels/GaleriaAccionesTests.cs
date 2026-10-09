@@ -89,6 +89,45 @@ public class GaleriaAccionesTests
         anime.EstadoUsuario.Should().Be("COMPLETED");
     }
 
+    // === Al abrir la app: animes que estaban sin estrenar ===
+
+    [Fact]
+    public async Task AlAbrir_UnAnimeQueYaSeEstreno_PasaAEnEmisionConSusEpisodios()
+    {
+        // Caso real: guardado como "sin estrenar", se estrenó y AniList ya programa el episodio 2. Solo se enteraba con el botón Actualizar.
+        var anime = new AnimeItem { AniListId = 206774, Titulo = "Mouse Cursor", Estado = "NOT_YET_RELEASED", Temporada = "FALL", AnioLanzamiento = 2026 };
+        AniListDevuelve(new AniListMedia { Id = 206774, Status = "RELEASING", NextAiringEpisode = new() { Episode = 2, AiringAt = 1791734400 } });
+
+        await CrearAsync(anime);
+
+        anime.Estado.Should().Be("RELEASING");
+        anime.TotalEpisodios.Should().Be(1);
+        _database.Verify(d => d.ActualizarAnimesAsync(It.Is<IEnumerable<AnimeItem>>(l => l.Single() == anime)), Times.Once);
+        _database.Verify(d => d.GuardarProximasEmisionesAsync(It.Is<IEnumerable<ProximaEmisionLocal>>(l => l.Single().Episodio == 2)), Times.Once);
+    }
+
+    [Fact]
+    public async Task AlAbrir_SiSigueSinEstrenar_NoGuardaNada()
+    {
+        var anime = new AnimeItem { AniListId = 5, Titulo = "Frieren 3", Estado = "NOT_YET_RELEASED", Temporada = "FALL", AnioLanzamiento = 2027 };
+        AniListDevuelve(new AniListMedia { Id = 5, Status = "NOT_YET_RELEASED" });
+
+        await CrearAsync(anime);
+
+        anime.Estado.Should().Be("NOT_YET_RELEASED");
+        _database.Verify(d => d.ActualizarAnimesAsync(It.IsAny<IEnumerable<AnimeItem>>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task AlAbrir_NoPreguntaPorLosQueYaEstanEnEmisionOTerminados()
+    {
+        await CrearAsync(
+            new AnimeItem { AniListId = 1, Titulo = "Bleach", Estado = "FINISHED", Temporada = "FALL", AnioLanzamiento = 2004 },
+            new AnimeItem { AniListId = 2, Titulo = "One Piece", Estado = "RELEASING", Temporada = "FALL", AnioLanzamiento = 1999 });
+
+        _tracking.Verify(t => t.ObtenerAnimesPorIdsLoteAsync(It.IsAny<IEnumerable<int>>(), It.IsAny<string?>()), Times.Never);
+    }
+
     // === Selección múltiple ===
 
     [Fact]
