@@ -111,8 +111,25 @@ public class DatabaseService : IDatabaseService, IDisposable
         (21, "conservar los videos de un anime (protege del borrado de \"Eliminar tras ver\")", AgregarColumnasTemporadaFavoritoAsync),
         // Un episodio con dos filas era posible por una carrera entre guardados (v22 la cierra): se unen las que ya hay (con copia
         // previa de la base) y el índice (AniListId, NumeroEpisodio) pasa a ser único.
-        (22, "episodios sin filas repetidas (se unen) + índice único por (anime, episodio)", DeduplicarRegistrosEpisodioAsync)
+        (22, "episodios sin filas repetidas (se unen) + índice único por (anime, episodio)", DeduplicarRegistrosEpisodioAsync),
+        (23, "repetir los análisis de OP/ED que quedaron sin opening (ahora se busca también pasado el minuto 8)", DescartarAnalisisSkipSinOpeningAsync)
     };
+
+    /// <summary>
+    /// v23: el opening solo se buscaba en los primeros 8 minutos y un episodio doble o con una apertura larga quedaba guardado sin él
+    /// (Sasaki to Pii-chan 2, episodio 1 de 47 min: suena a los 8:21). Esos análisis incompletos valen hasta 12 horas, así que se
+    /// descartan para que el episodio se analice de nuevo al abrirlo. Los que ya tienen opening no se tocan. Sin copia previa: son
+    /// datos calculados, se regeneran solos (igual que en la v16).
+    /// </summary>
+    private static async Task DescartarAnalisisSkipSinOpeningAsync(SQLiteAsyncConnection conexion)
+    {
+        await conexion.ExecuteAsync(
+            "DELETE FROM AnalisisSkipEpisodio WHERE Completo = 0 AND NOT EXISTS (SELECT 1 FROM SegmentoSkipGuardado s " +
+            "WHERE s.AnimeId = AnalisisSkipEpisodio.AnimeId AND s.Episodio = AnalisisSkipEpisodio.Episodio AND s.Tipo IN ('op', 'mixed-op'));");
+        await conexion.ExecuteAsync(
+            "DELETE FROM SegmentoSkipGuardado WHERE NOT EXISTS (SELECT 1 FROM AnalisisSkipEpisodio a " +
+            "WHERE a.AnimeId = SegmentoSkipGuardado.AnimeId AND a.Episodio = SegmentoSkipGuardado.Episodio);");
+    }
 
     /// <summary>v20: <see cref="AjusteAudio"/> (clave primaria = "anime_episodio"; se lee siempre por clave, sin índice).</summary>
     private static Task CrearTablaAjusteAudioAsync(SQLiteAsyncConnection conexion) => conexion.CreateTableAsync<AjusteAudio>();

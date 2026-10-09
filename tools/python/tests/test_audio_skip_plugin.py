@@ -60,6 +60,49 @@ def _con_episodio(monkeypatch, huella_completa):
         return (plugin._Ventana(0.0, huella_completa[:int(seg_inicio * FPS)]),
                 plugin._Ventana(comienzo, huella_completa[int(comienzo * FPS):]))
     monkeypatch.setattr(plugin, "_ventanas_episodio", ventanas)
+    monkeypatch.setattr(plugin, "_ventana_tramo", lambda _ruta, desde, hasta:
+                        plugin._Ventana(desde, huella_completa[int(desde * FPS):int(hasta * FPS)]))
+
+
+def test_un_opening_tras_una_apertura_larga_se_busca_hasta_la_mitad_del_episodio(monkeypatch, entorno):
+    # Sasaki to Pii-chan 2, episodio 1 (47 min): el opening suena a los 8:21, fuera de los primeros 480 s.
+    crear, _, episodio = entorno
+    monkeypatch.setattr(plugin, "_get_duration_seconds", lambda _: 2840.0)
+    op, ed = _ruido(88.6, 1), _ruido(88.5, 2)
+    _con_episodio(monkeypatch, _incrustar(_incrustar(_ruido(2840, 3), op, 501.5), ed, 2750.5))
+
+    r = plugin.detect_themes(episodio, [
+        {"path": crear("OP1.mp3", op), "kind": "OP", "priority": 0},
+        {"path": crear("ED1.mp3", ed), "kind": "ED", "priority": 0},
+    ])
+
+    por_tramo = {m["segment"]: m for m in r["matches"]}
+    assert por_tramo["op"]["start"] == pytest.approx(501.5, abs=0.2)
+    assert por_tramo["op"]["end"] == pytest.approx(590.1, abs=0.2)
+    assert por_tramo["ed"]["start"] == pytest.approx(2750.5, abs=0.2)
+
+
+def test_un_opening_a_caballo_del_limite_de_los_primeros_minutos_se_encuentra(monkeypatch, entorno):
+    crear, _, episodio = entorno
+    op = _ruido(90, 1)
+    _con_episodio(monkeypatch, _incrustar(_ruido(1400, 3), op, 440))  # 440-530 s: no cabe entero en los primeros 480
+
+    r = plugin.detect_themes(episodio, [{"path": crear("OP1.mp3", op), "kind": "OP", "priority": 0}])
+
+    m = r["matches"][0]
+    assert m["segment"] == "op" and m["mode"] == "full"
+    assert m["start"] == pytest.approx(440, abs=0.2)
+
+
+def test_el_opening_sonando_en_la_segunda_mitad_no_se_marca_como_opening(monkeypatch, entorno):
+    # Canción de fondo del clímax: marcarla haría que "saltar opening" se llevara la escena.
+    crear, _, episodio = entorno
+    op = _ruido(90, 1)
+    _con_episodio(monkeypatch, _incrustar(_ruido(1400, 3), op, 800))
+
+    r = plugin.detect_themes(episodio, [{"path": crear("OP1.mp3", op), "kind": "OP", "priority": 0}])
+
+    assert r["success"] and r["matches"] == []
 
 
 def test_ubica_opening_y_ending_con_sus_temas(monkeypatch, entorno):

@@ -46,6 +46,41 @@ public class DatabaseServiceSkipTests : IDisposable
             c.ExecuteScalar<int>("SELECT COUNT(*) FROM sqlite_master WHERE name = ?;", nombre).Should().Be(1, nombre);
     }
 
+    // v23: el opening ahora también se busca pasado el minuto 8. Lo guardado como "incompleto, sin opening" se hizo con la búsqueda
+    // corta y, sin esto, seguiría valiendo hasta 12 horas (Sasaki to Pii-chan 2, episodio 1: solo el ending).
+
+    [Fact]
+    public async Task BaseEnV22_DescartaLosAnalisisIncompletosSinOpening_YConservaElResto()
+    {
+        await _sut.InicializarBaseDatosAsync();
+        await _sut.GuardarAnalisisSkipAsync(Analisis(101, 1, completo: false), [Seg("ed", 2750.5, 2839)]);
+        await _sut.GuardarAnalisisSkipAsync(Analisis(101, 2, completo: false), []);
+        await _sut.GuardarAnalisisSkipAsync(Analisis(101, 3, completo: false), [Seg("op", 90, 180)]);
+        await _sut.GuardarAnalisisSkipAsync(Analisis(101, 4, completo: false), [Seg("mixed-op", 0, 80, "aniskip", 0)]);
+        await _sut.GuardarAnalisisSkipAsync(Analisis(101, 5), [Seg("op", 90, 180), Seg("ed", 1300, 1390)]);
+        _sut.Dispose();
+        using (var c = new SQLiteConnection(_rutaDb)) c.Execute("PRAGMA user_version = 22;");
+
+        for (int vez = 0; vez < 2; vez++) // la segunda apertura no cambia nada
+        {
+            using var reabierta = new DatabaseService(_rutaDb);
+            await reabierta.InicializarBaseDatosAsync();
+
+            foreach (int descartado in new[] { 1, 2 })
+            {
+                (await reabierta.ObtenerAnalisisSkipAsync(101, descartado)).Should().BeNull($"el episodio {descartado} se vuelve a analizar");
+                (await reabierta.ObtenerSegmentosSkipAsync(101, descartado)).Should().BeEmpty();
+            }
+            (await reabierta.ObtenerAnalisisSkipAsync(101, 3)).Should().NotBeNull("ya tiene opening: lo que le falta no cambia con esto");
+            (await reabierta.ObtenerSegmentosSkipAsync(101, 3)).Should().ContainSingle();
+            (await reabierta.ObtenerAnalisisSkipAsync(101, 4)).Should().NotBeNull("el opening de AniSkip también cuenta");
+            (await reabierta.ObtenerSegmentosSkipAsync(101, 5)).Should().HaveCount(2);
+        }
+
+        using var final = new SQLiteConnection(_rutaDb);
+        final.ExecuteScalar<int>("PRAGMA user_version;").Should().BeGreaterThanOrEqualTo(23);
+    }
+
     [Fact]
     public async Task Guardar_YObtener_ConservaAnalisisYTramos()
     {

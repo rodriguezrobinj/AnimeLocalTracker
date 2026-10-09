@@ -122,6 +122,9 @@ _TRAMO_MINIMO = 30 * _FPS
 # Solo se analizan por trozos los candidatos con cierta similitud completa (los demás no son la canción).
 _MINIMO_PARA_TROZOS = 0.45
 _MAXIMO_CANDIDATOS_TROZOS = 4
+# El opening se busca como mucho hasta esta fracción del episodio. Más allá el mismo tema suele sonar como canción de fondo del
+# clímax (episodios finales): marcarlo haría que "saltar opening" se llevara la escena.
+_LIMITE_OPENING = 0.5
 
 
 def detect_themes(episode_path: str, references: List[Dict[str, Any]], min_confidence: float = 0.7,
@@ -132,7 +135,7 @@ def detect_themes(episode_path: str, references: List[Dict[str, Any]], min_confi
     references: [{"path", "kind": "OP"|"ED", "priority": 0 (aplica al episodio según AnimeThemes) | 1 (resto)}].
     Por cada tramo se prueban grupos en orden y se para en el primero que acierta (así los temas que no aplican ni se
     decodifican si el que aplica ya coincide):
-      opening → OP que aplican, OP restantes.
+      opening → OP que aplican, OP restantes; si no aparece en head_seconds, otra vez hasta la mitad del episodio.
       ending  → ED que aplican, ED restantes y, por último, los OP (primero los que aplican): el episodio 1 y los finales
                 suelen cerrar con el opening; antes ese ending no se detectaba nunca.
     Devuelve matches con segment "op"/"ed", reference_path, start, end, confidence y mode ("full"/"partial").
@@ -162,7 +165,18 @@ def detect_themes(episode_path: str, references: List[Dict[str, Any]], min_confi
                     if str(r.get("kind", "")).upper() == kind and (priority is None or int(r.get("priority", 1)) == priority)]
 
         matches = []
-        op = _buscar_en_grupos(inicio, [grupo("OP", 0), grupo("OP", 1)], huellas, evaluados, cache_dir, min_confidence, None)
+        grupos_op = [grupo("OP", 0), grupo("OP", 1)]
+        op = _buscar_en_grupos(inicio, grupos_op, huellas, evaluados, cache_dir, min_confidence, None)
+        if not op:
+            # No está en los primeros minutos: un episodio doble o con una apertura en frío larga lo trae más tarde (Sasaki to
+            # Pii-chan 2, episodio 1 de 47 min: suena a los 8:21). Se mira hasta la mitad del episodio, y solo ahora, para no
+            # decodificar de más en el caso normal. El tramo empieza un tema antes del límite: cubre el que cae a caballo.
+            largo_tema = max((len(h) for r in grupos_op[0] + grupos_op[1] if (h := huellas.get(r)) is not None), default=0) / _FPS
+            hasta = duracion * _LIMITE_OPENING
+            if largo_tema > 0 and hasta > head_seconds:
+                tardio = _ventana_tramo(episode_path, max(0.0, head_seconds - largo_tema), hasta)
+                if tardio:
+                    op = _buscar_en_grupos(tardio, grupos_op, huellas, evaluados, cache_dir, min_confidence, None)
         if op:
             matches.append(dict(op, segment="op"))
 
@@ -202,6 +216,12 @@ def _ventanas_episodio(ruta: str, duracion: float, segundos_inicio: float, segun
     if len(h_inicio) == 0 or len(h_final) == 0:
         return None, None
     return _Ventana(0.0, h_inicio), _Ventana(comienzo_final, h_final)
+
+
+def _ventana_tramo(ruta: str, desde: float, hasta: float):
+    """_Ventana de un tramo suelto del episodio (None si no se pudo leer)."""
+    huella = _huella(_pcm(ruta, desde, hasta - desde))
+    return _Ventana(desde, huella) if len(huella) else None
 
 
 def _buscar_en_grupos(ventana, grupos, huellas, evaluados, cache_dir, min_confidence, excluir):

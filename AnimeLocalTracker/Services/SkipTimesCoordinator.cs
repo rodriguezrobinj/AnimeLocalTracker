@@ -28,7 +28,10 @@ public class SkipTimesCoordinator : ISkipTimesCoordinator
     /// </summary>
     internal TimeSpan TiempoMaximoAniSkip { get; set; } = TimeSpan.FromSeconds(20);
 
-    /// <summary>Segundos del principio del episodio donde se busca el opening (hay aperturas en frío de más de 3 minutos).</summary>
+    /// <summary>
+    /// Segundos del principio del episodio donde se busca el opening (hay aperturas en frío de más de 3 minutos). Si no aparece ahí,
+    /// el motor mira además hasta la mitad del episodio (episodios dobles: Sasaki to Pii-chan 2, episodio 1, lo trae a los 8:21).
+    /// </summary>
     internal const double SegundosBusquedaOpening = 480;
 
     /// <summary>Segundos del final donde se busca el ending (ending + escena poscréditos + avance).</summary>

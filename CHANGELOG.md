@@ -89,6 +89,10 @@ Actions + Velopack); las notas curadas de cada release se mantienen aquí.
   pantalla (Narrator).
 
 ### Corregido
+- El opening no se detectaba cuando empezaba pasado el minuto 8 (episodios dobles o con una apertura larga; Sasaki to
+  Pii-chan Season 2, episodio 1, de 47 minutos, lo trae a los 8:21): solo se buscaba en los primeros 8 minutos. Ahora,
+  si no aparece ahí, se busca hasta la mitad del episodio. Los episodios que quedaron guardados sin opening se vuelven
+  a analizar solos al abrirlos.
 - La lista de capítulos de la Ficha podía quedarse atascada en el episodio anterior aunque ya hubiera salido uno nuevo:
   si AniList todavía no tenía programada la fecha del episodio siguiente (algo habitual justo después de una emisión,
   antes de que confirme el próximo horario), la app se quedaba sin ninguna referencia de "qué es lo último que salió" y
