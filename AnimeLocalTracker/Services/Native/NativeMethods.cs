@@ -19,9 +19,6 @@ public static partial class NativeMethods
     [LibraryImport(DllName, EntryPoint = "anitomy_parse")]
     private static partial IntPtr NativeAnitomyParse(IntPtr input);
 
-    [LibraryImport(DllName, EntryPoint = "anitomy_parse_batch")]
-    private static partial IntPtr NativeAnitomyParseBatch(IntPtr inputJsonArray);
-
     [LibraryImport(DllName, EntryPoint = "compute_file_fingerprint")]
     private static partial IntPtr NativeComputeFingerprint(IntPtr videoPath);
 
@@ -105,33 +102,6 @@ public static partial class NativeMethods
         {
             AppLogger.Debug("NativeMethods", $"Error en anitomy_parse nativo: {ex.Message}");
             return null;
-        }
-        finally
-        {
-            if (inputPtr != IntPtr.Zero) Marshal.FreeHGlobal(inputPtr);
-        }
-    }
-
-    public static List<ParsedAnimeInfo> ParseBatch(IEnumerable<string> filenames)
-    {
-        if (!IsAvailable) return new();
-
-        IntPtr inputPtr = IntPtr.Zero;
-        IntPtr resultPtr = IntPtr.Zero;
-        try
-        {
-            string jsonInput = JsonSerializer.Serialize(filenames);
-            inputPtr = StringToUtf8Ptr(jsonInput);
-            resultPtr = NativeAnitomyParseBatch(inputPtr);
-            string? json = MarshalStringAndFree(resultPtr);
-            if (string.IsNullOrEmpty(json)) return new();
-
-            return JsonSerializer.Deserialize<List<ParsedAnimeInfo>>(json) ?? new();
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Debug("NativeMethods", $"Error en anitomy_parse_batch nativo: {ex.Message}");
-            return new();
         }
         finally
         {

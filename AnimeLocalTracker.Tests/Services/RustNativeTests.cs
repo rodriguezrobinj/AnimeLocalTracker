@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using AnimeLocalTracker.Services.Native;
 using FluentAssertions;
@@ -52,31 +51,6 @@ public class RustNativeTests
         result!.Success.Should().BeTrue();
         result.AnimeTitle.Should().Contain("Jujutsu Kaisen");
         result.EpisodeNumber.Should().Be("14");
-    }
-
-    [Fact]
-    public void NativeMethods_ParseBatch_DeberiaProcesarMultiplesArchivosEnParalelo()
-    {
-        if (!NativeMethods.IsAvailable) return;
-
-        var filenames = new List<string>
-        {
-            "[SubsPlease] Frieren - 01 (1080p).mkv",
-            "[SubsPlease] Frieren - 02 (1080p).mkv",
-            "[SubsPlease] Frieren - 03 (1080p).mkv",
-            "[Erai-raws] Oshi no Ko - 04 [1080p].mkv",
-            "[HorribleSubs] Bleach - 150 [720p].mkv"
-        };
-
-        var results = NativeMethods.ParseBatch(filenames);
-
-        results.Should().NotBeNull();
-        results.Count.Should().Be(5);
-        results[0].EpisodeNumber.Should().Be("01");
-        results[1].EpisodeNumber.Should().Be("02");
-        results[2].EpisodeNumber.Should().Be("03");
-        results[3].EpisodeNumber.Should().Be("04");
-        results[4].EpisodeNumber.Should().Be("150");
     }
 
     [Fact]

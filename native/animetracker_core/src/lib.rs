@@ -5,10 +5,9 @@ pub mod hasher;
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::panic::{catch_unwind, AssertUnwindSafe};
-use rayon::prelude::*;
 
 /// Barrera de seguridad para TODA función exportada al FFI: un panic (p.ej. de
-/// Rayon o de un crate interno) que cruce el borde `extern "C"` es
+/// un crate interno) que cruce el borde `extern "C"` es
 /// Undefined Behavior y derrumba el proceso .NET. Aquí se captura y se
 /// devuelve el valor de fallback (null/false) para que el llamador degrade
 /// con elegancia.
@@ -44,45 +43,6 @@ fn anitomy_parse_inner(input: *const c_char) -> *mut c_char {
     };
 
     match CString::new(json) {
-        Ok(cs) => cs.into_raw(),
-        Err(_) => std::ptr::null_mut(),
-    }
-}
-
-/// Parsea una lista JSON de nombres de archivo en paralelo (usando todos los núcleos de CPU con Rayon)
-/// y retorna un JSON array con los resultados estructurados.
-#[no_mangle]
-pub extern "C" fn anitomy_parse_batch(input_json_array: *const c_char) -> *mut c_char {
-    ffi_catch(|| anitomy_parse_batch_inner(input_json_array), std::ptr::null_mut())
-}
-
-fn anitomy_parse_batch_inner(input_json_array: *const c_char) -> *mut c_char {
-    if input_json_array.is_null() {
-        return std::ptr::null_mut();
-    }
-
-    let c_str = unsafe { CStr::from_ptr(input_json_array) };
-    let json_text = match c_str.to_str() {
-        Ok(s) => s,
-        Err(_) => return std::ptr::null_mut(),
-    };
-
-    let filenames: Vec<String> = match serde_json::from_str(json_text) {
-        Ok(v) => v,
-        Err(_) => return std::ptr::null_mut(),
-    };
-
-    let results: Vec<parser::ParsedAnimeInfo> = filenames
-        .par_iter()
-        .map(|f| parser::parse_filename(f))
-        .collect();
-
-    let json_output = match serde_json::to_string(&results) {
-        Ok(j) => j,
-        Err(_) => return std::ptr::null_mut(),
-    };
-
-    match CString::new(json_output) {
         Ok(cs) => cs.into_raw(),
         Err(_) => std::ptr::null_mut(),
     }
