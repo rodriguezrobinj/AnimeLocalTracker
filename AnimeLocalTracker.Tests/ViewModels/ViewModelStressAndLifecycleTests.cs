@@ -131,7 +131,11 @@ public class ViewModelStressAndLifecycleTests
 
         // Act
         var sut = new CalendarioViewModel(_dbMock.Object, _trackingMock.Object);
-        await Task.Delay(100);
+        // La carga arranca sola en el constructor: se espera a que reparta los 28 episodios, no un tiempo fijo (con la máquina
+        // cargada 100 ms no bastaban y la prueba fallaba a ratos con los días vacíos).
+        int Repartidos() => sut.Lunes.Count + sut.Martes.Count + sut.Miercoles.Count + sut.Jueves.Count + sut.Viernes.Count + sut.Sabado.Count + sut.Domingo.Count;
+        var reloj = System.Diagnostics.Stopwatch.StartNew();
+        while (Repartidos() < 28 && reloj.Elapsed < TimeSpan.FromSeconds(30)) await Task.Delay(25);
 
         // Assert
         sut.Lunes.Should().HaveCount(4);

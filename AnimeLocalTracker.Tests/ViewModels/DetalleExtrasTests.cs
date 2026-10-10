@@ -288,7 +288,9 @@ public class DetalleExtrasTests : IDisposable
         var episodio = sut.Episodios.Todos.Single();
         string ruta = Path.Combine(_carpeta, "Episodio 01.mp4");
         var bloqueo = new FileStream(ruta, FileMode.Open, FileAccess.Read, FileShare.None);
-        _ = Task.Run(async () => { await Task.Delay(500); bloqueo.Dispose(); });
+        // Se suelta desde un hilo propio, no desde el grupo de hilos: con la máquina cargada el grupo iba tan atrasado que el
+        // archivo seguía bloqueado cuando el borrado ya había agotado sus reintentos (unos 3 s) y la prueba fallaba a ratos.
+        new Thread(() => { Thread.Sleep(500); bloqueo.Dispose(); }) { IsBackground = true }.Start();
 
         await sut.Episodios.EliminarEpisodioCommand.ExecuteAsync(episodio);
 

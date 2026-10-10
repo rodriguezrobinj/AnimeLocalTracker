@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using AnimeLocalTracker.Messages;
 using AnimeLocalTracker.Models;
@@ -84,6 +85,11 @@ public class ReproductorStressTests
     [Fact]
     public void Reproductor_ConmutacionMasiva500Episodios_DeberiaActualizarSinFugasNiExcepciones()
     {
+        // Sin el contexto de xUnit: crea un hilo por cada continuación pendiente (cada cambio cancela las esperas del episodio
+        // anterior) y, con la máquina cargada, arrancar esos hilos se llevaba 40 s de los 5 permitidos. En la app van al hilo de la
+        // interfaz. xUnit vuelve a poner su contexto en la prueba siguiente.
+        SynchronizationContext.SetSynchronizationContext(null);
+
         // Arrange: Serie de 500 episodios
         var sut = CreateSut();
         var lista500 = Enumerable.Range(1, 500)
