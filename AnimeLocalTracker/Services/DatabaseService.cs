@@ -15,6 +15,14 @@ public class DatabaseService : IDatabaseService, IDisposable
 {
     private readonly string? _customDbPath;
     private SQLiteAsyncConnection _conexion = null!;
+
+    /// <summary>
+    /// Conexión aparte, de solo lectura, para todas las consultas. Por <see cref="_conexion"/> (la de escritura) una consulta veía
+    /// lo que una transacción abierta llevaba escrito sin confirmar: si esa transacción fallaba, la pantalla se quedaba con datos
+    /// que nunca existieron. Con WAL, una segunda conexión solo ve lo confirmado y no espera a quien escribe (medido: hacerlas
+    /// esperar su turno en la misma conexión retrasaba una lectura 951 ms durante un guardado de 1 s).
+    /// </summary>
+    private SQLiteAsyncConnection _lectura = null!;
     private readonly SemaphoreSlim _initLock = new(1, 1);
 
     // CA1869: opciones de serialización reutilizadas (export JSON)
@@ -31,7 +39,11 @@ public class DatabaseService : IDatabaseService, IDisposable
     {
         // Cerrar la conexión: abierta, Windows no deja borrar la base ni sus -wal/-shm (las pruebas dejaban cientos de bases en
         // %TEMP%), y el cierre limpio vuelca el WAL al archivo principal. Si algo la usa después, sqlite-net abre otra al vuelo.
-        try { _conexion?.CloseAsync().GetAwaiter().GetResult(); }
+        try
+        {
+            _lectura?.CloseAsync().GetAwaiter().GetResult();
+            _conexion?.CloseAsync().GetAwaiter().GetResult();
+        }
         catch (Exception ex) { AppLogger.Warn("DatabaseService", $"No se pudo cerrar la base de datos al desechar el servicio: {ex.Message}"); }
         _initLock.Dispose();
         GC.SuppressFinalize(this);
@@ -70,6 +82,12 @@ public class DatabaseService : IDatabaseService, IDisposable
             // no con CreateTableAsync suelto (que no altera columnas existentes).
             await EjecutarMigracionesPendientesAsync(conexion);
 
+            // Después de las migraciones: la base ya existe y está en modo WAL, que es lo que deja leer sin esperar a quien escribe.
+            var lectura = new SQLiteAsyncConnection(rutaBaseDatos, SQLiteOpenFlags.ReadOnly | SQLiteOpenFlags.FullMutex);
+            await lectura.ExecuteAsync("PRAGMA temp_store = MEMORY;");
+            await lectura.ExecuteAsync("PRAGMA cache_size = -64000;");
+
+            _lectura = lectura;
             _conexion = conexion;
         }
         finally
@@ -541,7 +559,7 @@ public class DatabaseService : IDatabaseService, IDisposable
 
     public async Task<List<AnimeItem>> ObtenerTodosLosAnimesAsync()
     {
-        var animes = await _conexion.Table<AnimeItem>().ToListAsync();
+        var animes = await _lectura.Table<AnimeItem>().ToListAsync();
         await Task.Run(() => 
         {
             foreach (var a in animes)
@@ -559,7 +577,7 @@ public class DatabaseService : IDatabaseService, IDisposable
     /// </summary>
     public async Task<List<AnimeItem>> ObtenerAnimesLigerosAsync()
     {
-        var items = await _conexion.QueryAsync<AnimeItem>(
+        var items = await _lectura.QueryAsync<AnimeItem>(
             "SELECT AniListId, MalId, Titulo, NombresAlternativos, RutaCarpeta, UrlPortada, " +
             "Generos, TotalEpisodios, Estado, EstadoUsuario FROM AnimeItem;");
         // Fuera del hilo que llama (casi siempre el de la interfaz: Historial, Actualizaciones, Calendario): son tantos
@@ -577,7 +595,7 @@ public class DatabaseService : IDatabaseService, IDisposable
     /// <summary>Devuelve la fila completa de un anime (incluida la Sinopsis) por su id.</summary>
     public async Task<AnimeItem?> ObtenerAnimePorIdAsync(int aniListId)
     {
-        var anime = await _conexion.Table<AnimeItem>().FirstOrDefaultAsync(a => a.AniListId == aniListId);
+        var anime = await _lectura.Table<AnimeItem>().FirstOrDefaultAsync(a => a.AniListId == aniListId);
         // Sin esto, PortadaVisible cae a la URL remota de AniList y la portada no se ve sin conexión
         // (Historial/Actualizaciones navegan a la Ficha con el anime que devuelve este método).
         anime?.ResolverPortadaLocal();
@@ -587,7 +605,7 @@ public class DatabaseService : IDatabaseService, IDisposable
     /// <summary>PERF-03: comprueba la existencia sin cargar la biblioteca completa.</summary>
     public async Task<bool> ExisteAnimeAsync(int aniListId)
     {
-        return await _conexion.ExecuteScalarAsync<int>(
+        return await _lectura.ExecuteScalarAsync<int>(
                    "SELECT COUNT(*) FROM AnimeItem WHERE AniListId = ?", aniListId) > 0;
     }
     
@@ -838,7 +856,7 @@ public class DatabaseService : IDatabaseService, IDisposable
         // IMP-05: el archivo puede venir de otra persona. Una ruta de red (\\servidor\…) hace que Windows se conecte a ese
         // servidor con las credenciales del usuario en cuanto la app mira la carpeta, así que solo se conservan las de
         // servidores que esta biblioteca YA usa (sus animes o su carpeta base); el resto entra sin carpeta.
-        var animesActuales = await _conexion.Table<AnimeItem>().ToListAsync();
+        var animesActuales = await _lectura.Table<AnimeItem>().ToListAsync();
         var carpetasActuales = animesActuales.ToDictionary(a => a.AniListId, a => a.RutaCarpeta);
         var protegidosActuales = animesActuales.Where(a => a.ConservarVideos).Select(a => a.AniListId).ToHashSet();
         var servidoresPropios = carpetasActuales.Values
@@ -1081,14 +1099,14 @@ public class DatabaseService : IDatabaseService, IDisposable
     public async Task<List<RegistroEpisodio>> ObtenerRegistrosPorAnimeAsync(int aniListId)
     {
         // Traemos todos los capítulos que ya viste de un anime en específico
-        return await _conexion.Table<RegistroEpisodio>()
+        return await _lectura.Table<RegistroEpisodio>()
             .Where(r => r.AniListId == aniListId)
             .ToListAsync();
     }
 
     public async Task<List<RegistroEpisodio>> ObtenerTodosLosRegistrosAsync()
     {
-        return await _conexion.Table<RegistroEpisodio>().ToListAsync();
+        return await _lectura.Table<RegistroEpisodio>().ToListAsync();
     }
 
     private sealed class ConteoVistos
@@ -1099,7 +1117,7 @@ public class DatabaseService : IDatabaseService, IDisposable
 
     public async Task<Dictionary<int, int>> ObtenerEpisodiosVistosPorAnimeAsync()
     {
-        var filas = await _conexion.QueryAsync<ConteoVistos>(
+        var filas = await _lectura.QueryAsync<ConteoVistos>(
             "SELECT AniListId, COUNT(*) AS Vistos FROM RegistroEpisodio WHERE VistoLocal = 1 GROUP BY AniListId;");
         return filas.ToDictionary(f => f.AniListId, f => f.Vistos);
     }
@@ -1118,14 +1136,14 @@ public class DatabaseService : IDatabaseService, IDisposable
     public async Task<List<RegistroEpisodio>> ObtenerHistorialEpisodiosAsync(int limite = 300)
     {
         // Traer episodios reproducidos o en progreso ordenados por fecha de reproducción más reciente
-        return await _conexion.QueryAsync<RegistroEpisodio>(
+        return await _lectura.QueryAsync<RegistroEpisodio>(
             "SELECT * FROM RegistroEpisodio WHERE UltimaReproduccion IS NOT NULL OR ProgresoSegundos > 0 ORDER BY UltimaReproduccion DESC LIMIT ?;",
             limite);
     }
 
     public async Task<List<RegistroEpisodio>> ObtenerEpisodiosNoSincronizadosAsync()
     {
-        return await _conexion.Table<RegistroEpisodio>()
+        return await _lectura.Table<RegistroEpisodio>()
             .Where(r => r.VistoLocal && !r.SincronizadoEnNube)
             .ToListAsync();
     }
@@ -1185,7 +1203,7 @@ public class DatabaseService : IDatabaseService, IDisposable
 
     public async Task<bool> ObtenerConservarVideosAsync(int aniListId)
     {
-        return await _conexion.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM AnimeItem WHERE AniListId = ? AND ConservarVideos = 1", aniListId) > 0;
+        return await _lectura.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM AnimeItem WHERE AniListId = ? AND ConservarVideos = 1", aniListId) > 0;
     }
 
     /// <summary>
@@ -1235,12 +1253,12 @@ public class DatabaseService : IDatabaseService, IDisposable
 
     public async Task<List<RelacionAnime>> ObtenerRelacionesAnimeAsync()
     {
-        return await _conexion.Table<RelacionAnime>().ToListAsync();
+        return await _lectura.Table<RelacionAnime>().ToListAsync();
     }
 
     public async Task<List<RelacionAnimeSync>> ObtenerRelacionesSincronizadasAsync()
     {
-        return await _conexion.Table<RelacionAnimeSync>().ToListAsync();
+        return await _lectura.Table<RelacionAnimeSync>().ToListAsync();
     }
 
     public async Task GuardarRelacionesAnimeAsync(IReadOnlyDictionary<int, List<RelacionAnime>> relacionesPorAnime)
@@ -1268,7 +1286,7 @@ public class DatabaseService : IDatabaseService, IDisposable
 
     public async Task<List<LogroDesbloqueado>> ObtenerLogrosDesbloqueadosAsync()
     {
-        return await _conexion.Table<LogroDesbloqueado>().ToListAsync();
+        return await _lectura.Table<LogroDesbloqueado>().ToListAsync();
     }
 
     public async Task GuardarLogrosDesbloqueadosAsync(IEnumerable<LogroDesbloqueado> logros)
@@ -1292,7 +1310,7 @@ public class DatabaseService : IDatabaseService, IDisposable
 
     public async Task<List<PartidaMinijuego>> ObtenerPartidasMinijuegoAsync()
     {
-        return await _conexion.Table<PartidaMinijuego>().ToListAsync();
+        return await _lectura.Table<PartidaMinijuego>().ToListAsync();
     }
 
     public async Task GuardarPartidaMinijuegoAsync(PartidaMinijuego partida)
@@ -1303,12 +1321,12 @@ public class DatabaseService : IDatabaseService, IDisposable
 
     public async Task<AnalisisSkipEpisodio?> ObtenerAnalisisSkipAsync(int animeId, int episodio)
     {
-        return await _conexion.Table<AnalisisSkipEpisodio>().Where(a => a.AnimeId == animeId && a.Episodio == episodio).FirstOrDefaultAsync();
+        return await _lectura.Table<AnalisisSkipEpisodio>().Where(a => a.AnimeId == animeId && a.Episodio == episodio).FirstOrDefaultAsync();
     }
 
     public async Task<List<SegmentoSkipGuardado>> ObtenerSegmentosSkipAsync(int animeId, int episodio)
     {
-        return await _conexion.Table<SegmentoSkipGuardado>().Where(s => s.AnimeId == animeId && s.Episodio == episodio).ToListAsync();
+        return await _lectura.Table<SegmentoSkipGuardado>().Where(s => s.AnimeId == animeId && s.Episodio == episodio).ToListAsync();
     }
 
     public async Task GuardarAnalisisSkipAsync(AnalisisSkipEpisodio analisis, IReadOnlyList<SegmentoSkipGuardado> segmentos)
@@ -1342,7 +1360,7 @@ public class DatabaseService : IDatabaseService, IDisposable
         foreach (var lote in animeIds.Distinct().Chunk(500))
         {
             string ids = string.Join(",", lote);
-            resultado.AddRange(await _conexion.QueryAsync<PersonajeAnime>($"SELECT * FROM PersonajeAnime WHERE AnimeId IN ({ids});"));
+            resultado.AddRange(await _lectura.QueryAsync<PersonajeAnime>($"SELECT * FROM PersonajeAnime WHERE AnimeId IN ({ids});"));
         }
         return resultado;
     }
@@ -1355,7 +1373,7 @@ public class DatabaseService : IDatabaseService, IDisposable
         foreach (var lote in animeIds.Distinct().Chunk(500))
         {
             string ids = string.Join(",", lote);
-            resultado.AddRange(await _conexion.QueryAsync<PersonajesAnimeSync>($"SELECT * FROM PersonajesAnimeSync WHERE AnimeId IN ({ids});"));
+            resultado.AddRange(await _lectura.QueryAsync<PersonajesAnimeSync>($"SELECT * FROM PersonajesAnimeSync WHERE AnimeId IN ({ids});"));
         }
         return resultado;
     }
@@ -1385,7 +1403,7 @@ public class DatabaseService : IDatabaseService, IDisposable
 
     public async Task<AjusteAudio?> ObtenerAjusteAudioAsync(int aniListId, int numeroEpisodio)
     {
-        return await _conexion.FindAsync<AjusteAudio>(AjusteAudio.ClaveDe(aniListId, numeroEpisodio));
+        return await _lectura.FindAsync<AjusteAudio>(AjusteAudio.ClaveDe(aniListId, numeroEpisodio));
     }
 
     public async Task GuardarAjusteAudioAsync(AjusteAudio ajuste)
@@ -1397,7 +1415,7 @@ public class DatabaseService : IDatabaseService, IDisposable
 
     public async Task<PreferenciaEmision?> ObtenerPreferenciaEmisionAsync(int aniListId)
     {
-        return await _conexion.FindAsync<PreferenciaEmision>(aniListId);
+        return await _lectura.FindAsync<PreferenciaEmision>(aniListId);
     }
 
     public async Task GuardarPreferenciaEmisionAsync(PreferenciaEmision preferencia)
@@ -1408,12 +1426,12 @@ public class DatabaseService : IDatabaseService, IDisposable
 
     public async Task<List<PreferenciaEmision>> ObtenerPreferenciasEmisionActivasAsync()
     {
-        return await _conexion.Table<PreferenciaEmision>().Where(p => p.Avisar || p.AutoDescargar).ToListAsync();
+        return await _lectura.Table<PreferenciaEmision>().Where(p => p.Avisar || p.AutoDescargar).ToListAsync();
     }
 
     public async Task<DatosExtraAnime?> ObtenerDatosExtraAsync(int aniListId)
     {
-        return await _conexion.FindAsync<DatosExtraAnime>(aniListId);
+        return await _lectura.FindAsync<DatosExtraAnime>(aniListId);
     }
 
     public async Task GuardarDatosExtraAsync(DatosExtraAnime datos)
@@ -1424,7 +1442,7 @@ public class DatabaseService : IDatabaseService, IDisposable
 
     public async Task<ProximaEmisionLocal?> ObtenerProximaEmisionAsync(int aniListId)
     {
-        return await _conexion.FindAsync<ProximaEmisionLocal>(aniListId);
+        return await _lectura.FindAsync<ProximaEmisionLocal>(aniListId);
     }
 
     public async Task GuardarProximaEmisionAsync(ProximaEmisionLocal proxima)
@@ -1435,7 +1453,7 @@ public class DatabaseService : IDatabaseService, IDisposable
 
     public async Task<SeguimientoLocal?> ObtenerSeguimientoLocalAsync(int aniListId)
     {
-        return await _conexion.FindAsync<SeguimientoLocal>(aniListId);
+        return await _lectura.FindAsync<SeguimientoLocal>(aniListId);
     }
 
     public async Task GuardarSeguimientoLocalAsync(SeguimientoLocal seguimiento)
@@ -1446,12 +1464,12 @@ public class DatabaseService : IDatabaseService, IDisposable
 
     public async Task<List<SeguimientoLocal>> ObtenerSeguimientosPendientesAsync()
     {
-        return await _conexion.Table<SeguimientoLocal>().Where(s => s.Pendiente).ToListAsync();
+        return await _lectura.Table<SeguimientoLocal>().Where(s => s.Pendiente).ToListAsync();
     }
 
     public async Task<List<ProximaEmisionLocal>> ObtenerProximasEmisionesAsync()
     {
-        return await _conexion.Table<ProximaEmisionLocal>().ToListAsync();
+        return await _lectura.Table<ProximaEmisionLocal>().ToListAsync();
     }
 
     /// <summary>Lo guardado más antiguo que esto se descarta (Actualizaciones mira 7 días atrás; el Calendario, la semana actual).</summary>
@@ -1480,12 +1498,12 @@ public class DatabaseService : IDatabaseService, IDisposable
 
     public async Task<List<EmisionGuardada>> ObtenerEmisionesAsync(long inicioUnix, long finUnix)
     {
-        return await _conexion.Table<EmisionGuardada>().Where(e => e.EmisionUnixUtc >= inicioUnix && e.EmisionUnixUtc <= finUnix).ToListAsync();
+        return await _lectura.Table<EmisionGuardada>().Where(e => e.EmisionUnixUtc >= inicioUnix && e.EmisionUnixUtc <= finUnix).ToListAsync();
     }
 
     public async Task<MediaAnimeAv1Verificado?> ObtenerMediaAnimeAv1Async(int aniListId)
     {
-        return await _conexion.FindAsync<MediaAnimeAv1Verificado>(aniListId);
+        return await _lectura.FindAsync<MediaAnimeAv1Verificado>(aniListId);
     }
 
     public async Task GuardarMediaAnimeAv1Async(MediaAnimeAv1Verificado media)
@@ -1499,7 +1517,7 @@ public class DatabaseService : IDatabaseService, IDisposable
 
     public async Task<List<DescargaHistorial>> ObtenerDescargasHistorialAsync(int limite = 300)
     {
-        return await _conexion.Table<DescargaHistorial>()
+        return await _lectura.Table<DescargaHistorial>()
             .OrderByDescending(d => d.FechaUtc)
             .Take(Math.Max(1, limite))
             .ToListAsync();

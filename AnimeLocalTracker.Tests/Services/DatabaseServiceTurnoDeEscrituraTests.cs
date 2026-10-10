@@ -129,6 +129,8 @@ public class DatabaseServiceTurnoDeEscrituraTests : IDisposable
         for (int i = 1; i <= 200; i++)
             await _sut.GuardarDescargaHistorialAsync(new DescargaHistorial { AniListId = 1, NumeroEpisodio = i, AnimeTitulo = marcador, FechaUtc = DateTime.UtcNow });
 
+        (await _sut.ObtenerDescargasHistorialAsync()).Should().NotBeEmpty();   // la conexión de lectura queda abierta, como en la app
+
         using var parar = new CancellationTokenSource();
         var compartida = ConexionCompartida();
         var guardando = Task.Run(async () =>

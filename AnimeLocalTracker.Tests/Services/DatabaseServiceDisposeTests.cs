@@ -31,6 +31,7 @@ public class DatabaseServiceDisposeTests : IDisposable
         var sut = new DatabaseService(ruta);
         await sut.InicializarBaseDatosAsync();
         await sut.GuardarAnimeAsync(new AnimeItem { AniListId = 1, Titulo = "Frieren" });
+        await sut.ObtenerTodosLosAnimesAsync();   // también la conexión de lectura queda abierta hasta desechar
 
         sut.Dispose();
 
