@@ -9,7 +9,7 @@ namespace AnimeLocalTracker.Services;
 
 public partial class FileScannerService : IFileScannerService
 {
-    private static readonly HashSet<string> VideoExtensions = new(StringComparer.OrdinalIgnoreCase) { ".mkv", ".mp4", ".avi" };
+    private static readonly HashSet<string> VideoExtensions = new(StringComparer.OrdinalIgnoreCase) { ".mkv", ".mp4", ".avi", ".webm" };
 
     public async Task<List<EpisodioItem>> EscanearEpisodiosAsync(string carpeta)
     {
@@ -59,20 +59,17 @@ public partial class FileScannerService : IFileScannerService
         });
     }
 
+    /// <summary>
+    /// Número de episodio según el núcleo Rust (anitomy), o 0 si el nombre no lo dice. Es el único criterio: antes, lo que
+    /// Rust no resolvía pasaba al daemon Python (anitopy + regex), que sobre 182 nombres reales de fansub con el episodio
+    /// anotado no acertó ninguno de más y falló 26 (una película "Movie 9" pasaba a ser el episodio 9; un especial "06.5",
+    /// un segundo episodio 6). Un especial con decimales se queda sin número a propósito.
+    /// No se descartan 480/720/1080/2160: "1080p" ya lo reconoce anitomy como resolución, y un 1080 a secas es un episodio
+    /// ("Episodio 1080" de una serie larga).
+    /// </summary>
     public static int ExtraerNumeroEpisodio(string nombre)
     {
         var parsed = Native.NativeMethods.ParseFilename(nombre);
-        if (parsed != null && !string.IsNullOrWhiteSpace(parsed.EpisodeNumber))
-        {
-            if (int.TryParse(parsed.EpisodeNumber, out int ep))
-            {
-                if (ep is not 480 and not 720 and not 1080 and not 2160)
-                {
-                    return ep;
-                }
-            }
-        }
-
-        return 0;
+        return int.TryParse(parsed?.EpisodeNumber, out int ep) && ep > 0 ? ep : 0;
     }
 }

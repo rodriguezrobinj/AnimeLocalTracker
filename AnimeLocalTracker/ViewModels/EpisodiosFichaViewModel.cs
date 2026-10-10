@@ -8,7 +8,6 @@ using System.Threading.Tasks;
 using AnimeLocalTracker.Messages;
 using AnimeLocalTracker.Models;
 using AnimeLocalTracker.Services;
-using AnimeLocalTracker.Services.Native;
 using AnimeLocalTracker.Services.Python;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -34,7 +33,6 @@ public sealed partial class EpisodiosFichaViewModel : ObservableObject,
     private readonly IDialogService _dialogService;
     private readonly IDownloadService _downloadService;
     private readonly PythonEpisodeEnricher? _enricher;
-    private readonly IPluginService? _pluginService;
     private readonly IVideoIntegrityService? _videoIntegrityService;
     private readonly INyaaSourceService? _nyaaSourceService;
     private readonly ISelectorTorrentService? _selectorTorrentService;
@@ -58,7 +56,6 @@ public sealed partial class EpisodiosFichaViewModel : ObservableObject,
         IDialogService dialogService,
         IDownloadService downloadService,
         PythonEpisodeEnricher? enricher = null,
-        IPluginService? pluginService = null,
         IVideoIntegrityService? videoIntegrityService = null,
         INyaaSourceService? nyaaSourceService = null,
         ISelectorTorrentService? selectorTorrentService = null,
@@ -69,7 +66,6 @@ public sealed partial class EpisodiosFichaViewModel : ObservableObject,
         _dialogService = dialogService;
         _downloadService = downloadService;
         _enricher = enricher;
-        _pluginService = pluginService;
         _videoIntegrityService = videoIntegrityService;
         _nyaaSourceService = nyaaSourceService;
         _selectorTorrentService = selectorTorrentService;
@@ -468,19 +464,8 @@ public sealed partial class EpisodiosFichaViewModel : ObservableObject,
             if (string.IsNullOrWhiteSpace(episodio.RutaCompleta)) return;
 
             string thumbPath = PythonEpisodeEnricher.ObtenerRutaMiniaturaEsperada(episodio.RutaCompleta);
-            bool extraido;
-            if (_enricher != null)
-            {
-                // Rust primero, Python solo si hace falta, con reintento de
-                // timestamp si el frame cae en una cortinilla casi negra.
-                extraido = await _enricher.ExtraerMiniaturaAsync(episodio.RutaCompleta, thumbPath);
-            }
-            else
-            {
-                extraido = NativeMethods.IsAvailable
-                           && NativeMethods.ExtractFrame(episodio.RutaCompleta, thumbPath, 2.0, 320)
-                           && PythonEpisodeEnricher.EsMiniaturaValida(thumbPath);
-            }
+            // Con reintento de timestamp si el frame cae en una cortinilla casi negra.
+            bool extraido = await PythonEpisodeEnricher.ExtraerMiniaturaAsync(episodio.RutaCompleta, thumbPath);
             if (extraido)
             {
                 episodio.RutaMiniatura = thumbPath;
@@ -1012,36 +997,6 @@ public sealed partial class EpisodiosFichaViewModel : ObservableObject,
             false, "CheckCircleOutline", "#4CAF50");
     }
 
-
-    [RelayCommand]
-    private async Task AnalizarOpenings()
-    {
-        if (Anime == null || _pluginService == null) return;
-        var descargados = _todosLosEpisodios.Where(e => e.Descargado && File.Exists(e.RutaCompleta)).ToList();
-        if (descargados.Count < 2)
-        {
-            await _dialogService.MostrarDialogoAsync("Info", LocalizationService.T("Det_MinEpisodiosOPMsj"), false, "InformationOutline", "#60A5FA");
-            return;
-        }
-
-        await _dialogService.MostrarDialogoAsync(LocalizationService.T("Det_Analizando"), LocalizationService.T("Det_AnalizandoOpMsj"), false, "InformationOutline", "#60A5FA");
-        
-        var pluginRes = await _pluginService.EjecutarPluginAsync<object, AnimeLocalTracker.Services.SkipTimesCoordinator.AudioSkipResult>(
-            "audio_skip_plugin.py", 
-            "detect_opening", 
-            new { video_paths = descargados.Take(2).Select(e => e.RutaCompleta).ToArray() }
-        );
-        
-        if (pluginRes != null && pluginRes.Found)
-        {
-            await _dialogService.MostrarDialogoAsync(LocalizationService.T("Det_OpEncontradoTitulo"), string.Format(LocalizationService.T("Det_OpEncontradoMsj"), pluginRes.IntroEstimatedStart, pluginRes.IntroEstimatedEnd), false, "CheckCircle", "#10B981");
-        }
-        else
-        {
-            await _dialogService.MostrarDialogoAsync(LocalizationService.T("Det_OpNoEncontradoTitulo"), LocalizationService.T("Det_OpNoEncontradoMsj"), false, "CloseCircle", "#EF4444");
-        }
-    }
-    
     [RelayCommand]
     private async Task ReproducirEpisodio(EpisodioItem episodio)
     {

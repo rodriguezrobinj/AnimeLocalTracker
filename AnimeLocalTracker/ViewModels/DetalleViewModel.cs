@@ -147,7 +147,7 @@ public partial class DetalleViewModel : ObservableObject,
         _authService = authService;
         _dialogService = dialogService;
         Episodios = new EpisodiosFichaViewModel(databaseService, fileScannerService, dialogService, downloadService, enricher,
-            pluginService, videoIntegrityService, nyaaSourceService, selectorTorrentService, settingsService);
+            videoIntegrityService, nyaaSourceService, selectorTorrentService, settingsService);
         Seguimiento = new SeguimientoEditorViewModel(animeTrackingService, databaseService, authService, dialogService,
             () => Episodios.Todos.Count > 0 ? Episodios.Todos.Count : Episodios.EpisodiosDelAnime.Count);
         Musica = new MusicaFichaViewModel(dialogService, animeThemesService, animeThemesDownload, audioTrackPlayer, audioDuration,

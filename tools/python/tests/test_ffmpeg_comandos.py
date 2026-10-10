@@ -1,10 +1,4 @@
-"""Comandos de ffmpeg/ffprobe del motor Python.
-
-Regresión de un error que pasaba desapercibido porque los llamadores tragaban el fallo:
-  * ffprobe no admite ``-nostdin`` -> inspect-episode fallaba SIEMPRE (sin resolución/códec/fps/10-bit).
-
-Y cobertura de la huella perceptual (dHash), que extrae el fotograma con ffmpeg en lugar de OpenCV.
-"""
+"""Comandos de ffmpeg del motor Python: la huella perceptual (dHash), que extrae el fotograma con ffmpeg en lugar de OpenCV."""
 import os
 import shutil
 import subprocess
@@ -15,10 +9,8 @@ import pytest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from media import episode_fingerprint, episode_metadata
+from media import episode_fingerprint
 from media.episode_fingerprint import EpisodeFingerprint
-from media.episode_metadata import EpisodeMetadata
-from media.ffmpeg_guard import argumentos_ffprobe
 
 
 @pytest.fixture
@@ -41,56 +33,11 @@ def _captura(monkeypatch, modulo, stdout="", stderr="", codigo=0):
     return comandos
 
 
-# ───────────────────────── Unitarias (no necesitan ffmpeg) ─────────────────────────
-
-def test_argumentos_ffprobe_no_incluyen_nostdin():
-    args = argumentos_ffprobe()
-    assert "-nostdin" not in args, "ffprobe no admite -nostdin (solo ffmpeg)"
-    assert "-max_alloc" in args and "-v" in args
-
-
-def test_inspect_episode_no_pasa_nostdin_a_ffprobe(monkeypatch, video_falso):
-    comandos = _captura(monkeypatch, episode_metadata, stdout='{"streams": [], "format": {"duration": "10"}}')
-
-    resultado = EpisodeMetadata.inspect_episode(video_falso)
-
-    assert resultado["success"] is True
-    assert comandos[0][0] == "ffprobe"
-    assert "-nostdin" not in comandos[0]
-    assert "-max_alloc" in comandos[0]
-
-
 # ───────────────── Integración con ffmpeg/ffprobe reales (se omiten si no están en el PATH) ─────────────────
 
 ffmpeg_real = shutil.which("ffmpeg")
 ffprobe_real = shutil.which("ffprobe")
 requiere_ffmpeg = pytest.mark.skipif(not (ffmpeg_real and ffprobe_real), reason="ffmpeg/ffprobe no están en el PATH")
-
-
-@pytest.fixture(scope="module")
-def video_real(tmp_path_factory):
-    """Video sintético de 6 s con un corte de escena fuerte a los 3 s (negro -> blanco).
-
-    scdet mide cambio de LUMINOSIDAD: un corte rojo -> azul apenas puntúa (~16 de 100) y no supera el umbral.
-    """
-    ruta = str(tmp_path_factory.mktemp("videos") / "sintetico.mp4")
-    subprocess.run(
-        [ffmpeg_real, "-y", "-loglevel", "error",
-         "-f", "lavfi", "-i", "color=c=black:s=64x64:r=10:d=3",
-         "-f", "lavfi", "-i", "color=c=white:s=64x64:r=10:d=3",
-         "-filter_complex", "[0:v][1:v]concat=n=2:v=1:a=0", "-c:v", "mpeg4", ruta],
-        check=True, timeout=60)
-    return ruta
-
-
-@requiere_ffmpeg
-def test_integracion_inspect_episode_devuelve_metadatos(video_real):
-    resultado = EpisodeMetadata.inspect_episode(video_real)
-
-    assert resultado["success"] is True, resultado
-    assert (resultado["ancho"], resultado["alto"]) == (64, 64)
-    assert resultado["duracion_segundos"] == pytest.approx(6.0, abs=0.5)
-    assert resultado["codec_video"] == "mpeg4"
 
 
 # ───────────────────────── Huella perceptual (dHash con ffmpeg) ─────────────────────────

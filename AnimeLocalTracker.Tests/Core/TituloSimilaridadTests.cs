@@ -5,8 +5,8 @@ using Xunit;
 namespace AnimeLocalTracker.Tests.Core;
 
 /// <summary>
-/// Fallback hermético de coincidencia de títulos (el daemon rapidfuzz es la vía
-/// preferida; C# cubre cuando Python no está disponible).
+/// Coincidencia de títulos: por palabras (<c>Similitud</c>) y letra a letra (<c>SimilitudPorLetras</c>, el cálculo que antes
+/// hacía rapidfuzz en el daemon Python).
 /// </summary>
 public class TituloSimilaridadTests
 {
@@ -48,6 +48,36 @@ public class TituloSimilaridadTests
         TituloSimilaridad.Similitud("", "Anime").Should().Be(0);
         TituloSimilaridad.Similitud(null, "Anime").Should().Be(0);
         TituloSimilaridad.Similitud("Anime", null).Should().Be(0);
+    }
+
+    // Puntuaciones de fuzz.token_sort_ratio de rapidfuzz 3.14.5 (sobre los textos en minúsculas, como los mandaba la app al daemon
+    // Python): el cálculo en C# tiene que dar exactamente lo mismo para que ninguna página cambie de aceptada a rechazada.
+    [Theory]
+    [InlineData("Jujutsu Kaizen", "Jujutsu Kaisen", 0.9285714285714286)]
+    [InlineData("BLACK TORCH", "Black Torch", 1.0)]
+    [InlineData("Naruto Shippuuden", "Naruto: Shippuden", 0.9411764705882352)]
+    [InlineData("Kaisen Jujutsu", "Jujutsu Kaisen", 1.0)]
+    [InlineData("Re:Zero kara Hajimeru Isekai Seikatsu", "Re Zero kara Hajimeru Isekai Seikatsu", 0.8648648648648648)]
+    [InlineData("Mushoku Tensei II: Isekai Ittara Honki Dasu", "Mushoku Tensei III: Isekai Ittara Honki Dasu", 0.9885057471264368)]
+    [InlineData("Dragon Ball Z: Battle of Gods", "Dragon Ball Z Película 14: Battle of Gods", 0.8)]
+    [InlineData("Dragon Ball Z", "Dragon Ball Super", 0.8)]
+    [InlineData("Sousou no Frieren", "Frieren: Beyond Journey's End", 0.4782608695652174)]
+    [InlineData("ドラゴンボールZ 神と神", "ドラゴンボールZ　神と神", 1.0)]
+    [InlineData("Grand Blue", "One Piece", 0.21052631578947367)]
+    [InlineData("Kage no Jitsuryokusha ni Naritakute!", "Kage no Jitsuryokusha ni Naritakute! 2nd Season", 0.8674698795180723)]
+    [InlineData("a", "b", 0.0)]
+    public void SimilitudPorLetras_DaLaMismaPuntuacionQueRapidfuzz(string a, string b, double esperada)
+    {
+        TituloSimilaridad.SimilitudPorLetras(a, b).Should().BeApproximately(esperada, 1e-12);
+        TituloSimilaridad.SimilitudPorLetras(b, a).Should().BeApproximately(esperada, 1e-12);
+    }
+
+    [Fact]
+    public void SimilitudPorLetras_VacioONull_DeberiaSerCero()
+    {
+        TituloSimilaridad.SimilitudPorLetras("", "Anime").Should().Be(0);
+        TituloSimilaridad.SimilitudPorLetras("Anime", "   ").Should().Be(0);
+        TituloSimilaridad.SimilitudPorLetras(null, null).Should().Be(0);
     }
 
     [Fact]

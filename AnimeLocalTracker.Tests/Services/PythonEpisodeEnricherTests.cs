@@ -1,7 +1,11 @@
 using System;
 using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
+using AnimeLocalTracker.Models;
 using AnimeLocalTracker.Services.Python;
 using FluentAssertions;
+using Moq;
 using Xunit;
 
 namespace AnimeLocalTracker.Tests.Services;
@@ -83,6 +87,113 @@ public class PythonEpisodeEnricherTests : IDisposable
         string path = CrearArchivo(minusculo);
 
         PythonEpisodeEnricher.EsMiniaturaValida(path).Should().BeFalse();
+    }
+
+    /// <summary>Video sintético (fuente lavfi de ffmpeg) con el ffmpeg embebido.</summary>
+    private async Task<string> CrearVideoAsync(string fuente)
+    {
+        string video = Path.Combine(_tempDir, Guid.NewGuid().ToString("N") + ".mp4");
+        var resultado = await AnimeLocalTracker.Core.ProcesoExterno.EjecutarAsync(AnimeLocalTracker.Services.FfmpegLocator.Ffmpeg,
+            ["-y", "-loglevel", "error", "-f", "lavfi", "-i", fuente, "-c:v", "mpeg4", video],
+            TimeSpan.FromSeconds(60), CancellationToken.None);
+        resultado!.Codigo.Should().Be(0, resultado.Error);
+        return video;
+    }
+
+    [Fact]
+    public async Task ExtraerMiniatura_SacaUnJpegCompletoDelAnchoDeSiempre()
+    {
+        string video = await CrearVideoAsync("testsrc2=s=1280x720:r=10:d=4");
+        string miniatura = Path.Combine(_tempDir, "miniatura.jpg");
+
+        (await PythonEpisodeEnricher.ExtraerMiniaturaAsync(video, miniatura)).Should().BeTrue();
+
+        PythonEpisodeEnricher.EsMiniaturaValida(miniatura).Should().BeTrue();
+        PythonEpisodeEnricher.EsFrameDemasiadoVacio(miniatura).Should().BeFalse();
+        var medidas = await AnimeLocalTracker.Core.ProcesoExterno.EjecutarAsync(AnimeLocalTracker.Services.FfmpegLocator.Ffprobe,
+            ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=p=0", miniatura],
+            TimeSpan.FromSeconds(30), CancellationToken.None);
+        medidas!.Salida.Trim().Should().Be("512,288", "las miniaturas ya guardadas miden eso y deben seguir viéndose iguales");
+        Directory.GetFiles(_tempDir, "miniatura.jpg*").Should().ContainSingle("el archivo de trabajo no debe quedar junto a la miniatura");
+    }
+
+    [Fact]
+    public async Task ExtraerMiniatura_SiLosInstantesSiguientesNoDanFotograma_ConservaElQueYaSaco()
+    {
+        // Video negro de 4 s: el fotograma del segundo 2 sale (casi vacío: se busca uno mejor) y los de los segundos 10 y 30 caen
+        // más allá del final. Antes, cada intento fallido borraba el archivo: quedaba "generada" una miniatura que no existía.
+        string video = await CrearVideoAsync("color=c=black:s=640x360:r=10:d=4");
+        string miniatura = Path.Combine(_tempDir, "negra.jpg");
+
+        (await PythonEpisodeEnricher.ExtraerMiniaturaAsync(video, miniatura)).Should().BeTrue();
+
+        PythonEpisodeEnricher.EsMiniaturaValida(miniatura).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ExtraerMiniatura_SiElVideoNoExiste_NoCreaNada()
+    {
+        string miniatura = Path.Combine(_tempDir, "sin_video.jpg");
+
+        (await PythonEpisodeEnricher.ExtraerMiniaturaAsync(Path.Combine(_tempDir, "no_existe.mkv"), miniatura)).Should().BeFalse();
+
+        File.Exists(miniatura).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ExtraerMiniatura_SiElArchivoNoEsUnVideo_NoDejaUnaMiniaturaRota()
+    {
+        string falso = Path.Combine(_tempDir, "falso.mp4");
+        await File.WriteAllBytesAsync(falso, new byte[64]);
+        string miniatura = Path.Combine(_tempDir, "falsa.jpg");
+
+        (await PythonEpisodeEnricher.ExtraerMiniaturaAsync(falso, miniatura)).Should().BeFalse();
+
+        Directory.GetFiles(_tempDir, "falsa.jpg*").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void LeerDatosTecnicos_TomaResolucionCodecFpsYProfundidadDeLaPistaDeVideo()
+    {
+        string json = """{"streams":[{"codec_name":"hevc","width":1920,"height":1080,"pix_fmt":"yuv420p10le","r_frame_rate":"24000/1001"}]}""";
+
+        PythonEpisodeEnricher.LeerDatosTecnicos(json)
+            .Should().Be(new PythonEpisodeEnricher.DatosTecnicos("1920x1080", "hevc", "24000/1001", true));
+    }
+
+    [Theory]
+    [InlineData("""{"streams":[]}""")]
+    [InlineData("{}")]
+    [InlineData("")]
+    [InlineData("esto no es JSON")]
+    public void LeerDatosTecnicos_SinPistaDeVideoOSalidaIlegible_DevuelveNull(string salida)
+    {
+        PythonEpisodeEnricher.LeerDatosTecnicos(salida).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task EnriquecerEpisodio_LeeLosDatosConFfprobeSinPasarPorElDaemon()
+    {
+        string video = await CrearVideoAsync("color=c=black:s=64x64:r=10:d=1");
+        var episodio = new EpisodioItem { RutaCompleta = video };
+
+        // Puente estricto: cualquier llamada al daemon haría fallar la prueba.
+        await new PythonEpisodeEnricher(new Mock<IPythonBridgeService>(MockBehavior.Strict).Object).EnriquecerEpisodioAsync(episodio);
+
+        episodio.Resolucion.Should().Be("64x64");
+        episodio.CodecVideo.Should().Be("mpeg4");
+        episodio.Fps.Should().Be("10/1");
+        episodio.Es10Bit.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task EnriquecerEpisodio_SiElArchivoNoExiste_NoTocaElEpisodio()
+    {
+        var episodio = new EpisodioItem { RutaCompleta = Path.Combine(_tempDir, "no_existe.mkv") };
+
+        await new PythonEpisodeEnricher(new Mock<IPythonBridgeService>(MockBehavior.Strict).Object).EnriquecerEpisodioAsync(episodio);
+
+        episodio.Resolucion.Should().BeEmpty();
     }
 
     [Fact]

@@ -5,14 +5,13 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using AnimeLocalTracker.Models;
-using AnimeLocalTracker.Services.Native;
 using AnimeLocalTracker.Services.Python;
 
 namespace AnimeLocalTracker.Services;
 
 /// <summary>
 /// Extraído de DetalleViewModel: enriquecimiento en segundo plano de metadata técnica
-/// (ffprobe vía daemon Python) y miniaturas (Rust FFI, con fallback a Python) de los episodios
+/// (ffprobe) y miniaturas (ffmpeg) de los episodios
 /// locales de un anime, con persistencia por lotes en SQLite. Instancia por ViewModel (no
 /// registrado en DI): mantiene el gate/lote de la sesión de detalle actual, sin estado
 /// compartido entre distintos animes/vistas.
@@ -64,16 +63,11 @@ public sealed class EpisodeEnrichmentCoordinator : IDisposable
 
                 if (pendientes.Count == 0) return;
 
-                // Importante: NO esperar aquí el ping al daemon Python (si está frío puede
-                // tardar 2-8 s). La extracción Rust de miniaturas no depende de Python:
-                // se resuelve pythonDisponible de forma diferida, solo si se necesita.
-                bool pythonDisponible = false;
-
                 // ── FASE 1: Miniaturas. Cada episodio se extrae, persiste y se refleja en la
                 //    UI ANTES de pasar al siguiente: la primera miniatura aparece en ~1s y el
                 //    resto van apareciendo de forma secuencial apenas cada una termina (sin
                 //    esperar a que se generen todas). BUG-01/BUG-02/BUG-03: la extracción por
-                //    episodio (Rust primero, Python solo si hace falta, con reintento de
+                //    episodio (con reintento de
                 //    timestamp si el frame cae en una cortinilla casi negra) vive en
                 //    PythonEpisodeEnricher.ExtraerMiniaturaAsync — un episodio problemático
                 //    puntual ya no puede dejar sin miniatura a los demás del lote, ni quedar
@@ -85,18 +79,7 @@ public sealed class EpisodeEnrichmentCoordinator : IDisposable
                     // que ya no está en pantalla.
                     cancellationToken.ThrowIfCancellationRequested();
                     string outPath = PythonEpisodeEnricher.ObtenerRutaMiniaturaEsperada(ep.RutaCompleta);
-                    bool ok;
-                    if (enricher != null)
-                    {
-                        ok = await enricher.ExtraerMiniaturaAsync(ep.RutaCompleta, outPath).ConfigureAwait(false);
-                    }
-                    else
-                    {
-                        // Sin enricher (p. ej. en pruebas): solo Rust directo, sin reintento de timestamp.
-                        ok = NativeMethods.IsAvailable
-                             && NativeMethods.ExtractFrame(ep.RutaCompleta, outPath, 2.0, 320)
-                             && PythonEpisodeEnricher.EsMiniaturaValida(outPath);
-                    }
+                    bool ok = await PythonEpisodeEnricher.ExtraerMiniaturaAsync(ep.RutaCompleta, outPath, cancellationToken).ConfigureAwait(false);
 
                     if (ok)
                     {
@@ -106,28 +89,23 @@ public sealed class EpisodeEnrichmentCoordinator : IDisposable
                     }
                 }
 
-                // ── FASE 2: Metadata técnica (ffprobe vía daemon Python) en segundo plano diferido ──
+                // ── FASE 2: Metadata técnica (ffprobe) en segundo plano diferido ──
                 var sinMetadata = pendientes.Where(e => string.IsNullOrEmpty(e.Resolucion)).ToList();
-                if (sinMetadata.Count > 0)
+                if (enricher != null)
                 {
-                    if (!pythonDisponible)
-                        pythonDisponible = enricher != null && await enricher.EstáDisponibleAsync().ConfigureAwait(false);
-                    if (pythonDisponible)
+                    foreach (var ep in sinMetadata)
                     {
-                        foreach (var ep in sinMetadata)
+                        cancellationToken.ThrowIfCancellationRequested();
+                        await enricher.EnriquecerEpisodioAsync(ep, cancellationToken).ConfigureAwait(false);
+
+                        if (!string.IsNullOrEmpty(ep.Resolucion))
                         {
-                            cancellationToken.ThrowIfCancellationRequested();
-                            await enricher!.EnriquecerEpisodioAsync(ep).ConfigureAwait(false);
-
-                            if (!string.IsNullOrEmpty(ep.Resolucion))
-                            {
-                                await PersistirRegistrosAsync(databaseService, aniListId, new[] { ep }).ConfigureAwait(false);
-                                solicitarRefrescoEpisodios();
-                            }
-
-                            // Pausa de cortesía para no saturar CPU en segundo plano
-                            await Task.Delay(20, cancellationToken).ConfigureAwait(false);
+                            await PersistirRegistrosAsync(databaseService, aniListId, new[] { ep }).ConfigureAwait(false);
+                            solicitarRefrescoEpisodios();
                         }
+
+                        // Pausa de cortesía para no saturar CPU en segundo plano
+                        await Task.Delay(20, cancellationToken).ConfigureAwait(false);
                     }
                 }
 

@@ -368,15 +368,9 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
     /// <summary>
     /// Resuelve AniListId → MAL ID (para verificar que la página encontrada es el
     /// anime correcto y no otro con nombre parecido). Nullable: sin resolver, la
-    /// coincidencia queda en nombres (Python rapidfuzz o fallback C#).
+    /// coincidencia queda en nombres (<see cref="TituloSimilaridad"/> y <see cref="FirmaTitulo"/>).
     /// </summary>
     private readonly Func<int, CancellationToken, Task<int?>>? _malIdResolver;
-
-    /// <summary>
-    /// Similitud de nombres (0..1) vía daemon Python (rapidfuzz) sobre títulos +
-    /// aka del media. Null si el daemon no está disponible → fallback C#.
-    /// </summary>
-    private readonly Func<List<string>, List<string>, CancellationToken, Task<double?>>? _similitudNombres;
 
     /// <summary>
     /// Títulos adicionales desde AniList (romaji, english, native, userPreferred y
@@ -388,14 +382,12 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
     public AnimeAv1VideoSourceResolver(
         HttpClient httpClient,
         Func<int, CancellationToken, Task<int?>>? malIdResolver = null,
-        Func<List<string>, List<string>, CancellationToken, Task<double?>>? similitudNombres = null,
         Func<int, CancellationToken, Task<List<string>?>>? titulosDesdeAniList = null,
         IDatabaseService? database = null,
         Func<int, CancellationToken, Task<IReadOnlyList<PrecuelaAnime>>>? precuelas = null)
     {
         _httpClient = httpClient;
         _malIdResolver = malIdResolver;
-        _similitudNombres = similitudNombres;
         _titulosDesdeAniList = titulosDesdeAniList;
         _database = database;
         _precuelas = precuelas;
@@ -432,7 +424,7 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
     /// FLUJO RIGUROSO (media-first): por cada candidato se consulta la página del
     /// media (una petición, no spam de 404 de episodios), se verifica la identidad
     /// con veredicto en cascada — MAL ID exacto → acepta; MAL ID no comparable →
-    /// coincidencia de nombre (rapidfuzz en el daemon Python o fallback C#) contra
+    /// coincidencia de nombre (por letras y por palabras) contra
     /// título + aka — y se resuelve el número de episodio real del sitio.
     /// </summary>
     public async Task<List<AnimeAv1HtmlParser.EmbedServidor>> ObtenerEmbedsEpisodioAsync(
@@ -606,7 +598,7 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
                 }
             }
 
-            int? desfase = await VerificarMediaAsync(media, b.MalIdEsperado, b.Titulos, b.Precuelas, ct);
+            int? desfase = VerificarMedia(media, b.MalIdEsperado, b.Titulos, b.Precuelas);
             if (!desfase.HasValue) continue;
 
             int? objetivo = ResolverNumeroEpisodio(media, b.NumeroEpisodio + desfase.Value);
@@ -728,7 +720,7 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
             }
         }
         var precuelas = await ObtenerPrecuelasAsync(aniListId, ct);
-        if (await VerificarMediaAsync(media, conocido.MalId, titulos, [], ct) is null) return [];
+        if (VerificarMedia(media, conocido.MalId, titulos, []) is null) return [];
 
         // Si la página guardada es la de una parte anterior (el sitio junta las partes), el episodio va desplazado.
         int desfase = DesfasePorPrecuela(precuelas, conocido.MalId) ?? 0;
@@ -1068,11 +1060,11 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
     /// 2. MAL ID de una precuela directa → la página junta varias partes: acepta con desfase.
     /// 3. MAL ID distinto → rechaza.
     /// 4. Sin MAL ID comparable → NOMBRES: se rechaza si es la misma serie pero OTRA temporada/parte
-    ///    (rapidfuzz no distingue "Mushoku Tensei II" de "III": 98 %); si no, acepta con el mejor
-    ///    parecido entre rapidfuzz (daemon Python), el C# de siempre y el de nombres sin temporada.
+    ///    (el parecido por letras no distingue "Mushoku Tensei II" de "III": 98 %); si no, acepta con el mejor
+    ///    parecido entre el de letras, el de palabras y el de nombres sin temporada (los tres en C#, sin daemon).
     /// </summary>
-    private async Task<int?> VerificarMediaAsync(
-        InfoMedia media, int? malIdEsperado, List<string> titulosLista, IReadOnlyList<PrecuelaAnime> precuelas, CancellationToken ct)
+    private static int? VerificarMedia(
+        InfoMedia media, int? malIdEsperado, List<string> titulosLista, IReadOnlyList<PrecuelaAnime> precuelas)
     {
         if (malIdEsperado.HasValue && media.MalId == malIdEsperado) return 0;
 
@@ -1104,15 +1096,10 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
             return null;
         }
 
-        double? rapidfuzz = null;
-        if (_similitudNombres != null)
-        {
-            try { rapidfuzz = await _similitudNombres(titulosLista, nombresMedia, ct); }
-            catch (Exception ex) { AppLogger.Debug("AnimeAv1VideoSourceResolver", $"Fallo rapidfuzz para {media.Slug}: {ex.Message}"); }
-        }
-        double csharp = titulosLista.Max(t => TituloSimilaridad.MejorSimilitud(t, nombresMedia));
-        double mejor = new[] { rapidfuzz ?? 0, csharp, identidad.MismaTemporada }.Max();
-        string detalle = $"rapidfuzz {(rapidfuzz.HasValue ? rapidfuzz.Value.ToString("P0") : "n/d")}, C# {csharp:P0}, con temporada {identidad.MismaTemporada:P0}";
+        double porLetras = titulosLista.Max(t => nombresMedia.Max(n => TituloSimilaridad.SimilitudPorLetras(t, n)));
+        double porPalabras = titulosLista.Max(t => TituloSimilaridad.MejorSimilitud(t, nombresMedia));
+        double mejor = new[] { porLetras, porPalabras, identidad.MismaTemporada }.Max();
+        string detalle = $"por letras {porLetras:P0}, por palabras {porPalabras:P0}, con temporada {identidad.MismaTemporada:P0}";
 
         if (mejor < UmbralNombreMedia)
         {

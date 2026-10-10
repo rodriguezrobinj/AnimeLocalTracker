@@ -2,22 +2,20 @@
 # Se compilan juntas a requirements.txt (con hashes SHA-256) con:
 #   py -3.11 -m pip install pip-tools
 #   py -3.11 -m piptools compile --pre --allow-unsafe --generate-hashes --strip-extras -o requirements.txt pyproject.toml requirements.in
-#   (revisar después que ningún paquete salvo anitopy quede en versión rc/beta: grep -E "==.*(rc|a|b)[0-9]" requirements.txt)
+#   (revisar después que ningún paquete quede en versión rc/beta: grep -E "==.*(rc|a|b)[0-9]" requirements.txt)
+#   --pre se puso por anitopy (solo existía como pre-lanzamiento), retirado el 2026-10-08 con sus comandos de parseo: el
+#   lock se dejó igual quitando su bloque a mano. Al regenerarlo, probar sin --pre; los topes de abajo siguen valiendo con él.
 # El lock se instala con:  python -m pip install --require-hashes -r tools/python/requirements.txt
 #                          python -m pip install --no-deps -e tools/python
 
-# Solo existe como pre-lanzamiento (2.2.0rc2); pyproject pide >=2.1.2 y el resolvedor de pip-compile no admite
-# pre-lanzamientos salvo que se fijen explícitamente.
-anitopy==2.2.0rc2
-
 # Suplantación de huella TLS para yt-dlp (la usaba el script de release por su cuenta).
 # >=0.15 por PYSEC-2026-2431 (pip-audit en CI); yt-dlp 2026.8.19 soporta curl_cffi hasta 0.16.x. Se fija a la última
-# estable: con --pre (por anitopy) el resolvedor elegía un beta (0.16.4b1).
+# estable: con --pre el resolvedor elegía un beta (0.16.4b1).
 curl_cffi==0.16.3
 
 # Empaquetado del daemon (.exe).
 pyinstaller>=6.22,<7
 
-# El lock se compila con --pre (por anitopy): sin este tope el resolvedor eligió un BETA de pydantic (2.14.0b2).
+# El lock se compila con --pre: sin este tope el resolvedor eligió un BETA de pydantic (2.14.0b2).
 # Se fija a la versión estable con la que se probó el daemon.
 pydantic==2.13.4

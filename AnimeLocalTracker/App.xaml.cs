@@ -17,14 +17,6 @@ public partial class App : Application
     // Este es nuestro contenedor global de dependencias
     public static IServiceProvider ServiceProvider { get; private set; } = null!;
 
-    /// <summary>DTO del veredicto de nombres del daemon (match-media).</summary>
-    private sealed class MatchMediaResult
-    {
-        public bool Success { get; set; }
-        public double Score { get; set; }
-        public string? MatchedTitle { get; set; }
-    }
-
     public App()
     {
         // "Borrar todos mis datos": este proceso solo existe para borrar la carpeta de datos cuando la app que lo lanzó ya
@@ -274,6 +266,8 @@ public partial class App : Application
         // Orquestación de skip-times (resolución MAL ID + reglas de evaluación)
         // Audio oficial de los OP/ED (AnimeThemes) para ubicarlos dentro de los episodios sin pasos manuales, y su caché en disco
         services.AddSingleton<IReferenciasAudioService, ReferenciasAudioService>();
+        // El cálculo lo hace el núcleo Rust; ffmpeg y la caché de huellas, esta clase.
+        services.AddSingleton<IDetectorTemasAudio>(_ => new DetectorTemasAudio());
         services.AddSingleton<ISkipTimesCoordinator, SkipTimesCoordinator>();
         services.AddSingleton<IMediaEnrichmentService, MediaEnrichmentService>();
 
@@ -300,7 +294,7 @@ public partial class App : Application
         // 4. Integración del Ecosistema de Automatización Python (Zero-Setup & Clean Architecture)
         services.AddSingleton<IPythonBridgeService, PythonBridgeService>();
         services.AddSingleton<PythonEpisodeEnricher>();
-        services.AddTransient<IFileScannerService, PythonFileScannerService>();
+        services.AddTransient<IFileScannerService, FileScannerService>();
         // ── PROVEEDORES DE VIDEO (Fase A multi-fuente) ──
         // La app ya no depende de una sola fuente: cada proveedor es un
         // IProveedorVideo intercambiable y el orquestador los prueba por
@@ -312,7 +306,6 @@ public partial class App : Application
             // episodio es del anime correcto (nombres parecidos ya no descargan
             // episodios equivocados).
             var aniSkip = sp.GetRequiredService<IAniSkipService>();
-            var bridge = sp.GetRequiredService<IPythonBridgeService>();
             var tracking = sp.GetRequiredService<IAnimeTrackingService>();
             var db = sp.GetRequiredService<IDatabaseService>();
 
@@ -331,31 +324,6 @@ public partial class App : Application
                         AppLogger.Debug("App", $"No se pudo leer el MAL ID local de {id}: {ex.Message}");
                     }
                     return await aniSkip.ObtenerMalIdDesdeAniListAsync(id, ct);
-                },
-                // Veredicto de nombres con rapidfuzz (daemon Python) sobre título+aka. En minúsculas
-                // (rapidfuzz distingue mayúsculas: "BLACK TORCH" frente a "Black Torch" daba 27 %) y con
-                // umbral 0 para que devuelva SIEMPRE su puntuación: con umbral, un rechazo llegaba como
-                // "sin respuesta" y la app decidía con otro criterio más permisivo.
-                async (titles, candidates, ct) =>
-                {
-                    try
-                    {
-                        if (!await bridge.IsAvailableAsync()) return null;
-                        var r = await bridge.ExecuteCommandAsync<object, MatchMediaResult>(
-                            "match-media",
-                            new
-                            {
-                                titles = titles.Select(t => t.ToLowerInvariant()).ToList(),
-                                candidates = candidates.Select(c => c.ToLowerInvariant()).ToList(),
-                                threshold = 0.0
-                            },
-                            ct);
-                        return r?.Success == true ? r.Score / 100.0 : null;
-                    }
-                    catch
-                    {
-                        return null;
-                    }
                 },
                 // Títulos adicionales desde AniList: native japonés, synonyms, etc.
                 // — la búsqueda no depende de lo que la biblioteca local guarde

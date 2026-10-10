@@ -1,10 +1,10 @@
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using AnimeLocalTracker.Models;
 using AnimeLocalTracker.Services;
-using AnimeLocalTracker.Services.Python;
 using FluentAssertions;
 using Moq;
 using Xunit;
@@ -19,7 +19,7 @@ namespace AnimeLocalTracker.Tests.Services;
 public class SkipTimesCoordinatorTests : System.IDisposable
 {
     private readonly Mock<IAniSkipService> _aniSkipMock = new();
-    private readonly Mock<IPythonBridgeService> _pythonBridgeMock = new();
+    private readonly Mock<IDetectorTemasAudio> _detectorMock = new();
     private readonly Mock<IAnimeThemesDownloadService> _themesDownloadMock = new();
     private readonly string _carpetaEpisodioVacia;
 
@@ -31,7 +31,7 @@ public class SkipTimesCoordinatorTests : System.IDisposable
 
     public SkipTimesCoordinatorTests()
     {
-        _pythonBridgeMock.Setup(p => p.IsAvailableAsync()).ReturnsAsync(true);
+        _detectorMock.SetupGet(d => d.Disponible).Returns(true);
 
         // Carpeta real pero vacía: así el plugin de comparación entre 2 episodios (que busca
         // "otro video" en el mismo directorio) no encuentra ninguno y no interfiere en las
@@ -41,7 +41,12 @@ public class SkipTimesCoordinatorTests : System.IDisposable
     }
 
     private SkipTimesCoordinator CrearSut() =>
-        new(_aniSkipMock.Object, _pythonBridgeMock.Object, _themesDownloadMock.Object);
+        new(_aniSkipMock.Object, _detectorMock.Object, _themesDownloadMock.Object);
+
+    private void ElDetectorEncuentra(params SkipTimesCoordinator.TemaDetectado[] tramos) =>
+        _detectorMock.Setup(d => d.DetectarAsync(It.IsAny<string>(), It.IsAny<IReadOnlyList<ReferenciaAudio>>(), It.IsAny<double>(), It.IsAny<double>(),
+                It.IsAny<double>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new SkipTimesCoordinator.DeteccionTemasResult { Success = true, Matches = tramos.ToList() });
 
     private string RutaEpisodioFicticia() => Path.Combine(_carpetaEpisodioVacia, "Episodio 05.mkv");
 
@@ -51,19 +56,7 @@ public class SkipTimesCoordinatorTests : System.IDisposable
         var opLocal = new TemaLocalDisponible("OP", "OP1", 1, "1-16", @"C:\Music\1\OP_OP1_v1_ep1-16.mp3");
         _themesDownloadMock.Setup(t => t.ListarDescargasLocales(101)).Returns(new List<TemaLocalDisponible> { opLocal });
 
-        var respuesta = new PluginDaemonResponse<SkipTimesCoordinator.DeteccionTemasResult>
-        {
-            Success = true,
-            Result = new SkipTimesCoordinator.DeteccionTemasResult
-            {
-                Success = true,
-                Matches = [new SkipTimesCoordinator.TemaDetectado { Segment = "op", Start = 90.0, End = 180.0, Confidence = 0.8 }]
-            }
-        };
-        _pythonBridgeMock
-            .Setup(p => p.ExecuteCommandAsync<It.IsAnyType, PluginDaemonResponse<SkipTimesCoordinator.DeteccionTemasResult>>(
-                "run-plugin", It.IsAny<It.IsAnyType>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(respuesta);
+        ElDetectorEncuentra(new SkipTimesCoordinator.TemaDetectado { Segment = "op", Start = 90.0, End = 180.0, Confidence = 0.8 });
 
         var sut = CrearSut();
 
@@ -85,23 +78,7 @@ public class SkipTimesCoordinatorTests : System.IDisposable
         var edLocal = new TemaLocalDisponible("ED", "ED1", 1, null, @"C:\Music\1\ED_ED1_v1_eptodos.mp3");
         _themesDownloadMock.Setup(t => t.ListarDescargasLocales(101)).Returns(new List<TemaLocalDisponible> { opLocal, edLocal });
 
-        var respuesta = new PluginDaemonResponse<SkipTimesCoordinator.DeteccionTemasResult>
-        {
-            Success = true,
-            Result = new SkipTimesCoordinator.DeteccionTemasResult
-            {
-                Success = true,
-                Matches =
-                [
-                    new SkipTimesCoordinator.TemaDetectado { Segment = "op", Start = 10, End = 100, Confidence = 0.9 },
-                    new SkipTimesCoordinator.TemaDetectado { Segment = "ed", Start = 1300, End = 1390, Confidence = 0.9 }
-                ]
-            }
-        };
-        _pythonBridgeMock
-            .Setup(p => p.ExecuteCommandAsync<It.IsAnyType, PluginDaemonResponse<SkipTimesCoordinator.DeteccionTemasResult>>(
-                "run-plugin", It.IsAny<It.IsAnyType>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(respuesta);
+        ElDetectorEncuentra(new SkipTimesCoordinator.TemaDetectado { Segment = "op", Start = 10, End = 100, Confidence = 0.9 }, new SkipTimesCoordinator.TemaDetectado { Segment = "ed", Start = 1300, End = 1390, Confidence = 0.9 });
 
         var sut = CrearSut();
 
@@ -121,6 +98,7 @@ public class SkipTimesCoordinatorTests : System.IDisposable
 
         _aniSkipMock.Setup(a => a.ObtenerMalIdDesdeAniListAsync(101, It.IsAny<CancellationToken>())).ReturnsAsync((int?)null);
 
+        ElDetectorEncuentra();
         var sut = CrearSut();
 
         var resultado = await sut.CargarSkipTimesAsync(101, 20, 1400, RutaEpisodioFicticia());
@@ -128,10 +106,8 @@ public class SkipTimesCoordinatorTests : System.IDisposable
         resultado.Should().BeEmpty();
         // OP1 no cubre el episodio 20 por rango, pero se manda igualmente (con prioridad baja) como último intento (la numeración de los
         // archivos no siempre coincide con la de AnimeThemes); al no acertar, se cae a AniSkip.
-        _pythonBridgeMock.Verify(
-            p => p.ExecuteCommandAsync<It.IsAnyType, PluginDaemonResponse<SkipTimesCoordinator.DeteccionTemasResult>>(
-                It.IsAny<string>(), It.IsAny<It.IsAnyType>(), It.IsAny<CancellationToken>()),
-            Times.Once);
+        _detectorMock.Verify(d => d.DetectarAsync(It.IsAny<string>(), It.IsAny<IReadOnlyList<ReferenciaAudio>>(), It.IsAny<double>(), It.IsAny<double>(),
+            It.IsAny<double>(), It.IsAny<CancellationToken>()), Times.Once);
         _aniSkipMock.Verify(a => a.ObtenerMalIdDesdeAniListAsync(101, It.IsAny<CancellationToken>()), Times.Once);
     }
 

@@ -25,22 +25,29 @@ public static partial class NativeMethods
     [LibraryImport(DllName, EntryPoint = "compute_file_fingerprint")]
     private static partial IntPtr NativeComputeFingerprint(IntPtr videoPath);
 
-    [LibraryImport(DllName, EntryPoint = "anitomy_extract_frame")]
-    [return: MarshalAs(UnmanagedType.I1)]
-    private static partial bool NativeExtractFrame(IntPtr videoPath, IntPtr outPath, double timestamp, int width);
-
     [LibraryImport(DllName, EntryPoint = "anitomy_free_string")]
     private static partial void NativeAnitomyFreeString(IntPtr ptr);
 
     [LibraryImport(DllName, EntryPoint = "anitomy_version")]
     private static partial IntPtr NativeAnitomyVersion();
 
+    public const int FotogramasPorSegundo = 10;
+    /// <summary>Muestras de audio (mono, 8 kHz) por fotograma de huella.</summary>
+    public const int MuestrasPorFotograma = 800;
+    /// <summary>Valores por fotograma de huella: volumen + 7 bandas.</summary>
+    public const int ColumnasHuella = 8;
+
+    [LibraryImport(DllName, EntryPoint = "audio_huella")]
+    private static unsafe partial int NativeAudioHuella(float* pcm, nuint muestras, float* salida, nuint capacidad);
+
+    [LibraryImport(DllName, EntryPoint = "audio_mejor_coincidencia")]
+    private static unsafe partial int NativeAudioMejorCoincidencia(float* ventana, nuint fotogramasVentana, double inicioVentana,
+        float* temas, nuint* largos, nuint nTemas, double excluirInicio, double excluirFin, CoincidenciaAudio* salida);
+
     private static bool VerificarDisponibilidad()
     {
         try
         {
-            AsegurarFfmpegEnPath();
-
             if (NativeLibrary.TryLoad(DllName, typeof(NativeMethods).Assembly, null, out var handle))
             {
                 NativeLibrary.Free(handle);
@@ -61,42 +68,6 @@ public static partial class NativeMethods
         }
 
         return false;
-    }
-
-    /// <summary>
-    /// Asegura que ffmpeg.exe/ffprobe.exe embebidos (carpeta FFmpeg/ del output de la app)
-    /// estén en el PATH del proceso para que los procesos hijo los encuentren por nombre:
-    /// el núcleo Rust (spritesheet.rs) y el daemon Python (ffprobe/ffmpeg) los invocan
-    /// vía `Command::new("ffmpeg")`/subprocess, que solo buscan en PATH.
-    /// Sin esto, miniaturas, sprite sheets y enriquecimiento fallan en silencio
-    /// en máquinas donde el usuario no tiene FFmpeg instalado.
-    /// </summary>
-    public static void AsegurarFfmpegEnPath()
-    {
-        try
-        {
-            string baseDir = AppDomain.CurrentDomain.BaseDirectory;
-            string ffmpegDir = Path.Combine(baseDir, "FFmpeg");
-            if (!File.Exists(Path.Combine(ffmpegDir, "ffmpeg.exe")))
-            {
-                // SEC-07: visibilidad — si el ffmpeg embebido falta, el núcleo Rust y el
-                // daemon Python caerían a un "ffmpeg" del PATH del sistema sin avisar.
-                AppLogger.Warn("NativeMethods", "ffmpeg embebido no encontrado en FFmpeg/: miniaturas y daemon dependerán del ffmpeg del PATH del sistema (SEC-07).");
-                return;
-            }
-
-            string? current = Environment.GetEnvironmentVariable("PATH");
-            var partes = (current ?? string.Empty)
-                .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries);
-            if (partes.Contains(ffmpegDir, StringComparer.OrdinalIgnoreCase)) return;
-
-            Environment.SetEnvironmentVariable("PATH", ffmpegDir + Path.PathSeparator + current);
-            AppLogger.Info("NativeMethods", $"ffmpeg embebido agregado al PATH: {ffmpegDir}");
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Debug("NativeMethods", $"No se pudo agregar ffmpeg embebido al PATH: {ex.Message}");
-        }
     }
 
     public static string? ObtenerVersion()
@@ -194,27 +165,81 @@ public static partial class NativeMethods
         }
     }
 
-    public static bool ExtractFrame(string videoPath, string outPath, double timestamp, int width = 240)
+    /// <summary>
+    /// Huella de audio mono a 8 kHz (fotogramas × <see cref="ColumnasHuella"/>, por filas). Vacía si hay menos de un fotograma.
+    /// Null si el núcleo nativo no está o falla: quien llama lo trata como "el motor no respondió".
+    /// </summary>
+    public static unsafe float[]? HuellaDeAudio(ReadOnlySpan<float> pcm)
     {
-        if (!IsAvailable || string.IsNullOrWhiteSpace(videoPath) || string.IsNullOrWhiteSpace(outPath)) return false;
+        if (!IsAvailable) return null;
 
-        IntPtr videoPtr = IntPtr.Zero;
-        IntPtr outPtr = IntPtr.Zero;
+        int fotogramas = pcm.Length / MuestrasPorFotograma;
+        var salida = new float[fotogramas * ColumnasHuella];
+        if (fotogramas == 0) return salida;
+
         try
         {
-            videoPtr = StringToUtf8Ptr(videoPath);
-            outPtr = StringToUtf8Ptr(outPath);
-            return NativeExtractFrame(videoPtr, outPtr, timestamp, width);
+            fixed (float* entrada = pcm)
+            fixed (float* destino = salida)
+            {
+                return NativeAudioHuella(entrada, (nuint)pcm.Length, destino, (nuint)fotogramas) == fotogramas ? salida : null;
+            }
         }
         catch (Exception ex)
         {
-            AppLogger.Debug("NativeMethods", $"Error en anitomy_extract_frame nativo: {ex.Message}");
-            return false;
+            AppLogger.Debug("NativeMethods", $"Error en audio_huella nativo: {ex.Message}");
+            return null;
         }
-        finally
+    }
+
+    /// <summary>
+    /// El tema que mejor suena en un tramo del episodio. <paramref name="mejor"/> es null si ninguno se puede ubicar (o todos caen
+    /// en el tramo excluido); se devuelve aunque su confianza sea baja. False si el núcleo nativo no está o falla.
+    /// </summary>
+    public static unsafe bool MejorCoincidencia(float[] ventana, double inicioVentana, IReadOnlyList<float[]> temas,
+        (double Inicio, double Fin)? excluir, out CoincidenciaAudio? mejor)
+    {
+        mejor = null;
+        if (!IsAvailable) return false;
+        if (temas.Count == 0 || ventana.Length < ColumnasHuella) return true;
+
+        try
         {
-            if (videoPtr != IntPtr.Zero) Marshal.FreeHGlobal(videoPtr);
-            if (outPtr != IntPtr.Zero) Marshal.FreeHGlobal(outPtr);
+            var largos = new nuint[temas.Count];
+            int total = 0;
+            for (int i = 0; i < temas.Count; i++)
+            {
+                largos[i] = (nuint)(temas[i].Length / ColumnasHuella);
+                total += (int)largos[i] * ColumnasHuella;
+            }
+            if (total == 0) return true;
+
+            var juntos = new float[total];
+            int posicion = 0;
+            for (int i = 0; i < temas.Count; i++)
+            {
+                int valores = (int)largos[i] * ColumnasHuella;
+                temas[i].AsSpan(0, valores).CopyTo(juntos.AsSpan(posicion));
+                posicion += valores;
+            }
+
+            CoincidenciaAudio resultado = default;
+            int codigo;
+            fixed (float* v = ventana)
+            fixed (float* t = juntos)
+            fixed (nuint* l = largos)
+            {
+                codigo = NativeAudioMejorCoincidencia(v, (nuint)(ventana.Length / ColumnasHuella), inicioVentana, t, l, (nuint)temas.Count,
+                    excluir?.Inicio ?? double.NaN, excluir?.Fin ?? double.NaN, &resultado);
+            }
+            if (codigo < 0) return false;
+            if (codigo == 1) mejor = resultado;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("NativeMethods", $"Error en audio_mejor_coincidencia nativo: {ex.Message}");
+            return false;
         }
     }
 
@@ -241,21 +266,6 @@ public static partial class NativeMethods
             NativeAnitomyFreeString(ptr);
         }
     }
-}
-
-public class NativeFrameRequest
-{
-    [JsonPropertyName("video_path")]
-    public string VideoPath { get; set; } = string.Empty;
-
-    [JsonPropertyName("out_path")]
-    public string OutPath { get; set; } = string.Empty;
-
-    [JsonPropertyName("timestamp")]
-    public double Timestamp { get; set; } = 30.0;
-
-    [JsonPropertyName("width")]
-    public uint Width { get; set; } = 320;
 }
 
 public class ParsedAnimeInfo
@@ -310,4 +320,17 @@ public class FingerprintResult
 
     [JsonPropertyName("error")]
     public string? Error { get; set; }
+}
+
+/// <summary>Dónde suena un tema dentro del episodio. Mismos campos y orden que <c>CoincidenciaAudio</c> en audio.rs.</summary>
+[StructLayout(LayoutKind.Sequential)]
+public struct CoincidenciaAudio
+{
+    /// <summary>Posición del tema ganador en la lista enviada.</summary>
+    public int Indice;
+    /// <summary>1 si el episodio usa solo una parte del tema.</summary>
+    public int Parcial;
+    public double Inicio;
+    public double Fin;
+    public double Confianza;
 }

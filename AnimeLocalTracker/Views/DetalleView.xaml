@@ -825,19 +825,6 @@
                                        HorizontalOffset="-236" VerticalOffset="6" StaysOpen="False" AllowsTransparency="True" PopupAnimation="Fade">
                                     <Border Style="{StaticResource DetMenuCard}">
                                         <StackPanel>
-                                    <Button Command="{Binding Episodios.AnalizarOpeningsCommand}" Style="{StaticResource DetMenuItem}">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-                                            <materialDesign:PackIcon Grid.Column="0" Kind="Magnify" Width="20" Height="20" Foreground="{StaticResource Brush.Accent}" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                <TextBlock Text="{loc:T Det_DetectarOp}" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource Brush.TextPrimary}"/>
-                                                <TextBlock Text="{loc:T Det_DetectarOpTip}" FontSize="11" Foreground="{StaticResource Brush.TextTertiary}" TextWrapping="Wrap" Margin="0,2,0,0"/>
-                                            </StackPanel>
-                                        </Grid>
-                                    </Button>
                                     <Button Command="{Binding Episodios.VerificarIntegridadCommand}" Style="{StaticResource DetMenuItem}"
                                             IsEnabled="{Binding Episodios.VerificandoIntegridad, Converter={StaticResource InverseBool}}">
                                         <Grid>

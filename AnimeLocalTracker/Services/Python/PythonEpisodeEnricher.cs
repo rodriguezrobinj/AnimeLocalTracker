@@ -1,7 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using AniSkipModels = AnimeLocalTracker.Models;
@@ -9,8 +13,8 @@ using AniSkipModels = AnimeLocalTracker.Models;
 namespace AnimeLocalTracker.Services.Python;
 
 /// <summary>
-/// Enriquece episodios locales con metadata técnica (ffprobe), miniaturas (ffmpeg)
-/// y análisis de duplicados (perceptual hash) — todo vía el bridge Python (daemon persistente).
+/// Enriquece episodios locales con metadata técnica (ffprobe) y miniaturas (ffmpeg), lanzados directamente,
+/// y análisis de duplicados (perceptual hash), este con el bridge Python (daemon persistente) de respaldo.
 /// </summary>
 public class PythonEpisodeEnricher
 {
@@ -21,38 +25,59 @@ public class PythonEpisodeEnricher
         _pythonBridge = pythonBridge;
     }
 
-    public async Task<bool> EstáDisponibleAsync()
-    {
-        try { return await _pythonBridge.IsAvailableAsync(); }
-        catch { return false; }
-    }
+    private static readonly TimeSpan TiempoMaximoFfprobe = TimeSpan.FromSeconds(30);
 
     /// <summary>
-    /// Obtiene metadata técnica de un video (ffprobe) y la aplica al EpisodioItem.
+    /// Obtiene metadata técnica de un video y la aplica al EpisodioItem. Llama a ffprobe directamente (sin el daemon Python):
+    /// así no espera detrás de un análisis de opening ni depende de que el daemon haya arrancado.
     /// </summary>
     public async Task EnriquecerEpisodioAsync(AniSkipModels.EpisodioItem episodio, CancellationToken ct = default)
     {
-        if (episodio == null || string.IsNullOrWhiteSpace(episodio.RutaCompleta)) return;
+        // File.Exists descarta también las URLs: ffprobe las abriría.
+        if (episodio == null || string.IsNullOrWhiteSpace(episodio.RutaCompleta) || !File.Exists(episodio.RutaCompleta)) return;
 
         try
         {
-            var result = await _pythonBridge.ExecuteCommandAsync<object, EpisodeInfoResult>(
-                "inspect-episode",
-                new { video_path = episodio.RutaCompleta },
-                ct);
+            // -protocol_whitelist file: un archivo que en realidad sea una lista (HLS, concat) no puede hacer que ffprobe salga a
+            // la red. -max_alloc: tope de 2 GB por reserva de memoria ante una cabecera malformada.
+            string[] argumentos =
+            [
+                "-protocol_whitelist", "file", "-max_alloc", "2147483648", "-v", "error", "-select_streams", "v:0",
+                "-show_entries", "stream=codec_name,width,height,pix_fmt,r_frame_rate", "-of", "json", episodio.RutaCompleta
+            ];
+            var resultado = await Core.ProcesoExterno.EjecutarAsync(FfmpegLocator.Ffprobe, argumentos, TiempoMaximoFfprobe, ct);
+            if (resultado is not { Codigo: 0 } || LeerDatosTecnicos(resultado.Salida) is not { } datos) return;
 
-            if (result != null && result.Success)
-            {
-                episodio.Resolucion = result.Ancho > 0 && result.Alto > 0
-                    ? $"{result.Ancho}x{result.Alto}" : string.Empty;
-                episodio.CodecVideo = result.CodecVideo ?? string.Empty;
-                episodio.Fps = result.Fps ?? string.Empty;
-                episodio.Es10Bit = result.Es10Bit;
-            }
+            episodio.Resolucion = datos.Resolucion;
+            episodio.CodecVideo = datos.CodecVideo;
+            episodio.Fps = datos.Fps;
+            episodio.Es10Bit = datos.Es10Bit;
         }
         catch (Exception ex)
         {
             AppLogger.Debug("PythonEpisodeEnricher", $"Error inspeccionando {episodio.TituloArchivo}: {ex.Message}");
+        }
+    }
+
+    internal sealed record DatosTecnicos(string Resolucion, string CodecVideo, string Fps, bool Es10Bit);
+
+    /// <summary>Salida JSON de ffprobe → datos de la primera pista de video. Null si no hay pista de video o no se entiende.</summary>
+    internal static DatosTecnicos? LeerDatosTecnicos(string salidaFfprobe)
+    {
+        try
+        {
+            var video = JsonSerializer.Deserialize<SalidaFfprobe>(salidaFfprobe)?.Streams?.FirstOrDefault();
+            if (video == null) return null;
+
+            return new DatosTecnicos(
+                video.Width > 0 && video.Height > 0 ? $"{video.Width}x{video.Height}" : string.Empty,
+                video.CodecName ?? string.Empty,
+                video.RFrameRate ?? string.Empty,
+                video.PixFmt?.Contains("10") == true);
+        }
+        catch (JsonException)
+        {
+            return null;
         }
     }
 
@@ -139,52 +164,42 @@ public class PythonEpisodeEnricher
         return path;
     }
 
+    private static readonly TimeSpan TiempoMaximoFfmpeg = TimeSpan.FromSeconds(60);
+
+    /// <summary>Ancho de las miniaturas. 512 y no 320: es el que ya tienen las guardadas (el núcleo Rust, que las hacía antes,
+    /// redondeaba el 320 pedido a la potencia de 2 siguiente) y con el que se midió <see cref="TamanoMinimoContenidoReal"/>.</summary>
+    private const int AnchoMiniatura = 512;
+
     /// <summary>
     /// Extrae la miniatura del episodio probando varios timestamps si el primero cae en
-    /// un frame casi negro/vacío (ver <see cref="TimestampsCandidatos"/>), usando Rust FFI
-    /// como primera opción y el bridge Python como respaldo en cada timestamp. Se queda con
+    /// un frame casi negro/vacío (ver <see cref="TimestampsCandidatos"/>). Se queda con
     /// el primer frame que ya no parezca vacío; si ninguno lo logra, conserva el último
     /// intento válido (mejor una miniatura "pobre" que ninguna). Devuelve true si quedó
     /// alguna miniatura utilizable en <paramref name="outPath"/>.
+    /// Es el único camino para sacar un fotograma: ffmpeg lanzado desde aquí (antes, Rust lanzaba ffmpeg y, si fallaba,
+    /// el daemon Python volvía a lanzarlo).
     /// </summary>
-    public async Task<bool> ExtraerMiniaturaAsync(string rutaVideo, string outPath, CancellationToken ct = default)
+    public static async Task<bool> ExtraerMiniaturaAsync(string rutaVideo, string outPath, CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(rutaVideo) || string.IsNullOrWhiteSpace(outPath)) return false;
+        // File.Exists descarta también las URLs: ffmpeg las abriría.
+        if (string.IsNullOrWhiteSpace(rutaVideo) || string.IsNullOrWhiteSpace(outPath) || !File.Exists(rutaVideo)) return false;
 
         try
         {
             // Ya hay una miniatura válida y con contenido real: nada que hacer.
             if (EsMiniaturaValida(outPath) && !EsFrameDemasiadoVacio(outPath)) return true;
 
-            Directory.CreateDirectory(CarpetaMiniaturas);
+            Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
 
             bool huboExito = false;
             foreach (var timestamp in TimestampsCandidatos)
             {
-                bool extraido = Native.NativeMethods.IsAvailable
-                    && Native.NativeMethods.ExtractFrame(rutaVideo, outPath, timestamp, 320);
+                if (!await ExtraerFotogramaAsync(rutaVideo, outPath, timestamp, ct)) continue;
 
-                // BUG-02: si Rust falló o dejó un JPEG truncado a medias, intentar el
-                // bridge Python para ESTE mismo timestamp antes de pasar al siguiente.
-                if (!extraido || !EsMiniaturaValida(outPath))
-                {
-                    if (File.Exists(outPath)) { try { File.Delete(outPath); } catch { } }
-
-                    var result = await _pythonBridge.ExecuteCommandAsync<object, ThumbResult>(
-                        "generate-thumbnail",
-                        new { video_path = rutaVideo, output_path = outPath, timestamp = (int)timestamp },
-                        ct);
-
-                    extraido = result != null && result.Success && EsMiniaturaValida(outPath);
-                }
-
-                if (extraido)
-                {
-                    huboExito = true;
-                    if (!EsFrameDemasiadoVacio(outPath)) return true;
-                    // Frame válido pero casi vacío: se conserva por si es el mejor que
-                    // consigamos, y se prueba el siguiente timestamp por si hay algo mejor.
-                }
+                huboExito = true;
+                if (!EsFrameDemasiadoVacio(outPath)) return true;
+                // Frame válido pero casi vacío: se conserva por si es el mejor que
+                // consigamos, y se prueba el siguiente timestamp por si hay algo mejor.
             }
 
             if (!huboExito) LimpiarMiniaturaCorrupta(rutaVideo);
@@ -198,16 +213,33 @@ public class PythonEpisodeEnricher
     }
 
     /// <summary>
-    /// Genera la miniatura del episodio si no existe (caché en LocalAppData/Thumbnails).
+    /// Un fotograma del video a <paramref name="outPath"/>. ffmpeg escribe en un archivo aparte que solo sustituye al destino
+    /// si salió un JPEG completo: un intento fallido (instante más allá del final, proceso cortado) no deja una miniatura a
+    /// medias (BUG-02) ni se lleva por delante la que ya había de un instante anterior.
     /// </summary>
-    public async Task GenerarMiniaturaAsync(AniSkipModels.EpisodioItem episodio, CancellationToken ct = default)
+    private static async Task<bool> ExtraerFotogramaAsync(string rutaVideo, string outPath, double segundo, CancellationToken ct)
     {
-        if (episodio == null || string.IsNullOrWhiteSpace(episodio.RutaCompleta)) return;
-
-        string thumbPath = ObtenerRutaMiniaturaEsperada(episodio.RutaCompleta);
-        if (await ExtraerMiniaturaAsync(episodio.RutaCompleta, thumbPath, ct))
+        string temporal = $"{outPath}.{Guid.NewGuid():N}.jpg";
+        try
         {
-            episodio.RutaMiniatura = thumbPath;
+            // -protocol_whitelist file: un archivo que en realidad sea una lista (HLS, concat) no puede hacer que ffmpeg salga a
+            // la red. -max_alloc: tope de 2 GB por reserva de memoria ante una cabecera malformada.
+            string[] argumentos =
+            [
+                "-y", "-nostdin", "-loglevel", "error", "-max_alloc", "2147483648", "-protocol_whitelist", "file",
+                "-ss", segundo.ToString("0.##", CultureInfo.InvariantCulture), "-i", rutaVideo,
+                "-an", "-sn", "-dn", "-frames:v", "1", "-vf", $"scale={AnchoMiniatura}:-2", "-q:v", "3", temporal
+            ];
+            var resultado = await Core.ProcesoExterno.EjecutarAsync(FfmpegLocator.Ffmpeg, argumentos, TiempoMaximoFfmpeg, ct,
+                ProcessPriorityClass.BelowNormal);
+            if (resultado is not { Codigo: 0 } || !EsMiniaturaValida(temporal)) return false;
+
+            File.Move(temporal, outPath, overwrite: true);
+            return true;
+        }
+        finally
+        {
+            try { File.Delete(temporal); } catch { /* best-effort */ }
         }
     }
 
@@ -307,23 +339,22 @@ public class PythonEpisodeEnricher
         }
     }
 
-    // ── Modelos de respuesta JSON (snake_case del CLI) ──
-    private class EpisodeInfoResult
+    // ── Salida de ffprobe (-of json) ──
+    private sealed class SalidaFfprobe
     {
-        public bool Success { get; set; }
-        public double DuracionSegundos { get; set; }
-        public int Ancho { get; set; }
-        public int Alto { get; set; }
-        public string? CodecVideo { get; set; }
-        public string? Fps { get; set; }
-        public bool Es10Bit { get; set; }
+        [JsonPropertyName("streams")] public List<PistaFfprobe>? Streams { get; set; }
     }
 
-    private class ThumbResult
+    private sealed class PistaFfprobe
     {
-        public bool Success { get; set; }
-        public string? Output { get; set; }
+        [JsonPropertyName("codec_name")] public string? CodecName { get; set; }
+        [JsonPropertyName("width")] public int Width { get; set; }
+        [JsonPropertyName("height")] public int Height { get; set; }
+        [JsonPropertyName("pix_fmt")] public string? PixFmt { get; set; }
+        [JsonPropertyName("r_frame_rate")] public string? RFrameRate { get; set; }
     }
+
+    // ── Modelos de respuesta JSON (snake_case del CLI) ──
 
     private class DuplicatesResult
     {

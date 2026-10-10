@@ -23,15 +23,3 @@ def es_ruta_media_segura(ruta: str) -> bool:
 # Límite de memoria por asignación de av_malloc en ffmpeg/ffprobe (2 GB por bloque):
 # acota bombas de asignación de headers/demuxers maliciosos sin afectar archivos legítimos.
 MAX_ALLOC = "2147483648"  # 2 GB
-
-
-def argumentos_ffprobe() -> list:
-    """Opciones de seguridad y silencio comunes a TODAS las llamadas a ffprobe.
-
-    OJO: ffprobe NO admite ``-nostdin`` (es una opción exclusiva de ffmpeg). Pasárselo hace que ffprobe
-    salga con error ("Failed to set value ... for option 'nostdin'") y, como los llamadores tragaban
-    el fallo, la app dejó de recibir resolución/códec/fps/10-bit de cada episodio sin ningún aviso.
-    ffprobe además nunca lee stdin, así que no lo necesita.
-    """
-    return ["-max_alloc", MAX_ALLOC, "-v", "error"]
-

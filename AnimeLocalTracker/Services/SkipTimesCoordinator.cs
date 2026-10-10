@@ -6,7 +6,6 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using AnimeLocalTracker.Models;
-using AnimeLocalTracker.Services.Python;
 
 namespace AnimeLocalTracker.Services;
 
@@ -39,49 +38,33 @@ public class SkipTimesCoordinator : ISkipTimesCoordinator
 
     internal const string OrigenAudio = "audio";
     internal const string OrigenAniSkip = "aniskip";
-    internal const string OrigenEscenas = "escenas";
 
     private readonly IAniSkipService? _aniSkipService;
-    private readonly IPythonBridgeService? _pythonBridge;
+    private readonly IDetectorTemasAudio? _detector;
     private readonly IAnimeThemesDownloadService? _themesDownload;
     private readonly IReferenciasAudioService? _referencias;
     private readonly IDatabaseService? _database;
-    private readonly string _carpetaHuellas;
 
     /// <summary>Análisis en marcha por "anime|episodio|firma": abrir el episodio que se está pre-analizando se une a ese trabajo.</summary>
     private readonly ConcurrentDictionary<string, Task<IReadOnlyList<AniSkipResult>>> _enCurso = new();
 
-    /// <summary>
-    /// Localiza audio_skip_plugin.py sin depender de AppDataPaths.PluginsFolder (esa carpeta es para
-    /// plugins que el USUARIO instala a mano; este es un plugin propio de la app, siempre debe estar
-    /// disponible). En desarrollo se lee directo de tools/python/ (única fuente de verdad, subiendo
-    /// directorios desde el ejecutable); en un build empaquetado esa carpeta del repo no existe, así
-    /// que se usa la copia sincronizada en AnimeLocalTracker/PythonPlugins/ (incluida por
-    /// &lt;None Include="PythonPlugins\**"/&gt; del .csproj — a diferencia de Tools\, esta SÍ va al
-    /// control de versiones). Mantener ambas copias iguales al tocar el algoritmo. En un build publicado NUNCA se
-    /// buscan carpetas superiores: lo encontrado se ejecuta (ver <see cref="LocalizadorHerramientasPython"/>).
-    /// </summary>
-    private static readonly Lazy<string?> RutaPluginAudioSkip = new(() =>
-        LocalizadorHerramientasPython.PluginAudioSkip(AppDomain.CurrentDomain.BaseDirectory, LocalizadorHerramientasPython.CompilacionDeDesarrollo));
-
+    /// <param name="detector">Ubica los temas por audio (núcleo Rust); sin él solo queda AniSkip.</param>
     /// <param name="referencias">Consigue (y baja si falta) el audio oficial de los temas; sin él solo se usan las descargas de la Ficha.</param>
     /// <param name="database">Guarda el análisis de cada episodio (segunda vez: al instante y sin red). Sin él no hay caché.</param>
-    /// <param name="carpetaHuellas">Dónde guarda el motor Python la huella de cada tema; por defecto <see cref="AppDataPaths.AudioFingerprintsDir"/>.</param>
-    public SkipTimesCoordinator(IAniSkipService? aniSkipService, IPythonBridgeService? pythonBridge = null, IAnimeThemesDownloadService? themesDownload = null,
-        IReferenciasAudioService? referencias = null, IDatabaseService? database = null, string? carpetaHuellas = null)
+    public SkipTimesCoordinator(IAniSkipService? aniSkipService, IDetectorTemasAudio? detector = null, IAnimeThemesDownloadService? themesDownload = null,
+        IReferenciasAudioService? referencias = null, IDatabaseService? database = null)
     {
         _aniSkipService = aniSkipService;
-        _pythonBridge = pythonBridge;
+        _detector = detector;
         _themesDownload = themesDownload;
         _referencias = referencias;
         _database = database;
-        _carpetaHuellas = carpetaHuellas ?? AppDataPaths.AudioFingerprintsDir;
     }
 
     /// <summary>
     /// Ubica el opening, el ending y el resumen del episodio. Orden: análisis ya guardado → audio oficial de AnimeThemes (el mejor
-    /// de todos los temas candidatos) → AniSkip solo para lo que falte → comparación con otro episodio local (último recurso para
-    /// el opening). El resultado se guarda para no repetirlo.
+    /// de todos los temas candidatos) → AniSkip solo para lo que falte.
+    /// El resultado se guarda para no repetirlo.
     /// </summary>
     public Task<IReadOnlyList<AniSkipResult>> CargarSkipTimesAsync(int animeId, int episodio, double duracionSegundos, string? rutaVideoLocal = null, CancellationToken ct = default) =>
         CargarSkipTimesAsync(animeId, episodio, duracionSegundos, rutaVideoLocal, null, ct);
@@ -137,16 +120,14 @@ public class SkipTimesCoordinator : ISkipTimesCoordinator
     {
         var resultados = new List<AniSkipResult>();
         bool completo = true;
-        bool referenciasCompletas = false;
         bool motorSinRespuesta = false;
 
         // 2) Audio de referencia (AnimeThemes): funciona con un solo episodio local y cubre opening y ending
         bool hayVideo = !string.IsNullOrWhiteSpace(rutaVideoLocal);
-        bool puedeDetectar = hayVideo && _pythonBridge != null && RutaPluginAudioSkip.Value != null && (_referencias != null || _themesDownload != null);
+        bool puedeDetectar = hayVideo && _detector is { Disponible: true } && (_referencias != null || _themesDownload != null);
         if (puedeDetectar)
         {
             var referencias = await ObtenerReferenciasAsync(animeId, episodio, ct);
-            referenciasCompletas = referencias.Completa;
             if (!referencias.Completa) completo = false;
 
             var deteccion = await DetectarTemasAsync(episodio, referencias.Temas, rutaVideoLocal!, ct);
@@ -182,15 +163,6 @@ public class SkipTimesCoordinator : ISkipTimesCoordinator
         ct.ThrowIfCancellationRequested();
         if (resultados.Count > 0) progreso?.Report(resultados.ToList()); // con lo de AniSkip incluido
 
-        // 4) Último recurso para el opening: compararlo con otro episodio local. Es lento (decenas de segundos) y poco fiable, así que solo
-        //    si AnimeThemes no dio nada con qué trabajar: con las referencias completas, que no salga un opening es un dato (episodio sin OP).
-        bool sinReferencias = !puedeDetectar || !referenciasCompletas;
-        if (hayVideo && sinReferencias && !resultados.Any(r => r.EsIntro) && _pythonBridge != null && RutaPluginAudioSkip.Value != null)
-        {
-            var local = await DetectarPorComparacionAsync(rutaVideoLocal!, ct);
-            if (local != null) resultados.Add(local);
-        }
-
         // Si aún falta el opening o el ending, el análisis se repite pasadas unas horas: AniSkip recibe datos con el tiempo y
         // AnimeThemes añade temas nuevos. (Un episodio sin opening de verdad solo cuesta esa repetición.) Con los dos ubicados por audio
         // está completo aunque AnimeThemes no respondiera esta vez: no queda nada que mejorar y repetirlo cada 12 h solo gastaba CPU.
@@ -198,7 +170,7 @@ public class SkipTimesCoordinator : ISkipTimesCoordinator
         if (ambosPorAudio) completo = true;
         else if (!resultados.Any(r => r.EsIntro) || !resultados.Any(r => r.EsEnding)) completo = false;
 
-        // Si el motor Python no respondió (fallo pasajero, no del archivo) no se guarda: guardarlo como incompleto dejaba el episodio sin
+        // Si el motor de audio no respondió (fallo pasajero, no del archivo) no se guarda: guardarlo como incompleto dejaba el episodio sin
         // marcas 12 h aunque al volver a abrirlo el análisis ya funcionara (caso real: Katainaka no Ossan II, episodio 8).
         if (motorSinRespuesta)
             AppLogger.Info("SkipTimesCoordinator", $"Análisis del episodio {episodio} sin guardar: el motor de audio no respondió; se repetirá al volver a abrirlo.");
@@ -225,42 +197,27 @@ public class SkipTimesCoordinator : ISkipTimesCoordinator
     }
 
     /// <summary>
-    /// Ubica opening y ending con TODOS los temas en una sola llamada al motor Python: el episodio se decodifica una vez (antes, una
-    /// vez por tema: One Piece con 29 temas tardaba 30 s; ahora ~2 s) y la huella de cada tema queda guardada en disco. Primero se
-    /// prueban los temas que AnimeThemes dice que aplican al episodio y solo si ninguno acierta los demás (la numeración de los archivos
-    /// no siempre coincide con la de AnimeThemes); para el ending también los openings (el episodio 1 y los finales suelen cerrar con él).
+    /// Ubica opening y ending con TODOS los temas en una sola pasada: el episodio se decodifica una vez y la huella de cada tema
+    /// queda guardada en disco. Primero se prueban los temas que AnimeThemes dice que aplican al episodio y solo si ninguno acierta
+    /// los demás (la numeración de los archivos no siempre coincide con la de AnimeThemes); para el ending también los openings (el
+    /// episodio 1 y los finales suelen cerrar con él).
     /// </summary>
     private async Task<(List<AniSkipResult> Tramos, bool MotorSinRespuesta)> DetectarTemasAsync(int episodio, IReadOnlyList<TemaLocalDisponible> temas, string rutaEpisodio, CancellationToken ct)
     {
         var lista = new List<AniSkipResult>();
         var enviados = temas
             .Where(t => string.Equals(t.Tipo, "OP", StringComparison.OrdinalIgnoreCase) || string.Equals(t.Tipo, "ED", StringComparison.OrdinalIgnoreCase))
-            .Select(t => new ReferenciaEnviada(t.RutaArchivo, t.Tipo.ToUpperInvariant(), t.AplicaAlEpisodio(episodio) ? 0 : 1))
+            .Select(t => new ReferenciaAudio(t.RutaArchivo, t.Tipo.ToUpperInvariant(), t.AplicaAlEpisodio(episodio) ? 0 : 1))
             .ToList();
         if (enviados.Count == 0) return (lista, false);
 
-        var payload = new
-        {
-            plugin_path = RutaPluginAudioSkip.Value,
-            func_name = "detect_themes",
-            args = new
-            {
-                episode_path = rutaEpisodio,
-                references = enviados.Select(r => new { path = r.Ruta, kind = r.Tipo, priority = r.Prioridad }).ToList(),
-                min_confidence = ConfianzaMinima,
-                head_seconds = SegundosBusquedaOpening,
-                tail_seconds = SegundosBusquedaEnding,
-                cache_dir = _carpetaHuellas
-            }
-        };
-
-        var respuesta = await _pythonBridge!.ExecuteCommandAsync<object, PluginDaemonResponse<DeteccionTemasResult>>("run-plugin", payload, ct);
-        if (respuesta is not { Success: true, Result: { Success: true } resultado })
+        var resultado = await _detector!.DetectarAsync(rutaEpisodio, enviados, ConfianzaMinima, SegundosBusquedaOpening, SegundosBusquedaEnding, ct);
+        if (resultado is not { Success: true })
         {
             // Antes un fallo del motor (ffmpeg, archivo ilegible…) se tragaba en silencio y parecía "no hay opening".
-            // Un error del plugin (ffmpeg, archivo ilegible…) viene con texto; sin él, el motor no contestó o contestó otra cosa.
-            string? motivo = respuesta?.Result?.Error ?? respuesta?.Error;
-            AppLogger.Warn("SkipTimesCoordinator", $"No se pudo analizar el audio del episodio {episodio}: {motivo ?? "sin respuesta válida del motor Python"}");
+            // Un error concreto viene con texto; sin él (null), el motor no pudo trabajar y el análisis no se guarda.
+            string? motivo = resultado?.Error;
+            AppLogger.Warn("SkipTimesCoordinator", $"No se pudo analizar el audio del episodio {episodio}: {motivo ?? "el motor de audio no respondió"}");
             return (lista, motivo == null);
         }
 
@@ -279,8 +236,6 @@ public class SkipTimesCoordinator : ISkipTimesCoordinator
         AppLogger.Debug("SkipTimesCoordinator", $"Audio de referencia del episodio {episodio}: {resultado.Evaluated} de {enviados.Count} tema(s) comparados en {resultado.Seconds:F1} s.");
         return (lista, false);
     }
-
-    private sealed record ReferenciaEnviada(string Ruta, string Tipo, int Prioridad);
 
     /// <summary>(consultado, tramos): consultado es false si no se pudo saber (sin equivalencia de MAL ID o error de red).</summary>
     private async Task<(bool Consultado, List<AniSkipResult> Lista)> ConsultarAniSkipAsync(int animeId, int episodio, double duracionSegundos, CancellationToken ct)
@@ -306,46 +261,6 @@ public class SkipTimesCoordinator : ISkipTimesCoordinator
             AppLogger.Debug("SkipTimesCoordinator", $"Error consultando AniSkip: {ex.Message}");
             return (false, new List<AniSkipResult>());
         }
-    }
-
-    private async Task<AniSkipResult?> DetectarPorComparacionAsync(string rutaVideoLocal, CancellationToken ct)
-    {
-        try
-        {
-            if (!await _pythonBridge!.IsAvailableAsync()) return null;
-
-            string dir = Path.GetDirectoryName(rutaVideoLocal)!;
-            if (!Directory.Exists(dir)) return null;
-            var otroVideo = Directory.GetFiles(dir, "*.*").FirstOrDefault(f => !string.Equals(f, rutaVideoLocal, StringComparison.OrdinalIgnoreCase)
-                && (f.EndsWith(".mkv", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".mp4", StringComparison.OrdinalIgnoreCase)));
-            if (otroVideo == null) return null;
-
-            var payload = new
-            {
-                plugin_path = RutaPluginAudioSkip.Value,
-                func_name = "detect_opening",
-                args = new { video_paths = new[] { rutaVideoLocal, otroVideo } }
-            };
-
-            var pluginRes = await _pythonBridge.ExecuteCommandAsync<object, PluginDaemonResponse<AudioSkipResult>>("run-plugin", payload, ct);
-            if (pluginRes is { Success: true, Result.Found: true })
-            {
-                var r = pluginRes.Result;
-                if (r.Confidence < ConfianzaMinima)
-                {
-                    AppLogger.Info("SkipTimesCoordinator", $"PLUGIN AUDIO: opening descartado por confianza baja [{r.IntroEstimatedStart} - {r.IntroEstimatedEnd}] (Conf: {r.Confidence:F2})");
-                    return null;
-                }
-                AppLogger.Info("SkipTimesCoordinator", $"PLUGIN AUDIO: Opening detectado [{r.IntroEstimatedStart} - {r.IntroEstimatedEnd}] (Conf: {r.Confidence})");
-                return CrearSkip("op", r.IntroEstimatedStart, r.IntroEstimatedEnd, OrigenEscenas, r.Confidence);
-            }
-        }
-        catch (OperationCanceledException) { throw; }
-        catch (Exception ex)
-        {
-            AppLogger.Debug("SkipTimesCoordinator", $"Error en plugin de audio local: {ex.Message}");
-        }
-        return null;
     }
 
     // === Análisis guardado ===
@@ -463,16 +378,7 @@ public class SkipTimesCoordinator : ISkipTimesCoordinator
             currentSeconds < s.Interval.EndTime - margenFinalSegundos);
     }
 
-    public class AudioSkipResult
-    {
-        public bool Found { get; set; }
-        public double IntroEstimatedStart { get; set; }
-        public double IntroEstimatedEnd { get; set; }
-        public double Confidence { get; set; }
-        public string? Source { get; set; }
-    }
-
-    /// <summary>Respuesta de audio_skip_plugin.detect_themes (JSON en snake_case).</summary>
+    /// <summary>Resultado de <see cref="IDetectorTemasAudio.DetectarAsync"/>.</summary>
     public class DeteccionTemasResult
     {
         public bool Success { get; set; }

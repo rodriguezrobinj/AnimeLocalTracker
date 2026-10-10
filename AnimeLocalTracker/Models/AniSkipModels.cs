@@ -32,7 +32,7 @@ public class AniSkipResult
     [JsonPropertyName("episodeLength")]
     public double EpisodeLength { get; set; }
 
-    /// <summary>De dónde salió el tramo: "audio" (referencia de AnimeThemes), "aniskip" (comunidad) o "escenas". Vacío si no se sabe.</summary>
+    /// <summary>De dónde salió el tramo: "audio" (referencia de AnimeThemes) o "aniskip" (comunidad). Vacío si no se sabe.</summary>
     [JsonIgnore]
     public string Origen { get; set; } = string.Empty;
 

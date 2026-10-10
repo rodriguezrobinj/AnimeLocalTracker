@@ -49,7 +49,7 @@ La verificación es proporcional al cambio: si no se tocó C#/XAML (investigar, 
 
 - `AnimeLocalTracker/` — app WPF principal (C#).
 - `AnimeLocalTracker.Tests/` — xUnit + FluentAssertions + Moq.
-- `native/animetracker_core/` — núcleo Rust (parsing, fingerprint perceptual, spritesheets), expuesto vía FFI (`LibraryImport`).
-- `tools/python/` — daemon Python (`AnimeTrackerTools.exe` empaquetado) para scraping/resolvers/detección de escenas, controlado por `PythonBridgeService`.
+- `native/animetracker_core/` — núcleo Rust (parseo de nombres de archivo, huella rápida de archivos y análisis de audio para ubicar openings y endings), expuesto vía FFI (`LibraryImport`).
+- `tools/python/` — daemon Python (`AnimeTrackerTools.exe` empaquetado) para scraping/resolvers y plugins del usuario, controlado por `PythonBridgeService`.
 
 Al añadir o cambiar una función del núcleo Rust o un comando del daemon Python (incluidas sus dependencias y regenerar `AnimeTrackerTools.exe`), usa el skill `nucleo-poliglota` (`.claude/skills/nucleo-poliglota/SKILL.md`).

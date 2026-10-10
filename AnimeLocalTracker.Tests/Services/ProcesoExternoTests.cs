@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using AnimeLocalTracker.Core;
+using AnimeLocalTracker.Services;
 using FluentAssertions;
 using Xunit;
 
@@ -51,6 +52,30 @@ public class ProcesoExternoTests
         using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(300));
 
         Func<Task> accion = () => ProcesoExterno.EjecutarAsync("cmd.exe", TardaMucho, null, cts.Token);
+
+        await accion.Should().ThrowAsync<OperationCanceledException>();
+    }
+
+    [Fact]
+    public async Task EjecutarBinario_DevuelveLosBytesDeLaSalidaSinTocarlos()
+    {
+        // 1 s de tono a 8 kHz en mono y f32: 8000 muestras × 4 bytes. Como texto se habría estropeado.
+        string[] argumentos = ["-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "sine=frequency=440:duration=1",
+            "-ac", "1", "-ar", "8000", "-f", "f32le", "-"];
+
+        var resultado = await ProcesoExterno.EjecutarBinarioAsync(FfmpegLocator.Ffmpeg, argumentos, TimeSpan.FromSeconds(30), CancellationToken.None);
+
+        resultado.Should().NotBeNull();
+        resultado!.Codigo.Should().Be(0, resultado.Error);
+        resultado.Salida.Length.Should().Be(32000);
+    }
+
+    [Fact]
+    public async Task EjecutarBinario_SiVenceElLimite_MataElProcesoYLanzaCancelacion()
+    {
+        string[] esperaLarga = ["/c", "ping", "-n", "30", "127.0.0.1"];
+
+        Func<Task> accion = () => ProcesoExterno.EjecutarBinarioAsync("cmd.exe", esperaLarga, TimeSpan.FromMilliseconds(300), CancellationToken.None);
 
         await accion.Should().ThrowAsync<OperationCanceledException>();
     }

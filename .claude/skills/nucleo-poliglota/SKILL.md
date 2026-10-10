@@ -9,9 +9,9 @@ Reglas de fondo en `polyglot-ffi.md`. Dónde está cada cosa:
 
 | Pieza | Código | Para qué |
 |---|---|---|
-| Núcleo Rust | `native/animetracker_core/src/` (`lib.rs`, `parser.rs`, `hasher.rs`, `spritesheet.rs`) → `animetracker_core.dll` | Parseo de nombres de archivo, huella perceptual, fotogramas/spritesheets |
+| Núcleo Rust | `native/animetracker_core/src/` (`lib.rs`, `parser.rs`, `hasher.rs`, `audio.rs`) → `animetracker_core.dll` | Parseo de nombres de archivo (único motor), huella rápida de archivos y análisis de audio de openings/endings (dos funciones puras con tipos directos, sin JSON; las dirige `Services/DetectorTemasAudio.cs`). No lanza procesos: ffmpeg/ffprobe se llaman desde C# con `Core/ProcesoExterno` |
 | Puente C# | `Services/Native/NativeMethods.cs` | `LibraryImport` + comprobación `IsAvailable` (si falta la DLL, la app degrada) |
-| Daemon Python | `tools/python/` (`cli.py`, `parsers/`, `resolvers/`, `media/`) → `AnimeTrackerTools.exe` | Scraping/resolvers de video, metadatos, plugins |
+| Daemon Python | `tools/python/` (`cli.py`, `resolvers/`, `media/`) → `AnimeTrackerTools.exe` | Scraping/resolvers de video, huella de duplicados, plugins |
 | Puente C# | `Services/Python/PythonBridgeService.cs` | Proceso persistente, JSON por líneas, reintentos |
 
 ## A. Función nueva en Rust
@@ -24,15 +24,15 @@ Reglas de fondo en `polyglot-ffi.md`. Dónde está cada cosa:
 
 ## B. Comando nuevo en el daemon Python
 
-1. En `cli.py`, `process_command`: un `elif command == "nombre":` que llama a un módulo de `parsers/`, `resolvers/` o `media/` y **devuelve un `dict` con `"success"`** (y `"error"` si falla). El canal es stdout: nada de `print` de depuración (va a stderr o al log).
+1. En `cli.py`, `process_command`: un `elif command == "nombre":` que llama a un módulo de `resolvers/` o `media/` y **devuelve un `dict` con `"success"`** (y `"error"` si falla). El canal es stdout: nada de `print` de depuración (va a stderr o al log).
 2. Protocolo: una línea JSON por petición `{"command","payload","id"}`; la respuesta devuelve el mismo `id`. `PythonBridgeService` descarta una respuesta que no sea de la petición en curso: así, una petición cancelada no entrega su respuesta tardía a la siguiente (de ahí la migración v16 que borró análisis de OP/ED mal asignados). Un cambio que rompa el formato sube `protocolVersion`.
 3. En C#: `ExecuteCommandAsync<TRequest, TResponse>("nombre", payload, ct)` con DTOs `[JsonPropertyName]`; existe `ExecuteCommandOneShotAsync` como respaldo mientras el daemon espera su reintento (backoff de 10 min). Todo proceso Python se lanza **solo** desde el puente, que lo mata en `ProcessExit`.
 4. Prueba en `tools/python/tests/test_*.py`: `python -m pytest tools/python/tests -q` (bloquea el CI). En C#, el puente se mockea en las pruebas del servicio que lo usa.
-5. **Dependencias**: se editan `pyproject.toml` / `requirements.in` y se regenera `requirements.txt` con hashes (comando exacto en la cabecera de `requirements.in`, con `py -3.11` y `pip-tools`); el CI instala con `--require-hashes`. `anitopy` es la única que queda en pre-lanzamiento. Cualquier módulo pesado que solo se use en desarrollo va a `MODULOS_EXCLUIDOS` de `build_binary.py` (Playwright y OpenCV ya están fuera).
+5. **Dependencias**: se editan `pyproject.toml` / `requirements.in` y se regenera `requirements.txt` con hashes (comando exacto en la cabecera de `requirements.in`, con `py -3.11` y `pip-tools`); el CI instala con `--require-hashes`. Ya no queda ninguna en pre-lanzamiento (`anitopy` se retiró: los nombres de archivo los parsea solo el núcleo Rust). Cualquier módulo pesado que solo se use en desarrollo va a `MODULOS_EXCLUIDOS` de `build_binary.py` (Playwright y OpenCV ya están fuera).
 6. **Empaquetado**: `python tools\python\build_binary.py` (≈ 75 s) regenera `AnimeTrackerTools.exe` en `AnimeLocalTracker/Tools/` (ignorado por git); luego `dotnet build` lo copia a `bin\…\Tools`. En Debug la app ejecuta los scripts de `tools/python`; fuera de Debug solo usa la copia empaquetada, así que **un comando nuevo no existe en una build de release hasta regenerar el `.exe`**. Comprueba cada comando contra el `.exe`, no solo contra el script.
 
 ## C. Verificación
 
 - Rust: `cargo test` + `cargo clippy --release -- -D warnings` en `native/animetracker_core`. Python: `pytest`. C#: build con 0 advertencias y `--filter` de la clase tocada; suite completa una vez al cerrar (`repo-build-test`).
-- Si el cambio afecta a lo que ve el usuario (miniaturas, detección de OP/ED, resolvers), pruébalo en vivo con `perfil-aislado`: hay detección por audio y descargas reales que no cubre ninguna prueba unitaria.
+- Si el cambio toca `audio.rs`, sus pruebas llevan valores de referencia del algoritmo original: no se cambian constantes ni umbrales sin repetir la comparación con episodios reales (ver `docs/plan-audio-openings-rust.md`, tarea 7). Si el cambio afecta a lo que ve el usuario (miniaturas, detección de OP/ED, resolvers), pruébalo en vivo con `perfil-aislado`: hay detección por audio y descargas reales que no cubre ninguna prueba unitaria.
 - No cambies la lista de plugins confiables ni su huella SHA-256 desde aquí (seguridad: `/security-review`).

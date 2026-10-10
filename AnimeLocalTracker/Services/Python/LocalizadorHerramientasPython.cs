@@ -33,18 +33,6 @@ internal static class LocalizadorHerramientasPython
     }
 
     /// <summary>
-    /// audio_skip_plugin.py: en desarrollo manda el de tools/python (única fuente de verdad); publicado, solo la copia
-    /// empaquetada en PythonPlugins/ (la sincroniza el .csproj). Null si no hay ninguna utilizable.
-    /// </summary>
-    internal static string? PluginAudioSkip(string baseDir, bool desarrollo)
-    {
-        if (desarrollo && BuscarEnRepositorio(baseDir, "audio_skip_plugin.py") is { } delRepositorio) return delRepositorio;
-
-        string empaquetado = Path.Combine(baseDir, "PythonPlugins", "audio_skip_plugin.py");
-        return File.Exists(empaquetado) ? empaquetado : null;
-    }
-
-    /// <summary>
     /// El daemon: el ejecutable empaquetado (--onedir: en una subcarpeta con su nombre; se mantienen las rutas antiguas
     /// por compatibilidad con builds previos) o, solo en desarrollo, el script cli.py del repositorio.
     /// </summary>

@@ -28,6 +28,7 @@ public class AnimeAv1ResolverMemoriaTests
         """;
 
     private static readonly string[] TitulosGrandBlue = { "Grand Blue Season 3" };
+    private static readonly string[] TitulosNaruto = { "Naruto Shippuuden" };
     private static readonly int[] EpisodiosALaVez = { 8, 9, 8, 9, 8 };
 
     private sealed class ContadorHandler : HttpMessageHandler
@@ -173,6 +174,19 @@ public class AnimeAv1ResolverMemoriaTests
 
         embeds.Should().NotBeEmpty();
         handler.Peticiones.Should().Be(2, "página del anime + página del episodio, sin búsqueda completa");
+    }
+
+    [Fact]
+    public async Task ObtenerEmbedsEpisodioAsync_PaginaSinMalIdConOtraRomanizacion_SeAceptaSinElDaemonPython()
+    {
+        // "Shippuuden" / "Shippuden": por palabras enteras solo coincide la mitad (0,5). Antes solo lo aceptaba rapidfuzz, en el
+        // daemon Python: con el daemon ocupado o sin arrancar, el mismo episodio "no estaba" en el sitio.
+        var handler = new PaginaFijaHandler(PaginaSinMalId("Naruto: Shippuden"));
+        var resolver = new AnimeAv1VideoSourceResolver(new HttpClient(handler), database: BdConPaginaGuardadaSinMalId(908).Object);
+
+        var embeds = await resolver.ObtenerEmbedsEpisodioAsync(TitulosNaruto, 9, aniListId: 908);
+
+        embeds.Should().NotBeEmpty();
     }
 
     [Fact]

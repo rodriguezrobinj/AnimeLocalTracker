@@ -1,15 +1,12 @@
 [project]
 name = "animetracker-tools"
 version = "1.0.0"
-description = "Motor de automatizacion, parsing de anime, extraccion de streams y benchmarks para AnimeLocalTracker."
+description = "Motor de automatizacion, extraccion de streams y benchmarks para AnimeLocalTracker."
 requires-python = ">=3.10"
 dependencies = [
-    "anitopy>=2.1.2",
-    "rapidfuzz>=3.9.0",
     "yt-dlp==2026.8.19",
     "playwright>=1.45.0",
-    "pydantic>=2.7.0",
-    "numpy>=1.26.0"
+    "pydantic>=2.7.0"
 ]
 
 [build-system]
@@ -18,7 +15,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["media*", "parsers*", "resolvers*", "automation*"]
+include = ["media*", "resolvers*", "automation*"]
 
 [tool.setuptools]
 py-modules = ["cli", "build_binary"]

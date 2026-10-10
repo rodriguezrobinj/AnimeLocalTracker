@@ -436,7 +436,7 @@ public partial class ActualizacionesViewModel : ObservableObject, IAlEntrarEnPes
         try
         {
             string thumbPath = PythonEpisodeEnricher.ObtenerRutaMiniaturaEsperada(item.RutaArchivo);
-            bool generada = await _enricher.ExtraerMiniaturaAsync(item.RutaArchivo, thumbPath);
+            bool generada = await PythonEpisodeEnricher.ExtraerMiniaturaAsync(item.RutaArchivo, thumbPath);
             if (!generada) return;
 
             // Preservar visto/progreso si ya existía un registro (p. ej. una descarga previa

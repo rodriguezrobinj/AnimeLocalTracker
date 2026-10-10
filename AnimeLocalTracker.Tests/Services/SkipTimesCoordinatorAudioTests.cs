@@ -7,7 +7,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using AnimeLocalTracker.Models;
 using AnimeLocalTracker.Services;
-using AnimeLocalTracker.Services.Python;
 using FluentAssertions;
 using Moq;
 using Xunit;
@@ -21,15 +20,14 @@ namespace AnimeLocalTracker.Tests.Services;
 public class SkipTimesCoordinatorAudioTests : IDisposable
 {
     private readonly Mock<IAniSkipService> _aniSkip = new();
-    private readonly Mock<IPythonBridgeService> _python = new();
+    private readonly Mock<IDetectorTemasAudio> _detector = new();
     private readonly Mock<IAnimeThemesDownloadService> _descargas = new();
     private readonly Mock<IReferenciasAudioService> _referencias = new();
     private readonly Mock<IDatabaseService> _db = new();
     private readonly string _carpeta = Path.Combine(Path.GetTempPath(), "AnimeTracker_SkipAudio_" + Guid.NewGuid().ToString("N"));
     private readonly string _episodio;
-    private readonly List<object> _llamadas = new();
+    private readonly List<(string Episodio, double Confianza, double SegundosInicio, double SegundosFinal)> _llamadas = new();
     private readonly List<(string Ruta, string Tipo, int Prioridad)> _enviadas = new();
-    private readonly string _carpetaHuellas = Path.Combine(Path.GetTempPath(), "huellas-que-no-se-crean");
 
     private AnalisisSkipEpisodio? _analisisGuardado;
     private List<SegmentoSkipGuardado> _segmentosGuardados = new();
@@ -40,7 +38,7 @@ public class SkipTimesCoordinatorAudioTests : IDisposable
         _episodio = Path.Combine(_carpeta, "Episodio 05.mkv");
         File.WriteAllBytes(_episodio, new byte[2048]);
 
-        _python.Setup(p => p.IsAvailableAsync()).ReturnsAsync(true);
+        _detector.SetupGet(d => d.Disponible).Returns(true);
         _aniSkip.Setup(a => a.ObtenerMalIdDesdeAniListAsync(It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(9999);
         _aniSkip.Setup(a => a.ObtenerSkipTimesAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<double>(), It.IsAny<CancellationToken>())).ReturnsAsync(new List<AniSkipResult>());
 
@@ -56,13 +54,13 @@ public class SkipTimesCoordinatorAudioTests : IDisposable
     }
 
     private SkipTimesCoordinator CrearSut(bool conBaseDeDatos = false) =>
-        new(_aniSkip.Object, _python.Object, _descargas.Object, _referencias.Object, conBaseDeDatos ? _db.Object : null, _carpetaHuellas);
+        new(_aniSkip.Object, _detector.Object, _descargas.Object, _referencias.Object, conBaseDeDatos ? _db.Object : null);
 
     private void Referencias(bool completa, params TemaLocalDisponible[] temas) =>
         _referencias.Setup(r => r.ObtenerAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ReferenciasEpisodio(temas, completa));
 
-    /// <summary>El motor Python "encuentra" estos tramos (segment "op"/"ed"); guarda la llamada y las referencias que se le mandaron.</summary>
+    /// <summary>El detector "encuentra" estos tramos (segment "op"/"ed"); guarda la llamada y las referencias que se le mandaron.</summary>
     private void Deteccion(params (string Tramo, double Inicio, double Fin, double Confianza)[] tramos) =>
         RespuestaDelMotor(new SkipTimesCoordinator.DeteccionTemasResult
         {
@@ -73,20 +71,16 @@ public class SkipTimesCoordinatorAudioTests : IDisposable
             }).ToList()
         });
 
-    private void RespuestaDelMotor(SkipTimesCoordinator.DeteccionTemasResult? resultado, bool exito = true) =>
-        _python.Setup(p => p.ExecuteCommandAsync<It.IsAnyType, PluginDaemonResponse<SkipTimesCoordinator.DeteccionTemasResult>>(
-                "run-plugin", It.IsAny<It.IsAnyType>(), It.IsAny<CancellationToken>()))
-            .Returns(new InvocationFunc(inv =>
+    /// <summary>Lo que responde el detector. Null = el motor no pudo trabajar.</summary>
+    private void RespuestaDelMotor(SkipTimesCoordinator.DeteccionTemasResult? resultado) =>
+        _detector.Setup(d => d.DetectarAsync(It.IsAny<string>(), It.IsAny<IReadOnlyList<ReferenciaAudio>>(), It.IsAny<double>(), It.IsAny<double>(),
+                It.IsAny<double>(), It.IsAny<CancellationToken>()))
+            .Returns((string episodio, IReadOnlyList<ReferenciaAudio> referencias, double confianza, double inicio, double final, CancellationToken _) =>
             {
-                object payload = inv.Arguments[1];
-                _llamadas.Add(payload);
-                foreach (object r in (System.Collections.IEnumerable)Propiedad(Propiedad(payload, "args"), "references"))
-                    _enviadas.Add(((string)Propiedad(r, "path"), (string)Propiedad(r, "kind"), (int)Propiedad(r, "priority")));
-
-                return Task.FromResult(new PluginDaemonResponse<SkipTimesCoordinator.DeteccionTemasResult> { Success = exito, Result = resultado });
-            }));
-
-    private static object Propiedad(object o, string nombre) => o.GetType().GetProperty(nombre)!.GetValue(o)!;
+                _llamadas.Add((episodio, confianza, inicio, final));
+                _enviadas.AddRange(referencias.Select(r => (r.Ruta, r.Tipo, r.Prioridad)));
+                return Task.FromResult(resultado);
+            });
 
     private static TemaLocalDisponible Tema(string tipo, string slug, string? rango, string ruta) => new(tipo, slug, 1, rango, ruta);
 
@@ -107,11 +101,7 @@ public class SkipTimesCoordinatorAudioTests : IDisposable
         _llamadas.Should().ContainSingle();
         _enviadas.Should().BeEquivalentTo(new[] { ("aplica.ogg", "OP", 0), ("noAplica.ogg", "OP", 1), ("ed1.ogg", "ED", 0) },
             "las canciones de inserción no son ni opening ni ending");
-        object args = Propiedad(_llamadas[0], "args");
-        Propiedad(_llamadas[0], "func_name").Should().Be("detect_themes");
-        Propiedad(args, "episode_path").Should().Be(_episodio);
-        Propiedad(args, "cache_dir").Should().Be(_carpetaHuellas);
-        Propiedad(args, "min_confidence").Should().Be(SkipTimesCoordinator.ConfianzaMinima);
+        _llamadas[0].Should().Be((_episodio, SkipTimesCoordinator.ConfianzaMinima, SkipTimesCoordinator.SegundosBusquedaOpening, SkipTimesCoordinator.SegundosBusquedaEnding));
     }
 
     [Fact]
@@ -180,9 +170,7 @@ public class SkipTimesCoordinatorAudioTests : IDisposable
         // Caso real (Katainaka no Ossan II ep 8): un fallo pasajero del motor se guardaba como análisis incompleto y el episodio
         // quedaba sin marcas 12 h aunque al volver a abrirlo el motor ya funcionara.
         Referencias(true, Tema("OP", "OP1", null, "op1.ogg"), Tema("ED", "ED1", null, "ed1.ogg"));
-        _python.Setup(p => p.ExecuteCommandAsync<It.IsAnyType, PluginDaemonResponse<SkipTimesCoordinator.DeteccionTemasResult>>(
-                "run-plugin", It.IsAny<It.IsAnyType>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((PluginDaemonResponse<SkipTimesCoordinator.DeteccionTemasResult>?)null);
+        RespuestaDelMotor(null);
 
         await CrearSut(conBaseDeDatos: true).CargarSkipTimesAsync(101, 5, 1400, _episodio);
 
@@ -311,58 +299,19 @@ public class SkipTimesCoordinatorAudioTests : IDisposable
         await f.Should().ThrowAsync<OperationCanceledException>();
     }
 
-    // === Último recurso (comparar con otro episodio) ===
-
-    private void OtroEpisodioLocal() => File.WriteAllBytes(Path.Combine(_carpeta, "Episodio 06.mkv"), new byte[1024]);
-
-    private void ComparacionEntreEpisodios(double confianza) =>
-        _python.Setup(p => p.ExecuteCommandAsync<It.IsAnyType, PluginDaemonResponse<SkipTimesCoordinator.AudioSkipResult>>(
-                "run-plugin", It.IsAny<It.IsAnyType>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new PluginDaemonResponse<SkipTimesCoordinator.AudioSkipResult>
-            {
-                Success = true,
-                Result = new SkipTimesCoordinator.AudioSkipResult { Found = true, IntroEstimatedStart = 0, IntroEstimatedEnd = 85, Confidence = confianza }
-            });
+    // === Sin referencias ===
 
     [Fact]
-    public async Task ConReferenciasCompletas_UnEpisodioSinOpening_NoLanzaLaComparacionLentaEntreEpisodios()
+    public async Task SinReferenciasYSinAniSkip_NoSeInventaUnOpening()
     {
-        OtroEpisodioLocal();
-        ComparacionEntreEpisodios(0.95);
-        Referencias(true, Tema("ED", "ED1", null, "ed1.ogg")); // AnimeThemes solo tiene ending para este episodio
-        Deteccion(("ed", 1300, 1390, 0.9));
-
-        var resultado = await CrearSut().CargarSkipTimesAsync(1, 20, 1400, _episodio);
-
-        resultado.Should().NotContain(r => r.EsIntro, "con el catálogo completo, no haber opening es un dato: no se inventa uno");
-        _python.Verify(p => p.ExecuteCommandAsync<It.IsAnyType, PluginDaemonResponse<SkipTimesCoordinator.AudioSkipResult>>(
-            It.IsAny<string>(), It.IsAny<It.IsAnyType>(), It.IsAny<CancellationToken>()), Times.Never);
-    }
-
-    [Fact]
-    public async Task SinReferencias_ElOpeningPuedeSalirDeCompararConOtroEpisodio()
-    {
-        OtroEpisodioLocal();
-        ComparacionEntreEpisodios(0.85);
+        // Antes había un último recurso (comparar con otro episodio de la carpeta); en los datos reales nunca dio un resultado.
+        File.WriteAllBytes(Path.Combine(_carpeta, "Episodio 06.mkv"), new byte[1024]);
         Referencias(false);
+        Deteccion();
 
         var resultado = await CrearSut().CargarSkipTimesAsync(1, 5, 1400, _episodio);
 
-        var op = resultado.Single(r => r.EsIntro);
-        (op.Origen, op.Interval.EndTime).Should().Be(("escenas", 85));
-    }
-
-    [Fact]
-    public async Task LaComparacionEntreEpisodios_ConConfianzaBaja_SeDescarta()
-    {
-        // Medido con un episodio real: dejó un "opening" de 0:00 a 1:25 con confianza 0,47.
-        OtroEpisodioLocal();
-        ComparacionEntreEpisodios(0.47);
-        Referencias(false);
-
-        var resultado = await CrearSut().CargarSkipTimesAsync(1, 5, 1400, _episodio);
-
-        resultado.Should().NotContain(r => r.EsIntro);
+        resultado.Should().BeEmpty();
     }
 
     // === Aviso de tramos parciales ===
@@ -480,7 +429,8 @@ public class SkipTimesCoordinatorAudioTests : IDisposable
         resultado[0].Origen.Should().Be("audio");
         _referencias.Verify(r => r.ObtenerAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
         _aniSkip.Verify(a => a.ObtenerMalIdDesdeAniListAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
-        _python.Verify(p => p.ExecuteCommandAsync<It.IsAnyType, It.IsAnyType>(It.IsAny<string>(), It.IsAny<It.IsAnyType>(), It.IsAny<CancellationToken>()), Times.Never);
+        _detector.Verify(d => d.DetectarAsync(It.IsAny<string>(), It.IsAny<IReadOnlyList<ReferenciaAudio>>(), It.IsAny<double>(), It.IsAny<double>(),
+            It.IsAny<double>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -557,26 +507,20 @@ public class SkipTimesCoordinatorAudioTests : IDisposable
 
     // === Pre-análisis del siguiente episodio ===
 
-    /// <summary>El motor Python queda "trabajando" hasta que se complete <paramref name="liberar"/>.</summary>
+    /// <summary>El detector queda "trabajando" hasta que se complete <paramref name="liberar"/>.</summary>
     private void DeteccionQueEspera(TaskCompletionSource liberar) =>
-        _python.Setup(p => p.ExecuteCommandAsync<It.IsAnyType, PluginDaemonResponse<SkipTimesCoordinator.DeteccionTemasResult>>(
-                "run-plugin", It.IsAny<It.IsAnyType>(), It.IsAny<CancellationToken>()))
-            .Returns(new InvocationFunc(inv => ResponderCuandoSeLibere(inv, liberar)));
-
-    private async Task<PluginDaemonResponse<SkipTimesCoordinator.DeteccionTemasResult>> ResponderCuandoSeLibere(IInvocation inv, TaskCompletionSource liberar)
-    {
-        _llamadas.Add(inv.Arguments[1]);
-        await liberar.Task.WaitAsync((CancellationToken)inv.Arguments[2]);
-        return new PluginDaemonResponse<SkipTimesCoordinator.DeteccionTemasResult>
-        {
-            Success = true,
-            Result = new SkipTimesCoordinator.DeteccionTemasResult
+        _detector.Setup(d => d.DetectarAsync(It.IsAny<string>(), It.IsAny<IReadOnlyList<ReferenciaAudio>>(), It.IsAny<double>(), It.IsAny<double>(),
+                It.IsAny<double>(), It.IsAny<CancellationToken>()))
+            .Returns(async (string episodio, IReadOnlyList<ReferenciaAudio> _, double confianza, double inicio, double final, CancellationToken ct) =>
             {
-                Success = true,
-                Matches = [new SkipTimesCoordinator.TemaDetectado { Segment = "op", Start = 90, End = 180, Confidence = 0.9 }]
-            }
-        };
-    }
+                _llamadas.Add((episodio, confianza, inicio, final));
+                await liberar.Task.WaitAsync(ct);
+                return (SkipTimesCoordinator.DeteccionTemasResult?)new SkipTimesCoordinator.DeteccionTemasResult
+                {
+                    Success = true,
+                    Matches = [new SkipTimesCoordinator.TemaDetectado { Segment = "op", Start = 90, End = 180, Confidence = 0.9 }]
+                };
+            });
 
     [Fact]
     public async Task AbrirElEpisodioQueSeEstaPreAnalizando_SeUneAEseAnalisis_SinRepetirlo()

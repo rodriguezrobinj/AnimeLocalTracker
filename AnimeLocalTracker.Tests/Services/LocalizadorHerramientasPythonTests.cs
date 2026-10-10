@@ -38,32 +38,6 @@ public sealed class LocalizadorHerramientasPythonTests : IDisposable
     }
 
     [Fact]
-    public void PluginAudioSkip_EnBuildPublicado_UsaLaCopiaEmpaquetadaYNoLaDeUnaCarpetaSuperior()
-    {
-        Crear(_raiz, "tools", "python", "audio_skip_plugin.py");
-        string empaquetado = Crear(_instalacion, "PythonPlugins", "audio_skip_plugin.py");
-
-        LocalizadorHerramientasPython.PluginAudioSkip(_instalacion, desarrollo: false).Should().Be(empaquetado);
-    }
-
-    [Fact]
-    public void PluginAudioSkip_EnBuildPublicadoSinCopiaEmpaquetada_NoRecurreAUnaCarpetaSuperior()
-    {
-        Crear(_raiz, "tools", "python", "audio_skip_plugin.py");
-
-        LocalizadorHerramientasPython.PluginAudioSkip(_instalacion, desarrollo: false).Should().BeNull();
-    }
-
-    [Fact]
-    public void PluginAudioSkip_EnDesarrollo_PrefiereElDelRepositorio()
-    {
-        string repositorio = Crear(_raiz, "tools", "python", "audio_skip_plugin.py");
-        Crear(_instalacion, "PythonPlugins", "audio_skip_plugin.py");
-
-        LocalizadorHerramientasPython.PluginAudioSkip(_instalacion, desarrollo: true).Should().Be(repositorio);
-    }
-
-    [Fact]
     public void Daemon_EnBuildPublicadoSinEjecutable_NoUsaScriptsDeCarpetasSuperioresNiDelDirectorioActual()
     {
         Crear(_raiz, "tools", "python", "cli.py");

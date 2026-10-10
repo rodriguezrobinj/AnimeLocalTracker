@@ -9,51 +9,15 @@ if hasattr(sys.stdin, 'reconfigure'):
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 
-from parsers.anime_parser import AnimeFileParser
 from resolvers.stream_extractor import StreamExtractor
 from media.episode_fingerprint import EpisodeFingerprint
-from media.episode_metadata import EpisodeMetadata, Thumbnail
 
 
 def process_command(command: str, payload: Dict[str, Any]) -> Dict[str, Any]:
     """
     Despacha el comando recibido con sus parámetros en formato JSON.
     """
-    if command == "parse-filename":
-        filename = payload.get("filename", "")
-        dir_context = payload.get("directory_context")
-        return AnimeFileParser.parse_filename(filename, dir_context)
-
-    elif command == "parse-batch":
-        filenames = payload.get("filenames", [])
-        dir_context = payload.get("directory_context")
-        return {"success": True, "results": AnimeFileParser.parse_batch(filenames, dir_context)}
-
-    elif command == "match-title":
-        query = payload.get("query", "")
-        candidates = payload.get("candidates", [])
-        threshold = float(payload.get("threshold", 75.0))
-        res = AnimeFileParser.match_title_fuzzy(query, candidates, threshold)
-        return {"success": True, "match": res}
-
-    elif command == "match-media":
-        # Sistema riguroso de coincidencia: busca el MEJOR match de nombres entre
-        # los títulos de la app y los del sitio (título + aka), usando rapidfuzz.
-        titles = payload.get("titles", [])
-        candidates = payload.get("candidates", [])
-        threshold = float(payload.get("threshold", 75.0))
-        best = None
-        for t in titles:
-            m = AnimeFileParser.match_title_fuzzy(t, candidates, threshold)
-            if m and (best is None or m["score"] > best["score"]):
-                best = m
-        return {
-            "success": best is not None,
-            "score": float(best["score"]) if best else 0.0,
-            "matched_title": best["matched_title"] if best else "",
-        }
-
-    elif command == "resolve-stream":
+    if command == "resolve-stream":
         url = payload.get("url", "")
         headers = payload.get("headers")
         return StreamExtractor.extract_stream_info(url, headers, payload.get("server"))
@@ -64,10 +28,6 @@ def process_command(command: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         headers = payload.get("headers")
         return StreamExtractor.download_stream(url, output_path, headers)
 
-    elif command == "inspect-episode":
-        video_path = payload.get("video_path", "")
-        return EpisodeMetadata.inspect_episode(video_path)
-
     elif command == "fingerprint":
         video_path = payload.get("video_path", "")
         timestamp = float(payload.get("timestamp", 30.0))
@@ -77,13 +37,6 @@ def process_command(command: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         paths = payload.get("video_paths", [])
         max_distance = int(payload.get("max_distance", 8))
         return EpisodeFingerprint.find_duplicates(paths, max_distance)
-
-    elif command == "generate-thumbnail":
-        video_path = payload.get("video_path", "")
-        output_path = payload.get("output_path", "")
-        timestamp = float(payload.get("timestamp", 30.0))
-        width = int(payload.get("width", 240))
-        return Thumbnail.generate_thumbnail(video_path, output_path, timestamp, width)
 
     elif command == "run-plugin":
         plugin_path = payload.get("plugin_path", "")
