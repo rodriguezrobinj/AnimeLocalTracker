@@ -480,18 +480,29 @@ public class DatabaseService : IDatabaseService, IDisposable
     }
 
     /// <summary>
-    /// Ejecuta una orden que SQLite no admite dentro de una transacción (VACUUM, ATTACH, DETACH). sqlite-net la rechaza a veces
-    /// ("cannot VACUUM from within a transaction" o un "not an error") cuando justo corre en otro hilo un
-    /// <c>RunInTransactionAsync</c> sobre la misma conexión; el reintento corto lo resuelve (medido con guardados concurrentes:
-    /// 22 de 125 intentos fallaban sin reintento y 0 con él). <paramref name="limpiar"/> deshace lo que dejó el intento fallido.
+    /// Ejecuta una orden que SQLite no admite dentro de una transacción (VACUUM, ATTACH, DETACH). La conexión es una sola y
+    /// sqlite-net solo hace esperar su turno a las transacciones (<c>RunInTransactionAsync</c>), no a las órdenes sueltas: lanzada
+    /// con <c>ExecuteAsync</c>, la orden caía DENTRO de la transacción que otro hilo tuviera abierta ("cannot VACUUM from within a
+    /// transaction"). Por eso se pide el turno de las transacciones y, ya con él, se cierra la que abre sqlite-net antes de
+    /// ejecutar: ninguna otra puede empezar hasta que termine. Antes solo se reintentaba 4 veces en ~0,4 s y un guardado más
+    /// largo que eso (una sincronización) hacía fallar la copia de seguridad o la restauración.
+    /// El reintento se queda para lo que no pasa por ese turno (una orden suelta a medias en otro hilo: "not an error").
+    /// <paramref name="limpiar"/> deshace lo que dejó el intento fallido.
     /// </summary>
-    private static async Task EjecutarFueraDeTransaccionAsync(SQLiteAsyncConnection conexion, string sql, Action? limpiar = null)
+    private static Task EjecutarFueraDeTransaccionAsync(SQLiteAsyncConnection conexion, string sql, Action? limpiar = null)
+        => EjecutarFueraDeTransaccionAsync(conexion, db => db.Execute(sql), limpiar);
+
+    private static async Task EjecutarFueraDeTransaccionAsync(SQLiteAsyncConnection conexion, Action<SQLiteConnection> orden, Action? limpiar = null)
     {
         for (int intento = 1; ; intento++)
         {
             try
             {
-                await conexion.ExecuteAsync(sql);
+                await conexion.RunInTransactionAsync(db =>
+                {
+                    db.Commit();   // deja la conexión sin transacción, con el turno todavía tomado (el Commit final de sqlite-net no hace nada)
+                    orden(db);
+                });
                 return;
             }
             catch (SQLiteException) when (intento < 4)
@@ -502,13 +513,30 @@ public class DatabaseService : IDatabaseService, IDisposable
         }
     }
 
+    /// <summary>
+    /// Toda escritura pasa por aquí o por <c>RunInTransactionAsync</c>: es lo único a lo que sqlite-net hace esperar turno en la
+    /// conexión (que es una sola). Una escritura suelta (<c>ExecuteAsync</c>, <c>InsertOrReplaceAsync</c>…) se ejecutaba DENTRO de
+    /// la transacción que otro hilo tuviera abierta: si esa transacción fallaba, la escritura se deshacía con ella aunque ya había
+    /// devuelto éxito; y si caía entre la lectura y la escritura de un guardado por lotes, el lote la pisaba con la fila vieja
+    /// (borrar el archivo de un episodio mientras se guardaban sus datos técnicos lo dejaba apuntando al archivo borrado).
+    /// Lo que una escritura necesite leer antes (p. ej. "Conservar los videos") se lee dentro, con el turno ya tomado.
+    /// Las lecturas no esperan turno: cuesta 0,01 ms por escritura y la interfaz sigue leyendo durante un guardado largo.
+    /// </summary>
+    private Task EscribirAsync(Action<SQLiteConnection> escritura) => _conexion.RunInTransactionAsync(escritura);
+
+    private static bool TieneConservarVideos(SQLiteConnection db, int aniListId)
+        => db.ExecuteScalar<int>("SELECT COUNT(*) FROM AnimeItem WHERE AniListId = ? AND ConservarVideos = 1", aniListId) > 0;
+
     public async Task GuardarAnimeAsync(AnimeItem anime)
     {
-        // Reemplazar la fila de un anime que ya existía no puede apagarle la protección de "Conservar los videos".
-        if (!anime.ConservarVideos) anime.ConservarVideos = await ObtenerConservarVideosAsync(anime.AniListId);
+        await EscribirAsync(db =>
+        {
+            // Reemplazar la fila de un anime que ya existía no puede apagarle la protección de "Conservar los videos".
+            if (!anime.ConservarVideos) anime.ConservarVideos = TieneConservarVideos(db, anime.AniListId);
 
-        // InsertOrReplace actualiza el registro si el AniListId ya existe, o lo inserta si es nuevo
-        await _conexion.InsertOrReplaceAsync(anime);
+            // InsertOrReplace actualiza el registro si el AniListId ya existe, o lo inserta si es nuevo
+            db.InsertOrReplace(anime);
+        });
     }
 
     public async Task<List<AnimeItem>> ObtenerTodosLosAnimesAsync()
@@ -565,14 +593,17 @@ public class DatabaseService : IDatabaseService, IDisposable
     
     public async Task EliminarAnimeAsync(AnimeItem anime)
     {
-        await _conexion.DeleteAsync(anime);
-        // Limpiar también los registros de episodios para no dejar huérfanos
-        await _conexion.ExecuteAsync("DELETE FROM RegistroEpisodio WHERE AniListId = ?", anime.AniListId);
+        await EscribirAsync(db =>
+        {
+            db.Delete(anime);
+            // Limpiar también los registros de episodios para no dejar huérfanos
+            db.Execute("DELETE FROM RegistroEpisodio WHERE AniListId = ?", anime.AniListId);
+        });
     }
 
     public async Task EliminarRegistroEpisodioAsync(int aniListId, int numeroEpisodio)
     {
-        await _conexion.ExecuteAsync("DELETE FROM RegistroEpisodio WHERE AniListId = ? AND NumeroEpisodio = ?", aniListId, numeroEpisodio);
+        await EscribirAsync(db => db.Execute("DELETE FROM RegistroEpisodio WHERE AniListId = ? AND NumeroEpisodio = ?", aniListId, numeroEpisodio));
     }
 
     /// <summary>
@@ -583,9 +614,9 @@ public class DatabaseService : IDatabaseService, IDisposable
     /// </summary>
     public async Task ConservarRegistroTrasEliminarArchivoAsync(int aniListId, int numeroEpisodio)
     {
-        await _conexion.ExecuteAsync(
+        await EscribirAsync(db => db.Execute(
             "UPDATE RegistroEpisodio SET RutaArchivo = '', RutaMiniatura = NULL, Resolucion = '', CodecVideo = '', Fps = '', Es10Bit = 0 " +
-            "WHERE AniListId = ? AND NumeroEpisodio = ?", aniListId, numeroEpisodio);
+            "WHERE AniListId = ? AND NumeroEpisodio = ?", aniListId, numeroEpisodio));
     }
 
     /// <summary>
@@ -1126,8 +1157,11 @@ public class DatabaseService : IDatabaseService, IDisposable
     {
         // La protección de "Conservar los videos" no se toca desde aquí: la copia en memoria puede ser vieja (la Galería guarda
         // la fila entera, también en el refresco automático de AniList). Manda la base de datos y la copia se pone al día.
-        anime.ConservarVideos = await ObtenerConservarVideosAsync(anime.AniListId);
-        await _conexion.UpdateAsync(anime);
+        await EscribirAsync(db =>
+        {
+            anime.ConservarVideos = TieneConservarVideos(db, anime.AniListId);
+            db.Update(anime);
+        });
     }
 
     public async Task ActualizarAnimesAsync(IEnumerable<AnimeItem> animes)
@@ -1135,16 +1169,18 @@ public class DatabaseService : IDatabaseService, IDisposable
         var lista = animes?.ToList();
         if (lista == null || lista.Count == 0) return;
 
-        var protegidos = (await _conexion.QueryScalarsAsync<int>("SELECT AniListId FROM AnimeItem WHERE ConservarVideos = 1")).ToHashSet();
-        foreach (var anime in lista) anime.ConservarVideos = protegidos.Contains(anime.AniListId);
-
         // PERF-06: UpdateAll en una sola transacción (los animes ya existen en la BD).
-        await _conexion.UpdateAllAsync(lista);
+        await EscribirAsync(db =>
+        {
+            var protegidos = db.QueryScalars<int>("SELECT AniListId FROM AnimeItem WHERE ConservarVideos = 1").ToHashSet();
+            foreach (var anime in lista) anime.ConservarVideos = protegidos.Contains(anime.AniListId);
+            db.UpdateAll(lista, runInTransaction: false);
+        });
     }
 
     public async Task GuardarConservarVideosAsync(int aniListId, bool conservar)
     {
-        await _conexion.ExecuteAsync("UPDATE AnimeItem SET ConservarVideos = ? WHERE AniListId = ?", conservar ? 1 : 0, aniListId);
+        await EscribirAsync(db => db.Execute("UPDATE AnimeItem SET ConservarVideos = ? WHERE AniListId = ?", conservar ? 1 : 0, aniListId));
     }
 
     public async Task<bool> ObtenerConservarVideosAsync(int aniListId)
@@ -1185,8 +1221,11 @@ public class DatabaseService : IDatabaseService, IDisposable
         // (y de su -wal). Compactar reescribe la base sin ellas y vaciar el -wal quita la copia que queda ahí.
         try
         {
-            await _conexion.ExecuteAsync("VACUUM;");
-            await _conexion.ExecuteScalarAsync<int>("PRAGMA wal_checkpoint(TRUNCATE);");
+            await EjecutarFueraDeTransaccionAsync(_conexion, db =>
+            {
+                db.Execute("VACUUM;");
+                db.ExecuteScalar<int>("PRAGMA wal_checkpoint(TRUNCATE);");
+            });
         }
         catch (Exception ex)
         {
@@ -1259,7 +1298,7 @@ public class DatabaseService : IDatabaseService, IDisposable
     public async Task GuardarPartidaMinijuegoAsync(PartidaMinijuego partida)
     {
         if (partida == null || string.IsNullOrWhiteSpace(partida.JuegoId)) return;
-        await _conexion.InsertAsync(partida);
+        await EscribirAsync(db => db.Insert(partida));
     }
 
     public async Task<AnalisisSkipEpisodio?> ObtenerAnalisisSkipAsync(int animeId, int episodio)
@@ -1353,7 +1392,7 @@ public class DatabaseService : IDatabaseService, IDisposable
     {
         if (ajuste == null || ajuste.AniListId <= 0) return;
         ajuste.Clave = AjusteAudio.ClaveDe(ajuste.AniListId, ajuste.NumeroEpisodio);
-        await _conexion.InsertOrReplaceAsync(ajuste);
+        await EscribirAsync(db => db.InsertOrReplace(ajuste));
     }
 
     public async Task<PreferenciaEmision?> ObtenerPreferenciaEmisionAsync(int aniListId)
@@ -1364,7 +1403,7 @@ public class DatabaseService : IDatabaseService, IDisposable
     public async Task GuardarPreferenciaEmisionAsync(PreferenciaEmision preferencia)
     {
         if (preferencia == null || preferencia.AniListId <= 0) return;
-        await _conexion.InsertOrReplaceAsync(preferencia);
+        await EscribirAsync(db => db.InsertOrReplace(preferencia));
     }
 
     public async Task<List<PreferenciaEmision>> ObtenerPreferenciasEmisionActivasAsync()
@@ -1380,7 +1419,7 @@ public class DatabaseService : IDatabaseService, IDisposable
     public async Task GuardarDatosExtraAsync(DatosExtraAnime datos)
     {
         if (datos == null || datos.AniListId <= 0) return;
-        await _conexion.InsertOrReplaceAsync(datos);
+        await EscribirAsync(db => db.InsertOrReplace(datos));
     }
 
     public async Task<ProximaEmisionLocal?> ObtenerProximaEmisionAsync(int aniListId)
@@ -1391,7 +1430,7 @@ public class DatabaseService : IDatabaseService, IDisposable
     public async Task GuardarProximaEmisionAsync(ProximaEmisionLocal proxima)
     {
         if (proxima == null || proxima.AniListId <= 0) return;
-        await _conexion.InsertOrReplaceAsync(proxima);
+        await EscribirAsync(db => db.InsertOrReplace(proxima));
     }
 
     public async Task<SeguimientoLocal?> ObtenerSeguimientoLocalAsync(int aniListId)
@@ -1402,7 +1441,7 @@ public class DatabaseService : IDatabaseService, IDisposable
     public async Task GuardarSeguimientoLocalAsync(SeguimientoLocal seguimiento)
     {
         if (seguimiento == null || seguimiento.AniListId <= 0) return;
-        await _conexion.InsertOrReplaceAsync(seguimiento);
+        await EscribirAsync(db => db.InsertOrReplace(seguimiento));
     }
 
     public async Task<List<SeguimientoLocal>> ObtenerSeguimientosPendientesAsync()
@@ -1452,7 +1491,7 @@ public class DatabaseService : IDatabaseService, IDisposable
     public async Task GuardarMediaAnimeAv1Async(MediaAnimeAv1Verificado media)
     {
         if (media == null || media.AniListId <= 0 || string.IsNullOrWhiteSpace(media.Slug)) return;
-        await _conexion.InsertOrReplaceAsync(media);
+        await EscribirAsync(db => db.InsertOrReplace(media));
     }
 
     // Tope de filas del historial de descargas: lo más antiguo se descarta para que la tabla no crezca sin límite.
@@ -1482,13 +1521,13 @@ public class DatabaseService : IDatabaseService, IDisposable
 
     public async Task EliminarDescargaHistorialAsync(int id)
     {
-        await _conexion.ExecuteAsync("DELETE FROM DescargaHistorial WHERE Id = ?;", id);
+        await EscribirAsync(db => db.Execute("DELETE FROM DescargaHistorial WHERE Id = ?;", id));
     }
 
     public async Task LimpiarDescargasHistorialAsync(bool soloFallidas = false)
     {
-        await _conexion.ExecuteAsync(soloFallidas
+        await EscribirAsync(db => db.Execute(soloFallidas
             ? "DELETE FROM DescargaHistorial WHERE Completada = 0;"
-            : "DELETE FROM DescargaHistorial;");
+            : "DELETE FROM DescargaHistorial;"));
     }
 }

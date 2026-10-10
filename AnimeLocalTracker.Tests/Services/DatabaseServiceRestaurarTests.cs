@@ -161,6 +161,27 @@ public class DatabaseServiceRestaurarTests : IDisposable
     }
 
     [Fact]
+    public async Task RestaurarMientrasSeGuardaUnLoteGrande_EsperaSuTurnoEnVezDeRendirse()
+    {
+        await PoblarBibliotecaActualAsync();
+        string copia = await CrearCopiaValidaAsync();
+
+        // Un guardado largo (una sincronización o una importación) mantiene abierta una transacción más de lo que duraban los
+        // reintentos de la restauración: su copia previa caía DENTRO de esa transacción ("cannot VACUUM from within a
+        // transaction") y la restauración se daba por fallida. Era también la causa de que la prueba anterior fallara a ratos.
+        var lote = Enumerable.Range(1, 150_000).Select(i => new RegistroEpisodio { AniListId = 3, NumeroEpisodio = i }).ToList();
+        var guardando = _sut.GuardarRegistrosEpisodioBulkAsync(lote);
+        await Task.Delay(100);
+
+        bool ok = await _sut.RestaurarCopiaSeguridadAsync(copia);
+        await guardando;
+
+        ok.Should().BeTrue();
+        (await _sut.ObtenerTodosLosAnimesAsync()).Should().ContainSingle().Which.AniListId.Should().Be(2);
+        (await _sut.ObtenerTodosLosRegistrosAsync()).Should().HaveCount(3).And.OnlyContain(r => r.AniListId == 2);
+    }
+
+    [Fact]
     public async Task UnFalloAMitadDelVolcado_DejaLaBibliotecaIntacta()
     {
         await PoblarBibliotecaActualAsync();

@@ -19,3 +19,6 @@
 6. **Migraciones de Esquema:**
    - El esquema evoluciona con la lista `Migraciones` de `DatabaseService` (versión + acción), nunca con `CreateTableAsync` suelto.
    - Los atributos `[Indexed]` del modelo solo aplican a bases NUEVAS: para bases existentes hace falta una migración explícita (`CREATE INDEX IF NOT EXISTS`).
+7. **Escrituras con turno:**
+   - En `DatabaseService` toda escritura va por `EscribirAsync(db => …)` o `RunInTransactionAsync`; nunca `_conexion.ExecuteAsync`/`InsertOrReplaceAsync`/`UpdateAsync`/`DeleteAsync` sueltos. La conexión es una sola y sqlite-net solo hace esperar turno a las transacciones: una escritura suelta se ejecuta dentro de la transacción que otro hilo tenga abierta (se pierde si esa transacción falla, o la pisa un guardado por lotes).
+   - Lo que la escritura necesite leer antes se lee dentro del mismo turno. `VACUUM`, `ATTACH` y `DETACH` van por `EjecutarFueraDeTransaccionAsync`.
