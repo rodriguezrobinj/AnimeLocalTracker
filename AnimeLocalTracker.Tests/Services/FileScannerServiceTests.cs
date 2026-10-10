@@ -33,6 +33,13 @@ public class FileScannerServiceTests
     [InlineData("Evangelion_1.11_You_Are_(Not)_Alone_[1080p,BluRay,x264,DTS-ES]_-_THORA", 0)]
     [InlineData("[Harunatsu] Classroom Crisis - Vol.1 [BD 720p-AAC]", 0)]
     [InlineData("The iDOLM@STER 765 Pro to Iu Monogatari", 0)]
+    // Número seguido del idioma, como nombran los sitios en español: anitomy lo tomaba todo por título.
+    [InlineData("Anime 12 Latino.mp4", 12)]
+    [InlineData("Dragon Ball Z 05 Audio Latino", 5)]
+    [InlineData("Naruto 100 Sub Español.mkv", 100)]
+    [InlineData("One Piece Movie 9 Latino.mp4", 0)]
+    [InlineData("Naruto Temporada 2 Latino", 0)]
+    [InlineData("Blade Runner 2049 Latino.mkv", 0)]
     public void ExtraerNumeroEpisodio_DeberiaDetectarEpisodioCorrecto(string fileName, int expectedEpisode)
     {
         // Act

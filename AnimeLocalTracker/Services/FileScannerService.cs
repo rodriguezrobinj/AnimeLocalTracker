@@ -64,6 +64,7 @@ public partial class FileScannerService : IFileScannerService
     /// Rust no resolvía pasaba al daemon Python (anitopy + regex), que sobre 182 nombres reales de fansub con el episodio
     /// anotado no acertó ninguno de más y falló 26 (una película "Movie 9" pasaba a ser el episodio 9; un especial "06.5",
     /// un segundo episodio 6). Un especial con decimales se queda sin número a propósito.
+    /// Lo único que el núcleo añade a anitomy es el número seguido del idioma ("Anime 12 Latino"), en parser.rs.
     /// No se descartan 480/720/1080/2160: "1080p" ya lo reconoce anitomy como resolución, y un 1080 a secas es un episodio
     /// ("Episodio 1080" de una serie larga).
     /// </summary>
