@@ -32,10 +32,10 @@ public static class ProcesoExterno
 
         return await HastaQueTermineAsync(proceso, limite, async corte =>
         {
-            var salida = proceso.StandardOutput.ReadToEndAsync(corte);
-            var error = proceso.StandardError.ReadToEndAsync(corte);
+            var salida = EnHiloPropio(proceso.StandardOutput.ReadToEnd);
+            var error = EnHiloPropio(proceso.StandardError.ReadToEnd);
             await proceso.WaitForExitAsync(corte);
-            return new Resultado(proceso.ExitCode, await salida, await error);
+            return new Resultado(proceso.ExitCode, await salida.WaitAsync(corte), await error.WaitAsync(corte));
         }, ct);
     }
 
@@ -50,12 +50,15 @@ public static class ProcesoExterno
 
         return await HastaQueTermineAsync(proceso, limite, async corte =>
         {
-            using var memoria = new MemoryStream();
-            var salida = proceso.StandardOutput.BaseStream.CopyToAsync(memoria, corte);
-            var error = proceso.StandardError.ReadToEndAsync(corte);
+            var salida = EnHiloPropio(() =>
+            {
+                using var memoria = new MemoryStream();
+                proceso.StandardOutput.BaseStream.CopyTo(memoria);
+                return memoria.ToArray();
+            });
+            var error = EnHiloPropio(proceso.StandardError.ReadToEnd);
             await proceso.WaitForExitAsync(corte);
-            await salida;
-            return new ResultadoBinario(proceso.ExitCode, memoria.ToArray(), await error);
+            return new ResultadoBinario(proceso.ExitCode, await salida.WaitAsync(corte), await error.WaitAsync(corte));
         }, ct);
     }
 
@@ -77,6 +80,22 @@ public static class ProcesoExterno
             try { proceso.PriorityClass = clase; } catch { /* ya terminó: nada que bajar */ }
         }
         return proceso;
+    }
+
+    /// <summary>
+    /// Lee una salida del proceso en un hilo aparte. Windows no deja leer estos pipes sin esperar, así que ReadToEndAsync dejaba
+    /// ocupado un hilo del grupo por cada salida mientras el proceso viviera: con varios ffmpeg lentos a la vez (miniaturas en
+    /// prioridad baja con el procesador ocupado), el resto del trabajo en segundo plano de la app esperaba segundos.
+    /// </summary>
+    private static Task<T> EnHiloPropio<T>(Func<T> leer)
+    {
+        // El hilo se arranca desde el grupo y no desde quien llama (puede ser el hilo de la interfaz): arrancarlo espera a que
+        // eche a andar, y con el procesador ocupado eso son decenas de milisegundos.
+        var lectura = Task.Run(() => Task.Factory.StartNew(leer, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default));
+        // Si el proceso se corta nadie espera ya esta lectura: que su fallo (pipe cerrado) no llegue al registro como error sin atender.
+        _ = lectura.ContinueWith(static t => _ = t.Exception, CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+        return lectura;
     }
 
     private static async Task<T> HastaQueTermineAsync<T>(Process proceso, TimeSpan? limite, Func<CancellationToken, Task<T>> leer, CancellationToken ct)

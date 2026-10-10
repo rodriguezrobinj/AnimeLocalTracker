@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using AnimeLocalTracker.Core;
@@ -54,6 +55,35 @@ public class ProcesoExternoTests
         Func<Task> accion = () => ProcesoExterno.EjecutarAsync("cmd.exe", TardaMucho, null, cts.Token);
 
         await accion.Should().ThrowAsync<OperationCanceledException>();
+    }
+
+    [Fact]
+    public async Task EjecutarAsync_MientrasLosProcesosViven_NoRetieneHilosDelGrupo()
+    {
+        // Windows no deja leer estos pipes sin esperar: leídos con ReadToEndAsync, cada proceso vivo dejaba ocupados dos hilos del
+        // grupo (uno por salida). Con varias miniaturas a la vez y el procesador ocupado (ffmpeg en prioridad baja no avanza),
+        // el resto del trabajo en segundo plano esperaba segundos (4 s medidos con 8 procesos).
+        using var cts = new CancellationTokenSource();
+        // Más lecturas que hilos tenga ahora el grupo: si las lecturas los ocuparan, la tarea de abajo quedaría detrás de todas.
+        int cuantos = ThreadPool.ThreadCount / 2 + 4;
+        var procesos = Enumerable.Range(0, cuantos)
+            .Select(_ => ProcesoExterno.EjecutarAsync("cmd.exe", TardaMucho, null, cts.Token))
+            .ToArray();
+        try
+        {
+            var reloj = Stopwatch.StartNew();
+            await Task.Run(() => { });
+
+            reloj.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(1), "leer las salidas no debe ocupar hilos del grupo");
+        }
+        finally
+        {
+            cts.Cancel();
+            foreach (var proceso in procesos)
+            {
+                try { await proceso; } catch (OperationCanceledException) { }
+            }
+        }
     }
 
     [Fact]
