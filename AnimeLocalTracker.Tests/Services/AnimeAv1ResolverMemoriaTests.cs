@@ -28,6 +28,7 @@ public class AnimeAv1ResolverMemoriaTests
         """;
 
     private static readonly string[] TitulosGrandBlue = { "Grand Blue Season 3" };
+    private static readonly string[] TitulosDragonBallZ = { "Dragon Ball Z" };
     private static readonly string[] TitulosNaruto = { "Naruto Shippuuden" };
     private static readonly int[] EpisodiosALaVez = { 8, 9, 8, 9, 8 };
 
@@ -187,6 +188,21 @@ public class AnimeAv1ResolverMemoriaTests
         var embeds = await resolver.ObtenerEmbedsEpisodioAsync(TitulosNaruto, 9, aniListId: 908);
 
         embeds.Should().NotBeEmpty();
+    }
+
+    [Theory]
+    [InlineData("Dragon Ball Super")]   // otra palabra
+    [InlineData("Dragon Ball")]         // una palabra de menos
+    [InlineData("Dragon Ball GT")]
+    public async Task ObtenerEmbedsEpisodioAsync_PaginaSinMalIdDeOtraEntregaDeLaFranquicia_NoDescargaLaEquivocada(string tituloDelSitio)
+    {
+        // Letra a letra "Dragon Ball Z" y "Dragon Ball Super" se parecen un 80 % (umbral 75 %): se aceptaba la página de otro anime.
+        var handler = new PaginaFijaHandler(PaginaSinMalId(tituloDelSitio));
+        var resolver = new AnimeAv1VideoSourceResolver(new HttpClient(handler), database: BdConPaginaGuardadaSinMalId(909).Object);
+
+        var embeds = await resolver.ObtenerEmbedsEpisodioAsync(TitulosDragonBallZ, 9, aniListId: 909);
+
+        embeds.Should().BeEmpty();
     }
 
     [Fact]

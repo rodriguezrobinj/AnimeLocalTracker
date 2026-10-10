@@ -1061,7 +1061,8 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
     /// 3. MAL ID distinto → rechaza.
     /// 4. Sin MAL ID comparable → NOMBRES: se rechaza si es la misma serie pero OTRA temporada/parte
     ///    (el parecido por letras no distingue "Mushoku Tensei II" de "III": 98 %); si no, acepta con el mejor
-    ///    parecido entre el de letras, el de palabras y el de nombres sin temporada (los tres en C#, sin daemon).
+    ///    parecido entre el de letras (solo si los nombres cambian en la escritura, no en una palabra: "Dragon Ball Z" /
+    ///    "Dragon Ball Super"), el de palabras y el de nombres sin temporada (los tres en C#, sin daemon).
     /// </summary>
     private static int? VerificarMedia(
         InfoMedia media, int? malIdEsperado, List<string> titulosLista, IReadOnlyList<PrecuelaAnime> precuelas)
@@ -1096,7 +1097,9 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
             return null;
         }
 
-        double porLetras = titulosLista.Max(t => nombresMedia.Max(n => TituloSimilaridad.SimilitudPorLetras(t, n)));
+        // Letra a letra solo cuenta entre nombres que cambian en la escritura: "Dragon Ball Z" y "Dragon Ball Super" dan un 80 %.
+        double porLetras = titulosLista.Max(t => nombresMedia.Max(n =>
+            TituloSimilaridad.SoloCambiaLaEscritura(t, n) ? TituloSimilaridad.SimilitudPorLetras(t, n) : 0));
         double porPalabras = titulosLista.Max(t => TituloSimilaridad.MejorSimilitud(t, nombresMedia));
         double mejor = new[] { porLetras, porPalabras, identidad.MismaTemporada }.Max();
         string detalle = $"por letras {porLetras:P0}, por palabras {porPalabras:P0}, con temporada {identidad.MismaTemporada:P0}";

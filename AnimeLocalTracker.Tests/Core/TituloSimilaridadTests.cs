@@ -80,6 +80,25 @@ public class TituloSimilaridadTests
         TituloSimilaridad.SimilitudPorLetras(null, null).Should().Be(0);
     }
 
+    // Lo que el parecido letra a letra no ve: si la diferencia es de escritura (vale) o de una palabra entera (otro anime).
+    [Theory]
+    [InlineData("Jujutsu Kaizen", "Jujutsu Kaisen", true)]             // errata
+    [InlineData("Naruto Shippuuden", "Naruto: Shippuden", true)]      // romanización
+    [InlineData("Yuu Yuu Hakusho", "Yu Yu Hakusho", true)]
+    [InlineData("Sword Art Online", "SwordArt Online", true)]         // palabras pegadas
+    [InlineData("Re:Zero kara Hajimeru", "Re Zero kara Hajimeru", true)]
+    [InlineData("Kaisen Jujutsu", "Jujutsu Kaisen", true)]
+    [InlineData("Dragon Ball Z", "Dragon Ball Super", false)]         // otra palabra
+    [InlineData("Dragon Ball Z", "Dragon Ball GT", false)]
+    [InlineData("Dragon Ball", "Dragon Ball Z", false)]               // una palabra de más: lo juzga el parecido por palabras
+    [InlineData("Dragon Ball Z: Battle of Gods", "Dragon Ball Z Película 14: Battle of Gods", false)]
+    [InlineData("", "Anime", false)]
+    public void SoloCambiaLaEscritura_DistingueUnaErrataDeOtraPalabra(string a, string b, bool esperado)
+    {
+        TituloSimilaridad.SoloCambiaLaEscritura(a, b).Should().Be(esperado);
+        TituloSimilaridad.SoloCambiaLaEscritura(b, a).Should().Be(esperado);
+    }
+
     [Fact]
     public void MejorSimilitud_ConAlternativos_DeberiaUsarElMejor()
     {
