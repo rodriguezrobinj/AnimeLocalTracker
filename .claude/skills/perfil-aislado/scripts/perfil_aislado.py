@@ -183,9 +183,13 @@ def iniciar(args):
     reales_antes = sesiones(datos_reales())
     propios_antes = sesiones(datos(perfil))  # un perfil reutilizado ya trae registros de ejecuciones anteriores
 
+    # También los temporales: la app guarda ahí los torrents a medias (%TEMP%\AnimeLocalTrackerTorrents) y al arrancar borra los
+    # que no están en SU cola. Con el %TEMP% real, la instancia de prueba borraría los torrents a medias de la app real.
+    temporales = perfil / "AppData" / "Local" / "Temp"
+    temporales.mkdir(parents=True, exist_ok=True)
     env = os.environ.copy()
     env.update(USERPROFILE=str(perfil), LOCALAPPDATA=str(perfil / "AppData" / "Local"), APPDATA=str(perfil / "AppData" / "Roaming"),
-               ANIMELOCALTRACKER_LOG_DETALLADO="1")
+               TEMP=str(temporales), TMP=str(temporales), ANIMELOCALTRACKER_LOG_DETALLADO="1")
     if not args.con_red:
         env["ANIMELOCALTRACKER_SIN_RED"] = "1"
     proceso = subprocess.Popen([str(exe)], env=env, cwd=str(exe.parent))
