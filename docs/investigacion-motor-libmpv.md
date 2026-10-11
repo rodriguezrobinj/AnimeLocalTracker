@@ -1,0 +1,236 @@
+# Diseño: migrar el reproductor de episodios de Flyleaf a libmpv
+
+Fecha: 2026-10-10. Estado: diseño aprobado en conversación, pendiente de revisión por escrito. Cada etapa tendrá su propio plan (`docs/plan-motor-libmpv-etapa-N.md`) cuando le toque.
+
+Antecedentes: sección 5.1 de `docs/investigacion-ecosistema-poliglota.md` (por qué se evaluó y el primer prototipo).
+
+## 1. Qué se quiere conseguir
+
+Decidido por el propietario del proyecto:
+
+1. **Memoria estable** al encadenar episodios (con Flyleaf se quedan unos 17 MB por episodio, PERF-02).
+2. **Quitar los parches**: el parche de Harmony sobre el lector de subtítulos, el dibujante propio de ASS, el reintento de AV1, la lectura de contadores privados por reflexión y la versión de integración continua de MaterialDesign que Flyleaf obliga a usar.
+3. **Mejor imagen**: Anime4K.
+4. **Apertura y saltos rápidos.**
+
+Condiciones:
+
+- El reproductor conserva todo lo que hace hoy.
+- La migración va **por etapas y con interruptor**: los dos motores conviven hasta que el nuevo iguale al actual.
+- Se usa la **compilación GPL ya hecha** de libmpv (shinchiro, la que enlaza mpv.io). El código de la app sigue bajo MIT; el paquete que se distribuye pasa a incluir un componente GPL.
+
+## 2. Alcance
+
+Flyleaf **solo** mueve el reproductor de episodios. La música de AnimeThemes (`AudioTrackPlayer`) y los clips de los minijuegos (`ClipPlayer`) usan el `MediaPlayer` de WPF y no entran.
+
+Dependen hoy de Flyleaf:
+
+| Pieza | Papel |
+|---|---|
+| `ViewModels/ReproductorViewModel*.cs` (3.056 líneas en tres archivos) | Usa `Player` directamente (unas 35 funciones distintas) |
+| `Views/ReproductorView.xaml` y `.xaml.cs` (1.285 + 1.157 líneas) | `FlyleafHost`: video y controles son dos ventanas nativas superpuestas |
+| `Views/MiniReproductorWindow` | Aloja la misma vista en una ventana flotante |
+| `Services/PlaybackSeekCoordinator`, `PlaybackVolumeCoordinator`, `SubtitleCoordinator`, `FrameCaptureService` | Reciben un `Player` en sus métodos |
+| `Services/EpisodeNavigator` | Lectura adelantada del episodio siguiente con un `Demuxer` de Flyleaf |
+| `Services/MotorVideo` | Arranque del motor, tarjetas gráficas, política del modo automático |
+| `Services/ParcheSubtitulosFlyleaf`, `SubtitleAssRenderer`, `SubtitleCuesExtractorService`, `Core/SubtitulosAss` | Subtítulos leídos y dibujados por la app para esquivar el lector de Flyleaf |
+| `Controls/SubtitleTextView` | La capa de texto con el estilo del usuario. La usa también la vista previa de Configuración, así que **no se borra**: deja de usarse en el reproductor |
+| `Core/EcualizadorAudio` | Filtros de audio de FFmpeg que se le pasan a Flyleaf |
+
+Fuera de alcance: el mando web, cambios en los controles del reproductor que no pida la migración, y sustituir `ffmpeg.exe`/`ffprobe.exe` (siguen haciendo falta para miniaturas, datos técnicos y detección de openings).
+
+## 3. Lo que ya está medido
+
+Equipo de referencia: portátil con Intel HD 620, pantalla de 1366×768. mpv 0.41 (compilación de shinchiro del 2026-10-11). Arneses desechables fuera del repositorio; videos de la biblioteca en solo lectura y sin sonido.
+
+### 3.1 Prototipo del motor (ventana nativa)
+
+| Qué se midió | Resultado |
+|---|---|
+| Re:Zero T4 ep. 19 (el ASS que cerraba la app) | Abre en 0,6 s; 27 saltos exactos con mediana de 34 ms (máximo 57); ningún fotograma perdido; subtítulos con su estilo |
+| Tokyo Revengers T4 ep. 2 (AV1 1080p) | Abre a la primera en 0,3 s; decodifica por software (la HD 620 no decodifica AV1) con 35–46 % de un núcleo y ningún fotograma perdido |
+| Youjo Senki ep. 2 (1080p, ASS con estilos) | Cursivas y posición correctas; saltos de ~30 ms |
+| Memoria, 10 episodios H.264 seguidos | 180–212 MB de memoria privada, sin crecer (−2,6 MB por episodio) |
+| Memoria, 8 episodios AV1 seguidos | 285–292 MB, sin crecer (−0,8 MB por episodio) |
+| Cambio de episodio | 0,1–0,15 s del segundo en adelante |
+
+### 3.2 Dónde se pinta el video
+
+Se compararon dos caminos, 25 s de reproducción por caso con la ventana maximizada:
+
+| Caso | A: ventana nativa (como hoy) | B: dentro de la ventana de WPF |
+|---|---|---|
+| 720p H.264 | 0 perdidos, 2 % de un núcleo | 0 perdidos, 10 % |
+| 1080p H.264 | 0 perdidos, 3 % | 0 perdidos, 9 % |
+| 1080p AV1 | 0 perdidos, 20 % | 0 perdidos, 22–39 % (varió entre pasadas) |
+| 1080p + Anime4K ligero | 0 perdidos | 0 perdidos |
+| 1080p + Anime4K medio | 154 perdidos | 237 perdidos (14,6 de 24 por segundo) |
+| 1080p + Anime4K muy pesado | no concluyente | 4 de 24 por segundo |
+
+En B se comprobó con una captura que un panel translúcido y un deslizador de WPF se componen encima del video en una sola ventana.
+
+**Decisión: camino B.** Cuesta unos 7 puntos de procesador en H.264 (el fotograma decodificado por la gráfica se copia una vez más: `d3d11va-copy`), pero los controles pasan a ser WPF normal. Anime4K solo es viable en su nivel ligero en este equipo, por cualquiera de los dos caminos.
+
+No medido: la fluidez percibida (los contadores no dicen si un movimiento de cámara se ve suave), el mini reproductor y el pintado por software.
+
+## 4. Arquitectura
+
+**Un solo reproductor con el motor intercambiable.** `ReproductorViewModel` conserva su lógica (progreso, «visto», AniList, saltar opening, episodio siguiente, menús) y deja de hablar con Flyleaf: habla con `IMotorVideo`, que tiene dos implementaciones. Un ajuste elige cuál.
+
+Se descartó copiar el reproductor entero para libmpv: duplicaría 3.000 líneas de lógica afinada y cualquier comportamiento que se le escapara a la copia se perdería sin aviso.
+
+### 4.1 Piezas
+
+| Pieza | Qué hace | Etapa |
+|---|---|---|
+| `Services/IMotorVideo.cs` | El contrato del motor (4.2) | 1 |
+| `Services/MotorFlyleaf.cs` | Envuelve el Flyleaf de hoy y se lleva dentro sus rodeos: vigilancia del arranque, reapertura de AV1, contador de fotogramas por reflexión, ventanas de espera de los saltos, lectura adelantada del episodio siguiente | 1 |
+| `MotorDePrueba` (proyecto de pruebas) | Motor de mentira para probar el reproductor sin video | 1 |
+| `Services/Native/LibMpv.cs` | Llamadas a `libmpv-2.dll` con `[LibraryImport]`, comprobación `Disponible` y degradación limpia si falta | 2 |
+| `Services/MotorMpv.cs` | libmpv detrás de `IMotorVideo`: órdenes, propiedades observadas y eventos en un hilo propio, que saltan al hilo de la interfaz antes de avisar | 2 |
+| `Controls/SuperficieMpv.cs` | Lienzo OpenGL que WPF compone como una imagen, donde libmpv pinta cada fotograma | 2 |
+| `Views/ReproductorMpvView.xaml` | Vista nueva: la superficie y, encima, los controles de hoy como WPF normal | 2 |
+
+### 4.2 El contrato del motor
+
+Recoge solo lo que el reproductor le pide hoy a Flyleaf. **La forma definitiva está en `docs/plan-motor-libmpv-etapa-1.md` (tarea 1)**, cerrada tras recorrer cada llamada; lo de abajo es el esbozo previo, que se conserva para ver de dónde se partió. Cambió en tres cosas: la apertura es una orden más un aviso (no una tarea que se espera), el contrato es más ancho (fotogramas mostrados, decodificación, tarjeta, proporción) porque la coreografía del arranque se queda en el reproductor, y no hay interfaz aparte para los subtítulos dibujados por la app.
+
+```csharp
+public enum EstadoMotor { Detenido, Abriendo, Reproduciendo, EnPausa, Terminado, Fallido }
+
+/// <summary>Una pista de audio o de subtítulos, sin tipos del motor.</summary>
+public sealed record PistaMedia(int Id, string? Idioma, string? Titulo, string Codec, bool EsExterna, bool Elegida);
+
+public interface IMotorVideo : IDisposable
+{
+    EstadoMotor Estado { get; }
+    TimeSpan Posicion { get; }
+    TimeSpan Duracion { get; }
+    event EventHandler<EstadoMotor>? EstadoCambiado;
+    event EventHandler<AperturaTerminada>? AperturaTerminada;   // éxito o fallo, códec, tamaño, si decodifica la gráfica
+
+    Task AbrirAsync(string ruta, TimeSpan? desde = null, CancellationToken ct = default);
+    void Reproducir();
+    void Pausar();
+    void Detener();
+    void Saltar(TimeSpan destino, bool exacto);
+    double Velocidad { get; set; }
+    int Volumen { get; set; }
+    bool Silencio { get; set; }
+
+    IReadOnlyList<PistaMedia> PistasAudio { get; }
+    IReadOnlyList<PistaMedia> PistasSubtitulos { get; }
+    void ElegirAudio(int id);
+    void ElegirSubtitulos(int? id);                              // null = apagados
+
+    void AplicarFiltrosAudio(IReadOnlyList<FiltroAudio> filtros); // ecualizador y modo noche
+    Task<BitmapSource?> CapturarFotogramaAsync();
+    void ConfigurarRendimiento(AjustesRendimientoVideo ajustes);  // aceleración, tarjeta, saltos, escalado
+    InformeVideo? Informe { get; }
+}
+```
+
+`AperturaTerminada` y `AjustesRendimientoVideo` son registros nuevos sin tipos del motor; `FiltroAudio` e `InformeVideo` ya existen.
+
+Lo que solo tiene sentido con Flyleaf (el texto del subtítulo para la capa de WPF, el dibujante de ASS, la resolución de líneas solapadas) no entra en el contrato común. En el plan de la etapa 1 se resolvió sin interfaz aparte: el reproductor trabaja con pistas propias y la vista clásica llega al `Player` de Flyleaf por una propiedad de paso que se borra con él.
+
+### 4.3 Qué cambia en lo que ya existe
+
+- `ReproductorViewModel` y los coordinadores de saltos, volumen, subtítulos y captura reciben `IMotorVideo` en vez de `Player`. Su lógica no cambia.
+- Todo rodeo específico de Flyleaf se muda a `MotorFlyleaf`; no se queda en el reproductor detrás de condicionales.
+- `MotorVideo` (arranque y política del modo automático) pasa a decidir también qué motor crear.
+
+### 4.4 Cómo se traduce cada función a libmpv
+
+| Función | En libmpv |
+|---|---|
+| Abrir, reanudar | `loadfile` con la opción `start` del archivo; eventos de archivo cargado, primer fotograma y fin |
+| Posición, duración, estado | Propiedades observadas: `time-pos`, `duration`, `pause`, `core-idle`, `eof-reached` (con `keep-open`) |
+| Saltos | `seek … absolute+exact` o `absolute+keyframes` |
+| Velocidad, volumen, silencio | `speed`, `volume`, `mute` |
+| Pistas | `track-list`; `aid` y `sid` |
+| Subtítulos ASS con su estilo | Nativo (libass), incluidas fuentes adjuntas y líneas solapadas |
+| «Usar mi estilo» | `sub-ass-override=force` |
+| Estilo de Configuración | `sub-font`, `sub-font-size`, `sub-color`, `sub-border-color`, `sub-border-size`, `sub-shadow-offset`, `sub-margin-y` |
+| Ecualizador y modo noche | `af` con los mismos filtros de FFmpeg, etiquetados para cambiarlos en vivo |
+| Captura | `screenshot-raw` |
+| Aceleración por hardware | `hwdec=auto-copy` o `no` |
+| Informe de video | `video-codec`, `hwdec-current`, `width`, `height` |
+| Anime4K | `glsl-shaders` |
+
+libmpv se arranca siempre con `config=no`, `load-scripts=no`, `ytdl=no`, `input-default-bindings=no` y `osc=no`: no lee la configuración ni los scripts de mpv del usuario, no resuelve direcciones de internet y no reacciona al teclado por su cuenta. Solo abre los archivos locales que la app ya valida.
+
+**Los subtítulos los dibuja siempre libmpv**, también los de texto plano con el estilo de Configuración. Puede haber diferencias pequeñas de aspecto frente a la capa de WPF de hoy (grosor del contorno, sombra) que se ajustan a ojo en la etapa 3. La vista previa de Configuración sigue siendo la capa de WPF (`SubtitleTextView`): el ajuste de la etapa 3 consiste en que lo que se ve en el reproductor se parezca a esa vista previa.
+
+## 5. La vista
+
+**Pintado.** `SuperficieMpv` usa `OpenTK.GLWpfControl` (OpenGL compartido con WPF a través de Direct3D) y la interfaz de pintado de libmpv (`vo=libmpv`). libmpv avisa cuando hay fotograma nuevo y la superficie lo pinta en el siguiente paso de composición de WPF, sin bloquear el hilo de la interfaz.
+
+**Controles.** `ReproductorMpvView` copia el árbol de controles de `ReproductorView` y lo coloca encima de la superficie como WPF normal. Sobran en la vista nueva la reflexión que apaga el ratón nativo de Flyleaf, el rodeo de los enlaces congelados en la raíz del `FlyleafHost` y el gancho de los bordes del mini reproductor.
+
+**Qué vista se abre.** El reproductor expone qué motor usa y la plantilla de `App.xaml` elige `ReproductorView` o `ReproductorMpvView`. Navegación, ficha e historial no cambian.
+
+**Mini reproductor.** La misma ventana flotante de hoy con la vista dentro. Al pasar del formato normal al mini, la superficie se crea en la otra ventana y libmpv vuelve a engancharse sin cortar la reproducción. **Sin probar**: la etapa 3 empieza comprobándolo; si hubiera corte, la alternativa es mover la superficie entre ventanas en vez de recrearla.
+
+**Rendimiento de video (Configuración → Reproducción).** Los ajustes conservan su aspecto:
+
+| Ajuste | Con libmpv |
+|---|---|
+| Saltos | Exactos o a fotograma clave. En Automático, exactos |
+| Aceleración por hardware | Decodificación por la gráfica encendida o apagada |
+| Escalado inteligente | Anime4K (sección 6) |
+| Tarjeta gráfica | Se conserva si libmpv permite elegirla con este modo de pintado; si no, se oculta con el motor nuevo. Se comprueba en la etapa 3 |
+
+**Modo de compatibilidad.** Si el lienzo OpenGL no arranca (máquina virtual, escritorio remoto, controlador antiguo): mientras exista Flyleaf se usa el motor clásico y se anota en el registro. Para después de la retirada, la candidata es la salida por software de libmpv sobre una imagen de WPF, limitada al tamaño de la ventana. **Sin medir**: se mide en la etapa 5 y, si no basta, la retirada de Flyleaf espera a tener otra salida.
+
+## 6. Anime4K
+
+El ajuste «Escalado inteligente» (`EscaladoInteligenteVideo`: Automático, Activado, Desactivado) pasa a gobernar Anime4K con el motor nuevo. No hay pantallas ni ajustes nuevos.
+
+- **Niveles**: ligero (`Clamp_Highlights` + `Restore_CNN_S` + `Upscale_CNN_x2_S`, el medido sin pérdidas en la HD 620) y medio (variantes `M`) para gráficas dedicadas. La política que elige nivel vive en `MotorVideo`, junto a la de los saltos.
+- **Automático**: se enciende en el nivel que corresponde al equipo y **se apaga solo** en ese episodio si el contador de fotogramas perdidos crece de forma sostenida; se anota en el registro.
+- **Activado**: mismo nivel, sin apagado automático.
+- **Desactivado**: nunca.
+
+Los shaders (MIT, menos de 1 MB) van dentro del repositorio.
+
+## 7. Etapas
+
+Cada una termina en algo comprobable en la app y lleva su propio plan.
+
+| Etapa | Contenido | Se da por buena cuando |
+|---|---|---|
+| 1. Costura | `IMotorVideo`, `MotorFlyleaf`, `MotorDePrueba`; reproductor y coordinadores pasan a la interfaz | La suite pasa, hay pruebas nuevas del reproductor con el motor de mentira y una pasada completa en la app con Flyleaf no muestra diferencias |
+| 2. libmpv básico | `LibMpv`, `MotorMpv`, `SuperficieMpv`, `ReproductorMpvView`, empaquetado y avisos de licencia; ajuste oculto `MotorVideo` en `settings.json` | Con el ajuste activado: abrir, pausar, saltar, volumen, velocidad, reanudar y episodio siguiente funcionan, y el progreso llega a la base como siempre |
+| 3. Paridad | Subtítulos, pistas de audio, ecualizador y modo noche, capturas, mini reproductor, pantalla completa, atajos, ajustes de rendimiento, informe de video | Cada función de la lista de comprobación del reproductor actual hace lo mismo con el motor nuevo |
+| 4. Anime4K | Sección 6 | Se enciende, se nota y se apaga solo al perder fotogramas |
+| 5. Predeterminado | libmpv por defecto; «Motor de video: Nuevo / Clásico» en Configuración → Reproducción; modo de compatibilidad | Una versión publicada y usada un tiempo sin volver al clásico |
+| 6. Retirada | Fuera `MotorFlyleaf`, `ReproductorView`, `ParcheSubtitulosFlyleaf`, `SubtitleAssRenderer`, `SubtitleCuesExtractorService`, `SubtitulosAss`, y los paquetes FlyleafLib, FlyleafLib.Controls.WPF, Flyleaf.FFmpeg y Lib.Harmony; MaterialDesignThemes a una versión estable | La app compila y pasa sin ninguna referencia a Flyleaf |
+
+Durante las etapas 2 a 5 hay dos vistas del reproductor: cualquier cambio en los controles habría que hacerlo en las dos, así que el reproductor no se toca por otros motivos hasta la etapa 6. La etapa 5 es el punto de no retorno práctico; hasta ahí todo se revierte apagando un ajuste.
+
+## 8. Empaquetado y licencia
+
+- `libmpv-2.dll` (121 MB) no entra en git. Se sigue el patrón de `tools\Get-FFmpegBinaries.ps1`: un `tools\Get-Libmpv.ps1` con versión y SHA-256 fijadas, usado por `build.ps1`, el CI y el corte de versión.
+- El proveedor solo conserva sus compilaciones unos dos meses (30 publicadas el 2026-10-10). Para que la versión fijada no desaparezca hay que archivar el paquete en una release del propio repositorio. **Esa subida necesita el visto bueno del propietario** en la etapa 2.
+- El instalador crece unos 120 MB desde la etapa 2 y no baja en la 6: la carpeta `FFmpeg/` sigue haciendo falta para `ffmpeg.exe` y `ffprobe.exe`.
+- Paquetes nuevos: `OpenTK.GLWpfControl` y sus dependencias. Su peso real en el instalador se mide en la etapa 2.
+- Licencia: el código sigue bajo MIT. «Acerca de», el README y la página de cada release avisan de que el paquete incluye mpv bajo GPL, con enlace a su código fuente y a la versión exacta. Si algún día se quisiera cerrar el código habría que pasar a una compilación LGPL.
+
+## 9. Pruebas y verificación
+
+- **Reproductor con motor de mentira (etapa 1)**: al terminar un episodio pasa al siguiente, marca visto en el umbral, reanuda donde iba, no fabrica fechas de reproducción. Hoy esas rutas corren sin motor.
+- **Motor real sin pantalla (etapa 2)**: `MotorMpv` con `vo=null` y `ao=null` sobre videos diminutos generados con el FFmpeg de la app: abrir, saltar, listar pistas, llegar al final, cancelar a mitad. Corren si la biblioteca está descargada y se saltan si falta.
+- **En la app con perfil aislado, al cerrar cada etapa**: los tres videos de referencia, un episodio con subtítulos SRT, el mini reproductor y diez episodios seguidos mirando la memoria. Nunca más del 85 % de un episodio ni el último de un anime sin completar.
+- Reglas del repositorio que aplican: `[LibraryImport]` (nunca `[DllImport]`), saltos al hilo de la interfaz antes de tocar nada observable, textos nuevos por `LocalizationService`, colores de la paleta.
+
+## 10. Riesgos
+
+| Riesgo | Mitigación |
+|---|---|
+| Perder comportamientos afinados al mover código a `MotorFlyleaf` (etapa 1) | Pruebas nuevas con el motor de mentira y pasada completa en la app antes de seguir |
+| El mini reproductor al cambiar de ventana | Sin probar: va lo primero de la etapa 3, con alternativa prevista |
+| Equipos donde el lienzo OpenGL no arranque | El interruptor mientras exista Flyleaf; después, el modo de compatibilidad, que hay que medir |
+| Diferencias de aspecto en los subtítulos con el estilo del usuario | Ajuste a ojo en la etapa 3 |
+| Fluidez percibida | La juzga el propietario al probar la etapa 2; si no convence, queda el camino A (ventana nativa) |
+| Dos vistas durante la convivencia | No tocar el reproductor por otros motivos hasta la etapa 6 |
