@@ -60,3 +60,6 @@ public sealed partial class OpcionPistaAudio : ObservableObject
         return opciones.FirstOrDefault(o => string.Equals(o.Idioma, idiomaPreferido, StringComparison.OrdinalIgnoreCase));
     }
 }
+
+/// <summary>Una pista de subtítulos en el menú del reproductor.</summary>
+public sealed record OpcionPistaSubtitulos(Services.PistaSubtitulosMotor Pista, string Nombre);

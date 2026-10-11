@@ -106,5 +106,6 @@ dotnet run --project AnimeLocalTracker/AnimeLocalTracker.csproj
 <div align="center">
   <h3>AnimeLocalTracker</h3>
   <p><em>Porque el mejor contenido del mundo exige la plataforma más avanzada para reproducirlo.</em></p>
-  <sub>Diseñado y distribuido bajo la estricta y permisiva Licencia MIT.</sub>
+  <sub>Diseñado y distribuido bajo la estricta y permisiva Licencia MIT.</sub><br>
+  <sub>El instalador incluye <a href="https://mpv.io">mpv</a> (libmpv, compilación de shinchiro <code>20261011-git-accb7b2821</code>), distribuido bajo la GPL versión 2 o posterior; su código fuente está en <a href="https://github.com/mpv-player/mpv">github.com/mpv-player/mpv</a>. El código de AnimeLocalTracker sigue bajo la licencia MIT.</sub>
 </div>

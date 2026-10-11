@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using AnimeLocalTracker.Services;
 using AnimeLocalTracker.ViewModels;
@@ -306,5 +307,57 @@ public sealed class ReproductorConMotorTests : IDisposable
 
         avisos.Should().Be(1);
         _motor.ProporcionVideo.Should().BeApproximately(1.333, 0.001);
+    }
+
+    [Theory]
+    [InlineData("Mpv", true, true)]
+    [InlineData("mpv", true, true)]
+    [InlineData("Mpv", false, false)] // falta la biblioteca: se sigue con el motor clásico
+    [InlineData("Flyleaf", true, false)]
+    [InlineData(null, true, false)]
+    [InlineData("cualquier otra cosa", true, false)]
+    public void ConElAjusteEnMpvPeroSinBiblioteca_SeUsaFlyleaf(string? ajuste, bool mpvDisponible, bool esperado)
+    {
+        MotorVideo.ElegirMotor(ajuste, mpvDisponible).Should().Be(esperado);
+    }
+
+    [Fact]
+    public async Task ElMenuDeSubtitulos_ListaLasPistasDelMotor_ConNombreLegible()
+    {
+        _motor.Subtitulos.Add(new PistaSubtitulosMotor(3, "es", null, true, false, null));
+        _motor.Subtitulos.Add(new PistaSubtitulosMotor(4, "en", "Signs & Songs", true, false, null));
+        using var sut = CrearSut(_motor);
+        await sut.CargarVideoAsync(_ruta, 101, "Frieren", 5);
+        _motor.TerminarApertura();
+
+        sut.PistasSubtitulosMenu.Select(p => p.Pista.Indice).Should().Equal(3, 4);
+        sut.PistasSubtitulosMenu[1].Nombre.Should().Contain("Signs & Songs");
+
+        sut.SelectSubtitleStreamCommand.Execute(sut.PistasSubtitulosMenu[1].Pista);
+        _motor.SubtitulosDelMotor!.Indice.Should().Be(4);
+    }
+
+    [Fact]
+    public void ConUnMotorInyectado_NoSeUsaLaVistaDelMotorNuevo()
+    {
+        using var sut = CrearSut(_motor);
+
+        sut.UsaMotorMpv.Should().BeFalse("solo el motor que elige la app por el ajuste decide la vista");
+    }
+
+    [Fact]
+    public async Task CerrarPorNavegacion_GuardaElProgresoYDesechaElMotor()
+    {
+        using var sut = CrearSut(_motor);
+        await sut.CargarVideoAsync(_ruta, 101, "Frieren", 5);
+        _motor.TerminarApertura();
+        _motor.FotogramasMostrados = 3;
+        await EsperarHasta(() => !sut.OcultarVideoInicio);
+        _motor.Posicion = TimeSpan.FromSeconds(120);
+
+        sut.CerrarPorNavegacion();
+
+        _motor.VecesDesechado.Should().Be(1);
+        await EsperarHasta(() => _estado.Invocations.Any(i => i.Method.Name == nameof(IPlaybackStateService.GuardarProgresoAsync)));
     }
 }

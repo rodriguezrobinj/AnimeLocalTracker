@@ -773,7 +773,7 @@ public sealed class LocalizationService : INotifyPropertyChanged
         ["Acerca_BuscarActualizaciones"] = "Buscar Actualizaciones",
         ["Acerca_RegistroCambios"] = "Registro de cambios y mejoras publicadas",
         ["Acerca_ProyectoOpenSource"] = "Proyecto de Código Abierto (Open Source)",
-        ["Acerca_Tecnologias"] = "Desarrollado con .NET 8, C#, WPF, Flyleaf, SQLite-net, MaterialDesign y Velopack.",
+        ["Acerca_Tecnologias"] = "Desarrollado con .NET 8, C#, WPF, Flyleaf, libmpv, SQLite-net, MaterialDesign y Velopack.",
         ["Acerca_AbrirRepositorioTip"] = "Abrir repositorio en GitHub",
         ["Acerca_VerGitHub"] = "Ver en GitHub",
         ["Acerca_ReportarProblemaTip"] = "Reportar un problema o sugerencia en GitHub Issues",
@@ -1255,6 +1255,7 @@ public sealed class LocalizationService : INotifyPropertyChanged
         // --- Acerca de ---
         ["Acerca_NovedadesTituloFormato"] = "Novedades: {0}",
         ["Acerca_LicenciaTexto"] = "Licencia MIT - Software de Código Abierto",
+        ["Acerca_AvisoMpv"] = "Incluye mpv (libmpv), distribuido bajo la licencia GPL versión 2 o posterior. Su código fuente está en mpv.io; el de esta app, en GitHub.",
         ["Acerca_NovedadesDefault"] = "- Gestor y reproductor nativo multimedia para colecciones de anime locales.\n- Auto-tracking local e integración bidireccional con AniList.\n- Motor acelerado por hardware con Flyleaf y DirectX.\n- Actualizaciones automáticas con Velopack y GitHub Releases.",
         ["Acerca_PublicadoFormato"] = "Publicado: {0:dd/MM/yyyy}",
         ["Acerca_ActualizacionDisponibleTitulo"] = "¡Actualización Disponible!",
@@ -2167,7 +2168,7 @@ public sealed class LocalizationService : INotifyPropertyChanged
         ["Acerca_BuscarActualizaciones"] = "Check for Updates",
         ["Acerca_RegistroCambios"] = "Changelog of published fixes and improvements",
         ["Acerca_ProyectoOpenSource"] = "Open Source Project",
-        ["Acerca_Tecnologias"] = "Built with .NET 8, C#, WPF, Flyleaf, SQLite-net, MaterialDesign and Velopack.",
+        ["Acerca_Tecnologias"] = "Built with .NET 8, C#, WPF, Flyleaf, libmpv, SQLite-net, MaterialDesign and Velopack.",
         ["Acerca_AbrirRepositorioTip"] = "Open repository on GitHub",
         ["Acerca_VerGitHub"] = "View on GitHub",
         ["Acerca_ReportarProblemaTip"] = "Report a problem or suggestion on GitHub Issues",
@@ -2649,6 +2650,7 @@ public sealed class LocalizationService : INotifyPropertyChanged
         // --- About ---
         ["Acerca_NovedadesTituloFormato"] = "What's new: {0}",
         ["Acerca_LicenciaTexto"] = "MIT License - Open Source Software",
+        ["Acerca_AvisoMpv"] = "Includes mpv (libmpv), distributed under the GPL version 2 or later. Its source code is at mpv.io; this app's is on GitHub.",
         ["Acerca_NovedadesDefault"] = "- Native media manager and player for local anime collections.\n- Local auto-tracking with two-way AniList integration.\n- Hardware-accelerated engine with Flyleaf and DirectX.\n- Automatic updates via Velopack and GitHub Releases.",
         ["Acerca_PublicadoFormato"] = "Published: {0:MM/dd/yyyy}",
         ["Acerca_ActualizacionDisponibleTitulo"] = "Update Available!",

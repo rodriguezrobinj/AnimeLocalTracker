@@ -59,6 +59,8 @@
       <PackageReference Include="MdXaml" Version="1.27.0" />
       <!-- Descargas por torrent (Nyaa.si, MVP): MIT, activamente mantenida. -->
       <PackageReference Include="MonoTorrent" Version="3.0.2" />
+      <!-- Lienzo OpenGL que WPF compone como imagen: ahí pinta libmpv (Controls/SuperficieMpv.cs). -->
+      <PackageReference Include="OpenTK.GLWpfControl" Version="4.3.6" />
       <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
       <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.1" />
       <PackageReference Include="Microsoft.Extensions.Http.Polly" Version="8.0.1" />
@@ -71,6 +73,10 @@
 
     <ItemGroup>
       <None Include="FFmpeg\**">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
+      <!-- libmpv-2.dll (motor de video nuevo); la descarga tools\Get-Libmpv.ps1. -->
+      <None Include="Mpv\**">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>
       <None Include="Tools\**">

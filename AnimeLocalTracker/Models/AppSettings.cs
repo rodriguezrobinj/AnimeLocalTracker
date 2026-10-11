@@ -25,6 +25,9 @@ public class AppSettings
     public string? TarjetaGraficaVideo { get; set; }
     /// <summary>Escalado inteligente (RTX Video Super Resolution / Intel): "Automatico", "Activado" o "Desactivado".</summary>
     public string EscaladoInteligenteVideo { get; set; } = "Automatico";
+    /// <summary>Motor del reproductor de episodios: "Flyleaf" (el de siempre) o "Mpv" (libmpv, en pruebas: ver
+    /// docs/investigacion-motor-libmpv.md). Sin interfaz todavía: se cambia a mano en settings.json.</summary>
+    public string MotorVideo { get; set; } = "Flyleaf";
 
     /// <summary>Volumen del reproductor de video (0 a 100). Se recuerda de un video al siguiente y entre sesiones.</summary>
     public int VolumenReproductor { get; set; } = 100;

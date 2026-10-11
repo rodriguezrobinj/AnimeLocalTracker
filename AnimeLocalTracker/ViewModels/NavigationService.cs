@@ -234,6 +234,13 @@ public sealed partial class NavigationService : ObservableObject, INavigationSer
 
         // Navegar con el reproductor abierto: el episodio sigue en el mini reproductor (su propia ventana) y la app queda libre.
         _vistaAnteriorAlReproductor = null;
+        if (ReproductorActivo.UsaMotorMpv)
+        {
+            // Etapa 2: con el motor nuevo aún no hay mini reproductor; navegar cierra el episodio guardando el progreso.
+            ReproductorActivo.CerrarPorNavegacion();
+            ReproductorActivo = null;
+            return;
+        }
         if (!ReproductorActivo.EsModoMini) ReproductorActivo.MinimizarAMini();
     }
 }

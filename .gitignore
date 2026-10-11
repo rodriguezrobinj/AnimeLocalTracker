@@ -37,6 +37,7 @@ BenchmarkHistory/
 
 # Binarios que se descargan o se regeneran
 AnimeLocalTracker/FFmpeg/
+AnimeLocalTracker/Mpv/
 AnimeLocalTracker/Tools/
 native/**/target/
 # Lo regenera build.ps1 desde native\animetracker_core\target\release

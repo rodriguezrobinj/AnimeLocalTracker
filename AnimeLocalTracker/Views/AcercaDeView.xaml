@@ -276,6 +276,7 @@
                                 <StackPanel VerticalAlignment="Center">
                                     <TextBlock Text="{loc:T Acerca_ProyectoOpenSource}" Style="{StaticResource AppText.Section}"/>
                                     <TextBlock Text="{Binding LicenciaTexto, Mode=OneWay}" Style="{StaticResource AppText.Caption}"/>
+                                    <TextBlock Text="{loc:T Acerca_AvisoMpv}" Style="{StaticResource AppText.Caption}" TextWrapping="Wrap" MaxWidth="520" HorizontalAlignment="Left"/>
                                 </StackPanel>
                             </StackPanel>
 
@@ -287,6 +288,7 @@
                                 <Border Style="{StaticResource AcercaTechChip}"><TextBlock Text="C#" Style="{StaticResource AcercaTechChipText}"/></Border>
                                 <Border Style="{StaticResource AcercaTechChip}"><TextBlock Text="WPF" Style="{StaticResource AcercaTechChipText}"/></Border>
                                 <Border Style="{StaticResource AcercaTechChip}"><TextBlock Text="Flyleaf" Style="{StaticResource AcercaTechChipText}"/></Border>
+                                <Border Style="{StaticResource AcercaTechChip}"><TextBlock Text="libmpv" Style="{StaticResource AcercaTechChipText}"/></Border>
                                 <Border Style="{StaticResource AcercaTechChip}"><TextBlock Text="SQLite-net" Style="{StaticResource AcercaTechChipText}"/></Border>
                                 <Border Style="{StaticResource AcercaTechChip}"><TextBlock Text="MaterialDesign" Style="{StaticResource AcercaTechChipText}"/></Border>
                                 <Border Style="{StaticResource AcercaTechChip}"><TextBlock Text="Velopack" Style="{StaticResource AcercaTechChipText}"/></Border>

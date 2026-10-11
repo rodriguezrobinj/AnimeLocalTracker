@@ -62,6 +62,9 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
     private readonly Func<AjustesInicialesMotor, IMotorVideo?> _fabricaMotor;
 
+    /// <summary>El reproductor usa libmpv: la plantilla de App.xaml elige con esto la vista que pinta el video dentro de WPF.</summary>
+    public bool UsaMotorMpv { get; }
+
     [ObservableProperty]
     private bool _esModoMini;
 
@@ -355,7 +358,19 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         ILimpiadorDeEpisodios? limpiadorDeEpisodios = null,
         Func<AjustesInicialesMotor, IMotorVideo?>? fabricaMotor = null)
     {
-        _fabricaMotor = fabricaMotor ?? MotorFlyleaf.Crear;
+        if (fabricaMotor != null)
+        {
+            _fabricaMotor = fabricaMotor;
+        }
+        else
+        {
+            string? ajusteMotor = settingsService?.ObtenerConfiguracion()?.MotorVideo;
+            bool pideMpv = string.Equals(ajusteMotor?.Trim(), "Mpv", StringComparison.OrdinalIgnoreCase);
+            // La biblioteca solo se carga si el ajuste la pide: con el motor clásico ni se toca.
+            UsaMotorMpv = pideMpv && !EsEntornoPruebas() && MotorVideo.ElegirMotor(ajusteMotor, Services.Native.LibMpv.Disponible);
+            if (pideMpv && !UsaMotorMpv) AppLogger.Warn("ReproductorViewModel", "El ajuste pide el motor libmpv pero su biblioteca no está: se usa el motor clásico.");
+            _fabricaMotor = UsaMotorMpv ? ajustes => MotorMpv.Crear(ajustes) : MotorFlyleaf.Crear;
+        }
         _databaseService = databaseService;
         _limpiadorDeEpisodios = limpiadorDeEpisodios;
         _settingsService = settingsService;
@@ -572,6 +587,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         _haCompletadoOpen = true;
         AppLogger.Debug("ReproductorViewModel", $"[Arranque] OpenCompleted a los {_relojArranque.ElapsedMilliseconds} ms (estado {motor.Estado}).");
         AppLogger.Debug("ReproductorViewModel", $"Pistas de subtítulos disponibles: {motor.PistasSubtitulos.Count}.");
+        ActualizarPistasSubtitulosMenu();
         EvaluarSubtitulosPorDefecto();
 
         try
@@ -856,6 +872,9 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     [RelayCommand]
     public void MinimizarAMini()
     {
+        // El mini reproductor llega en la etapa 3: dos vistas no pueden pintar a la vez el mismo video de libmpv.
+        if (UsaMotorMpv) return;
+
         EsModoMini = true;
         _windowModeCoordinator.EntrarModoMini();
     }
@@ -884,6 +903,21 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     // ── Pistas de audio (doblaje + original, comentarios…). El botón está siempre; con una sola pista el menú lo dice. ──
 
     public System.Collections.ObjectModel.ObservableCollection<OpcionPistaAudio> PistasAudio { get; } = new();
+
+    /// <summary>Pistas de subtítulos del archivo abierto, para el menú de la vista del motor nuevo.</summary>
+    public System.Collections.ObjectModel.ObservableCollection<OpcionPistaSubtitulos> PistasSubtitulosMenu { get; } = new();
+
+    private void ActualizarPistasSubtitulosMenu()
+    {
+        var opciones = (Motor?.PistasSubtitulos ?? Array.Empty<PistaSubtitulosMotor>())
+            .Select((p, i) => new OpcionPistaSubtitulos(p, OpcionPistaAudio.ConstruirNombre(p.Idioma, p.Titulo, i + 1)))
+            .ToList();
+        Core.HiloUi.Ejecutar(() =>
+        {
+            PistasSubtitulosMenu.Clear();
+            foreach (var o in opciones) PistasSubtitulosMenu.Add(o);
+        });
+    }
 
     [ObservableProperty] private bool _hayVariasPistasAudio;
     [ObservableProperty] private bool _hayUnaSolaPistaAudio;
@@ -2181,6 +2215,15 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     /// Única salida del reproductor (botón de retroceder, ✕, Esc, fin de episodio): guarda, cierra el PiP y vuelve a la vista
     /// anterior. La pantalla completa se conserva (decisión del usuario): solo se sale del reproductor, no del modo de la ventana. Registra el motivo en el log: si alguna vez "vuelve solo a la ficha", el log dirá qué lo pidió.
     /// </summary>
+    /// <summary>Cierra el episodio porque el usuario navegó a otra parte de la app (con el motor nuevo aún no hay mini reproductor
+    /// que lo siga mostrando). Como <see cref="SalirDelReproductor"/>, pero sin volver a la vista anterior.</summary>
+    public void CerrarPorNavegacion()
+    {
+        AppLogger.Info("ReproductorViewModel", $"Saliendo del reproductor (episodio {_episodio}, {TimeSpan.FromSeconds(CurrentSeconds):mm\\:ss}): se navegó a otra parte de la app.");
+        _ = GuardarProgresoActualAsync();
+        Dispose();
+    }
+
     private void SalirDelReproductor(string motivo)
     {
         AppLogger.Info("ReproductorViewModel", $"Saliendo del reproductor (episodio {_episodio}, {TimeSpan.FromSeconds(CurrentSeconds):mm\\:ss}): {motivo}.");

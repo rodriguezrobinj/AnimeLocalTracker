@@ -172,6 +172,10 @@ public static class MotorVideo
         _ => fabricante is FabricanteGrafica.Nvidia or FabricanteGrafica.Intel && memoriaMb >= 2048
     };
 
+    /// <summary>True si toca el motor nuevo: lo pide el ajuste y la biblioteca está en la instalación.</summary>
+    public static bool ElegirMotor(string? ajuste, bool mpvDisponible) =>
+        mpvDisponible && string.Equals(ajuste?.Trim(), "Mpv", StringComparison.OrdinalIgnoreCase);
+
     public static bool EscaladoDisponible(FabricanteGrafica fabricante) => fabricante is FabricanteGrafica.Nvidia or FabricanteGrafica.Intel;
 
     internal static FabricanteGrafica FabricanteDe(GPUVendor fabricante) => fabricante switch

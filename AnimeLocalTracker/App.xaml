@@ -447,7 +447,28 @@
             <!-- El reproductor NUNCA se reutiliza (swapchain Direct3D nativa): cada
                  navegación crea una vista nueva a partir del VM transitorio. -->
             <DataTemplate DataType="{x:Type vm:ReproductorViewModel}">
-                <views:ReproductorView />
+                <!-- Dos vistas mientras conviven los dos motores (docs/investigacion-motor-libmpv.md): la clásica (Flyleaf) y la del
+                     motor nuevo, que pinta el video dentro de WPF. El reproductor lo decide al construirse. -->
+                <ContentControl Content="{Binding}" Focusable="False">
+                    <ContentControl.Style>
+                        <Style TargetType="ContentControl">
+                            <Setter Property="ContentTemplate">
+                                <Setter.Value>
+                                    <DataTemplate><views:ReproductorView/></DataTemplate>
+                                </Setter.Value>
+                            </Setter>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding UsaMotorMpv}" Value="True">
+                                    <Setter Property="ContentTemplate">
+                                        <Setter.Value>
+                                            <DataTemplate><views:ReproductorMpvView/></DataTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ContentControl.Style>
+                </ContentControl>
             </DataTemplate>
         </ResourceDictionary>
     </Application.Resources>
