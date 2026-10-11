@@ -79,6 +79,10 @@
       <None Include="Mpv\**">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>
+      <!-- Shaders de Anime4K (MIT) para el escalado inteligente del motor nuevo. -->
+      <None Include="Shaders\**">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
       <None Include="Tools\**">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>

@@ -197,6 +197,9 @@ public sealed class MotorFlyleaf : IMotorVideo
         }
     }
 
+    public ClaseEscalado ClaseDeEscalado => ClaseEscalado.PorControlador;
+    public long FotogramasPerdidos => 0; // el escalado de la tarjeta no se vigila
+
     public bool EscaladoInteligente
     {
         get => Player.Config.Video.SuperResolution;

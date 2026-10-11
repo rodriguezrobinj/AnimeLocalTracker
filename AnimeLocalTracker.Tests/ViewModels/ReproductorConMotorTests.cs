@@ -435,4 +435,100 @@ public sealed class ReproductorConMotorTests : IDisposable
         _motor.FiltrosRecordados.Should().NotBeNull();
         _motor.FiltrosRecordados!.Should().Contain(f => f.Id == AnimeLocalTracker.Core.EcualizadorAudio.IdBanda(1) && f.Argumentos.EndsWith("g=3.0"));
     }
+
+    // ── Etapa 4 de libmpv: escalado con sombreadores (Anime4K), vigilado en automático ──
+
+    private ReproductorViewModel CrearSutConSombreadores(string modo)
+    {
+        _motor.ClaseDeEscalado = ClaseEscalado.PorSombreadores;
+        _motor.TarjetaEnUso = new TarjetaGrafica("Intel(R) HD Graphics 620", FabricanteGrafica.Intel, 0);
+        var configuracion = new Mock<ISettingsService>();
+        configuracion.Setup(c => c.ObtenerConfiguracion()).Returns(new AnimeLocalTracker.Models.AppSettings { EscaladoInteligenteVideo = modo });
+        return new ReproductorViewModel(
+            Mock.Of<IDatabaseService>(), Mock.Of<IAnimeTrackingService>(), Mock.Of<IAuthService>(),
+            settingsService: configuracion.Object, playbackStateService: _estado.Object, fabricaMotor: _ => _motor)
+        {
+            VigilanteEscalado = new VigilanteEscalado { Ventana = TimeSpan.FromMilliseconds(40) }
+        };
+    }
+
+    private async Task AbrirYVerLaImagen(ReproductorViewModel sut, int episodio = 5)
+    {
+        await sut.CargarVideoAsync(_ruta, 101, "Frieren", episodio);
+        _motor.TerminarApertura();
+        _motor.FotogramasMostrados = 3;
+        await EsperarHasta(() => !sut.OcultarVideoInicio);
+    }
+
+    /// <summary>El motor "pierde" fotogramas sin parar hasta que se cumple la condición (o se agota el tiempo).</summary>
+    private async Task<bool> PerdiendoFotogramasHasta(Func<bool> condicion, int ms)
+    {
+        var limite = DateTime.UtcNow.AddMilliseconds(ms);
+        while (!condicion() && DateTime.UtcNow < limite)
+        {
+            _motor.FotogramasPerdidos += 10;
+            await Task.Delay(20);
+        }
+        return condicion();
+    }
+
+    [Fact]
+    public async Task ConSombreadores_EnAutomaticoSeEnciendeAunqueLaTarjetaSeaIntegrada()
+    {
+        using var sut = CrearSutConSombreadores(ModosRendimientoVideo.Automatico);
+
+        await AbrirYVerLaImagen(sut);
+
+        await EsperarHasta(() => _motor.EscaladoInteligente);
+    }
+
+    [Fact]
+    public async Task EnAutomatico_SiPierdeFotogramasDeFormaSostenida_SeApagaEnEseEpisodio()
+    {
+        using var sut = CrearSutConSombreadores(ModosRendimientoVideo.Automatico);
+        await AbrirYVerLaImagen(sut);
+        await EsperarHasta(() => _motor.EscaladoInteligente);
+
+        (await PerdiendoFotogramasHasta(() => !_motor.EscaladoInteligente, 8000)).Should().BeTrue("cuatro ventanas seguidas perdiendo fotogramas");
+
+        // Y no vuelve a encenderse en el mismo episodio aunque deje de perder.
+        await Task.Delay(600);
+        _motor.EscaladoInteligente.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task EnActivado_NoSeApagaAunquePierdaFotogramas()
+    {
+        using var sut = CrearSutConSombreadores(ModosRendimientoVideo.Activado);
+        await AbrirYVerLaImagen(sut);
+        await EsperarHasta(() => _motor.EscaladoInteligente);
+
+        (await PerdiendoFotogramasHasta(() => !_motor.EscaladoInteligente, 2500)).Should().BeFalse("lo pidió el usuario: no se apaga solo");
+    }
+
+    [Fact]
+    public async Task TrasApagarsePorRendimiento_AlAbrirOtroEpisodioVuelveAIntentarlo()
+    {
+        using var sut = CrearSutConSombreadores(ModosRendimientoVideo.Automatico);
+        await AbrirYVerLaImagen(sut);
+        await EsperarHasta(() => _motor.EscaladoInteligente);
+        (await PerdiendoFotogramasHasta(() => !_motor.EscaladoInteligente, 8000)).Should().BeTrue();
+
+        await AbrirYVerLaImagen(sut, episodio: 6);
+
+        await EsperarHasta(() => _motor.EscaladoInteligente);
+    }
+
+    [Fact]
+    public async Task ConElEscaladoDelControlador_UnaIntegradaSigueSinEscaladoEnAutomatico()
+    {
+        // El motor clásico: su escalado es el de la tarjeta y en automático solo se usa con una dedicada.
+        _motor.TarjetaEnUso = new TarjetaGrafica("Intel(R) HD Graphics 620", FabricanteGrafica.Intel, 128);
+        using var sut = CrearSut(_motor);
+
+        await AbrirYVerLaImagen(sut);
+        await Task.Delay(400);
+
+        _motor.EscaladoInteligente.Should().BeFalse();
+    }
 }

@@ -52,6 +52,8 @@ public sealed class MotorDePrueba : IMotorVideo
     public event EventHandler? ProporcionVideoCambiada;
     public TarjetaGrafica? TarjetaEnUso { get; set; }
     public bool EscaladoInteligente { get; set; }
+    public ClaseEscalado ClaseDeEscalado { get; set; }
+    public long FotogramasPerdidos { get; set; }
     public BitmapSource? Captura { get; set; }
     public BitmapSource? CapturarFotograma() => Captura;
 

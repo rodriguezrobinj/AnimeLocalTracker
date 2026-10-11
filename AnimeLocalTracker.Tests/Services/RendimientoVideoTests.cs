@@ -53,6 +53,65 @@ public class RendimientoVideoTests
     public void Escalado_SegunModoYTarjeta(string modo, FabricanteGrafica fabricante, long memoriaMb, bool esperado) =>
         MotorVideo.UsarEscaladoInteligente(modo, fabricante, memoriaMb).Should().Be(esperado);
 
+    // === Escalado con sombreadores (Anime4K, motor nuevo): funciona en cualquier tarjeta y el reproductor lo vigila ===
+
+    [Theory]
+    [InlineData(ModosRendimientoVideo.Automatico, FabricanteGrafica.Intel, 0, true)]       // integrada, memoria desconocida
+    [InlineData(ModosRendimientoVideo.Automatico, FabricanteGrafica.Desconocido, 0, true)]
+    [InlineData(ModosRendimientoVideo.Activado, FabricanteGrafica.Amd, 0, true)]
+    [InlineData(ModosRendimientoVideo.Desactivado, FabricanteGrafica.Nvidia, 8192, false)]
+    [InlineData(null, FabricanteGrafica.Intel, 0, true)]                                   // settings.json editado a mano: como Automático
+    [InlineData("", FabricanteGrafica.Intel, 0, true)]
+    [InlineData("cualquiera", FabricanteGrafica.Intel, 0, true)]
+    public void EscaladoConSombreadores_SegunModo(string? modo, FabricanteGrafica fabricante, long memoriaMb, bool esperado) =>
+        MotorVideo.UsarEscaladoInteligente(modo, fabricante, memoriaMb, ClaseEscalado.PorSombreadores).Should().Be(esperado);
+
+    [Theory]
+    [InlineData(FabricanteGrafica.Intel, NivelEscalado.Ligero)]       // medido en una HD 620: el medio pierde 9 fotogramas por segundo
+    [InlineData(FabricanteGrafica.Desconocido, NivelEscalado.Ligero)]
+    [InlineData(FabricanteGrafica.Nvidia, NivelEscalado.Medio)]
+    [InlineData(FabricanteGrafica.Amd, NivelEscalado.Medio)]
+    public void NivelAnime4K_SegunLaTarjeta(FabricanteGrafica fabricante, NivelEscalado esperado) =>
+        MotorVideo.NivelAnime4K(fabricante).Should().Be(esperado);
+
+    [Fact]
+    public void SombreadoresAnime4K_ListaLosTresDeCadaNivelEnOrden()
+    {
+        MotorVideo.SombreadoresAnime4K(NivelEscalado.Ligero).Should().Equal(
+            "Anime4K_Clamp_Highlights.glsl", "Anime4K_Restore_CNN_S.glsl", "Anime4K_Upscale_CNN_x2_S.glsl");
+        MotorVideo.SombreadoresAnime4K(NivelEscalado.Medio).Should().Equal(
+            "Anime4K_Clamp_Highlights.glsl", "Anime4K_Restore_CNN_M.glsl", "Anime4K_Upscale_CNN_x2_M.glsl");
+    }
+
+    [Fact]
+    public void LosShadersDeAnime4K_EstanJuntoALaApp()
+    {
+        string carpeta = System.IO.Path.Combine(AppContext.BaseDirectory, "Shaders", "Anime4K");
+        foreach (string nombre in System.Linq.Enumerable.Concat(MotorVideo.SombreadoresAnime4K(NivelEscalado.Ligero), MotorVideo.SombreadoresAnime4K(NivelEscalado.Medio)))
+        {
+            string ruta = System.IO.Path.Combine(carpeta, nombre);
+            System.IO.File.Exists(ruta).Should().BeTrue($"{nombre} se copia con la app");
+            System.IO.File.ReadAllText(ruta).Should().StartWith("// MIT License", "cada shader lleva su aviso de licencia");
+        }
+    }
+
+    [Fact]
+    public void LosShadersQueNoAmplian_SoloActuanSiElVideoSeAgranda()
+    {
+        // "Restaurar" y "recortar brillos" corrían siempre: medido en la app con una Intel HD 620, a 1080p sin ampliar perdían
+        // 8 fotogramas por segundo. Cada pasada de los cinco archivos lleva la condición de los shaders de ampliación.
+        const string condicion = "//!WHEN OUTPUT.w MAIN.w / 1.200 > OUTPUT.h MAIN.h / 1.200 > *";
+        string carpeta = System.IO.Path.Combine(AppContext.BaseDirectory, "Shaders", "Anime4K");
+        foreach (string ruta in System.IO.Directory.GetFiles(carpeta, "*.glsl"))
+        {
+            string[] lineas = System.IO.File.ReadAllLines(ruta);
+            int pasadas = System.Linq.Enumerable.Count(lineas, l => l.StartsWith("//!DESC", StringComparison.Ordinal));
+            int condicionadas = System.Linq.Enumerable.Count(lineas, l => l.Trim() == condicion);
+            pasadas.Should().BeGreaterThan(0);
+            condicionadas.Should().Be(pasadas, $"todas las pasadas de {System.IO.Path.GetFileName(ruta)} llevan la condición");
+        }
+    }
+
     // === Tarjeta elegida ===
 
     [Fact]

@@ -247,7 +247,52 @@ public sealed partial class MotorMpv : IMotorVideo
     }
 
     public TarjetaGrafica? TarjetaEnUso => _tarjeta;
-    public bool EscaladoInteligente { get => false; set { } }
+
+    // ── Escalado inteligente: Anime4K (sombreadores que libmpv aplica al pintar) ──
+
+    private volatile bool _escalado;
+
+    /// <summary>Junto a la app. Las pruebas la cambian para simular una instalación incompleta.</summary>
+    internal string CarpetaDeSombreadores { get; set; } = Path.Combine(AppContext.BaseDirectory, "Shaders", "Anime4K");
+
+    public ClaseEscalado ClaseDeEscalado => ClaseEscalado.PorSombreadores;
+    public long FotogramasPerdidos => _hayArchivo && long.TryParse(Leer("frame-drop-count"), out long perdidos) ? perdidos : 0;
+
+    public bool EscaladoInteligente
+    {
+        get => _escalado;
+        set
+        {
+            if (value == _escalado) return;
+            Ordenar("change-list", "glsl-shaders", "clr", "");
+            _escalado = value && CargarSombreadores();
+        }
+    }
+
+    /// <summary>False si falta algún archivo (instalación incompleta): mejor sin escalado que con medio juego de shaders.</summary>
+    private bool CargarSombreadores()
+    {
+        var nivel = NivelPedido();
+        var rutas = MotorVideo.SombreadoresAnime4K(nivel).Select(nombre => Path.Combine(CarpetaDeSombreadores, nombre)).ToList();
+        if (!rutas.All(File.Exists))
+        {
+            AppLogger.Warn("MotorMpv", $"Faltan los shaders de Anime4K en '{CarpetaDeSombreadores}': el escalado inteligente no se enciende.");
+            return false;
+        }
+        if (!rutas.All(ruta => Ordenar("change-list", "glsl-shaders", "append", ruta)))
+        {
+            Ordenar("change-list", "glsl-shaders", "clr", "");
+            return false;
+        }
+        AppLogger.Info("MotorMpv", $"Escalado inteligente encendido: Anime4K, nivel {nivel}.");
+        return true;
+    }
+
+    /// <summary>El que aguanta la tarjeta, salvo que la variable de diagnóstico ANIMELOCALTRACKER_ANIME4K_NIVEL fuerce otro.</summary>
+    private NivelEscalado NivelPedido() =>
+        Enum.TryParse(Environment.GetEnvironmentVariable("ANIMELOCALTRACKER_ANIME4K_NIVEL"), ignoreCase: true, out NivelEscalado forzado) && Enum.IsDefined(forzado)
+            ? forzado
+            : MotorVideo.NivelAnime4K(_tarjeta?.Fabricante ?? FabricanteGrafica.Desconocido);
 
     /// <summary>El fotograma que se está viendo, con sus subtítulos. libmpv lo escribe a un PNG sin comprimir que se lee y se borra.</summary>
     public BitmapSource? CapturarFotograma()

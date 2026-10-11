@@ -16,6 +16,14 @@ public sealed record AperturaTerminada(ClaseApertura Clase, bool Exito, string? 
 
 public enum FabricanteGrafica { Desconocido, Intel, Nvidia, Amd }
 
+/// <summary>
+/// Cómo mejora la imagen cada motor: con el escalado del controlador de la tarjeta (solo algunas, y no se puede medir lo que le cuesta)
+/// o con sombreadores propios (en cualquier tarjeta, y se ve cuándo no dan abasto).
+/// </summary>
+public enum ClaseEscalado { PorControlador, PorSombreadores }
+
+public enum NivelEscalado { Ligero, Medio }
+
 /// <summary>Una pista de audio del archivo abierto. <paramref name="Idioma"/> en dos letras, o null si no se sabe.</summary>
 public sealed record PistaAudioMotor(int Indice, string? Idioma, string? Titulo);
 
@@ -60,6 +68,9 @@ public interface IMotorVideo : IDisposable
     event EventHandler? ProporcionVideoCambiada;
     TarjetaGrafica? TarjetaEnUso { get; }
     bool EscaladoInteligente { get; set; }
+    ClaseEscalado ClaseDeEscalado { get; }
+    /// <summary>Fotogramas que el motor no llegó a pintar a tiempo desde que abrió el archivo. 0 si el motor no lo sabe.</summary>
+    long FotogramasPerdidos { get; }
     BitmapSource? CapturarFotograma();
 
     IReadOnlyList<PistaAudioMotor> PistasAudio { get; }

@@ -1327,6 +1327,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             _arranqueRegistrado = false;
             _cambiandoPistaAudio = false;
             _imagenLista = false;
+            _escaladoApagadoPorRendimiento = false; // cada episodio vuelve a intentarlo: puede ser de otra resolución
             if (_reabiertoPorProcesador)
             {
                 // El episodio anterior no pudo con la tarjeta gráfica; este se juzga por sí solo con el ajuste del usuario.
@@ -1592,8 +1593,14 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
             _estrategiaSaltos = MotorVideo.ElegirEstrategiaSaltos(ajustes?.ModoSaltosVideo, porHardware, Environment.ProcessorCount);
 
-            bool escalado = tarjeta != null && MotorVideo.UsarEscaladoInteligente(ajustes?.EscaladoInteligenteVideo, tarjeta.Fabricante, tarjeta.MemoriaMb);
-            motor.EscaladoInteligente = escalado;
+            string? modoEscalado = ajustes?.EscaladoInteligenteVideo;
+            motor.EscaladoInteligente = tarjeta != null && !_escaladoApagadoPorRendimiento
+                && MotorVideo.UsarEscaladoInteligente(modoEscalado, tarjeta.Fabricante, tarjeta.MemoriaMb, motor.ClaseDeEscalado);
+            bool escalado = motor.EscaladoInteligente; // lo que quedó puesto de verdad (puede no haber podido)
+
+            // El escalado por sombreadores se enciende en cualquier tarjeta: en automático se vigila y, si no da abasto, se apaga.
+            VigilanteEscalado.Reiniciar();
+            _vigilarEscalado = escalado && motor.ClaseDeEscalado == ClaseEscalado.PorSombreadores && modoEscalado != ModosRendimientoVideo.Activado;
 
             AppLogger.Info("ReproductorViewModel", $"Video: {codec} por {(porHardware ? "tarjeta gráfica" : "procesador")} · tarjeta {tarjeta?.Nombre ?? "?"} · " +
                 $"{Environment.ProcessorCount} hilos · saltos {_estrategiaSaltos} · escalado {(escalado ? "sí" : "no")}.");
@@ -1603,6 +1610,23 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         {
             AppLogger.Debug("ReproductorViewModel", $"No se pudo evaluar el rendimiento del video: {ex.Message}");
         }
+    }
+
+    /// <summary>Cuándo se da por hecho que el escalado no da abasto. Las pruebas ponen ventanas de milisegundos.</summary>
+    internal VigilanteEscalado VigilanteEscalado { get; set; } = new();
+
+    private readonly Stopwatch _relojVigilante = Stopwatch.StartNew();
+    private volatile bool _vigilarEscalado;
+    /// <summary>Ya se apagó en este episodio por perder fotogramas: una reapertura del mismo archivo no lo vuelve a encender.</summary>
+    private volatile bool _escaladoApagadoPorRendimiento;
+
+    private void ApagarEscaladoPorRendimiento(IMotorVideo motor)
+    {
+        _vigilarEscalado = false;
+        _escaladoApagadoPorRendimiento = true;
+        motor.EscaladoInteligente = false;
+        AppLogger.Info("ReproductorViewModel", "El escalado inteligente perdía fotogramas de forma sostenida: se apaga en este episodio.");
+        if (MotorVideo.UltimoInforme is { } informe) MotorVideo.PublicarInforme(informe with { Escalado = false, MomentoUtc = DateTime.UtcNow });
     }
 
     private static Task EnHiloDeInterfazAsync(Action accion)
@@ -1960,6 +1984,8 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                     double curSeconds = Motor.Posicion.TotalSeconds;
                     double durSeconds = Motor.Duracion.TotalSeconds;
 
+                    if (_vigilarEscalado && VigilanteEscalado.Anotar(Motor.FotogramasPerdidos, _relojVigilante.Elapsed)) ApagarEscaladoPorRendimiento(Motor);
+
                     if (_imagenLista) AplicarSeekDeArranqueDiferidoSiCorresponde(durSeconds);
 
                     if (!IsDraggingSlider)
@@ -2219,7 +2245,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     private void SalirDelReproductor(string motivo)
     {
         AppLogger.Info("ReproductorViewModel", $"Saliendo del reproductor (episodio {_episodio}, {TimeSpan.FromSeconds(CurrentSeconds):mm\\:ss}): {motivo}.");
-        try { AppLogger.Debug("ReproductorViewModel", $"[Arranque] Al salir: posición {Motor?.Posicion.TotalSeconds:F1} s, estado {Motor?.Estado}, fotogramas {Motor?.FotogramasMostrados}, códec {Motor?.CodecVideo}, por tarjeta {Motor?.DecodificaPorHardware}."); } catch { }
+        try { AppLogger.Debug("ReproductorViewModel", $"[Arranque] Al salir: posición {Motor?.Posicion.TotalSeconds:F1} s, estado {Motor?.Estado}, fotogramas {Motor?.FotogramasMostrados} (perdidos {Motor?.FotogramasPerdidos}, escalado {Motor?.EscaladoInteligente}), códec {Motor?.CodecVideo}, por tarjeta {Motor?.DecodificaPorHardware}."); } catch { }
         EsModoMini = false;
         _windowModeCoordinator.SalirModoMini();
         _ = GuardarProgresoActualAsync();

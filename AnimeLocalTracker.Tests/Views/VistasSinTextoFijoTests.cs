@@ -22,7 +22,7 @@ public class VistasSinTextoFijoTests
     /// <summary>Texto que NO se traduce a propósito: nombres propios y tecnologías, nombres de tecla y cada idioma en su propio idioma.</summary>
     private static readonly HashSet<string> Permitidos = new(StringComparer.Ordinal)
     {
-        "MIT", ".NET 8", "WPF", "Flyleaf", "libmpv", "SQLite-net", "MaterialDesign", "Velopack",
+        "MIT", ".NET 8", "WPF", "Flyleaf", "libmpv", "Anime4K", "SQLite-net", "MaterialDesign", "Velopack",
         "ANIMELOCALTRACKER", "AnimeTracker",
         "Enter", "Escape",
         "Español", "English",

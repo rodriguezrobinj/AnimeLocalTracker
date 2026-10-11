@@ -289,6 +289,7 @@
                                 <Border Style="{StaticResource AcercaTechChip}"><TextBlock Text="WPF" Style="{StaticResource AcercaTechChipText}"/></Border>
                                 <Border Style="{StaticResource AcercaTechChip}"><TextBlock Text="Flyleaf" Style="{StaticResource AcercaTechChipText}"/></Border>
                                 <Border Style="{StaticResource AcercaTechChip}"><TextBlock Text="libmpv" Style="{StaticResource AcercaTechChipText}"/></Border>
+                                <Border Style="{StaticResource AcercaTechChip}"><TextBlock Text="Anime4K" Style="{StaticResource AcercaTechChipText}"/></Border>
                                 <Border Style="{StaticResource AcercaTechChip}"><TextBlock Text="SQLite-net" Style="{StaticResource AcercaTechChipText}"/></Border>
                                 <Border Style="{StaticResource AcercaTechChip}"><TextBlock Text="MaterialDesign" Style="{StaticResource AcercaTechChipText}"/></Border>
                                 <Border Style="{StaticResource AcercaTechChip}"><TextBlock Text="Velopack" Style="{StaticResource AcercaTechChipText}"/></Border>

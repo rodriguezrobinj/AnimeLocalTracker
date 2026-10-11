@@ -653,4 +653,68 @@ public sealed class MotorMpvTests : IClassFixture<VideoDePrueba>
         motor.TarjetaDetectada("  ", null);
         motor.TarjetaEnUso!.Nombre.Should().Be("Intel(R) HD Graphics 620", "sin nombre no cambia nada");
     }
+
+    // ── Etapa 4: Anime4K ──
+
+    [Fact]
+    public void EncenderElEscalado_CargaLosTresShadersDelNivelLigero_YApagarloLosQuita()
+    {
+        if (!AnimeLocalTracker.Services.Native.LibMpv.Disponible) return;
+        var (motor, _) = Crear();
+        using var __ = motor;
+        motor.ClaseDeEscalado.Should().Be(ClaseEscalado.PorSombreadores);
+        motor.EscaladoInteligente.Should().BeFalse();
+
+        motor.EscaladoInteligente = true;
+
+        motor.EscaladoInteligente.Should().BeTrue();
+        string cargados = motor.LeerPropiedad("glsl-shaders");
+        int a = cargados.IndexOf("Anime4K_Clamp_Highlights.glsl", StringComparison.Ordinal);
+        int b = cargados.IndexOf("Anime4K_Restore_CNN_S.glsl", StringComparison.Ordinal);
+        int c = cargados.IndexOf("Anime4K_Upscale_CNN_x2_S.glsl", StringComparison.Ordinal);
+        (a >= 0 && a < b && b < c).Should().BeTrue($"los tres, en orden: {cargados}");
+
+        motor.EscaladoInteligente = false;
+
+        motor.EscaladoInteligente.Should().BeFalse();
+        motor.LeerPropiedad("glsl-shaders").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void ConTarjetaNvidia_ElNivelEsElMedio()
+    {
+        if (!AnimeLocalTracker.Services.Native.LibMpv.Disponible) return;
+        var (motor, _) = Crear();
+        using var __ = motor;
+        motor.TarjetaDetectada("GeForce RTX 3060/PCIe/SSE2", "NVIDIA Corporation");
+
+        motor.EscaladoInteligente = true;
+
+        motor.LeerPropiedad("glsl-shaders").Should().Contain("Anime4K_Restore_CNN_M.glsl").And.Contain("Anime4K_Upscale_CNN_x2_M.glsl");
+    }
+
+    [Fact]
+    public void SinLosArchivos_ElEscaladoNoSeEnciende()
+    {
+        // Instalación incompleta: mejor sin escalado que con medio juego de shaders, y sin lanzar.
+        if (!AnimeLocalTracker.Services.Native.LibMpv.Disponible) return;
+        var (motor, _) = Crear();
+        using var __ = motor;
+        motor.CarpetaDeSombreadores = _video.Carpeta;
+
+        motor.EscaladoInteligente = true;
+
+        motor.EscaladoInteligente.Should().BeFalse();
+        motor.LeerPropiedad("glsl-shaders").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void LosFotogramasPerdidos_SinArchivoSonCero()
+    {
+        if (!AnimeLocalTracker.Services.Native.LibMpv.Disponible) return;
+        var (motor, _) = Crear();
+        using var __ = motor;
+
+        motor.FotogramasPerdidos.Should().Be(0);
+    }
 }

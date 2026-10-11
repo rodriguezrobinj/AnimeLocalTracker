@@ -165,12 +165,32 @@ public static class MotorVideo
     /// tarjeta NVIDIA o Intel dedicada (2 GB o más): en una integrada gasta batería y apenas se nota. Flyleaf además solo lo aplica si el
     /// video se amplía en pantalla y es de 8 bits (los AV1 de 10 bits no lo usan).
     /// </summary>
-    public static bool UsarEscaladoInteligente(string? modo, FabricanteGrafica fabricante, long memoriaMb) => modo switch
+    /// <param name="clase">Con sombreadores (Anime4K, motor nuevo) el automático lo enciende en cualquier tarjeta: el reproductor lo
+    /// apaga si pierde fotogramas (<see cref="VigilanteEscalado"/>).</param>
+    public static bool UsarEscaladoInteligente(string? modo, FabricanteGrafica fabricante, long memoriaMb,
+        ClaseEscalado clase = ClaseEscalado.PorControlador) => modo switch
     {
         ModosRendimientoVideo.Activado => true,
         ModosRendimientoVideo.Desactivado => false,
-        _ => fabricante is FabricanteGrafica.Nvidia or FabricanteGrafica.Intel && memoriaMb >= 2048
+        _ => clase == ClaseEscalado.PorSombreadores || (fabricante is FabricanteGrafica.Nvidia or FabricanteGrafica.Intel && memoriaMb >= 2048)
     };
+
+    /// <summary>
+    /// El nivel de Anime4K que suele aguantar cada tarjeta. Medido en una Intel HD 620 a 1080p: el ligero no pierde fotogramas y el
+    /// medio pierde 9 por segundo. No se distingue una AMD integrada de una dedicada: si el medio no aguanta, el automático lo apaga.
+    /// </summary>
+    public static NivelEscalado NivelAnime4K(FabricanteGrafica fabricante) =>
+        fabricante is FabricanteGrafica.Nvidia or FabricanteGrafica.Amd ? NivelEscalado.Medio : NivelEscalado.Ligero;
+
+    /// <summary>
+    /// Los shaders de un nivel, en el orden en que se aplican: recortar brillos, restaurar líneas y ampliar. El de ampliar se salta
+    /// solo cuando el video no se agranda al menos un 20 % en pantalla (lo lleva escrito en su cabecera).
+    /// </summary>
+    public static IReadOnlyList<string> SombreadoresAnime4K(NivelEscalado nivel)
+    {
+        string variante = nivel == NivelEscalado.Medio ? "M" : "S";
+        return ["Anime4K_Clamp_Highlights.glsl", $"Anime4K_Restore_CNN_{variante}.glsl", $"Anime4K_Upscale_CNN_x2_{variante}.glsl"];
+    }
 
     /// <summary>True si toca el motor nuevo: lo pide el ajuste y la biblioteca está en la instalación.</summary>
     public static bool ElegirMotor(string? ajuste, bool mpvDisponible) =>
