@@ -132,6 +132,19 @@ Coste: bajo; es sobre todo borrar. Riesgo: que el camino que se quita estuviera 
 
 **Si se quiere explorar:** un arnés aparte que abra los tres archivos que más guerra dieron (Re:Zero T4 ep. 19 por el ASS, Tokyo Revengers T4 ep. 1 por el AV1, Youjo Senki por los estilos) y mida memoria tras 10 episodios. Con ese resultado se decide.
 
+**Prototipo hecho el 2026-10-10** (arnés desechable fuera del repo: una ventana con libmpv incrustado por su identificador de ventana, 10 funciones de la biblioteca llamadas directamente, sin envoltorio; mpv 0.41 de la compilación de shinchiro; videos en solo lectura y sin sonido; equipo de referencia con Intel HD 620):
+
+| Qué se midió | Resultado con libmpv |
+|---|---|
+| Re:Zero T4 ep. 19 (el ASS que cerraba la app) | Abre en 0,6 s, decodifica por la tarjeta gráfica, 27 saltos exactos a lo largo del episodio con mediana de 34 ms (máximo 57), ningún fotograma perdido, subtítulos con su estilo |
+| Tokyo Revengers T4 ep. 2 (AV1 1080p) | Abre en 0,3 s a la primera, sin reintentos. Decodifica por software (la HD 620 no decodifica AV1): 35–46 % de un núcleo y ningún fotograma perdido en 20 s. Saltos exactos de 35 a 295 ms |
+| Youjo Senki ep. 2 (1080p, ASS con estilos) | Abre en 0,2–0,7 s, cursivas y posición del guion correctas, saltos de ~30 ms |
+| Memoria, 10 episodios H.264 seguidos | Entre 180 y 212 MB de memoria privada, **sin crecer** (−2,6 MB por episodio); al parar, 129 MB. El motor actual se queda ~17 MB por episodio (PERF-02) |
+| Memoria, 8 episodios AV1 seguidos | Entre 285 y 292 MB, sin crecer (−0,8 MB por episodio); al parar, 110 MB |
+| Cambio de episodio | 0,1–0,15 s del segundo en adelante |
+
+Lo que el prototipo **no** responde: cómo quedarían los controles encima del video (se incrustó en una ventana normal; en WPF sigue haciendo falta una ventana aparte encima, como hoy, o pintar el video dentro de WPF, que no se probó), el mini reproductor, el ecualizador y el resto de funciones que hoy cuelgan de Flyleaf (21 archivos lo usan; el reproductor suma unas 4.200 líneas). Dos costes ciertos: el instalador crece unos 120 MB (`libmpv-2.dll` trae su propio FFmpeg y la carpeta `FFmpeg/` actual sigue haciendo falta para `ffmpeg.exe` y `ffprobe.exe`), y la compilación habitual de libmpv es GPL mientras el proyecto es MIT: haría falta una compilación LGPL o revisar la licencia con la que se distribuye la app.
+
 **HLSL sobre el video, descartado con Flyleaf:** la documentación de FlyleafLib 3.11.3 solo expone elegir procesador de video, superresolución y filtros; no hay punto de entrada para shaders propios. Los `ShaderEffect` de WPF no llegan a la superficie de video. Anime4K pasa por cambiar de motor o por mantener una copia modificada de Flyleaf.
 
 ### 5.2 Mando web desde el móvil (servidor HTTP embebido + página HTML/TypeScript)
