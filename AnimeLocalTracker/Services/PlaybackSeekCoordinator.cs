@@ -1,7 +1,6 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using FlyleafLib.MediaPlayer;
 
 namespace AnimeLocalTracker.Services;
 
@@ -28,14 +27,14 @@ public class PlaybackSeekCoordinator : IPlaybackSeekCoordinator
 
     public void IniciarVentanaDeSettle() => _settleHastaUtc = DateTime.UtcNow + VentanaSettleSeek;
 
-    public void SolicitarSeek(Player? player, double segundos, Func<bool> haCompletadoOpen, bool preciso = false)
+    public void SolicitarSeek(IMotorVideo? motor, double segundos, Func<bool> haCompletadoOpen, bool preciso = false)
     {
-        if (player == null || player.IsDisposed) return;
+        if (motor == null || motor.Desechado) return;
 
         var transcurrido = DateTime.UtcNow - _ultimoSeekAplicadoUtc;
         if (transcurrido >= IntervaloMinimoSeek)
         {
-            AplicarSeekNativo(player, segundos, haCompletadoOpen, preciso);
+            AplicarSeekNativo(motor, segundos, haCompletadoOpen, preciso);
             return;
         }
 
@@ -55,7 +54,7 @@ public class PlaybackSeekCoordinator : IPlaybackSeekCoordinator
                 double objetivo = Interlocked.Exchange(ref _seekPendiente, -1);
                 if (objetivo >= 0 && !ct.IsCancellationRequested)
                 {
-                    AplicarSeekNativo(player, objetivo, haCompletadoOpen, _seekPendientePreciso);
+                    AplicarSeekNativo(motor, objetivo, haCompletadoOpen, _seekPendientePreciso);
                 }
             }
             catch (OperationCanceledException) { }
@@ -66,14 +65,14 @@ public class PlaybackSeekCoordinator : IPlaybackSeekCoordinator
         }, ct);
     }
 
-    private void AplicarSeekNativo(Player player, double segundos, Func<bool> haCompletadoOpen, bool preciso)
+    private void AplicarSeekNativo(IMotorVideo motor, double segundos, Func<bool> haCompletadoOpen, bool preciso)
     {
-        if (player.IsDisposed) return;
+        if (motor.Desechado) return;
 
         // Si el reproductor todavía se está abriendo o no ha completado la inicialización inicial del decodificador,
         // no invocar Player.CurTime de inmediato (interrumpe la creación del contexto de video en FFmpeg/Flyleaf
         // dejando la pantalla negra). Guardamos la posición para aplicarla en cuanto OpenCompleted se active.
-        if (!haCompletadoOpen() || player.Status == Status.Opening || player.Status == Status.Stopped)
+        if (!haCompletadoOpen() || motor.Estado is EstadoMotor.Abriendo or EstadoMotor.Detenido)
         {
             _seekPendienteAlAbrir = segundos;
             return;
@@ -82,8 +81,7 @@ public class PlaybackSeekCoordinator : IPlaybackSeekCoordinator
         _ultimoSeekAplicadoUtc = DateTime.UtcNow;
         try
         {
-            if (preciso) player.SeekAccurate((int)Math.Round(segundos * 1000));
-            else player.CurTime = TimeSpan.FromSeconds(segundos).Ticks;
+            motor.Saltar(TimeSpan.FromSeconds(segundos), preciso);
         }
         catch (Exception ex)
         {

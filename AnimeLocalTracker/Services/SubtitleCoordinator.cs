@@ -1,50 +1,25 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using FlyleafLib.MediaPlayer;
 
 namespace AnimeLocalTracker.Services;
 
 public class SubtitleCoordinator : ISubtitleCoordinator
 {
-    public bool DebenHabilitarsePorDefecto(Player? player, bool permitirSubtitulosConfig)
-    {
-        if (!permitirSubtitulosConfig) return false;
-        if (player?.Subtitles?.Streams == null || player.Subtitles.Streams.Count == 0) return false;
-        return true;
-    }
+    public bool DebenHabilitarsePorDefecto(IMotorVideo? motor, bool permitirSubtitulosConfig) =>
+        permitirSubtitulosConfig && motor != null && motor.PistasSubtitulos.Count > 0;
 
-    public void Deshabilitar(Player? player)
-    {
-        if (player?.Config?.Subtitles != null)
-        {
-            player.Config.Subtitles.Enabled = false;
-        }
-    }
+    public void Deshabilitar(IMotorVideo? motor) => motor?.ApagarSubtitulosDelMotor();
 
-    public void Habilitar(Player? player)
+    public PistaSubtitulosMotor? PistaPorDefecto(IMotorVideo? motor, string idiomaPreferido)
     {
-        if (player?.Config?.Subtitles != null)
-        {
-            player.Config.Subtitles.Enabled = true;
-        }
-    }
-
-    public object? PistaPorDefecto(Player? player, string idiomaPreferido)
-    {
-        var subtitulos = player?.Subtitles;
-        if (subtitulos?.Streams == null || subtitulos.Streams.Count == 0 || subtitulos.StreamIndex >= 0) return null;
-
-        var pistas = subtitulos.Streams.ToList();
-        int i = ElegirPista(pistas.Select(s => new PistaSubtitulos(s.IsBitmap, IdiomaDosLetras(s), s.Title)).ToList(), idiomaPreferido);
+        if (motor == null || motor.IndicePistaSubtitulosDelMotor >= 0) return null;
+        var pistas = motor.PistasSubtitulos;
+        int i = ElegirPista(pistas.Select(s => new PistaSubtitulos(s.EsImagen, s.Idioma, s.Titulo)).ToList(), idiomaPreferido);
         return i >= 0 ? pistas[i] : null;
     }
 
-    private static string? IdiomaDosLetras(FlyleafLib.MediaFramework.MediaStream.SubtitlesStream s)
-    {
-        try { return s.Language?.TopCulture?.TwoLetterISOLanguageName; }
-        catch { return null; }
-    }
+    public void SeleccionarPista(IMotorVideo? motor, PistaSubtitulosMotor pista) => motor?.MostrarSubtitulosDelMotor(pista);
 
     internal sealed record PistaSubtitulos(bool EsImagen, string? Idioma, string? Titulo);
 
@@ -79,12 +54,4 @@ public class SubtitleCoordinator : ISubtitleCoordinator
 
     private static bool EsSoloCarteles(string? titulo) =>
         !string.IsNullOrWhiteSpace(titulo) && MarcasSoloCarteles.Any(m => titulo.Contains(m, StringComparison.OrdinalIgnoreCase));
-
-    public void SeleccionarPista(Player? player, object stream)
-    {
-        if (player == null || stream == null) return;
-
-        Habilitar(player);
-        player.OpenAsync((dynamic)stream);
-    }
 }

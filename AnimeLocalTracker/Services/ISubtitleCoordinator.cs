@@ -1,4 +1,3 @@
-using FlyleafLib.MediaPlayer;
 
 namespace AnimeLocalTracker.Services;
 
@@ -9,20 +8,11 @@ namespace AnimeLocalTracker.Services;
 /// </summary>
 public interface ISubtitleCoordinator
 {
-    /// <summary>True si, según si el usuario permite subtítulos por defecto y si el archivo
-    /// realmente trae pistas, deben quedar habilitados.</summary>
-    bool DebenHabilitarsePorDefecto(Player? player, bool permitirSubtitulosConfig);
-
-    void Habilitar(Player? player);
-    void Deshabilitar(Player? player);
-
-    /// <summary>Habilita los subtítulos de Flyleaf y reabre el Player con el stream elegido. Solo para pistas que la app no
-    /// puede leer por su cuenta (de imagen, o de texto cuya extracción falló): las de texto no deben pasar por Flyleaf.</summary>
-    void SeleccionarPista(Player? player, object stream);
-
-    /// <summary>
-    /// Pista a mostrar al abrir un episodio (Flyleaf arranca con sus subtítulos apagados y no elige ninguna).
-    /// Null si Flyleaf ya tiene una abierta o el archivo no trae pistas.
-    /// </summary>
-    object? PistaPorDefecto(Player? player, string idiomaPreferido);
+    bool DebenHabilitarsePorDefecto(IMotorVideo? motor, bool permitirSubtitulosConfig);
+    /// <summary>Apaga los subtítulos que esté mostrando el propio motor.</summary>
+    void Deshabilitar(IMotorVideo? motor);
+    /// <summary>Le pide al motor que muestre esa pista (las de imagen y las externas solo las sabe mostrar él).</summary>
+    void SeleccionarPista(IMotorVideo? motor, PistaSubtitulosMotor pista);
+    /// <summary>La pista a mostrar al abrir, o null si no hay ninguna o el motor ya tiene una abierta.</summary>
+    PistaSubtitulosMotor? PistaPorDefecto(IMotorVideo? motor, string idiomaPreferido);
 }

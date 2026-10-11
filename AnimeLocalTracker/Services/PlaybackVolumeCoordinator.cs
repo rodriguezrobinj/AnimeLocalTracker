@@ -1,5 +1,4 @@
 using System;
-using FlyleafLib.MediaPlayer;
 
 namespace AnimeLocalTracker.Services;
 
@@ -13,16 +12,15 @@ public class PlaybackVolumeCoordinator : IPlaybackVolumeCoordinator
         return "VolumeHigh";
     }
 
-    public bool AplicarVolumen(Player? player, int volumen, bool estabaMuteado)
+    public bool AplicarVolumen(IMotorVideo? motor, int volumen, bool estabaMuteado)
     {
-        if (player?.Audio == null) return false;
-
+        if (motor == null) return false;
         try
         {
-            player.Audio.Volume = volumen;
+            motor.Volumen = volumen;
             if (volumen > 0 && estabaMuteado)
             {
-                player.Audio.Mute = false;
+                motor.Silencio = false;
                 return true;
             }
         }
@@ -30,25 +28,24 @@ public class PlaybackVolumeCoordinator : IPlaybackVolumeCoordinator
         {
             AppLogger.Debug("PlaybackVolumeCoordinator", $"Error asignando volumen: {ex.Message}");
         }
-
         return false;
     }
 
-    public void Desmutear(Player? player, int volumenActual)
+    public void Desmutear(IMotorVideo? motor, int volumenActual)
     {
-        if (player?.Audio == null) return;
+        if (motor == null) return;
         try
         {
-            player.Audio.Mute = false;
-            player.Audio.Volume = volumenActual;
+            motor.Silencio = false;
+            motor.Volumen = volumenActual;
         }
         catch { }
     }
 
-    public void Mutear(Player? player)
+    public void Mutear(IMotorVideo? motor)
     {
-        if (player?.Audio == null) return;
-        try { player.Audio.Mute = true; }
+        if (motor == null) return;
+        try { motor.Silencio = true; }
         catch { }
     }
 }

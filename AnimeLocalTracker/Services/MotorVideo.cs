@@ -26,7 +26,7 @@ public enum EstrategiaSaltos
     Rapidos
 }
 
-public sealed record TarjetaGrafica(string Nombre, GPUVendor Fabricante, long MemoriaMb);
+public sealed record TarjetaGrafica(string Nombre, FabricanteGrafica Fabricante, long MemoriaMb);
 
 /// <summary>Lo que se detectó en el último video abierto: se muestra en Configuración para que cada usuario vea por qué su equipo va así.</summary>
 public sealed record InformeVideo(string Codec, bool PorHardware, string? Tarjeta, EstrategiaSaltos Saltos, bool Escalado, DateTime MomentoUtc);
@@ -106,7 +106,7 @@ public static class MotorVideo
         {
             return Engine.Video.GPUAdapters.Values
                 .Where(g => !string.IsNullOrWhiteSpace(g.Description) && !g.Description.Contains("Basic Render", StringComparison.OrdinalIgnoreCase))
-                .Select(g => new TarjetaGrafica(g.Description.Trim(), g.Vendor, (long)((ulong)g.VideoMemory / (1024 * 1024))))
+                .Select(g => new TarjetaGrafica(g.Description.Trim(), FabricanteDe(g.Vendor), (long)((ulong)g.VideoMemory / (1024 * 1024))))
                 .GroupBy(t => t.Nombre, StringComparer.OrdinalIgnoreCase)
                 .Select(g => g.OrderByDescending(t => t.MemoriaMb).First())
                 .OrderByDescending(t => t.MemoriaMb)
@@ -143,7 +143,7 @@ public static class MotorVideo
     /// limpio: la tarjeta queda elegida y no llega ni un fotograma. Con la tarjeta elegida y 0 fotogramas tras la espera, se reabre por
     /// procesador (una vez por episodio).
     /// </summary>
-    public static bool DebeReintentarPorProcesador(bool porHardware, uint fotogramas, bool yaReintentado) =>
+    public static bool DebeReintentarPorProcesador(bool porHardware, long fotogramas, bool yaReintentado) =>
         porHardware && fotogramas == 0 && !yaReintentado;
 
     // === Modo automático ===
@@ -165,12 +165,20 @@ public static class MotorVideo
     /// tarjeta NVIDIA o Intel dedicada (2 GB o más): en una integrada gasta batería y apenas se nota. Flyleaf además solo lo aplica si el
     /// video se amplía en pantalla y es de 8 bits (los AV1 de 10 bits no lo usan).
     /// </summary>
-    public static bool UsarEscaladoInteligente(string? modo, GPUVendor fabricante, long memoriaMb) => modo switch
+    public static bool UsarEscaladoInteligente(string? modo, FabricanteGrafica fabricante, long memoriaMb) => modo switch
     {
         ModosRendimientoVideo.Activado => true,
         ModosRendimientoVideo.Desactivado => false,
-        _ => fabricante is GPUVendor.Nvidia or GPUVendor.Intel && memoriaMb >= 2048
+        _ => fabricante is FabricanteGrafica.Nvidia or FabricanteGrafica.Intel && memoriaMb >= 2048
     };
 
-    public static bool EscaladoDisponible(GPUVendor fabricante) => fabricante is GPUVendor.Nvidia or GPUVendor.Intel;
+    public static bool EscaladoDisponible(FabricanteGrafica fabricante) => fabricante is FabricanteGrafica.Nvidia or FabricanteGrafica.Intel;
+
+    internal static FabricanteGrafica FabricanteDe(GPUVendor fabricante) => fabricante switch
+    {
+        GPUVendor.Intel => FabricanteGrafica.Intel,
+        GPUVendor.Nvidia => FabricanteGrafica.Nvidia,
+        GPUVendor.ATI => FabricanteGrafica.Amd,
+        _ => FabricanteGrafica.Desconocido
+    };
 }

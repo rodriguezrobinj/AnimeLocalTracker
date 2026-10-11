@@ -4,8 +4,6 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using AnimeLocalTracker.Models;
-using FlyleafLib;
-using FlyleafLib.MediaFramework.MediaDemuxer;
 
 namespace AnimeLocalTracker.Services;
 
@@ -69,12 +67,12 @@ public class EpisodeNavigator : IEpisodeNavigator
     // igual ciclo de vida que tenía _precargaCts en ReproductorViewModel antes de esta extracción.
     private CancellationTokenSource _precargaCts = new();
 
-    public void ConsiderarPrecarga(double porcentaje, string? rutaSiguiente)
+    public void ConsiderarPrecarga(double porcentaje, string? rutaSiguiente, Action<string, CancellationToken> precalentar)
     {
         if (!DebePrecargarSiguienteEpisodio(porcentaje, rutaSiguiente, _rutaPrecargada)) return;
 
         _rutaPrecargada = rutaSiguiente;
-        _ = PrecargarSiguienteAsync(rutaSiguiente!, _precargaCts.Token);
+        precalentar(rutaSiguiente!, _precargaCts.Token);
     }
 
     public void CancelarPrecargaYReiniciar()
@@ -92,49 +90,5 @@ public class EpisodeNavigator : IEpisodeNavigator
         GC.SuppressFinalize(this);
         _precargaCts.Cancel();
         _precargaCts.Dispose();
-    }
-
-    /// <summary>
-    /// Pre-buffering del siguiente episodio: abre un <see cref="Demuxer"/> de FlyleafLib APARTE del
-    /// Player en reproducción contra el archivo del siguiente episodio, y lo descarta enseguida. No
-    /// sustituye la apertura real del Player al cambiar de episodio — la API pública de FlyleafLib no
-    /// permite entregarle a un Player un demuxer ya abierto — pero adelanta el sondeo de
-    /// contenedor/streams (avformat_find_stream_info) y calienta la caché de E/S de Windows para ese
-    /// archivo, así que cuando SiguienteEpisodio() abra el Player real, esa parte del trabajo ya no
-    /// parte de cero. Estrictamente best-effort: nunca toca el Player en reproducción, y cualquier
-    /// fallo (archivo movido, formato no soportado) se descarta sin avisar al usuario.
-    /// </summary>
-    private static async Task PrecargarSiguienteAsync(string rutaSiguiente, CancellationToken ct)
-    {
-        try
-        {
-            await Task.Run(() =>
-            {
-                if (ct.IsCancellationRequested) return;
-
-                var config = new Config();
-                var demuxer = new Demuxer(config.Demuxer, MediaType.Video);
-                try
-                {
-                    string error = demuxer.Open(rutaSiguiente);
-                    if (!string.IsNullOrEmpty(error))
-                    {
-                        AppLogger.Debug("EpisodeNavigator", $"Precarga del siguiente episodio no pudo abrir '{rutaSiguiente}': {error}");
-                    }
-                }
-                finally
-                {
-                    demuxer.Dispose();
-                }
-            }, ct).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-            // Se cambió de episodio/se cerró el reproductor antes de que terminara: no hay nada que hacer.
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Debug("EpisodeNavigator", $"Precarga del siguiente episodio falló (no afecta la reproducción actual): {ex.Message}");
-        }
     }
 }

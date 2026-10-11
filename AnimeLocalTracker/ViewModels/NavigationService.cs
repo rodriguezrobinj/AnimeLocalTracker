@@ -182,7 +182,7 @@ public sealed partial class NavigationService : ObservableObject, INavigationSer
             var viewModel = CrearReproductor();
             if (viewModel == null) return;
 
-            viewModel.AsegurarPlayerInicializado();
+            viewModel.AsegurarMotorInicializado();
             viewModel.EsModoMini = false;
             ReproductorActivo = viewModel;
 

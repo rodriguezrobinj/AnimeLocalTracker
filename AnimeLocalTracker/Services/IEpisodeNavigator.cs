@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using AnimeLocalTracker.Models;
 
 namespace AnimeLocalTracker.Services;
@@ -23,7 +24,7 @@ public interface IEpisodeNavigator : IDisposable
     /// Evalúa si toca disparar la pre-carga en este instante del sondeo de progreso (umbral del 95%
     /// + no precargado ya) y, si corresponde, la dispara en segundo plano (best-effort, nunca lanza).
     /// </summary>
-    void ConsiderarPrecarga(double porcentaje, string? rutaSiguiente);
+    void ConsiderarPrecarga(double porcentaje, string? rutaSiguiente, Action<string, CancellationToken> precalentar);
 
     /// <summary>
     /// Cancela la pre-carga en curso y reinicia el estado para la próxima — llamar tanto al cargar

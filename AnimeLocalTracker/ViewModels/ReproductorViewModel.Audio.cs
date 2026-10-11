@@ -9,9 +9,6 @@ using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
-using FlyleafLib;
-using FlyleafLib.MediaFramework.MediaDecoder;
-using FlyleafLib.MediaPlayer;
 using AnimeLocalTracker.Messages;
 using AnimeLocalTracker.Models;
 using AnimeLocalTracker.Services;
@@ -48,23 +45,20 @@ public partial class ReproductorViewModel
 
     private void AplicarModoNocheAlPlayer(bool activo) => AplicarFiltrosAudio();
 
-    /// <summary>Cadena de filtros de audio actual (ecualizador y Modo Noche) en el formato de Flyleaf.</summary>
-    private List<Filter> ConstruirFiltrosAudio() =>
-        Core.EcualizadorAudio.ConstruirFiltros(EcualizadorActivo, BandasEcualizador.Select(b => b.Ganancia).ToList(), ModoNocheActivo, ArgumentosModoNoche)
-            .Select(f => new Filter { Id = f.Id, Name = f.Nombre, Args = f.Argumentos })
-            .ToList();
+    /// <summary>Cadena de filtros de audio actual (ecualizador y Modo Noche).</summary>
+    private IReadOnlyList<Core.FiltroAudio> ConstruirFiltrosAudio() =>
+        Core.EcualizadorAudio.ConstruirFiltros(EcualizadorActivo, BandasEcualizador.Select(b => b.Ganancia).ToList(), ModoNocheActivo, ArgumentosModoNoche).ToList();
 
     /// <summary>Reconstruye la cadena de filtros (al encender/apagar el ecualizador o el Modo Noche; un corte de milisegundos).</summary>
     /// <param name="videoAbriendose">Los ajustes propios del anime o del capítulo llegan mientras el video se está abriendo: si el
     /// audio aún no existe no hay nada que recargar (no es un fallo) y la apertura ya monta la lista recién puesta.</param>
     private void AplicarFiltrosAudio(bool videoAbriendose = false)
     {
-        if (Player?.Config?.Audio == null) return;
+        if (Motor == null) return;
         try
         {
-            Player.Config.Audio.Filters = ConstruirFiltrosAudio();
-            int resultado = Player.Config.Audio.ReloadFilters();
-            if (resultado < 0 && !videoAbriendose) AppLogger.Warn("ReproductorViewModel", $"Flyleaf no pudo montar los filtros de audio ({resultado}).");
+            bool montados = Motor.AplicarFiltrosAudio(ConstruirFiltrosAudio());
+            if (!montados && !videoAbriendose) AppLogger.Warn("ReproductorViewModel", "El motor no pudo montar los filtros de audio.");
         }
         catch (Exception ex)
         {
@@ -191,17 +185,16 @@ public partial class ReproductorViewModel
 
     private void ActualizarFiltroBanda(BandaEcualizador banda)
     {
-        if (!EcualizadorActivo || Player?.Config?.Audio == null) return;
+        if (!EcualizadorActivo || Motor == null) return;
         try
         {
-            var audio = Player.Config.Audio;
             // El cambio en vivo solo toca el filtro que está sonando. La lista de la configuración es la que Flyleaf usa para
             // montar la cadena al abrir el siguiente episodio: sin ponerla al día, ahí volvían las ganancias anteriores.
-            audio.Filters = ConstruirFiltrosAudio();
-            int r1 = audio.UpdateFilter(Core.EcualizadorAudio.IdBanda(banda.Indice), "g", Core.EcualizadorAudio.TextoGanancia(banda.Ganancia));
+            (Motor as MotorFlyleaf)?.RecordarFiltrosParaElSiguienteArchivo(ConstruirFiltrosAudio());
+            bool r1 = Motor.CambiarFiltroEnVivo(Core.EcualizadorAudio.IdBanda(banda.Indice), "g", Core.EcualizadorAudio.TextoGanancia(banda.Ganancia));
             double pre = Core.EcualizadorAudio.Preamplificacion(BandasEcualizador.Select(b => b.Ganancia).ToList());
-            int r2 = audio.UpdateFilter(Core.EcualizadorAudio.IdPreamplificador, "volume", Core.EcualizadorAudio.TextoVolumen(pre));
-            if (r1 < 0 || r2 < 0) AplicarFiltrosAudio(); // si el filtro no admite el cambio en vivo, se monta la cadena de nuevo
+            bool r2 = Motor.CambiarFiltroEnVivo(Core.EcualizadorAudio.IdPreamplificador, "volume", Core.EcualizadorAudio.TextoVolumen(pre));
+            if (!r1 || !r2) AplicarFiltrosAudio(); // si el filtro no admite el cambio en vivo, se monta la cadena de nuevo
         }
         catch (Exception ex)
         {

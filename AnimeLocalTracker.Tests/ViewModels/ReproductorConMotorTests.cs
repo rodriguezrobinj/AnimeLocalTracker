@@ -1,0 +1,310 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Threading.Tasks;
+using AnimeLocalTracker.Services;
+using AnimeLocalTracker.ViewModels;
+using FluentAssertions;
+using Moq;
+using Xunit;
+
+namespace AnimeLocalTracker.Tests.ViewModels;
+
+/// <summary>
+/// El reproductor con un motor de mentira. Antes de la costura estas rutas (arranque, reanudación, reintentos) solo se podían ver en
+/// la app: bajo pruebas no había motor.
+/// </summary>
+public sealed class ReproductorConMotorTests : IDisposable
+{
+    private readonly Mock<IPlaybackStateService> _estado = new();
+    private readonly MotorDePrueba _motor = new() { Duracion = TimeSpan.FromSeconds(1420) };
+    private readonly string _carpeta = Path.Combine(Path.GetTempPath(), "alt_motor_" + Guid.NewGuid().ToString("N"));
+    private readonly string _ruta;
+
+    public ReproductorConMotorTests()
+    {
+        Directory.CreateDirectory(_carpeta);
+        _ruta = Path.Combine(_carpeta, "Ep05.mkv");
+        File.WriteAllText(_ruta, "no es un video: solo tiene que existir");
+    }
+
+    public void Dispose()
+    {
+        try { Directory.Delete(_carpeta, true); } catch { }
+    }
+
+    private ReproductorViewModel CrearSut(IMotorVideo? motor) => new(
+        Mock.Of<IDatabaseService>(), Mock.Of<IAnimeTrackingService>(), Mock.Of<IAuthService>(),
+        playbackStateService: _estado.Object, fabricaMotor: _ => motor);
+
+    private static async Task EsperarHasta(Func<bool> condicion, int ms = 8000)
+    {
+        var limite = DateTime.UtcNow.AddMilliseconds(ms);
+        while (!condicion() && DateTime.UtcNow < limite) await Task.Delay(20);
+        condicion().Should().BeTrue($"la condición debía cumplirse en {ms} ms");
+    }
+
+    [Fact]
+    public async Task AlAbrirUnEpisodio_ArrancaEnSilencioYSeDestapaConElPrimerFotograma()
+    {
+        using var sut = CrearSut(_motor);
+
+        await sut.CargarVideoAsync(_ruta, 101, "Frieren", 5);
+
+        _motor.Abiertos.Should().Equal(_ruta);
+        _motor.SilencioPuesto.Should().BeTrue("el audio arrancaba antes que la imagen");
+        sut.OcultarVideoInicio.Should().BeTrue();
+
+        _motor.TerminarApertura();
+
+        _motor.Estado.Should().Be(EstadoMotor.Reproduciendo);
+        sut.PlayPauseIcon.Should().Be("Pause");
+        _motor.SilencioPuesto.Should().BeTrue("sigue en silencio hasta que se vea la imagen");
+
+        _motor.FotogramasMostrados = 3;
+
+        await EsperarHasta(() => !sut.OcultarVideoInicio);
+        await EsperarHasta(() => !_motor.SilencioPuesto);
+        _motor.Saltos.Should().BeEmpty("sin punto guardado no hay salto de reanudación");
+    }
+
+    [Fact]
+    public async Task ConPuntoGuardado_SaltaAhiAntesDeDestaparElVideo()
+    {
+        _estado.Setup(e => e.ObtenerPosicionParaReanudarAsync(101, 5, It.IsAny<string?>())).ReturnsAsync((300d, 1420d));
+        using var sut = CrearSut(_motor);
+
+        await sut.CargarVideoAsync(_ruta, 101, "Frieren", 5);
+        _motor.TerminarApertura();
+        _motor.Saltos.Should().BeEmpty("no se salta mientras el decodificador arranca: dejaba la pantalla en negro");
+        _motor.FotogramasMostrados = 3;
+
+        await EsperarHasta(() => !sut.OcultarVideoInicio);
+        _motor.Saltos.Should().ContainSingle().Which.Segundos.Should().Be(300);
+        sut.CurrentSeconds.Should().Be(300);
+    }
+
+    [Fact]
+    public async Task SinMotor_AbrirUnEpisodioNoFalla()
+    {
+        _estado.Setup(e => e.ObtenerPosicionParaReanudarAsync(101, 5, It.IsAny<string?>())).ReturnsAsync((300d, 1420d));
+        using var sut = CrearSut(null);
+
+        await sut.CargarVideoAsync(_ruta, 101, "Frieren", 5);
+
+        sut.Motor.Should().BeNull();
+        sut.CurrentSeconds.Should().Be(300, "el punto guardado se muestra aunque no haya motor");
+        sut.TogglePlayPause();
+        sut.Seek(60);
+    }
+
+    [Fact]
+    public async Task SiLaAperturaFalla_ReintentaUnaVezYLuegoAvisa()
+    {
+        using var sut = CrearSut(_motor);
+        await sut.CargarVideoAsync(_ruta, 101, "Frieren", 5);
+
+        _motor.TerminarApertura(exito: false, error: "formato no reconocido");
+
+        await EsperarHasta(() => _motor.Abiertos.Count == 2);
+        _motor.VecesDetenido.Should().Be(1);
+        sut.OcultarVideoInicio.Should().BeTrue("aún se está intentando");
+
+        _motor.TerminarApertura(exito: false, error: "formato no reconocido");
+
+        sut.OcultarVideoInicio.Should().BeFalse();
+        sut.PlayPauseIcon.Should().Be("Play");
+        _motor.Abiertos.Should().HaveCount(2, "un archivo dañado de verdad no se reintenta sin fin");
+    }
+
+    [Fact]
+    public async Task SiLaTarjetaNoDaImagen_ReabreUnaVezPorProcesador()
+    {
+        _motor.DecodificaPorHardware = true;
+        using var sut = CrearSut(_motor);
+        await sut.CargarVideoAsync(_ruta, 101, "Frieren", 5);
+
+        _motor.TerminarApertura(); // y no llega ni un fotograma
+
+        await EsperarHasta(() => _motor.Abiertos.Count == 2, ms: 10000);
+        _motor.AceleracionPuesta.Should().BeFalse();
+        _motor.VecesDetenido.Should().Be(1);
+
+        _motor.TerminarApertura(); // la reapertura tampoco pinta nada: no hay tercera
+        await EsperarHasta(() => !sut.OcultarVideoInicio, ms: 15000); // se deja de esperar: mejor ver el fallo que una tapa eterna
+        _motor.Abiertos.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task UnAvisoDeAperturaDelEpisodioAnterior_SeComportaComoHoy()
+    {
+        // El aviso del motor no dice de qué archivo es. Si llega el del episodio que se dejó atrás, el reproductor lo toma por el
+        // del nuevo: se fija aquí para que la etapa 2 (libmpv sí sabe de qué archivo avisa) decida si lo corrige.
+        using var sut = CrearSut(_motor);
+        await sut.CargarVideoAsync(_ruta, 101, "Frieren", 5);
+        string otra = Path.Combine(_carpeta, "Ep06.mkv");
+        File.WriteAllText(otra, "x");
+        await sut.CargarVideoAsync(otra, 101, "Frieren", 6);
+
+        _motor.TerminarApertura(); // el del 5, tardío
+
+        _motor.Abiertos.Should().Equal(_ruta, otra);
+        _motor.VecesReproducir.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task CerrarConLaAperturaAMedias_DesechaElMotorSinFallar()
+    {
+        var sut = CrearSut(_motor);
+        await sut.CargarVideoAsync(_ruta, 101, "Frieren", 5);
+
+        sut.Dispose();
+        _motor.TerminarApertura(); // el aviso llega con el reproductor ya cerrado
+        await Task.Delay(300);
+
+        _motor.VecesDesechado.Should().Be(1);
+        sut.Motor.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task PausarYReanudar_PasanPorElMotor_YAlTerminarSeVuelveAEmpezar()
+    {
+        using var sut = CrearSut(_motor);
+        await sut.CargarVideoAsync(_ruta, 101, "Frieren", 5);
+        _motor.TerminarApertura();
+
+        sut.TogglePlayPause();
+        _motor.Estado.Should().Be(EstadoMotor.EnPausa);
+        sut.PlayPauseIcon.Should().Be("Play");
+
+        sut.TogglePlayPause();
+        _motor.Estado.Should().Be(EstadoMotor.Reproduciendo);
+
+        _motor.Estado = EstadoMotor.Terminado;
+        sut.TogglePlayPause();
+        _motor.Saltos.Should().Contain((0d, false), "reproducir un episodio terminado lo reinicia");
+        _motor.Estado.Should().Be(EstadoMotor.Reproduciendo);
+    }
+
+    [Fact]
+    public async Task CambiarDePistaDeAudio_NoSeTrataComoUnEpisodioNuevo()
+    {
+        _motor.Audio.Add(new PistaAudioMotor(1, "ja", null));
+        _motor.Audio.Add(new PistaAudioMotor(2, "es", "Latino"));
+        _motor.IndicePistaAudioActual = 1;
+        using var sut = CrearSut(_motor);
+        await sut.CargarVideoAsync(_ruta, 101, "Frieren", 5);
+        _motor.TerminarApertura();
+        _motor.FotogramasMostrados = 3;
+        await EsperarHasta(() => !sut.OcultarVideoInicio);
+        sut.PistasAudio.Should().HaveCount(2);
+        sut.HayVariasPistasAudio.Should().BeTrue();
+
+        sut.SeleccionarPistaAudioCommand.Execute(sut.PistasAudio[1]);
+        _motor.AudioElegido.Should().Be(new PistaAudioMotor(2, "es", "Latino"));
+        _motor.SilencioPuesto = true; // el motor reabre el audio y vuelve a avisar
+        _motor.TerminarApertura();
+
+        _motor.Abiertos.Should().HaveCount(1, "no se reabre el episodio");
+        _motor.VecesReproducir.Should().Be(1, "ni se vuelve a dar a reproducir");
+        _motor.SilencioPuesto.Should().BeFalse("se restaura el silencio que tenía el usuario");
+        _motor.VolumenPuesto.Should().Be(sut.Volumen);
+        sut.PistasAudio[1].EsActual.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ElEcualizador_MontaSusFiltrosEnElMotor_YUnaBandaSeCambiaEnVivo()
+    {
+        using var sut = CrearSut(_motor);
+        await sut.CargarVideoAsync(_ruta, 101, "Frieren", 5);
+        _motor.TerminarApertura();
+
+        sut.BandasEcualizador[0].Ganancia = 6; // mover una banda con el ecualizador apagado lo enciende y monta la cadena
+        sut.EcualizadorActivo.Should().BeTrue();
+        _motor.Filtros.Should().NotBeEmpty();
+
+        sut.BandasEcualizador[1].Ganancia = 3; // ya encendido: solo se toca el filtro que está sonando
+        _motor.CambiosEnVivo.Should().Contain(c => c.Id == AnimeLocalTracker.Core.EcualizadorAudio.IdBanda(1) && c.Clave == "g");
+    }
+
+    [Fact]
+    public async Task UnaPistaDeTexto_LaLeeLaApp_YNoSeLePideAlMotor()
+    {
+        // El lector de subtítulos ASS de Flyleaf cerraba la app con ciertas etiquetas: las pistas de texto las lee la app.
+        var extractor = new Mock<ISubtitleCuesExtractorService>();
+        IReadOnlyList<AnimeLocalTracker.Models.SubtitleCue> lineas = [new(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(3), "Hola")];
+        extractor.Setup(x => x.ExtraerAsync(_ruta, 2, null, It.IsAny<System.Threading.CancellationToken>())).ReturnsAsync(lineas);
+        _motor.Subtitulos.Add(new PistaSubtitulosMotor(2, LocalizationService.Cultura.TwoLetterISOLanguageName, null, false, false, null));
+        using var sut = new ReproductorViewModel(
+            Mock.Of<IDatabaseService>(), Mock.Of<IAnimeTrackingService>(), Mock.Of<IAuthService>(),
+            playbackStateService: _estado.Object, subtitleCuesExtractorService: extractor.Object, fabricaMotor: _ => _motor);
+
+        await sut.CargarVideoAsync(_ruta, 101, "Frieren", 5);
+        _motor.TerminarApertura();
+
+        await EsperarHasta(() => sut.SubtitulosDobleLineaActivo);
+        _motor.SubtitulosDelMotor.Should().BeNull();
+        sut.SubtitulosHabilitados.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task SiLaAppNoPuedeLeerUnaPistaDeTexto_SeLaDejaAlMotor()
+    {
+        var extractor = new Mock<ISubtitleCuesExtractorService>();
+        extractor.Setup(x => x.ExtraerAsync(_ruta, 2, null, It.IsAny<System.Threading.CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<AnimeLocalTracker.Models.SubtitleCue>)Array.Empty<AnimeLocalTracker.Models.SubtitleCue>());
+        var texto = new PistaSubtitulosMotor(2, LocalizationService.Cultura.TwoLetterISOLanguageName, null, false, false, null);
+        _motor.Subtitulos.Add(texto);
+        using var sut = new ReproductorViewModel(
+            Mock.Of<IDatabaseService>(), Mock.Of<IAnimeTrackingService>(), Mock.Of<IAuthService>(),
+            playbackStateService: _estado.Object, subtitleCuesExtractorService: extractor.Object, fabricaMotor: _ => _motor);
+
+        await sut.CargarVideoAsync(_ruta, 101, "Frieren", 5);
+        _motor.TerminarApertura();
+
+        await EsperarHasta(() => _motor.SubtitulosDelMotor == texto); // mejor los del motor que quedarse sin subtítulos
+    }
+
+    [Fact]
+    public async Task UnaPistaDeImagen_SeLePideAlMotor_YSuAvisoNoReiniciaElEpisodio()
+    {
+        var imagen = new PistaSubtitulosMotor(4, "es", null, EsImagen: true, EsAss: false, RutaExterna: null);
+        _motor.Subtitulos.Add(imagen);
+        using var sut = CrearSut(_motor);
+        await sut.CargarVideoAsync(_ruta, 101, "Frieren", 5);
+        _motor.TerminarApertura();
+
+        _motor.SubtitulosDelMotor.Should().Be(imagen, "la app no sabe dibujar subtítulos de imagen");
+
+        _motor.TerminarApertura(clase: ClaseApertura.Subtitulos);
+
+        _motor.VecesReproducir.Should().Be(1);
+        _motor.Abiertos.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public async Task ApagarLosSubtitulos_SeLoDiceAlMotor()
+    {
+        _motor.Subtitulos.Add(new PistaSubtitulosMotor(4, "es", null, true, false, null));
+        using var sut = CrearSut(_motor);
+        await sut.CargarVideoAsync(_ruta, 101, "Frieren", 5);
+        _motor.TerminarApertura();
+
+        sut.TurnOffSubtitles();
+
+        _motor.SubtitulosDelMotor.Should().BeNull();
+        sut.SubtitulosHabilitados.Should().BeFalse();
+    }
+
+    [Fact]
+    public void ElMotorAvisaCuandoCambiaLaProporcionDelVideo()
+    {
+        int avisos = 0;
+        _motor.ProporcionVideoCambiada += (_, _) => avisos++;
+
+        _motor.CambiarProporcion(4 / 3.0);
+
+        avisos.Should().Be(1);
+        _motor.ProporcionVideo.Should().BeApproximately(1.333, 0.001);
+    }
+}

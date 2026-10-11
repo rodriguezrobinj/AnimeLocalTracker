@@ -9,9 +9,6 @@ using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
-using FlyleafLib;
-using FlyleafLib.MediaFramework.MediaDecoder;
-using FlyleafLib.MediaPlayer;
 using AnimeLocalTracker.Messages;
 using AnimeLocalTracker.Models;
 using AnimeLocalTracker.Services;
@@ -59,23 +56,23 @@ public partial class ReproductorViewModel
     /// de color (caso real: el cartel del título de Re:Zero 4th Season, <c>{\c&amp;H..&amp;\fad(..)..\3a&amp;H37&amp;..}</c>), en un
     /// hilo suyo que no se puede proteger. Solo las pistas de imagen (PGS/VobSub), que la app no sabe dibujar, van por Flyleaf.
     /// </summary>
-    private void AbrirPistaSubtitulos(object pista)
+    private void AbrirPistaSubtitulos(PistaSubtitulosMotor pista)
     {
         ReiniciarCuesSubtitulos();
 
-        if (pista is FlyleafLib.MediaFramework.MediaStream.SubtitlesStream { IsBitmap: false, ExternalStream: null } texto)
+        if (pista is { EsImagen: false, RutaExterna: null })
         {
-            _subtitleCoordinator.Deshabilitar(Player); // por si Flyleaf tenía abierta otra pista (de imagen)
-            IniciarCargaCuesSubtitulos(_rutaVideo, texto.StreamIndex, null, texto);
+            _subtitleCoordinator.Deshabilitar(Motor); // por si el motor tenía abierta otra pista (de imagen)
+            IniciarCargaCuesSubtitulos(_rutaVideo, pista.Indice, null, pista);
 
             // Si además es ASS/SSA se prepara el dibujo con su estilo original; mientras tanto (y si falla) se ve el texto plano.
-            _pistaTextoActual = texto;
-            PistaActualEsAss = texto.CodecID is Flyleaf.FFmpeg.AVCodecID.Ass or Flyleaf.FFmpeg.AVCodecID.Ssa;
+            _pistaTextoActual = pista;
+            PistaActualEsAss = pista.EsAss;
             IniciarDibujoAssSiCorresponde();
             return;
         }
 
-        _subtitleCoordinator.SeleccionarPista(Player, pista);
+        _subtitleCoordinator.SeleccionarPista(Motor, pista);
     }
 
     /// <summary>
@@ -83,34 +80,33 @@ public partial class ReproductorViewModel
     /// leer). Se intenta extraer igualmente para resolver los solapes; hasta que termine (o si falla) se muestra el texto único
     /// de Flyleaf.
     /// </summary>
-    private void CargarCuesDePistaDeFlyleaf()
+    private void CargarCuesDePistaDelMotor()
     {
         ReiniciarCuesSubtitulos();
 
-        var subtitulos = Player?.Subtitles;
-        if (subtitulos == null || subtitulos.StreamIndex < 0) return;
-        var stream = subtitulos.Streams?.FirstOrDefault(s => s.StreamIndex == subtitulos.StreamIndex);
-        if (stream == null) return;
+        int abierta = Motor?.IndicePistaSubtitulosDelMotor ?? -1;
+        if (abierta < 0) return;
+        var pista = Motor!.PistasSubtitulos.FirstOrDefault(s => s.Indice == abierta);
+        if (pista == null) return;
 
-        // Una pista externa (.srt/.ass suelto junto al video) trae su ruta real en ExternalStream.Url; una pista
-        // incrustada en el propio contenedor no tiene ExternalStream y se identifica por su índice de flujo.
-        string? rutaExterna = stream.ExternalStream?.Url;
-        int? streamIndexEmbebido = rutaExterna == null ? stream.StreamIndex : null;
+        // Una pista externa (.srt/.ass suelto junto al video) trae su ruta real; una incrustada en el propio contenedor se
+        // identifica por su índice de flujo.
+        int? streamIndexEmbebido = pista.RutaExterna == null ? pista.Indice : null;
 
-        IniciarCargaCuesSubtitulos(_rutaVideo, streamIndexEmbebido, rutaExterna, null);
+        IniciarCargaCuesSubtitulos(_rutaVideo, streamIndexEmbebido, pista.RutaExterna, null);
     }
 
-    private void IniciarCargaCuesSubtitulos(string rutaVideo, int? streamIndexEmbebido, string? rutaExterna, object? pistaSinFlyleaf)
+    private void IniciarCargaCuesSubtitulos(string rutaVideo, int? streamIndexEmbebido, string? rutaExterna, PistaSubtitulosMotor? pistaSinMotor)
     {
         var cts = new CancellationTokenSource();
         _subtitleCuesCts = cts;
 
-        _ = CargarCuesSubtitulosAsync(rutaVideo, streamIndexEmbebido, rutaExterna, pistaSinFlyleaf, cts);
+        _ = CargarCuesSubtitulosAsync(rutaVideo, streamIndexEmbebido, rutaExterna, pistaSinMotor, cts);
     }
 
-    /// <param name="pistaSinFlyleaf">Pista de texto que Flyleaf no tiene abierta: si la app no consigue leerla, se le entrega a
+    /// <param name="pistaSinMotor">Pista de texto que Flyleaf no tiene abierta: si la app no consigue leerla, se le entrega a
     /// Flyleaf como último recurso para no dejar el episodio sin subtítulos. Null si Flyleaf ya la está mostrando.</param>
-    private async Task CargarCuesSubtitulosAsync(string rutaVideo, int? streamIndexEmbebido, string? rutaExterna, object? pistaSinFlyleaf, CancellationTokenSource cts)
+    private async Task CargarCuesSubtitulosAsync(string rutaVideo, int? streamIndexEmbebido, string? rutaExterna, PistaSubtitulosMotor? pistaSinMotor, CancellationTokenSource cts)
     {
         try
         {
@@ -123,10 +119,10 @@ public partial class ReproductorViewModel
             {
                 AppLogger.Debug("ReproductorViewModel", $"Pista de subtítulos {streamIndexEmbebido?.ToString() ?? "externa"} extraída: {cues.Count} líneas.");
             }
-            else if (pistaSinFlyleaf != null && SubtitulosHabilitados)
+            else if (pistaSinMotor != null && SubtitulosHabilitados)
             {
                 AppLogger.Warn("ReproductorViewModel", $"No se pudo leer la pista de subtítulos {streamIndexEmbebido}: se deja en manos de Flyleaf.");
-                _subtitleCoordinator.SeleccionarPista(Player, pistaSinFlyleaf);
+                _subtitleCoordinator.SeleccionarPista(Motor, pistaSinMotor);
             }
             else
             {
@@ -170,7 +166,7 @@ public partial class ReproductorViewModel
 
     private CancellationTokenSource? _assCts;
     private bool _assListo;
-    private FlyleafLib.MediaFramework.MediaStream.SubtitlesStream? _pistaTextoActual;
+    private PistaSubtitulosMotor? _pistaTextoActual;
 
     private bool _usarMiEstiloEnAss;
     /// <summary>
@@ -207,20 +203,19 @@ public partial class ReproductorViewModel
     private void IniciarDibujoAssSiCorresponde()
     {
         var pista = _pistaTextoActual;
-        var player = Player;
-        if (pista == null || player == null) return;
+        var motor = Motor;
+        if (pista == null || motor == null) return;
 
-        bool esAss = pista.CodecID is Flyleaf.FFmpeg.AVCodecID.Ass or Flyleaf.FFmpeg.AVCodecID.Ssa;
-        if (!Core.SubtitulosAss.DebeDibujarse(esAss, pista.IsBitmap, pista.ExternalStream != null, UsarMiEstiloEnAss)) return;
+        if (!Core.SubtitulosAss.DebeDibujarse(pista.EsAss, pista.EsImagen, pista.RutaExterna != null, UsarMiEstiloEnAss)) return;
 
         // ponytail: pantalla principal en unidades de WPF. Con la escala de Windows por encima del 100 % se dibuja algo por
         // debajo de los píxeles reales; si se nota borroso, usar los píxeles del monitor donde está la ventana.
-        var (anchoVideo, altoVideo) = TamanoDelVideo(player);
+        var (anchoVideo, altoVideo) = motor.TamanoVideo;
         var (ancho, alto) = Core.SubtitulosAss.TamanoDibujo(
             anchoVideo, altoVideo,
             (int)SystemParameters.PrimaryScreenWidth, (int)SystemParameters.PrimaryScreenHeight);
         int indice = Core.SubtitulosAss.IndiceEntreSubtitulos(
-            player.Subtitles.Streams.Where(s => s.ExternalStream == null).Select(s => s.StreamIndex), pista.StreamIndex);
+            motor.PistasSubtitulos.Where(s => s.RutaExterna == null).Select(s => s.Indice), pista.Indice);
         if (ancho == 0 || indice < 0)
         {
             AppLogger.Debug("ReproductorViewModel", $"Dibujo ASS no disponible (tamaño {ancho}x{alto}, pista {indice}): se queda el texto plano.");
@@ -228,17 +223,6 @@ public partial class ReproductorViewModel
         }
 
         IniciarDibujoAss(_rutaVideo, indice, ancho, alto);
-    }
-
-    /// <summary>Tamaño del video abierto. Justo al abrir (cuando se elige la pista de subtítulos) Player.Video aún vale 0x0, porque
-    /// se rellena con el primer fotograma: entonces se toma de la pista de video del contenedor, que ya está leída.</summary>
-    private static (int Ancho, int Alto) TamanoDelVideo(Player player)
-    {
-        int ancho = player.Video?.Width ?? 0, alto = player.Video?.Height ?? 0;
-        if (ancho > 0 && alto > 0) return (ancho, alto);
-
-        var pista = player.VideoDemuxer?.VideoStream ?? player.VideoDemuxer?.VideoStreams?.FirstOrDefault();
-        return pista == null ? (0, 0) : ((int)pista.Width, (int)pista.Height);
     }
 
     internal void IniciarDibujoAss(string ruta, int indice, int ancho, int alto)

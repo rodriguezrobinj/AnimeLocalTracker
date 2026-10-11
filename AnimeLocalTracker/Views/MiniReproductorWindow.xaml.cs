@@ -21,7 +21,7 @@ public partial class MiniReproductorWindow : Window
     private const double ProporcionPorDefecto = 16d / 9d;
 
     private readonly ReproductorViewModel _reproductor;
-    private INotifyPropertyChanged? _videoObservado;
+    private IMotorVideo? _motorObservado;
     private bool _cierrePorCodigo;
 
     public MiniReproductorWindow(ReproductorViewModel reproductor)
@@ -32,8 +32,8 @@ public partial class MiniReproductorWindow : Window
         Title = LocalizationService.T("Player_MiniTitulo");
 
         Loaded += (_, _) => AjustarAProporcion();
-        _videoObservado = reproductor.Player?.Video;
-        if (_videoObservado != null) _videoObservado.PropertyChanged += Video_PropertyChanged;
+        _motorObservado = reproductor.Motor;
+        if (_motorObservado != null) _motorObservado.ProporcionVideoCambiada += Motor_ProporcionCambiada;
     }
 
     /// <summary>Cierre pedido por la app (restaurar el formato habitual o cerrar el episodio).</summary>
@@ -55,8 +55,8 @@ public partial class MiniReproductorWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
-        if (_videoObservado != null) _videoObservado.PropertyChanged -= Video_PropertyChanged;
-        _videoObservado = null;
+        if (_motorObservado != null) _motorObservado.ProporcionVideoCambiada -= Motor_ProporcionCambiada;
+        _motorObservado = null;
         base.OnClosed(e);
     }
 
@@ -85,7 +85,7 @@ public partial class MiniReproductorWindow : Window
     {
         try
         {
-            double valor = _reproductor.Player?.Video.AspectRatio.Value ?? 0;
+            double valor = _reproductor.Motor?.ProporcionVideo ?? 0;
             return valor is > 0.5 and < 4 ? valor : ProporcionPorDefecto;
         }
         catch
@@ -94,9 +94,9 @@ public partial class MiniReproductorWindow : Window
         }
     }
 
-    private void Video_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    private void Motor_ProporcionCambiada(object? sender, EventArgs e)
     {
-        if (e.PropertyName == "AspectRatio") Dispatcher.BeginInvoke(AjustarAProporcion);
+        Dispatcher.BeginInvoke(AjustarAProporcion); // el aviso puede llegar desde un hilo del motor
     }
 
     /// <summary>Ajusta el alto a la proporción del video (al abrir, o si el siguiente episodio tiene otra), sin mover el borde de abajo:

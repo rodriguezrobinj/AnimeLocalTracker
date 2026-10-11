@@ -3,7 +3,6 @@ using System.IO;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media.Imaging;
-using FlyleafLib.MediaPlayer;
 
 namespace AnimeLocalTracker.Services;
 
@@ -15,13 +14,13 @@ public class FrameCaptureService : IFrameCaptureService
     /// la resolución nativa del video. Si los subtítulos están activos ya quedan incluidos porque
     /// Flyleaf los compone dentro del propio frame renderizado (no son un overlay WPF aparte).
     /// </summary>
-    public async Task<string?> CapturarYGuardarAsync(Player? player)
+    public async Task<string?> CapturarYGuardarAsync(IMotorVideo? motor)
     {
-        if (player == null) return null;
+        if (motor == null) return null;
 
         try
         {
-            var bitmap = player.TakeSnapshotToBitmapSource(0, 0);
+            var bitmap = motor.CapturarFotograma();
             if (bitmap == null) return null;
             bitmap.Freeze();
 

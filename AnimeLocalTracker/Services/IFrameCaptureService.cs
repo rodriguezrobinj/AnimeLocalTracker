@@ -1,5 +1,4 @@
 using System.Threading.Tasks;
-using FlyleafLib.MediaPlayer;
 
 namespace AnimeLocalTracker.Services;
 
@@ -13,5 +12,5 @@ public interface IFrameCaptureService
     /// Copia el bitmap al portapapeles antes de guardarlo. Nunca lanza: los errores se registran y
     /// se traducen a null para que el llamador decida qué mensaje mostrar.
     /// </summary>
-    Task<string?> CapturarYGuardarAsync(Player? player);
+    Task<string?> CapturarYGuardarAsync(IMotorVideo? motor);
 }

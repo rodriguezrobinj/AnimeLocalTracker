@@ -1,5 +1,4 @@
 using System;
-using FlyleafLib.MediaPlayer;
 
 namespace AnimeLocalTracker.Services;
 
@@ -29,7 +28,7 @@ public interface IPlaybackSeekCoordinator : IDisposable
     /// (arrastre en vivo) salta al fotograma clave anterior, que es instantáneo. En los AV1 del usuario hay hasta ~10 s entre
     /// fotogramas clave: con el salto rápido, "adelantar 10 s" avanzaba 2-5 s o se quedaba en el mismo sitio.
     /// </param>
-    void SolicitarSeek(Player? player, double segundos, Func<bool> haCompletadoOpen, bool preciso = false);
+    void SolicitarSeek(IMotorVideo? motor, double segundos, Func<bool> haCompletadoOpen, bool preciso = false);
 
     /// <summary>Entrega y limpia el seek que quedó diferido porque el Player no estaba listo
     /// cuando se pidió. Null si no hay ninguno pendiente.</summary>

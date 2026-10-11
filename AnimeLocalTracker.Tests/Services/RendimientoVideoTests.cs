@@ -44,13 +44,13 @@ public class RendimientoVideoTests
     // === Escalado inteligente ===
 
     [Theory]
-    [InlineData(ModosRendimientoVideo.Automatico, GPUVendor.Intel, 128, false)]   // integrada (Intel HD 620)
-    [InlineData(ModosRendimientoVideo.Automatico, GPUVendor.Nvidia, 8192, true)]  // RTX dedicada
-    [InlineData(ModosRendimientoVideo.Automatico, GPUVendor.Intel, 8192, true)]   // Intel Arc
-    [InlineData(ModosRendimientoVideo.Automatico, GPUVendor.ATI, 8192, false)]    // Flyleaf no lo tiene para AMD
-    [InlineData(ModosRendimientoVideo.Activado, GPUVendor.Intel, 128, true)]
-    [InlineData(ModosRendimientoVideo.Desactivado, GPUVendor.Nvidia, 8192, false)]
-    public void Escalado_SegunModoYTarjeta(string modo, GPUVendor fabricante, long memoriaMb, bool esperado) =>
+    [InlineData(ModosRendimientoVideo.Automatico, FabricanteGrafica.Intel, 128, false)]   // integrada (Intel HD 620)
+    [InlineData(ModosRendimientoVideo.Automatico, FabricanteGrafica.Nvidia, 8192, true)]  // RTX dedicada
+    [InlineData(ModosRendimientoVideo.Automatico, FabricanteGrafica.Intel, 8192, true)]   // Intel Arc
+    [InlineData(ModosRendimientoVideo.Automatico, FabricanteGrafica.Amd, 8192, false)]    // Flyleaf no lo tiene para AMD
+    [InlineData(ModosRendimientoVideo.Activado, FabricanteGrafica.Intel, 128, true)]
+    [InlineData(ModosRendimientoVideo.Desactivado, FabricanteGrafica.Nvidia, 8192, false)]
+    public void Escalado_SegunModoYTarjeta(string modo, FabricanteGrafica fabricante, long memoriaMb, bool esperado) =>
         MotorVideo.UsarEscaladoInteligente(modo, fabricante, memoriaMb).Should().Be(esperado);
 
     // === Tarjeta elegida ===

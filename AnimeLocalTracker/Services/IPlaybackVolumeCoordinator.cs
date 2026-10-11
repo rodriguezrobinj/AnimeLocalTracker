@@ -1,4 +1,3 @@
-using FlyleafLib.MediaPlayer;
 
 namespace AnimeLocalTracker.Services;
 
@@ -16,10 +15,10 @@ public interface IPlaybackVolumeCoordinator
     /// Aplica el volumen al Player; si <paramref name="estabaMuteado"/> y el volumen es &gt; 0,
     /// también desmutea. Devuelve true si desmuteó (el llamador debe actualizar su IsMuted).
     /// </summary>
-    bool AplicarVolumen(Player? player, int volumen, bool estabaMuteado);
+    bool AplicarVolumen(IMotorVideo? motor, int volumen, bool estabaMuteado);
 
     /// <summary>Desmutea y re-aplica el volumen actual (fiel al ToggleMute original).</summary>
-    void Desmutear(Player? player, int volumenActual);
+    void Desmutear(IMotorVideo? motor, int volumenActual);
 
-    void Mutear(Player? player);
+    void Mutear(IMotorVideo? motor);
 }
