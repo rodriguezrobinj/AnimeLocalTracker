@@ -69,6 +69,8 @@ public class UrlSeguridadTests
     [Theory]
     [InlineData("https://cdn.example.com/master.m3u8")]
     [InlineData("https://cdn.example.com/stream/manifest.mpd")]
+    // Espejo real de Streamwish (2026-10-10): la lista HLS se llama master.txt
+    [InlineData("https://wzrlxfli3szhgr0.deepspaceantenna.space/mvznwsitszvr/hls3/01/04144/p0lxkv30iba0_,n,h,x,.urlset/master.txt")]
     public void EsUrlManifiestoStreaming_Manifiestos_DeberiaDetectar(string url)
     {
         UrlSeguridad.EsUrlManifiestoStreaming(url).Should().BeTrue();
@@ -77,6 +79,7 @@ public class UrlSeguridadTests
     [Theory]
     [InlineData("https://cdn.example.com/video.mp4")]
     [InlineData("https://cdn.example.com/video.mkv?v=2")]
+    [InlineData("https://cdn.example.com/notas/readme.txt")]
     [InlineData("")]
     [InlineData(null)]
     public void EsUrlManifiestoStreaming_ArchivosDirectos_DeberiaRechazar(string? url)

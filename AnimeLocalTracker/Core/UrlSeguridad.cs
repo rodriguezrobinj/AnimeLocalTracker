@@ -161,15 +161,15 @@ public static class UrlSeguridad
     }
 
     /// <summary>
-    /// True si la URL es un manifiesto HLS/DASH (.m3u8/.mpd). En esta fase el
-    /// descargador solo maneja archivos directos; los manifiestos se omiten
-    /// (la descarga segmentada queda como fase 2).
+    /// True si la URL es un manifiesto HLS/DASH (.m3u8/.mpd): no es un archivo directo, lo descarga yt-dlp por fragmentos.
+    /// Vidhide y Streamwish publican además su lista HLS como ".../master.txt" en algunos espejos: tratada como archivo
+    /// directo, la app bajaba el texto de la lista en vez del video.
     /// </summary>
     public static bool EsUrlManifiestoStreaming(string? url)
     {
         if (string.IsNullOrWhiteSpace(url)) return false;
         string u = url.ToLowerInvariant();
-        return u.Contains(".m3u8") || u.Contains(".mpd");
+        return u.Contains(".m3u8") || u.Contains(".mpd") || u.Contains("/master.txt");
     }
 
     private static bool EsHostPermitido(string host, string[] permitidos)

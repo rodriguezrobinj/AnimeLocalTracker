@@ -141,11 +141,23 @@ def test_prefiere_el_espejo_que_responde_sin_referer():
     assert r["direct_url"] == "https://cdn-a.example.net/hls2/master.m3u8"
 
 
-def test_si_ninguna_lista_responde_se_queda_con_la_de_mayor_calidad():
-    links = {"hls2": "https://cdn.example.net/hls2/master.m3u8", "hls4": "https://cdn.example.net/hls4/master.m3u8"}
-    descargar = fake_descargar({EMBED: (200, None, pagina(links))})  # las listas dan 404: puede ser un fallo pasajero, no se descarta el video
+def test_si_ninguna_lista_responde_falla_para_que_la_app_pruebe_otro_servidor():
+    # Caso real (Dungeon Meshi ep. 24 por Streamwish, 2026-10-10): las dos listas del video daban 404 y tiempo agotado, se devolvía
+    # la primera como "resuelta" y la app reintentaba ese enlace muerto y acababa en el torrent, con Mediafire, Mega y Voe disponibles.
+    links = {"hls2": "https://cdn.example.net/hls2/master.m3u8", "hls3": "https://cdn.example.net/hls3/master.txt"}
+    descargar = fake_descargar({EMBED: (200, None, pagina(links))})  # las listas dan 404
 
-    assert PackedHlsExtractor.extract_packed(EMBED, descargar=descargar)["direct_url"] == "https://cdn.example.net/hls4/master.m3u8"
+    r = PackedHlsExtractor.extract_packed(EMBED, descargar=descargar)
+
+    assert r["success"] is False
+    assert "ninguna" in r["error"]
+
+
+def test_una_lista_publicada_como_master_txt_vale_si_responde():
+    links = {"hls2": "https://cdn.example.net/hls2/master.m3u8", "hls3": "https://cdn.example.net/hls3/master.txt"}
+    descargar = fake_descargar({EMBED: (200, None, pagina(links)), **listas("https://cdn.example.net/hls3/master.txt")})
+
+    assert PackedHlsExtractor.extract_packed(EMBED, descargar=descargar)["direct_url"] == "https://cdn.example.net/hls3/master.txt"
 
 
 def test_rechaza_un_embed_a_un_destino_no_publico():

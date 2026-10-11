@@ -1058,7 +1058,8 @@
                                             <Button Command="{Binding DataContext.Episodios.DescargarEpisodioCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                     CommandParameter="{Binding}"
                                                     Width="34" Height="34"
-                                                    ToolTip="{loc:T Det_DescargarEpisodioTip}">
+                                                    ToolTip="{loc:T Det_DescargarEpisodioTip}"
+                                                    AutomationProperties.Name="{loc:T Det_DescargarEpisodioTip}">
                                                 <Button.Style>
                                                     <Style TargetType="Button" BasedOn="{StaticResource DetRowIconBtn}">
                                                         <Setter Property="Visibility" Value="Visible"/>

@@ -96,8 +96,12 @@ class PackedHlsExtractor:
                 enlaces = _leer_enlaces(js) if js else {}
                 candidatas = [c for c in (urljoin(actual, enlaces[k]) for k in _por_calidad(enlaces)) if destino_seguro(c)]
                 if candidatas:
-                    # La de mayor calidad que responda sola; si ninguna contesta (¿fallo pasajero?) no se descarta el video: la mejor.
-                    lista = next((c for c in candidatas if _responde_sin_referer(c, descargar)), candidatas[0])
+                    # La de mayor calidad que responda sola. Si ninguna contesta se da por fallido: devolver una igualmente
+                    # dejaba a la app reintentando un enlace muerto (más de un minuto) y sin probar los demás servidores del
+                    # episodio, que es lo que hace cuando un servidor falla.
+                    lista = next((c for c in candidatas if _responde_sin_referer(c, descargar)), None)
+                    if lista is None:
+                        return error("Vidhide/Streamwish: ninguna de las listas del video responde.")
                     titulo = _TITULO.search(cuerpo)
                     return resultado_directo(lista, titulo.group(1).strip() if titulo else "")
             return None
