@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Windows.Media.Imaging;
 using AnimeLocalTracker.Core;
+using AnimeLocalTracker.Models;
 
 namespace AnimeLocalTracker.Services;
 
@@ -72,11 +73,17 @@ public interface IMotorVideo : IDisposable
     PistaSubtitulosMotor? PistaSubtitulosDe(object nativa);
     void MostrarSubtitulosDelMotor(PistaSubtitulosMotor pista);
     void ApagarSubtitulosDelMotor();
+    /// <summary>El motor dibuja él mismo, dentro del video, también los subtítulos de texto. Si es false, los de texto los lee y los pinta la app.</summary>
+    bool DibujaSubtitulosDeTexto { get; }
+    /// <summary>Aspecto de los subtítulos que dibuja el motor. <paramref name="tambienEnAss"/>: usarlo también en las pistas ASS, en vez de su estilo original.</summary>
+    void AplicarEstiloSubtitulos(EstiloSubtitulos estilo, bool tambienEnAss);
 
     /// <returns>False si el motor no pudo montar la cadena.</returns>
     bool AplicarFiltrosAudio(IReadOnlyList<FiltroAudio> filtros);
     /// <returns>False si ese filtro no admite el cambio sin remontar la cadena.</returns>
     bool CambiarFiltroEnVivo(string id, string clave, string valor);
+    /// <summary>Deja apuntada la cadena para el siguiente archivo sin remontar la que suena (después de un cambio en vivo).</summary>
+    void RecordarFiltrosAudio(IReadOnlyList<FiltroAudio> filtros);
 
     /// <summary>Adelanta la lectura de un archivo que se abrirá después. Sin garantías: si falla no pasa nada.</summary>
     void PrecalentarArchivo(string ruta, CancellationToken ct);

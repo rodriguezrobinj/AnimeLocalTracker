@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows;
@@ -15,6 +16,7 @@ namespace AnimeLocalTracker.Controls;
 /// Donde se ve el video del motor nuevo: un lienzo OpenGL que WPF compone como una imagen más (así los controles van encima como
 /// WPF normal, sin segunda ventana). libmpv avisa de que hay fotograma y se pinta en el siguiente paso de composición.
 /// Con un motor que no sea <see cref="MotorMpv"/> no hace nada.
+/// Hay una por motor (<see cref="Para"/>) y vive lo que él: las vistas se la pasan (<see cref="MoverA"/>) en vez de crear otra.
 /// </summary>
 public sealed class SuperficieMpv : Grid, IDisposable
 {
@@ -26,6 +28,22 @@ public sealed class SuperficieMpv : Grid, IDisposable
     {
         get => (IMotorVideo?)GetValue(MotorProperty);
         set => SetValue(MotorProperty, value);
+    }
+
+    private static readonly ConditionalWeakTable<MotorMpv, SuperficieMpv> PorMotor = new();
+
+    /// <summary>La superficie de ese motor. Es una sola: pasa de la vista de la ventana principal a la del mini reproductor y vuelve.</summary>
+    public static SuperficieMpv Para(MotorMpv motor) => PorMotor.GetValue(motor, m => new SuperficieMpv { Motor = m });
+
+    /// <summary>
+    /// La saca de donde esté y la pone en <paramref name="hueco"/>. Se mueve el mismo lienzo en vez de crear otro porque así el pintor
+    /// de libmpv sigue vivo: soltarlo apaga el video y tarda 1 s en volver (medido). Por eso salir del árbol visual no suelta nada.
+    /// </summary>
+    public void MoverA(Decorator hueco)
+    {
+        if (ReferenceEquals(Parent, hueco)) return;
+        if (Parent is Decorator anterior) anterior.Child = null;
+        hueco.Child = this;
     }
 
     private readonly GLWpfControl _lienzo = new();
@@ -48,7 +66,6 @@ public sealed class SuperficieMpv : Grid, IDisposable
         Children.Add(_lienzo);
         _lienzo.Render += Pintar;
         _lienzo.Start(new GLWpfControlSettings { MajorVersion = 3, MinorVersion = 3, RenderContinuously = false });
-        Unloaded += (_, _) => SoltarPintor();
         Loaded += (_, _) => PedirPintado();
         SizeChanged += (_, _) => PedirPintado(); // en pausa nadie avisa: al cambiar de tamaño hay que repintar el mismo fotograma
     }
@@ -56,9 +73,9 @@ public sealed class SuperficieMpv : Grid, IDisposable
     private void CambiarMotor(MotorMpv? motor)
     {
         SoltarPintor();
-        if (_motor != null) _motor.Desechando -= SoltarPintor;
+        if (_motor != null) _motor.Desechando -= Dispose;
         _motor = motor;
-        if (_motor != null) _motor.Desechando += SoltarPintor;
+        if (_motor != null) _motor.Desechando += Dispose;
         PedirPintado();
     }
 
@@ -131,6 +148,17 @@ public sealed class SuperficieMpv : Grid, IDisposable
             }
             LibMpv.mpv_render_context_set_update_callback(_pintor, Marshal.GetFunctionPointerForDelegate(_aviso), 0);
             AppLogger.Debug("SuperficieMpv", $"Pintor de libmpv creado ({_lienzo.FrameBufferWidth}x{_lienzo.FrameBufferHeight}).");
+            try
+            {
+                // Con el contexto OpenGL del lienzo activo: qué tarjeta lo pinta (para el informe de video).
+                motor.TarjetaDetectada(
+                    OpenTK.Graphics.OpenGL4.GL.GetString(OpenTK.Graphics.OpenGL4.StringName.Renderer),
+                    OpenTK.Graphics.OpenGL4.GL.GetString(OpenTK.Graphics.OpenGL4.StringName.Vendor));
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Debug("SuperficieMpv", $"No se pudo leer el nombre de la tarjeta gráfica: {ex.Message}");
+            }
             motor.PintorCreado();
             return true;
         }
@@ -141,12 +169,15 @@ public sealed class SuperficieMpv : Grid, IDisposable
         }
     }
 
-    /// <summary>La vista que la contiene no vuelve a usarse: suelta el pintor y el lienzo OpenGL (el motor sigue vivo).</summary>
+    /// <summary>El motor se va a cerrar: suelta el pintor (libmpv exige que sea antes), sale de la vista que la aloje y suelta el lienzo OpenGL.</summary>
     public void Dispose()
     {
+        if (!Dispatcher.CheckAccess()) { Dispatcher.Invoke(Dispose); return; }
+
         SoltarPintor();
-        if (_motor != null) _motor.Desechando -= SoltarPintor;
+        if (_motor != null) _motor.Desechando -= Dispose;
         _motor = null;
+        if (Parent is Decorator hueco) hueco.Child = null;
         _lienzo.Dispose();
     }
 

@@ -178,6 +178,15 @@ public static class MotorVideo
 
     public static bool EscaladoDisponible(FabricanteGrafica fabricante) => fabricante is FabricanteGrafica.Nvidia or FabricanteGrafica.Intel;
 
+    /// <summary>Fabricante a partir del texto que da el controlador ("Intel", "NVIDIA Corporation", "ATI Technologies Inc.", "AMD Radeon…").</summary>
+    internal static FabricanteGrafica FabricantePorNombre(string? texto) =>
+        string.IsNullOrWhiteSpace(texto) ? FabricanteGrafica.Desconocido
+        : texto.Contains("intel", StringComparison.OrdinalIgnoreCase) ? FabricanteGrafica.Intel
+        : texto.Contains("nvidia", StringComparison.OrdinalIgnoreCase) || texto.Contains("geforce", StringComparison.OrdinalIgnoreCase) ? FabricanteGrafica.Nvidia
+        : texto.Contains("amd", StringComparison.OrdinalIgnoreCase) || texto.Contains("radeon", StringComparison.OrdinalIgnoreCase)
+          || texto.Contains("ati ", StringComparison.OrdinalIgnoreCase) ? FabricanteGrafica.Amd
+        : FabricanteGrafica.Desconocido;
+
     internal static FabricanteGrafica FabricanteDe(GPUVendor fabricante) => fabricante switch
     {
         GPUVendor.Intel => FabricanteGrafica.Intel,

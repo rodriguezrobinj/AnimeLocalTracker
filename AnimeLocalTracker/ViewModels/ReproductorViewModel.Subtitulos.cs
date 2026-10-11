@@ -60,6 +60,15 @@ public partial class ReproductorViewModel
     {
         ReiniciarCuesSubtitulos();
 
+        if (Motor?.DibujaSubtitulosDeTexto == true)
+        {
+            // Este motor dibuja todas las pistas dentro del video: la app ni extrae las líneas ni prepara su dibujo ASS.
+            _pistaTextoActual = pista;
+            PistaActualEsAss = pista.EsAss;
+            _subtitleCoordinator.SeleccionarPista(Motor, pista);
+            return;
+        }
+
         if (pista is { EsImagen: false, RutaExterna: null })
         {
             _subtitleCoordinator.Deshabilitar(Motor); // por si el motor tenía abierta otra pista (de imagen)
@@ -181,6 +190,12 @@ public partial class ReproductorViewModel
             if (!SetProperty(ref _usarMiEstiloEnAss, value)) return;
 
             GuardarUsarMiEstiloEnAss(value);
+            if (Motor?.DibujaSubtitulosDeTexto == true)
+            {
+                AplicarEstiloSubtitulosAlMotor();
+                return;
+            }
+
             if (value) SubtitulosAssActivo = false;
             else if (_assListo) SubtitulosAssActivo = true;
             else IniciarDibujoAssSiCorresponde();
@@ -189,6 +204,11 @@ public partial class ReproductorViewModel
 
     [RelayCommand]
     private void ToggleUsarMiEstiloEnAss() => UsarMiEstiloEnAss = !UsarMiEstiloEnAss;
+
+    /// <summary>Al motor que dibuja los subtítulos: el estilo de Configuración y si debe usarlo también en las pistas ASS.</summary>
+    private void AplicarEstiloSubtitulosAlMotor() => Motor?.AplicarEstiloSubtitulos(EstiloSubtitulos, UsarMiEstiloEnAss);
+
+    partial void OnEstiloSubtitulosChanged(EstiloSubtitulos value) => AplicarEstiloSubtitulosAlMotor();
 
     private void GuardarUsarMiEstiloEnAss(bool valor)
     {
@@ -204,7 +224,7 @@ public partial class ReproductorViewModel
     {
         var pista = _pistaTextoActual;
         var motor = Motor;
-        if (pista == null || motor == null) return;
+        if (pista == null || motor == null || motor.DibujaSubtitulosDeTexto) return;
 
         if (!Core.SubtitulosAss.DebeDibujarse(pista.EsAss, pista.EsImagen, pista.RutaExterna != null, UsarMiEstiloEnAss)) return;
 

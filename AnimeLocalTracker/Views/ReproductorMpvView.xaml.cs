@@ -9,6 +9,7 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using AnimeLocalTracker.Controls;
 using AnimeLocalTracker.Services;
 using AnimeLocalTracker.ViewModels;
 using MaterialDesignThemes.Wpf;
@@ -64,24 +65,31 @@ namespace AnimeLocalTracker.Views
             EnlazarSubtitulos(e.NewValue as ReproductorViewModel);
         }
 
-        // === Texto de los subtítulos: mismo patrón que el toast/cuenta atrás (ver comentario en el XAML).
-        // Escucha Player.Subtitles.SubsText; si el Player se recrea, se vuelve a enganchar al nuevo. ===
+        // === El reproductor al que mira esta vista (el nombre viene de la vista clásica, que lo usaba para los subtítulos;
+        // aquí los dibuja libmpv dentro del video y la vista solo aloja la superficie y sigue el resto del estado). ===
         private ReproductorViewModel? _vmSubtitulos;
 
         private void EnlazarSubtitulos(ReproductorViewModel? vm)
         {
-            if (ReferenceEquals(_vmSubtitulos, vm))
+            if (!ReferenceEquals(_vmSubtitulos, vm))
             {
-                ActualizarCapaAss(); // la vista aparece con el modo ASS ya activo (mini reproductor): se lee el estado actual
-                return;
+                if (_vmSubtitulos != null) _vmSubtitulos.PropertyChanged -= VmSubtitulos_PropertyChanged;
+                _vmSubtitulos = vm;
+                if (_vmSubtitulos != null) _vmSubtitulos.PropertyChanged += VmSubtitulos_PropertyChanged;
+
+                ActualizarTapaVideo();
             }
+            AlojarSuperficie();
+        }
 
-            if (_vmSubtitulos != null) _vmSubtitulos.PropertyChanged -= VmSubtitulos_PropertyChanged;
-            _vmSubtitulos = vm;
-            if (_vmSubtitulos != null) _vmSubtitulos.PropertyChanged += VmSubtitulos_PropertyChanged;
-
-            ActualizarTapaVideo();
-            ActualizarCapaAss();
+        /// <summary>
+        /// Trae a esta vista la superficie de video del motor. Es una sola por motor: al pasar al mini reproductor (otra ventana, otra
+        /// instancia de esta vista) se mueve en vez de crearse otra, porque soltar el pintor de libmpv deja el video 1 s en negro.
+        /// Solo la pide una vista cargada: la que se está yendo no se la quita a la que llega.
+        /// </summary>
+        private void AlojarSuperficie()
+        {
+            if (IsLoaded && _vmSubtitulos?.Motor is MotorMpv { Desechado: false } motor) SuperficieMpv.Para(motor).MoverA(HuecoVideo);
         }
 
         private void ActualizarTapaVideo() =>
@@ -189,18 +197,9 @@ namespace AnimeLocalTracker.Views
 
         private void VmSubtitulos_PropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName is nameof(ReproductorViewModel.SubtitulosAssActivo) or nameof(ReproductorViewModel.SubtitulosHabilitados))
+            if (e.PropertyName == nameof(ReproductorViewModel.Motor))
             {
-                Core.HiloUi.Ejecutar(ActualizarCapaAss);
-                return;
-            }
-
-            if (e.PropertyName is nameof(ReproductorViewModel.EstiloSubtitulos)
-                or nameof(ReproductorViewModel.SubtitulosDobleLineaActivo)
-                or nameof(ReproductorViewModel.SubtituloLineaAbajo)
-                or nameof(ReproductorViewModel.SubtituloLineaArriba))
-            {
-                Core.HiloUi.Ejecutar(ActualizarTextoSubtitulos);
+                Core.HiloUi.Ejecutar(AlojarSuperficie);
                 return;
             }
 
@@ -236,125 +235,6 @@ namespace AnimeLocalTracker.Views
 
             ListaCajonEpisodios.UpdateLayout();
             ListaCajonEpisodios.ScrollIntoView(actual);
-        }
-
-        private void ActualizarTextoSubtitulos()
-        {
-            if (_assCapaActiva)
-            {
-                // La capa ASS ya dibuja estas líneas con su estilo: el texto plano se oculta para no verlas dos veces.
-                SubtitulosVista.Texto = string.Empty;
-                SubtitulosVistaArriba.Texto = string.Empty;
-                return;
-            }
-
-            // Con la pista completa ya extraída (ver ReproductorViewModel.CargarCuesSubtitulosSiCorresponde) se
-            // confía en las dos líneas resueltas por la app, que sí distinguen cuándo hay dos hablando a la vez.
-            // Si todavía no terminó de extraerse (o falló), se sigue mostrando el texto único de Flyleaf abajo,
-            // igual que siempre: los subtítulos nunca desaparecen por culpa de esta mejora.
-            if (_vmSubtitulos?.SubtitulosDobleLineaActivo == true)
-            {
-                SubtitulosVista.Texto = _vmSubtitulos.SubtituloLineaAbajo;
-                SubtitulosVistaArriba.Texto = _vmSubtitulos.SubtituloLineaArriba;
-            }
-            else
-            {
-                SubtitulosVista.Texto = string.Empty; // lo que no lee la app lo dibuja libmpv dentro del video
-                SubtitulosVistaArriba.Texto = string.Empty;
-            }
-
-            SubtitulosVista.Estilo = _vmSubtitulos?.EstiloSubtitulos;
-            SubtitulosVistaArriba.Estilo = _vmSubtitulos?.EstiloSubtitulos;
-        }
-
-        // === Capa de subtítulos ASS (ver SubtitulosAssImagen en el XAML y docs/investigacion-subtitulos-ass.md) ===
-        // El ViewModel es el dueño del dibujante; esta vista solo le pide el fotograma del instante actual y lo pinta.
-        // Cada instancia de la vista (ventana principal y mini reproductor) tiene su propio bitmap y solo dibuja mientras se ve.
-        private WriteableBitmap? _assBitmap;
-        private byte[]? _assBufer;
-        private bool _assCapaActiva;
-        private bool _assDibujando;
-        private long _assUltimoTick = -1;
-
-        private void ActualizarCapaAss()
-        {
-            var vm = _vmSubtitulos;
-            bool activa = vm is { SubtitulosAssActivo: true, SubtitulosHabilitados: true } && IsLoaded && IsVisible
-                          && vm.DibujanteAss.Ancho > 0 && vm.DibujanteAss.Alto > 0;
-
-            if (_assCapaActiva)
-            {
-                CompositionTarget.Rendering -= CapaAss_Rendering;
-                SubtitulosAssImagen.Visibility = Visibility.Collapsed;
-                SubtitulosAssImagen.Source = null;
-                _assBitmap = null;
-                _assBufer = null;
-            }
-
-            _assCapaActiva = activa;
-            if (activa)
-            {
-                var dibujante = vm!.DibujanteAss;
-                _assBitmap = new WriteableBitmap(dibujante.Ancho, dibujante.Alto, 96, 96, PixelFormats.Pbgra32, null);
-                _assBufer = new byte[dibujante.Ancho * dibujante.Alto * 4];
-                _assUltimoTick = -1;
-                SubtitulosAssImagen.Source = _assBitmap;
-                SubtitulosAssImagen.Visibility = Visibility.Visible;
-                CompositionTarget.Rendering += CapaAss_Rendering;
-            }
-
-            ActualizarTextoSubtitulos();
-        }
-
-        /// <summary>
-        /// En cada fotograma de la interfaz: si el video avanzó (o saltó), se pide el dibujo de ese instante a un hilo de fondo y
-        /// al volver se copia al bitmap la franja que cambió. Mientras hay un dibujo en curso no se pide otro: el siguiente toma
-        /// el instante más reciente, así un cartel pesado salta fotogramas del subtítulo en vez de acumular retraso. En pausa el
-        /// tiempo no cambia y no se dibuja nada.
-        /// </summary>
-        private async void CapaAss_Rendering(object? sender, EventArgs e)
-        {
-            var vm = _vmSubtitulos;
-            var motor = vm?.Motor;
-            var bitmap = _assBitmap;
-            var bufer = _assBufer;
-            if (_assDibujando || vm == null || motor == null || motor.Desechado || bitmap == null || bufer == null) return;
-
-            long tick = motor.Posicion.Ticks;
-            if (tick == _assUltimoTick) return;
-            _assUltimoTick = tick;
-
-            _assDibujando = true;
-            try
-            {
-                var dibujante = vm.DibujanteAss;
-                var instante = TimeSpan.FromTicks(tick);
-                var (ok, filaInicial, filas) = await Task.Run(() =>
-                {
-                    bool dibujado = dibujante.Renderizar(instante, bufer, out int desde, out int cuantas);
-                    return (dibujado, desde, cuantas);
-                });
-
-                if (!ReferenceEquals(bitmap, _assBitmap)) return; // la capa se apagó o cambió de episodio mientras se dibujaba
-                if (!ok)
-                {
-                    vm.NotificarFalloDibujoAss();
-                    return;
-                }
-                if (filas == 0) return; // nada cambió en pantalla: no se toca el bitmap
-
-                // Solo se copia la franja de filas que cambió (un diálogo son unas decenas de filas, no el fotograma entero).
-                int paso = bitmap.PixelWidth * 4;
-                bitmap.WritePixels(new Int32Rect(0, filaInicial, bitmap.PixelWidth, filas), bufer, paso, filaInicial * paso);
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Debug("ReproductorView", $"No se pudo pintar la capa de subtítulos ASS: {ex.Message}");
-            }
-            finally
-            {
-                _assDibujando = false;
-            }
         }
 
         /// <summary>Se suscribe a los cambios del toast de IDialogService (y se desuscribe del anterior).</summary>
@@ -477,8 +357,6 @@ namespace AnimeLocalTracker.Views
             {
                 Mouse.OverrideCursor = null;
             }
-
-            ActualizarCapaAss(); // oculta: se deja de dibujar; visible otra vez: se retoma
         }
 
         private void ReproductorView_Loaded(object sender, RoutedEventArgs e)
@@ -517,9 +395,6 @@ namespace AnimeLocalTracker.Views
 
             // StaysOpen=True: cerrar manualmente al salir del reproductor
             CerrarMenus();
-
-            // Esta vista no vuelve a usarse: se suelta el pintor de libmpv y el lienzo OpenGL. El motor no se destruye aquí.
-            Superficie.Dispose();
         }
 
         /// <summary>La app está activa si lo está la ventana principal o la que contiene esta vista.</summary>

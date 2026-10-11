@@ -37,6 +37,16 @@ public class VistasSinTextoFijoTests
     }
 
     [Fact]
+    public void LaVistaDelMotorNuevo_NoTieneCapasDeSubtitulosPropias()
+    {
+        // Con libmpv los subtítulos van dentro del video: una capa de la app encima los mostraría dos veces.
+        string xaml = File.ReadAllText(Path.Combine(RaizDelRepositorio(), "AnimeLocalTracker", "Views", "ReproductorMpvView.xaml"));
+
+        Assert.DoesNotContain("SubtitleTextView", xaml);
+        Assert.DoesNotContain("SubtitulosAssImagen", xaml);
+    }
+
+    [Fact]
     public void NingunaVistaTieneTextoVisibleFijo()
     {
         string proyecto = Path.Combine(RaizDelRepositorio(), "AnimeLocalTracker");

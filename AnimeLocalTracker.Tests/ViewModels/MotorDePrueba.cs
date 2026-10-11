@@ -78,6 +78,11 @@ public sealed class MotorDePrueba : IMotorVideo
     public void ElegirAudio(PistaAudioMotor pista) { AudioElegido = pista; IndicePistaAudioActual = pista.Indice; }
     public void MostrarSubtitulosDelMotor(PistaSubtitulosMotor pista) => SubtitulosDelMotor = pista;
     public void ApagarSubtitulosDelMotor() { VecesSubtitulosApagados++; SubtitulosDelMotor = null; }
+    public bool DibujaSubtitulosDeTexto { get; set; }
+    public (AnimeLocalTracker.Models.EstiloSubtitulos Estilo, bool TambienEnAss)? EstiloPuesto { get; private set; }
+    public void AplicarEstiloSubtitulos(AnimeLocalTracker.Models.EstiloSubtitulos estilo, bool tambienEnAss) => EstiloPuesto = (estilo, tambienEnAss);
+    public IReadOnlyList<FiltroAudio>? FiltrosRecordados { get; private set; }
+    public void RecordarFiltrosAudio(IReadOnlyList<FiltroAudio> filtros) => FiltrosRecordados = filtros;
     public bool AplicarFiltrosAudio(IReadOnlyList<FiltroAudio> filtros) { Filtros = filtros; return true; }
     public bool CambiarFiltroEnVivo(string id, string clave, string valor) { CambiosEnVivo.Add((id, clave, valor)); return AdmiteCambiosEnVivo; }
     public void PrecalentarArchivo(string ruta, CancellationToken ct) => Precalentados.Add(ruta);

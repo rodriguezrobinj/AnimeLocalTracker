@@ -553,6 +553,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
         motor.AperturaTerminada += AlTerminarApertura;
         Motor = motor;
+        AplicarEstiloSubtitulosAlMotor();
     }
 
     private void AlTerminarApertura(object? sender, AperturaTerminada e)
@@ -872,9 +873,6 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     [RelayCommand]
     public void MinimizarAMini()
     {
-        // El mini reproductor llega en la etapa 3: dos vistas no pueden pintar a la vez el mismo video de libmpv.
-        if (UsaMotorMpv) return;
-
         EsModoMini = true;
         _windowModeCoordinator.EntrarModoMini();
     }
@@ -1038,6 +1036,9 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     {
         SubtitulosHabilitados = true;
         SubtitulosIcon = "Subtitles";
+
+        // El motor que dibuja los subtítulos se quedó sin pista al apagarlos: se le vuelve a dar la que tenía.
+        if (Motor?.DibujaSubtitulosDeTexto == true && _pistaTextoActual != null) _subtitleCoordinator.SeleccionarPista(Motor, _pistaTextoActual);
     }
 
     public EpisodioItem? ObtenerSiguienteEpisodio() => _episodeNavigator.ObtenerSiguiente(_episodio);
@@ -2215,15 +2216,6 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     /// Única salida del reproductor (botón de retroceder, ✕, Esc, fin de episodio): guarda, cierra el PiP y vuelve a la vista
     /// anterior. La pantalla completa se conserva (decisión del usuario): solo se sale del reproductor, no del modo de la ventana. Registra el motivo en el log: si alguna vez "vuelve solo a la ficha", el log dirá qué lo pidió.
     /// </summary>
-    /// <summary>Cierra el episodio porque el usuario navegó a otra parte de la app (con el motor nuevo aún no hay mini reproductor
-    /// que lo siga mostrando). Como <see cref="SalirDelReproductor"/>, pero sin volver a la vista anterior.</summary>
-    public void CerrarPorNavegacion()
-    {
-        AppLogger.Info("ReproductorViewModel", $"Saliendo del reproductor (episodio {_episodio}, {TimeSpan.FromSeconds(CurrentSeconds):mm\\:ss}): se navegó a otra parte de la app.");
-        _ = GuardarProgresoActualAsync();
-        Dispose();
-    }
-
     private void SalirDelReproductor(string motivo)
     {
         AppLogger.Info("ReproductorViewModel", $"Saliendo del reproductor (episodio {_episodio}, {TimeSpan.FromSeconds(CurrentSeconds):mm\\:ss}): {motivo}.");

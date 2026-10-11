@@ -190,7 +190,7 @@ public partial class ReproductorViewModel
         {
             // El cambio en vivo solo toca el filtro que está sonando. La lista de la configuración es la que Flyleaf usa para
             // montar la cadena al abrir el siguiente episodio: sin ponerla al día, ahí volvían las ganancias anteriores.
-            (Motor as MotorFlyleaf)?.RecordarFiltrosParaElSiguienteArchivo(ConstruirFiltrosAudio());
+            Motor.RecordarFiltrosAudio(ConstruirFiltrosAudio());
             bool r1 = Motor.CambiarFiltroEnVivo(Core.EcualizadorAudio.IdBanda(banda.Indice), "g", Core.EcualizadorAudio.TextoGanancia(banda.Ganancia));
             double pre = Core.EcualizadorAudio.Preamplificacion(BandasEcualizador.Select(b => b.Ganancia).ToList());
             bool r2 = Motor.CambiarFiltroEnVivo(Core.EcualizadorAudio.IdPreamplificador, "volume", Core.EcualizadorAudio.TextoVolumen(pre));

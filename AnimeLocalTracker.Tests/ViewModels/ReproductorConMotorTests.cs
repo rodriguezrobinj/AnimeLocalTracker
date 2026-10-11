@@ -345,19 +345,94 @@ public sealed class ReproductorConMotorTests : IDisposable
         sut.UsaMotorMpv.Should().BeFalse("solo el motor que elige la app por el ajuste decide la vista");
     }
 
-    [Fact]
-    public async Task CerrarPorNavegacion_GuardaElProgresoYDesechaElMotor()
+    // ── Etapa 3 de libmpv: un motor que dibuja él mismo los subtítulos de texto ──
+
+    private static readonly PistaSubtitulosMotor PistaAss = new(3, LocalizationService.Cultura.TwoLetterISOLanguageName, null, EsImagen: false, EsAss: true, RutaExterna: null);
+
+    private (ReproductorViewModel Sut, Mock<ISubtitleCuesExtractorService> Extractor) CrearSutQueDibujaSubtitulos(AnimeLocalTracker.Models.AppSettings? ajustes = null)
     {
+        _motor.DibujaSubtitulosDeTexto = true;
+        _motor.Subtitulos.Add(PistaAss);
+        var extractor = new Mock<ISubtitleCuesExtractorService>();
+        var configuracion = new Mock<ISettingsService>();
+        configuracion.Setup(c => c.ObtenerConfiguracion()).Returns(ajustes ?? new AnimeLocalTracker.Models.AppSettings());
+        var sut = new ReproductorViewModel(
+            Mock.Of<IDatabaseService>(), Mock.Of<IAnimeTrackingService>(), Mock.Of<IAuthService>(),
+            settingsService: configuracion.Object, playbackStateService: _estado.Object,
+            subtitleCuesExtractorService: extractor.Object, fabricaMotor: _ => _motor);
+        return (sut, extractor);
+    }
+
+    [Fact]
+    public async Task ConMotorQueDibujaLosSubtitulos_UnaPistaDeTextoSeLeDaAlMotorYLaAppNoLaExtrae()
+    {
+        var (sut, extractor) = CrearSutQueDibujaSubtitulos();
+        using var _ = sut;
+        await sut.CargarVideoAsync(_ruta, 101, "Frieren", 5);
+        _motor.TerminarApertura();
+
+        _motor.SubtitulosDelMotor.Should().Be(PistaAss, "este motor dibuja todas las pistas dentro del video");
+        sut.PistaActualEsAss.Should().BeTrue("el menú sigue ofreciendo «Usar mi estilo»");
+        sut.SubtitulosAssActivo.Should().BeFalse("la app no prepara su propio dibujo ASS");
+        sut.SubtitulosDobleLineaActivo.Should().BeFalse();
+        extractor.Verify(x => x.ExtraerAsync(It.IsAny<string>(), It.IsAny<int?>(), It.IsAny<string?>(), It.IsAny<System.Threading.CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ConMotorQueDibujaLosSubtitulos_UsarMiEstiloSeLoPideAlMotor()
+    {
+        var (sut, _) = CrearSutQueDibujaSubtitulos();
+        using var __ = sut;
+        await sut.CargarVideoAsync(_ruta, 101, "Frieren", 5);
+        _motor.TerminarApertura();
+
+        sut.UsarMiEstiloEnAss = true;
+        _motor.EstiloPuesto!.Value.TambienEnAss.Should().BeTrue();
+
+        sut.UsarMiEstiloEnAss = false;
+        _motor.EstiloPuesto!.Value.TambienEnAss.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ConMotorQueDibujaLosSubtitulos_ApagarYEncenderVuelveAMostrarLaMismaPista()
+    {
+        var (sut, _) = CrearSutQueDibujaSubtitulos();
+        using var __ = sut;
+        await sut.CargarVideoAsync(_ruta, 101, "Frieren", 5);
+        _motor.TerminarApertura();
+
+        sut.DeshabilitarSubtitulos();
+        _motor.SubtitulosDelMotor.Should().BeNull();
+
+        sut.HabilitarSubtitulos();
+        _motor.SubtitulosDelMotor.Should().Be(PistaAss);
+    }
+
+    [Fact]
+    public async Task AlCrearElMotor_SeLeDaElEstiloDeSubtitulosDeConfiguracion()
+    {
+        var ajustes = new AnimeLocalTracker.Models.AppSettings { EstiloSubtitulos = new AnimeLocalTracker.Models.EstiloSubtitulos { Tamano = 60 }, UsarMiEstiloEnAss = true };
+        var (sut, _) = CrearSutQueDibujaSubtitulos(ajustes);
+        using var __ = sut;
+
+        await sut.CargarVideoAsync(_ruta, 101, "Frieren", 5);
+
+        _motor.EstiloPuesto!.Value.Estilo.Tamano.Should().Be(60);
+        _motor.EstiloPuesto!.Value.TambienEnAss.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task CambiarUnaBandaEnVivo_RecuerdaLaCadenaParaElSiguienteArchivo()
+    {
+        // El cambio en vivo solo toca el filtro que suena: sin apuntar la cadena, el siguiente episodio volvía a las ganancias anteriores.
         using var sut = CrearSut(_motor);
         await sut.CargarVideoAsync(_ruta, 101, "Frieren", 5);
         _motor.TerminarApertura();
-        _motor.FotogramasMostrados = 3;
-        await EsperarHasta(() => !sut.OcultarVideoInicio);
-        _motor.Posicion = TimeSpan.FromSeconds(120);
+        sut.BandasEcualizador[0].Ganancia = 6;
 
-        sut.CerrarPorNavegacion();
+        sut.BandasEcualizador[1].Ganancia = 3;
 
-        _motor.VecesDesechado.Should().Be(1);
-        await EsperarHasta(() => _estado.Invocations.Any(i => i.Method.Name == nameof(IPlaybackStateService.GuardarProgresoAsync)));
+        _motor.FiltrosRecordados.Should().NotBeNull();
+        _motor.FiltrosRecordados!.Should().Contain(f => f.Id == AnimeLocalTracker.Core.EcualizadorAudio.IdBanda(1) && f.Argumentos.EndsWith("g=3.0"));
     }
 }

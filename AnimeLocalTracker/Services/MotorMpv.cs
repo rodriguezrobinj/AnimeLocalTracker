@@ -1,12 +1,16 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using AnimeLocalTracker.Core;
+using AnimeLocalTracker.Models;
 using AnimeLocalTracker.Services.Native;
 
 namespace AnimeLocalTracker.Services;
@@ -61,11 +65,14 @@ public sealed partial class MotorMpv : IMotorVideo
                 ("input-default-bindings", "no"), ("input-vo-keyboard", "no"), ("input-cursor", "no"),
                 ("idle", "yes"),          // sin archivo se queda esperando el siguiente
                 ("keep-open", "yes"),     // al terminar se queda en el último fotograma: el reproductor decide qué hacer
-                ("sid", "no"),            // sus subtítulos apagados: la app elige la pista y la lee ella (como con el motor clásico)
+                ("sid", "no"),            // sus subtítulos apagados hasta que la app elija pista (MostrarSubtitulosDelMotor)
                 ("sub-auto", "fuzzy"),    // los .srt/.ass sueltos junto al video aparecen como pistas
                 ("audio-display", "no"),
                 ("hwdec", ajustes.AceleracionPorHardware ? "auto-copy" : "no"),
                 ("vo", sinSalida ? "null" : "libmpv"),
+                ("screenshot-png-compression", "0"), // la captura se lee y se borra enseguida: sin comprimir tarda 35 ms en vez de 500
+                ("screenshot-high-bit-depth", "no"),
+                ("af", CadenaDeFiltros(ajustes.FiltrosAudio)),
             })
             {
                 LibMpv.mpv_set_option_string(mpv, nombre, valor);
@@ -93,7 +100,7 @@ public sealed partial class MotorMpv : IMotorVideo
             LibMpv.mpv_observe_property(mpv, IdProporcion, "video-params/aspect", LibMpv.FormatoDoble);
 
             AppLogger.Info("MotorMpv", $"Motor libmpv listo ({LibMpv.Leer(mpv, "mpv-version")}).");
-            return new MotorMpv(mpv, sinSalida);
+            return new MotorMpv(mpv, sinSalida) { _filtros = ajustes.FiltrosAudio.ToList() };
         }
         catch (Exception ex)
         {
@@ -167,6 +174,12 @@ public sealed partial class MotorMpv : IMotorVideo
         Interlocked.Exchange(ref _fotogramas, 0);
         Interlocked.Exchange(ref _posicionTicks, 0);
         Fijar("pause", "no"); // como el motor clásico: abrir es empezar a reproducir
+        Fijar("sid", "no");   // libmpv conservaría la pista del archivo anterior: cada archivo empieza sin subtítulos y la app elige
+
+        // Un cambio en vivo del ecualizador no toca la opción "af": sin esto el archivo nuevo volvería a las ganancias anteriores.
+        IReadOnlyList<FiltroAudio>? pendientes;
+        lock (_candado) pendientes = _filtrosPendientes;
+        if (pendientes != null) AplicarFiltrosAudio(pendientes);
 
         // El reproductor abre en cuanto tiene motor, y la vista tarda en tener dónde pintar (hasta 2 s recién abierta la app). Cargando
         // ya, libmpv abre el archivo sin video y lo va reproduciendo: el episodio empezaría con esos segundos consumidos y el video,
@@ -225,11 +238,159 @@ public sealed partial class MotorMpv : IMotorVideo
     public double ProporcionVideo => BitConverter.Int64BitsToDouble(Interlocked.Read(ref _proporcionBits));
 
     // Etapas 3 y 4 (docs/plan-motor-libmpv-etapa-2.md, "Lo que la etapa 2 NO hace").
-    public TarjetaGrafica? TarjetaEnUso => null;
+    private volatile TarjetaGrafica? _tarjeta;
+
+    /// <summary>La tarjeta que pinta el lienzo (la que Windows asigna a la app): la dice la superficie al crear el pintor. Memoria desconocida.</summary>
+    internal void TarjetaDetectada(string? nombre, string? fabricante)
+    {
+        if (!string.IsNullOrWhiteSpace(nombre)) _tarjeta = new TarjetaGrafica(nombre.Trim(), MotorVideo.FabricantePorNombre($"{fabricante} {nombre}"), 0);
+    }
+
+    public TarjetaGrafica? TarjetaEnUso => _tarjeta;
     public bool EscaladoInteligente { get => false; set { } }
-    public BitmapSource? CapturarFotograma() => null;
-    public bool AplicarFiltrosAudio(IReadOnlyList<FiltroAudio> filtros) => true;
-    public bool CambiarFiltroEnVivo(string id, string clave, string valor) => true;
+
+    /// <summary>El fotograma que se está viendo, con sus subtítulos. libmpv lo escribe a un PNG sin comprimir que se lee y se borra.</summary>
+    public BitmapSource? CapturarFotograma()
+    {
+        if (_desechado || !_hayArchivo) return null;
+
+        string ruta = Path.Combine(Path.GetTempPath(), $"animelocaltracker-captura-{Guid.NewGuid():N}.png");
+        try
+        {
+            if (!Ordenar("screenshot-to-file", ruta, "subtitles")) return null;
+
+            var imagen = new BitmapImage();
+            imagen.BeginInit();
+            imagen.CacheOption = BitmapCacheOption.OnLoad; // lee el archivo entero ahora: se puede borrar enseguida
+            imagen.UriSource = new Uri(ruta);
+            imagen.EndInit();
+            imagen.Freeze();
+            return imagen;
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("MotorMpv", $"No se pudo capturar el fotograma: {ex.Message}");
+            return null;
+        }
+        finally
+        {
+            try { File.Delete(ruta); } catch { }
+        }
+    }
+
+    // ── Ecualizador y modo noche ──
+
+    private const string EtiquetaFiltros = "filtros";
+    private IReadOnlyList<FiltroAudio> _filtros = [];       // la cadena montada: da el nombre de cada filtro para el cambio en vivo
+    private IReadOnlyList<FiltroAudio>? _filtrosPendientes; // tras un cambio en vivo: se montan al abrir el siguiente archivo
+
+    /// <summary>Un solo grafo de FFmpeg, con cada filtro nombrado "nombre@id" para poder cambiarlo en vivo.</summary>
+    internal static string CadenaDeFiltros(IReadOnlyList<FiltroAudio> filtros) =>
+        filtros.Count == 0 ? "" : $"@{EtiquetaFiltros}:lavfi=[{string.Join(",", filtros.Select(f => $"{f.Nombre}@{f.Id}={f.Argumentos}"))}]";
+
+    public bool AplicarFiltrosAudio(IReadOnlyList<FiltroAudio> filtros)
+    {
+        lock (_candado)
+        {
+            _filtros = filtros.ToList();
+            _filtrosPendientes = null;
+        }
+        return Fijar("af", CadenaDeFiltros(filtros));
+    }
+
+    /// <summary>Hay que nombrar el filtro: con el destino por defecto ("todos") libmpv devuelve error aunque el cambio se aplique.</summary>
+    public bool CambiarFiltroEnVivo(string id, string clave, string valor)
+    {
+        string? nombre;
+        lock (_candado) nombre = _filtros.FirstOrDefault(f => f.Id == id)?.Nombre;
+        return nombre != null && _hayArchivo && Ordenar("af-command", EtiquetaFiltros, clave, valor, $"{nombre}@{id}");
+    }
+
+    public void RecordarFiltrosAudio(IReadOnlyList<FiltroAudio> filtros)
+    {
+        lock (_candado) _filtrosPendientes = filtros.ToList();
+    }
+
+    // ── Subtítulos: los dibuja libmpv dentro del video (libass), también los de texto plano ──
+
+    public bool DibujaSubtitulosDeTexto => true;
+
+    // Medidas de Configuración → medidas de libmpv. En Configuración el tamaño es el cuerpo de la letra en píxeles, tal como lo pinta
+    // WPF, y no cambia con la ventana. libmpv mide la celda de la fuente (ascendente + descendente: un 16 % más que el cuerpo en
+    // Trebuchet MS, distinto en cada fuente) y lo escala todo con el alto del video, tomando 720 como referencia. Se igualan con el
+    // video a 768 de alto (pantalla completa en el equipo donde se ajustó el estilo): ahí la letra y el contorno miden lo que dice
+    // Configuración, y en ventanas más grandes o más pequeñas (mini reproductor) guardan esa proporción.
+    // Medido: la misma línea ocupaba 472 px con WPF y 411 con libmpv antes de corregir (1,148; la celda de Trebuchet MS es 1,161).
+    internal const double AltoDeReferencia = 768, AltoDeLibmpv = 720, CeldaPorDefecto = 1.15;
+
+    internal static double EscalaDeVentana => AltoDeLibmpv / AltoDeReferencia;
+
+    /// <summary>Alto de la celda de la fuente respecto a su cuerpo. Si la fuente no está o no se puede medir, un valor típico.</summary>
+    internal static double CeldaDeLaFuente(EstiloSubtitulos e)
+    {
+        try
+        {
+            var tipo = new Typeface(new FontFamily(e.Fuente), e.Cursiva ? FontStyles.Italic : FontStyles.Normal,
+                e.Negrita ? FontWeights.Bold : FontWeights.Normal, FontStretches.Normal);
+            return tipo.TryGetGlyphTypeface(out var glifos) && glifos.Height is > 0.8 and < 2 ? glifos.Height : CeldaPorDefecto;
+        }
+        catch
+        {
+            return CeldaPorDefecto;
+        }
+    }
+
+    private EstiloSubtitulos _estilo = new(); // bajo _candado, como las dos siguientes
+    private bool _tambienEnAss, _pistaMostradaEsAss;
+
+    /// <summary>
+    /// Opciones de libmpv para un estilo de Configuración. <paramref name="forzar"/>: usarlo en vez del estilo del propio subtítulo
+    /// (el usuario pidió «Usar mi estilo», o la pista es de texto plano y no tiene otro). El borde de la caja no tiene equivalente.
+    /// </summary>
+    internal static IReadOnlyList<(string Nombre, string Valor)> OpcionesDeEstilo(EstiloSubtitulos e, bool forzar)
+    {
+        static string N(double v) => v.ToString("0.##", CultureInfo.InvariantCulture);
+        bool caja = e.OpacidadFondo > 0;
+        return
+        [
+            ("sub-font", e.Fuente),
+            ("sub-font-size", N(e.Tamano * CeldaDeLaFuente(e) * EscalaDeVentana)),
+            ("sub-bold", e.Negrita ? "yes" : "no"),
+            ("sub-italic", e.Cursiva ? "yes" : "no"),
+            ("sub-color", e.ColorTexto),
+            ("sub-outline-color", e.ColorContorno),
+            ("sub-outline-size", N(e.GrosorContorno * EscalaDeVentana)),
+            ("sub-shadow-offset", "0"),
+            ("sub-border-style", caja ? "background-box" : "outline-and-shadow"),
+            ("sub-back-color", caja ? $"#{(int)Math.Round(e.OpacidadFondo * 255 / 100.0, MidpointRounding.AwayFromZero):X2}000000" : "#00000000"),
+            // El subrayado solo existe como retoque del estilo ASS; sin forzar, subrayaría también los subtítulos con estilo propio.
+            ("sub-ass-style-overrides", forzar && e.Subrayado ? "Underline=-1" : ""),
+            // "strip" y no "force": con "force" se quedan las cursivas y las posiciones del subtítulo original.
+            ("sub-ass-override", forzar ? "strip" : "no"),
+        ];
+    }
+
+    public void AplicarEstiloSubtitulos(EstiloSubtitulos estilo, bool tambienEnAss)
+    {
+        lock (_candado)
+        {
+            _estilo = estilo;
+            _tambienEnAss = tambienEnAss;
+        }
+        AplicarOpcionesDeEstilo();
+    }
+
+    private void AplicarOpcionesDeEstilo()
+    {
+        EstiloSubtitulos estilo;
+        bool forzar;
+        lock (_candado)
+        {
+            estilo = _estilo;
+            forzar = _tambienEnAss || !_pistaMostradaEsAss;
+        }
+        foreach (var (nombre, valor) in OpcionesDeEstilo(estilo, forzar)) Fijar(nombre, valor);
+    }
     public void PrecalentarArchivo(string ruta, CancellationToken ct) { } // con libmpv el cambio de episodio tarda ~0,1 s: no hace falta
 
     public IReadOnlyList<PistaAudioMotor> PistasAudio { get { lock (_candado) return _audio.Select(a => a.Pista).ToList(); } }
@@ -269,24 +430,32 @@ public sealed partial class MotorMpv : IMotorVideo
     public void MostrarSubtitulosDelMotor(PistaSubtitulosMotor pista)
     {
         int id;
-        lock (_candado) id = _subtitulos.Where(s => s.Pista == pista).Select(s => s.IdMpv).DefaultIfEmpty(-1).First();
-        if (id >= 0) Fijar("sid", id.ToString(CultureInfo.InvariantCulture));
+        lock (_candado)
+        {
+            id = _subtitulos.Where(s => s.Pista == pista).Select(s => s.IdMpv).DefaultIfEmpty(-1).First();
+            if (id >= 0) _pistaMostradaEsAss = pista.EsAss;
+        }
+        if (id < 0) return; // una pista de otro archivo (la que se guardó del episodio anterior)
+
+        AplicarOpcionesDeEstilo(); // una pista ASS conserva su estilo; una de texto plano usa el de Configuración
+        Fijar("sid", id.ToString(CultureInfo.InvariantCulture));
     }
 
     public void ApagarSubtitulosDelMotor() => Fijar("sid", "no");
 
-    private void Fijar(string nombre, string valor)
-    {
-        if (!_desechado) LibMpv.mpv_set_property_string(_mpv, nombre, valor);
-    }
+    private bool Fijar(string nombre, string valor) => !_desechado && LibMpv.mpv_set_property_string(_mpv, nombre, valor) >= 0;
 
     private string Leer(string nombre) => _desechado ? string.Empty : LibMpv.Leer(_mpv, nombre);
 
-    private void Ordenar(params string[] argumentos)
+    /// <summary>Para las pruebas: lo que libmpv dice de una propiedad suya.</summary>
+    internal string LeerPropiedad(string nombre) => Leer(nombre);
+
+    private bool Ordenar(params string[] argumentos)
     {
-        if (_desechado) return;
+        if (_desechado) return false;
         int resultado = LibMpv.Orden(_mpv, argumentos);
         if (resultado < 0) AppLogger.Debug("MotorMpv", $"La orden '{argumentos[0]}' falló: {LibMpv.TextoDeError(resultado)}.");
+        return resultado >= 0;
     }
 
     private void AtenderEventos()

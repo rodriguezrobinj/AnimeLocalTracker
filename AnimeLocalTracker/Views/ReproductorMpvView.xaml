@@ -310,28 +310,12 @@
         <!-- El video lo pinta libmpv en la superficie; los controles van encima como WPF normal (sin la segunda ventana de Flyleaf). -->
         <Grid x:Name="HostVideo">
             <Grid>
-                <ctl:SuperficieMpv x:Name="Superficie" Motor="{Binding Motor}"/>
+                <!-- El video. La superficie es una por motor y la trae el code-behind (AlojarSuperficie): al pasar al mini reproductor
+                     se mueve a la vista de esa ventana en vez de crearse otra, y así el video no se corta. Los subtítulos los dibuja
+                     libmpv dentro del propio video (también los de texto plano, con el estilo de Configuración). -->
+                <Border x:Name="HuecoVideo"/>
                 <!-- Bindings vía ElementName: FlyleafHost sobrescribe el DataContext de su contenido -->
 
-                <!-- Subtítulos. Dos elementos (SubtitleTextView) que dibujan el texto con el estilo elegido en
-                     Configuración → Reproducción (tipografía, tamaño, color, contorno, caja).
-                     Están en la raíz del contenido del FlyleafHost (no se desvanecen con los controles), así que
-                     su texto y su estilo los empuja el code-behind (EnlazarSubtitulos), no un Binding: en esa raíz
-                     los bindings se quedan congelados y los subtítulos nunca aparecían (ver memoria del proyecto).
-                     MaxHeight amplio: con letra grande y dos líneas el bloque supera los 150 px y se encogía.
-                     La de abajo es la de siempre; la de arriba solo se llena cuando dos líneas se solapan en el
-                     tiempo (dos personajes hablando a la vez) — así ninguna tapa a la otra. -->
-                <Viewbox VerticalAlignment="Top" Margin="40,25,40,40" StretchDirection="DownOnly" MaxHeight="320" IsHitTestVisible="False">
-                    <ctl:SubtitleTextView x:Name="SubtitulosVistaArriba" MaxWidth="1200"/>
-                </Viewbox>
-                <Viewbox VerticalAlignment="Bottom" Margin="40,40,40,25" StretchDirection="DownOnly" MaxHeight="320" IsHitTestVisible="False">
-                    <ctl:SubtitleTextView x:Name="SubtitulosVista" MaxWidth="1200"/>
-                </Viewbox>
-
-                <!-- Subtítulos ASS/SSA con su estilo original: una imagen del tamaño del video que dibuja libass (ver
-                     docs/investigacion-subtitulos-ass.md). Se estira igual que el video para que los carteles coincidan con su
-                     letrero. Como el texto de arriba, la llena y la muestra el code-behind (ActualizarCapaAss), no un Binding. -->
-                <Image x:Name="SubtitulosAssImagen" Stretch="Uniform" IsHitTestVisible="False" Visibility="Collapsed"/>
 
                 <!-- Tapa el video mientras abre y, al reanudar, hasta que el salto al punto guardado se asienta: sin ella se veía
                      un instante el 0:00. Va FUERA de OverlayControls porque esos controles se desvanecen tras 3 s sin mover el

@@ -1,9 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using AnimeLocalTracker.Core;
+using AnimeLocalTracker.Models;
 using AnimeLocalTracker.Services;
 using FluentAssertions;
 using Xunit;
@@ -39,6 +42,129 @@ public class MotorMpvIdiomasTests
     public void IdiomaDosLetras_SinIdiomaReconocible_DaNulo(string? deLaPista)
     {
         MotorMpv.IdiomaDosLetras(deLaPista).Should().BeNull();
+    }
+}
+
+/// <summary>Lo que se le dice a libmpv, sin libmpv: estilo de subtítulos, cadena de filtros de audio y fabricante de la tarjeta.</summary>
+public class MotorMpvTraduccionesTests
+{
+    private static Dictionary<string, string> Opciones(EstiloSubtitulos estilo, bool forzar) =>
+        MotorMpv.OpcionesDeEstilo(estilo, forzar).ToDictionary(o => o.Nombre, o => o.Valor);
+
+    private static string N(double v) => v.ToString("0.##", CultureInfo.InvariantCulture);
+
+    [Fact]
+    public void OpcionesDeEstilo_ElEstiloPorDefecto()
+    {
+        var o = Opciones(new EstiloSubtitulos(), forzar: false);
+
+        o["sub-font"].Should().Be("Trebuchet MS");
+        o["sub-font-size"].Should().Be(N(44 * MotorMpv.CeldaDeLaFuente(new EstiloSubtitulos()) * 720 / 768));
+        o["sub-bold"].Should().Be("yes");
+        o["sub-italic"].Should().Be("no");
+        o["sub-color"].Should().Be("#FFFFFF");
+        o["sub-outline-color"].Should().Be("#000000");
+        o["sub-outline-size"].Should().Be(N(3 * 720.0 / 768));
+        o["sub-border-style"].Should().Be("outline-and-shadow");
+        o["sub-back-color"].Should().Be("#00000000", "sin caja");
+        o["sub-ass-override"].Should().Be("no", "las pistas ASS conservan su estilo");
+        o["sub-ass-style-overrides"].Should().BeEmpty();
+    }
+
+    [Fact]
+    public void OpcionesDeEstilo_ConCajaAl50()
+    {
+        var o = Opciones(new EstiloSubtitulos { OpacidadFondo = 50 }, forzar: false);
+
+        o["sub-border-style"].Should().Be("background-box");
+        o["sub-back-color"].Should().Be("#80000000");
+    }
+
+    [Fact]
+    public void OpcionesDeEstilo_AlForzar_ElSubtituloPierdeSuEstiloYSusEtiquetas()
+    {
+        Opciones(new EstiloSubtitulos(), forzar: true)["sub-ass-override"].Should().Be("strip");
+    }
+
+    [Fact]
+    public void OpcionesDeEstilo_ElSubrayadoSoloAlForzar()
+    {
+        var subrayado = new EstiloSubtitulos { Subrayado = true };
+
+        Opciones(subrayado, forzar: true)["sub-ass-style-overrides"].Should().Be("Underline=-1");
+        Opciones(subrayado, forzar: false)["sub-ass-style-overrides"].Should().BeEmpty("subrayaría también los subtítulos con estilo propio");
+        Opciones(new EstiloSubtitulos(), forzar: true)["sub-ass-style-overrides"].Should().BeEmpty();
+    }
+
+    [Fact]
+    public void OpcionesDeEstilo_UsaPuntoDecimalAunqueLaCulturaSeaEspanola()
+    {
+        var antes = CultureInfo.CurrentCulture;
+        try
+        {
+            CultureInfo.CurrentCulture = new CultureInfo("es-ES");
+            var o = Opciones(new EstiloSubtitulos { Tamano = 44.5, GrosorContorno = 2.5 }, forzar: false);
+
+            o["sub-font-size"].Should().Contain(".").And.NotContain(",");
+            o["sub-outline-size"].Should().Be("2.34").And.NotContain(",");
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = antes;
+        }
+    }
+
+    [Fact]
+    public void ElTamano_ConElVideoA768DeAlto_MideLoQueDiceConfiguracion()
+    {
+        // libmpv mide la celda de la fuente (más alta que el cuerpo de la letra) y escala con el alto del video desde 720.
+        var estilo = new EstiloSubtitulos { Tamano = 44 };
+        double deLibmpv = double.Parse(Opciones(estilo, forzar: true)["sub-font-size"], CultureInfo.InvariantCulture);
+
+        double celdaEnPantalla = deLibmpv * 768 / 720;
+        (celdaEnPantalla / MotorMpv.CeldaDeLaFuente(estilo)).Should().BeApproximately(44, 0.05, "el cuerpo de la letra en píxeles");
+    }
+
+    [Fact]
+    public void LaCeldaDeLaFuente_SeMideEnLaFuenteElegida_YSiNoExisteSeUsaUnValorTipico()
+    {
+        MotorMpv.CeldaDeLaFuente(new EstiloSubtitulos()).Should().BeInRange(1.10, 1.25, "Trebuchet MS: 1,16");
+        MotorMpv.CeldaDeLaFuente(new EstiloSubtitulos { Fuente = "Comic Sans MS" })
+            .Should().BeGreaterThan(MotorMpv.CeldaDeLaFuente(new EstiloSubtitulos { Fuente = "Arial" }), "cada fuente tiene su celda");
+        MotorMpv.CeldaDeLaFuente(new EstiloSubtitulos { Fuente = "" }).Should().BeInRange(1.0, 1.5);
+    }
+
+    [Fact]
+    public void CadenaDeFiltros_SinFiltrosEsVacia()
+    {
+        MotorMpv.CadenaDeFiltros([]).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void CadenaDeFiltros_NombraCadaFiltroConSuId()
+    {
+        var filtros = EcualizadorAudio.ConstruirFiltros(true, MotorMpvTests.Ganancias(banda0: 3), true, MotorMpvTests.ModoNoche);
+
+        string cadena = MotorMpv.CadenaDeFiltros(filtros);
+
+        cadena.Should().StartWith("@filtros:lavfi=[").And.EndWith("]");
+        cadena.Should().Contain("volume@eq_pre=volume=-3.0dB");
+        cadena.Should().Contain("equalizer@eq_b0=f=31:t=o:w=1:g=3.0");
+        cadena.Should().Contain($"acompressor@{EcualizadorAudio.IdModoNoche}={MotorMpvTests.ModoNoche}");
+    }
+
+    [Theory]
+    [InlineData("Intel", FabricanteGrafica.Intel)]
+    [InlineData("Intel Intel(R) HD Graphics 620", FabricanteGrafica.Intel)]
+    [InlineData("NVIDIA Corporation GeForce RTX 3060/PCIe/SSE2", FabricanteGrafica.Nvidia)]
+    [InlineData("ATI Technologies Inc. Radeon RX 580 Series", FabricanteGrafica.Amd)]
+    [InlineData("AMD Radeon(TM) Graphics", FabricanteGrafica.Amd)]
+    [InlineData("Microsoft Basic Render Driver", FabricanteGrafica.Desconocido)]
+    [InlineData("", FabricanteGrafica.Desconocido)]
+    [InlineData(null, FabricanteGrafica.Desconocido)]
+    public void FabricantePorNombre_LoSacaDelTextoDelControlador(string? texto, FabricanteGrafica esperado)
+    {
+        MotorVideo.FabricantePorNombre(texto).Should().Be(esperado);
     }
 }
 
@@ -327,5 +453,204 @@ public sealed class MotorMpvTests : IClassFixture<VideoDePrueba>
 
         motor.PistasAudio.Should().BeEmpty();
         motor.CapturarFotograma().Should().BeNull();
+    }
+
+    // ── Etapa 3: subtítulos, filtros de audio, captura y tarjeta ──
+
+    internal const string ModoNoche = "threshold=0.089:ratio=9:attack=200:release=1000:makeup=2";
+
+    internal static List<double> Ganancias(double banda0)
+    {
+        var ganancias = Enumerable.Repeat(0d, EcualizadorAudio.Frecuencias.Count).ToList();
+        ganancias[0] = banda0;
+        return ganancias;
+    }
+
+    private async Task<(MotorMpv Motor, List<AperturaTerminada> Avisos)> CrearYAbrir()
+    {
+        var (motor, avisos) = Crear();
+        motor.Abrir(_video.Ruta);
+        await EsperarHasta(() => { lock (avisos) return avisos.Count == 1; });
+        return (motor, avisos);
+    }
+
+    [Fact]
+    public async Task MostrarLaPistaDeTexto_LaDibujaElMotorSinAvisoYConElEstiloDado()
+    {
+        if (!AnimeLocalTracker.Services.Native.LibMpv.Disponible) return;
+        var (motor, avisos) = await CrearYAbrir();
+        using var _ = motor;
+        var pista = motor.PistasSubtitulos.Single();
+        motor.DibujaSubtitulosDeTexto.Should().BeTrue();
+
+        motor.AplicarEstiloSubtitulos(new EstiloSubtitulos { Tamano = 60, ColorTexto = "#FFE14D" }, tambienEnAss: false);
+        motor.MostrarSubtitulosDelMotor(pista);
+
+        motor.IndicePistaSubtitulosDelMotor.Should().Be(pista.Indice);
+        var esperado = MotorMpv.OpcionesDeEstilo(new EstiloSubtitulos { Tamano = 60 }, forzar: true).Single(o => o.Nombre == "sub-font-size").Valor;
+        double.Parse(motor.LeerPropiedad("sub-font-size"), CultureInfo.InvariantCulture)
+            .Should().BeApproximately(double.Parse(esperado, CultureInfo.InvariantCulture), 0.01);
+        motor.LeerPropiedad("sub-color").ToUpperInvariant().Should().EndWith("FFE14D");
+        motor.LeerPropiedad("sub-ass-override").Should().Be("strip", "en una pista de texto plano el estilo siempre es el de Configuración");
+
+        motor.Pausar();
+        motor.Saltar(TimeSpan.FromSeconds(1.5), exacto: true);
+        await EsperarHasta(() => motor.LeerPropiedad("sub-text").Contains("Hola"));
+        lock (avisos) avisos.Should().HaveCount(1, "mostrar una pista no es abrir nada: la app no tiene nada que leer");
+    }
+
+    [Fact]
+    public async Task ApagarLosSubtitulos_DejaElMotorSinPista()
+    {
+        if (!AnimeLocalTracker.Services.Native.LibMpv.Disponible) return;
+        var (motor, _) = await CrearYAbrir();
+        using var __ = motor;
+        motor.Pausar();
+        motor.Saltar(TimeSpan.FromSeconds(1.5), exacto: true);
+        motor.MostrarSubtitulosDelMotor(motor.PistasSubtitulos.Single());
+        await EsperarHasta(() => motor.LeerPropiedad("sub-text").Contains("Hola"));
+
+        motor.ApagarSubtitulosDelMotor();
+
+        motor.IndicePistaSubtitulosDelMotor.Should().Be(-1);
+        await EsperarHasta(() => motor.LeerPropiedad("sub-text").Length == 0);
+    }
+
+    [Fact]
+    public async Task AbrirOtroArchivo_EmpiezaSinSubtitulosDelMotor()
+    {
+        // libmpv conserva la pista elegida de un archivo al siguiente. El reproductor elige pista en cada episodio solo si el motor
+        // no trae ya una: sin apagarla, el episodio siguiente se quedaba con el número de pista del anterior (otro idioma si el
+        // archivo las ordena distinto) y el menú perdía «Usar mi estilo».
+        if (!AnimeLocalTracker.Services.Native.LibMpv.Disponible) return;
+        var (motor, avisos) = await CrearYAbrir();
+        using var _ = motor;
+        motor.MostrarSubtitulosDelMotor(motor.PistasSubtitulos.Single());
+        motor.IndicePistaSubtitulosDelMotor.Should().BeGreaterThanOrEqualTo(0);
+
+        motor.Abrir(_video.RutaConTildes);
+        await EsperarHasta(() => { lock (avisos) return avisos.Count == 2; });
+
+        motor.IndicePistaSubtitulosDelMotor.Should().Be(-1);
+    }
+
+    [Fact]
+    public async Task MostrarUnaPistaQueNoEsDeEsteArchivo_NoHaceNada()
+    {
+        if (!AnimeLocalTracker.Services.Native.LibMpv.Disponible) return;
+        var (motor, _) = await CrearYAbrir();
+        using var __ = motor;
+
+        motor.MostrarSubtitulosDelMotor(new PistaSubtitulosMotor(99, "en", null, EsImagen: false, EsAss: true, RutaExterna: null));
+
+        motor.IndicePistaSubtitulosDelMotor.Should().Be(-1);
+    }
+
+    [Fact]
+    public async Task MontarElEcualizador_YCambiarUnaBandaEnVivo()
+    {
+        if (!AnimeLocalTracker.Services.Native.LibMpv.Disponible) return;
+        var (motor, _) = await CrearYAbrir();
+        using var __ = motor;
+        await EsperarHasta(() => motor.Posicion > TimeSpan.FromMilliseconds(300));
+
+        motor.AplicarFiltrosAudio(EcualizadorAudio.ConstruirFiltros(true, Ganancias(banda0: 3), true, ModoNoche)).Should().BeTrue();
+
+        motor.LeerPropiedad("af").Should().Contain("equalizer@eq_b0=f=31:t=o:w=1:g=3.0").And.Contain("acompressor@");
+        // El grafo se monta con el siguiente trozo de audio: hasta entonces no hay filtro al que mandarle nada.
+        await EsperarHasta(() => motor.CambiarFiltroEnVivo(EcualizadorAudio.IdBanda(0), "g", "6.0"), 5000);
+        motor.CambiarFiltroEnVivo(EcualizadorAudio.IdPreamplificador, "volume", "-6.0dB").Should().BeTrue();
+        var antes = motor.Posicion;
+        await EsperarHasta(() => motor.Posicion > antes, 3000);
+    }
+
+    [Fact]
+    public async Task CambiarUnFiltroQueNoEstaMontado_DevuelveFalse()
+    {
+        if (!AnimeLocalTracker.Services.Native.LibMpv.Disponible) return;
+        var (motor, avisos) = Crear();
+        using var _ = motor;
+        motor.CambiarFiltroEnVivo(EcualizadorAudio.IdBanda(0), "g", "6.0").Should().BeFalse("motor recién creado, sin archivo ni cadena");
+
+        motor.Abrir(_video.Ruta);
+        await EsperarHasta(() => { lock (avisos) return avisos.Count == 1; });
+        motor.CambiarFiltroEnVivo(EcualizadorAudio.IdBanda(0), "g", "6.0").Should().BeFalse("ecualizador apagado");
+
+        motor.AplicarFiltrosAudio(EcualizadorAudio.ConstruirFiltros(true, Ganancias(banda0: 3), false, ModoNoche));
+        motor.CambiarFiltroEnVivo("no_existe", "g", "6.0").Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task LosFiltrosRecordados_SeMontanAlAbrirElSiguienteArchivo()
+    {
+        if (!AnimeLocalTracker.Services.Native.LibMpv.Disponible) return;
+        var (motor, avisos) = await CrearYAbrir();
+        using var _ = motor;
+        motor.AplicarFiltrosAudio(EcualizadorAudio.ConstruirFiltros(true, Ganancias(banda0: 3), false, ModoNoche));
+
+        motor.RecordarFiltrosAudio(EcualizadorAudio.ConstruirFiltros(true, Ganancias(banda0: 9), false, ModoNoche));
+        motor.LeerPropiedad("af").Should().Contain("g=3.0", "recordar no remonta la cadena que suena");
+
+        motor.Abrir(_video.RutaConTildes);
+        await EsperarHasta(() => { lock (avisos) return avisos.Count == 2; });
+        motor.LeerPropiedad("af").Should().Contain("equalizer@eq_b0=f=31:t=o:w=1:g=9.0");
+    }
+
+    [Fact]
+    public void LosFiltrosDeLosAjustesIniciales_QuedanMontados_YQuitarlosVaciaLaCadena()
+    {
+        if (!AnimeLocalTracker.Services.Native.LibMpv.Disponible) return;
+        var iniciales = EcualizadorAudio.ConstruirFiltros(true, Ganancias(banda0: 3), false, ModoNoche);
+        using var motor = MotorMpv.Crear(new AjustesInicialesMotor(false, null, iniciales), sinSalida: true)!;
+
+        motor.LeerPropiedad("af").Should().Contain("equalizer@eq_b0");
+
+        motor.AplicarFiltrosAudio([]).Should().BeTrue();
+        motor.LeerPropiedad("af").Should().BeEmpty();
+    }
+
+    private static string[] CapturasTemporales() => Directory.GetFiles(Path.GetTempPath(), "animelocaltracker-captura-*.png");
+
+    [Fact]
+    public async Task CapturarUnFotograma_DaLaImagenDelVideoYNoDejaTemporales()
+    {
+        if (!AnimeLocalTracker.Services.Native.LibMpv.Disponible) return;
+        var (motor, _) = await CrearYAbrir();
+        using var __ = motor;
+        await EsperarHasta(() => motor.Posicion > TimeSpan.FromMilliseconds(300));
+
+        var imagen = motor.CapturarFotograma();
+
+        imagen.Should().NotBeNull();
+        (imagen!.PixelWidth, imagen.PixelHeight).Should().Be((320, 180));
+        imagen.IsFrozen.Should().BeTrue("se pasa al portapapeles y a otro hilo para guardarla");
+        CapturasTemporales().Should().BeEmpty();
+    }
+
+    [Fact]
+    public void CapturarSinArchivo_DevuelveNullYNoDejaTemporales()
+    {
+        if (!AnimeLocalTracker.Services.Native.LibMpv.Disponible) return;
+        var (motor, _) = Crear();
+
+        motor.CapturarFotograma().Should().BeNull("no hay nada abierto");
+        motor.Dispose();
+        motor.CapturarFotograma().Should().BeNull("motor desechado");
+        CapturasTemporales().Should().BeEmpty();
+    }
+
+    [Fact]
+    public void TarjetaDetectada_SeVeEnTarjetaEnUso()
+    {
+        if (!AnimeLocalTracker.Services.Native.LibMpv.Disponible) return;
+        var (motor, _) = Crear();
+        using var __ = motor;
+        motor.TarjetaEnUso.Should().BeNull("sin superficie no se sabe qué tarjeta pinta");
+
+        motor.TarjetaDetectada("  Intel(R) HD Graphics 620 ", "Intel");
+        motor.TarjetaEnUso.Should().Be(new TarjetaGrafica("Intel(R) HD Graphics 620", FabricanteGrafica.Intel, 0));
+
+        motor.TarjetaDetectada("  ", null);
+        motor.TarjetaEnUso!.Nombre.Should().Be("Intel(R) HD Graphics 620", "sin nombre no cambia nada");
     }
 }

@@ -236,6 +236,10 @@ public sealed class MotorFlyleaf : IMotorVideo
         if (Player.Config?.Subtitles != null) Player.Config.Subtitles.Enabled = false;
     }
 
+    // Las pistas de texto las lee y las pinta la app (ver ReproductorViewModel.AbrirPistaSubtitulos): aquí no hay estilo que aplicar.
+    public bool DibujaSubtitulosDeTexto => false;
+    public void AplicarEstiloSubtitulos(Models.EstiloSubtitulos estilo, bool tambienEnAss) { }
+
     private static PistaSubtitulosMotor APista(SubtitlesStream s) => new(
         s.StreamIndex, IdiomaDosLetras(s), s.Title, s.IsBitmap,
         s.CodecID is Flyleaf.FFmpeg.AVCodecID.Ass or Flyleaf.FFmpeg.AVCodecID.Ssa, s.ExternalStream?.Url);
@@ -264,10 +268,10 @@ public sealed class MotorFlyleaf : IMotorVideo
         Player.Config?.Audio == null || Player.Config.Audio.UpdateFilter(id, clave, valor) >= 0;
 
     /// <summary>
-    /// Solo de Flyleaf (no está en el contrato): deja apuntada la cadena sin recargarla. El cambio en vivo solo toca el filtro que
-    /// está sonando; esta lista es la que Flyleaf monta al abrir el siguiente episodio, y sin ponerla al día volvían las ganancias anteriores.
+    /// Deja apuntada la cadena sin recargarla. El cambio en vivo solo toca el filtro que está sonando; esta lista es la que Flyleaf
+    /// monta al abrir el siguiente episodio, y sin ponerla al día volvían las ganancias anteriores.
     /// </summary>
-    public void RecordarFiltrosParaElSiguienteArchivo(IReadOnlyList<FiltroAudio> filtros)
+    public void RecordarFiltrosAudio(IReadOnlyList<FiltroAudio> filtros)
     {
         if (Player.Config?.Audio != null) Player.Config.Audio.Filters = AFiltrosDeFlyleaf(filtros);
     }
