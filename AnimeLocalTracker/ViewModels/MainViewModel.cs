@@ -77,6 +77,21 @@ public partial class MainViewModel : ObservableObject,
 
     public NavigationService Navigation => (NavigationService)_navigationService;
     public IDialogService DialogService { get; }
+
+    /// <summary>
+    /// El aviso de la ventana principal (abajo) está a la vista. No lo está si ya lo dibuja el reproductor o si interrumpiría el
+    /// episodio: con el video ocupando la ventana no se ve ninguno (los del reproductor los pinta su vista, arriba) y con el video
+    /// en el mini reproductor no se ven los del reproductor (los pinta su ventana). Un aviso que el reproductor ya dibujó no
+    /// vuelve a salir aquí si el reproductor se cierra antes de que caduque; uno de fuera que siga vivo entra entonces con su
+    /// animación (la entrada y la salida van con esta propiedad), en vez de aparecer de golpe.
+    /// </summary>
+    public bool ToastEnVentana => !_toastYaDibujadoPorElReproductor && DebeVerseElToast(DialogService.ToastVisible, DialogService.ToastDelReproductor,
+        _navigationService.ReproductorActivo != null, _navigationService.ReproductorActivo?.EsModoMini == true);
+
+    private bool _toastYaDibujadoPorElReproductor;
+
+    internal static bool DebeVerseElToast(bool visible, bool delReproductor, bool hayReproductor, bool enMini) =>
+        visible && (!hayReproductor || (enMini && !delReproductor));
     /// <summary>La música de una ficha que sigue sonando fuera de ella: alimenta la barra pequeña de la ventana principal.</summary>
     public IMusicaDeFondoService? MusicaDeFondo { get; }
     /// <summary>Fase 2d: overlay para elegir un torrent a mano — mismo patrón que <see cref="DialogService"/>.</summary>
@@ -166,6 +181,16 @@ public partial class MainViewModel : ObservableObject,
         _navigationService.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(INavigationService.VistaActual)) MarcarPestanaActiva();
+            if (e.PropertyName is nameof(INavigationService.ReproductorActivo) or nameof(INavigationService.ReproductorEnVentanaPrincipal))
+                OnPropertyChanged(nameof(ToastEnVentana));
+        };
+        DialogService.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is not (nameof(IDialogService.ToastVisible) or nameof(IDialogService.ToastDelReproductor)
+                or nameof(IDialogService.ToastTitulo) or nameof(IDialogService.ToastMensaje))) return;
+            // Se decide con el aviso (al salir o al cambiar), no al cerrarse el reproductor: así el que ya se vio arriba no se repite.
+            _toastYaDibujadoPorElReproductor = DialogService.ToastVisible && DialogService.ToastDelReproductor && _navigationService.ReproductorActivo != null;
+            OnPropertyChanged(nameof(ToastEnVentana));
         };
 
         WeakReferenceMessenger.Default.RegisterAll(this);

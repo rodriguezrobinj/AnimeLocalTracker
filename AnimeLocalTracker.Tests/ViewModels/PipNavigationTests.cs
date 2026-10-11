@@ -59,7 +59,7 @@ public class PipNavigationTests : IDisposable
         CommunityToolkit.Mvvm.Messaging.WeakReferenceMessenger.Default.UnregisterAll(_navigationService);
     }
 
-    private MainViewModel CreateMainVm()
+    private MainViewModel CreateMainVm(IDialogService? dialogo = null)
     {
         return new MainViewModel(
             _navigationService,
@@ -67,7 +67,7 @@ public class PipNavigationTests : IDisposable
             _libraryService,
             _downloadMock.Object,
             _updateMock.Object,
-            new Mock<IDialogService>().Object,
+            dialogo ?? new Mock<IDialogService>().Object,
             Mock.Of<ISelectorTorrentService>(),
             Mock.Of<IDatabaseService>(),
             Mock.Of<IFileScannerService>(),
@@ -200,6 +200,58 @@ public class PipNavigationTests : IDisposable
         repVm.RestaurarFormatoHabitualCommand.Execute(null);
         mainVm.Navigation.ReproductorEnVentanaPrincipal.Should().BeSameAs(repVm);
         avisos.Should().Contain(nameof(INavigationService.ReproductorEnVentanaPrincipal));
+    }
+
+    // ── El aviso de la ventana principal y el del reproductor no se pisan ──
+
+    [Theory]
+    [InlineData(false, false, false, false, false)] // no hay aviso
+    [InlineData(true, false, false, false, true)]   // sin reproductor: como siempre
+    [InlineData(true, true, false, false, true)]    // aviso del reproductor que llega con él ya cerrado (visto, espacio liberado)
+    [InlineData(true, true, true, false, false)]    // video en la ventana: lo dibuja su vista, arriba (antes salía dos veces)
+    [InlineData(true, false, true, false, false)]   // video en la ventana: los de fuera no interrumpen el episodio
+    [InlineData(true, true, true, true, false)]     // mini reproductor: el suyo lo dibuja su ventana
+    [InlineData(true, false, true, true, true)]     // mini reproductor: los de fuera, en la app
+    public void ElAvisoDeLaVentanaPrincipal_SoloSeVeSiNoLoDibujaElReproductorNiInterrumpeElEpisodio(
+        bool visible, bool delReproductor, bool hayReproductor, bool enMini, bool esperado)
+    {
+        MainViewModel.DebeVerseElToast(visible, delReproductor, hayReproductor, enMini).Should().Be(esperado);
+    }
+
+    [Fact]
+    public void ToastEnVentana_SigueAlAvisoYAlReproductor()
+    {
+        var dialogo = new Mock<IDialogService>();
+        dialogo.SetupGet(d => d.ToastVisible).Returns(true);
+        var mainVm = CreateMainVm(dialogo.Object);
+        using var repVm = CreateReproductorVm();
+        var avisos = new List<string?>();
+        mainVm.PropertyChanged += (_, e) => avisos.Add(e.PropertyName);
+        mainVm.ToastEnVentana.Should().BeTrue();
+
+        mainVm.Navigation.ReproductorActivo = repVm;
+        mainVm.ToastEnVentana.Should().BeFalse("el video ocupa la ventana");
+        avisos.Should().Contain(nameof(MainViewModel.ToastEnVentana));
+
+        avisos.Clear();
+        repVm.MinimizarAMiniCommand.Execute(null);
+        mainVm.ToastEnVentana.Should().BeTrue("con el video en el mini, un aviso de fuera se ve en la app");
+        avisos.Should().Contain(nameof(MainViewModel.ToastEnVentana));
+
+        avisos.Clear();
+        dialogo.SetupGet(d => d.ToastDelReproductor).Returns(true);
+        dialogo.Raise(d => d.PropertyChanged += null, new System.ComponentModel.PropertyChangedEventArgs(nameof(IDialogService.ToastDelReproductor)));
+        mainVm.ToastEnVentana.Should().BeFalse("el del reproductor ya lo dibuja la ventana mini");
+        avisos.Should().Contain(nameof(MainViewModel.ToastEnVentana));
+
+        mainVm.Navigation.ReproductorActivo = null;
+        mainVm.ToastEnVentana.Should().BeFalse("el reproductor ya lo dibujó: al cerrarlo no se repite abajo");
+
+        // Un aviso del reproductor que llega con él ya cerrado (espacio liberado al salir) sí se ve en la app.
+        avisos.Clear();
+        dialogo.Raise(d => d.PropertyChanged += null, new System.ComponentModel.PropertyChangedEventArgs(nameof(IDialogService.ToastMensaje)));
+        mainVm.ToastEnVentana.Should().BeTrue();
+        avisos.Should().Contain(nameof(MainViewModel.ToastEnVentana));
     }
 
     [Fact]

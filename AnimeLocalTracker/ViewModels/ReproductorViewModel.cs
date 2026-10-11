@@ -324,7 +324,12 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     private void NotificarEpisodioTerminadoParaLimpieza(int animeId, int episodio)
     {
         if (_limpiadorDeEpisodios == null || animeId <= 0 || episodio <= 0) return;
-        _ = _limpiadorDeEpisodios.AplicarTrasVerAsync(animeId, episodio);
+        // Su aviso («se liberaron N episodios») es consecuencia de lo que se acaba de ver, como los logros: si el reproductor sigue
+        // abierto (pasó al siguiente episodio) se dibuja encima del video; si no, lo dibuja la ventana principal.
+        using (DialogService?.AvisosComoDelReproductor())
+        {
+            _ = _limpiadorDeEpisodios.AplicarTrasVerAsync(animeId, episodio);
+        }
     }
 
     private string? _rutaPortada;
@@ -1922,6 +1927,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     {
         if (_fueMarcadoComoVisto) return;
         _fueMarcadoComoVisto = true;
+        AppLogger.Debug("ReproductorViewModel", $"Auto-tracking del episodio {_episodio}: en {CurrentSeconds:F1} s de {TotalSeconds:F1} s (el motor dice {Motor?.Posicion.TotalSeconds:F1} de {Motor?.Duracion.TotalSeconds:F1} s).");
 
         try
         {
@@ -2038,7 +2044,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                     if (!_arranqueRegistrado)
                     {
                         _arranqueRegistrado = true;
-                        AppLogger.Debug("ReproductorViewModel", $"[Arranque] Primer tick reproduciendo a los {_relojArranque.ElapsedMilliseconds} ms (duración {Motor.Duracion.TotalSeconds:F1} s, fotogramas {Motor.FotogramasMostrados}).");
+                        AppLogger.Debug("ReproductorViewModel", $"[Arranque] Primer tick reproduciendo a los {_relojArranque.ElapsedMilliseconds} ms (posición {Motor.Posicion.TotalSeconds:F1} s, duración {Motor.Duracion.TotalSeconds:F1} s, fotogramas {Motor.FotogramasMostrados}).");
                     }
                     double curSeconds = Motor.Posicion.TotalSeconds;
                     double durSeconds = Motor.Duracion.TotalSeconds;

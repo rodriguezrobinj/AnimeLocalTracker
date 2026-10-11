@@ -60,6 +60,28 @@ public class ReproductorEliminarTrasVerTests
     }
 
     [Fact]
+    public async Task ElAvisoDeEspacioLiberado_CuentaComoDelReproductor()
+    {
+        // Al pasar solo al episodio siguiente el reproductor sigue en pantalla: sin esto el aviso del borrado no lo dibujaba nadie.
+        bool dentro = false;
+        bool? llamadoDentro = null;
+        var dialogo = new Mock<IDialogService>();
+        var ambito = new Mock<System.IDisposable>();
+        ambito.Setup(a => a.Dispose()).Callback(() => dentro = false);
+        dialogo.Setup(d => d.AvisosComoDelReproductor()).Callback(() => dentro = true).Returns(ambito.Object);
+        _limpiador.Setup(l => l.AplicarTrasVerAsync(101, 5)).Callback(() => llamadoDentro = dentro).Returns(Task.CompletedTask);
+        _db.Setup(d => d.ObtenerRegistrosPorAnimeAsync(It.IsAny<int>())).ReturnsAsync(new List<RegistroEpisodio>());
+        var sut = new ReproductorViewModel(_db.Object, _tracking.Object, _auth.Object, dialogService: dialogo.Object, limpiadorDeEpisodios: _limpiador.Object);
+        sut.CargarVideo(@"C:\Anime\Ep05.mkv", 101, "Solo Leveling", 5);
+        await sut.RealizarAutoTrackingAsync();
+
+        sut.CargarVideo(@"C:\Anime\Ep06.mkv", 101, "Solo Leveling", 6);
+
+        Assert.True(llamadoDentro);
+        sut.Dispose();
+    }
+
+    [Fact]
     public async Task AlRecargarElMismoEpisodio_NoAvisa()
     {
         var sut = CrearSut();

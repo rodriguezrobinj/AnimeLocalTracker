@@ -530,13 +530,10 @@
                             <Setter Property="Opacity" Value="0"/>
                             <Setter Property="Margin" Value="0,0,0,-100"/>
                             <Style.Triggers>
-                                <!-- Con el reproductor ocupando la ventana, este aviso no se dibuja: los del reproductor los pinta su vista
-                                     (arriba) y los de fuera no interrumpen el episodio. Con el motor clásico lo tapaba el video (ventana
-                                     nativa); con el nuevo el video es WPF y, sin esto, cada aviso salía dos veces: arriba y abajo. -->
-                                <DataTrigger Binding="{Binding Navigation.ReproductorEnVentanaPrincipal, Converter={StaticResource NullToCollapsed}}" Value="Visible">
-                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                </DataTrigger>
-                                <DataTrigger Binding="{Binding DialogService.ToastVisible}" Value="True">
+                                <!-- ToastEnVentana y no DialogService.ToastVisible: con el reproductor a la vista sus avisos los pinta su vista y
+                                     los de fuera no interrumpen el episodio (MainViewModel.ToastEnVentana). Con el motor clásico lo tapaba el
+                                     video (ventana nativa); con el nuevo el video es WPF y cada aviso salía dos veces: arriba y abajo. -->
+                                <DataTrigger Binding="{Binding ToastEnVentana}" Value="True">
                                     <DataTrigger.EnterActions>
                                         <BeginStoryboard>
                                             <Storyboard>
