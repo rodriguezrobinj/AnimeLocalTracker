@@ -1,7 +1,8 @@
 import sys
 import json
 import argparse
-from typing import Any, Dict
+import threading
+from typing import Any, Dict, Optional
 
 # Forzar codificación UTF-8 en streams estándar de Windows
 if hasattr(sys.stdin, 'reconfigure'):
@@ -13,9 +14,10 @@ from resolvers.stream_extractor import StreamExtractor
 from media.episode_fingerprint import EpisodeFingerprint
 
 
-def process_command(command: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+def process_command(command: str, payload: Dict[str, Any], cancelada: Optional[threading.Event] = None) -> Dict[str, Any]:
     """
-    Despacha el comando recibido con sus parámetros en formato JSON.
+    Despacha el comando recibido con sus parámetros en formato JSON. "cancelada" se activa si la app deja de esperar la
+    respuesta: los comandos largos que puedan parar a medias la consultan.
     """
     if command == "resolve-stream":
         url = payload.get("url", "")
@@ -36,7 +38,7 @@ def process_command(command: str, payload: Dict[str, Any]) -> Dict[str, Any]:
     elif command == "find-duplicates":
         paths = payload.get("video_paths", [])
         max_distance = int(payload.get("max_distance", 8))
-        return EpisodeFingerprint.find_duplicates(paths, max_distance)
+        return EpisodeFingerprint.find_duplicates(paths, max_distance, cancelada=cancelada)
 
     elif command == "run-plugin":
         plugin_path = payload.get("plugin_path", "")
@@ -85,28 +87,47 @@ def process_command(command: str, payload: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def run_daemon():
-    """Modo daemon: lee comandos JSON (una línea por comando) por stdin y
-    responde por stdout con una línea JSON. Persistente para evitar el
-    coste de arranque de Python+imports en cada llamada."""
+    """Modo daemon: lee mensajes JSON (una línea cada uno) por stdin y responde por stdout con una línea JSON por
+    petición. Persistente para evitar el coste de arranque de Python+imports en cada llamada.
+
+    Cada petición {"id", "command", "payload"} se atiende en su propio hilo, así que una lenta no hace esperar a las
+    demás y las respuestas pueden salir en otro orden: la app las reparte por el "id", que vuelve en la respuesta.
+    {"cancel": id} avisa de que esa respuesta ya no se espera: no se escribe, y el comando para si sabe hacerlo."""
     sys.stdout.reconfigure(encoding='utf-8', newline='\n')
     sys.stdin.reconfigure(encoding='utf-8')
+    escritura = threading.Lock()
+    en_curso: Dict[Any, threading.Event] = {}
+
+    def responder(respuesta: Dict[str, Any]) -> None:
+        with escritura:
+            print(json.dumps(respuesta, ensure_ascii=False), flush=True)
+
+    def atender(mensaje: Dict[str, Any], cancelada: threading.Event) -> None:
+        try:
+            result = process_command(mensaje.get("command", "ping"), mensaje.get("payload", {}), cancelada)
+        except Exception as ex:
+            result = {"success": False, "error": f"excepción daemon: {str(ex)}"}
+        en_curso.pop(mensaje.get("id"), None)
+        if not cancelada.is_set():
+            responder({**result, "id": mensaje.get("id")} if isinstance(result, dict) else result)
+
     # Primer mensaje de saludo para confirmar que el daemon está vivo
-    # INT-02: Se añade protocolVersion para detectar desajustes entre la app C# y el daemon Python
-    print(json.dumps({"success": True, "daemon": "ready", "version": "1.0.0", "protocolVersion": 1}), flush=True)
+    # INT-02: protocolVersion detecta desajustes entre la app C# y el daemon Python (2 = peticiones a la vez y cancelación)
+    responder({"success": True, "daemon": "ready", "version": "1.0.0", "protocolVersion": 2})
     for line in sys.stdin:
         try:
-            payload = json.loads(line.strip().lstrip('\ufeff'))
-            command = payload.get("command", "ping")
-            data = payload.get("payload", {})
-            result = process_command(command, data)
-            # El id de la petición vuelve en la respuesta: la app descarta una respuesta que no sea de la petición que espera.
-            if isinstance(result, dict) and "id" in payload:
-                result = {**result, "id": payload["id"]}
-            print(json.dumps(result, ensure_ascii=False), flush=True)
+            mensaje = json.loads(line.strip().lstrip('\ufeff'))
         except json.JSONDecodeError:
-            print(json.dumps({"success": False, "error": "JSON inválido en línea de comando"}), flush=True)
-        except Exception as ex:
-            print(json.dumps({"success": False, "error": f"excepción daemon: {str(ex)}"}), flush=True)
+            responder({"success": False, "error": "JSON inválido en línea de comando"})
+            continue
+        if "cancel" in mensaje:
+            cancelada = en_curso.get(mensaje["cancel"])
+            if cancelada is not None:
+                cancelada.set()
+            continue
+        cancelada = en_curso[mensaje.get("id")] = threading.Event()
+        # ponytail: un hilo no se puede matar desde fuera; un plugin que no termine sigue vivo hasta que se cierre la app.
+        threading.Thread(target=atender, args=(mensaje, cancelada), daemon=True).start()
 
 
 def main():

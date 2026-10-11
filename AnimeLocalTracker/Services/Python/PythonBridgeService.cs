@@ -67,7 +67,7 @@ namespace AnimeLocalTracker.Services.Python
 
         /// <summary>
         /// Ejecuta un comando en un proceso one-shot dedicado, SIN pasar por el daemon
-        /// persistente (que procesa comandos en serie y se bloquearía con uno largo).
+        /// persistente: dentro del daemon un comando en marcha no se puede parar a la fuerza.
         /// Si se cancela, el proceso se mata con todo su árbol (yt-dlp/ffmpeg no
         /// mueren con el Dispose del objeto Process). Para comandos largos como
         /// download-stream (HLS).
@@ -187,12 +187,14 @@ namespace AnimeLocalTracker.Services.Python
         // ────────────────────────────────────────────────────────────────
         //  DAEMON persistente (JSON-lines por stdin/stdout)
         // ────────────────────────────────────────────────────────────────
-        private const string DaemonGreeting = "daemon";
+        private const int VersionProtocolo = 2;
         private static readonly object DaemonLock = new();
-        private static readonly SemaphoreSlim DaemonSemaphore = new(1, 1);
+        private static readonly SemaphoreSlim ArranqueDaemon = new(1, 1);
         private static Process? _daemonProcess;
-        private static StreamReader? _daemonOut;
-        private static StreamWriter? _daemonIn;
+        private static CanalDaemon? _canal;
+
+        /// <summary>El proceso del daemon en marcha, si lo hay (para las pruebas: cancelar una petición no debe reiniciarlo).</summary>
+        internal static int? PidDelDaemon => _daemonProcess?.Id;
 
         /// <summary>
         /// Ejecuta un comando a través del proceso daemon persistente. Devuelve default
@@ -200,92 +202,41 @@ namespace AnimeLocalTracker.Services.Python
         /// </summary>
         private async Task<TResponse?> ExecuteViaDaemonAsync<TRequest, TResponse>(string command, TRequest payload, CancellationToken ct)
         {
-            // El protocolo es una sola línea por comando en un stream compartido:
-            // serializa send+receive para evitar respuestas cruzadas entre llamadas.
-            await DaemonSemaphore.WaitAsync(ct).ConfigureAwait(false);
+            CanalDaemon? canal;
             try
             {
-                try
-                {
-                    // Daemon indisponible (sin ejecutable compilado, arranque fallido o saludo
-                    // con timeout): devolver default para caer al modo one-shot (nunca lanzar).
-                    if (!await EnsureDaemonStartedAsync(ct).ConfigureAwait(false))
-                        return default;
-                }
-                catch (Exception ex)
-                {
-                    AppLogger.Debug("PythonBridge", $"Daemon no disponible ({ex.Message}); se usará el modo one-shot.");
-                    return default;
-                }
-                if (_daemonProcess == null || _daemonProcess.HasExited)
-                    return default;
-
-                long id = Interlocked.Increment(ref _ultimoIdPeticion);
-                string? output;
-                try
-                {
-                    string jsonInput = JsonSerializer.Serialize(payload, JsonOptions);
-                    string send = JsonSerializer.Serialize(new { id, command, payload = System.Text.Json.Nodes.JsonNode.Parse(jsonInput) }, JsonOptions);
-
-                    lock (DaemonLock)
-                    {
-                        if (_daemonIn == null || _daemonOut == null)
-                            return default;
-
-                        _daemonIn.WriteLine(send);
-                        _daemonIn.Flush();
-                    }
-
-                    // Leer la línea de respuesta (el daemon responde una línea JSON por comando). Una respuesta con otro id es de una
-                    // petición anterior que se abandonó: se descarta y se sigue esperando la propia (daemons viejos no mandan id).
-                    while (true)
-                    {
-                        output = await _daemonOut.ReadLineAsync(ct).AsTask().ConfigureAwait(false);
-                        if (string.IsNullOrWhiteSpace(output))
-                        {
-                            CleanupDaemon(); // cerró la salida: murió
-                            return default;
-                        }
-                        if (!EsRespuestaDeOtraPeticion(output, id)) break;
-                        AppLogger.Warn("PythonBridge", $"Respuesta del daemon descartada: era de una petición anterior (esperada {id}).");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    // El comando ya se envió y su respuesta llegará más tarde. Si el daemon siguiera vivo, la PRÓXIMA petición leería esa
-                    // línea como propia (caso real: el opening/ending de un episodio se guardó en el siguiente, y otro episodio quedó
-                    // "sin respuesta" al leer la de una miniatura). Se reinicia (~1 s) en vez de arrastrar el desfase; de paso deja de
-                    // gastar CPU en un trabajo que ya nadie espera.
-                    AppLogger.Debug("PythonBridge", $"Comando '{command}' interrumpido ({ex.GetType().Name}); se reinicia el daemon para no desfasar las respuestas.");
-                    CleanupDaemon();
-                    if (ex is OperationCanceledException && ct.IsCancellationRequested) throw;
-                    return default; // el daemon murió: cae al one-shot
-                }
-
-                var res = JsonSerializer.Deserialize<TResponse>(output, SnakeCaseOptions);
-                return res ?? JsonSerializer.Deserialize<TResponse>(output, JsonOptions);
+                // Daemon indisponible (sin ejecutable compilado, arranque fallido o saludo
+                // con timeout): devolver default para caer al modo one-shot (nunca lanzar).
+                canal = await EnsureDaemonStartedAsync(ct).ConfigureAwait(false);
             }
-            finally
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                DaemonSemaphore.Release();
+                AppLogger.Debug("PythonBridge", $"Daemon no disponible ({ex.Message}); se usará el modo one-shot.");
+                return default;
             }
-        }
+            if (canal == null) return default;
 
-        private static long _ultimoIdPeticion;
-
-        /// <summary>True si la línea trae un "id" distinto de <paramref name="id"/> (sin id, o ilegible, se acepta como propia).</summary>
-        internal static bool EsRespuestaDeOtraPeticion(string linea, long id)
-        {
+            string? output;
             try
             {
-                return System.Text.Json.Nodes.JsonNode.Parse(linea) is System.Text.Json.Nodes.JsonObject obj
-                    && obj.TryGetPropertyValue("id", out var valor) && valor is System.Text.Json.Nodes.JsonValue v
-                    && v.TryGetValue<long>(out long recibido) && recibido != id;
+                // Si se cancela, el canal avisa al daemon y la excepción sigue hacia quien llamó: el daemon no se reinicia y las
+                // demás peticiones en curso no se enteran.
+                output = await canal.PedirAsync(command, JsonSerializer.Serialize(payload, JsonOptions), ct).ConfigureAwait(false);
             }
-            catch (JsonException)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                return false;
+                AppLogger.Debug("PythonBridge", $"Comando '{command}' interrumpido ({ex.GetType().Name}); se reinicia el daemon.");
+                CleanupDaemon(canal);
+                return default; // cae al one-shot
             }
+            if (output == null)
+            {
+                CleanupDaemon(canal); // cerró la salida: murió
+                return default;
+            }
+
+            var res = JsonSerializer.Deserialize<TResponse>(output, SnakeCaseOptions);
+            return res ?? JsonSerializer.Deserialize<TResponse>(output, JsonOptions);
         }
 
         /// <summary>
@@ -302,18 +253,40 @@ namespace AnimeLocalTracker.Services.Python
         /// </summary>
         private static DateTime _daemonProximoIntento = DateTime.MinValue;
 
-        private async Task<bool> EnsureDaemonStartedAsync(CancellationToken ct)
+        private async Task<CanalDaemon?> EnsureDaemonStartedAsync(CancellationToken ct)
         {
-            if (DateTime.UtcNow < _daemonProximoIntento) return false;
-            if (_daemonProcess != null && !_daemonProcess.HasExited)
-                return true;
+            if (DaemonEnMarcha() is { } enMarcha) return enMarcha;
+
+            // De uno en uno: varias peticiones a la vez no deben arrancar cada una su daemon.
+            await ArranqueDaemon.WaitAsync(ct).ConfigureAwait(false);
+            try
+            {
+                return DaemonEnMarcha() ?? await ArrancarDaemonAsync(ct).ConfigureAwait(false);
+            }
+            finally
+            {
+                ArranqueDaemon.Release();
+            }
+        }
+
+        private static CanalDaemon? DaemonEnMarcha()
+        {
+            lock (DaemonLock)
+            {
+                return _daemonProcess is { HasExited: false } ? _canal : null;
+            }
+        }
+
+        private async Task<CanalDaemon?> ArrancarDaemonAsync(CancellationToken ct)
+        {
+            if (DateTime.UtcNow < _daemonProximoIntento) return null;
 
             // El daemon requiere el ejecutable compilado (PyInstaller). Sin él (p.ej. CI sin el
             // binario embebido) degradar al modo one-shot en lugar de lanzar una excepción.
             if (string.IsNullOrEmpty(_cachedExecutablePath))
             {
                 AppLogger.Debug("PythonBridge", "Daemon no disponible (sin ejecutable compilado); se usará el modo one-shot.");
-                return false;
+                return null;
             }
 
             try
@@ -347,8 +320,6 @@ namespace AnimeLocalTracker.Services.Python
                 proc.BeginErrorReadLine();
                 JobObjectHelper.AddProcess(proc);
                 _daemonProcess = proc;
-                _daemonOut = proc.StandardOutput;
-                _daemonIn = proc.StandardInput;
 
                 // Consumir el saludo de forma no bloqueante antes del primer comando.
                 // INT-04: 20 s de margen (la extracción onefile + imports puede superar los 8 s).
@@ -356,7 +327,7 @@ namespace AnimeLocalTracker.Services.Python
                 linkedCts.CancelAfter(TimeSpan.FromSeconds(20));
                 try
                 {
-                    string? greetingLine = await _daemonOut.ReadLineAsync(linkedCts.Token).ConfigureAwait(false);
+                    string? greetingLine = await proc.StandardOutput.ReadLineAsync(linkedCts.Token).ConfigureAwait(false);
                     if (string.IsNullOrWhiteSpace(greetingLine))
                     {
                         throw new InvalidOperationException("Daemon cerró el stream de salida sin saludar.");
@@ -366,9 +337,9 @@ namespace AnimeLocalTracker.Services.Python
                     using var doc = JsonDocument.Parse(greetingLine);
                     if (doc.RootElement.TryGetProperty("protocolVersion", out var prop))
                     {
-                        if (prop.GetInt32() != 1)
+                        if (prop.GetInt32() != VersionProtocolo)
                         {
-                            throw new InvalidOperationException($"El daemon devolvió protocolVersion={prop.GetInt32()}, pero se esperaba 1.");
+                            throw new InvalidOperationException($"El daemon devolvió protocolVersion={prop.GetInt32()}, pero se esperaba {VersionProtocolo}.");
                         }
                     }
                     else
@@ -377,7 +348,9 @@ namespace AnimeLocalTracker.Services.Python
                     }
 
                     _daemonProximoIntento = DateTime.MinValue;
-                    return true;
+                    var canal = new CanalDaemon(proc.StandardOutput, proc.StandardInput);
+                    lock (DaemonLock) _canal = canal;
+                    return canal;
                 }
                 catch (Exception initEx)
                 {
@@ -386,30 +359,34 @@ namespace AnimeLocalTracker.Services.Python
                     AppLogger.Warn("PythonBridge", $"Fallo en handshake del daemon: {initEx.Message}. Se usará modo one-shot y se reintentará en unos minutos.");
                     _daemonProximoIntento = DateTime.UtcNow.AddMinutes(10);
                     CleanupDaemon();
-                    return false;
+                    return null;
                 }
             }
             catch (Exception ex)
             {
                 AppLogger.Debug("PythonBridge", $"No se pudo iniciar el daemon Python: {ex.Message}");
                 _daemonProximoIntento = DateTime.UtcNow.AddMinutes(10);
-                _daemonProcess = null;
-                _daemonOut = null;
-                _daemonIn = null;
-                return false;
+                CleanupDaemon();
+                return null;
             }
         }
 
-        private void CleanupDaemon()
+        /// <param name="soloSiEsEste">
+        /// El canal por el que falló quien llama: si ya hay otro daemon en su lugar (otra petición lo reinició antes), no se toca.
+        /// </param>
+        private static void CleanupDaemon(CanalDaemon? soloSiEsEste = null)
         {
-            try
+            lock (DaemonLock)
             {
-                _daemonProcess?.Kill(entireProcessTree: true);
+                if (soloSiEsEste != null && !ReferenceEquals(soloSiEsEste, _canal)) return;
+                try
+                {
+                    _daemonProcess?.Kill(entireProcessTree: true);
+                }
+                catch { }
+                _daemonProcess = null;
+                _canal = null;
             }
-            catch { }
-            _daemonProcess = null;
-            _daemonOut = null;
-            _daemonIn = null;
         }
 
         public void Dispose()

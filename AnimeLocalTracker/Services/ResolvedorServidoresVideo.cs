@@ -61,7 +61,7 @@ public sealed class ResolvedorServidoresVideo(IPythonBridgeService pythonBridge,
                     continue;
                 }
 
-                var result = await pythonBridge.ExecuteCommandOneShotAsync<object, ProveedorVideoAnimeAv1.StreamResult>(
+                var result = await pythonBridge.ExecuteCommandAsync<object, ProveedorVideoAnimeAv1.StreamResult>(
                     "resolve-stream",
                     new { url = embed.Url, server = embed.Server },
                     ct);

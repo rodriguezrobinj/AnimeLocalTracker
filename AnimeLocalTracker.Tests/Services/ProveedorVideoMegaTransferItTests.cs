@@ -135,7 +135,7 @@ public class ProveedorVideoMegaTransferItTests
         var url = await proveedor.BuscarUrlEpisodioAsync(Titulos, 1);
 
         url.Should().Be(UrlTransferIt);
-        bridge.Verify(b => b.ExecuteCommandOneShotAsync<object, ProveedorVideoAnimeAv1.StreamResult>(
+        bridge.Verify(b => b.ExecuteCommandAsync<object, ProveedorVideoAnimeAv1.StreamResult>(
             It.IsAny<string>(), It.IsAny<object>(), It.IsAny<CancellationToken>()), Times.Never);
         http.Peticiones.Should().Contain(p => p.Contains("bt7.api.mega.co.nz") && p.Contains("x=LWBgKbxnyZgK"));
     }
@@ -168,7 +168,7 @@ public class ProveedorVideoMegaTransferItTests
     {
         // Los servidores de descarga de MEGA contestan 509 (cuota gratuita agotada): no se devuelve una URL que fallaría.
         var (proveedor, bridge, _) = Crear(req => Responder(req, estadoDescarga: (HttpStatusCode)509));
-        bridge.Setup(b => b.ExecuteCommandOneShotAsync<object, ProveedorVideoAnimeAv1.StreamResult>(
+        bridge.Setup(b => b.ExecuteCommandAsync<object, ProveedorVideoAnimeAv1.StreamResult>(
                 "resolve-stream", It.IsAny<object>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ProveedorVideoAnimeAv1.StreamResult { Success = true, DirectUrl = "https://cdn.voe.example.com/video.mp4" });
 

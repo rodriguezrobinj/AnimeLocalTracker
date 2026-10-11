@@ -58,7 +58,7 @@ public class ServidoresMediafireVidhideTests
             : req.RequestUri.AbsoluteUri.Contains("/tokyo-revengers-santen-sensou-hen/1/") ? Ok(paginaEpisodio) : new HttpResponseMessage(HttpStatusCode.NotFound)));
         var bridge = new Mock<IPythonBridgeService>();
         bridge.Setup(b => b.IsAvailableAsync()).ReturnsAsync(true);
-        bridge.Setup(b => b.ExecuteCommandOneShotAsync<object, ProveedorVideoAnimeAv1.StreamResult>("resolve-stream", It.IsAny<object>(), It.IsAny<CancellationToken>()))
+        bridge.Setup(b => b.ExecuteCommandAsync<object, ProveedorVideoAnimeAv1.StreamResult>("resolve-stream", It.IsAny<object>(), It.IsAny<CancellationToken>()))
             .Callback<string, object, CancellationToken>((_, payload, _) => payloads.Add(JsonSerializer.Serialize(payload)))
             .ReturnsAsync(new ProveedorVideoAnimeAv1.StreamResult { Success = true, DirectUrl = "https://cdn.resuelto.example.com/master.m3u8" });
         return (new ProveedorVideoJkAnime(bridge.Object, new AnimeAv1VideoSourceResolver(http), new JkAnimeClient(http)), bridge, payloads);

@@ -220,7 +220,7 @@ public class ProveedorVideoJkAnimeTests
 
         proveedor.Nombre.Should().Be("JKAnime");
         url.Should().Be("https://cdn.mp4upload.com/iaswjnh6jjo8/video.mp4");
-        bridge.Verify(b => b.ExecuteCommandOneShotAsync<object, ProveedorVideoAnimeAv1.StreamResult>(
+        bridge.Verify(b => b.ExecuteCommandAsync<object, ProveedorVideoAnimeAv1.StreamResult>(
             It.IsAny<string>(), It.IsAny<object>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -311,7 +311,7 @@ public class ProveedorVideoJkAnimeTests
     public async Task ConElOrdenDeServidoresDelUsuario_VoeVaPrimeroYSeResuelveConElDaemon()
     {
         var (proveedor, bridge, _) = Crear(req => Sitio(req));
-        bridge.Setup(b => b.ExecuteCommandOneShotAsync<object, ProveedorVideoAnimeAv1.StreamResult>(
+        bridge.Setup(b => b.ExecuteCommandAsync<object, ProveedorVideoAnimeAv1.StreamResult>(
                 "resolve-stream", It.IsAny<object>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ProveedorVideoAnimeAv1.StreamResult { Success = true, DirectUrl = "https://cdn.voe.example.com/video.mp4" });
 
@@ -328,7 +328,7 @@ public class ProveedorVideoJkAnimeTests
             : null));
 
         (await proveedor.BuscarUrlEpisodioAsync(Titulos, 1)).Should().BeNull();
-        bridge.Verify(b => b.ExecuteCommandOneShotAsync<object, ProveedorVideoAnimeAv1.StreamResult>(
+        bridge.Verify(b => b.ExecuteCommandAsync<object, ProveedorVideoAnimeAv1.StreamResult>(
             It.IsAny<string>(), It.IsAny<object>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 

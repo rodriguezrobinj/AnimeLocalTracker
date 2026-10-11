@@ -82,10 +82,13 @@ class EpisodeFingerprint:
             return 64
 
     @classmethod
-    def find_duplicates(cls, video_paths: List[str], max_distance: int = 8, timestamp: float = 30.0) -> Dict[str, Any]:
-        """Agrupa los archivos cuyo frame clave es perceptualmente equivalente (duplicados)."""
+    def find_duplicates(cls, video_paths: List[str], max_distance: int = 8, timestamp: float = 30.0, cancelada=None) -> Dict[str, Any]:
+        """Agrupa los archivos cuyo frame clave es perceptualmente equivalente (duplicados). "cancelada" (threading.Event)
+        corta entre un archivo y el siguiente: cada uno es un ffmpeg, y con cientos nadie esperaría ya el resultado."""
         fingerprints = []
         for path in video_paths:
+            if cancelada is not None and cancelada.is_set():
+                return {"success": False, "error": "cancelado"}
             r = cls.compute_fingerprint(path, timestamp)
             if r.get("success"):
                 fingerprints.append({"path": path, "hash": r["hash"]})

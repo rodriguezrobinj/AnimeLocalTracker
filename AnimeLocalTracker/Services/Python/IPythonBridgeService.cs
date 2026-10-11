@@ -12,14 +12,15 @@ namespace AnimeLocalTracker.Services.Python
         Task<bool> IsAvailableAsync();
 
         /// <summary>
-        /// Ejecuta un comando en el motor de herramientas Python enviando y recibiendo JSON tipado.
+        /// Ejecuta un comando en el motor de herramientas Python enviando y recibiendo JSON tipado. Varias llamadas pueden
+        /// estar en curso a la vez, y cancelar una no afecta a las demás.
         /// </summary>
         Task<TResponse?> ExecuteCommandAsync<TRequest, TResponse>(string command, TRequest payload, CancellationToken ct = default);
 
         /// <summary>
-        /// Ejecuta un comando en un proceso one-shot dedicado (nunca bloquea el daemon
-        /// persistente) y mata el proceso con su árbol si se cancela. Para comandos
-        /// largos como la descarga HLS (download-stream).
+        /// Ejecuta un comando en un proceso one-shot dedicado y mata el proceso con su árbol
+        /// si se cancela. Para comandos largos que deben poder pararse de verdad, como la
+        /// descarga HLS (download-stream).
         /// </summary>
         Task<TResponse?> ExecuteCommandOneShotAsync<TRequest, TResponse>(string command, TRequest payload, CancellationToken ct = default);
     }
