@@ -357,7 +357,7 @@ public class DownloadServiceTests : IDisposable
         var archivoDaemon = tempDest + ".mp4"; // yt-dlp añade la extensión real al outtmpl
         await File.WriteAllTextAsync(archivoDaemon, "contenido-segmentado");
         bridgeMock.Setup(b => b.ExecuteCommandOneShotAsync<object, DownloadService.DownloadStreamResult>(
-                "download-stream", It.IsAny<object>(), It.IsAny<CancellationToken>()))
+                "download-stream", It.IsAny<object>(), It.IsAny<IProgress<(double, double)>?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new DownloadService.DownloadStreamResult { Success = true, RutaArchivo = archivoDaemon });
 
         var sut = new DownloadService(
@@ -374,7 +374,7 @@ public class DownloadServiceTests : IDisposable
             File.Exists(tempDest).Should().BeTrue("el archivo descargado debe quedar en el destino");
             File.Exists(archivoDaemon).Should().BeFalse("la ruta con extensión del daemon se mueve al destino");
             bridgeMock.Verify(b => b.ExecuteCommandOneShotAsync<object, DownloadService.DownloadStreamResult>(
-                "download-stream", It.IsAny<object>(), It.IsAny<CancellationToken>()), Times.Once);
+                "download-stream", It.IsAny<object>(), It.IsAny<IProgress<(double, double)>?>(), It.IsAny<CancellationToken>()), Times.Once);
         }
         finally
         {
@@ -384,12 +384,52 @@ public class DownloadServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task DownloadVideoAsync_ConManifiestoHls_PasaElAvanceQueVaDandoLaDescarga()
+    {
+        // Antes una descarga de Vidhide o Streamwish giraba sin porcentaje hasta terminar: el avance no salía del proceso.
+        var bridgeMock = new Mock<IPythonBridgeService>();
+        var destino = Path.Combine(Path.GetTempPath(), $"hls_avance_{Guid.NewGuid():N}.mkv");
+        bridgeMock.Setup(b => b.ExecuteCommandOneShotAsync<object, DownloadService.DownloadStreamResult>(
+                "download-stream", It.IsAny<object>(), It.IsAny<IProgress<(double, double)>?>(), It.IsAny<CancellationToken>()))
+            .Callback<string, object, IProgress<(double, double)>?, CancellationToken>((_, _, avance, _) =>
+            {
+                avance!.Report((25.0, 2048.0));
+                avance.Report((80.0, 4096.0));
+                File.WriteAllText(destino, "contenido-segmentado");
+            })
+            .ReturnsAsync(new DownloadService.DownloadStreamResult { Success = true });
+        var sut = new DownloadService(
+            _httpClientFactoryMock.Object,
+            sourceResolver: _sourceResolverMock.Object,
+            settingsService: _settingsServiceMock.Object,
+            pythonBridge: bridgeMock.Object);
+        var recibidos = new AvanceEnOrden();
+        try
+        {
+            await sut.DownloadVideoAsync("https://cdn.example.com/master.m3u8", destino, recibidos);
+
+            recibidos.Pasos.Should().Equal((25.0, 2048.0), (80.0, 4096.0));
+        }
+        finally
+        {
+            try { if (File.Exists(destino)) File.Delete(destino); } catch { }
+        }
+    }
+
+    /// <summary>Recoge los avisos en el momento (Progress&lt;T&gt; los entregaría más tarde, por el grupo de hilos).</summary>
+    private sealed class AvanceEnOrden : IProgress<(double Progress, double Speed)>
+    {
+        public List<(double, double)> Pasos { get; } = [];
+        public void Report((double Progress, double Speed) value) => Pasos.Add(value);
+    }
+
+    [Fact]
     public async Task DownloadVideoAsync_ConManifiestoHlsYDaemonFallido_DeberiaLanzarConElError()
     {
         // Arrange: el daemon devuelve error (p. ej. el proveedor HLS cayó)
         var bridgeMock = new Mock<IPythonBridgeService>();
         bridgeMock.Setup(b => b.ExecuteCommandOneShotAsync<object, DownloadService.DownloadStreamResult>(
-                "download-stream", It.IsAny<object>(), It.IsAny<CancellationToken>()))
+                "download-stream", It.IsAny<object>(), It.IsAny<IProgress<(double, double)>?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new DownloadService.DownloadStreamResult { Success = false, Error = "timeout de red" });
 
         var sut = new DownloadService(

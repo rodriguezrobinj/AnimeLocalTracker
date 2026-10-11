@@ -57,6 +57,27 @@ public class PythonBridgeSalidaTests
     }
 
     [Theory]
+    [InlineData("{\"progress\": 37.5, \"speed\": 1048576}", 37.5, 1048576.0)]
+    [InlineData("{\"progress\": 100.0, \"speed\": 0}", 100.0, 0.0)]
+    [InlineData("{\"progress\": 12}", 12.0, 0.0)]
+    [InlineData("{\"progress\": 250, \"speed\": -5}", 100.0, 0.0)] // nunca fuera de 0 a 100 ni velocidad negativa
+    public void AvanceDe_LeeElPorcentajeYLaVelocidadDeUnaLineaDeAvance(string linea, double porcentaje, double velocidad)
+    {
+        PythonBridgeService.AvanceDe(linea).Should().Be((porcentaje, velocidad));
+    }
+
+    [Theory]
+    [InlineData("{\"success\": true, \"file\": \"C:\\\\video.mp4\"}")] // el resultado
+    [InlineData("{\"progress\": \"mucho\"}")]
+    [InlineData("{\"progress\": 12")]
+    [InlineData("[download]  45.3% of ~ 287.00MiB")]
+    [InlineData("")]
+    public void AvanceDe_LoQueNoEsUnaLineaDeAvance_DaNulo(string linea)
+    {
+        PythonBridgeService.AvanceDe(linea).Should().BeNull();
+    }
+
+    [Theory]
     [InlineData("")]
     [InlineData("   \n  ")]
     [InlineData("esto no es json\notra línea")]

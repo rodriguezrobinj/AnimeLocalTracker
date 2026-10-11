@@ -1124,15 +1124,16 @@ public class DownloadService : IDownloadService
     }
 
     /// <summary>
-    /// Descarga un stream HLS/DASH con yt-dlp en el daemon (bloqueante, sin progreso
-    /// incremental en esta fase). yt-dlp puede añadir la extensión real al outtmpl:
-    /// se normaliza al destino esperado.
+    /// Descarga un stream HLS/DASH con yt-dlp en un proceso aparte del daemon (se mata al cancelar). El avance llega por
+    /// fragmentos bajados: el tamaño total de un HLS no se conoce de antemano. yt-dlp puede añadir la extensión real al
+    /// outtmpl: se normaliza al destino esperado.
     /// </summary>
-    private async Task DescargarManifiestoConDaemonAsync(string videoUrl, string destinationPath, CancellationToken cancellationToken)
+    private async Task DescargarManifiestoConDaemonAsync(string videoUrl, string destinationPath, IProgress<(double Progress, double Speed)>? progress, CancellationToken cancellationToken)
     {
         var resultado = await _pythonBridge!.ExecuteCommandOneShotAsync<object, DownloadStreamResult>(
             "download-stream",
             new { url = videoUrl, output_path = destinationPath },
+            progress,
             cancellationToken);
 
         if (resultado == null || !resultado.Success)
@@ -1181,7 +1182,7 @@ public class DownloadService : IDownloadService
         // con yt-dlp en el daemon (segmentos, encriptación y merge los maneja yt-dlp)
         if (_pythonBridge != null && Core.UrlSeguridad.EsUrlManifiestoStreaming(videoUrl))
         {
-            await DescargarManifiestoConDaemonAsync(videoUrl, destinationPath, cancellationToken);
+            await DescargarManifiestoConDaemonAsync(videoUrl, destinationPath, progress, cancellationToken);
             return;
         }
 

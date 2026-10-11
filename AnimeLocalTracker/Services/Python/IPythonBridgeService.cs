@@ -22,6 +22,8 @@ namespace AnimeLocalTracker.Services.Python
         /// si se cancela. Para comandos largos que deben poder pararse de verdad, como la
         /// descarga HLS (download-stream).
         /// </summary>
-        Task<TResponse?> ExecuteCommandOneShotAsync<TRequest, TResponse>(string command, TRequest payload, CancellationToken ct = default);
+        /// <param name="avance">Recibe el porcentaje (0 a 100) y la velocidad en bytes por segundo, si el comando los va dando.</param>
+        Task<TResponse?> ExecuteCommandOneShotAsync<TRequest, TResponse>(string command, TRequest payload,
+            IProgress<(double Progreso, double Velocidad)>? avance = null, CancellationToken ct = default);
     }
 }

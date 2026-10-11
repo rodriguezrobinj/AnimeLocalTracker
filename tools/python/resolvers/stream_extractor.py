@@ -1,4 +1,4 @@
-from typing import Dict, Any, List, Optional
+from typing import Callable, Dict, Any, List, Optional
 from urllib.parse import urlparse
 import os
 import yt_dlp
@@ -155,7 +155,31 @@ class StreamExtractor:
             }
 
     @staticmethod
-    def download_stream(url: str, output_path: str, custom_headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+    def avisador_de_avance(al_avanzar: Callable[[float, float], None]) -> Callable[[Dict[str, Any]], None]:
+        """
+        El aviso que yt-dlp llama mientras descarga, convertido en al_avanzar(porcentaje, bytes por segundo) una vez por
+        cada punto porcentual. En HLS el tamaño total no se sabe de antemano: el avance sale de los fragmentos ya bajados.
+        """
+        ultimo = [-1]
+
+        def aviso(d: Dict[str, Any]) -> None:
+            if d.get('status') != 'downloading':
+                return
+            total, hechos = d.get('fragment_count'), d.get('fragment_index')
+            if not total or hechos is None:
+                total, hechos = d.get('total_bytes') or d.get('total_bytes_estimate'), d.get('downloaded_bytes')
+            if not total or hechos is None:
+                return
+            porcentaje = max(0.0, min(100.0, 100.0 * hechos / total))
+            if int(porcentaje) != ultimo[0]:
+                ultimo[0] = int(porcentaje)
+                al_avanzar(porcentaje, float(d.get('speed') or 0))
+
+        return aviso
+
+    @staticmethod
+    def download_stream(url: str, output_path: str, custom_headers: Optional[Dict[str, str]] = None,
+                        al_avanzar: Optional[Callable[[float, float], None]] = None) -> Dict[str, Any]:
         """
         Descarga un stream (HLS/DASH segmentado o archivo directo) con yt-dlp a un
         archivo local. Bloqueante. Hardening INT-01: URL validada (solo https hacia servidores públicos)
@@ -178,6 +202,7 @@ class StreamExtractor:
             'no_warnings': True,
             # La salida estándar del daemon es el canal de la respuesta (una línea JSON): sin esto yt-dlp escribe ahí su progreso
             # ("[download] 12.3 % …", ~1800 líneas en un HLS de 147 fragmentos) y el lector de C# no entiende la respuesta.
+            # El avance que sí se manda va aparte, en líneas JSON propias (ver al_avanzar).
             'noprogress': True,
             # Hardening: nunca expandir playlists y acotar red/archivo
             'noplaylist': True,
@@ -197,6 +222,8 @@ class StreamExtractor:
 
         if custom_headers:
             ydl_opts['http_headers'] = custom_headers
+        if al_avanzar is not None:
+            ydl_opts['progress_hooks'] = [StreamExtractor.avisador_de_avance(al_avanzar)]
 
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:

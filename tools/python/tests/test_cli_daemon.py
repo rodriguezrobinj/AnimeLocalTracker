@@ -78,3 +78,20 @@ def test_buscar_duplicados_cancelado_no_abre_ningun_video():
     res = EpisodeFingerprint.find_duplicates(["C:\\no_existe_1.mkv", "C:\\no_existe_2.mkv"], cancelada=Cancelada())
 
     assert res == {"success": False, "error": "cancelado"}
+
+
+def test_un_comando_de_un_solo_uso_escribe_su_avance_antes_del_resultado(monkeypatch, capsys):
+    import cli
+
+    def descarga_falsa(url, output_path, headers, al_avanzar):
+        al_avanzar(12.345, 2048.7)
+        al_avanzar(100.0, 0.0)
+        return {"success": True, "file": output_path}
+
+    monkeypatch.setattr(cli.StreamExtractor, "download_stream", staticmethod(descarga_falsa))
+    monkeypatch.setattr(sys, "argv", ["cli.py", "--command", "download-stream", "--json", json.dumps({"url": "https://x/y.m3u8", "output_path": "C:\\ep.mkv"})])
+
+    cli.main()
+
+    lineas = [json.loads(linea) for linea in capsys.readouterr().out.splitlines()]
+    assert lineas == [{"progress": 12.3, "speed": 2049}, {"progress": 100.0, "speed": 0}, {"success": True, "file": "C:\\ep.mkv"}]

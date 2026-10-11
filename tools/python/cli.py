@@ -14,10 +14,11 @@ from resolvers.stream_extractor import StreamExtractor
 from media.episode_fingerprint import EpisodeFingerprint
 
 
-def process_command(command: str, payload: Dict[str, Any], cancelada: Optional[threading.Event] = None) -> Dict[str, Any]:
+def process_command(command: str, payload: Dict[str, Any], cancelada: Optional[threading.Event] = None, al_avanzar=None) -> Dict[str, Any]:
     """
     Despacha el comando recibido con sus parámetros en formato JSON. "cancelada" se activa si la app deja de esperar la
-    respuesta: los comandos largos que puedan parar a medias la consultan.
+    respuesta: los comandos largos que puedan parar a medias la consultan. "al_avanzar(porcentaje, bytes por segundo)"
+    recibe el avance de los comandos que lo dan (la descarga).
     """
     if command == "resolve-stream":
         url = payload.get("url", "")
@@ -28,7 +29,7 @@ def process_command(command: str, payload: Dict[str, Any], cancelada: Optional[t
         url = payload.get("url", "")
         output_path = payload.get("output_path", "")
         headers = payload.get("headers")
-        return StreamExtractor.download_stream(url, output_path, headers)
+        return StreamExtractor.download_stream(url, output_path, headers, al_avanzar)
 
     elif command == "fingerprint":
         video_path = payload.get("video_path", "")
@@ -162,8 +163,12 @@ def main():
             print(json.dumps({"success": False, "error": f"JSON inválido en stdin: {str(e)}"}))
             sys.exit(1)
 
+    def avisar_avance(porcentaje: float, velocidad: float) -> None:
+        # Una línea JSON por punto porcentual, antes de la del resultado: la app las lee según llegan.
+        print(json.dumps({"progress": round(porcentaje, 1), "speed": round(velocidad)}), flush=True)
+
     command = args.command or payload.get("command", "ping")
-    result = process_command(command, payload)
+    result = process_command(command, payload, al_avanzar=avisar_avance)
 
     # Salida estándar única en formato JSON
     print(json.dumps(result, ensure_ascii=False))

@@ -120,3 +120,67 @@ def test_resolve_y_download_rechazan_lo_que_no_sea_https_hacia_internet(url, tmp
     assert resuelto["success"] is False
     assert descargado["success"] is False
     mock_ydl_cls.assert_not_called()
+
+
+# ── Avance de la descarga (HLS): un aviso por punto porcentual ──
+
+def _avances(avisos):
+    recibidos = []
+    aviso = StreamExtractor.avisador_de_avance(lambda porcentaje, velocidad: recibidos.append((porcentaje, velocidad)))
+    for d in avisos:
+        aviso(d)
+    return recibidos
+
+
+def test_avance_por_fragmentos_avisa_una_vez_por_punto_porcentual():
+    # 400 fragmentos: cada uno es un cuarto de punto, y yt-dlp avisa varias veces dentro del mismo fragmento.
+    avisos = [{"status": "downloading", "fragment_index": i, "fragment_count": 400, "speed": 1000.0 + i} for i in range(0, 9) for _ in range(3)]
+
+    assert _avances(avisos) == [(0.0, 1000.0), (1.0, 1004.0), (2.0, 1008.0)]
+
+
+def test_avance_sin_fragmentos_usa_los_bytes_y_el_tamano_estimado():
+    avisos = [
+        {"status": "downloading", "downloaded_bytes": 50, "total_bytes_estimate": 200, "speed": None},
+        {"status": "downloading", "downloaded_bytes": 300, "total_bytes": 200},  # la estimación se quedó corta: nunca más de 100
+    ]
+
+    assert _avances(avisos) == [(25.0, 0.0), (100.0, 0.0)]
+
+
+def test_avance_ignora_lo_que_no_es_descarga_o_no_tiene_total():
+    avisos = [
+        {"status": "finished", "fragment_index": 4, "fragment_count": 4},
+        {"status": "downloading", "downloaded_bytes": 50},
+        {"status": "downloading"},
+    ]
+
+    assert _avances(avisos) == []
+
+
+def test_download_stream_pasa_el_aviso_de_avance_a_yt_dlp(monkeypatch, tmp_path):
+    opciones = {}
+
+    class YdlFalso:
+        def __init__(self, opts):
+            opciones.update(opts)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+        def extract_info(self, url, download):
+            for aviso in opciones.get("progress_hooks", []):
+                aviso({"status": "downloading", "fragment_index": 1, "fragment_count": 2, "speed": 512})
+            return None
+
+    monkeypatch.setattr("resolvers.stream_extractor.yt_dlp.YoutubeDL", YdlFalso)
+    monkeypatch.setattr(StreamExtractor, "_is_safe_http_url", staticmethod(lambda url: True))
+    recibidos = []
+
+    StreamExtractor.download_stream("https://cdn.example.com/master.m3u8", str(tmp_path / "ep.mkv"), None, lambda p, v: recibidos.append((p, v)))
+
+    assert recibidos == [(50.0, 512.0)]
+    assert opciones["noprogress"] is True, "el progreso en texto de yt-dlp sigue fuera de la salida"

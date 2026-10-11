@@ -89,6 +89,37 @@ namespace AnimeLocalTracker.Tests.Services
             }
         }
 
+        [Fact]
+        public async Task ComandoDeUnSoloUso_EntregaElAvanceSegunLlega_YLuegoElResultado()
+        {
+            // El proceso escribe líneas de avance antes de la del resultado (así lo hace la descarga HLS con yt-dlp).
+            string dir = Path.Combine(Path.GetTempPath(), "alt_bridge_" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(dir);
+            string plugin = Path.Combine(dir, "plugin_avance.py");
+            File.WriteAllText(plugin, "import json\ndef descargar(valor):\n    for p in (10, 55.5):\n        print(json.dumps({'progress': p, 'speed': 2048}), flush=True)\n    return valor\n");
+            try
+            {
+                var bridge = new PythonBridgeService();
+                var avance = new AvanceEnOrden();
+
+                var r = await bridge.ExecuteCommandOneShotAsync<object, EcoResponse>("run-plugin",
+                    new { plugin_path = plugin, func_name = "descargar", args = new { valor = "listo" } }, avance);
+
+                Assert.Equal("listo", r?.Result);
+                Assert.Equal([(10.0, 2048.0), (55.5, 2048.0)], avance.Pasos);
+            }
+            finally
+            {
+                try { Directory.Delete(dir, true); } catch { }
+            }
+        }
+
+        private sealed class AvanceEnOrden : IProgress<(double Progreso, double Velocidad)>
+        {
+            public System.Collections.Generic.List<(double, double)> Pasos { get; } = [];
+            public void Report((double Progreso, double Velocidad) value) => Pasos.Add(value);
+        }
+
         private class EcoResponse
         {
             public bool Success { get; set; }

@@ -62,7 +62,7 @@ namespace AnimeLocalTracker.Services.Python
             if (viaDaemon != null) return viaDaemon;
 
             // 2. Fallback: spawn de proceso one-shot (como antes)
-            return await EjecutarOneShotAsync<TRequest, TResponse>(command, payload, ct);
+            return await EjecutarOneShotAsync<TRequest, TResponse>(command, payload, avance: null, ct);
         }
 
         /// <summary>
@@ -72,12 +72,15 @@ namespace AnimeLocalTracker.Services.Python
         /// mueren con el Dispose del objeto Process). Para comandos largos como
         /// download-stream (HLS).
         /// </summary>
-        public async Task<TResponse?> ExecuteCommandOneShotAsync<TRequest, TResponse>(string command, TRequest payload, CancellationToken ct = default)
+        public async Task<TResponse?> ExecuteCommandOneShotAsync<TRequest, TResponse>(string command, TRequest payload,
+            IProgress<(double Progreso, double Velocidad)>? avance = null, CancellationToken ct = default)
         {
-            return await EjecutarOneShotAsync<TRequest, TResponse>(command, payload, ct);
+            ResolveExecutable();
+            return await EjecutarOneShotAsync<TRequest, TResponse>(command, payload, avance, ct);
         }
 
-        private async Task<TResponse?> EjecutarOneShotAsync<TRequest, TResponse>(string command, TRequest payload, CancellationToken ct)
+        private async Task<TResponse?> EjecutarOneShotAsync<TRequest, TResponse>(string command, TRequest payload,
+            IProgress<(double Progreso, double Velocidad)>? avance, CancellationToken ct)
         {
             Process? proceso = null;
             try
@@ -124,9 +127,15 @@ namespace AnimeLocalTracker.Services.Python
                 // Leer respuesta JSON por stdout y los avisos por stderr A LA VEZ: leyendo uno detrás de otro,
                 // si Python escribía más de lo que cabe en el búfer de stderr ambos procesos se quedaban
                 // esperándose (bloqueo) hasta que vencía el tiempo del comando.
-                var tareaSalida = proceso.StandardOutput.ReadToEndAsync(ct);
                 var tareaError = proceso.StandardError.ReadToEndAsync(ct);
-                string output = await tareaSalida;
+                // Línea a línea: un comando largo va escribiendo su avance antes del resultado, y hay que darlo según llega.
+                var salida = new StringBuilder();
+                while (await proceso.StandardOutput.ReadLineAsync(ct) is { } linea)
+                {
+                    if (avance != null && AvanceDe(linea) is { } paso) avance.Report(paso);
+                    else salida.AppendLine(linea);
+                }
+                string output = salida.ToString();
                 string error = await tareaError;
 
                 await proceso.WaitForExitAsync(ct);
@@ -154,6 +163,26 @@ namespace AnimeLocalTracker.Services.Python
             finally
             {
                 proceso?.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// El avance que trae una línea de la salida de un comando ({"progress": 37.5, "speed": 1048576}: porcentaje y bytes
+        /// por segundo), o null si la línea es otra cosa (el resultado, un aviso suelto).
+        /// </summary>
+        internal static (double Progreso, double Velocidad)? AvanceDe(string linea)
+        {
+            if (!linea.StartsWith("{\"progress\"", StringComparison.Ordinal)) return null;
+            try
+            {
+                using var doc = JsonDocument.Parse(linea);
+                if (!doc.RootElement.TryGetProperty("progress", out var progreso) || !progreso.TryGetDouble(out double porcentaje)) return null;
+                double velocidad = doc.RootElement.TryGetProperty("speed", out var v) && v.TryGetDouble(out double bps) ? bps : 0;
+                return (Math.Clamp(porcentaje, 0, 100), Math.Max(velocidad, 0));
+            }
+            catch (Exception ex) when (ex is JsonException or InvalidOperationException)
+            {
+                return null;
             }
         }
 
