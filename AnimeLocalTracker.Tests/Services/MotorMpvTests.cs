@@ -67,7 +67,7 @@ public class MotorMpvTraduccionesTests
         o["sub-outline-size"].Should().Be(N(3 * 720.0 / 768));
         o["sub-border-style"].Should().Be("outline-and-shadow");
         o["sub-back-color"].Should().Be("#00000000", "sin caja");
-        o["sub-ass-override"].Should().Be("no", "las pistas ASS conservan su estilo");
+        o["sub-ass-override"].Should().Be("scale", "las pistas ASS conservan su estilo, y se pueden subir cuando salen los controles");
         o["sub-ass-style-overrides"].Should().BeEmpty();
     }
 
@@ -514,6 +514,23 @@ public sealed class MotorMpvTests : IClassFixture<VideoDePrueba>
 
         motor.IndicePistaSubtitulosDelMotor.Should().Be(-1);
         await EsperarHasta(() => motor.LeerPropiedad("sub-text").Length == 0);
+    }
+
+    [Fact]
+    public void ColocarSubtitulos_LosSubeYLosDevuelveASuSitio_SinPasarseDeLaMitad()
+    {
+        using var motor = MotorMpv.Crear(Ajustes, sinSalida: true);
+        if (motor == null) return; // sin la biblioteca en esta máquina
+        static double Leida(MotorMpv m) => double.Parse(m.LeerPropiedad("sub-pos"), CultureInfo.InvariantCulture);
+
+        motor.ColocarSubtitulos(88.4);
+        Leida(motor).Should().BeApproximately(88.4, 0.01, "con los controles a la vista");
+
+        motor.ColocarSubtitulos(20);
+        Leida(motor).Should().Be(50, "una ventana diminuta no los manda al techo");
+
+        motor.ColocarSubtitulos(100);
+        Leida(motor).Should().Be(100, "al ocultarse los controles vuelven a su sitio");
     }
 
     [Fact]

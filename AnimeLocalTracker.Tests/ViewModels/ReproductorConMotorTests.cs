@@ -309,16 +309,165 @@ public sealed class ReproductorConMotorTests : IDisposable
         _motor.ProporcionVideo.Should().BeApproximately(1.333, 0.001);
     }
 
+    // ── Etapa 5 de libmpv: el motor nuevo es el predeterminado ──
+
     [Theory]
-    [InlineData("Mpv", true, true)]
-    [InlineData("mpv", true, true)]
-    [InlineData("Mpv", false, false)] // falta la biblioteca: se sigue con el motor clásico
-    [InlineData("Flyleaf", true, false)]
-    [InlineData(null, true, false)]
-    [InlineData("cualquier otra cosa", true, false)]
-    public void ConElAjusteEnMpvPeroSinBiblioteca_SeUsaFlyleaf(string? ajuste, bool mpvDisponible, bool esperado)
+    [InlineData(null, true)]
+    [InlineData("", true)]
+    [InlineData("Mpv", true)]
+    [InlineData("mpv", true)]
+    [InlineData("Nuevo", true)]
+    [InlineData("x", true)]
+    [InlineData("Flyleaf", false)]
+    [InlineData(" flyleaf ", false)]
+    public void ElegirMotor_TodoLoQueNoSeaElClasicoEsElNuevo(string? ajuste, bool esperado)
     {
-        MotorVideo.ElegirMotor(ajuste, mpvDisponible).Should().Be(esperado);
+        MotorVideo.ElegirMotor(ajuste, mpvDisponible: true).Should().Be(esperado);
+        MotoresDeVideo.Normalizar(ajuste).Should().Be(esperado ? MotoresDeVideo.Nuevo : MotoresDeVideo.Clasico);
+    }
+
+    [Fact]
+    public void ElegirMotor_SinBibliotecaOConElLienzoRoto_EsElClasico()
+    {
+        MotorVideo.ElegirMotor("Mpv", mpvDisponible: false).Should().BeFalse("falta la biblioteca: se sigue con el motor clásico");
+
+        MotorVideo.LienzoNoDisponible = true;
+        try { MotorVideo.ElegirMotor("Mpv", mpvDisponible: true).Should().BeFalse("el lienzo ya falló en esta sesión"); }
+        finally { MotorVideo.LienzoNoDisponible = false; }
+    }
+
+    [Fact]
+    public void AppSettings_PorDefectoPideElMotorNuevo()
+    {
+        new AnimeLocalTracker.Models.AppSettings().MotorVideo.Should().Be(MotoresDeVideo.Nuevo);
+    }
+
+    [Fact]
+    public async Task ElMotorSeEligeAlCrearElReproductor_NoAMitadDeEpisodio()
+    {
+        // Cambiar «Motor de video» en Configuración con un episodio abierto (o en el mini reproductor) no toca al que suena.
+        var ajustes = new AnimeLocalTracker.Models.AppSettings();
+        var configuracion = new Mock<ISettingsService>();
+        configuracion.Setup(c => c.ObtenerConfiguracion()).Returns(ajustes);
+        int motoresCreados = 0;
+        using var sut = new ReproductorViewModel(
+            Mock.Of<IDatabaseService>(), Mock.Of<IAnimeTrackingService>(), Mock.Of<IAuthService>(),
+            settingsService: configuracion.Object, playbackStateService: _estado.Object,
+            fabricaMotor: _ => { motoresCreados++; return _motor; });
+        await sut.CargarVideoAsync(_ruta, 101, "Frieren", 5);
+
+        ajustes.MotorVideo = MotoresDeVideo.Clasico;
+        await sut.CargarVideoAsync(_ruta, 101, "Frieren", 6);
+
+        motoresCreados.Should().Be(1);
+        _motor.VecesDesechado.Should().Be(0);
+        _motor.Abiertos.Should().HaveCount(2);
+    }
+
+    // ── Modo de compatibilidad: el motor nuevo no puede pintar y se sigue con el clásico ──
+
+    private (ReproductorViewModel Sut, MotorDePrueba Clasico) CrearSutConMotorNuevo(bool hayClasico = true)
+    {
+        var clasico = new MotorDePrueba { Duracion = TimeSpan.FromSeconds(1420) };
+        var sut = CrearSut(_motor);
+        sut.UsaMotorMpv = true;
+        sut.FabricaMotorClasico = _ => hayClasico ? clasico : null;
+        return (sut, clasico);
+    }
+
+    [Fact]
+    public async Task SiElLienzoFalla_ElEpisodioSeReabreConElMotorClasicoDondeIba()
+    {
+        _estado.Setup(e => e.ObtenerPosicionParaReanudarAsync(101, 5, It.IsAny<string?>())).ReturnsAsync((300d, 1420d));
+        var (sut, clasico) = CrearSutConMotorNuevo();
+        using var _ = sut;
+        try
+        {
+            await sut.CargarVideoAsync(_ruta, 101, "Frieren", 5);
+
+            sut.PasarAlMotorClasico("sin OpenGL");
+
+            _motor.VecesDesechado.Should().Be(1);
+            sut.Motor.Should().BeSameAs(clasico);
+            sut.UsaMotorMpv.Should().BeFalse("la plantilla cambia a la vista clásica");
+            MotorVideo.LienzoNoDisponible.Should().BeTrue("el resto de la sesión ya no lo intenta");
+            clasico.Abiertos.Should().Equal(_ruta);
+            clasico.SilencioPuesto.Should().BeTrue("arranca en silencio, como cualquier apertura");
+
+            clasico.TerminarApertura();
+            clasico.FotogramasMostrados = 3;
+
+            await EsperarHasta(() => !sut.OcultarVideoInicio);
+            clasico.Saltos.Should().ContainSingle().Which.Segundos.Should().Be(300);
+        }
+        finally { MotorVideo.LienzoNoDisponible = false; }
+    }
+
+    [Fact]
+    public async Task SiElLienzoFallaConElEpisodioAMedias_SigueDesdeEsePunto()
+    {
+        var (sut, clasico) = CrearSutConMotorNuevo();
+        using var _ = sut;
+        try
+        {
+            await AbrirYVerLaImagen(sut);
+            _motor.Posicion = TimeSpan.FromSeconds(640);
+            await EsperarHasta(() => Math.Abs(sut.CurrentSeconds - 640) < 1); // la barra sigue al video
+
+            sut.PasarAlMotorClasico("el lienzo dejó de pintar");
+
+            sut.OcultarVideoInicio.Should().BeTrue("se tapa hasta que el clásico muestre su primer fotograma");
+            clasico.TerminarApertura();
+            clasico.FotogramasMostrados = 3;
+            await EsperarHasta(() => !sut.OcultarVideoInicio);
+            clasico.Saltos.Should().ContainSingle().Which.Segundos.Should().Be(640);
+        }
+        finally { MotorVideo.LienzoNoDisponible = false; }
+    }
+
+    [Fact]
+    public async Task ElAvisoDosVeces_SoloCambiaUnaVez()
+    {
+        var (sut, clasico) = CrearSutConMotorNuevo();
+        using var _ = sut;
+        try
+        {
+            await sut.CargarVideoAsync(_ruta, 101, "Frieren", 5);
+
+            sut.PasarAlMotorClasico("sin OpenGL");
+            sut.PasarAlMotorClasico("sin OpenGL");
+
+            clasico.Abiertos.Should().HaveCount(1);
+            clasico.VecesDesechado.Should().Be(0);
+            _motor.VecesDesechado.Should().Be(1);
+        }
+        finally { MotorVideo.LienzoNoDisponible = false; }
+    }
+
+    [Fact]
+    public async Task SiElLienzoFallaYNoHayMotorClasico_AvisaUnaVez()
+    {
+        var dialogos = new Mock<IDialogService>();
+        var sut = new ReproductorViewModel(
+            Mock.Of<IDatabaseService>(), Mock.Of<IAnimeTrackingService>(), Mock.Of<IAuthService>(),
+            playbackStateService: _estado.Object, dialogService: dialogos.Object, fabricaMotor: _ => _motor)
+        {
+            UsaMotorMpv = true,
+            FabricaMotorClasico = _ => null
+        };
+        using var _ = sut;
+        try
+        {
+            await sut.CargarVideoAsync(_ruta, 101, "Frieren", 5);
+
+            sut.PasarAlMotorClasico("sin OpenGL");
+            sut.PasarAlMotorClasico("sin OpenGL");
+
+            sut.Motor.Should().BeNull();
+            sut.OcultarVideoInicio.Should().BeFalse("no se deja la tapa esperando un video que no va a llegar");
+            dialogos.Verify(d => d.MostrarToastReproductor(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Once);
+        }
+        finally { MotorVideo.LienzoNoDisponible = false; }
     }
 
     [Fact]

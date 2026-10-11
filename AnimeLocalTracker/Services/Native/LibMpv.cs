@@ -12,11 +12,16 @@ internal static partial class LibMpv
 {
     private const string Dll = "libmpv-2";
 
+    private static string Ruta => Path.Combine(AppContext.BaseDirectory, "Mpv", "libmpv-2.dll");
+
+    /// <summary>La biblioteca está en la instalación. No la carga: es lo que pregunta Configuración para ofrecer el motor nuevo.</summary>
+    public static bool EnLaInstalacion => File.Exists(Ruta);
+
     private static readonly Lazy<bool> Cargada = new(() =>
     {
         try
         {
-            string ruta = Path.Combine(AppContext.BaseDirectory, "Mpv", "libmpv-2.dll");
+            string ruta = Ruta;
             // Cargada por su ruta completa, las llamadas de abajo la encuentran por su nombre (Windows reutiliza el módulo ya cargado).
             return File.Exists(ruta) && NativeLibrary.TryLoad(ruta, out _);
         }

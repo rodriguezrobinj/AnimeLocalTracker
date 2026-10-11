@@ -448,7 +448,8 @@
                  navegación crea una vista nueva a partir del VM transitorio. -->
             <DataTemplate DataType="{x:Type vm:ReproductorViewModel}">
                 <!-- Dos vistas mientras conviven los dos motores (docs/investigacion-motor-libmpv.md): la clásica (Flyleaf) y la del
-                     motor nuevo, que pinta el video dentro de WPF. El reproductor lo decide al construirse. -->
+                     motor nuevo, que pinta el video dentro de WPF. El reproductor lo decide al construirse y solo lo cambia si el motor
+                     nuevo no puede pintar en este equipo (ReproductorViewModel.PasarAlMotorClasico). -->
                 <ContentControl Content="{Binding}" Focusable="False">
                     <ContentControl.Style>
                         <Style TargetType="ContentControl">

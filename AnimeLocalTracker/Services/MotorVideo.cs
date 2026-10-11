@@ -15,6 +15,16 @@ public static class ModosRendimientoVideo
     public const string Desactivado = "Desactivado";
 }
 
+/// <summary>Valores del ajuste «Motor de video», tal como se guardan en settings.json.</summary>
+public static class MotoresDeVideo
+{
+    public const string Nuevo = "Mpv", Clasico = "Flyleaf";
+
+    /// <summary>Lo que hay escrito en settings.json → uno de los dos valores. Todo lo que no sea el clásico es el nuevo.</summary>
+    public static string Normalizar(string? ajuste) =>
+        string.Equals(ajuste?.Trim(), Clasico, StringComparison.OrdinalIgnoreCase) ? Clasico : Nuevo;
+}
+
 /// <summary>Cómo se resuelven los saltos del reproductor (flechas, ±N s, saltar opening, clic en la barra).</summary>
 public enum EstrategiaSaltos
 {
@@ -192,9 +202,12 @@ public static class MotorVideo
         return ["Anime4K_Clamp_Highlights.glsl", $"Anime4K_Restore_CNN_{variante}.glsl", $"Anime4K_Upscale_CNN_x2_{variante}.glsl"];
     }
 
-    /// <summary>True si toca el motor nuevo: lo pide el ajuste y la biblioteca está en la instalación.</summary>
+    /// <summary>En esta sesión el lienzo OpenGL del motor nuevo no arrancó: se deja de intentar hasta reiniciar la app.</summary>
+    public static bool LienzoNoDisponible { get; internal set; }
+
+    /// <summary>True si toca el motor nuevo: no se pidió el clásico, la biblioteca está en la instalación y el lienzo no ha fallado.</summary>
     public static bool ElegirMotor(string? ajuste, bool mpvDisponible) =>
-        mpvDisponible && string.Equals(ajuste?.Trim(), "Mpv", StringComparison.OrdinalIgnoreCase);
+        mpvDisponible && !LienzoNoDisponible && MotoresDeVideo.Normalizar(ajuste) == MotoresDeVideo.Nuevo;
 
     public static bool EscaladoDisponible(FabricanteGrafica fabricante) => fabricante is FabricanteGrafica.Nvidia or FabricanteGrafica.Intel;
 

@@ -341,6 +341,22 @@ public partial class ConfiguracionViewModel : ObservableObject
         public override string ToString() => Nombre;
     }
 
+    /// <summary>¿Está el motor nuevo en la instalación? Solo mira el archivo, no carga la biblioteca. Las pruebas lo sustituyen.</summary>
+    internal Func<bool> HayMotorNuevo { get; set; } = () => Services.Native.LibMpv.EnLaInstalacion;
+
+    /// <summary>«Motor de video»: <see cref="MotoresDeVideo"/>. Se aplica al abrir el siguiente episodio.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(UsaMotorNuevo))]
+    private string _motorDeVideo = MotoresDeVideo.Nuevo;
+
+    /// <summary>False en una instalación sin libmpv: se muestra el clásico, no se deja elegir y guardar no toca el ajuste.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(UsaMotorNuevo))]
+    private bool _motorNuevoDisponible = true;
+
+    /// <summary>Con el motor nuevo no se elige tarjeta gráfica ni se dibuja el borde de la caja de subtítulos, y el escalado es Anime4K.</summary>
+    public bool UsaMotorNuevo => MotorNuevoDisponible && MotorDeVideo == MotoresDeVideo.Nuevo;
+
     [ObservableProperty] private string _modoSaltosVideo = ModosRendimientoVideo.Automatico;
     [ObservableProperty] private bool _aceleracionHardwareVideo = true;
     [ObservableProperty] private string _tarjetaGraficaVideo = string.Empty;
@@ -498,6 +514,8 @@ public partial class ConfiguracionViewModel : ObservableObject
         MusicaSigueFueraDeLaFicha = config.MusicaSigueFueraDeLaFicha;
         Idioma = config.Idioma == "en" ? "en" : "es";
         VelocidadReproduccionDefecto = config.VelocidadReproduccionDefecto is >= 0.5 and <= 2.0 ? config.VelocidadReproduccionDefecto : 1.0;
+        MotorNuevoDisponible = HayMotorNuevo();
+        MotorDeVideo = MotorNuevoDisponible ? MotoresDeVideo.Normalizar(config.MotorVideo) : MotoresDeVideo.Clasico;
         ModoSaltosVideo = config.ModoSaltosVideo is ModosRendimientoVideo.Exactos or ModosRendimientoVideo.Rapidos ? config.ModoSaltosVideo : ModosRendimientoVideo.Automatico;
         AceleracionHardwareVideo = config.AceleracionHardwareVideo;
         TarjetaGraficaVideo = config.TarjetaGraficaVideo ?? string.Empty;
@@ -719,6 +737,7 @@ public partial class ConfiguracionViewModel : ObservableObject
             config.MusicaSigueFueraDeLaFicha = MusicaSigueFueraDeLaFicha;
             config.Idioma = Idioma == "en" ? "en" : "es";
             config.VelocidadReproduccionDefecto = VelocidadReproduccionDefecto is >= 0.5 and <= 2.0 ? VelocidadReproduccionDefecto : 1.0;
+            if (MotorNuevoDisponible) config.MotorVideo = MotoresDeVideo.Normalizar(MotorDeVideo); // sin libmpv se muestra el clásico, pero no se pisa lo guardado
             config.ModoSaltosVideo = string.IsNullOrEmpty(ModoSaltosVideo) ? ModosRendimientoVideo.Automatico : ModoSaltosVideo;
             config.AceleracionHardwareVideo = AceleracionHardwareVideo;
             config.TarjetaGraficaVideo = string.IsNullOrWhiteSpace(TarjetaGraficaVideo) ? null : TarjetaGraficaVideo;

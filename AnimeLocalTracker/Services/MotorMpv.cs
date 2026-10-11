@@ -114,6 +114,11 @@ public sealed partial class MotorMpv : IMotorVideo
 
     /// <summary>Para la superficie: el motor está a punto de cerrarse y hay que soltar el pintor ANTES (libmpv lo exige).</summary>
     internal event Action? Desechando;
+
+    /// <summary>La superficie no pudo crear el lienzo OpenGL o libmpv no lo aceptó: este motor no va a poder pintar en este equipo.</summary>
+    internal event Action<string>? SinSalida;
+    internal void AvisarSinSalida(string motivo) => SinSalida?.Invoke(motivo);
+
     internal nint Manejador => _mpv;
     internal void ContarFotograma() => Interlocked.Increment(ref _fotogramas);
 
@@ -360,6 +365,20 @@ public sealed partial class MotorMpv : IMotorVideo
 
     public bool DibujaSubtitulosDeTexto => true;
 
+    private double _posicionSubtitulos = 100;
+
+    /// <summary>
+    /// Altura de los subtítulos en % del alto de la imagen (100 = su sitio). La vista los sube mientras los controles están a la
+    /// vista, para que la barra inferior no los tape. Solo se mueven los diálogos de abajo: los carteles con posición propia no.
+    /// </summary>
+    internal void ColocarSubtitulos(double porcentaje)
+    {
+        porcentaje = Math.Clamp(porcentaje, 50, 100);
+        if (Math.Abs(porcentaje - _posicionSubtitulos) < 0.5) return;
+        _posicionSubtitulos = porcentaje;
+        Fijar("sub-pos", porcentaje.ToString("0.#", CultureInfo.InvariantCulture));
+    }
+
     // Medidas de Configuración → medidas de libmpv. En Configuración el tamaño es el cuerpo de la letra en píxeles, tal como lo pinta
     // WPF, y no cambia con la ventana. libmpv mide la celda de la fuente (ascendente + descendente: un 16 % más que el cuerpo en
     // Trebuchet MS, distinto en cada fuente) y lo escala todo con el alto del video, tomando 720 como referencia. Se igualan con el
@@ -411,7 +430,9 @@ public sealed partial class MotorMpv : IMotorVideo
             // El subrayado solo existe como retoque del estilo ASS; sin forzar, subrayaría también los subtítulos con estilo propio.
             ("sub-ass-style-overrides", forzar && e.Subrayado ? "Underline=-1" : ""),
             // "strip" y no "force": con "force" se quedan las cursivas y las posiciones del subtítulo original.
-            ("sub-ass-override", forzar ? "strip" : "no"),
+            // Sin forzar, "scale" (el valor de fábrica de mpv) y no "no": la pista ASS conserva su estilo igual, pero "no" le quita
+            // también la posición (sub-pos) y los diálogos se quedarían detrás de los controles.
+            ("sub-ass-override", forzar ? "strip" : "scale"),
         ];
     }
 

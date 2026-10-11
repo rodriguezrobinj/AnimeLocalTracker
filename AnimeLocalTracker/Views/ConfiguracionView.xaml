@@ -705,6 +705,26 @@
                                     </StackPanel>
                                     <Border Style="{StaticResource CfgDivider}"/>
 
+                                    <!-- Motor de video: con el nuevo (libmpv) sobran «Tarjeta gráfica» y el borde de la caja de subtítulos, y el escalado es Anime4K -->
+                                    <ctl:SettingRow Title="{loc:T Cfg_MotorVideo}">
+                                        <ctl:SettingRow.Style>
+                                            <Style TargetType="ctl:SettingRow" BasedOn="{StaticResource {x:Type ctl:SettingRow}}">
+                                                <Setter Property="Description" Value="{loc:T Cfg_MotorVideoSub}"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding MotorNuevoDisponible}" Value="False">
+                                                        <Setter Property="Description" Value="{loc:T Cfg_MotorVideoSubNoDisponible}"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </ctl:SettingRow.Style>
+                                        <ComboBox SelectedValue="{Binding MotorDeVideo}" SelectedValuePath="Tag" Height="36" MinWidth="230"
+                                                  IsEnabled="{Binding MotorNuevoDisponible}" AutomationProperties.Name="{loc:T Cfg_MotorVideo}">
+                                            <ComboBoxItem Content="{loc:T Cfg_MotorVideo_Nuevo}" Tag="Mpv"/>
+                                            <ComboBoxItem Content="{loc:T Cfg_MotorVideo_Clasico}" Tag="Flyleaf"/>
+                                        </ComboBox>
+                                    </ctl:SettingRow>
+                                    <Border Style="{StaticResource CfgDivider}"/>
+
                                     <ctl:SettingRow Title="{loc:T Cfg_ModoSaltos}"
                                                     Description="{loc:T Cfg_ModoSaltosSub}">
                                         <ComboBox SelectedValue="{Binding ModoSaltosVideo}" SelectedValuePath="Tag" Height="36" MinWidth="230"
@@ -724,15 +744,25 @@
                                     <Border Style="{StaticResource CfgDivider}"/>
 
                                     <ctl:SettingRow Title="{loc:T Cfg_TarjetaGrafica}"
-                                                    Description="{loc:T Cfg_TarjetaGraficaSub}">
+                                                    Description="{loc:T Cfg_TarjetaGraficaSub}"
+                                                    Visibility="{Binding UsaMotorNuevo, Converter={StaticResource InverseBoolToVis}}">
                                         <ComboBox ItemsSource="{Binding TarjetasGraficas}" SelectedValue="{Binding TarjetaGraficaVideo}"
                                                   SelectedValuePath="Valor" DisplayMemberPath="Nombre" Height="36" MinWidth="230" MaxWidth="320"
                                                   AutomationProperties.Name="{loc:T Cfg_TarjetaGrafica}"/>
                                     </ctl:SettingRow>
-                                    <Border Style="{StaticResource CfgDivider}"/>
+                                    <Border Style="{StaticResource CfgDivider}" Visibility="{Binding UsaMotorNuevo, Converter={StaticResource InverseBoolToVis}}"/>
 
-                                    <ctl:SettingRow Title="{loc:T Cfg_EscaladoInteligente}"
-                                                    Description="{loc:T Cfg_EscaladoInteligenteSub}">
+                                    <ctl:SettingRow Title="{loc:T Cfg_EscaladoInteligente}">
+                                        <ctl:SettingRow.Style>
+                                            <Style TargetType="ctl:SettingRow" BasedOn="{StaticResource {x:Type ctl:SettingRow}}">
+                                                <Setter Property="Description" Value="{loc:T Cfg_EscaladoInteligenteSub}"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding UsaMotorNuevo}" Value="True">
+                                                        <Setter Property="Description" Value="{loc:T Cfg_EscaladoInteligenteSubMpv}"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </ctl:SettingRow.Style>
                                         <ComboBox SelectedValue="{Binding EscaladoInteligenteVideo}" SelectedValuePath="Tag" Height="36" MinWidth="230"
                                                   AutomationProperties.Name="{loc:T Cfg_EscaladoInteligente}">
                                             <ComboBoxItem Content="{loc:T Cfg_Opcion_Automatico}" Tag="Automatico"/>
@@ -861,7 +891,8 @@
                                     <Border Style="{StaticResource CfgDivider}"/>
 
                                     <ctl:SettingRow Title="{loc:T Cfg_EstiloBordeGrosor}"
-                                                    Description="{loc:T Cfg_EstiloBordeGrosorSub}">
+                                                    Description="{loc:T Cfg_EstiloBordeGrosorSub}"
+                                                    Visibility="{Binding UsaMotorNuevo, Converter={StaticResource InverseBoolToVis}}">
                                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                             <Slider Style="{StaticResource CfgSlider}" Minimum="0" Maximum="6" TickFrequency="0.5" IsSnapToTickEnabled="True" Width="170"
                                                     Value="{Binding EstiloGrosorBorde}"
@@ -870,15 +901,16 @@
                                                        Foreground="{DynamicResource Brush.AccentSoft}" FontWeight="Bold" FontSize="13" Margin="12,0,0,0" VerticalAlignment="Center" MinWidth="48" TextAlignment="Right"/>
                                         </StackPanel>
                                     </ctl:SettingRow>
-                                    <Border Style="{StaticResource CfgDivider}"/>
+                                    <Border Style="{StaticResource CfgDivider}" Visibility="{Binding UsaMotorNuevo, Converter={StaticResource InverseBoolToVis}}"/>
 
                                     <ctl:SettingRow Title="{loc:T Cfg_EstiloBordeColor}"
-                                                    Description="{loc:T Cfg_EstiloBordeColorSub}">
+                                                    Description="{loc:T Cfg_EstiloBordeColorSub}"
+                                                    Visibility="{Binding UsaMotorNuevo, Converter={StaticResource InverseBoolToVis}}">
                                         <ComboBox ItemsSource="{Binding ColoresSubtitulos}" SelectedValue="{Binding EstiloColorBorde}" SelectedValuePath="Hex"
                                                   ItemTemplate="{StaticResource CfgColorItemTemplate}" Height="36" MinWidth="160"
                                                   AutomationProperties.Name="{loc:T Cfg_EstiloBordeColor}"/>
                                     </ctl:SettingRow>
-                                    <Border Style="{StaticResource CfgDivider}"/>
+                                    <Border Style="{StaticResource CfgDivider}" Visibility="{Binding UsaMotorNuevo, Converter={StaticResource InverseBoolToVis}}"/>
 
                                     <ctl:SettingRow Title="{loc:T Cfg_EstiloRestablecer}"
                                                     Description="{loc:T Cfg_EstiloRestablecerSub}">

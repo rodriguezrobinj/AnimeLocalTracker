@@ -179,9 +179,22 @@ libmpv se arranca siempre con `config=no`, `load-scripts=no`, `ytdl=no`, `input-
 | Saltos | Exactos o a fotograma clave. En Automático, exactos |
 | Aceleración por hardware | Decodificación por la gráfica encendida o apagada |
 | Escalado inteligente | Anime4K (sección 6) |
-| Tarjeta gráfica | Se conserva si libmpv permite elegirla con este modo de pintado; si no, se oculta con el motor nuevo. Se comprueba en la etapa 3 |
+| Tarjeta gráfica | Con este modo de pintado no se elige (la decide el lienzo): la fila se oculta con el motor nuevo (etapa 5) |
+| Motor de video | «Nuevo (libmpv)» o «Clásico (Flyleaf)», desde la etapa 5. Se aplica al abrir el siguiente episodio |
 
-**Modo de compatibilidad.** Si el lienzo OpenGL no arranca (máquina virtual, escritorio remoto, controlador antiguo): mientras exista Flyleaf se usa el motor clásico y se anota en el registro. Para después de la retirada, la candidata es la salida por software de libmpv sobre una imagen de WPF, limitada al tamaño de la ventana. **Sin medir**: se mide en la etapa 5 y, si no basta, la retirada de Flyleaf espera a tener otra salida.
+**Modo de compatibilidad.** Si el lienzo OpenGL no arranca (máquina virtual, escritorio remoto, controlador antiguo): mientras exista Flyleaf se usa el motor clásico y se anota en el registro (hecho en la etapa 5: `ReproductorViewModel.PasarAlMotorClasico`; el episodio se reabre donde iba y el resto de la sesión ya no lo intenta). Para después de la retirada, la candidata es la salida por software de libmpv sobre una imagen de WPF, limitada al tamaño de la ventana.
+
+**Salida por software, medida en la etapa 5 (2026-10-11).** Arnés desechable: la interfaz de pintado por software de libmpv (`MPV_RENDER_API_TYPE_SW`, formato `bgr0`) sobre un `WriteableBitmap` del tamaño de la ventana, pintando en el hilo de la interfaz. Intel HD 620, i5-7300U (4 hilos), ventana de 1366×705, 45 s por caso desde el minuto 2, sin sonido ni subtítulos:
+
+| Caso | Fotogramas por segundo | Perdidos | Pintar cada fotograma | Procesador | Memoria del arnés |
+|---|---|---|---|---|---|
+| H.264 1080p, lienzo OpenGL (decodifica la tarjeta) | 24,0 | 0 | 0,9 ms (peor 2) | 3 % | 231 MB |
+| H.264 1080p, por software (decodifica la tarjeta) | 24,0 | 0 | 3,0 ms (peor 5) | 7 % | 166 MB |
+| H.264 1080p, por software (decodifica el procesador) | 24,0 | 0 | 3,4 ms (peor 5) | 12 % | 152 MB |
+| AV1 1080p 10 bits, lienzo OpenGL (decodifica el procesador) | 24,0 | 0 | 1,4 ms (peor 10) | 12 % | 295 MB |
+| AV1 1080p 10 bits, por software (decodifica el procesador) | 24,0 | 0 | 3,4 ms (peor 10) | 16 % | 224 MB |
+
+La salida por software aguanta el video a su ritmo con un coste pequeño (unos 4 puntos de procesador más y 3 ms por fotograma en el hilo de la interfaz, que no se retrasó más de 11 ms) y gasta menos memoria que el lienzo. **Recomendación para la etapa 6:** retirar Flyleaf con esta salida como modo de compatibilidad, previa comprobación dentro de la app. **Lo que la medida no dice** (y la etapa 4 enseñó que el arnés no basta): cómo va con subtítulos ASS con muchas capas, con los controles encima y en una ventana más grande (1080p o 4K, donde el coste crece con los píxeles), ni en un equipo sin aceleración de verdad (allí WPF también compone por software); además sin OpenGL no hay Anime4K y el reescalado es el básico. Todo eso se mide en la app antes de quitar nada.
 
 ## 6. Anime4K
 
@@ -230,7 +243,7 @@ Durante las etapas 2 a 5 hay dos vistas del reproductor: cualquier cambio en los
 |---|---|
 | Perder comportamientos afinados al mover código a `MotorFlyleaf` (etapa 1) | Pruebas nuevas con el motor de mentira y pasada completa en la app antes de seguir |
 | El mini reproductor al cambiar de ventana | Sin probar: va lo primero de la etapa 3, con alternativa prevista |
-| Equipos donde el lienzo OpenGL no arranque | El interruptor mientras exista Flyleaf; después, el modo de compatibilidad, que hay que medir |
+| Equipos donde el lienzo OpenGL no arranque | Paso automático al motor clásico mientras exista Flyleaf (etapa 5); después, la salida por software, medida en un arnés (sección 5) y pendiente de medir en la app |
 | Diferencias de aspecto en los subtítulos con el estilo del usuario | Ajuste a ojo en la etapa 3 |
 | Fluidez percibida | La juzga el propietario al probar la etapa 2; si no convence, queda el camino A (ventana nativa) |
 | Dos vistas durante la convivencia | No tocar el reproductor por otros motivos hasta la etapa 6 |

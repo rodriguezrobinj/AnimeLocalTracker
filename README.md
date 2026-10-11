@@ -4,7 +4,7 @@
 [![GitHub Release](https://img.shields.io/github/v/release/rodriguezrobinj/AnimeLocalTracker?style=for-the-badge&color=e50914)](https://github.com/rodriguezrobinj/AnimeLocalTracker/releases)
 [![.NET 8](https://img.shields.io/badge/.NET-8.0_WPF-512BD4?style=for-the-badge&logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
 [![AniList API](https://img.shields.io/badge/AniList-GraphQL_Sync-02A9FF?style=for-the-badge&logo=anilist&logoColor=white)](https://anilist.co/)
-[![Flyleaf Video Engine](https://img.shields.io/badge/Engine-Flyleaf_DirectX11-FF6B00?style=for-the-badge&logo=ffmpeg&logoColor=white)](https://github.com/FredTinc/Flyleaf)
+[![mpv Video Engine](https://img.shields.io/badge/Engine-mpv_%2B_Anime4K-FF6B00?style=for-the-badge&logo=mpv&logoColor=white)](https://mpv.io)
 [![Tests Passing](https://img.shields.io/badge/Tests-2921%2F2921_Passing-28a745?style=for-the-badge&logo=githubactions&logoColor=white)](https://github.com/rodriguezrobinj/AnimeLocalTracker)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](LICENSE)
 
@@ -32,8 +32,10 @@ Hemos fusionado la soberanía absoluta de tus archivos locales con la elegancia,
 
 No estamos hablando de un simple reproductor o un catalogador del montón. Estamos hablando de un ecosistema diseñado meticulosamente para respetar tu tiempo y elevar tu experiencia visual al máximo nivel.
 
-### 🎥 1. Reproducción Cinematográfica de Élite (Flyleaf & DirectX 11)
+### 🎥 1. Reproducción Cinematográfica de Élite (mpv & Anime4K)
 El corazón de AnimeLocalTracker no admite titubeos ni concesiones. Olvídate de configuraciones complejas o *lag*. Disfruta de aceleración por hardware pura (soporte HEVC/H.265, AV1, VP9) que garantiza 60, 120 e incluso 144 FPS estables. Los subtítulos se renderizan con precisión milimétrica (silueta gaussiana y sombra de alto contraste) diseñados específicamente para deslumbrar en paneles OLED y monitores 4K. Con modo Picture-in-Picture (PiP) integrado, tú controlas cómo consumes tu contenido.
+
+El motor de video es **mpv** (libmpv): los subtítulos ASS se ven con su estilo original (carteles y karaokes incluidos) y **Anime4K** mejora la nitidez cuando un video de baja resolución se amplía en pantalla. El motor anterior (Flyleaf) sigue disponible en *Configuración → Reproducción → Motor de video → Clásico*, y la app pasa a él por su cuenta en los equipos donde el nuevo no puede pintar (sin OpenGL).
 
 ### ⚡ 2. Binge-Watching Perfecto con AniSkip
 ¿Por qué romper la inmersión buscando el minuto exacto en que termina el *opening*? Nuestro sistema se integra de manera nativa con la API de AniSkip. Salta introducciones, *endings* y escenas post-créditos con un solo clic o, si lo prefieres, de forma 100% automática. Cuando un episodio termina, el siguiente comienza al instante. **Tú solo siéntate y deja que la historia fluya.**

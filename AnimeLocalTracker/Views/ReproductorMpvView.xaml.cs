@@ -51,6 +51,7 @@ namespace AnimeLocalTracker.Views
             this.Unloaded += ReproductorView_Unloaded;
             this.IsVisibleChanged += ReproductorView_IsVisibleChanged;
             this.DataContextChanged += ReproductorView_DataContextChanged;
+            this.SizeChanged += (_, _) => ColocarSubtitulos();
         }
 
         private void ReproductorView_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
@@ -89,7 +90,37 @@ namespace AnimeLocalTracker.Views
         /// </summary>
         private void AlojarSuperficie()
         {
-            if (IsLoaded && _vmSubtitulos?.Motor is MotorMpv { Desechado: false } motor) SuperficieMpv.Para(motor).MoverA(HuecoVideo);
+            // Sin superficie (este equipo no puede crear el lienzo): el motor ya está avisado y el reproductor pasa al clásico.
+            if (IsLoaded && _vmSubtitulos?.Motor is MotorMpv { Desechado: false } motor) SuperficieMpv.Para(motor)?.MoverA(HuecoVideo);
+            ColocarSubtitulos();
+        }
+
+        /// <summary>Lo que los subtítulos ya dejan libre por debajo, en % del alto (el margen de fábrica de libmpv: 22 de 720).</summary>
+        private const double MargenPropioDeLosSubtitulos = 3;
+
+        /// <summary>
+        /// Los subtítulos los dibuja libmpv dentro del video, así que los controles quedan encima. Mientras están a la vista, los
+        /// diálogos suben justo por encima de la barra de progreso; al ocultarse vuelven a su sitio.
+        /// </summary>
+        private void ColocarSubtitulos()
+        {
+            if (!IsLoaded || _vmSubtitulos?.Motor is not MotorMpv { Desechado: false } motor) return;
+
+            double alto = HuecoVideo.ActualHeight, posicion = 100;
+            if (_controlsVisible && alto > 0)
+            {
+                double arriba = alto - 50; // el mini reproductor: su barra inferior mide 50
+                try
+                {
+                    if (ProgressBarArea.IsVisible) arriba = ProgressBarArea.TranslatePoint(new Point(0, 0), HuecoVideo).Y;
+                }
+                catch (InvalidOperationException)
+                {
+                    // Sin ancestro común (aún sin mostrar): se queda la barra del mini
+                }
+                posicion = 100 * arriba / alto + MargenPropioDeLosSubtitulos;
+            }
+            motor.ColocarSubtitulos(posicion);
         }
 
         private void ActualizarTapaVideo() =>
@@ -515,7 +546,10 @@ namespace AnimeLocalTracker.Views
             // ...ni mientras el mouse esté físicamente sobre los controles. En el mini, solo si está sobre un botón o la barra de progreso:
             // sus franjas oscuras de arriba y abajo ocupan buena parte del recuadro y, con el ratón quieto encima, nunca se ocultaban.
             bool esMini = DataContext is ReproductorViewModel { EsModoMini: true };
-            if (esMini ? PunteroSobreUnControl() : OverlayControls != null && OverlayControls.IsMouseOver)
+            // En grande, sobre la franja de arriba, la barra de abajo o el cajón, pero no sobre el video que queda entre ellas: la capa
+            // de controles ocupa toda la vista y es transparente, así que su IsMouseOver es cierto en cualquier punto del reproductor
+            // y, con el ratón quieto encima del video, los controles (y el cursor) no se ocultaban nunca.
+            if (esMini ? PunteroSobreUnControl() : OverlayControls.IsMouseOver && !ReferenceEquals(Mouse.DirectlyOver, OverlayControls))
                 return;
 
             OcultarControles();
@@ -538,6 +572,7 @@ namespace AnimeLocalTracker.Views
         private void MostrarControles()
         {
             _controlsVisible = true;
+            ColocarSubtitulos();
             Mouse.OverrideCursor = null;
 
             var fadeIn = new DoubleAnimation(1.0, TimeSpan.FromMilliseconds(200))
@@ -550,6 +585,7 @@ namespace AnimeLocalTracker.Views
         private void OcultarControles()
         {
             _controlsVisible = false;
+            ColocarSubtitulos();
             // Solo se oculta el cursor si está encima del reproductor: fuera de la app, Windows lo dejaba oculto hasta moverlo.
             if (PunteroSobreElReproductor()) Mouse.OverrideCursor = Cursors.None;
 

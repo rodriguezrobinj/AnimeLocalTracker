@@ -60,10 +60,15 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     /// La lógica del reproductor usa <see cref="Motor"/>.</summary>
     public Player? Player => (Motor as MotorFlyleaf)?.Player;
 
-    private readonly Func<AjustesInicialesMotor, IMotorVideo?> _fabricaMotor;
+    private Func<AjustesInicialesMotor, IMotorVideo?> _fabricaMotor;
 
-    /// <summary>El reproductor usa libmpv: la plantilla de App.xaml elige con esto la vista que pinta el video dentro de WPF.</summary>
-    public bool UsaMotorMpv { get; }
+    /// <summary>Fábrica del motor clásico para el modo de compatibilidad. Las pruebas la sustituyen.</summary>
+    internal Func<AjustesInicialesMotor, IMotorVideo?> FabricaMotorClasico { get; set; } = MotorFlyleaf.Crear;
+
+    private bool _usaMotorMpv;
+    /// <summary>El reproductor usa libmpv: la plantilla de App.xaml elige con esto la vista que pinta el video dentro de WPF.
+    /// Pasa a false si el motor nuevo no puede pintar en este equipo (<see cref="PasarAlMotorClasico"/>).</summary>
+    public bool UsaMotorMpv { get => _usaMotorMpv; internal set => SetProperty(ref _usaMotorMpv, value); }
 
     [ObservableProperty]
     private bool _esModoMini;
@@ -365,11 +370,12 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         else
         {
             string? ajusteMotor = settingsService?.ObtenerConfiguracion()?.MotorVideo;
-            bool pideMpv = string.Equals(ajusteMotor?.Trim(), "Mpv", StringComparison.OrdinalIgnoreCase);
+            bool pideMpv = MotoresDeVideo.Normalizar(ajusteMotor) == MotoresDeVideo.Nuevo && !MotorVideo.LienzoNoDisponible;
             // La biblioteca solo se carga si el ajuste la pide: con el motor clásico ni se toca.
-            UsaMotorMpv = pideMpv && !EsEntornoPruebas() && MotorVideo.ElegirMotor(ajusteMotor, Services.Native.LibMpv.Disponible);
-            if (pideMpv && !UsaMotorMpv) AppLogger.Warn("ReproductorViewModel", "El ajuste pide el motor libmpv pero su biblioteca no está: se usa el motor clásico.");
-            _fabricaMotor = UsaMotorMpv ? ajustes => MotorMpv.Crear(ajustes) : MotorFlyleaf.Crear;
+            _usaMotorMpv = pideMpv && !EsEntornoPruebas() && MotorVideo.ElegirMotor(ajusteMotor, Services.Native.LibMpv.Disponible);
+            if (pideMpv && !_usaMotorMpv && !EsEntornoPruebas())
+                AppLogger.Warn("ReproductorViewModel", "El ajuste pide el motor libmpv pero su biblioteca no está: se usa el motor clásico.");
+            _fabricaMotor = _usaMotorMpv ? CrearMotorNuevo : MotorFlyleaf.Crear;
         }
         _databaseService = databaseService;
         _limpiadorDeEpisodios = limpiadorDeEpisodios;
@@ -554,6 +560,59 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         motor.AperturaTerminada += AlTerminarApertura;
         Motor = motor;
         AplicarEstiloSubtitulosAlMotor();
+    }
+
+    private MotorMpv? CrearMotorNuevo(AjustesInicialesMotor ajustes)
+    {
+        var motor = MotorMpv.Crear(ajustes);
+        if (motor != null) motor.SinSalida += PasarAlMotorClasico;
+        return motor;
+    }
+
+    /// <summary>
+    /// El motor nuevo no puede pintar en este equipo (sin OpenGL: máquina virtual, escritorio remoto, controlador antiguo): el
+    /// episodio se reabre con el clásico donde iba y el resto de la sesión ya no lo intenta. No toca el ajuste guardado.
+    /// </summary>
+    public void PasarAlMotorClasico(string motivo)
+    {
+        if (!UsaMotorMpv) return; // ya se pasó: el aviso puede llegar más de una vez
+        AppLogger.Warn("ReproductorViewModel", $"El motor nuevo no puede pintar en este equipo ({motivo}): se sigue con el motor clásico.");
+        MotorVideo.LienzoNoDisponible = true;
+
+        double segundos = CurrentSeconds;
+        var anterior = Motor;
+        if (anterior != null) anterior.AperturaTerminada -= AlTerminarApertura;
+        Motor = null;
+        try { anterior?.Dispose(); }
+        catch (Exception ex) { AppLogger.Debug("ReproductorViewModel", $"No se pudo cerrar el motor nuevo: {ex.Message}"); }
+
+        _fabricaMotor = FabricaMotorClasico;
+        UsaMotorMpv = false; // la plantilla cambia a la vista clásica
+        AsegurarMotorInicializado();
+        if (Motor == null)
+        {
+            AppLogger.Error("ReproductorViewModel", "Tampoco arrancó el motor clásico: no hay con qué mostrar el video.");
+            OcultarVideoInicio = false;
+            PlayPauseIcon = "Play";
+            AvisarEnReproductor(LocalizationService.T("Player_ErrorAbrirTitulo"), LocalizationService.T("Player_ErrorSinVideo"), "AlertCircleOutline", "#EF4444");
+            return;
+        }
+        if (string.IsNullOrEmpty(_rutaVideo)) return; // aún no había episodio: lo abrirá CargarVideoAsync con el motor clásico
+
+        // Como una apertura normal: tapado y en silencio hasta el primer fotograma, y el salto al punto donde iba lo da el vigilante
+        // de arranque. Con la reanudación aún sin aplicar, CurrentSeconds ya es el punto guardado.
+        if (segundos > _posicionInicioSegundos) _posicionInicioSegundos = segundos;
+        _pistaSubtitulosElegida = false; // las pistas eran del motor que se cerró: se vuelven a evaluar con las del clásico
+        ReiniciarCuesSubtitulos();
+        _haCompletadoOpen = false;
+        _imagenLista = false;
+        _cambiandoPistaAudio = false;
+        _reanudacionPendiente = true;
+        OcultarVideoInicio = true;
+        _ocultarVideoDesdeUtc = DateTime.UtcNow;
+        try { Motor.Silencio = true; } catch { }
+        Motor.Abrir(_rutaVideo);
+        try { Motor.Velocidad = Math.Clamp(_settingsService?.ObtenerConfiguracion()?.VelocidadReproduccionDefecto ?? 1.0, 0.5, 2.0); } catch { }
     }
 
     private void AlTerminarApertura(object? sender, AperturaTerminada e)

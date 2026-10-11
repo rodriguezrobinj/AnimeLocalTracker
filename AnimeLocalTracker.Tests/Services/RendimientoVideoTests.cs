@@ -211,6 +211,70 @@ public class RendimientoVideoTests
             .Should().Be((ModosRendimientoVideo.Exactos, false, (string?)null, ModosRendimientoVideo.Desactivado));
     }
 
+    // === Configuración: motor de video (etapa 5 de libmpv) ===
+
+    private static (ConfiguracionViewModel Vm, AppSettings Config) CrearConfiguracionConMotor(AppSettings config, bool hayMotorNuevo)
+    {
+        var (vm, _) = CrearConfiguracion(config);
+        vm.HayMotorNuevo = () => hayMotorNuevo;
+        vm.CargarDatosConfiguracion();
+        return (vm, config);
+    }
+
+    [Fact]
+    public async Task Configuracion_CargaYGuardaElMotorDeVideo()
+    {
+        var (vm, config) = CrearConfiguracionConMotor(new AppSettings { MotorVideo = "Flyleaf" }, hayMotorNuevo: true);
+        vm.MotorDeVideo.Should().Be(MotoresDeVideo.Clasico);
+        vm.UsaMotorNuevo.Should().BeFalse();
+
+        vm.MotorDeVideo = MotoresDeVideo.Nuevo;
+        await vm.GuardarPreferenciasAsync();
+
+        config.MotorVideo.Should().Be("Mpv");
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("mpv")]
+    [InlineData("cualquier cosa")]
+    public void Configuracion_SinClaveOConUnValorRaro_MuestraElNuevo(string? guardado)
+    {
+        var (vm, _) = CrearConfiguracionConMotor(new AppSettings { MotorVideo = guardado! }, hayMotorNuevo: true);
+
+        vm.MotorDeVideo.Should().Be(MotoresDeVideo.Nuevo);
+        vm.UsaMotorNuevo.Should().BeTrue();
+        new AppSettings().MotorVideo.Should().Be(MotoresDeVideo.Nuevo, "un settings.json sin la clave toma el valor por defecto");
+    }
+
+    [Fact]
+    public async Task SinLibmpv_ConfiguracionMuestraElClasicoYNoLoCambiaAlGuardar()
+    {
+        var (vm, config) = CrearConfiguracionConMotor(new AppSettings { MotorVideo = "Mpv" }, hayMotorNuevo: false);
+
+        vm.MotorNuevoDisponible.Should().BeFalse();
+        vm.MotorDeVideo.Should().Be(MotoresDeVideo.Clasico, "el desplegable no se queda vacío");
+        vm.UsaMotorNuevo.Should().BeFalse();
+
+        await vm.GuardarPreferenciasAsync();
+
+        config.MotorVideo.Should().Be("Mpv", "una instalación incompleta no borra lo que eligió el usuario");
+    }
+
+    [Fact]
+    public void UsaMotorNuevo_AvisaAlCambiarElMotor()
+    {
+        var (vm, _) = CrearConfiguracionConMotor(new AppSettings(), hayMotorNuevo: true);
+        var avisos = new List<string?>();
+        vm.PropertyChanged += (_, e) => avisos.Add(e.PropertyName);
+
+        vm.MotorDeVideo = MotoresDeVideo.Clasico;
+
+        avisos.Should().Contain(nameof(ConfiguracionViewModel.UsaMotorNuevo));
+        vm.UsaMotorNuevo.Should().BeFalse();
+    }
+
     [Fact]
     public void ElDiagnostico_ExplicaComoSeReprodujoElUltimoVideo()
     {
