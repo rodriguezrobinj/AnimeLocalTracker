@@ -552,6 +552,31 @@ public sealed class MotorMpvTests : IClassFixture<VideoDePrueba>
     }
 
     [Fact]
+    public async Task AlCargarOtroArchivo_LoApuntadoDelAnteriorDejaDeValer()
+    {
+        // Visto en la app al pasar solo al episodio siguiente: un aviso de libmpv del archivo que terminó llegaba después de que
+        // Abrir pusiera la posición a cero, y el motor seguía diciendo "30,00 s" con el archivo nuevo ya cargado (y libmpv en 0).
+        // El reproductor mira la posición en cuanto el motor dice que reproduce: si caía en ese instante, daba el episodio nuevo
+        // por visto nada más empezar.
+        if (!AnimeLocalTracker.Services.Native.LibMpv.Disponible) return;
+        var (motor, _) = await CrearYAbrir();
+        using var __ = motor;
+        motor.Saltar(TimeSpan.FromSeconds(5), exacto: true);
+        motor.Reproducir();
+        await EsperarHasta(() => motor.Estado == EstadoMotor.Terminado);
+        double alAvisar = -1;
+        EstadoMotor estadoAlAvisar = default;
+        motor.AperturaTerminada += (_, _) => { estadoAlAvisar = motor.Estado; alAvisar = motor.Posicion.TotalSeconds; };
+
+        motor.Abrir(_video.RutaConTildes);
+        motor.SimularAvisoTardio(TimeSpan.FromSeconds(6), fin: true); // el aviso rezagado del archivo anterior
+        await EsperarHasta(() => alAvisar >= 0);
+
+        alAvisar.Should().BeLessThan(1, "en el aviso de apertura la posición ya es la del archivo nuevo");
+        estadoAlAvisar.Should().NotBe(EstadoMotor.Terminado, "un archivo recién cargado no ha terminado");
+    }
+
+    [Fact]
     public async Task MostrarUnaPistaQueNoEsDeEsteArchivo_NoHaceNada()
     {
         if (!AnimeLocalTracker.Services.Native.LibMpv.Disponible) return;

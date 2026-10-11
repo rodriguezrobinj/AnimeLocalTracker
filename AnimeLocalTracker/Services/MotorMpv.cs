@@ -144,6 +144,13 @@ public sealed partial class MotorMpv : IMotorVideo
 
     internal void PintorSoltado() => _pintorListo = false;
 
+    /// <summary>Solo para pruebas: lo que deja apuntado un aviso de libmpv del archivo anterior que llega tarde (ver el aviso de archivo cargado).</summary>
+    internal void SimularAvisoTardio(TimeSpan posicion, bool fin)
+    {
+        Interlocked.Exchange(ref _posicionTicks, posicion.Ticks);
+        _fin = fin;
+    }
+
     /// <summary>
     /// Un archivo que se queda sin dónde pintar pierde su pista de video ("No render context set" → "Video: no video") y libmpv no
     /// la recupera solo. Pedir "vid=auto" no vale: ya está en "auto" y no hace nada. Hay que nombrar la pista.
@@ -539,6 +546,14 @@ public sealed partial class MotorMpv : IMotorVideo
                         // (el salto de reanudación) vería 0, o la del episodio anterior.
                         if (double.TryParse(Leer("duration"), NumberStyles.Float, CultureInfo.InvariantCulture, out double duracion))
                             Interlocked.Exchange(ref _duracionTicks, TimeSpan.FromSeconds(Math.Max(0, duracion)).Ticks);
+                        // Lo apuntado del archivo anterior deja de valer aquí. Uno de sus avisos puede llegar después de que Abrir lo
+                        // pusiera a cero (visto en la app: 30,00 s apuntados con libmpv ya en 0): el reproductor, que mira la posición
+                        // en cuanto el motor dice que reproduce, daba el episodio nuevo por visto nada más empezar. Los avisos que
+                        // lleguen desde ahora ya son de este archivo.
+                        _fin = false;
+                        Interlocked.Exchange(ref _posicionTicks,
+                            double.TryParse(Leer("time-pos"), NumberStyles.Float, CultureInfo.InvariantCulture, out double posicion)
+                                ? TimeSpan.FromSeconds(Math.Max(0, posicion)).Ticks : 0);
                         _hayArchivo = true;
                         _abriendo = false;
                         ReactivarVideoSiHaceFalta(); // por si el pintor se creó justo entre el fallo de la salida y este aviso
