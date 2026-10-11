@@ -32,13 +32,19 @@ public class AnimeAv1ResolverMemoriaTests
     private static readonly string[] TitulosNaruto = { "Naruto Shippuuden" };
     private static readonly int[] EpisodiosALaVez = { 8, 9, 8, 9, 8 };
 
+    /// <summary>
+    /// Los sitios de mentira de esta clase contestan la misma página HTML a todo, también a la petición de datos (__data.json),
+    /// así que el lector cae cada vez a la página: aquí se cuentan páginas.
+    /// </summary>
+    private static bool EsPeticionDeDatos(HttpRequestMessage request) => request.RequestUri!.AbsolutePath.EndsWith("/__data.json", StringComparison.Ordinal);
+
     private sealed class ContadorHandler : HttpMessageHandler
     {
         public int Peticiones;
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            Interlocked.Increment(ref Peticiones);
+            if (!EsPeticionDeDatos(request)) Interlocked.Increment(ref Peticiones);
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(FixturePagina) });
         }
     }
@@ -137,7 +143,7 @@ public class AnimeAv1ResolverMemoriaTests
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            Interlocked.Increment(ref Peticiones);
+            if (!EsPeticionDeDatos(request)) Interlocked.Increment(ref Peticiones);
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(_html) });
         }
     }

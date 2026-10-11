@@ -14,8 +14,9 @@ namespace AnimeLocalTracker.Services;
 public readonly record struct PrecuelaAnime(int? MalId, int Episodios, IReadOnlyList<string>? Titulos = null);
 
 /// <summary>
-/// INT-01: contrato tipado del scraping de animeav1.com — todo el parseo de HTML vive
-/// aquí, aislado de la red, para poder testearse con fixtures reales.
+/// INT-01: contrato tipado del scraping de animeav1.com — todo el parseo vive
+/// aquí, aislado de la red, para poder testearse con fixtures reales. Cada lectura acepta la respuesta de datos del sitio
+/// (JSON, ver AnimeAv1DatosJson.cs) o, de respaldo, el HTML de la página.
 /// </summary>
 public static partial class AnimeAv1HtmlParser
 {
@@ -30,13 +31,15 @@ public static partial class AnimeAv1HtmlParser
     /// Cada pista se extrae por separado para poder etiquetar el idioma de cada servidor.
     /// Solo se devuelven URLs https; el filtrado por host permitido lo hace UrlSeguridad.
     /// </summary>
-    public static List<EmbedServidor> ExtraerEmbeds(string html) => ExtraerBloque(html, "embeds:{");
+    public static List<EmbedServidor> ExtraerEmbeds(string html) =>
+        LeerDatos(html, out var datos) ? ServidoresDe(Campo(datos, "embeds")) : ExtraerBloque(html, "embeds:{");
 
     /// <summary>
     /// Bloque <c>downloads:{SUB:[{server,url},...],DUB:[...]}</c> de la misma página: enlaces de DESCARGA (TransferIt, Mega,
     /// 1Fichier, MP4Upload) que la app no leía. Mismo formato que <see cref="ExtraerEmbeds"/>.
     /// </summary>
-    public static List<EmbedServidor> ExtraerDescargas(string html) => ExtraerBloque(html, "downloads:{");
+    public static List<EmbedServidor> ExtraerDescargas(string html) =>
+        LeerDatos(html, out var datos) ? ServidoresDe(Campo(datos, "downloads")) : ExtraerBloque(html, "downloads:{");
 
     private static List<EmbedServidor> ExtraerBloque(string html, string claveBloque)
     {
@@ -142,6 +145,7 @@ public static partial class AnimeAv1HtmlParser
     public static int? ExtraerMalIdDelMedia(string html)
     {
         if (string.IsNullOrWhiteSpace(html)) return null;
+        if (LeerDatos(html, out var datos)) return Entero(Campo(Campo(datos, "media"), "malId"));
 
         int inicio = html.IndexOf("votes:", StringComparison.Ordinal);
         string seccion = inicio >= 0 ? html[inicio..] : html;
@@ -159,6 +163,7 @@ public static partial class AnimeAv1HtmlParser
     {
         var lista = new List<(int, int)>();
         if (string.IsNullOrWhiteSpace(html)) return lista;
+        if (LeerDatos(html, out var datos)) return datos == null ? lista : EpisodiosDe(datos);
 
         int inicio = html.IndexOf("episodes:[", StringComparison.Ordinal);
         if (inicio < 0) return lista;
@@ -185,6 +190,7 @@ public static partial class AnimeAv1HtmlParser
     public static TitulosMedia? ExtraerTitulosDelMedia(string html)
     {
         if (string.IsNullOrWhiteSpace(html)) return null;
+        if (LeerDatos(html, out var datos)) return datos == null ? null : TitulosDe(datos);
 
         var m = TituloMediaRegex().Match(html);
         if (!m.Success) return null;
@@ -210,6 +216,7 @@ public static partial class AnimeAv1HtmlParser
     {
         var lista = new List<(string, string)>();
         if (string.IsNullOrWhiteSpace(html)) return lista;
+        if (LeerDatos(html, out var datos)) return datos == null ? lista : RelationsDe(datos);
 
         foreach (Match m in RelationMediaRegex().Matches(html))
         {
@@ -237,6 +244,7 @@ public static partial class AnimeAv1HtmlParser
     {
         var lista = new List<ResultadoCatalogo>();
         if (string.IsNullOrWhiteSpace(html)) return lista;
+        if (LeerDatos(html, out var datos)) return datos == null ? lista : ResultadosDe(datos);
         var vistos = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         int inicio = html.IndexOf("results:[", StringComparison.Ordinal);
@@ -877,7 +885,7 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
             await limite.WaitAsync(ct);
             dentro = true;
 
-            var html = await ObtenerHtmlAsync($"https://animeav1.com/catalogo?search={Uri.EscapeDataString(termino)}", ct);
+            var html = await ObtenerPaginaDelSitioAsync($"https://animeav1.com/catalogo?search={Uri.EscapeDataString(termino)}", ct);
             return html == null ? [] : AnimeAv1HtmlParser.ExtraerResultadosCatalogo(html);
         }
         catch (Exception ex)
@@ -889,6 +897,21 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
         {
             if (dentro) limite.Release();
         }
+    }
+
+    /// <summary>
+    /// Lo que publica una página de animeav1.com: su respuesta de datos (JSON) y, solo si el sitio no la da, el HTML de la
+    /// página; las lecturas de <see cref="AnimeAv1HtmlParser"/> entienden las dos. Null si la página no existe o no se pudo pedir.
+    /// </summary>
+    private async Task<string?> ObtenerPaginaDelSitioAsync(string url, CancellationToken ct)
+    {
+        var datos = await ObtenerHtmlAsync(AnimeAv1HtmlParser.UrlDeDatos(url), ct);
+        return AnimeAv1HtmlParser.ClasificarDatos(datos) switch
+        {
+            AnimeAv1HtmlParser.RespuestaDeDatos.ConDatos => datos,
+            AnimeAv1HtmlParser.RespuestaDeDatos.PaginaInexistente => null,
+            _ => await ObtenerHtmlAsync(url, ct)
+        };
     }
 
     /// <summary>
@@ -1021,7 +1044,7 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
     // "(2021)" / "(2021" (el año que AniList añade a algunos títulos no está en los del sitio)
     [GeneratedRegex(@"\(\s*\d{4}\s*\)?")]
     private static partial Regex AnioEntreParentesisRegex();
-    /// <summary>Info del media del sitio (malId, títulos, episodios reales, HTML crudo para relations).</summary>
+    /// <summary>Info del media del sitio (malId, títulos, episodios reales y la respuesta cruda, datos o HTML, para relations).</summary>
     public sealed record InfoMedia(string Slug, int? MalId, string? Titulo, List<string> Alternativos, List<(int Id, int Numero)> Episodios, string Html);
 
     /// <summary>Descarga la página del media y parsea su información.</summary>
@@ -1030,7 +1053,7 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
         string mediaUrl = $"https://animeav1.com/media/{slug}";
         if (!EsDominioPermitido(mediaUrl, "animeav1.com")) return null;
 
-        var html = await ObtenerHtmlAsync(mediaUrl, ct);
+        var html = await ObtenerPaginaDelSitioAsync(mediaUrl, ct);
         if (html == null) return null;
 
         var titulos = AnimeAv1HtmlParser.ExtraerTitulosDelMedia(html);
@@ -1139,7 +1162,7 @@ public partial class AnimeAv1VideoSourceResolver : IVideoSourceResolver
     {
         if (!EsDominioPermitido(pageUrl, "animeav1.com")) return [];
 
-        var html = await ObtenerHtmlAsync(pageUrl, cancellationToken);
+        var html = await ObtenerPaginaDelSitioAsync(pageUrl, cancellationToken);
         if (html == null) return [];
 
         // Anti-confusión: si la página declara un malId distinto del esperado,
