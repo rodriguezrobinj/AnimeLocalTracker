@@ -152,7 +152,8 @@ public sealed class MotorMpvTests : IClassFixture<VideoDePrueba>
         motor.Posicion.Should().Be(TimeSpan.Zero);
 
         motor.PintorCreado();
-        await EsperarHasta(() => avisos.Count == 1);
+        // Al menos uno: en una máquina sin tarjeta de sonido (el CI) al aviso de "cargado" le sigue enseguida el de "nada que reproducir".
+        await EsperarHasta(() => { lock (avisos) return avisos.Count >= 1; });
     }
 
     [Fact]
