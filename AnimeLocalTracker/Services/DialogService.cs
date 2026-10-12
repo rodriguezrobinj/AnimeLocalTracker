@@ -90,7 +90,28 @@ public partial class DialogService : ObservableObject, IDialogService
         MostrarToastInterno(titulo, mensaje, icono, color, delReproductor);
     }
 
+    /// <summary>Cuánto dura un aviso en pantalla. Las pruebas lo acortan.</summary>
+    internal TimeSpan DuracionToast { get; set; } = TimeSpan.FromMilliseconds(3500);
+
+    // Solo hay un hueco de aviso. Cada aviso que lo ocupa lleva su número: el temporizador de uno anterior ya no manda.
+    private int _versionToast;
+    // ponytail: un solo aviso de fuera en espera (el último). Si llegan varios mientras se ve uno del reproductor, los anteriores
+    // se pierden, como se perdían antes al pisarse; hace falta una cola si eso llega a notarse.
+    private (string Titulo, string Mensaje, string Icono, string Color)? _toastEnEspera;
+
     private void MostrarToastInterno(string titulo, string mensaje, string icono, string color, bool delReproductor)
+    {
+        // Un aviso de fuera (una descarga que termina, un episodio nuevo en emisión) no le quita el sitio al del reproductor que se
+        // está viendo: antes lo cortaba al instante, y durante un episodio ni siquiera se veía qué lo había cortado. Espera su turno.
+        if (ToastVisible && ToastDelReproductor && !delReproductor)
+        {
+            _toastEnEspera = (titulo, mensaje, icono, color);
+            return;
+        }
+        OcuparElHueco(titulo, mensaje, icono, color, delReproductor);
+    }
+
+    private void OcuparElHueco(string titulo, string mensaje, string icono, string color, bool delReproductor)
     {
         ToastDelReproductor = delReproductor;
         ToastTitulo = titulo;
@@ -98,20 +119,36 @@ public partial class DialogService : ObservableObject, IDialogService
         ToastIcono = icono;
         ToastColor = color;
         ToastVisible = true;
-        
+
         // Ocultar automáticamente
-        _ = Task.Run(async () => 
+        int version = ++_versionToast;
+        _ = Task.Run(async () =>
         {
             try
             {
-                await Task.Delay(3500);
-                System.Windows.Application.Current?.Dispatcher?.Invoke(() => ToastVisible = false);
+                await Task.Delay(DuracionToast);
+                Core.HiloUi.Ejecutar(() => AlCaducarElToast(version));
             }
             catch (Exception ex)
             {
                 AppLogger.Debug("DialogService", $"Error al ocultar toast: {ex.Message}");
             }
         });
+    }
+
+    private void AlCaducarElToast(int version)
+    {
+        // Mientras tanto llegó otro aviso: este temporizador era del anterior. Sin esto, un aviso que llegaba a los 3 s de otro
+        // solo se veía medio segundo.
+        if (version != _versionToast) return;
+
+        if (_toastEnEspera is { } enEspera)
+        {
+            _toastEnEspera = null;
+            OcuparElHueco(enEspera.Titulo, enEspera.Mensaje, enEspera.Icono, enEspera.Color, delReproductor: false);
+            return;
+        }
+        ToastVisible = false;
     }
 
     [RelayCommand]

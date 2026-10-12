@@ -84,7 +84,8 @@ public class ReproductorToastTests
             dialogo.MostrarToast("Descarga completada", "Frieren - Episodio 6", "Download", "#4CAF50");
 
             ((TextBlock)vista.FindName("ToastRepTitulo")).Text.Should().Be("Auto-Tracking", "el texto de fuera no llega a la vista del reproductor");
-            ((Border)vista.FindName("ToastReproductor")).Opacity.Should().Be(0, "y el aviso del reproductor se retira en vez de quedarse con otro texto");
+            dialogo.ToastVisible.Should().BeTrue();
+            dialogo.ToastDelReproductor.Should().BeTrue("y el aviso del reproductor sigue en pantalla: el de fuera espera su turno");
         });
     }
 
@@ -103,8 +104,9 @@ public class ReproductorToastTests
             dialogo.ToastDelReproductor.Should().BeTrue();
             ((TextBlock)vista.FindName("ToastRepTitulo")).Text.Should().Be("¡Logro desbloqueado!");
 
-            dialogo.MostrarToast("Descarga completada", "Frieren - Episodio 6", "Download", "#4CAF50");
-            dialogo.ToastDelReproductor.Should().BeFalse("fuera del ámbito, el aviso vuelve a ser de la app");
+            var otro = new DialogService(); // en este aún se ve el del logro, y el de fuera esperaría su turno
+            otro.MostrarToast("Descarga completada", "Frieren - Episodio 6", "Download", "#4CAF50");
+            otro.ToastDelReproductor.Should().BeFalse("fuera del ámbito, el aviso vuelve a ser de la app");
         });
     }
 
