@@ -168,7 +168,7 @@ No arregla ninguna maraña; abre una puerta. Un servidor mínimo dentro de la ap
 ## 7. Hallazgos de paso
 
 - El `AnimeTrackerTools.exe` **local** lleva `curl_cffi 0.10.0`, mientras `requirements.txt` fija `0.16.3` (subido por PYSEC-2026-2431). Se construyó con el Python del sistema, no con el entorno bloqueado. Los builds de release instalan con `--require-hashes`, así que el paquete publicado no debería estar afectado; no lo comprobé sobre un instalador.
-- `pydantic` está en las dependencias y ningún archivo de `tools/python` lo importa. `playwright` sigue en `pyproject.toml` y solo lo usa `browser_stream_extractor.py`.
+- `pydantic` estaba en las dependencias y ningún archivo de `tools/python` lo importaba (retirado el 2026-10-11). `playwright` sigue en `pyproject.toml` y solo lo usa `browser_stream_extractor.py`.
 - `CLAUDE.md` y los comentarios de `spritesheet.rs` describen el núcleo Rust con capacidades que no tiene ("fingerprint perceptual", "<20 ms").
 
 ## 8. Qué no se verificó

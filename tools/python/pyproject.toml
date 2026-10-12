@@ -5,8 +5,7 @@ description = "Motor de automatizacion, extraccion de streams y benchmarks para 
 requires-python = ">=3.10"
 dependencies = [
     "yt-dlp==2026.8.19",
-    "playwright>=1.45.0",
-    "pydantic>=2.7.0"
+    "playwright>=1.45.0"
 ]
 
 [build-system]
