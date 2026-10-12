@@ -1,10 +1,13 @@
 # Dependencias EXTRA del daemon Python, además de las de pyproject.toml (que es la fuente de las versiones directas).
 # Se compilan juntas a requirements.txt (con hashes SHA-256) con:
 #   py -3.11 -m pip install pip-tools
-#   py -3.11 -m piptools compile --pre --allow-unsafe --generate-hashes --strip-extras -o requirements.txt pyproject.toml requirements.in
+#   py -3.11 -m piptools compile --allow-unsafe --generate-hashes --strip-extras -o requirements.txt pyproject.toml requirements.in
 #   (revisar después que ningún paquete quede en versión rc/beta: grep -E "==.*(rc|a|b)[0-9]" requirements.txt)
-#   --pre se puso por anitopy (solo existía como pre-lanzamiento), retirado el 2026-10-08 con sus comandos de parseo: el
-#   lock se dejó igual quitando su bloque a mano. Al regenerarlo, probar sin --pre; los topes de abajo siguen valiendo con él.
+#   Sin --upgrade solo cambia lo que cambie aquí o en pyproject.toml: el resto conserva la versión del lock anterior.
+#   Ya no lleva --pre (se puso por anitopy, retirado el 2026-10-08): el lock se regeneró sin él el 2026-10-11. Los topes de
+#   abajo se pusieron cuando con --pre el resolvedor elegía betas; se conservan como versiones probadas.
+#   Ojo con Dependabot: regenera el lock solo desde este archivo, sin pyproject.toml, y borra yt-dlp, playwright y otros
+#   (PR #18, CI en rojo). Sus PR de este directorio se cierran y la subida se hace a mano con el comando de arriba.
 # El lock se instala con:  python -m pip install --require-hashes -r tools/python/requirements.txt
 #                          python -m pip install --no-deps -e tools/python
 
@@ -16,6 +19,6 @@ curl_cffi==0.16.3
 # Empaquetado del daemon (.exe).
 pyinstaller>=6.22,<7
 
-# El lock se compila con --pre: sin este tope el resolvedor eligió un BETA de pydantic (2.14.0b2).
-# Se fija a la versión estable con la que se probó el daemon.
-pydantic==2.13.4
+# Se fija a la versión estable con la que se probó el daemon (el tope nació cuando, con --pre, el resolvedor eligió el
+# beta 2.14.0b2).
+pydantic==2.14.0
