@@ -223,7 +223,7 @@ public sealed class VideoDePrueba : IDisposable
 /// <summary>libmpv de verdad, sin ventana ni sonido. Si la biblioteca no está descargada (tools\Get-Libmpv.ps1), las pruebas no hacen nada.</summary>
 public sealed class MotorMpvTests : IClassFixture<VideoDePrueba>
 {
-    private static readonly AjustesInicialesMotor Ajustes = new(false, null, []);
+    private static readonly AjustesInicialesMotor Ajustes = new(false, []);
     private readonly VideoDePrueba _video;
 
     public MotorMpvTests(VideoDePrueba video) => _video = video;
@@ -492,7 +492,6 @@ public sealed class MotorMpvTests : IClassFixture<VideoDePrueba>
         var (motor, avisos) = await CrearYAbrir();
         using var _ = motor;
         var pista = motor.PistasSubtitulos.Single();
-        motor.DibujaSubtitulosDeTexto.Should().BeTrue();
 
         motor.AplicarEstiloSubtitulos(new EstiloSubtitulos { Tamano = 60, ColorTexto = "#FFE14D" }, tambienEnAss: false);
         motor.MostrarSubtitulosDelMotor(pista);
@@ -654,7 +653,7 @@ public sealed class MotorMpvTests : IClassFixture<VideoDePrueba>
     {
         if (!AnimeLocalTracker.Services.Native.LibMpv.Disponible) return;
         var iniciales = EcualizadorAudio.ConstruirFiltros(true, Ganancias(banda0: 3), false, ModoNoche);
-        using var motor = MotorMpv.Crear(new AjustesInicialesMotor(false, null, iniciales), sinSalida: true)!;
+        using var motor = MotorMpv.Crear(new AjustesInicialesMotor(false, iniciales), sinSalida: true)!;
 
         motor.LeerPropiedad("af").Should().Contain("equalizer@eq_b0");
 
@@ -715,7 +714,6 @@ public sealed class MotorMpvTests : IClassFixture<VideoDePrueba>
         if (!AnimeLocalTracker.Services.Native.LibMpv.Disponible) return;
         var (motor, _) = Crear();
         using var __ = motor;
-        motor.ClaseDeEscalado.Should().Be(ClaseEscalado.PorSombreadores);
         motor.EscaladoInteligente.Should().BeFalse();
 
         motor.EscaladoInteligente = true;

@@ -385,7 +385,7 @@ public class UpdateService : IUpdateService
         {
             Version = ObtenerVersionActual(),
             Titulo = "AnimeLocalTracker",
-            NotasVersion = "• Gestor y reproductor nativo multimedia para colecciones de anime locales.\n• Auto-tracking local y sincronización bidireccional con AniList.\n• Motor multimedia acelerado por hardware con Flyleaf y DirectX.\n• Sistema de actualizaciones automáticas integrado con GitHub Releases."
+            NotasVersion = "• Gestor y reproductor nativo multimedia para colecciones de anime locales.\n• Auto-tracking local y sincronización bidireccional con AniList.\n• Motor multimedia acelerado por hardware con mpv.\n• Sistema de actualizaciones automáticas integrado con GitHub Releases."
         };
     }
 }

@@ -7,8 +7,8 @@
     <!-- MINI REPRODUCTOR: ventana propia, siempre encima y SIN dueño, para que siga a la vista aunque la ventana principal se
          minimice y para que la app quede libre para navegar mientras tanto. Dentro va la misma ReproductorView (su plantilla
          de App.xaml), que en EsModoMini muestra sus controles compactos. El video ocupa la ventana entera (sin marco) y la
-         ventana conserva la proporción del video, así no quedan franjas negras. Los bordes siguen sirviendo para cambiar el
-         tamaño aunque el video (otra ventana nativa de Flyleaf) los cubra: ver ReproductorView.BordeMiniHook. -->
+         ventana conserva la proporción del video, así no quedan franjas negras. Los bordes sirven para cambiar el tamaño
+         (WindowChrome): el video es WPF y no los tapa. -->
     <WindowChrome.WindowChrome>
         <WindowChrome CaptionHeight="0" ResizeBorderThickness="6" GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False"/>
     </WindowChrome.WindowChrome>

@@ -5,7 +5,7 @@ namespace AnimeLocalTracker.Services;
 
 /// <summary>
 /// Reproductor de una pista de audio local con posición, duración y volumen (para la barra de la sección de música de la
-/// ficha). Es independiente del reproductor de video (Flyleaf) y del de clips de los minijuegos. Se usa siempre desde el
+/// ficha). Es independiente del reproductor de video (libmpv) y del de clips de los minijuegos. Se usa siempre desde el
 /// hilo de UI. Abstraído para poder probar la lógica de la ficha sin sonido real.
 /// </summary>
 public interface IAudioTrackPlayer : IDisposable

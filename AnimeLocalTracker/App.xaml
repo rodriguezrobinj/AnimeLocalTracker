@@ -444,32 +444,10 @@
             <DataTemplate DataType="{x:Type vm:ActualizacionesViewModel}">
                 <views:ActualizacionesView />
             </DataTemplate>
-            <!-- El reproductor NUNCA se reutiliza (swapchain Direct3D nativa): cada
-                 navegación crea una vista nueva a partir del VM transitorio. -->
+            <!-- El reproductor no se reutiliza: cada navegación crea una vista nueva a partir del ViewModel transitorio. La
+                 superficie de video es del motor y pasa de una vista a otra (Controls/SuperficieMpv). -->
             <DataTemplate DataType="{x:Type vm:ReproductorViewModel}">
-                <!-- Dos vistas mientras conviven los dos motores (docs/investigacion-motor-libmpv.md): la clásica (Flyleaf) y la del
-                     motor nuevo, que pinta el video dentro de WPF. El reproductor lo decide al construirse y solo lo cambia si el motor
-                     nuevo no puede pintar en este equipo (ReproductorViewModel.PasarAlMotorClasico). -->
-                <ContentControl Content="{Binding}" Focusable="False">
-                    <ContentControl.Style>
-                        <Style TargetType="ContentControl">
-                            <Setter Property="ContentTemplate">
-                                <Setter.Value>
-                                    <DataTemplate><views:ReproductorView/></DataTemplate>
-                                </Setter.Value>
-                            </Setter>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding UsaMotorMpv}" Value="True">
-                                    <Setter Property="ContentTemplate">
-                                        <Setter.Value>
-                                            <DataTemplate><views:ReproductorMpvView/></DataTemplate>
-                                        </Setter.Value>
-                                    </Setter>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </ContentControl.Style>
-                </ContentControl>
+                <views:ReproductorMpvView/>
             </DataTemplate>
         </ResourceDictionary>
     </Application.Resources>

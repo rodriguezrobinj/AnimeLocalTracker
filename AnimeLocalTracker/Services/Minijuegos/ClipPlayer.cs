@@ -6,7 +6,7 @@ namespace AnimeLocalTracker.Services.Minijuegos;
 
 /// <summary>
 /// Reproduce un trozo de un mp3 local. Es un <see cref="MediaPlayer"/> propio, independiente del reproductor de video
-/// (Flyleaf) y de la vista previa de la ficha, para no interferir con ellos. Se usa siempre desde el hilo de UI.
+/// (libmpv) y de la vista previa de la ficha, para no interferir con ellos. Se usa siempre desde el hilo de UI.
 /// </summary>
 public interface IClipPlayer
 {

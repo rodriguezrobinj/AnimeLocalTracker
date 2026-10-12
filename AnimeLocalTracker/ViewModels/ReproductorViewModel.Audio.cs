@@ -16,7 +16,7 @@ using AnimeLocalTracker.Services.Logros;
 
 namespace AnimeLocalTracker.ViewModels;
 
-/// <summary>Audio del reproductor: Modo Noche y ecualizador de 10 bandas (filtros de FFmpeg sobre el Player).</summary>
+/// <summary>Audio del reproductor: Modo Noche y ecualizador de 10 bandas (filtros de FFmpeg sobre el motor de video).</summary>
 public partial class ReproductorViewModel
 {
     /// <summary>Carga en curso de los ajustes de sonido propios del anime o del capítulo abierto (las pruebas la esperan).</summary>
@@ -161,7 +161,7 @@ public partial class ReproductorViewModel
 
     partial void OnEcualizadorActivoChanged(bool value)
     {
-        if (_cargandoAudio) return; // quien carga monta los filtros al final (o aún no hay Player y los monta CreateOptimizedPlayer)
+        if (_cargandoAudio) return; // quien carga monta los filtros al final (o aún no hay motor y se le dan al crearlo)
         AplicarFiltrosAudio();
         GuardarAudioEnDiferido();
     }
@@ -188,7 +188,7 @@ public partial class ReproductorViewModel
         if (!EcualizadorActivo || Motor == null) return;
         try
         {
-            // El cambio en vivo solo toca el filtro que está sonando. La lista de la configuración es la que Flyleaf usa para
+            // El cambio en vivo solo toca el filtro que está sonando. La lista de la configuración es la que el motor usa para
             // montar la cadena al abrir el siguiente episodio: sin ponerla al día, ahí volvían las ganancias anteriores.
             Motor.RecordarFiltrosAudio(ConstruirFiltrosAudio());
             bool r1 = Motor.CambiarFiltroEnVivo(Core.EcualizadorAudio.IdBanda(banda.Indice), "g", Core.EcualizadorAudio.TextoGanancia(banda.Ganancia));

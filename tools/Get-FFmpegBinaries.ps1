@@ -4,18 +4,16 @@
     ffmpeg.exe, ffprobe.exe y las DLLs de las que dependen.
 
 .DESCRIPTION
-    Las DLLs de FFmpeg (avcodec-63.dll, avformat-63.dll...) las usa el reproductor (Flyleaf, FFmpegPath=":FFmpeg") y,
-    desde que los ejecutables son "shared", también ffmpeg.exe/ffprobe.exe (núcleo Rust: miniaturas; daemon Python:
-    yt-dlp, escenas, metadatos; VideoIntegrityService). OJO: el paquete NuGet Flyleaf.FFmpeg NO trae esas DLLs (solo
-    un ensamblado .NET de 0,5 MB); la carpeta AnimeLocalTracker\FFmpeg\ está en .gitignore y, en un equipo de
-    desarrollo, las DLLs las coloca el desarrollador a mano. Este script cubre el resto de casos (checkout limpio,
-    CI de GitHub) para que ffmpeg.exe/ffprobe.exe nunca queden sin sus DLLs.
+    Las DLLs de FFmpeg (avcodec-63.dll, avformat-63.dll...) solo las usan ffmpeg.exe y ffprobe.exe, que son "shared"
+    (núcleo Rust: miniaturas; daemon Python: yt-dlp, escenas, metadatos; VideoIntegrityService). El reproductor ya no
+    las toca: desde la retirada de Flyleaf usa libmpv, que trae sus propios códecs (tools\Get-Libmpv.ps1). La carpeta
+    AnimeLocalTracker\FFmpeg\ está en .gitignore; este script la rellena (checkout limpio, CI de GitHub) para que
+    ffmpeg.exe/ffprobe.exe nunca queden sin sus DLLs.
 
     Comportamiento:
       * ffmpeg.exe y ffprobe.exe: se instalan siempre que no sean ya los "shared" (~0,6 MB y ~0,2 MB; los estáticos
         antiguos pesaban ~98 MB cada uno con otra copia completa de los códecs -> ~70 MB menos de instalador).
-      * DLLs: se instalan SOLO si faltan. Nunca se sobrescriben las que ya haya (p. ej. las del reproductor en un PC
-        de desarrollo); con -Forzar sí se reemplazan.
+      * DLLs: se instalan SOLO si faltan. Nunca se sobrescriben las que ya haya; con -Forzar sí se reemplazan.
 
     REGLA DE COMPATIBILIDAD: los exe y las DLLs deben compartir la versión MAYOR de cada biblioteca (avcodec-63,
     avformat-63, avutil-61...). La versión de FFmpeg está FIJADA aquí (antes se bajaba "la última release" sin control)

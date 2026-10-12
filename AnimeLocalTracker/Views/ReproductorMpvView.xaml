@@ -306,15 +306,13 @@
     </UserControl.Resources>
 
     <Grid>
-        <!-- Reproductor NATIVO Flyleaf -->
-        <!-- El video lo pinta libmpv en la superficie; los controles van encima como WPF normal (sin la segunda ventana de Flyleaf). -->
+        <!-- El video lo pinta libmpv en la superficie; los controles van encima como WPF normal. -->
         <Grid x:Name="HostVideo">
             <Grid>
                 <!-- El video. La superficie es una por motor y la trae el code-behind (AlojarSuperficie): al pasar al mini reproductor
                      se mueve a la vista de esa ventana en vez de crearse otra, y así el video no se corta. Los subtítulos los dibuja
                      libmpv dentro del propio video (también los de texto plano, con el estilo de Configuración). -->
                 <Border x:Name="HuecoVideo"/>
-                <!-- Bindings vía ElementName: FlyleafHost sobrescribe el DataContext de su contenido -->
 
 
                 <!-- Tapa el video mientras abre y, al reanudar, hasta que el salto al punto guardado se asienta: sin ella se veía
@@ -1199,8 +1197,7 @@
                 <!-- AVISO (toast) DEL REPRODUCTOR. Va en la raíz del contenido del host y NO dentro de
                      OverlayControls: esos controles se desvanecen tras unos segundos sin actividad, y avisos
                      como "Continuando desde 09:36" salen justo cuando ya están ocultos. Sus textos los
-                     actualiza el code-behind (ReproductorView.xaml.cs), no un Binding: en la raíz del
-                     contenido del FlyleafHost los bindings se quedan congelados (ver memoria del proyecto). -->
+                     actualiza el code-behind (EnlazarToast y ActualizarToast), no un Binding. -->
                 <Border x:Name="ToastReproductor" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,70,0,0"
                         Opacity="0" IsHitTestVisible="False" AutomationProperties.LiveSetting="Assertive">
                     <materialDesign:Card UniformCornerRadius="10" Background="{StaticResource Brush.Surface2}" Padding="20,15" materialDesign:ElevationAssist.Elevation="Dp8">
@@ -1218,7 +1215,7 @@
                 <!-- CUENTA ATRÁS DE AUTO-PLAY (Configuración → Reproducción → "Al terminar un episodio").
                      Igual que ToastReproductor: fuera de OverlayControls (no se desvanece por inactividad,
                      justo cuando el episodio termina y el mouse lleva rato quieto) y con texto empujado
-                     desde el code-behind, no por Binding (bindings congelados en la raíz del FlyleafHost). -->
+                     desde el code-behind, no por Binding. -->
                 <Border x:Name="CuentaAtrasSiguiente" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,20,90"
                         Background="#F2141414" BorderBrush="{StaticResource Brush.RingBase}" BorderThickness="1" CornerRadius="10" Padding="16"
                         Opacity="0" IsHitTestVisible="False">

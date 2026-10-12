@@ -2,9 +2,9 @@
 namespace AnimeLocalTracker.Services;
 
 /// <summary>
-/// Orquesta subtítulos contra el <see cref="Player"/> de Flyleaf. El ViewModel sigue dueño de
+/// Orquesta subtítulos contra el motor de video. El ViewModel sigue dueño de
 /// SubtitulosHabilitados/SubtitulosIcon (propiedades observables); este colaborador solo toca
-/// el Player y decide qué corresponde por defecto.
+/// el motor y decide qué corresponde por defecto.
 /// </summary>
 public interface ISubtitleCoordinator
 {

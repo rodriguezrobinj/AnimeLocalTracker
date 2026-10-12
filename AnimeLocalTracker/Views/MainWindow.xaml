@@ -531,8 +531,8 @@
                             <Setter Property="Margin" Value="0,0,0,-100"/>
                             <Style.Triggers>
                                 <!-- ToastEnVentana y no DialogService.ToastVisible: con el reproductor a la vista sus avisos los pinta su vista y
-                                     los de fuera no interrumpen el episodio (MainViewModel.ToastEnVentana). Con el motor clásico lo tapaba el
-                                     video (ventana nativa); con el nuevo el video es WPF y cada aviso salía dos veces: arriba y abajo. -->
+                                     los de fuera no interrumpen el episodio (MainViewModel.ToastEnVentana). El video es WPF y no tapa este
+                                     aviso: sin esto, cada aviso del reproductor salía dos veces, arriba y abajo. -->
                                 <DataTrigger Binding="{Binding ToastEnVentana}" Value="True">
                                     <DataTrigger.EnterActions>
                                         <BeginStoryboard>

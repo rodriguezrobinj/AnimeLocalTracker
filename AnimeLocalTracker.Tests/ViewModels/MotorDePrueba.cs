@@ -8,15 +8,14 @@ using AnimeLocalTracker.Services;
 namespace AnimeLocalTracker.Tests.ViewModels;
 
 /// <summary>
-/// Motor de mentira: la prueba decide el estado y dispara los avisos; el motor apunta lo que se le pidió. Se comporta como Flyleaf
-/// en lo que el reproductor da por hecho: abrir deja el estado en "abriendo", reproducir en "reproduciendo", saltar mueve la posición
+/// Motor de mentira: la prueba decide el estado y dispara los avisos; el motor apunta lo que se le pidió. Se comporta como el de
+/// verdad en lo que el reproductor da por hecho: abrir deja el estado en "abriendo", reproducir en "reproduciendo", saltar mueve la posición
 /// y pinta fotogramas nuevos.
 /// </summary>
 public sealed class MotorDePrueba : IMotorVideo
 {
     public List<string> Abiertos { get; } = [];
     public List<(double Segundos, bool Exacto)> Saltos { get; } = [];
-    public List<string> Precalentados { get; } = [];
     public int VecesDetenido { get; private set; }
     public int VecesDesechado { get; private set; }
     public int VecesReproducir { get; private set; }
@@ -52,7 +51,6 @@ public sealed class MotorDePrueba : IMotorVideo
     public event EventHandler? ProporcionVideoCambiada;
     public TarjetaGrafica? TarjetaEnUso { get; set; }
     public bool EscaladoInteligente { get; set; }
-    public ClaseEscalado ClaseDeEscalado { get; set; }
     public long FotogramasPerdidos { get; set; }
     public BitmapSource? Captura { get; set; }
     public BitmapSource? CapturarFotograma() => Captura;
@@ -63,7 +61,6 @@ public sealed class MotorDePrueba : IMotorVideo
     public int IndicePistaAudioActual { get; set; } = -1;
     public IReadOnlyList<PistaSubtitulosMotor> PistasSubtitulos => Subtitulos;
     public int IndicePistaSubtitulosDelMotor => SubtitulosDelMotor?.Indice ?? -1;
-    public PistaSubtitulosMotor? PistaSubtitulosDe(object nativa) => nativa as PistaSubtitulosMotor;
 
     public void Abrir(string ruta) { Abiertos.Add(ruta); Estado = EstadoMotor.Abriendo; FotogramasMostrados = 0; }
     public void Reproducir() { VecesReproducir++; Estado = EstadoMotor.Reproduciendo; }
@@ -80,14 +77,12 @@ public sealed class MotorDePrueba : IMotorVideo
     public void ElegirAudio(PistaAudioMotor pista) { AudioElegido = pista; IndicePistaAudioActual = pista.Indice; }
     public void MostrarSubtitulosDelMotor(PistaSubtitulosMotor pista) => SubtitulosDelMotor = pista;
     public void ApagarSubtitulosDelMotor() { VecesSubtitulosApagados++; SubtitulosDelMotor = null; }
-    public bool DibujaSubtitulosDeTexto { get; set; }
     public (AnimeLocalTracker.Models.EstiloSubtitulos Estilo, bool TambienEnAss)? EstiloPuesto { get; private set; }
     public void AplicarEstiloSubtitulos(AnimeLocalTracker.Models.EstiloSubtitulos estilo, bool tambienEnAss) => EstiloPuesto = (estilo, tambienEnAss);
     public IReadOnlyList<FiltroAudio>? FiltrosRecordados { get; private set; }
     public void RecordarFiltrosAudio(IReadOnlyList<FiltroAudio> filtros) => FiltrosRecordados = filtros;
     public bool AplicarFiltrosAudio(IReadOnlyList<FiltroAudio> filtros) { Filtros = filtros; return true; }
     public bool CambiarFiltroEnVivo(string id, string clave, string valor) { CambiosEnVivo.Add((id, clave, valor)); return AdmiteCambiosEnVivo; }
-    public void PrecalentarArchivo(string ruta, CancellationToken ct) => Precalentados.Add(ruta);
     public void Dispose() { VecesDesechado++; Desechado = true; }
 
     /// <summary>El aviso que da el motor al terminar de abrir el archivo (o una pista de audio suya).</summary>

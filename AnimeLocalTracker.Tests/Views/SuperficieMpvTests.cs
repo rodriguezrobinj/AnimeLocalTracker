@@ -20,7 +20,7 @@ public class SuperficieMpvTests
     [Fact]
     public void SiElLienzoNoArranca_LaSuperficiePintaPorSoftware()
     {
-        // Máquina virtual, escritorio remoto o controlador antiguo: antes el episodio se reabría con el motor clásico.
+        // Máquina virtual, escritorio remoto o controlador antiguo: el episodio se ve igual, pintado por software.
         if (!LibMpv.Disponible) return;
         string? antes = Environment.GetEnvironmentVariable(VariableSinOpenGl);
         Environment.SetEnvironmentVariable(VariableSinOpenGl, "1");
@@ -30,7 +30,7 @@ public class SuperficieMpvTests
         {
             _host.Ejecutar(() =>
             {
-                motor = MotorMpv.Crear(new AjustesInicialesMotor(false, null, []), sinSonido: true)!;
+                motor = MotorMpv.Crear(new AjustesInicialesMotor(false, []), sinSonido: true)!;
                 motor.SinSalida += sinSalida.Add;
 
                 SuperficieMpv.Para(motor).Should().NotBeNull();

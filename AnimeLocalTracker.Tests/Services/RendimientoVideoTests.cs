@@ -1,11 +1,9 @@
 using System;
 using System.Collections.Generic;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using AnimeLocalTracker.Models;
 using AnimeLocalTracker.Services;
 using AnimeLocalTracker.ViewModels;
-using FlyleafLib;
 using FluentAssertions;
 using Moq;
 using Xunit;
@@ -41,30 +39,17 @@ public class RendimientoVideoTests
     public void RespaldoPorProcesador_SoloSiLaTarjetaNoMostroImagen(bool porHardware, uint fotogramas, bool yaReintentado, bool esperado) =>
         MotorVideo.DebeReintentarPorProcesador(porHardware, fotogramas, yaReintentado).Should().Be(esperado);
 
-    // === Escalado inteligente ===
+    // === Escalado inteligente (Anime4K): funciona en cualquier tarjeta y el reproductor lo vigila ===
 
     [Theory]
-    [InlineData(ModosRendimientoVideo.Automatico, FabricanteGrafica.Intel, 128, false)]   // integrada (Intel HD 620)
-    [InlineData(ModosRendimientoVideo.Automatico, FabricanteGrafica.Nvidia, 8192, true)]  // RTX dedicada
-    [InlineData(ModosRendimientoVideo.Automatico, FabricanteGrafica.Intel, 8192, true)]   // Intel Arc
-    [InlineData(ModosRendimientoVideo.Automatico, FabricanteGrafica.Amd, 8192, false)]    // Flyleaf no lo tiene para AMD
-    [InlineData(ModosRendimientoVideo.Activado, FabricanteGrafica.Intel, 128, true)]
-    [InlineData(ModosRendimientoVideo.Desactivado, FabricanteGrafica.Nvidia, 8192, false)]
-    public void Escalado_SegunModoYTarjeta(string modo, FabricanteGrafica fabricante, long memoriaMb, bool esperado) =>
-        MotorVideo.UsarEscaladoInteligente(modo, fabricante, memoriaMb).Should().Be(esperado);
-
-    // === Escalado con sombreadores (Anime4K, motor nuevo): funciona en cualquier tarjeta y el reproductor lo vigila ===
-
-    [Theory]
-    [InlineData(ModosRendimientoVideo.Automatico, FabricanteGrafica.Intel, 0, true)]       // integrada, memoria desconocida
-    [InlineData(ModosRendimientoVideo.Automatico, FabricanteGrafica.Desconocido, 0, true)]
-    [InlineData(ModosRendimientoVideo.Activado, FabricanteGrafica.Amd, 0, true)]
-    [InlineData(ModosRendimientoVideo.Desactivado, FabricanteGrafica.Nvidia, 8192, false)]
-    [InlineData(null, FabricanteGrafica.Intel, 0, true)]                                   // settings.json editado a mano: como Automático
-    [InlineData("", FabricanteGrafica.Intel, 0, true)]
-    [InlineData("cualquiera", FabricanteGrafica.Intel, 0, true)]
-    public void EscaladoConSombreadores_SegunModo(string? modo, FabricanteGrafica fabricante, long memoriaMb, bool esperado) =>
-        MotorVideo.UsarEscaladoInteligente(modo, fabricante, memoriaMb, ClaseEscalado.PorSombreadores).Should().Be(esperado);
+    [InlineData(ModosRendimientoVideo.Automatico, true)]
+    [InlineData(ModosRendimientoVideo.Activado, true)]
+    [InlineData(ModosRendimientoVideo.Desactivado, false)]
+    [InlineData(null, true)]            // settings.json editado a mano: como Automático
+    [InlineData("", true)]
+    [InlineData("cualquiera", true)]
+    public void Escalado_SegunModo(string? modo, bool esperado) =>
+        MotorVideo.UsarEscaladoInteligente(modo).Should().Be(esperado);
 
     [Theory]
     [InlineData(FabricanteGrafica.Intel, NivelEscalado.Ligero)]       // medido en una HD 620: el medio pierde 9 fotogramas por segundo
@@ -110,26 +95,6 @@ public class RendimientoVideoTests
             pasadas.Should().BeGreaterThan(0);
             condicionadas.Should().Be(pasadas, $"todas las pasadas de {System.IO.Path.GetFileName(ruta)} llevan la condición");
         }
-    }
-
-    // === Tarjeta elegida ===
-
-    [Fact]
-    public void ElPatronDeLaTarjeta_CoincideConSuNombreAunqueLleveParentesis()
-    {
-        // Flyleaf compara Config.Video.GPUAdapter como expresión regular: "Intel(R)" sin escapar no coincidiría consigo mismo.
-        string patron = MotorVideo.PatronTarjeta("Intel(R) HD Graphics 620")!;
-
-        Regex.IsMatch("Intel(R) HD Graphics 620", patron, RegexOptions.IgnoreCase).Should().BeTrue();
-        Regex.IsMatch("Intel(R) HD Graphics 6200", patron, RegexOptions.IgnoreCase).Should().BeFalse("no debe elegir otra tarjeta por parecido");
-        Regex.IsMatch("IntelR HD Graphics 620", "Intel(R) HD Graphics 620").Should().BeTrue("así fallaba sin escapar: los paréntesis son un grupo");
-    }
-
-    [Fact]
-    public void SinTarjetaElegida_NoSeFuerzaNinguna()
-    {
-        MotorVideo.PatronTarjeta(null).Should().BeNull();
-        MotorVideo.PatronTarjeta("  ").Should().BeNull();
     }
 
     // === Salto "rápido": siempre a un fotograma clave ===
@@ -180,12 +145,11 @@ public class RendimientoVideoTests
     {
         var (vm, _) = CrearConfiguracion(new AppSettings
         {
-            ModoSaltosVideo = ModosRendimientoVideo.Rapidos, AceleracionHardwareVideo = false,
-            TarjetaGraficaVideo = "NVIDIA GeForce RTX 4060 Laptop GPU", EscaladoInteligenteVideo = ModosRendimientoVideo.Activado
+            ModoSaltosVideo = ModosRendimientoVideo.Rapidos, AceleracionHardwareVideo = false, EscaladoInteligenteVideo = ModosRendimientoVideo.Activado
         });
 
-        (vm.ModoSaltosVideo, vm.AceleracionHardwareVideo, vm.TarjetaGraficaVideo, vm.EscaladoInteligenteVideo)
-            .Should().Be((ModosRendimientoVideo.Rapidos, false, "NVIDIA GeForce RTX 4060 Laptop GPU", ModosRendimientoVideo.Activado));
+        (vm.ModoSaltosVideo, vm.AceleracionHardwareVideo, vm.EscaladoInteligenteVideo)
+            .Should().Be((ModosRendimientoVideo.Rapidos, false, ModosRendimientoVideo.Activado));
     }
 
     [Fact]
@@ -197,18 +161,17 @@ public class RendimientoVideoTests
     }
 
     [Fact]
-    public async Task Configuracion_GuardaLosAjustes_YLaTarjetaAutomaticaComoNula()
+    public async Task Configuracion_GuardaLosAjustes()
     {
-        var (vm, config) = CrearConfiguracion(new AppSettings { TarjetaGraficaVideo = "Intel(R) HD Graphics 620" });
+        var (vm, config) = CrearConfiguracion(new AppSettings());
         vm.ModoSaltosVideo = ModosRendimientoVideo.Exactos;
         vm.AceleracionHardwareVideo = false;
-        vm.TarjetaGraficaVideo = string.Empty;
         vm.EscaladoInteligenteVideo = ModosRendimientoVideo.Desactivado;
 
         await vm.GuardarPreferenciasAsync();
 
-        (config.ModoSaltosVideo, config.AceleracionHardwareVideo, config.TarjetaGraficaVideo, config.EscaladoInteligenteVideo)
-            .Should().Be((ModosRendimientoVideo.Exactos, false, (string?)null, ModosRendimientoVideo.Desactivado));
+        (config.ModoSaltosVideo, config.AceleracionHardwareVideo, config.EscaladoInteligenteVideo)
+            .Should().Be((ModosRendimientoVideo.Exactos, false, ModosRendimientoVideo.Desactivado));
     }
 
     [Fact]
@@ -224,68 +187,52 @@ public class RendimientoVideoTests
         config.VideoPorSoftware.Should().BeFalse();
     }
 
-    // === Configuración: motor de video (etapa 5 de libmpv) ===
-
-    private static (ConfiguracionViewModel Vm, AppSettings Config) CrearConfiguracionConMotor(AppSettings config, bool hayMotorNuevo)
+    [Fact]
+    public async Task AjustesDeUnaVersionAnterior_SeLeenSinLasClavesRetiradas()
     {
-        var (vm, _) = CrearConfiguracion(config);
-        vm.HayMotorNuevo = () => hayMotorNuevo;
-        vm.CargarDatosConfiguracion();
-        return (vm, config);
+        // Etapa 6 de libmpv: ya no hay motor clásico, ni tarjeta que elegir, ni borde en la caja de los subtítulos. Quien actualiza
+        // trae esas claves en su settings.json (aquí con el valor antiguo «Flyleaf» a propósito).
+        string carpeta = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "alt_ajustes_" + Guid.NewGuid().ToString("N"));
+        System.IO.Directory.CreateDirectory(carpeta);
+        try
+        {
+            string archivo = System.IO.Path.Combine(carpeta, "settings.json");
+            System.IO.File.WriteAllText(archivo, """
+                {
+                  "MotorVideo": "Flyleaf",
+                  "TarjetaGraficaVideo": "Intel(R) HD Graphics 620",
+                  "AceleracionHardwareVideo": false,
+                  "EstiloSubtitulos": { "Tamano": 50, "OpacidadFondo": 60, "GrosorBorde": 2, "ColorBorde": "#FF0000" }
+                }
+                """);
+            var servicio = new SettingsService(archivo);
+
+            var config = servicio.ObtenerConfiguracion();
+
+            config.AceleracionHardwareVideo.Should().BeFalse("lo que sigue existiendo se conserva");
+            (config.EstiloSubtitulos.Tamano, config.EstiloSubtitulos.OpacidadFondo).Should().Be((50, 60));
+
+            await servicio.GuardarConfiguracionAsync(config);
+
+            string guardado = System.IO.File.ReadAllText(archivo);
+            guardado.Should().NotContain("MotorVideo").And.NotContain("TarjetaGraficaVideo").And.NotContain("GrosorBorde").And.NotContain("ColorBorde");
+            guardado.Should().Contain("\"AceleracionHardwareVideo\": false").And.Contain("\"OpacidadFondo\": 60");
+        }
+        finally
+        {
+            try { System.IO.Directory.Delete(carpeta, true); } catch { }
+        }
     }
 
     [Fact]
-    public async Task Configuracion_CargaYGuardaElMotorDeVideo()
+    public void ElDiagnosticoDelEquipo_NoInventaUnaTarjetaQueNoConoce()
     {
-        var (vm, config) = CrearConfiguracionConMotor(new AppSettings { MotorVideo = "Flyleaf" }, hayMotorNuevo: true);
-        vm.MotorDeVideo.Should().Be(MotoresDeVideo.Clasico);
-        vm.UsaMotorNuevo.Should().BeFalse();
+        // La tarjeta la dice el lienzo al pintar un video: sin haber abierto ninguno (o pintando por software) solo se dan los hilos.
+        var (vm, _) = CrearConfiguracion(new AppSettings());
 
-        vm.MotorDeVideo = MotoresDeVideo.Nuevo;
-        await vm.GuardarPreferenciasAsync();
+        vm.ActualizarRendimientoVideo();
 
-        config.MotorVideo.Should().Be("Mpv");
-    }
-
-    [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    [InlineData("mpv")]
-    [InlineData("cualquier cosa")]
-    public void Configuracion_SinClaveOConUnValorRaro_MuestraElNuevo(string? guardado)
-    {
-        var (vm, _) = CrearConfiguracionConMotor(new AppSettings { MotorVideo = guardado! }, hayMotorNuevo: true);
-
-        vm.MotorDeVideo.Should().Be(MotoresDeVideo.Nuevo);
-        vm.UsaMotorNuevo.Should().BeTrue();
-        new AppSettings().MotorVideo.Should().Be(MotoresDeVideo.Nuevo, "un settings.json sin la clave toma el valor por defecto");
-    }
-
-    [Fact]
-    public async Task SinLibmpv_ConfiguracionMuestraElClasicoYNoLoCambiaAlGuardar()
-    {
-        var (vm, config) = CrearConfiguracionConMotor(new AppSettings { MotorVideo = "Mpv" }, hayMotorNuevo: false);
-
-        vm.MotorNuevoDisponible.Should().BeFalse();
-        vm.MotorDeVideo.Should().Be(MotoresDeVideo.Clasico, "el desplegable no se queda vacío");
-        vm.UsaMotorNuevo.Should().BeFalse();
-
-        await vm.GuardarPreferenciasAsync();
-
-        config.MotorVideo.Should().Be("Mpv", "una instalación incompleta no borra lo que eligió el usuario");
-    }
-
-    [Fact]
-    public void UsaMotorNuevo_AvisaAlCambiarElMotor()
-    {
-        var (vm, _) = CrearConfiguracionConMotor(new AppSettings(), hayMotorNuevo: true);
-        var avisos = new List<string?>();
-        vm.PropertyChanged += (_, e) => avisos.Add(e.PropertyName);
-
-        vm.MotorDeVideo = MotoresDeVideo.Clasico;
-
-        avisos.Should().Contain(nameof(ConfiguracionViewModel.UsaMotorNuevo));
-        vm.UsaMotorNuevo.Should().BeFalse();
+        vm.DiagnosticoEquipoTexto.Should().Contain(Environment.ProcessorCount.ToString()).And.NotContain("?");
     }
 
     [Fact]
@@ -297,12 +244,5 @@ public class RendimientoVideoTests
             new InformeVideo("av1", false, "Intel(R) HD Graphics 620", EstrategiaSaltos.Equilibrados, false, DateTime.UtcNow));
 
         texto.Should().Contain("AV1").And.Contain(LocalizationService.T("Cfg_DiagPorProcesador")).And.Contain(LocalizationService.T("Cfg_DiagSaltosEquilibrados"));
-    }
-
-    [Fact]
-    public void EnPruebas_NoSeArrancaElMotorDeVideo()
-    {
-        // Flyleaf puede colgarse sin ventana: en las pruebas no se listan tarjetas (lista vacía) en vez de arrancarlo.
-        MotorVideo.ListarTarjetas().Should().BeEmpty();
     }
 }

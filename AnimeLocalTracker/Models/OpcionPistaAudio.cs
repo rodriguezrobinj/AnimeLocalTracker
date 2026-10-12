@@ -17,7 +17,7 @@ public sealed partial class OpcionPistaAudio : ObservableObject
         _esActual = esActual;
     }
 
-    /// <summary>El AudioStream de Flyleaf (object para no atar el modelo a la librería).</summary>
+    /// <summary>La pista del motor de video (object para no atar el modelo al servicio).</summary>
     public object Pista { get; }
 
     /// <summary>"Japonés · Original", "Inglés", "Pista 2"…</summary>

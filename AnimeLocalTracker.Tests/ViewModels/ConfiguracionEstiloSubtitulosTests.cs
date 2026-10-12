@@ -77,7 +77,7 @@ public class ConfiguracionEstiloSubtitulosTests
     {
         var (vm, settings, _) = CrearSut(new AppSettings
         {
-            EstiloSubtitulos = new EstiloSubtitulos { Fuente = "Impact", Tamano = 70, Negrita = false, Subrayado = true, GrosorBorde = 3 }
+            EstiloSubtitulos = new EstiloSubtitulos { Fuente = "Impact", Tamano = 70, Negrita = false, Subrayado = true, OpacidadFondo = 40 }
         });
 
         vm.RestablecerEstiloSubtitulosCommand.Execute(null);
@@ -86,7 +86,7 @@ public class ConfiguracionEstiloSubtitulosTests
         vm.EstiloTamano.Should().Be(44);
         vm.EstiloNegrita.Should().BeTrue();
         vm.EstiloSubrayado.Should().BeFalse();
-        vm.EstiloGrosorBorde.Should().Be(0);
+        vm.EstiloOpacidadFondo.Should().Be(0);
         vm.EstiloVistaPrevia.Should().BeEquivalentTo(new EstiloSubtitulos());
         settings.Verify(s => s.GuardarConfiguracionAsync(It.IsAny<AppSettings>()), Times.Never,
             "restablecer solo cambia la pantalla; se guarda con «Guardar preferencias»");
@@ -108,8 +108,6 @@ public class ConfiguracionEstiloSubtitulosTests
         vm.EstiloColorTexto = "#7CFC7C";
         vm.EstiloGrosorContorno = 5;
         vm.EstiloOpacidadFondo = 60;
-        vm.EstiloGrosorBorde = 2;
-        vm.EstiloColorBorde = "#FF8FD0";
         await vm.GuardarPreferenciasAsync();
 
         guardada.Should().BeSameAs(config);
@@ -117,7 +115,7 @@ public class ConfiguracionEstiloSubtitulosTests
         {
             Fuente = "Georgia", Tamano = 56, Negrita = false, Cursiva = true, Subrayado = false,
             ColorTexto = "#7CFC7C", ColorContorno = "#000000", GrosorContorno = 5,
-            OpacidadFondo = 60, GrosorBorde = 2, ColorBorde = "#FF8FD0"
+            OpacidadFondo = 60
         });
     }
 

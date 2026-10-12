@@ -9,10 +9,9 @@ namespace AnimeLocalTracker.Services;
 public class FrameCaptureService : IFrameCaptureService
 {
     /// <summary>
-    /// Captura el fotograma que Flyleaf tiene actualmente renderizado directo desde su buffer
-    /// Direct3D (Player.TakeSnapshotToBitmapSource) — sin relanzar ffmpeg ni re-decodificar, y en
-    /// la resolución nativa del video. Si los subtítulos están activos ya quedan incluidos porque
-    /// Flyleaf los compone dentro del propio frame renderizado (no son un overlay WPF aparte).
+    /// Captura el fotograma que el motor tiene en pantalla (<see cref="IMotorVideo.CapturarFotograma"/>), sin relanzar
+    /// ffmpeg ni volver a decodificar, y en la resolución del video. Si los subtítulos están activos quedan incluidos:
+    /// el motor los dibuja dentro del propio video (no son una capa de WPF aparte).
     /// </summary>
     public async Task<string?> CapturarYGuardarAsync(IMotorVideo? motor)
     {

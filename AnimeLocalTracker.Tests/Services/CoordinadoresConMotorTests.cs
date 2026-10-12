@@ -8,7 +8,7 @@ using Xunit;
 
 namespace AnimeLocalTracker.Tests.Services;
 
-/// <summary>Los coordinadores del reproductor contra el contrato del motor (antes recibían el Player de Flyleaf y no se podían probar).</summary>
+/// <summary>Los coordinadores del reproductor contra el contrato del motor (antes recibían el reproductor de la biblioteca de video y no se podían probar).</summary>
 public class CoordinadoresConMotorTests
 {
     private static async Task EsperarHasta(Func<bool> condicion, int ms = 5000)
@@ -120,23 +120,5 @@ public class CoordinadoresConMotorTests
 
         subtitulos.Deshabilitar(motor);
         motor.SubtitulosDelMotor.Should().BeNull();
-    }
-
-    [Fact]
-    public void LecturaAdelantada_SePideUnaVezPorEpisodioYSoloCercaDelFinal()
-    {
-        using var navegador = new EpisodeNavigator();
-        int pedidas = 0;
-        void Precalentar(string ruta, CancellationToken ct) => pedidas++;
-
-        navegador.ConsiderarPrecarga(0.50, "C:\\Anime\\Ep02.mkv", Precalentar);
-        pedidas.Should().Be(0);
-        navegador.ConsiderarPrecarga(0.96, "C:\\Anime\\Ep02.mkv", Precalentar);
-        navegador.ConsiderarPrecarga(0.97, "C:\\Anime\\Ep02.mkv", Precalentar);
-        pedidas.Should().Be(1);
-
-        navegador.CancelarPrecargaYReiniciar();
-        navegador.ConsiderarPrecarga(0.96, "C:\\Anime\\Ep03.mkv", Precalentar);
-        pedidas.Should().Be(2);
     }
 }

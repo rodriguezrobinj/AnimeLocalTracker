@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Threading;
 using System.Windows.Media.Imaging;
 using AnimeLocalTracker.Core;
 using AnimeLocalTracker.Models;
@@ -16,27 +15,22 @@ public sealed record AperturaTerminada(ClaseApertura Clase, bool Exito, string? 
 
 public enum FabricanteGrafica { Desconocido, Intel, Nvidia, Amd }
 
-/// <summary>
-/// Cómo mejora la imagen cada motor: con el escalado del controlador de la tarjeta (solo algunas, y no se puede medir lo que le cuesta)
-/// o con sombreadores propios (en cualquier tarjeta, y se ve cuándo no dan abasto).
-/// </summary>
-public enum ClaseEscalado { PorControlador, PorSombreadores }
-
 public enum NivelEscalado { Ligero, Medio }
 
 /// <summary>Una pista de audio del archivo abierto. <paramref name="Idioma"/> en dos letras, o null si no se sabe.</summary>
 public sealed record PistaAudioMotor(int Indice, string? Idioma, string? Titulo);
 
-/// <summary>Una pista de subtítulos. Las de imagen (PGS, VobSub) y las externas solo las sabe mostrar el motor.</summary>
+/// <summary>Una pista de subtítulos del archivo abierto, o un archivo suelto junto al video (<paramref name="RutaExterna"/>).</summary>
 public sealed record PistaSubtitulosMotor(int Indice, string? Idioma, string? Titulo, bool EsImagen, bool EsAss, string? RutaExterna);
 
 /// <summary>Lo que el motor necesita saber antes de abrir el primer archivo.</summary>
 /// <param name="VideoPorSoftware">Modo de compatibilidad: pintar sin OpenGL, aunque el equipo lo tenga.</param>
-public sealed record AjustesInicialesMotor(bool AceleracionPorHardware, string? TarjetaGrafica, IReadOnlyList<FiltroAudio> FiltrosAudio, bool VideoPorSoftware = false);
+public sealed record AjustesInicialesMotor(bool AceleracionPorHardware, IReadOnlyList<FiltroAudio> FiltrosAudio, bool VideoPorSoftware = false);
 
 /// <summary>
-/// El motor de video del reproductor de episodios, sin tipos de ninguna biblioteca. Es lo que el reproductor le pedía a Flyleaf, ni más
-/// ni menos: la coreografía (arrancar en silencio hasta el primer fotograma, reanudar, reintentar) sigue en el reproductor.
+/// El motor de video del reproductor de episodios, sin tipos de ninguna biblioteca. Lo implementan <c>MotorMpv</c> (libmpv) y el
+/// motor de mentira de las pruebas; la coreografía (arrancar en silencio hasta el primer fotograma, reanudar, reintentar) sigue en
+/// el reproductor.
 /// Salvo que se diga otra cosa, los miembros no lanzan: si el motor no puede, no hace nada.
 /// </summary>
 public interface IMotorVideo : IDisposable
@@ -69,7 +63,6 @@ public interface IMotorVideo : IDisposable
     event EventHandler? ProporcionVideoCambiada;
     TarjetaGrafica? TarjetaEnUso { get; }
     bool EscaladoInteligente { get; set; }
-    ClaseEscalado ClaseDeEscalado { get; }
     /// <summary>Fotogramas que el motor no llegó a pintar a tiempo desde que abrió el archivo. 0 si el motor no lo sabe.</summary>
     long FotogramasPerdidos { get; }
     BitmapSource? CapturarFotograma();
@@ -81,12 +74,8 @@ public interface IMotorVideo : IDisposable
     IReadOnlyList<PistaSubtitulosMotor> PistasSubtitulos { get; }
     /// <summary>Índice de la pista que el propio motor tiene abierta, o -1.</summary>
     int IndicePistaSubtitulosDelMotor { get; }
-    /// <summary>La pista que corresponde a un objeto propio del motor (lo que entrega la vista clásica), o null.</summary>
-    PistaSubtitulosMotor? PistaSubtitulosDe(object nativa);
     void MostrarSubtitulosDelMotor(PistaSubtitulosMotor pista);
     void ApagarSubtitulosDelMotor();
-    /// <summary>El motor dibuja él mismo, dentro del video, también los subtítulos de texto. Si es false, los de texto los lee y los pinta la app.</summary>
-    bool DibujaSubtitulosDeTexto { get; }
     /// <summary>Aspecto de los subtítulos que dibuja el motor. <paramref name="tambienEnAss"/>: usarlo también en las pistas ASS, en vez de su estilo original.</summary>
     void AplicarEstiloSubtitulos(EstiloSubtitulos estilo, bool tambienEnAss);
 
@@ -96,7 +85,4 @@ public interface IMotorVideo : IDisposable
     bool CambiarFiltroEnVivo(string id, string clave, string valor);
     /// <summary>Deja apuntada la cadena para el siguiente archivo sin remontar la que suena (después de un cambio en vivo).</summary>
     void RecordarFiltrosAudio(IReadOnlyList<FiltroAudio> filtros);
-
-    /// <summary>Adelanta la lectura de un archivo que se abrirá después. Sin garantías: si falla no pasa nada.</summary>
-    void PrecalentarArchivo(string ruta, CancellationToken ct);
 }

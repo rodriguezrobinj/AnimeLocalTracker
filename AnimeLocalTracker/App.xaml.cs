@@ -281,8 +281,6 @@ public partial class App : Application
         // por sesión de reproducción (Singleton, igual que FrameCaptureService).
         services.AddSingleton<IPlaybackWindowModeCoordinator, PlaybackWindowModeCoordinator>();
         services.AddSingleton<ISubtitleCoordinator, SubtitleCoordinator>();
-        services.AddSingleton<ISubtitleCuesExtractorService, SubtitleCuesExtractorService>();
-        services.AddTransient<ISubtitleAssRenderer, SubtitleAssRenderer>(); // uno por reproductor: cada ViewModel cierra el suyo
         services.AddSingleton<IPlaybackVolumeCoordinator, PlaybackVolumeCoordinator>();
 
         // Fase 3 del refactor: coalescing de seek — sí tiene estado por sesión de reproducción
@@ -526,7 +524,7 @@ public partial class App : Application
             }
             catch { }
 
-            // PERF-01: el motor de video (Flyleaf) NO se inicia aquí, y tampoco lo que no hace falta para ver la ventana
+            // PERF-01: aquí no se inicia nada que no haga falta para ver la ventana
             // (sincronización, avisos de emisión, copia de seguridad, cola de descargas, motor Python…): todo eso arranca
             // cuando la ventana ya está pintada (ver IniciarTrasPrimerPintado).
 
@@ -596,7 +594,6 @@ public partial class App : Application
             IniciarServiciosDeFondo(settingsService);
         });
 
-        IniciarMotorDeVideoEnReposo();
         mainWindow.PrecalentarPestanasEnReposo();
     }
 
@@ -686,30 +683,6 @@ public partial class App : Application
     }
 
     private static readonly TimeSpan RetrasoCopiaDeSeguridad = TimeSpan.FromSeconds(8);
-    private static readonly TimeSpan RetrasoMotorDeVideo = TimeSpan.FromSeconds(3);
-
-    /// <summary>
-    /// El motor de video (Flyleaf) carga 160 MB de bibliotecas de FFmpeg y su arranque exige el hilo de la interfaz: hacerlo
-    /// justo al mostrar la ventana la dejaba sin responder en el peor momento (0,3 s con el equipo caliente, varios segundos
-    /// en el primer arranque del día). Ahora las bibliotecas se cargan antes en otro hilo y el arranque, ya ligero, espera a
-    /// que la interfaz esté en reposo. Si se abre un video antes, el reproductor lo inicia por su cuenta (es idempotente).
-    /// </summary>
-    private void IniciarMotorDeVideoEnReposo()
-    {
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                MotorVideo.PrecargarBibliotecas();
-                await Task.Delay(RetrasoMotorDeVideo);
-                await Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.ApplicationIdle, () => MotorVideo.AsegurarIniciado());
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Warn("App", $"No se pudo preparar el motor de video por adelantado: {ex.Message}");
-            }
-        });
-    }
 
     protected override void OnExit(ExitEventArgs e)
     {

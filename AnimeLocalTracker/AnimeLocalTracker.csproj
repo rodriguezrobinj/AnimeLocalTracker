@@ -30,12 +30,6 @@
     </ItemGroup>
 
     <ItemGroup>
-      <!-- FlyleafLib se queda sin precompilar al publicar: ParcheSubtitulosFlyleaf (Harmony) sustituye una función suya en
-           ejecución, y eso solo está probado sobre código compilado al vuelo, como en los builds de desarrollo. -->
-      <PublishReadyToRunExclude Include="FlyleafLib.dll" />
-    </ItemGroup>
-
-    <ItemGroup>
       <!-- Evita colisiones de nombres entre WinForms y WPF (UserControl, Application, Point, KeyEventArgs...). -->
       <Using Remove="System.Windows.Forms" />
       <Using Remove="System.Drawing" />
@@ -43,13 +37,6 @@
 
     <ItemGroup>
       <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
-      <!-- Con alias: FlyleafLib usa Flyleaf.FFmpeg.Bindings, que define los mismos tipos (Flyleaf.FFmpeg.Raw…) y es el que tiene
-           cargadas las bibliotecas. Sin el alias, el código que los nombra (Services/SubtitleAssRenderer.cs) no compila (CS0433). -->
-      <PackageReference Include="Flyleaf.FFmpeg" Version="9.0.0" Aliases="FFmpegExtendido" />
-      <PackageReference Include="FlyleafLib" Version="3.11.3" />
-      <PackageReference Include="FlyleafLib.Controls.WPF" Version="1.7.3" />
-      <!-- Parche en caliente del lector de subtítulos ASS de FlyleafLib (ver Services/ParcheSubtitulosFlyleaf.cs). -->
-      <PackageReference Include="Lib.Harmony" Version="2.4.2" />
       <!-- Compilación de integración continua A PROPÓSITO: todas las versiones de FlyleafLib.Controls.WPF (1.7.3 a 1.7.11, la última)
            dependen de MaterialDesignThemes >= 5.3.3-ci1443, y la estable más reciente (5.3.2) es anterior: NuGet la rechaza con
            NU1605 (comprobado el 2026-10-06). Es un paquete oficial del repositorio MaterialDesignInXAML en nuget.org (no se puede
@@ -79,7 +66,7 @@
       <None Include="Mpv\**">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>
-      <!-- Shaders de Anime4K (MIT) para el escalado inteligente del motor nuevo. -->
+      <!-- Shaders de Anime4K (MIT) para el escalado inteligente del reproductor. -->
       <None Include="Shaders\**">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>

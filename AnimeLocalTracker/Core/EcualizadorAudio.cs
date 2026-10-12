@@ -8,7 +8,7 @@ namespace AnimeLocalTracker.Core;
 /// <summary>Un ajuste predefinido del ecualizador (ganancias en dB de cada banda).</summary>
 public sealed record PresetEcualizador(string Clave, IReadOnlyList<double> Ganancias);
 
-/// <summary>Un filtro de audio de FFmpeg tal como lo recibe Flyleaf (Id = nombre de la instancia, para cambiarlo en vivo).</summary>
+/// <summary>Un filtro de audio de FFmpeg tal como lo recibe el motor de video (Id = nombre de la instancia, para cambiarlo en vivo).</summary>
 public sealed record FiltroAudio(string Id, string Nombre, string Argumentos);
 
 /// <summary>

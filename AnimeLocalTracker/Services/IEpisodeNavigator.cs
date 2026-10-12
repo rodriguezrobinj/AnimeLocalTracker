@@ -1,15 +1,13 @@
-using System;
 using System.Collections.Generic;
-using System.Threading;
 using AnimeLocalTracker.Models;
 
 namespace AnimeLocalTracker.Services;
 
 /// <summary>
 /// Dueño de la lista de episodios disponibles de la sesión de reproducción actual: consultas de
-/// siguiente/anterior y pre-carga best-effort del siguiente episodio cerca del final del actual.
+/// siguiente/anterior.
 /// </summary>
-public interface IEpisodeNavigator : IDisposable
+public interface IEpisodeNavigator
 {
     /// <summary>Episodios con archivo local, ordenados por número (los que llegaron por parámetro a CargarVideo).</summary>
     IReadOnlyList<EpisodioItem> EpisodiosDisponibles { get; }
@@ -19,16 +17,4 @@ public interface IEpisodeNavigator : IDisposable
 
     EpisodioItem? ObtenerSiguiente(int episodioActual);
     EpisodioItem? ObtenerAnterior(int episodioActual);
-
-    /// <summary>
-    /// Evalúa si toca disparar la pre-carga en este instante del sondeo de progreso (umbral del 95%
-    /// + no precargado ya) y, si corresponde, la dispara en segundo plano (best-effort, nunca lanza).
-    /// </summary>
-    void ConsiderarPrecarga(double porcentaje, string? rutaSiguiente, Action<string, CancellationToken> precalentar);
-
-    /// <summary>
-    /// Cancela la pre-carga en curso y reinicia el estado para la próxima — llamar tanto al cargar
-    /// un episodio nuevo (descarta la pre-carga del anterior) como al liberar el ViewModel (Dispose).
-    /// </summary>
-    void CancelarPrecargaYReiniciar();
 }

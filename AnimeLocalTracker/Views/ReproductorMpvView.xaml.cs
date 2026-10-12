@@ -16,8 +16,7 @@ using MaterialDesignThemes.Wpf;
 
 namespace AnimeLocalTracker.Views
 {
-    // Vista del reproductor con el motor nuevo (libmpv): copia de ReproductorView sin las ventanas nativas de Flyleaf.
-    // Mientras convivan los dos motores, un cambio en los controles va en las dos (docs/investigacion-motor-libmpv.md).
+    // Vista del reproductor: aloja la superficie de video del motor (libmpv) y pone los controles encima como WPF normal.
     [System.Runtime.Versioning.SupportedOSPlatform("windows7.0")]
     public partial class ReproductorMpvView : UserControl
     {
@@ -45,8 +44,7 @@ namespace AnimeLocalTracker.Views
             _fadeTimer.Interval = TimeSpan.FromSeconds(3);
             _fadeTimer.Tick += FadeTimer_Tick;
 
-            // Suscribimos PreProcessInput en Loaded (no en el constructor)
-            // para que FlyleafHost ya haya terminado de inicializar su ventana nativa.
+            // PreProcessInput se suscribe en Loaded (no en el constructor): solo interesa mientras la vista está en pantalla.
             this.Loaded += ReproductorView_Loaded;
             this.Unloaded += ReproductorView_Unloaded;
             this.IsVisibleChanged += ReproductorView_IsVisibleChanged;
@@ -66,8 +64,8 @@ namespace AnimeLocalTracker.Views
             EnlazarSubtitulos(e.NewValue as ReproductorViewModel);
         }
 
-        // === El reproductor al que mira esta vista (el nombre viene de la vista clásica, que lo usaba para los subtítulos;
-        // aquí los dibuja libmpv dentro del video y la vista solo aloja la superficie y sigue el resto del estado). ===
+        // === El reproductor al que mira esta vista (el nombre viene de cuando la vista dibujaba los subtítulos; ahora los
+        // dibuja libmpv dentro del video y la vista solo aloja la superficie y sigue el resto del estado). ===
         private ReproductorViewModel? _vmSubtitulos;
 
         private void EnlazarSubtitulos(ReproductorViewModel? vm)
@@ -323,7 +321,7 @@ namespace AnimeLocalTracker.Views
         }
 
         // === Cuenta atrás de auto-play al siguiente episodio: mismo patrón que EnlazarToast/ActualizarToast
-        // (ver comentario en el XAML sobre por qué no se usa Binding en la raíz del FlyleafHost) ===
+        // (ver el comentario del XAML) ===
         private ReproductorViewModel? _vmCuentaAtras;
         private bool _cuentaAtrasMostrada;
 
@@ -394,12 +392,11 @@ namespace AnimeLocalTracker.Views
             EnlazarToast((DataContext as ReproductorViewModel)?.DialogService);
             EnlazarSubtitulos(DataContext as ReproductorViewModel);
 
-            // Suscribir al pipeline global de input DESPUÉS de que FlyleafHost
-            // haya creado su ventana nativa (ocurre durante el layout pass de Loaded).
+            // Suscribir al pipeline global de input mientras la vista está cargada (se quita en Unloaded).
             InputManager.Current.PreProcessInput += InputManager_PreProcessInput;
             _fadeTimer.Start();
 
-            // Restaurar foco con prioridad baja para no competir con FlyleafHost
+            // Restaurar el foco con prioridad baja, con la vista ya colocada
             Dispatcher.BeginInvoke(DispatcherPriority.Input, () =>
             {
                 if (IsLoaded && IsVisible)
@@ -448,8 +445,8 @@ namespace AnimeLocalTracker.Views
         private struct PuntoNativo { public int X; public int Y; }
 
         /// <summary>
-        /// True si el puntero está sobre el propio reproductor: su ventana (la principal, o la del mini reproductor) o las ventanas de
-        /// video y controles de Flyleaf. Fuera —barra de tareas, otro programa o, con el mini abierto, el resto de la app— ni se
+        /// True si el puntero está sobre el propio reproductor: su ventana (la principal, o la del mini reproductor).
+        /// Fuera —barra de tareas, otro programa o, con el mini abierto, el resto de la app— ni se
         /// despiertan sus controles ni se oculta el cursor: antes, navegando por la app con el mini abierto, el cursor desaparecía.
         /// </summary>
         private bool PunteroSobreElReproductor()
@@ -477,7 +474,7 @@ namespace AnimeLocalTracker.Views
             if (e.StagingItem.Input is not MouseEventArgs mouseArgs)
                 return;
 
-            // Solo si la app está activa (la ventana principal o las de Flyleaf). El mini reproductor no se activa al pasar el ratón
+            // Solo si la app está activa. El mini reproductor no se activa al pasar el ratón
             // por encima mientras se usa otra ventana: ahí basta con que el puntero esté sobre él.
             bool esMini = DataContext is ReproductorViewModel { EsModoMini: true };
             if (!AppActiva() && !esMini)
@@ -800,8 +797,7 @@ namespace AnimeLocalTracker.Views
                 return;
             }
 
-            // Segunda línea de defensa: el fix principal es ToggleFullScreenOnDoubleClick="False"
-            // en FlyleafHost (su captura del mouse es nativa y no pasa por el routing de WPF).
+            // El doble clic no hace nada más en el reproductor (no alterna la pantalla completa).
             e.Handled = true;
         }
 

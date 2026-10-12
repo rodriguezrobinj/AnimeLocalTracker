@@ -39,7 +39,6 @@ public class EstiloSubtitulosTests : IDisposable
         estilo.ColorTexto.Should().Be("#FFFFFF");
         estilo.ColorContorno.Should().Be("#000000");
         estilo.OpacidadFondo.Should().Be(0, "sin caja de fondo, como antes");
-        estilo.GrosorBorde.Should().Be(0);
     }
 
     [Fact]
@@ -49,8 +48,7 @@ public class EstiloSubtitulosTests : IDisposable
         {
             Tamano = 500,
             GrosorContorno = -4,
-            OpacidadFondo = 900,
-            GrosorBorde = 99
+            OpacidadFondo = 900
         };
 
         var normal = estilo.Normalizar();
@@ -58,7 +56,6 @@ public class EstiloSubtitulosTests : IDisposable
         normal.Tamano.Should().Be(EstiloSubtitulos.TamanoMaximo);
         normal.GrosorContorno.Should().Be(0);
         normal.OpacidadFondo.Should().Be(100);
-        normal.GrosorBorde.Should().Be(EstiloSubtitulos.GrosorBordeMaximo);
     }
 
     [Fact]
@@ -76,11 +73,10 @@ public class EstiloSubtitulosTests : IDisposable
     [InlineData(null)]
     public void Normalizar_ConColorInvalido_DeberiaVolverAlColorPorDefecto(string? color)
     {
-        var normal = new EstiloSubtitulos { ColorTexto = color!, ColorContorno = color!, ColorBorde = color! }.Normalizar();
+        var normal = new EstiloSubtitulos { ColorTexto = color!, ColorContorno = color! }.Normalizar();
 
         normal.ColorTexto.Should().Be("#FFFFFF");
         normal.ColorContorno.Should().Be("#000000");
-        normal.ColorBorde.Should().Be("#FFFFFF");
     }
 
     [Fact]
@@ -162,7 +158,7 @@ public class EstiloSubtitulosTests : IDisposable
         {
             Fuente = "Verdana", Tamano = 60, Negrita = false, Cursiva = true, Subrayado = true,
             ColorTexto = "#FFE14D", ColorContorno = "#4DE1FF", GrosorContorno = 5,
-            OpacidadFondo = 55, GrosorBorde = 2, ColorBorde = "#FF5A5A"
+            OpacidadFondo = 55
         };
 
         await sut.GuardarConfiguracionAsync(config);

@@ -37,7 +37,7 @@ $root = $PSScriptRoot
 $ffmpegDir = "$root\AnimeLocalTracker\FFmpeg"
 & "$root\tools\Get-FFmpegBinaries.ps1" -Destino $ffmpegDir
 
-# libmpv-2.dll: motor de video nuevo (docs\investigacion-motor-libmpv.md). Versión y SHA256 fijados en
+# libmpv-2.dll: el motor de video del reproductor (docs\investigacion-motor-libmpv.md). Versión y SHA256 fijados en
 # tools\Get-Libmpv.ps1; la carpeta AnimeLocalTracker\Mpv\ está en .gitignore.
 & "$root\tools\Get-Libmpv.ps1" -Destino "$root\AnimeLocalTracker\Mpv"
 

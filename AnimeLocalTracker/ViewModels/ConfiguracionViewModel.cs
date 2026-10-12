@@ -208,14 +208,12 @@ public partial class ConfiguracionViewModel : ObservableObject
     [ObservableProperty] private string _estiloColorContorno = "#000000";
     [ObservableProperty] private double _estiloGrosorContorno = 3;
     [ObservableProperty] private double _estiloOpacidadFondo;
-    [ObservableProperty] private double _estiloGrosorBorde;
-    [ObservableProperty] private string _estiloColorBorde = "#FFFFFF";
     [ObservableProperty] private EstiloSubtitulos _estiloVistaPrevia = new();
 
     /// <summary>Tipografías disponibles para los subtítulos.</summary>
     public IReadOnlyList<string> FuentesSubtitulos => EstiloSubtitulos.FuentesDisponibles;
 
-    /// <summary>Paleta compartida por los tres selectores de color (texto, contorno y borde de la caja).</summary>
+    /// <summary>Paleta compartida por los dos selectores de color (texto y contorno).</summary>
     public IReadOnlyList<ColorEstiloOpcion> ColoresSubtitulos { get; } =
         EstiloSubtitulos.Paleta.Select(c => new ColorEstiloOpcion(c.Clave, c.Hex)).ToList();
 
@@ -223,7 +221,7 @@ public partial class ConfiguracionViewModel : ObservableObject
     {
         nameof(EstiloFuente), nameof(EstiloTamano), nameof(EstiloNegrita), nameof(EstiloCursiva),
         nameof(EstiloSubrayado), nameof(EstiloColorTexto), nameof(EstiloColorContorno),
-        nameof(EstiloGrosorContorno), nameof(EstiloOpacidadFondo), nameof(EstiloGrosorBorde), nameof(EstiloColorBorde)
+        nameof(EstiloGrosorContorno), nameof(EstiloOpacidadFondo)
     };
 
     protected override void OnPropertyChanged(System.ComponentModel.PropertyChangedEventArgs e)
@@ -246,9 +244,7 @@ public partial class ConfiguracionViewModel : ObservableObject
         ColorTexto = EstiloColorTexto,
         ColorContorno = EstiloColorContorno,
         GrosorContorno = EstiloGrosorContorno,
-        OpacidadFondo = (int)Math.Round(EstiloOpacidadFondo),
-        GrosorBorde = EstiloGrosorBorde,
-        ColorBorde = EstiloColorBorde
+        OpacidadFondo = (int)Math.Round(EstiloOpacidadFondo)
     }.Normalizar();
 
     private void AplicarEstilo(EstiloSubtitulos? origen)
@@ -263,8 +259,6 @@ public partial class ConfiguracionViewModel : ObservableObject
         EstiloColorContorno = e.ColorContorno;
         EstiloGrosorContorno = e.GrosorContorno;
         EstiloOpacidadFondo = e.OpacidadFondo;
-        EstiloGrosorBorde = e.GrosorBorde;
-        EstiloColorBorde = e.ColorBorde;
         EstiloVistaPrevia = ConstruirEstilo();
     }
 
@@ -328,64 +322,28 @@ public partial class ConfiguracionViewModel : ObservableObject
 
     partial void OnSeccionActivaChanged(SeccionConfiguracion value)
     {
-        // La lista de tarjetas y el informe del último video se leen al entrar (arrancar el motor de video solo si hace falta).
+        // El informe del último video se lee al entrar.
         if (value == SeccionConfiguracion.Reproduccion) ActualizarRendimientoVideo();
     }
 
     // === RENDIMIENTO DE VIDEO (Reproducción) ===
 
-    /// <summary>Opción del desplegable de tarjeta gráfica: Valor "" = la que elija Windows.</summary>
-    public sealed record OpcionTarjetaGrafica(string Valor, string Nombre)
-    {
-        /// <summary>Lo que leen los lectores de pantalla en el desplegable (si no, leían el nombre interno del tipo).</summary>
-        public override string ToString() => Nombre;
-    }
-
-    /// <summary>¿Está el motor nuevo en la instalación? Solo mira el archivo, no carga la biblioteca. Las pruebas lo sustituyen.</summary>
-    internal Func<bool> HayMotorNuevo { get; set; } = () => Services.Native.LibMpv.EnLaInstalacion;
-
-    /// <summary>«Motor de video»: <see cref="MotoresDeVideo"/>. Se aplica al abrir el siguiente episodio.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(UsaMotorNuevo))]
-    private string _motorDeVideo = MotoresDeVideo.Nuevo;
-
-    /// <summary>False en una instalación sin libmpv: se muestra el clásico, no se deja elegir y guardar no toca el ajuste.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(UsaMotorNuevo))]
-    private bool _motorNuevoDisponible = true;
-
-    /// <summary>Con el motor nuevo no se elige tarjeta gráfica ni se dibuja el borde de la caja de subtítulos, y el escalado es Anime4K.</summary>
-    public bool UsaMotorNuevo => MotorNuevoDisponible && MotorDeVideo == MotoresDeVideo.Nuevo;
-
     [ObservableProperty] private string _modoSaltosVideo = ModosRendimientoVideo.Automatico;
     [ObservableProperty] private bool _aceleracionHardwareVideo = true;
     [ObservableProperty] private bool _videoPorSoftware;
-    [ObservableProperty] private string _tarjetaGraficaVideo = string.Empty;
     [ObservableProperty] private string _escaladoInteligenteVideo = ModosRendimientoVideo.Automatico;
     [ObservableProperty] private string _diagnosticoEquipoTexto = string.Empty;
     [ObservableProperty] private string _diagnosticoUltimoVideoTexto = string.Empty;
 
-    public System.Collections.ObjectModel.ObservableCollection<OpcionTarjetaGrafica> TarjetasGraficas { get; } = new();
-
-    /// <summary>Rehace el desplegable de tarjetas y los textos de diagnóstico (al entrar en la sección y al cambiar de idioma).</summary>
+    /// <summary>Rehace los textos de diagnóstico (al entrar en la sección y al cambiar de idioma).</summary>
     internal void ActualizarRendimientoVideo()
     {
-        var tarjetas = MotorVideo.ListarTarjetas();
-        string elegida = TarjetaGraficaVideo;
-
-        TarjetasGraficas.Clear();
-        TarjetasGraficas.Add(new OpcionTarjetaGrafica(string.Empty, LocalizationService.T("Cfg_TarjetaAutomatica")));
-        foreach (var t in tarjetas)
-            TarjetasGraficas.Add(new OpcionTarjetaGrafica(t.Nombre, t.MemoriaMb >= 1024 ? $"{t.Nombre} · {t.MemoriaMb / 1024.0:0.#} GB" : t.Nombre));
-        // Una tarjeta guardada que ahora no está (gráfica externa desconectada): se conserva la elección en vez de perderla en silencio.
-        if (!string.IsNullOrEmpty(elegida) && !tarjetas.Any(t => string.Equals(t.Nombre, elegida, StringComparison.OrdinalIgnoreCase)))
-            TarjetasGraficas.Add(new OpcionTarjetaGrafica(elegida, string.Format(LocalizationService.T("Cfg_TarjetaNoConectadaFormato"), elegida)));
-        TarjetaGraficaVideo = string.Empty;
-        TarjetaGraficaVideo = elegida; // vuelve a seleccionar en el desplegable ya rellenado
-
-        DiagnosticoEquipoTexto = string.Format(LocalizationService.T("Cfg_DiagEquipoFormato"),
-            tarjetas.Count > 0 ? string.Join(" + ", tarjetas.Select(t => t.Nombre)) : "?", Environment.ProcessorCount);
-        DiagnosticoUltimoVideoTexto = DescribirUltimoVideo(MotorVideo.UltimoInforme);
+        // La tarjeta la dice el lienzo al pintar el primer video de la sesión: antes de eso (o pintando por software) no se conoce.
+        var informe = MotorVideo.UltimoInforme;
+        DiagnosticoEquipoTexto = string.IsNullOrWhiteSpace(informe?.Tarjeta)
+            ? string.Format(LocalizationService.T("Cfg_DiagEquipoSinTarjetaFormato"), Environment.ProcessorCount)
+            : string.Format(LocalizationService.T("Cfg_DiagEquipoFormato"), informe.Tarjeta, Environment.ProcessorCount);
+        DiagnosticoUltimoVideoTexto = DescribirUltimoVideo(informe);
     }
 
     internal static string DescribirUltimoVideo(InformeVideo? informe)
@@ -515,12 +473,9 @@ public partial class ConfiguracionViewModel : ObservableObject
         MusicaSigueFueraDeLaFicha = config.MusicaSigueFueraDeLaFicha;
         Idioma = config.Idioma == "en" ? "en" : "es";
         VelocidadReproduccionDefecto = config.VelocidadReproduccionDefecto is >= 0.5 and <= 2.0 ? config.VelocidadReproduccionDefecto : 1.0;
-        MotorNuevoDisponible = HayMotorNuevo();
-        MotorDeVideo = MotorNuevoDisponible ? MotoresDeVideo.Normalizar(config.MotorVideo) : MotoresDeVideo.Clasico;
         ModoSaltosVideo = config.ModoSaltosVideo is ModosRendimientoVideo.Exactos or ModosRendimientoVideo.Rapidos ? config.ModoSaltosVideo : ModosRendimientoVideo.Automatico;
         AceleracionHardwareVideo = config.AceleracionHardwareVideo;
         VideoPorSoftware = config.VideoPorSoftware;
-        TarjetaGraficaVideo = config.TarjetaGraficaVideo ?? string.Empty;
         EscaladoInteligenteVideo = config.EscaladoInteligenteVideo is ModosRendimientoVideo.Activado or ModosRendimientoVideo.Desactivado ? config.EscaladoInteligenteVideo : ModosRendimientoVideo.Automatico;
         // El registro de Windows es la fuente de verdad (no AppSettings): así se refleja si el
         // usuario lo desactivó desde el Administrador de tareas en vez de desde esta pantalla.
@@ -739,11 +694,9 @@ public partial class ConfiguracionViewModel : ObservableObject
             config.MusicaSigueFueraDeLaFicha = MusicaSigueFueraDeLaFicha;
             config.Idioma = Idioma == "en" ? "en" : "es";
             config.VelocidadReproduccionDefecto = VelocidadReproduccionDefecto is >= 0.5 and <= 2.0 ? VelocidadReproduccionDefecto : 1.0;
-            if (MotorNuevoDisponible) config.MotorVideo = MotoresDeVideo.Normalizar(MotorDeVideo); // sin libmpv se muestra el clásico, pero no se pisa lo guardado
             config.ModoSaltosVideo = string.IsNullOrEmpty(ModoSaltosVideo) ? ModosRendimientoVideo.Automatico : ModoSaltosVideo;
             config.AceleracionHardwareVideo = AceleracionHardwareVideo;
             config.VideoPorSoftware = VideoPorSoftware;
-            config.TarjetaGraficaVideo = string.IsNullOrWhiteSpace(TarjetaGraficaVideo) ? null : TarjetaGraficaVideo;
             config.EscaladoInteligenteVideo = string.IsNullOrEmpty(EscaladoInteligenteVideo) ? ModosRendimientoVideo.Automatico : EscaladoInteligenteVideo;
             config.TeclaPanicoActiva = TeclaPanicoActiva;
             config.TeclaPanico = TeclaPanico == "Escape" ? "Escape" : "F12";

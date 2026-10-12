@@ -1,7 +1,7 @@
 # Shaders de Anime4K
 
 De [Anime4K](https://github.com/bloc97/Anime4K) v4.0.1 (bloc97, licencia MIT; cada archivo lleva su aviso). Son los que carga el
-escalado inteligente del motor nuevo (`MotorVideo.SombreadoresAnime4K`): recortar brillos, restaurar líneas y ampliar, en dos
+escalado inteligente del reproductor (`MotorVideo.SombreadoresAnime4K`): recortar brillos, restaurar líneas y ampliar, en dos
 niveles (S para gráficas integradas, M para dedicadas).
 
 ## La única modificación

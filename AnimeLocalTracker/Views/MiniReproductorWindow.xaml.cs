@@ -15,9 +15,6 @@ namespace AnimeLocalTracker.Views;
 /// </summary>
 public partial class MiniReproductorWindow : Window
 {
-    /// <summary>Grosor (en DIP) de la franja de los bordes que sirve para cambiar el tamaño (igual que ResizeBorderThickness).</summary>
-    public const double GrosorBorde = 6;
-
     private const double ProporcionPorDefecto = 16d / 9d;
 
     private readonly ReproductorViewModel _reproductor;
@@ -64,20 +61,6 @@ public partial class MiniReproductorWindow : Window
     {
         base.OnSourceInitialized(e);
         (PresentationSource.FromVisual(this) as HwndSource)?.AddHook(WndProc);
-    }
-
-    /// <summary>
-    /// True si el punto (en píxeles de pantalla) cae en la franja de los bordes de esta ventana. Lo usa la vista del reproductor para
-    /// dejar pasar esos puntos a esta ventana: el video y los controles de Flyleaf son ventanas nativas que la cubren entera.
-    /// </summary>
-    public bool EnBordeDeRedimension(int x, int y)
-    {
-        var manejador = new WindowInteropHelper(this).Handle;
-        if (manejador == IntPtr.Zero || !GetWindowRect(manejador, out var r)) return false;
-
-        int borde = (int)Math.Ceiling(GrosorBorde * VisualTreeHelper.GetDpi(this).DpiScaleX);
-        return x >= r.Left && x < r.Right && y >= r.Top && y < r.Bottom
-            && (x - r.Left < borde || r.Right - x <= borde || y - r.Top < borde || r.Bottom - y <= borde);
     }
 
     /// <summary>Proporción ancho/alto del episodio que se está viendo (16:9 si aún no se sabe).</summary>
@@ -169,7 +152,4 @@ public partial class MiniReproductorWindow : Window
 
     [StructLayout(LayoutKind.Sequential)]
     private struct RECT { public int Left, Top, Right, Bottom; }
-
-    [DllImport("user32.dll")]
-    private static extern bool GetWindowRect(IntPtr ventana, out RECT rect);
 }

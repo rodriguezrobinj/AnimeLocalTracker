@@ -10,7 +10,7 @@ public class PlaybackSeekCoordinator : IPlaybackSeekCoordinator
     // ventana el bucle de tracking no repinta la posición para evitar rebotes.
     private static readonly TimeSpan VentanaSettleSeek = TimeSpan.FromMilliseconds(900);
 
-    // Enviar CurTime a Flyleaf más rápido de lo que él procesa los seeks los ENCOLA y pueden
+    // Pedir saltos al motor más rápido de lo que él los procesa los ENCOLA y pueden
     // aplicarse FUERA DE ORDEN: el video "no se coloca y vuelve donde estaba". Con un intervalo
     // mínimo entre seeks y aplicando siempre el objetivo MÁS RECIENTE, el orden queda garantizado.
     private static readonly TimeSpan IntervaloMinimoSeek = TimeSpan.FromMilliseconds(250);
@@ -70,7 +70,7 @@ public class PlaybackSeekCoordinator : IPlaybackSeekCoordinator
         if (motor.Desechado) return;
 
         // Si el reproductor todavía se está abriendo o no ha completado la inicialización inicial del decodificador,
-        // no invocar Player.CurTime de inmediato (interrumpe la creación del contexto de video en FFmpeg/Flyleaf
+        // no saltar de inmediato (interrumpe el arranque del decodificador de video
         // dejando la pantalla negra). Guardamos la posición para aplicarla en cuanto OpenCompleted se active.
         if (!haCompletadoOpen() || motor.Estado is EstadoMotor.Abriendo or EstadoMotor.Detenido)
         {

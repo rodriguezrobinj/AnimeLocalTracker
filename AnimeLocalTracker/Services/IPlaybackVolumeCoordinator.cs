@@ -2,8 +2,8 @@
 namespace AnimeLocalTracker.Services;
 
 /// <summary>
-/// Orquesta volumen/mute contra el <see cref="Player"/> de Flyleaf. El ViewModel sigue dueño de
-/// Volumen/IsMuted/VolumenIcon (propiedades observables); este colaborador solo toca el Player
+/// Orquesta volumen/mute contra el motor de video. El ViewModel sigue dueño de
+/// Volumen/IsMuted/VolumenIcon (propiedades observables); este colaborador solo toca el motor
 /// y calcula el ícono correspondiente.
 /// </summary>
 public interface IPlaybackVolumeCoordinator
@@ -12,7 +12,7 @@ public interface IPlaybackVolumeCoordinator
     string CalcularIcono(int volumen, bool isMuted);
 
     /// <summary>
-    /// Aplica el volumen al Player; si <paramref name="estabaMuteado"/> y el volumen es &gt; 0,
+    /// Aplica el volumen al motor; si <paramref name="estabaMuteado"/> y el volumen es &gt; 0,
     /// también desmutea. Devuelve true si desmuteó (el llamador debe actualizar su IsMuted).
     /// </summary>
     bool AplicarVolumen(IMotorVideo? motor, int volumen, bool estabaMuteado);

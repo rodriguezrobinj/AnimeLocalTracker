@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using FlyleafLib;
 
 namespace AnimeLocalTracker.Services;
 
@@ -13,16 +12,6 @@ public static class ModosRendimientoVideo
     public const string Rapidos = "Rapidos";
     public const string Activado = "Activado";
     public const string Desactivado = "Desactivado";
-}
-
-/// <summary>Valores del ajuste «Motor de video», tal como se guardan en settings.json.</summary>
-public static class MotoresDeVideo
-{
-    public const string Nuevo = "Mpv", Clasico = "Flyleaf";
-
-    /// <summary>Lo que hay escrito en settings.json → uno de los dos valores. Todo lo que no sea el clásico es el nuevo.</summary>
-    public static string Normalizar(string? ajuste) =>
-        string.Equals(ajuste?.Trim(), Clasico, StringComparison.OrdinalIgnoreCase) ? Clasico : Nuevo;
 }
 
 /// <summary>Cómo se resuelven los saltos del reproductor (flechas, ±N s, saltar opening, clic en la barra).</summary>
@@ -42,92 +31,12 @@ public sealed record TarjetaGrafica(string Nombre, FabricanteGrafica Fabricante,
 public sealed record InformeVideo(string Codec, bool PorHardware, string? Tarjeta, EstrategiaSaltos Saltos, bool Escalado, DateTime MomentoUtc);
 
 /// <summary>
-/// Motor de video (Flyleaf) compartido por toda la app: arranque único, tarjetas gráficas disponibles, informe del último video y la
-/// política del modo automático (qué saltos usar y si activar el escalado inteligente según el equipo).
+/// Lo que comparte toda la app sobre el video: el informe del último episodio abierto y la política del modo automático (qué saltos
+/// usar y si activar el escalado inteligente según el equipo).
 /// </summary>
 public static class MotorVideo
 {
     private static readonly object Candado = new();
-    private static bool _iniciado;
-
-    /// <summary>Arranca el motor una vez. False en pruebas automáticas (Flyleaf puede colgarse sin ventana) o si falla.</summary>
-    public static bool AsegurarIniciado()
-    {
-        if (ViewModels.ReproductorViewModel.EsEntornoPruebas()) return false;
-
-        lock (Candado)
-        {
-            if (_iniciado) return true;
-            try
-            {
-                var reloj = System.Diagnostics.Stopwatch.StartNew();
-                Engine.Start(new EngineConfig { FFmpegPath = ":FFmpeg", UIRefresh = true });
-                _iniciado = true;
-                AppLogger.Info("MotorVideo", $"[Perf] Motor de video iniciado en {reloj.ElapsedMilliseconds} ms ({MedidorRendimiento.MsDesdeInicio} ms desde que se abrió la app).");
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Debug("MotorVideo", $"No se pudo iniciar el motor Flyleaf: {ex.Message}");
-            }
-            return _iniciado;
-        }
-    }
-
-    /// <summary>Orden de carga de las bibliotecas de FFmpeg: cada una depende de las anteriores.</summary>
-    private static readonly string[] OrdenBibliotecasFFmpeg = ["avutil", "swresample", "swscale", "avcodec", "avformat", "avfilter", "avdevice"];
-
-    /// <summary>
-    /// Carga en memoria las bibliotecas de FFmpeg (160 MB) desde un hilo cualquiera, para que <see cref="AsegurarIniciado"/>
-    /// —que sí exige el hilo de la interfaz— las encuentre ya cargadas y no deje la ventana sin responder mientras Windows
-    /// las lee del disco (y el antivirus las revisa). Si algo falla no pasa nada: el motor las cargará él, como antes.
-    /// </summary>
-    public static void PrecargarBibliotecas()
-    {
-        if (ViewModels.ReproductorViewModel.EsEntornoPruebas()) return;
-
-        try
-        {
-            string carpeta = System.IO.Path.Combine(AppContext.BaseDirectory, "FFmpeg");
-            if (!System.IO.Directory.Exists(carpeta)) return;
-
-            var reloj = System.Diagnostics.Stopwatch.StartNew();
-            var archivos = System.IO.Directory.GetFiles(carpeta, "*.dll");
-            int cargadas = 0;
-            foreach (string prefijo in OrdenBibliotecasFFmpeg)
-            {
-                foreach (string archivo in archivos.Where(a => System.IO.Path.GetFileName(a).StartsWith(prefijo + "-", StringComparison.OrdinalIgnoreCase)))
-                {
-                    if (System.Runtime.InteropServices.NativeLibrary.TryLoad(archivo, out _)) cargadas++;
-                }
-            }
-            AppLogger.Debug("MotorVideo", $"[Perf] Bibliotecas de FFmpeg cargadas por adelantado: {cargadas} en {reloj.ElapsedMilliseconds} ms.");
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Debug("MotorVideo", $"No se pudieron cargar por adelantado las bibliotecas de FFmpeg: {ex.Message}");
-        }
-    }
-
-    /// <summary>Tarjetas gráficas reales del equipo (sin el adaptador de software de Microsoft ni nombres repetidos).</summary>
-    public static IReadOnlyList<TarjetaGrafica> ListarTarjetas()
-    {
-        if (!AsegurarIniciado()) return Array.Empty<TarjetaGrafica>();
-        try
-        {
-            return Engine.Video.GPUAdapters.Values
-                .Where(g => !string.IsNullOrWhiteSpace(g.Description) && !g.Description.Contains("Basic Render", StringComparison.OrdinalIgnoreCase))
-                .Select(g => new TarjetaGrafica(g.Description.Trim(), FabricanteDe(g.Vendor), (long)((ulong)g.VideoMemory / (1024 * 1024))))
-                .GroupBy(t => t.Nombre, StringComparer.OrdinalIgnoreCase)
-                .Select(g => g.OrderByDescending(t => t.MemoriaMb).First())
-                .OrderByDescending(t => t.MemoriaMb)
-                .ToList();
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Debug("MotorVideo", $"No se pudieron listar las tarjetas gráficas: {ex.Message}");
-            return Array.Empty<TarjetaGrafica>();
-        }
-    }
 
     private static InformeVideo? _ultimoInforme;
     public static InformeVideo? UltimoInforme
@@ -141,17 +50,9 @@ public static class MotorVideo
     }
 
     /// <summary>
-    /// Patrón para Config.Video.GPUAdapter: Flyleaf lo compara como expresión regular contra el nombre, así que "Intel(R) HD Graphics
-    /// 620" tal cual no coincidiría consigo mismo (los paréntesis son un grupo). Null = la que elija Windows.
-    /// </summary>
-    public static string? PatronTarjeta(string? nombre) =>
-        string.IsNullOrWhiteSpace(nombre) ? null : "^" + System.Text.RegularExpressions.Regex.Escape(nombre.Trim()) + "$";
-
-    /// <summary>
-    /// Flyleaf pide la tarjeta gráfica y, si no soporta el formato, suele caer solo a software (libdav1d). Pero si ffmpeg rechaza los
-    /// paquetes antes de pedirle nada a la tarjeta (Tokyo Revengers S4 en una Intel HD 620: "trailing_one_bit out of range"), no hay fallo
-    /// limpio: la tarjeta queda elegida y no llega ni un fotograma. Con la tarjeta elegida y 0 fotogramas tras la espera, se reabre por
-    /// procesador (una vez por episodio).
+    /// El motor pide la tarjeta gráfica y, si no soporta el formato, suele caer solo al procesador. Pero puede quedarse con la tarjeta
+    /// elegida sin que llegue ni un fotograma (visto con Tokyo Revengers S4 en una Intel HD 620). Con la tarjeta elegida y 0 fotogramas
+    /// tras la espera, se reabre por procesador (una vez por episodio).
     /// </summary>
     public static bool DebeReintentarPorProcesador(bool porHardware, long fotogramas, bool yaReintentado) =>
         porHardware && fotogramas == 0 && !yaReintentado;
@@ -171,19 +72,10 @@ public static class MotorVideo
     };
 
     /// <summary>
-    /// Escalado inteligente (RTX Video Super Resolution de NVIDIA o el de Intel; Flyleaf no lo tiene para AMD). En automático, solo con
-    /// tarjeta NVIDIA o Intel dedicada (2 GB o más): en una integrada gasta batería y apenas se nota. Flyleaf además solo lo aplica si el
-    /// video se amplía en pantalla y es de 8 bits (los AV1 de 10 bits no lo usan).
+    /// Escalado inteligente (Anime4K: sombreadores que funcionan en cualquier tarjeta). En automático se enciende siempre y el
+    /// reproductor lo apaga en ese episodio si pierde fotogramas (<see cref="VigilanteEscalado"/>).
     /// </summary>
-    /// <param name="clase">Con sombreadores (Anime4K, motor nuevo) el automático lo enciende en cualquier tarjeta: el reproductor lo
-    /// apaga si pierde fotogramas (<see cref="VigilanteEscalado"/>).</param>
-    public static bool UsarEscaladoInteligente(string? modo, FabricanteGrafica fabricante, long memoriaMb,
-        ClaseEscalado clase = ClaseEscalado.PorControlador) => modo switch
-    {
-        ModosRendimientoVideo.Activado => true,
-        ModosRendimientoVideo.Desactivado => false,
-        _ => clase == ClaseEscalado.PorSombreadores || (fabricante is FabricanteGrafica.Nvidia or FabricanteGrafica.Intel && memoriaMb >= 2048)
-    };
+    public static bool UsarEscaladoInteligente(string? modo) => modo != ModosRendimientoVideo.Desactivado;
 
     /// <summary>
     /// El nivel de Anime4K que suele aguantar cada tarjeta. Medido en una Intel HD 620 a 1080p: el ligero no pierde fotogramas y el
@@ -202,15 +94,6 @@ public static class MotorVideo
         return ["Anime4K_Clamp_Highlights.glsl", $"Anime4K_Restore_CNN_{variante}.glsl", $"Anime4K_Upscale_CNN_x2_{variante}.glsl"];
     }
 
-    /// <summary>En esta sesión el lienzo OpenGL del motor nuevo no arrancó: se deja de intentar hasta reiniciar la app.</summary>
-    public static bool LienzoNoDisponible { get; internal set; }
-
-    /// <summary>True si toca el motor nuevo: no se pidió el clásico, la biblioteca está en la instalación y el lienzo no ha fallado.</summary>
-    public static bool ElegirMotor(string? ajuste, bool mpvDisponible) =>
-        mpvDisponible && !LienzoNoDisponible && MotoresDeVideo.Normalizar(ajuste) == MotoresDeVideo.Nuevo;
-
-    public static bool EscaladoDisponible(FabricanteGrafica fabricante) => fabricante is FabricanteGrafica.Nvidia or FabricanteGrafica.Intel;
-
     /// <summary>Fabricante a partir del texto que da el controlador ("Intel", "NVIDIA Corporation", "ATI Technologies Inc.", "AMD Radeon…").</summary>
     internal static FabricanteGrafica FabricantePorNombre(string? texto) =>
         string.IsNullOrWhiteSpace(texto) ? FabricanteGrafica.Desconocido
@@ -219,12 +102,4 @@ public static class MotorVideo
         : texto.Contains("amd", StringComparison.OrdinalIgnoreCase) || texto.Contains("radeon", StringComparison.OrdinalIgnoreCase)
           || texto.Contains("ati ", StringComparison.OrdinalIgnoreCase) ? FabricanteGrafica.Amd
         : FabricanteGrafica.Desconocido;
-
-    internal static FabricanteGrafica FabricanteDe(GPUVendor fabricante) => fabricante switch
-    {
-        GPUVendor.Intel => FabricanteGrafica.Intel,
-        GPUVendor.Nvidia => FabricanteGrafica.Nvidia,
-        GPUVendor.ATI => FabricanteGrafica.Amd,
-        _ => FabricanteGrafica.Desconocido
-    };
 }

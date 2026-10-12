@@ -229,44 +229,6 @@ public sealed class ReproductorConMotorTests : IDisposable
     }
 
     [Fact]
-    public async Task UnaPistaDeTexto_LaLeeLaApp_YNoSeLePideAlMotor()
-    {
-        // El lector de subtítulos ASS de Flyleaf cerraba la app con ciertas etiquetas: las pistas de texto las lee la app.
-        var extractor = new Mock<ISubtitleCuesExtractorService>();
-        IReadOnlyList<AnimeLocalTracker.Models.SubtitleCue> lineas = [new(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(3), "Hola")];
-        extractor.Setup(x => x.ExtraerAsync(_ruta, 2, null, It.IsAny<System.Threading.CancellationToken>())).ReturnsAsync(lineas);
-        _motor.Subtitulos.Add(new PistaSubtitulosMotor(2, LocalizationService.Cultura.TwoLetterISOLanguageName, null, false, false, null));
-        using var sut = new ReproductorViewModel(
-            Mock.Of<IDatabaseService>(), Mock.Of<IAnimeTrackingService>(), Mock.Of<IAuthService>(),
-            playbackStateService: _estado.Object, subtitleCuesExtractorService: extractor.Object, fabricaMotor: _ => _motor);
-
-        await sut.CargarVideoAsync(_ruta, 101, "Frieren", 5);
-        _motor.TerminarApertura();
-
-        await EsperarHasta(() => sut.SubtitulosDobleLineaActivo);
-        _motor.SubtitulosDelMotor.Should().BeNull();
-        sut.SubtitulosHabilitados.Should().BeTrue();
-    }
-
-    [Fact]
-    public async Task SiLaAppNoPuedeLeerUnaPistaDeTexto_SeLaDejaAlMotor()
-    {
-        var extractor = new Mock<ISubtitleCuesExtractorService>();
-        extractor.Setup(x => x.ExtraerAsync(_ruta, 2, null, It.IsAny<System.Threading.CancellationToken>()))
-            .ReturnsAsync((IReadOnlyList<AnimeLocalTracker.Models.SubtitleCue>)Array.Empty<AnimeLocalTracker.Models.SubtitleCue>());
-        var texto = new PistaSubtitulosMotor(2, LocalizationService.Cultura.TwoLetterISOLanguageName, null, false, false, null);
-        _motor.Subtitulos.Add(texto);
-        using var sut = new ReproductorViewModel(
-            Mock.Of<IDatabaseService>(), Mock.Of<IAnimeTrackingService>(), Mock.Of<IAuthService>(),
-            playbackStateService: _estado.Object, subtitleCuesExtractorService: extractor.Object, fabricaMotor: _ => _motor);
-
-        await sut.CargarVideoAsync(_ruta, 101, "Frieren", 5);
-        _motor.TerminarApertura();
-
-        await EsperarHasta(() => _motor.SubtitulosDelMotor == texto); // mejor los del motor que quedarse sin subtítulos
-    }
-
-    [Fact]
     public async Task UnaPistaDeImagen_SeLePideAlMotor_YSuAvisoNoReiniciaElEpisodio()
     {
         var imagen = new PistaSubtitulosMotor(4, "es", null, EsImagen: true, EsAss: false, RutaExterna: null);
@@ -275,7 +237,7 @@ public sealed class ReproductorConMotorTests : IDisposable
         await sut.CargarVideoAsync(_ruta, 101, "Frieren", 5);
         _motor.TerminarApertura();
 
-        _motor.SubtitulosDelMotor.Should().Be(imagen, "la app no sabe dibujar subtítulos de imagen");
+        _motor.SubtitulosDelMotor.Should().Be(imagen, "todas las pistas las dibuja el motor");
 
         _motor.TerminarApertura(clase: ClaseApertura.Subtitulos);
 
@@ -309,165 +271,52 @@ public sealed class ReproductorConMotorTests : IDisposable
         _motor.ProporcionVideo.Should().BeApproximately(1.333, 0.001);
     }
 
-    // ── Etapa 5 de libmpv: el motor nuevo es el predeterminado ──
+    // ── Etapa 6 de libmpv: un solo motor. Si no hay con qué mostrar el video se avisa una vez y no se reintenta ──
 
-    [Theory]
-    [InlineData(null, true)]
-    [InlineData("", true)]
-    [InlineData("Mpv", true)]
-    [InlineData("mpv", true)]
-    [InlineData("Nuevo", true)]
-    [InlineData("x", true)]
-    [InlineData("Flyleaf", false)]
-    [InlineData(" flyleaf ", false)]
-    public void ElegirMotor_TodoLoQueNoSeaElClasicoEsElNuevo(string? ajuste, bool esperado)
+    [Fact]
+    public async Task SinBiblioteca_ElReproductorAvisaYNoReintenta()
     {
-        MotorVideo.ElegirMotor(ajuste, mpvDisponible: true).Should().Be(esperado);
-        MotoresDeVideo.Normalizar(ajuste).Should().Be(esperado ? MotoresDeVideo.Nuevo : MotoresDeVideo.Clasico);
+        // Instalación dañada (falta libmpv-2.dll): no hay otro motor al que caer.
+        var dialogos = new Mock<IDialogService>();
+        int intentos = 0;
+        using var sut = new ReproductorViewModel(
+            Mock.Of<IDatabaseService>(), Mock.Of<IAnimeTrackingService>(), Mock.Of<IAuthService>(),
+            playbackStateService: _estado.Object, dialogService: dialogos.Object, fabricaMotor: _ => { intentos++; return null; });
+
+        sut.AsegurarMotorInicializado(); // así llega desde la navegación: primero el motor, luego el episodio
+        await sut.CargarVideoAsync(_ruta, 101, "Frieren", 5);
+        await sut.CargarVideoAsync(_ruta, 101, "Frieren", 6);
+
+        sut.Motor.Should().BeNull();
+        intentos.Should().Be(1, "si la biblioteca no está, no va a aparecer entre un episodio y el siguiente");
+        dialogos.Verify(d => d.MostrarToastReproductor(It.IsAny<string>(), LocalizationService.T("Player_ErrorSinMotor"), It.IsAny<string>(), It.IsAny<string>()), Times.Once);
+        dialogos.Verify(d => d.MostrarToastReproductor(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Once);
     }
 
     [Fact]
-    public void ElegirMotor_SinBibliotecaOConElLienzoRoto_EsElClasico()
+    public async Task SiNoHaySalida_AvisaUnaVezYNoReabre()
     {
-        MotorVideo.ElegirMotor("Mpv", mpvDisponible: false).Should().BeFalse("falta la biblioteca: se sigue con el motor clásico");
-
-        MotorVideo.LienzoNoDisponible = true;
-        try { MotorVideo.ElegirMotor("Mpv", mpvDisponible: true).Should().BeFalse("el lienzo ya falló en esta sesión"); }
-        finally { MotorVideo.LienzoNoDisponible = false; }
-    }
-
-    [Fact]
-    public void AppSettings_PorDefectoPideElMotorNuevo()
-    {
-        new AnimeLocalTracker.Models.AppSettings().MotorVideo.Should().Be(MotoresDeVideo.Nuevo);
-    }
-
-    [Fact]
-    public async Task ElMotorSeEligeAlCrearElReproductor_NoAMitadDeEpisodio()
-    {
-        // Cambiar «Motor de video» en Configuración con un episodio abierto (o en el mini reproductor) no toca al que suena.
-        var ajustes = new AnimeLocalTracker.Models.AppSettings();
-        var configuracion = new Mock<ISettingsService>();
-        configuracion.Setup(c => c.ObtenerConfiguracion()).Returns(ajustes);
+        // Ni lienzo OpenGL ni pintado por software: el motor avisa (puede hacerlo más de una vez) y el reproductor lo cierra.
+        var dialogos = new Mock<IDialogService>();
         int motoresCreados = 0;
         using var sut = new ReproductorViewModel(
             Mock.Of<IDatabaseService>(), Mock.Of<IAnimeTrackingService>(), Mock.Of<IAuthService>(),
-            settingsService: configuracion.Object, playbackStateService: _estado.Object,
-            fabricaMotor: _ => { motoresCreados++; return _motor; });
+            playbackStateService: _estado.Object, dialogService: dialogos.Object, fabricaMotor: _ => { motoresCreados++; return _motor; });
         await sut.CargarVideoAsync(_ruta, 101, "Frieren", 5);
 
-        ajustes.MotorVideo = MotoresDeVideo.Clasico;
+        sut.MotorSinSalida("sin OpenGL y sin pintado por software");
+        sut.MotorSinSalida("sin OpenGL y sin pintado por software");
+
+        sut.Motor.Should().BeNull();
+        _motor.VecesDesechado.Should().Be(1);
+        _motor.Abiertos.Should().HaveCount(1, "no se reabre: volvería a fallar igual");
+        sut.OcultarVideoInicio.Should().BeFalse("no se deja la tapa esperando un video que no va a llegar");
+        dialogos.Verify(d => d.MostrarToastReproductor(It.IsAny<string>(), LocalizationService.T("Player_ErrorSinVideo"), It.IsAny<string>(), It.IsAny<string>()), Times.Once);
+        dialogos.Verify(d => d.MostrarToastReproductor(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Once);
+
         await sut.CargarVideoAsync(_ruta, 101, "Frieren", 6);
 
-        motoresCreados.Should().Be(1);
-        _motor.VecesDesechado.Should().Be(0);
-        _motor.Abiertos.Should().HaveCount(2);
-    }
-
-    // ── Modo de compatibilidad: el motor nuevo no puede pintar y se sigue con el clásico ──
-
-    private (ReproductorViewModel Sut, MotorDePrueba Clasico) CrearSutConMotorNuevo(bool hayClasico = true)
-    {
-        var clasico = new MotorDePrueba { Duracion = TimeSpan.FromSeconds(1420) };
-        var sut = CrearSut(_motor);
-        sut.UsaMotorMpv = true;
-        sut.FabricaMotorClasico = _ => hayClasico ? clasico : null;
-        return (sut, clasico);
-    }
-
-    [Fact]
-    public async Task SiElLienzoFalla_ElEpisodioSeReabreConElMotorClasicoDondeIba()
-    {
-        _estado.Setup(e => e.ObtenerPosicionParaReanudarAsync(101, 5, It.IsAny<string?>())).ReturnsAsync((300d, 1420d));
-        var (sut, clasico) = CrearSutConMotorNuevo();
-        using var _ = sut;
-        try
-        {
-            await sut.CargarVideoAsync(_ruta, 101, "Frieren", 5);
-
-            sut.PasarAlMotorClasico("sin OpenGL");
-
-            _motor.VecesDesechado.Should().Be(1);
-            sut.Motor.Should().BeSameAs(clasico);
-            sut.UsaMotorMpv.Should().BeFalse("la plantilla cambia a la vista clásica");
-            MotorVideo.LienzoNoDisponible.Should().BeTrue("el resto de la sesión ya no lo intenta");
-            clasico.Abiertos.Should().Equal(_ruta);
-            clasico.SilencioPuesto.Should().BeTrue("arranca en silencio, como cualquier apertura");
-
-            clasico.TerminarApertura();
-            clasico.FotogramasMostrados = 3;
-
-            await EsperarHasta(() => !sut.OcultarVideoInicio);
-            clasico.Saltos.Should().ContainSingle().Which.Segundos.Should().Be(300);
-        }
-        finally { MotorVideo.LienzoNoDisponible = false; }
-    }
-
-    [Fact]
-    public async Task SiElLienzoFallaConElEpisodioAMedias_SigueDesdeEsePunto()
-    {
-        var (sut, clasico) = CrearSutConMotorNuevo();
-        using var _ = sut;
-        try
-        {
-            await AbrirYVerLaImagen(sut);
-            _motor.Posicion = TimeSpan.FromSeconds(640);
-            await EsperarHasta(() => Math.Abs(sut.CurrentSeconds - 640) < 1); // la barra sigue al video
-
-            sut.PasarAlMotorClasico("el lienzo dejó de pintar");
-
-            sut.OcultarVideoInicio.Should().BeTrue("se tapa hasta que el clásico muestre su primer fotograma");
-            clasico.TerminarApertura();
-            clasico.FotogramasMostrados = 3;
-            await EsperarHasta(() => !sut.OcultarVideoInicio);
-            clasico.Saltos.Should().ContainSingle().Which.Segundos.Should().Be(640);
-        }
-        finally { MotorVideo.LienzoNoDisponible = false; }
-    }
-
-    [Fact]
-    public async Task ElAvisoDosVeces_SoloCambiaUnaVez()
-    {
-        var (sut, clasico) = CrearSutConMotorNuevo();
-        using var _ = sut;
-        try
-        {
-            await sut.CargarVideoAsync(_ruta, 101, "Frieren", 5);
-
-            sut.PasarAlMotorClasico("sin OpenGL");
-            sut.PasarAlMotorClasico("sin OpenGL");
-
-            clasico.Abiertos.Should().HaveCount(1);
-            clasico.VecesDesechado.Should().Be(0);
-            _motor.VecesDesechado.Should().Be(1);
-        }
-        finally { MotorVideo.LienzoNoDisponible = false; }
-    }
-
-    [Fact]
-    public async Task SiElLienzoFallaYNoHayMotorClasico_AvisaUnaVez()
-    {
-        var dialogos = new Mock<IDialogService>();
-        var sut = new ReproductorViewModel(
-            Mock.Of<IDatabaseService>(), Mock.Of<IAnimeTrackingService>(), Mock.Of<IAuthService>(),
-            playbackStateService: _estado.Object, dialogService: dialogos.Object, fabricaMotor: _ => _motor)
-        {
-            UsaMotorMpv = true,
-            FabricaMotorClasico = _ => null
-        };
-        using var _ = sut;
-        try
-        {
-            await sut.CargarVideoAsync(_ruta, 101, "Frieren", 5);
-
-            sut.PasarAlMotorClasico("sin OpenGL");
-            sut.PasarAlMotorClasico("sin OpenGL");
-
-            sut.Motor.Should().BeNull();
-            sut.OcultarVideoInicio.Should().BeFalse("no se deja la tapa esperando un video que no va a llegar");
-            dialogos.Verify(d => d.MostrarToastReproductor(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Once);
-        }
-        finally { MotorVideo.LienzoNoDisponible = false; }
+        motoresCreados.Should().Be(1, "el episodio siguiente tampoco lo intenta en este reproductor");
     }
 
     [Fact]
@@ -486,52 +335,35 @@ public sealed class ReproductorConMotorTests : IDisposable
         _motor.SubtitulosDelMotor!.Indice.Should().Be(4);
     }
 
-    [Fact]
-    public void ConUnMotorInyectado_NoSeUsaLaVistaDelMotorNuevo()
-    {
-        using var sut = CrearSut(_motor);
-
-        sut.UsaMotorMpv.Should().BeFalse("solo el motor que elige la app por el ajuste decide la vista");
-    }
-
-    // ── Etapa 3 de libmpv: un motor que dibuja él mismo los subtítulos de texto ──
+    // ── Los subtítulos los dibuja siempre el motor, dentro del video: también los de texto ──
 
     private static readonly PistaSubtitulosMotor PistaAss = new(3, LocalizationService.Cultura.TwoLetterISOLanguageName, null, EsImagen: false, EsAss: true, RutaExterna: null);
 
-    private (ReproductorViewModel Sut, Mock<ISubtitleCuesExtractorService> Extractor) CrearSutQueDibujaSubtitulos(AnimeLocalTracker.Models.AppSettings? ajustes = null)
+    private ReproductorViewModel CrearSutConPistaAss(AnimeLocalTracker.Models.AppSettings? ajustes = null)
     {
-        _motor.DibujaSubtitulosDeTexto = true;
         _motor.Subtitulos.Add(PistaAss);
-        var extractor = new Mock<ISubtitleCuesExtractorService>();
         var configuracion = new Mock<ISettingsService>();
         configuracion.Setup(c => c.ObtenerConfiguracion()).Returns(ajustes ?? new AnimeLocalTracker.Models.AppSettings());
-        var sut = new ReproductorViewModel(
+        return new ReproductorViewModel(
             Mock.Of<IDatabaseService>(), Mock.Of<IAnimeTrackingService>(), Mock.Of<IAuthService>(),
-            settingsService: configuracion.Object, playbackStateService: _estado.Object,
-            subtitleCuesExtractorService: extractor.Object, fabricaMotor: _ => _motor);
-        return (sut, extractor);
+            settingsService: configuracion.Object, playbackStateService: _estado.Object, fabricaMotor: _ => _motor);
     }
 
     [Fact]
-    public async Task ConMotorQueDibujaLosSubtitulos_UnaPistaDeTextoSeLeDaAlMotorYLaAppNoLaExtrae()
+    public async Task UnaPistaDeTexto_SeLeDaAlMotor()
     {
-        var (sut, extractor) = CrearSutQueDibujaSubtitulos();
-        using var _ = sut;
+        using var sut = CrearSutConPistaAss();
         await sut.CargarVideoAsync(_ruta, 101, "Frieren", 5);
         _motor.TerminarApertura();
 
-        _motor.SubtitulosDelMotor.Should().Be(PistaAss, "este motor dibuja todas las pistas dentro del video");
-        sut.PistaActualEsAss.Should().BeTrue("el menú sigue ofreciendo «Usar mi estilo»");
-        sut.SubtitulosAssActivo.Should().BeFalse("la app no prepara su propio dibujo ASS");
-        sut.SubtitulosDobleLineaActivo.Should().BeFalse();
-        extractor.Verify(x => x.ExtraerAsync(It.IsAny<string>(), It.IsAny<int?>(), It.IsAny<string?>(), It.IsAny<System.Threading.CancellationToken>()), Times.Never);
+        _motor.SubtitulosDelMotor.Should().Be(PistaAss);
+        sut.PistaActualEsAss.Should().BeTrue("el menú ofrece «Usar mi estilo»");
     }
 
     [Fact]
-    public async Task ConMotorQueDibujaLosSubtitulos_UsarMiEstiloSeLoPideAlMotor()
+    public async Task UsarMiEstilo_SeLoPideAlMotor()
     {
-        var (sut, _) = CrearSutQueDibujaSubtitulos();
-        using var __ = sut;
+        using var sut = CrearSutConPistaAss();
         await sut.CargarVideoAsync(_ruta, 101, "Frieren", 5);
         _motor.TerminarApertura();
 
@@ -543,10 +375,9 @@ public sealed class ReproductorConMotorTests : IDisposable
     }
 
     [Fact]
-    public async Task ConMotorQueDibujaLosSubtitulos_ApagarYEncenderVuelveAMostrarLaMismaPista()
+    public async Task ApagarYEncenderLosSubtitulos_VuelveAMostrarLaMismaPista()
     {
-        var (sut, _) = CrearSutQueDibujaSubtitulos();
-        using var __ = sut;
+        using var sut = CrearSutConPistaAss();
         await sut.CargarVideoAsync(_ruta, 101, "Frieren", 5);
         _motor.TerminarApertura();
 
@@ -561,8 +392,7 @@ public sealed class ReproductorConMotorTests : IDisposable
     public async Task AlCrearElMotor_SeLeDaElEstiloDeSubtitulosDeConfiguracion()
     {
         var ajustes = new AnimeLocalTracker.Models.AppSettings { EstiloSubtitulos = new AnimeLocalTracker.Models.EstiloSubtitulos { Tamano = 60 }, UsarMiEstiloEnAss = true };
-        var (sut, _) = CrearSutQueDibujaSubtitulos(ajustes);
-        using var __ = sut;
+        using var sut = CrearSutConPistaAss(ajustes);
 
         await sut.CargarVideoAsync(_ruta, 101, "Frieren", 5);
 
@@ -589,7 +419,6 @@ public sealed class ReproductorConMotorTests : IDisposable
 
     private ReproductorViewModel CrearSutConSombreadores(string modo)
     {
-        _motor.ClaseDeEscalado = ClaseEscalado.PorSombreadores;
         _motor.TarjetaEnUso = new TarjetaGrafica("Intel(R) HD Graphics 620", FabricanteGrafica.Intel, 0);
         var configuracion = new Mock<ISettingsService>();
         configuracion.Setup(c => c.ObtenerConfiguracion()).Returns(new AnimeLocalTracker.Models.AppSettings { EscaladoInteligenteVideo = modo });
@@ -666,18 +495,5 @@ public sealed class ReproductorConMotorTests : IDisposable
         await AbrirYVerLaImagen(sut, episodio: 6);
 
         await EsperarHasta(() => _motor.EscaladoInteligente);
-    }
-
-    [Fact]
-    public async Task ConElEscaladoDelControlador_UnaIntegradaSigueSinEscaladoEnAutomatico()
-    {
-        // El motor clásico: su escalado es el de la tarjeta y en automático solo se usa con una dedicada.
-        _motor.TarjetaEnUso = new TarjetaGrafica("Intel(R) HD Graphics 620", FabricanteGrafica.Intel, 128);
-        using var sut = CrearSut(_motor);
-
-        await AbrirYVerLaImagen(sut);
-        await Task.Delay(400);
-
-        _motor.EscaladoInteligente.Should().BeFalse();
     }
 }

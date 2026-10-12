@@ -9,7 +9,6 @@ using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
-using FlyleafLib.MediaPlayer;
 using AnimeLocalTracker.Messages;
 using AnimeLocalTracker.Models;
 using AnimeLocalTracker.Services;
@@ -27,8 +26,6 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     private readonly IFrameCaptureService _frameCaptureService;
     private readonly IPlaybackWindowModeCoordinator _windowModeCoordinator;
     private readonly ISubtitleCoordinator _subtitleCoordinator;
-    private readonly ISubtitleCuesExtractorService _subtitleCuesExtractor;
-    private readonly ISubtitleAssRenderer _assRenderer;
     private readonly IPlaybackVolumeCoordinator _volumeCoordinator;
     private readonly IPlaybackSeekCoordinator _seekCoordinator;
     private readonly IFotogramasClaveService _fotogramasClaveService;
@@ -53,22 +50,13 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
     /// <summary>El motor de video. Null bajo pruebas sin motor inyectado, o si el motor no arranca en este equipo.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(Player))]
     private IMotorVideo? _motor;
 
-    /// <summary>Solo para la vista clásica, que se enlaza al reproductor de Flyleaf (su anfitrión de video y el menú de subtítulos).
-    /// La lógica del reproductor usa <see cref="Motor"/>.</summary>
-    public Player? Player => (Motor as MotorFlyleaf)?.Player;
+    /// <summary>Null bajo pruebas sin motor inyectado: ni se carga libmpv ni se avisa de que falta.</summary>
+    private readonly Func<AjustesInicialesMotor, IMotorVideo?>? _fabricaMotor;
 
-    private Func<AjustesInicialesMotor, IMotorVideo?> _fabricaMotor;
-
-    /// <summary>Fábrica del motor clásico para el modo de compatibilidad. Las pruebas la sustituyen.</summary>
-    internal Func<AjustesInicialesMotor, IMotorVideo?> FabricaMotorClasico { get; set; } = MotorFlyleaf.Crear;
-
-    private bool _usaMotorMpv;
-    /// <summary>El reproductor usa libmpv: la plantilla de App.xaml elige con esto la vista que pinta el video dentro de WPF.
-    /// Pasa a false si el motor nuevo no puede pintar en este equipo (<see cref="PasarAlMotorClasico"/>).</summary>
-    public bool UsaMotorMpv { get => _usaMotorMpv; internal set => SetProperty(ref _usaMotorMpv, value); }
+    /// <summary>No hay con qué mostrar el video (falta la biblioteca o el equipo no puede pintarlo): ya se avisó y este reproductor no lo reintenta.</summary>
+    private bool _sinVideo;
 
     [ObservableProperty]
     private bool _esModoMini;
@@ -194,7 +182,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     /// <summary>Reintentos de apertura del episodio actual (uno como mucho: un archivo de verdad dañado no se reintenta sin fin).</summary>
     private int _reintentosApertura;
 
-    /// <summary>Tiempo máximo esperando a que Flyleaf termine de abrir antes de reintentar (antes se quedaba cargando sin fin y había que
+    /// <summary>Tiempo máximo esperando a que el motor termine de abrir antes de reintentar (antes se quedaba cargando sin fin y había que
     /// salir y volver a entrar varias veces).</summary>
     internal TimeSpan TiempoMaximoApertura { get; set; } = TimeSpan.FromSeconds(8);
 
@@ -360,28 +348,13 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         IFrameCaptureService? frameCaptureService = null,
         IPlaybackWindowModeCoordinator? windowModeCoordinator = null,
         ISubtitleCoordinator? subtitleCoordinator = null,
-        ISubtitleCuesExtractorService? subtitleCuesExtractorService = null,
         IPlaybackVolumeCoordinator? volumeCoordinator = null,
         IPlaybackSeekCoordinator? seekCoordinator = null,
         IFotogramasClaveService? fotogramasClaveService = null,
-        ISubtitleAssRenderer? subtitleAssRenderer = null,
         ILimpiadorDeEpisodios? limpiadorDeEpisodios = null,
         Func<AjustesInicialesMotor, IMotorVideo?>? fabricaMotor = null)
     {
-        if (fabricaMotor != null)
-        {
-            _fabricaMotor = fabricaMotor;
-        }
-        else
-        {
-            string? ajusteMotor = settingsService?.ObtenerConfiguracion()?.MotorVideo;
-            bool pideMpv = MotoresDeVideo.Normalizar(ajusteMotor) == MotoresDeVideo.Nuevo && !MotorVideo.LienzoNoDisponible;
-            // La biblioteca solo se carga si el ajuste la pide: con el motor clásico ni se toca.
-            _usaMotorMpv = pideMpv && !EsEntornoPruebas() && MotorVideo.ElegirMotor(ajusteMotor, Services.Native.LibMpv.Disponible);
-            if (pideMpv && !_usaMotorMpv && !EsEntornoPruebas())
-                AppLogger.Warn("ReproductorViewModel", "El ajuste pide el motor libmpv pero su biblioteca no está: se usa el motor clásico.");
-            _fabricaMotor = _usaMotorMpv ? CrearMotorNuevo : MotorFlyleaf.Crear;
-        }
+        _fabricaMotor = fabricaMotor ?? (EsEntornoPruebas() ? null : CrearMotor);
         _databaseService = databaseService;
         _limpiadorDeEpisodios = limpiadorDeEpisodios;
         _settingsService = settingsService;
@@ -396,8 +369,6 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         _frameCaptureService = frameCaptureService ?? new FrameCaptureService();
         _windowModeCoordinator = windowModeCoordinator ?? new PlaybackWindowModeCoordinator(ventanaPrincipal);
         _subtitleCoordinator = subtitleCoordinator ?? new SubtitleCoordinator();
-        _subtitleCuesExtractor = subtitleCuesExtractorService ?? new SubtitleCuesExtractorService();
-        _assRenderer = subtitleAssRenderer ?? new SubtitleAssRenderer();
         _volumeCoordinator = volumeCoordinator ?? new PlaybackVolumeCoordinator();
         _seekCoordinator = seekCoordinator ?? new PlaybackSeekCoordinator();
         _fotogramasClaveService = fotogramasClaveService ?? new FotogramasClaveService();
@@ -496,8 +467,8 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     }
 
 
-    // En entornos de pruebas (headless) Flyleaf puede dejar su hilo maestro bloqueado y
-    // cualquier construcción posterior de Config() se cuelga en Dispatcher.Invoke síncrono.
+    // Bajo pruebas automáticas no se crea el motor de verdad (carga libmpv y eleva la prioridad del proceso):
+    // el reproductor trabaja sin motor salvo que la prueba le inyecte uno.
     internal static bool EsEntornoPruebas()
     {
         try
@@ -543,16 +514,19 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     public void AsegurarMotorInicializado()
     {
         if (Motor != null && !Motor.Desechado) return;
+        if (_fabricaMotor == null || _sinVideo) return;
 
         var ajustes = _settingsService?.ObtenerConfiguracion();
         var motor = _fabricaMotor(new AjustesInicialesMotor(
             ajustes?.AceleracionHardwareVideo ?? true,
-            ajustes?.TarjetaGraficaVideo,
             ModoNocheActivo || EcualizadorActivo ? ConstruirFiltrosAudio() : Array.Empty<Core.FiltroAudio>(),
             ajustes?.VideoPorSoftware ?? false));
         if (motor == null)
         {
+            // Falta libmpv-2.dll o no arranca (instalación dañada). No hay otro motor al que caer.
+            AppLogger.Error("ReproductorViewModel", "No se pudo crear el motor de video: el episodio no se puede reproducir.");
             Motor = null;
+            AvisarSinVideo("Player_ErrorSinMotor");
             return;
         }
 
@@ -568,69 +542,49 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         AplicarEstiloSubtitulosAlMotor();
     }
 
-    private MotorMpv? CrearMotorNuevo(AjustesInicialesMotor ajustes)
+    private MotorMpv? CrearMotor(AjustesInicialesMotor ajustes)
     {
         var motor = MotorMpv.Crear(ajustes);
-        if (motor != null) motor.SinSalida += PasarAlMotorClasico;
+        if (motor != null) motor.SinSalida += MotorSinSalida;
         return motor;
     }
 
     /// <summary>
-    /// El motor nuevo no puede pintar en este equipo (sin OpenGL: máquina virtual, escritorio remoto, controlador antiguo): el
-    /// episodio se reabre con el clásico donde iba y el resto de la sesión ya no lo intenta. No toca el ajuste guardado.
+    /// El motor no puede pintar en este equipo, ni en el lienzo OpenGL ni por software. Se cierra (sin dónde pintar no llega a cargar el
+    /// archivo, y el vigilante de la apertura lo reabriría para nada) y se avisa. El aviso puede llegar más de una vez.
     /// </summary>
-    public void PasarAlMotorClasico(string motivo)
+    public void MotorSinSalida(string motivo)
     {
-        if (!UsaMotorMpv) return; // ya se pasó: el aviso puede llegar más de una vez
-        AppLogger.Warn("ReproductorViewModel", $"El motor nuevo no puede pintar en este equipo ({motivo}): se sigue con el motor clásico.");
-        MotorVideo.LienzoNoDisponible = true;
+        if (_sinVideo) return;
+        AppLogger.Error("ReproductorViewModel", $"El motor de video no puede pintar en este equipo ({motivo}).");
 
-        double segundos = CurrentSeconds;
         var anterior = Motor;
         if (anterior != null) anterior.AperturaTerminada -= AlTerminarApertura;
         Motor = null;
         try { anterior?.Dispose(); }
-        catch (Exception ex) { AppLogger.Debug("ReproductorViewModel", $"No se pudo cerrar el motor nuevo: {ex.Message}"); }
+        catch (Exception ex) { AppLogger.Debug("ReproductorViewModel", $"No se pudo cerrar el motor de video: {ex.Message}"); }
+        AvisarSinVideo("Player_ErrorSinVideo");
+    }
 
-        _fabricaMotor = FabricaMotorClasico;
-        UsaMotorMpv = false; // la plantilla cambia a la vista clásica
-        AsegurarMotorInicializado();
-        if (Motor == null)
-        {
-            AppLogger.Error("ReproductorViewModel", "Tampoco arrancó el motor clásico: no hay con qué mostrar el video.");
-            OcultarVideoInicio = false;
-            PlayPauseIcon = "Play";
-            AvisarEnReproductor(LocalizationService.T("Player_ErrorAbrirTitulo"), LocalizationService.T("Player_ErrorSinVideo"), "AlertCircleOutline", "#EF4444");
-            return;
-        }
-        if (string.IsNullOrEmpty(_rutaVideo)) return; // aún no había episodio: lo abrirá CargarVideoAsync con el motor clásico
-
-        // Como una apertura normal: tapado y en silencio hasta el primer fotograma, y el salto al punto donde iba lo da el vigilante
-        // de arranque. Con la reanudación aún sin aplicar, CurrentSeconds ya es el punto guardado.
-        if (segundos > _posicionInicioSegundos) _posicionInicioSegundos = segundos;
-        _pistaSubtitulosElegida = false; // las pistas eran del motor que se cerró: se vuelven a evaluar con las del clásico
-        ReiniciarCuesSubtitulos();
-        _haCompletadoOpen = false;
-        _imagenLista = false;
-        _cambiandoPistaAudio = false;
-        _reanudacionPendiente = true;
-        OcultarVideoInicio = true;
-        _ocultarVideoDesdeUtc = DateTime.UtcNow;
-        try { Motor.Silencio = true; } catch { }
-        Motor.Abrir(_rutaVideo);
-        try { Motor.Velocidad = Math.Clamp(_settingsService?.ObtenerConfiguracion()?.VelocidadReproduccionDefecto ?? 1.0, 0.5, 2.0); } catch { }
+    /// <summary>Una vez por reproductor: sin tapa esperando un video que no va a llegar, y sin volver a intentarlo en el episodio siguiente.</summary>
+    private void AvisarSinVideo(string claveMensaje)
+    {
+        if (_sinVideo) return;
+        _sinVideo = true;
+        OcultarVideoInicio = false;
+        PlayPauseIcon = "Play";
+        AvisarEnReproductor(LocalizationService.T("Player_ErrorAbrirTitulo"), LocalizationService.T(claveMensaje), "AlertCircleOutline", "#EF4444");
     }
 
     private void AlTerminarApertura(object? sender, AperturaTerminada e)
     {
         if (sender is not IMotorVideo motor) return;
 
-        // Que el motor abra una pista de subtítulos también avisa: solo hay que extraer la pista nueva. Antes se reevaluaba
-        // "subtítulos por defecto" y, con esa opción apagada, se apagaba en el acto la pista que el usuario acababa de elegir en el menú.
+        // Un aviso por una pista de subtítulos no es un episodio nuevo: reevaluar "subtítulos por defecto" aquí apagaba en el acto,
+        // con esa opción apagada, la pista que el usuario acababa de elegir en el menú.
         if (e.Clase == ClaseApertura.Subtitulos)
         {
             if (!e.Exito) AppLogger.Warn("ReproductorViewModel", $"No se pudo abrir la pista de subtítulos: {e.Error}");
-            CargarCuesDePistaDelMotor();
             return;
         }
 
@@ -954,8 +908,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     [RelayCommand]
     public void SelectSubtitleStream(object stream)
     {
-        // La vista clásica entrega la pista de Flyleaf; la nueva entregará ya la del contrato.
-        var pista = stream as PistaSubtitulosMotor ?? Motor?.PistaSubtitulosDe(stream);
+        var pista = stream as PistaSubtitulosMotor;
         if (Motor == null || pista == null) return;
 
         SubtitulosHabilitados = true;
@@ -967,7 +920,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
     public System.Collections.ObjectModel.ObservableCollection<OpcionPistaAudio> PistasAudio { get; } = new();
 
-    /// <summary>Pistas de subtítulos del archivo abierto, para el menú de la vista del motor nuevo.</summary>
+    /// <summary>Pistas de subtítulos del archivo abierto, para el menú de la vista.</summary>
     public System.Collections.ObjectModel.ObservableCollection<OpcionPistaSubtitulos> PistasSubtitulosMenu { get; } = new();
 
     private void ActualizarPistasSubtitulosMenu()
@@ -1063,7 +1016,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             {
                 HabilitarSubtitulos();
 
-                // Flyleaf tiene sus subtítulos apagados y no elige pista: la elige la app (idioma de la app, luego inglés) y la
+                // El motor arranca con sus subtítulos apagados y no elige pista: la elige la app (idioma de la app, luego inglés) y la
                 // abre como si el usuario la hubiera escogido en el menú.
                 if (!_pistaSubtitulosElegida)
                 {
@@ -1088,22 +1041,16 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         SubtitulosHabilitados = false;
         SubtitulosIcon = "SubtitlesOutline";
         _subtitleCoordinator.Deshabilitar(Motor);
-
-        // No hace falta volver a extraer al reactivarlos: la pista no cambió. Solo se limpian las líneas para que
-        // no quede una imagen fantasma mientras están apagados.
-        SubtituloLineaAbajo = string.Empty;
-        SubtituloLineaArriba = string.Empty;
     }
 
-    /// <summary>Solo marca el estado: a Flyleaf no se le encienden los subtítulos aquí (abriría y leería una pista por su cuenta);
-    /// qué se muestra lo decide <see cref="AbrirPistaSubtitulos"/>.</summary>
+    /// <summary>Marca el estado y devuelve al motor la pista que tenía; cuál se muestra lo decide <see cref="AbrirPistaSubtitulos"/>.</summary>
     public void HabilitarSubtitulos()
     {
         SubtitulosHabilitados = true;
         SubtitulosIcon = "Subtitles";
 
-        // El motor que dibuja los subtítulos se quedó sin pista al apagarlos: se le vuelve a dar la que tenía.
-        if (Motor?.DibujaSubtitulosDeTexto == true && _pistaTextoActual != null) _subtitleCoordinator.SeleccionarPista(Motor, _pistaTextoActual);
+        // El motor se quedó sin pista al apagarlos: se le vuelve a dar la que tenía.
+        if (_pistaTextoActual != null) _subtitleCoordinator.SeleccionarPista(Motor, _pistaTextoActual);
     }
 
     public EpisodioItem? ObtenerSiguienteEpisodio() => _episodeNavigator.ObtenerSiguiente(_episodio);
@@ -1233,11 +1180,6 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         }
     }
 
-    /// <summary>ARQ-01: decisión pura de pre-carga — movida a <see cref="EpisodeNavigator"/>; se
-    /// mantiene este reenvío para no tocar los tests existentes que la llaman por este nombre.</summary>
-    internal static bool DebePrecargarSiguienteEpisodio(double porcentaje, string? rutaSiguiente, string? rutaYaPrecargada) =>
-        EpisodeNavigator.DebePrecargarSiguienteEpisodio(porcentaje, rutaSiguiente, rutaYaPrecargada);
-
     private CancellationTokenSource? _trackingCts;
 
     /// <summary>
@@ -1364,8 +1306,8 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         // Cancelar rastreo previo
         Core.Cancelacion.Reemplazar(ref _trackingCts);
 
-        // 1. Asegurar que Player existe antes de configurar el nuevo archivo. No se detiene antes el video anterior: la apertura de
-        //    Flyleaf ya lo reinicia en su propio hilo, y el Stop() previo repetía ese trabajo en el de la interfaz (~200 ms bloqueada
+        // 1. Asegurar que hay motor antes de configurar el nuevo archivo. No se detiene antes el video anterior: abrir otro
+        //    archivo ya lo sustituye, y pararlo antes repetía ese trabajo en el hilo de la interfaz (~200 ms bloqueada
         //    en cada cambio de episodio). El audio viejo se silencia justo antes de abrir y la tapa cubre la última imagen.
         AsegurarMotorInicializado();
 
@@ -1449,9 +1391,6 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         _autoPlayEjecutado = false;
         MostrarCuentaAtrasSiguiente = false;
 
-        // Cancelar la pre-carga del siguiente episodio del video anterior (si seguía en curso)
-        _episodeNavigator.CancelarPrecargaYReiniciar();
-
         return currentSkipCts.Token;
     }
 
@@ -1494,7 +1433,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         _haCompletadoOpen = false;
         _finDeEpisodioProcesado = false;
         _pistaSubtitulosElegida = false;
-        ReiniciarCuesSubtitulos(); // las líneas del episodio anterior no valen para este
+        OlvidarPistaSubtitulos(); // las líneas del episodio anterior no valen para este
         _reintentosApertura = 0;
         _estrategiaSaltos = EstrategiaSaltos.Equilibrados;
 
@@ -1602,7 +1541,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     /// <summary>El episodio actual ya se reabrió una vez sin tarjeta gráfica (se restablece al cambiar de episodio).</summary>
     private bool _reabiertoPorProcesador;
 
-    /// <summary>Apaga la decodificación por tarjeta solo para este episodio y lo reabre: Flyleaf elige entonces libdav1d.</summary>
+    /// <summary>Apaga la decodificación por tarjeta solo para este episodio y lo reabre: el motor decodifica entonces por procesador.</summary>
     private void ReabrirPorProcesador(IMotorVideo motor)
     {
         _reabiertoPorProcesador = true;
@@ -1643,7 +1582,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     private EstrategiaSaltos _estrategiaSaltos = EstrategiaSaltos.Equilibrados;
 
     /// <summary>
-    /// Con la imagen ya en pantalla se sabe qué decodificador se usa DE VERDAD: Flyleaf pide la tarjeta gráfica y, si el formato no
+    /// Con la imagen ya en pantalla se sabe qué decodificador se usa DE VERDAD: el motor pide la tarjeta gráfica y, si el formato no
     /// está soportado (AV1 en una Intel HD 620), cae en silencio a software (libdav1d). Leído al abrir decía "hardware" siempre. Con ese
     /// dato se eligen los saltos y el escalado inteligente del modo automático, y se deja el informe para Configuración.
     /// </summary>
@@ -1660,12 +1599,12 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
             string? modoEscalado = ajustes?.EscaladoInteligenteVideo;
             motor.EscaladoInteligente = tarjeta != null && !_escaladoApagadoPorRendimiento
-                && MotorVideo.UsarEscaladoInteligente(modoEscalado, tarjeta.Fabricante, tarjeta.MemoriaMb, motor.ClaseDeEscalado);
+                && MotorVideo.UsarEscaladoInteligente(modoEscalado);
             bool escalado = motor.EscaladoInteligente; // lo que quedó puesto de verdad (puede no haber podido)
 
-            // El escalado por sombreadores se enciende en cualquier tarjeta: en automático se vigila y, si no da abasto, se apaga.
+            // El escalado se enciende en cualquier tarjeta: en automático se vigila y, si no da abasto, se apaga.
             VigilanteEscalado.Reiniciar();
-            _vigilarEscalado = escalado && motor.ClaseDeEscalado == ClaseEscalado.PorSombreadores && modoEscalado != ModosRendimientoVideo.Activado;
+            _vigilarEscalado = escalado && modoEscalado != ModosRendimientoVideo.Activado;
 
             AppLogger.Info("ReproductorViewModel", $"Video: {codec} por {(porHardware ? "tarjeta gráfica" : "procesador")} · tarjeta {tarjeta?.Nombre ?? "?"} · " +
                 $"{Environment.ProcessorCount} hilos · saltos {_estrategiaSaltos} · escalado {(escalado ? "sí" : "no")}.");
@@ -1706,7 +1645,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
-    /// Si Flyleaf no termina de abrir en <see cref="TiempoMaximoApertura"/> (a veces se quedaba cargando sin fin, sobre todo al reanudar),
+    /// Si el motor no termina de abrir en <see cref="TiempoMaximoApertura"/> (a veces se quedaba cargando sin fin, sobre todo al reanudar),
     /// se reintenta una vez; si tampoco, se avisa en vez de dejar el spinner para siempre.
     /// </summary>
     private async Task VigilarAperturaAsync(string ruta, CancellationToken ct)
@@ -1727,7 +1666,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         catch (OperationCanceledException) { }
     }
 
-    /// <summary>Un reintento por episodio: el archivo existe pero Flyleaf no lo abrió (o se quedó abriendo). True si se reintentó.</summary>
+    /// <summary>Un reintento por episodio: el archivo existe pero el motor no lo abrió (o se quedó abriendo). True si se reintentó.</summary>
     private bool ReintentarAperturaSiCorresponde(string? error)
     {
         string ruta = _rutaVideo;
@@ -1825,8 +1764,8 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
-    /// Captura el fotograma actual (ver <see cref="FrameCaptureService"/>: snapshot directo del
-    /// buffer Direct3D de Flyleaf, sin relanzar ffmpeg ni re-decodificar), lo copia al portapapeles
+    /// Captura el fotograma actual (ver <see cref="FrameCaptureService"/>: el que el motor tiene en
+    /// pantalla, sin relanzar ffmpeg ni volver a decodificar), lo copia al portapapeles
     /// y lo guarda en Imágenes\AnimeLocalTracker. Este comando solo traduce el resultado a un toast.
     /// </summary>
     [RelayCommand]
@@ -1958,7 +1897,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     /// Qué hacer al llegar al final de un episodio, según Configuración → Reproducción → "Al terminar
     /// un episodio". Se llama UNA vez por episodio (guardado por <c>_autoPlayEjecutado</c> en el
     /// llamador). "Permanecer pausado" y "sin siguiente episodio" no hacen nada: el video se queda
-    /// en el último fotograma, que es exactamente el comportamiento por defecto de Flyleaf al terminar.
+    /// en el último fotograma, que es lo que hace el motor al terminar (keep-open).
     /// </summary>
     private async Task EjecutarAccionFinEpisodioAsync(CancellationToken ct)
     {
@@ -2073,15 +2012,6 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
                     double porcentaje = durSeconds > 0 ? curSeconds / durSeconds : 0;
 
-                    // PERF: cerca del final, pre-abrir (y descartar) el demuxer del siguiente episodio
-                    // en un Demuxer aparte del Player en reproducción — adelanta el sondeo de
-                    // contenedor/streams y calienta la caché de E/S de Windows para ese archivo, sin
-                    // tocar en absoluto la reproducción actual. Como máximo una vez por episodio.
-                    if (TieneEpisodioSiguiente && !EsEntornoPruebas())
-                    {
-                        _episodeNavigator.ConsiderarPrecarga(porcentaje, _siguienteEpisodioCache?.RutaCompleta, (ruta, ctPrecarga) => Motor?.PrecalentarArchivo(ruta, ctPrecarga));
-                    }
-
                     // Auto-Tracking al umbral configurado (FUN-003: antes fijo en 90%). NO se espera: sincroniza con AniList, y con
                     // AniList lento (esperas de 30-60 s en los logs) la barra, el botón de saltar el ending y los subtítulos se
                     // quedaban congelados todo ese rato. La marca local se guarda primero, al instante.
@@ -2093,7 +2023,6 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                     _finDeEpisodioProcesado = false; // volvió a reproducir: un nuevo final se vuelve a procesar
 
                     ProcesarDeteccionDeSkip(curSeconds);
-                    ActualizarLineasSubtitulosSolapados(curSeconds);
                 }
                 else if (Motor?.Estado == EstadoMotor.Terminado && _haCompletadoOpen && !_finDeEpisodioProcesado)
                 {
@@ -2346,8 +2275,6 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         // "Eliminar tras ver": el reproductor también se libera al navegar a otra pestaña, no solo al pulsar salir.
         if (_fueMarcadoComoVisto) NotificarEpisodioTerminadoParaLimpieza(_animeId, _episodio);
 
-        CerrarDibujoAss();
-
         if (_smtc != null)
         {
             _smtc.PlayRequested -= OnSmtcPlayRequested;
@@ -2369,15 +2296,6 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
 
         try
         {
-            Core.Cancelacion.Detener(ref _subtitleCuesCts);
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Debug("ReproductorViewModel", $"Error al cancelar la extracción de subtítulos: {ex.Message}");
-        }
-
-        try
-        {
             Core.Cancelacion.Detener(ref _skipCts);
             Core.Cancelacion.Detener(ref _preanalisisCts);
         }
@@ -2390,12 +2308,6 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         }
         catch { }
         _trackingCts = null;
-
-        try
-        {
-            _episodeNavigator.Dispose();
-        }
-        catch { }
 
         if (Motor != null)
         {
@@ -2429,8 +2341,8 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     private readonly ILogrosService? _logrosService;
 
     /// <summary>
-    /// Los avisos (toast) de la ventana principal quedan TAPADOS por el video: Flyleaf dibuja en su propia
-    /// ventana nativa. La vista del reproductor los dibuja por su cuenta, encima del video, a partir de esto.
+    /// Con un episodio a la vista, los avisos (toast) los dibuja la vista del reproductor encima del video, a partir de
+    /// esto; la ventana principal oculta el suyo mientras tanto (<c>MainViewModel.ToastEnVentana</c>).
     /// </summary>
     public IDialogService? DialogService { get; }
 }

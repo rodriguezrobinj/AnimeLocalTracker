@@ -11,7 +11,7 @@ namespace AnimeLocalTracker.Tests.ViewModels;
 public class ReproductorEntornoPruebasTests
 {
     private static readonly string[] EnsambladosNormales =
-        { "System.Private.CoreLib", "AnimeLocalTracker", "FlyleafLib", "PresentationFramework" };
+        { "System.Private.CoreLib", "AnimeLocalTracker", "OpenTK.Core", "PresentationFramework" };
 
     [Fact]
     public void AppNormal_NoEsEntornoDePruebas()

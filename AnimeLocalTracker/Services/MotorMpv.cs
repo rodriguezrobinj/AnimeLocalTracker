@@ -192,7 +192,7 @@ public sealed partial class MotorMpv : IMotorVideo
         _fin = false;
         Interlocked.Exchange(ref _fotogramas, 0);
         Interlocked.Exchange(ref _posicionTicks, 0);
-        Fijar("pause", "no"); // como el motor clásico: abrir es empezar a reproducir
+        Fijar("pause", "no"); // abrir es empezar a reproducir
         Fijar("sid", "no");   // libmpv conservaría la pista del archivo anterior: cada archivo empieza sin subtítulos y la app elige
 
         // Un cambio en vivo del ecualizador no toca la opción "af": sin esto el archivo nuevo volvería a las ganancias anteriores.
@@ -256,7 +256,6 @@ public sealed partial class MotorMpv : IMotorVideo
 
     public double ProporcionVideo => BitConverter.Int64BitsToDouble(Interlocked.Read(ref _proporcionBits));
 
-    // Etapas 3 y 4 (docs/plan-motor-libmpv-etapa-2.md, "Lo que la etapa 2 NO hace").
     private volatile TarjetaGrafica? _tarjeta;
 
     /// <summary>La tarjeta que pinta el lienzo (la que Windows asigna a la app): la dice la superficie al crear el pintor. Memoria desconocida.</summary>
@@ -274,7 +273,6 @@ public sealed partial class MotorMpv : IMotorVideo
     /// <summary>Junto a la app. Las pruebas la cambian para simular una instalación incompleta.</summary>
     internal string CarpetaDeSombreadores { get; set; } = Path.Combine(AppContext.BaseDirectory, "Shaders", "Anime4K");
 
-    public ClaseEscalado ClaseDeEscalado => ClaseEscalado.PorSombreadores;
     public long FotogramasPerdidos => _hayArchivo && long.TryParse(Leer("frame-drop-count"), out long perdidos) ? perdidos : 0;
 
     public bool EscaladoInteligente
@@ -377,8 +375,6 @@ public sealed partial class MotorMpv : IMotorVideo
 
     // ── Subtítulos: los dibuja libmpv dentro del video (libass), también los de texto plano ──
 
-    public bool DibujaSubtitulosDeTexto => true;
-
     private double _posicionSubtitulos = 100;
 
     /// <summary>
@@ -471,7 +467,6 @@ public sealed partial class MotorMpv : IMotorVideo
         }
         foreach (var (nombre, valor) in OpcionesDeEstilo(estilo, forzar)) Fijar(nombre, valor);
     }
-    public void PrecalentarArchivo(string ruta, CancellationToken ct) { } // con libmpv el cambio de episodio tarda ~0,1 s: no hace falta
 
     public IReadOnlyList<PistaAudioMotor> PistasAudio { get { lock (_candado) return _audio.Select(a => a.Pista).ToList(); } }
     public IReadOnlyList<PistaSubtitulosMotor> PistasSubtitulos { get { lock (_candado) return _subtitulos.Select(s => s.Pista).ToList(); } }
@@ -494,15 +489,13 @@ public sealed partial class MotorMpv : IMotorVideo
         }
     }
 
-    public PistaSubtitulosMotor? PistaSubtitulosDe(object nativa) => nativa as PistaSubtitulosMotor;
-
     public void ElegirAudio(PistaAudioMotor pista)
     {
         int id;
         lock (_candado) id = _audio.Where(a => a.Pista == pista).Select(a => a.IdMpv).DefaultIfEmpty(-1).First();
         if (id < 0) return;
         Fijar("aid", id.ToString(CultureInfo.InvariantCulture));
-        // El reproductor espera el mismo aviso que al abrir (así lo hacía el motor clásico) para restaurar volumen y silencio.
+        // El reproductor espera el mismo aviso que al abrir para restaurar volumen y silencio.
         _ = Task.Run(() => AperturaTerminada?.Invoke(this, new AperturaTerminada(ClaseApertura.Video, true, null)));
     }
 

@@ -5,23 +5,18 @@ using System.Runtime.InteropServices;
 namespace AnimeLocalTracker.Services.Native;
 
 /// <summary>
-/// Llamadas a libmpv-2.dll (motor de video nuevo). La biblioteca va en la carpeta Mpv de la instalación y se carga la primera vez
-/// que se pregunta por <see cref="Disponible"/>: con el motor clásico ni se toca. Nadie llama a nada de aquí sin comprobarlo antes.
+/// Llamadas a libmpv-2.dll (el motor de video). La biblioteca va en la carpeta Mpv de la instalación y se carga la primera vez
+/// que se pregunta por <see cref="Disponible"/>, al abrir el primer episodio. Nadie llama a nada de aquí sin comprobarlo antes.
 /// </summary>
 internal static partial class LibMpv
 {
     private const string Dll = "libmpv-2";
 
-    private static string Ruta => Path.Combine(AppContext.BaseDirectory, "Mpv", "libmpv-2.dll");
-
-    /// <summary>La biblioteca está en la instalación. No la carga: es lo que pregunta Configuración para ofrecer el motor nuevo.</summary>
-    public static bool EnLaInstalacion => File.Exists(Ruta);
-
     private static readonly Lazy<bool> Cargada = new(() =>
     {
         try
         {
-            string ruta = Ruta;
+            string ruta = Path.Combine(AppContext.BaseDirectory, "Mpv", "libmpv-2.dll");
             // Cargada por su ruta completa, las llamadas de abajo la encuentran por su nombre (Windows reutiliza el módulo ya cargado).
             return File.Exists(ruta) && NativeLibrary.TryLoad(ruta, out _);
         }

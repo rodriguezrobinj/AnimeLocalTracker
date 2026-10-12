@@ -10,12 +10,11 @@ namespace AnimeLocalTracker.Controls;
 /// <summary>
 /// Dibuja un subtítulo con el <see cref="EstiloSubtitulos"/> configurado: tipografía, tamaño, negrita/cursiva/
 /// subrayado, color, contorno REAL alrededor de cada letra (no un texto duplicado y borroso) y, opcionalmente,
-/// una caja de fondo con borde. Lo usan el reproductor y la vista previa de Configuración, así lo que se ve
-/// al configurar es exactamente lo que se ve al reproducir.
+/// una caja de fondo. Es la vista previa de Configuración: en el reproductor los subtítulos los dibuja libmpv con
+/// estas mismas medidas (<c>MotorMpv.OpcionesDeEstilo</c>).
 ///
 /// Es un elemento propio (no un TextBlock) porque WPF no tiene contorno de texto nativo: se convierte el
 /// texto a geometría y se dibuja primero el trazo y encima el relleno.
-/// Sus propiedades se pueden asignar por código: dentro del FlyleafHost los Binding se quedan congelados.
 /// </summary>
 public sealed class SubtitleTextView : FrameworkElement
 {
@@ -52,7 +51,7 @@ public sealed class SubtitleTextView : FrameworkElement
         set => SetValue(EstiloProperty, value);
     }
 
-    private bool TieneCaja => _estiloEnUso.OpacidadFondo > 0 || _estiloEnUso.GrosorBorde > 0;
+    private bool TieneCaja => _estiloEnUso.OpacidadFondo > 0;
 
     protected override Size MeasureOverride(Size availableSize)
     {
@@ -64,13 +63,10 @@ public sealed class SubtitleTextView : FrameworkElement
         _estiloEnUso = (Estilo ?? new EstiloSubtitulos()).Normalizar();
         var e = _estiloEnUso;
 
-        // Espacio que ocupa todo lo que rodea al texto: contorno + relleno de la caja + borde de la caja
+        // Espacio que ocupa todo lo que rodea al texto: contorno + relleno de la caja
         double contorno = e.GrosorContorno;
-        double bordeCaja = TieneCaja ? e.GrosorBorde : 0;
-        double rellenoH = TieneCaja ? RellenoCajaHorizontal : 0;
-        double rellenoV = TieneCaja ? RellenoCajaVertical : 0;
-        double margenX = contorno + rellenoH + bordeCaja;
-        double margenY = contorno + rellenoV + bordeCaja;
+        double margenX = contorno + (TieneCaja ? RellenoCajaHorizontal : 0);
+        double margenY = contorno + (TieneCaja ? RellenoCajaVertical : 0);
 
         double anchoMaxTexto = double.IsInfinity(availableSize.Width) ? 0 : Math.Max(1, availableSize.Width - 2 * margenX);
 
@@ -93,14 +89,8 @@ public sealed class SubtitleTextView : FrameworkElement
 
         if (TieneCaja)
         {
-            double borde = e.GrosorBorde;
-            var fondo = e.OpacidadFondo > 0
-                ? new SolidColorBrush(Color.FromArgb((byte)Math.Round(e.OpacidadFondo * 255 / 100.0), 0, 0, 0))
-                : null;
-            var lapiz = borde > 0 ? new Pen(Pincel(e.ColorBorde), borde) : null;
-            // El trazo se centra sobre el borde del rectángulo: se mete media línea para que no se recorte.
-            var rect = new Rect(borde / 2, borde / 2, Math.Max(0, RenderSize.Width - borde), Math.Max(0, RenderSize.Height - borde));
-            drawingContext.DrawRoundedRectangle(fondo, lapiz, rect, 8, 8);
+            var fondo = new SolidColorBrush(Color.FromArgb((byte)Math.Round(e.OpacidadFondo * 255 / 100.0), 0, 0, 0));
+            drawingContext.DrawRoundedRectangle(fondo, null, new Rect(RenderSize), 8, 8);
         }
 
         if (e.GrosorContorno > 0)

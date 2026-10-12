@@ -11,8 +11,8 @@ using Xunit;
 namespace AnimeLocalTracker.Tests.Views;
 
 /// <summary>
-/// Los avisos de la ventana principal quedan tapados por el video (Flyleaf dibuja en su propia
-/// ventana nativa), así que la vista del reproductor dibuja los suyos encima del video.
+/// Con un episodio a la vista, los avisos los dibuja la vista del reproductor encima del video
+/// (la ventana principal oculta el suyo mientras tanto).
 /// </summary>
 [Collection("WpfSmoke")]
 public class ReproductorToastTests
@@ -30,7 +30,7 @@ public class ReproductorToastTests
         _host.Ejecutar(() =>
         {
             var dialogo = new DialogService();
-            var vista = new ReproductorView { DataContext = CrearVm(dialogo) };
+            var vista = new ReproductorMpvView { DataContext = CrearVm(dialogo) };
 
             dialogo.MostrarToastReproductor("Reanudar Reproducción", "Continuando desde 10:26", "PlaySpeed", "#2196F3");
 
@@ -46,7 +46,7 @@ public class ReproductorToastTests
         _host.Ejecutar(() =>
         {
             var dialogo = new DialogService();
-            var vista = new ReproductorView { DataContext = CrearVm(dialogo) };
+            var vista = new ReproductorMpvView { DataContext = CrearVm(dialogo) };
 
             var act = () => dialogo.MostrarToastReproductor("T", "M", "IconoQueNoExiste", "esto-no-es-un-color");
 
@@ -62,7 +62,7 @@ public class ReproductorToastTests
         _host.Ejecutar(() =>
         {
             var dialogo = new DialogService();
-            var vista = new ReproductorView { DataContext = CrearVm(dialogo) };
+            var vista = new ReproductorMpvView { DataContext = CrearVm(dialogo) };
             dialogo.MostrarToastReproductor("Primero", "M1", "InformationOutline", "#2196F3");
 
             vista.DataContext = null;
@@ -78,7 +78,7 @@ public class ReproductorToastTests
         _host.Ejecutar(() =>
         {
             var dialogo = new DialogService();
-            var vista = new ReproductorView { DataContext = CrearVm(dialogo) };
+            var vista = new ReproductorMpvView { DataContext = CrearVm(dialogo) };
             dialogo.MostrarToastReproductor("Auto-Tracking", "Episodio 5 marcado como visto", "CheckCircle", "#4CAF50");
 
             dialogo.MostrarToast("Descarga completada", "Frieren - Episodio 6", "Download", "#4CAF50");
@@ -95,7 +95,7 @@ public class ReproductorToastTests
         _host.Ejecutar(() =>
         {
             var dialogo = new DialogService();
-            var vista = new ReproductorView { DataContext = CrearVm(dialogo) };
+            var vista = new ReproductorMpvView { DataContext = CrearVm(dialogo) };
 
             using (dialogo.AvisosComoDelReproductor())
             {
@@ -117,7 +117,7 @@ public class ReproductorToastTests
         {
             var vm = new ReproductorViewModel(Mock.Of<IDatabaseService>(), Mock.Of<IAnimeTrackingService>(), Mock.Of<IAuthService>());
 
-            var act = () => _ = new ReproductorView { DataContext = vm };
+            var act = () => _ = new ReproductorMpvView { DataContext = vm };
 
             act.Should().NotThrow();
             vm.DialogService.Should().BeNull();

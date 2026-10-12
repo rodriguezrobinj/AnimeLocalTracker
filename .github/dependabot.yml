@@ -9,9 +9,6 @@ updates:
       microsoft-extensions:
         patterns:
           - "Microsoft.Extensions.*"
-      flyleaf:
-        patterns:
-          - "Flyleaf*"
     ignore:
       # Fijado a una compilación de CI porque FlyleafLib.Controls.WPF lo exige (ver el comentario en AnimeLocalTracker.csproj):
       # que Dependabot no proponga otra compilación de CI sin revisar.

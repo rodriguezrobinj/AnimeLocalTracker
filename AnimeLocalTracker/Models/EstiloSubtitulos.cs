@@ -15,7 +15,6 @@ public class EstiloSubtitulos
     public const double TamanoMinimo = 24;
     public const double TamanoMaximo = 80;
     public const double GrosorContornoMaximo = 8;
-    public const double GrosorBordeMaximo = 6;
 
     private static readonly Regex ColorHex = new("^#[0-9A-Fa-f]{6}$", RegexOptions.Compiled);
 
@@ -60,11 +59,6 @@ public class EstiloSubtitulos
     /// <summary>Opacidad (0-100) del fondo negro de la caja que rodea el subtítulo (0 = sin caja).</summary>
     public int OpacidadFondo { get; set; }
 
-    /// <summary>Grosor del borde de la caja del subtítulo (0 = sin borde).</summary>
-    public double GrosorBorde { get; set; }
-
-    public string ColorBorde { get; set; } = "#FFFFFF";
-
     /// <summary>
     /// Corrige valores fuera de rango o mal formados (settings.json editado a mano) y devuelve una
     /// copia lista para usar; nunca modifica la instancia original.
@@ -79,9 +73,7 @@ public class EstiloSubtitulos
         ColorTexto = ColorValido(ColorTexto, "#FFFFFF"),
         ColorContorno = ColorValido(ColorContorno, "#000000"),
         GrosorContorno = double.IsNaN(GrosorContorno) ? 3 : Math.Clamp(GrosorContorno, 0, GrosorContornoMaximo),
-        OpacidadFondo = Math.Clamp(OpacidadFondo, 0, 100),
-        GrosorBorde = double.IsNaN(GrosorBorde) ? 0 : Math.Clamp(GrosorBorde, 0, GrosorBordeMaximo),
-        ColorBorde = ColorValido(ColorBorde, "#FFFFFF")
+        OpacidadFondo = Math.Clamp(OpacidadFondo, 0, 100)
     };
 
     private static string ColorValido(string? valor, string porDefecto)
