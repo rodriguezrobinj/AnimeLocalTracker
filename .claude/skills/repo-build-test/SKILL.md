@@ -60,6 +60,14 @@ El SDK de WPF compila cada proyecto en dos fases: primero genera los `.g.cs` des
    ```
    `-nodeReuse:false` evita que esa build deje nodos vivos para la siguiente invocación; conviene pasarlo en toda la sesión si vas a encadenar varios `dotnet build`/`dotnet test` seguidos.
 
+## Si cambiaste una interfaz de servicio
+
+`AnimeLocalTracker.Benchmarks/ReproductorBenchmarks.cs` implementa a mano `IDatabaseService`, `IAnimeTrackingService` e `IAuthService`. Al añadir o cambiar un miembro de esas interfaces, añádelo también ahí y compruébalo (unos 5 s, con la app ya compilada):
+```
+dotnet build AnimeLocalTracker.Benchmarks/AnimeLocalTracker.Benchmarks.csproj -c Debug -t:Compile -p:BuildProjectReferences=false
+```
+El CI lo comprueba en cada subida (`build.ps1`), pero aquí se sube directo a `main`: si no lo miras antes, `main` queda en rojo después.
+
 ## Exe de prueba (para lanzar la app manualmente)
 
 `AnimeLocalTracker\bin\Debug\net8.0-windows10.0.26100.0\AnimeLocalTracker.exe`
@@ -74,4 +82,4 @@ El SDK de WPF compila cada proyecto en dos fases: primero genera los `.g.cs` des
 
 ## Alternativa: `build.ps1`
 
-El repo tiene `.\build.ps1 -RunTests`, que compila app y pruebas de forma no incremental (reintenta una vez si falla) y además gestiona la descarga de `ffmpeg.exe`/`ffprobe.exe` embebidos si faltan. Es más lento pero más completo (útil antes de empaquetar una release). Para iteración rápida durante desarrollo, el procedimiento de arriba con `dotnet build`/`dotnet test` directos es más rápido y suficiente.
+El repo tiene `.\build.ps1 -RunTests`, que compila app y pruebas de forma no incremental (reintenta una vez si falla), comprueba que el proyecto de benchmarks compila y además gestiona la descarga de `ffmpeg.exe`/`ffprobe.exe` embebidos si faltan. Es más lento pero más completo (útil antes de empaquetar una release). Para iteración rápida durante desarrollo, el procedimiento de arriba con `dotnet build`/`dotnet test` directos es más rápido y suficiente.

@@ -42,7 +42,7 @@ jobs:
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.nuget/packages
-        key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+        key: nuget-v2-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
 
     - name: Setup .NET 8 SDK
       uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
@@ -114,7 +114,8 @@ jobs:
       env:
         # DEV-08: builds deterministas en CI (mismos bits en cada release)
         ContinuousIntegrationBuild: 'true'
-      run: powershell -ExecutionPolicy Bypass -File .\build.ps1 -RunTests
+      # -SinBenchmarks: los benchmarks no se distribuyen; que compilen lo vigila el CI de cada subida, no la publicación.
+      run: powershell -ExecutionPolicy Bypass -File .\build.ps1 -RunTests -SinBenchmarks
 
     # vpk solo genera el delta si encuentra los paquetes anteriores en Releases/.
     # En un runner limpio no existen → descargar los nupkg de la release previa.

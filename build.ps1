@@ -13,7 +13,9 @@ param(
     [ValidateSet("Debug", "Release")]
     [string]$Configuration = "Debug",
     [switch]$RunTests,
-    [switch]$Coverage
+    [switch]$Coverage,
+    # Para publicar una versión: los benchmarks no se distribuyen y no deben poder impedirla (ver más abajo).
+    [switch]$SinBenchmarks
 )
 
 $ErrorActionPreference = "Stop"
@@ -49,14 +51,13 @@ function Invoke-Build {
     # solución): el build de la solución podía terminar con "OK" dejando el ensamblado
     # de tests AUSENTE (runner limpio, CI) u OBSOLETO (obj poblado en local) — el doble
     # pase no lo garantizaba. --no-incremental fuerza siempre el producto final real.
-    & dotnet build "$root\AnimeLocalTracker\AnimeLocalTracker.csproj" -c $Configuration --nologo -v q -nodeReuse:false --no-incremental
+    # "| Out-Host": sin él, lo que imprime dotnet (los errores) pasa a ser parte de lo que DEVUELVE la función, junto al $false;
+    # una lista no vacía cuenta como verdadero y el fallo se tomaba por éxito, sin reintento, sin "exit 1" y sin verse el error.
+    & dotnet build "$root\AnimeLocalTracker\AnimeLocalTracker.csproj" -c $Configuration --nologo -v q -nodeReuse:false --no-incremental | Out-Host
     if ($LASTEXITCODE -ne 0) { return $false }
-    & dotnet build "$root\AnimeLocalTracker.Tests\AnimeLocalTracker.Tests.csproj" -c $Configuration --nologo -v q -nodeReuse:false --no-incremental
-    if ($LASTEXITCODE -ne 0) { return $false }
-    # Los benchmarks solo se EJECUTAN bajo demanda (workflow benchmarks.yml), pero se compilan siempre: implementan a mano
-    # interfaces de la app (IDatabaseService…) y, sin esto, un método nuevo los rompía sin que nadie lo viera hasta el flujo
-    # semanal (en rojo del 5 al 12 de octubre de 2026). Sin recompilar la app: ya está hecha dos líneas más arriba.
-    & dotnet build "$root\AnimeLocalTracker.Benchmarks\AnimeLocalTracker.Benchmarks.csproj" -c $Configuration --nologo -v q -nodeReuse:false --no-incremental -p:BuildProjectReferences=false
+    # BuildProjectReferences=false: sin él, --no-incremental (que es un Rebuild) limpiaba y volvía a compilar la app que acaba de
+    # compilarse en la línea anterior (medido: su DLL cambiaba de hora y la fase tardaba 35 s en vez de 13).
+    & dotnet build "$root\AnimeLocalTracker.Tests\AnimeLocalTracker.Tests.csproj" -c $Configuration --nologo -v q -nodeReuse:false --no-incremental -p:BuildProjectReferences=false | Out-Host
     if ($LASTEXITCODE -ne 0) { return $false }
     return $true
 }
@@ -66,6 +67,20 @@ if (-not (Invoke-Build "compilación")) {
     Write-Host "[build] La compilación falló; se reintenta una vez (posible flake wpftmp)..." -ForegroundColor DarkYellow
     if (-not (Invoke-Build "reintento")) {
         Write-Host "[build] ERROR: el reintento también falló." -ForegroundColor Red
+        exit 1
+    }
+}
+
+# Los benchmarks solo se EJECUTAN bajo demanda (workflow benchmarks.yml), pero se comprueba siempre que compilan: implementan
+# a mano interfaces de la app (IDatabaseService…) y, sin esto, un método nuevo los rompía sin que nadie lo viera hasta el flujo
+# semanal (en rojo del 5 al 12 de octubre de 2026). Solo "Compile" y sin recompilar la app (ya está hecha arriba): no copia a
+# su carpeta bin el medio giga de contenido de la app. Fuera del reintento: no tiene XAML, el flake de WPF no le afecta.
+# release.yml lo salta (-SinBenchmarks): un paquete de BenchmarkDotNet que no se pueda bajar o con un aviso de seguridad nuevo
+# (que aquí es error) no debe impedir publicar una versión de la app.
+if (-not $SinBenchmarks) {
+    & dotnet build "$root\AnimeLocalTracker.Benchmarks\AnimeLocalTracker.Benchmarks.csproj" -c $Configuration --nologo -v q -nodeReuse:false -t:Compile -p:BuildProjectReferences=false | Out-Host
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "[build] ERROR: el proyecto de benchmarks no compila (revisa los servicios de mentira de ReproductorBenchmarks.cs)." -ForegroundColor Red
         exit 1
     }
 }
