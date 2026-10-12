@@ -18,7 +18,7 @@ namespace AnimeLocalTracker.Views
 {
     // Vista del reproductor: aloja la superficie de video del motor (libmpv) y pone los controles encima como WPF normal.
     [System.Runtime.Versioning.SupportedOSPlatform("windows7.0")]
-    public partial class ReproductorMpvView : UserControl
+    public partial class ReproductorView : UserControl
     {
         private DispatcherTimer _fadeTimer;
         private bool _controlsVisible = true;
@@ -28,7 +28,7 @@ namespace AnimeLocalTracker.Views
         private IDialogService? _dialogoToast;
         private bool _toastMostrado;
 
-        public ReproductorMpvView()
+        public ReproductorView()
         {
             InitializeComponent();
 

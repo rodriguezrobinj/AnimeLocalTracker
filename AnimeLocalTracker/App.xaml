@@ -447,7 +447,7 @@
             <!-- El reproductor no se reutiliza: cada navegación crea una vista nueva a partir del ViewModel transitorio. La
                  superficie de video es del motor y pasa de una vista a otra (Controls/SuperficieMpv). -->
             <DataTemplate DataType="{x:Type vm:ReproductorViewModel}">
-                <views:ReproductorMpvView/>
+                <views:ReproductorView/>
             </DataTemplate>
         </ResourceDictionary>
     </Application.Resources>

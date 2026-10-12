@@ -41,7 +41,7 @@ public class EstadisticasViewTests
             _ = new ActualizacionesView();
             _ = new HistorialView();
             _ = new DescargasView();
-            _ = new ReproductorMpvView();
+            _ = new ReproductorView();
         });
     }
 }
