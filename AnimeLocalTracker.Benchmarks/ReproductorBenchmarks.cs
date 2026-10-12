@@ -176,6 +176,10 @@ public Task ActualizarAnimesAsync(IEnumerable<AnimeItem> animes) => Task.Complet
         public Task GuardarDescargaHistorialAsync(DescargaHistorial descarga) => Task.CompletedTask;
         public Task EliminarDescargaHistorialAsync(int id) => Task.CompletedTask;
         public Task LimpiarDescargasHistorialAsync(bool soloFallidas = false) => Task.CompletedTask;
+        public Task GuardarConservarVideosAsync(int aniListId, bool conservar) => Task.CompletedTask;
+        public Task<bool> ObtenerConservarVideosAsync(int aniListId) => Task.FromResult(false);
+        public Task<AjusteAudio?> ObtenerAjusteAudioAsync(int aniListId, int numeroEpisodio) => Task.FromResult<AjusteAudio?>(null);
+        public Task GuardarAjusteAudioAsync(AjusteAudio ajuste) => Task.CompletedTask;
     }
 
     private class DummyTrackingService : IAnimeTrackingService
