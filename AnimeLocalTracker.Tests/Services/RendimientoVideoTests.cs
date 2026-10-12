@@ -188,6 +188,19 @@ public class RendimientoVideoTests
     }
 
     [Fact]
+    public async Task Configuracion_ElColorLigeroSeCargaYSeGuarda()
+    {
+        new AppSettings().ColorLigeroVideo.Should().BeFalse("apagado por defecto: la calidad de imagen de siempre");
+        var (vm, config) = CrearConfiguracion(new AppSettings());
+        vm.ColorLigeroVideo.Should().BeFalse();
+
+        vm.ColorLigeroVideo = true;
+        await vm.GuardarPreferenciasAsync();
+
+        config.ColorLigeroVideo.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task AjustesDeUnaVersionAnterior_SeLeenSinLasClavesRetiradas()
     {
         // Etapa 6 de libmpv: ya no hay motor clásico, ni tarjeta que elegir, ni borde en la caja de los subtítulos. Quien actualiza

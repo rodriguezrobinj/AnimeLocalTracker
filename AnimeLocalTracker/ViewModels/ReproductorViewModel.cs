@@ -520,7 +520,8 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         var motor = _fabricaMotor(new AjustesInicialesMotor(
             ajustes?.AceleracionHardwareVideo ?? true,
             ModoNocheActivo || EcualizadorActivo ? ConstruirFiltrosAudio() : Array.Empty<Core.FiltroAudio>(),
-            ajustes?.VideoPorSoftware ?? false));
+            ajustes?.VideoPorSoftware ?? false,
+            ajustes?.ColorLigeroVideo ?? false));
         if (motor == null)
         {
             // Falta libmpv-2.dll o no arranca (instalación dañada). No hay otro motor al que caer.

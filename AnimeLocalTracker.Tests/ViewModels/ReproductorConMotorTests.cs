@@ -350,6 +350,21 @@ public sealed class ReproductorConMotorTests : IDisposable
     }
 
     [Fact]
+    public void ElColorLigeroDeConfiguracion_LlegaAlMotorAlCrearlo()
+    {
+        var configuracion = new Mock<ISettingsService>();
+        configuracion.Setup(c => c.ObtenerConfiguracion()).Returns(new AnimeLocalTracker.Models.AppSettings { ColorLigeroVideo = true });
+        AjustesInicialesMotor? pedidos = null;
+        using var sut = new ReproductorViewModel(
+            Mock.Of<IDatabaseService>(), Mock.Of<IAnimeTrackingService>(), Mock.Of<IAuthService>(),
+            settingsService: configuracion.Object, playbackStateService: _estado.Object, fabricaMotor: a => { pedidos = a; return _motor; });
+
+        sut.AsegurarMotorInicializado();
+
+        pedidos!.ColorLigero.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task UnaPistaDeTexto_SeLeDaAlMotor()
     {
         using var sut = CrearSutConPistaAss();

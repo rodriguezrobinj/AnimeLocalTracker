@@ -26,6 +26,9 @@ public class AppSettings
     /// <summary>Modo de compatibilidad: libmpv pinta el video por software en vez de en el lienzo OpenGL. Para equipos donde el lienzo
     /// se crea pero se ve negro o con fallos (si ni se crea, la app pasa a este modo ella sola). Sin escalado inteligente.</summary>
     public bool VideoPorSoftware { get; set; }
+    /// <summary>La tarjeta gráfica interpola el color del video de la forma más barata (menos trabajo por fotograma, bordes de color
+    /// algo menos nítidos). Apagado, la calidad de fábrica de libmpv.</summary>
+    public bool ColorLigeroVideo { get; set; }
 
     /// <summary>Volumen del reproductor de video (0 a 100). Se recuerda de un video al siguiente y entre sesiones.</summary>
     public int VolumenReproductor { get; set; } = 100;

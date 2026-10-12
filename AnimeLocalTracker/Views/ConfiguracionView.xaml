@@ -740,6 +740,14 @@
                                             <ComboBoxItem Content="{loc:T Cfg_Opcion_Desactivado}" Tag="Desactivado"/>
                                         </ComboBox>
                                     </ctl:SettingRow>
+                                    <Border Style="{StaticResource CfgDivider}"/>
+
+                                    <!-- Interpolación de color barata (cscale=bilinear): menos trabajo de tarjeta por fotograma -->
+                                    <ctl:SettingRow Title="{loc:T Cfg_ColorLigero}"
+                                                    Description="{loc:T Cfg_ColorLigeroSub}">
+                                        <ToggleButton IsChecked="{Binding ColorLigeroVideo}" Style="{StaticResource CfgSwitch}"
+                                                      AutomationProperties.Name="{loc:T Cfg_ColorLigero}"/>
+                                    </ctl:SettingRow>
                                 </StackPanel>
                             </Border>
 

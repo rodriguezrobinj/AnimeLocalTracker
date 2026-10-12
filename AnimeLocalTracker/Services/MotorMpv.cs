@@ -79,6 +79,9 @@ public sealed partial class MotorMpv : IMotorVideo
                 LibMpv.mpv_set_option_string(mpv, nombre, valor);
             }
             if (sinSalida || sinSonido) LibMpv.mpv_set_option_string(mpv, "ao", "null");
+            // Sin valor, el color se interpola con el filtro de la imagen (lanczos): en una gráfica integrada con video 1080p son
+            // 7 de los 17 ms de tarjeta de cada fotograma (medido en una HD 620).
+            if (ajustes.ColorLigero) LibMpv.mpv_set_option_string(mpv, "cscale", "bilinear");
             // Diagnóstico: el registro propio de libmpv, solo si se pide con esta variable de entorno (ruta del archivo).
             if (Environment.GetEnvironmentVariable("ANIMELOCALTRACKER_MPV_LOG") is { Length: > 0 } registroMpv)
             {

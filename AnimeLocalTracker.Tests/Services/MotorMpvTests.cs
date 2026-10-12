@@ -833,6 +833,19 @@ public sealed class MotorMpvTests : IClassFixture<VideoDePrueba>
     }
 
     [Fact]
+    public void ColorLigero_PideLaInterpolacionDeColorSencilla()
+    {
+        // Sin valor, libmpv interpola el color con el mismo filtro que la imagen (lanczos): en una gráfica integrada (HD 620,
+        // video 1080p) son 7 ms de tarjeta por fotograma, medidos. Apagado no se toca: la calidad de siempre.
+        if (!AnimeLocalTracker.Services.Native.LibMpv.Disponible) return;
+        using var normal = MotorMpv.Crear(Ajustes, sinSalida: true)!;
+        using var ligero = MotorMpv.Crear(Ajustes with { ColorLigero = true }, sinSalida: true)!;
+
+        normal.LeerPropiedad("cscale").Should().BeEmpty();
+        ligero.LeerPropiedad("cscale").Should().Be("bilinear");
+    }
+
+    [Fact]
     public void LosFotogramasPerdidos_SinArchivoSonCero()
     {
         if (!AnimeLocalTracker.Services.Native.LibMpv.Disponible) return;

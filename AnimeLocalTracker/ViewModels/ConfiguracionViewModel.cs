@@ -331,6 +331,7 @@ public partial class ConfiguracionViewModel : ObservableObject
     [ObservableProperty] private string _modoSaltosVideo = ModosRendimientoVideo.Automatico;
     [ObservableProperty] private bool _aceleracionHardwareVideo = true;
     [ObservableProperty] private bool _videoPorSoftware;
+    [ObservableProperty] private bool _colorLigeroVideo;
     [ObservableProperty] private string _escaladoInteligenteVideo = ModosRendimientoVideo.Automatico;
     [ObservableProperty] private string _diagnosticoEquipoTexto = string.Empty;
     [ObservableProperty] private string _diagnosticoUltimoVideoTexto = string.Empty;
@@ -476,6 +477,7 @@ public partial class ConfiguracionViewModel : ObservableObject
         ModoSaltosVideo = config.ModoSaltosVideo is ModosRendimientoVideo.Exactos or ModosRendimientoVideo.Rapidos ? config.ModoSaltosVideo : ModosRendimientoVideo.Automatico;
         AceleracionHardwareVideo = config.AceleracionHardwareVideo;
         VideoPorSoftware = config.VideoPorSoftware;
+        ColorLigeroVideo = config.ColorLigeroVideo;
         EscaladoInteligenteVideo = config.EscaladoInteligenteVideo is ModosRendimientoVideo.Activado or ModosRendimientoVideo.Desactivado ? config.EscaladoInteligenteVideo : ModosRendimientoVideo.Automatico;
         // El registro de Windows es la fuente de verdad (no AppSettings): así se refleja si el
         // usuario lo desactivó desde el Administrador de tareas en vez de desde esta pantalla.
@@ -697,6 +699,7 @@ public partial class ConfiguracionViewModel : ObservableObject
             config.ModoSaltosVideo = string.IsNullOrEmpty(ModoSaltosVideo) ? ModosRendimientoVideo.Automatico : ModoSaltosVideo;
             config.AceleracionHardwareVideo = AceleracionHardwareVideo;
             config.VideoPorSoftware = VideoPorSoftware;
+            config.ColorLigeroVideo = ColorLigeroVideo;
             config.EscaladoInteligenteVideo = string.IsNullOrEmpty(EscaladoInteligenteVideo) ? ModosRendimientoVideo.Automatico : EscaladoInteligenteVideo;
             config.TeclaPanicoActiva = TeclaPanicoActiva;
             config.TeclaPanico = TeclaPanico == "Escape" ? "Escape" : "F12";
