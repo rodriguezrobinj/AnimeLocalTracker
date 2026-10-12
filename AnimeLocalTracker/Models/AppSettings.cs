@@ -28,6 +28,9 @@ public class AppSettings
     /// <summary>Motor del reproductor de episodios: "Mpv" (libmpv, el predeterminado) o "Flyleaf" (el clásico). Ver
     /// Services.MotoresDeVideo y docs/investigacion-motor-libmpv.md.</summary>
     public string MotorVideo { get; set; } = Services.MotoresDeVideo.Nuevo;
+    /// <summary>Modo de compatibilidad: libmpv pinta el video por software en vez de en el lienzo OpenGL. Para equipos donde el lienzo
+    /// se crea pero se ve negro o con fallos (si ni se crea, la app pasa a este modo ella sola). Sin escalado inteligente.</summary>
+    public bool VideoPorSoftware { get; set; }
 
     /// <summary>Volumen del reproductor de video (0 a 100). Se recuerda de un video al siguiente y entre sesiones.</summary>
     public int VolumenReproductor { get; set; } = 100;

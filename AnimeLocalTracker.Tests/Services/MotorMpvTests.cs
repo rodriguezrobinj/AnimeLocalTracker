@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using AnimeLocalTracker.Core;
@@ -165,6 +166,16 @@ public class MotorMpvTraduccionesTests
     public void FabricantePorNombre_LoSacaDelTextoDelControlador(string? texto, FabricanteGrafica esperado)
     {
         MotorVideo.FabricantePorNombre(texto).Should().Be(esperado);
+    }
+
+    [Theory]
+    [InlineData(1366, 705, 1366, 705)]   // la ventana del equipo donde se midió: tal cual
+    [InlineData(3840, 2160, 1920, 1080)] // pantalla completa 4K: libmpv pinta a 1080p y WPF amplía
+    [InlineData(2560, 1080, 1920, 810)]  // ultrapanorámica: manda el ancho
+    [InlineData(0, 0, 16, 16)]           // aún sin medir
+    public void TamanoPorSoftware_RespetaElTopeYLaProporcion(double anchoPx, double altoPx, int ancho, int alto)
+    {
+        PintorPorSoftware.Tamano(anchoPx, altoPx).Should().Be((ancho, alto));
     }
 }
 
@@ -748,6 +759,76 @@ public sealed class MotorMpvTests : IClassFixture<VideoDePrueba>
 
         motor.EscaladoInteligente.Should().BeFalse();
         motor.LeerPropiedad("glsl-shaders").Should().BeEmpty();
+    }
+
+    // ── Modo de compatibilidad: libmpv pinta por software, sin OpenGL ──
+
+    [Fact]
+    public async Task PintorPorSoftware_PintaUnFotogramaDeUnClipReal()
+    {
+        if (!AnimeLocalTracker.Services.Native.LibMpv.Disponible) return;
+        using var motor = MotorMpv.Crear(Ajustes, sinSonido: true)!;
+        int avisos = 0;
+        using var pintor = PintorPorSoftware.Crear(motor, () => Interlocked.Increment(ref avisos));
+        pintor.Should().NotBeNull("pintar por software no depende de la tarjeta gráfica");
+
+        motor.Abrir(_video.Ruta);
+        await EsperarHasta(() => Volatile.Read(ref avisos) > 0);
+
+        const int ancho = 320, alto = 180, paso = ancho * 4;
+        var pixeles = new byte[paso * alto];
+        var fijado = GCHandle.Alloc(pixeles, GCHandleType.Pinned);
+        try
+        {
+            await EsperarHasta(() => pintor!.Pintar(fijado.AddrOfPinnedObject(), ancho, alto, paso));
+        }
+        finally
+        {
+            fijado.Free();
+        }
+
+        pixeles.Count(b => b > 32).Should().BeGreaterThan(pixeles.Length / 10, "el clip es una carta de colores, no una imagen en negro");
+    }
+
+    [Fact]
+    public async Task PorSoftware_LaCapturaDeFotogramaDaLaImagenDelVideo()
+    {
+        // En la app no se pulsa (escribe en Imágenes y en el portapapeles): que libmpv capture también sin lienzo se ve aquí.
+        if (!AnimeLocalTracker.Services.Native.LibMpv.Disponible) return;
+        using var motor = MotorMpv.Crear(Ajustes, sinSonido: true)!;
+        using var pintor = PintorPorSoftware.Crear(motor, () => { });
+        motor.Abrir(_video.Ruta);
+        var pixeles = new byte[320 * 4 * 180];
+        var fijado = GCHandle.Alloc(pixeles, GCHandleType.Pinned);
+        try
+        {
+            await EsperarHasta(() => pintor!.Pintar(fijado.AddrOfPinnedObject(), 320, 180, 320 * 4));
+        }
+        finally
+        {
+            fijado.Free();
+        }
+
+        var imagen = motor.CapturarFotograma();
+
+        imagen.Should().NotBeNull();
+        (imagen!.PixelWidth, imagen.PixelHeight).Should().Be((320, 180));
+    }
+
+    [Fact]
+    public void PorSoftware_ElEscaladoInteligenteNoCargaSombreadores()
+    {
+        // Anime4K son sombreadores de OpenGL: sin lienzo no hay dónde aplicarlos, y sin tarjeta el reproductor ni lo intenta.
+        if (!AnimeLocalTracker.Services.Native.LibMpv.Disponible) return;
+        using var motor = MotorMpv.Crear(Ajustes with { VideoPorSoftware = true }, sinSalida: true)!;
+        motor.TarjetaDetectada("Intel(R) HD Graphics 620", "Intel");
+        motor.PintaPorSoftware.Should().BeTrue();
+
+        motor.EscaladoInteligente = true;
+
+        motor.EscaladoInteligente.Should().BeFalse();
+        motor.LeerPropiedad("glsl-shaders").Should().BeEmpty();
+        motor.TarjetaEnUso.Should().BeNull();
     }
 
     [Fact]

@@ -548,7 +548,8 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         var motor = _fabricaMotor(new AjustesInicialesMotor(
             ajustes?.AceleracionHardwareVideo ?? true,
             ajustes?.TarjetaGraficaVideo,
-            ModoNocheActivo || EcualizadorActivo ? ConstruirFiltrosAudio() : Array.Empty<Core.FiltroAudio>()));
+            ModoNocheActivo || EcualizadorActivo ? ConstruirFiltrosAudio() : Array.Empty<Core.FiltroAudio>(),
+            ajustes?.VideoPorSoftware ?? false));
         if (motor == null)
         {
             Motor = null;

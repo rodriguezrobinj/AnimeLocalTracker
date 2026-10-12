@@ -4,58 +4,36 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using AnimeLocalTracker.Services;
 using AnimeLocalTracker.Services.Native;
-using OpenTK.Windowing.GraphicsLibraryFramework;
+using GLFW = OpenTK.Windowing.GraphicsLibraryFramework.GLFW;
 using OpenTK.Wpf;
 
 namespace AnimeLocalTracker.Controls;
 
 /// <summary>
-/// Donde se ve el video del motor nuevo: un lienzo OpenGL que WPF compone como una imagen más (así los controles van encima como
-/// WPF normal, sin segunda ventana). libmpv avisa de que hay fotograma y se pinta en el siguiente paso de composición.
-/// Con un motor que no sea <see cref="MotorMpv"/> no hace nada.
+/// Donde se ve el video de libmpv, compuesto por WPF como una imagen más (así los controles van encima como WPF normal, sin segunda
+/// ventana). libmpv avisa de que hay fotograma y se pinta en el siguiente paso de composición. Hay dos formas de pintar: un lienzo
+/// OpenGL (la normal) o, en el modo de compatibilidad, una imagen de WPF que libmpv rellena por software.
 /// Hay una por motor (<see cref="Para"/>) y vive lo que él: las vistas se la pasan (<see cref="MoverA"/>) en vez de crear otra.
 /// </summary>
 public sealed class SuperficieMpv : Grid, IDisposable
 {
-    public static readonly DependencyProperty MotorProperty = DependencyProperty.Register(
-        nameof(Motor), typeof(IMotorVideo), typeof(SuperficieMpv),
-        new PropertyMetadata(null, (d, e) => ((SuperficieMpv)d).CambiarMotor(e.NewValue as MotorMpv)));
-
-    public IMotorVideo? Motor
-    {
-        get => (IMotorVideo?)GetValue(MotorProperty);
-        set => SetValue(MotorProperty, value);
-    }
-
     private static readonly ConditionalWeakTable<MotorMpv, SuperficieMpv> PorMotor = new();
 
     /// <summary>Diagnóstico: con valor 1 el lienzo se da por no disponible, para probar el modo de compatibilidad en un equipo que sí tiene OpenGL.</summary>
     private const string VariableSinOpenGl = "ANIMELOCALTRACKER_SIN_OPENGL";
 
-    /// <summary>
-    /// La superficie de ese motor. Es una sola: pasa de la vista de la ventana principal a la del mini reproductor y vuelve.
-    /// Null si este equipo no puede crear el lienzo OpenGL (máquina virtual, escritorio remoto, controlador antiguo): se le avisa al
-    /// motor, y el reproductor sigue con el clásico.
-    /// </summary>
-    public static SuperficieMpv? Para(MotorMpv motor)
+    /// <summary>La superficie de ese motor. Es una sola: pasa de la vista de la ventana principal a la del mini reproductor y vuelve.</summary>
+    public static SuperficieMpv Para(MotorMpv motor)
     {
         if (PorMotor.TryGetValue(motor, out var existente)) return existente;
-        try
-        {
-            if (Environment.GetEnvironmentVariable(VariableSinOpenGl) == "1")
-                throw new NotSupportedException($"OpenGL apagado con {VariableSinOpenGl}");
-            var nueva = new SuperficieMpv { Motor = motor };
-            PorMotor.Add(motor, nueva);
-            return nueva;
-        }
-        catch (Exception ex)
-        {
-            AvisarSinSalida(motor, $"no se pudo crear el lienzo OpenGL: {ex.Message}");
-            return null;
-        }
+        var nueva = new SuperficieMpv(motor);
+        PorMotor.Add(motor, nueva);
+        return nueva;
     }
 
     /// <summary>Después, no ahora: quien avisa está a medio cargar una vista o a medio pintar, y la respuesta cierra este motor.</summary>
@@ -63,8 +41,8 @@ public sealed class SuperficieMpv : Grid, IDisposable
         Dispatcher.CurrentDispatcher.BeginInvoke(() => { if (!motor.Desechado) motor.AvisarSinSalida(motivo); });
 
     /// <summary>
-    /// La saca de donde esté y la pone en <paramref name="hueco"/>. Se mueve el mismo lienzo en vez de crear otro porque así el pintor
-    /// de libmpv sigue vivo: soltarlo apaga el video y tarda 1 s en volver (medido). Por eso salir del árbol visual no suelta nada.
+    /// La saca de donde esté y la pone en <paramref name="hueco"/>. Se mueve la misma superficie en vez de crear otra porque así el
+    /// pintor de libmpv sigue vivo: soltarlo apaga el video y tarda 1 s en volver (medido). Por eso salir del árbol visual no suelta nada.
     /// </summary>
     public void MoverA(Decorator hueco)
     {
@@ -73,11 +51,18 @@ public sealed class SuperficieMpv : Grid, IDisposable
         hueco.Child = this;
     }
 
-    private readonly GLWpfControl _lienzo = new();
     private MotorMpv? _motor;
+    private int _pintadoPedido;
+
+    // Con OpenGL.
+    private GLWpfControl? _lienzo;
     private nint _pintor;
     private bool _pintorRechazado;
-    private int _pintadoPedido;
+
+    // Por software.
+    private PintorPorSoftware? _porSoftware;
+    private Image? _imagen;
+    private WriteableBitmap? _mapa;
 
     // Vivos mientras exista el pintor: libmpv guarda los punteros.
     private ObtenerFuncionGl? _obtenerFuncion;
@@ -89,22 +74,58 @@ public sealed class SuperficieMpv : Grid, IDisposable
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate void AvisoDePintado(nint contexto);
 
-    public SuperficieMpv()
+    private SuperficieMpv(MotorMpv motor)
     {
-        Children.Add(_lienzo);
-        _lienzo.Render += Pintar;
-        _lienzo.Start(new GLWpfControlSettings { MajorVersion = 3, MinorVersion = 3, RenderContinuously = false });
+        _motor = motor;
+        motor.Desechando += Dispose;
         Loaded += (_, _) => PedirPintado();
         SizeChanged += (_, _) => PedirPintado(); // en pausa nadie avisa: al cambiar de tamaño hay que repintar el mismo fotograma
+
+        if (motor.PintaPorSoftware) PasarASoftware("lo pide el modo de compatibilidad de Configuración", esFallo: false);
+        else if (Environment.GetEnvironmentVariable(VariableSinOpenGl) == "1") PasarASoftware($"OpenGL apagado con {VariableSinOpenGl}", esFallo: false);
+        else
+        {
+            try
+            {
+                _lienzo = new GLWpfControl();
+                Children.Add(_lienzo);
+                _lienzo.Render += PintarEnElLienzo;
+                _lienzo.Start(new GLWpfControlSettings { MajorVersion = 3, MinorVersion = 3, RenderContinuously = false });
+            }
+            catch (Exception ex)
+            {
+                // Máquina virtual, escritorio remoto, controlador antiguo.
+                PasarASoftware($"no se pudo crear el lienzo OpenGL: {ex.Message}", esFallo: true);
+            }
+        }
     }
 
-    private void CambiarMotor(MotorMpv? motor)
+    /// <summary>
+    /// Quita el lienzo, si lo había, y pone una imagen que libmpv rellena por software. Como aún no había pintor, el archivo no se ha
+    /// cargado: el episodio empieza donde tenía que empezar. Solo si tampoco así se puede se avisa al motor de que no hay salida.
+    /// </summary>
+    private void PasarASoftware(string motivo, bool esFallo)
     {
-        SoltarPintor();
-        if (_motor != null) _motor.Desechando -= Dispose;
-        _motor = motor;
-        if (_motor != null) _motor.Desechando += Dispose;
-        PedirPintado();
+        if (_motor is not { Desechado: false } motor || _porSoftware != null) return;
+
+        if (_lienzo != null)
+        {
+            Children.Remove(_lienzo);
+            try { _lienzo.Dispose(); }
+            catch (Exception ex) { AppLogger.Debug("SuperficieMpv", $"No se pudo soltar el lienzo OpenGL: {ex.Message}"); }
+            _lienzo = null;
+        }
+
+        string mensaje = $"El video se pinta por software, sin escalado inteligente: {motivo}.";
+        if (esFallo) AppLogger.Warn("SuperficieMpv", mensaje);
+        else AppLogger.Info("SuperficieMpv", mensaje);
+
+        motor.PintaPorSoftware = true;
+        _imagen = new Image { Stretch = Stretch.Fill };
+        Children.Add(_imagen);
+        _porSoftware = PintorPorSoftware.Crear(motor, PedirPintado);
+        if (_porSoftware == null) AvisarSinSalida(motor, $"{motivo}, y libmpv tampoco pudo pintar por software");
+        else PedirPintado();
     }
 
     /// <summary>Desde cualquier hilo: pide un pintado en el hilo de la interfaz, sin acumular peticiones.</summary>
@@ -114,15 +135,38 @@ public sealed class SuperficieMpv : Grid, IDisposable
         Dispatcher.BeginInvoke(DispatcherPriority.Render, () =>
         {
             Interlocked.Exchange(ref _pintadoPedido, 0);
-            _lienzo.InvalidateVisual();
+            if (_porSoftware != null) PintarEnLaImagen();
+            else _lienzo?.InvalidateVisual();
         });
     }
 
+    /// <summary>libmpv pinta en la memoria de la imagen, al tamaño en píxeles de la zona de video (con tope: ver <see cref="PintorPorSoftware.Tamano"/>).</summary>
+    private void PintarEnLaImagen()
+    {
+        if (_motor is not { Desechado: false } motor || _porSoftware == null || _imagen == null) return;
+
+        var ppp = VisualTreeHelper.GetDpi(this);
+        var (ancho, alto) = PintorPorSoftware.Tamano(ActualWidth * ppp.DpiScaleX, ActualHeight * ppp.DpiScaleY);
+        if (_mapa == null || _mapa.PixelWidth != ancho || _mapa.PixelHeight != alto)
+            _imagen.Source = _mapa = new WriteableBitmap(ancho, alto, 96, 96, PixelFormats.Bgr32, null);
+
+        _mapa.Lock();
+        try
+        {
+            if (_porSoftware.Pintar(_mapa.BackBuffer, ancho, alto, _mapa.BackBufferStride)) motor.ContarFotograma();
+            _mapa.AddDirtyRect(new Int32Rect(0, 0, ancho, alto));
+        }
+        finally
+        {
+            _mapa.Unlock();
+        }
+    }
+
     /// <summary>Con el contexto OpenGL del lienzo ya activo: la primera vez crea el pintor de libmpv; después pinta el fotograma.</summary>
-    private void Pintar(TimeSpan _)
+    private void PintarEnElLienzo(TimeSpan _)
     {
         var motor = _motor;
-        if (motor == null || motor.Desechado || _pintorRechazado) return;
+        if (motor == null || motor.Desechado || _lienzo == null || _pintorRechazado) return;
 
         if (_pintor == 0 && !CrearPintor(motor)) return;
 
@@ -171,12 +215,14 @@ public sealed class SuperficieMpv : Grid, IDisposable
             if (resultado < 0)
             {
                 _pintor = 0;
-                _pintorRechazado = true; // no se reintenta en cada fotograma: el reproductor pasa al motor clásico
-                AvisarSinSalida(motor, $"libmpv no pudo pintar en la ventana: {LibMpv.TextoDeError(resultado)}");
+                _pintorRechazado = true; // no se reintenta en cada fotograma
+                string motivo = $"libmpv no pudo pintar en el lienzo OpenGL: {LibMpv.TextoDeError(resultado)}";
+                // Después, no ahora: se está a medio pintar en el lienzo que hay que quitar.
+                Dispatcher.BeginInvoke(() => PasarASoftware(motivo, esFallo: true));
                 return false;
             }
             LibMpv.mpv_render_context_set_update_callback(_pintor, Marshal.GetFunctionPointerForDelegate(_aviso), 0);
-            AppLogger.Debug("SuperficieMpv", $"Pintor de libmpv creado ({_lienzo.FrameBufferWidth}x{_lienzo.FrameBufferHeight}).");
+            AppLogger.Debug("SuperficieMpv", $"Pintor de libmpv creado ({_lienzo!.FrameBufferWidth}x{_lienzo.FrameBufferHeight}).");
             try
             {
                 // Con el contexto OpenGL del lienzo activo: qué tarjeta lo pinta (para el informe de video).
@@ -207,13 +253,14 @@ public sealed class SuperficieMpv : Grid, IDisposable
         if (_motor != null) _motor.Desechando -= Dispose;
         _motor = null;
         if (Parent is Decorator hueco) hueco.Child = null;
-        _lienzo.Dispose();
+        _lienzo?.Dispose();
     }
 
     private void SoltarPintor()
     {
+        _porSoftware?.Dispose();
+        _porSoftware = null;
         if (_pintor == 0) return;
-        if (!Dispatcher.CheckAccess()) { Dispatcher.Invoke(SoltarPintor); return; }
 
         nint pintor = _pintor;
         _pintor = 0;

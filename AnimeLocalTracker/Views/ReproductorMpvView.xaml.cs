@@ -90,8 +90,7 @@ namespace AnimeLocalTracker.Views
         /// </summary>
         private void AlojarSuperficie()
         {
-            // Sin superficie (este equipo no puede crear el lienzo): el motor ya está avisado y el reproductor pasa al clásico.
-            if (IsLoaded && _vmSubtitulos?.Motor is MotorMpv { Desechado: false } motor) SuperficieMpv.Para(motor)?.MoverA(HuecoVideo);
+            if (IsLoaded && _vmSubtitulos?.Motor is MotorMpv { Desechado: false } motor) SuperficieMpv.Para(motor).MoverA(HuecoVideo);
             ColocarSubtitulos();
         }
 

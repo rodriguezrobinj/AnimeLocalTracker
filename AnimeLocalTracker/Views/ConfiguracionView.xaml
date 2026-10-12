@@ -743,6 +743,15 @@
                                     </ctl:SettingRow>
                                     <Border Style="{StaticResource CfgDivider}"/>
 
+                                    <!-- Modo de compatibilidad: solo existe en el motor nuevo (libmpv pintando por software, sin OpenGL) -->
+                                    <ctl:SettingRow Title="{loc:T Cfg_VideoCompatibilidad}"
+                                                    Description="{loc:T Cfg_VideoCompatibilidadSub}"
+                                                    Visibility="{Binding UsaMotorNuevo, Converter={StaticResource BoolToVis}}">
+                                        <ToggleButton IsChecked="{Binding VideoPorSoftware}" Style="{StaticResource CfgSwitch}"
+                                                      AutomationProperties.Name="{loc:T Cfg_VideoCompatibilidad}"/>
+                                    </ctl:SettingRow>
+                                    <Border Style="{StaticResource CfgDivider}" Visibility="{Binding UsaMotorNuevo, Converter={StaticResource BoolToVis}}"/>
+
                                     <ctl:SettingRow Title="{loc:T Cfg_TarjetaGrafica}"
                                                     Description="{loc:T Cfg_TarjetaGraficaSub}"
                                                     Visibility="{Binding UsaMotorNuevo, Converter={StaticResource InverseBoolToVis}}">

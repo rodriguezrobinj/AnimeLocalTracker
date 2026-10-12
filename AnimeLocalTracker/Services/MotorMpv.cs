@@ -48,7 +48,8 @@ public sealed partial class MotorMpv : IMotorVideo
 
     /// <summary>Null si falta la biblioteca o libmpv no arranca en este equipo.</summary>
     /// <param name="sinSalida">Sin imagen ni sonido (pruebas): todo lo demás funciona igual.</param>
-    public static MotorMpv? Crear(AjustesInicialesMotor ajustes, bool sinSalida = false)
+    /// <param name="sinSonido">Con imagen pero sin sonido (pruebas del pintado: en el CI no hay tarjeta de sonido).</param>
+    public static MotorMpv? Crear(AjustesInicialesMotor ajustes, bool sinSalida = false, bool sinSonido = false)
     {
         if (!LibMpv.Disponible) return null;
 
@@ -77,7 +78,7 @@ public sealed partial class MotorMpv : IMotorVideo
             {
                 LibMpv.mpv_set_option_string(mpv, nombre, valor);
             }
-            if (sinSalida) LibMpv.mpv_set_option_string(mpv, "ao", "null");
+            if (sinSalida || sinSonido) LibMpv.mpv_set_option_string(mpv, "ao", "null");
             // Diagnóstico: el registro propio de libmpv, solo si se pide con esta variable de entorno (ruta del archivo).
             if (Environment.GetEnvironmentVariable("ANIMELOCALTRACKER_MPV_LOG") is { Length: > 0 } registroMpv)
             {
@@ -100,7 +101,7 @@ public sealed partial class MotorMpv : IMotorVideo
             LibMpv.mpv_observe_property(mpv, IdProporcion, "video-params/aspect", LibMpv.FormatoDoble);
 
             AppLogger.Info("MotorMpv", $"Motor libmpv listo ({LibMpv.Leer(mpv, "mpv-version")}).");
-            return new MotorMpv(mpv, sinSalida) { _filtros = ajustes.FiltrosAudio.ToList() };
+            return new MotorMpv(mpv, sinSalida) { _filtros = ajustes.FiltrosAudio.ToList(), PintaPorSoftware = ajustes.VideoPorSoftware };
         }
         catch (Exception ex)
         {
@@ -115,9 +116,15 @@ public sealed partial class MotorMpv : IMotorVideo
     /// <summary>Para la superficie: el motor está a punto de cerrarse y hay que soltar el pintor ANTES (libmpv lo exige).</summary>
     internal event Action? Desechando;
 
-    /// <summary>La superficie no pudo crear el lienzo OpenGL o libmpv no lo aceptó: este motor no va a poder pintar en este equipo.</summary>
+    /// <summary>La superficie no pudo pintar ni en el lienzo OpenGL ni por software: este motor no va a poder mostrar el video en este equipo.</summary>
     internal event Action<string>? SinSalida;
     internal void AvisarSinSalida(string motivo) => SinSalida?.Invoke(motivo);
+
+    /// <summary>
+    /// El video se pinta por software (modo de compatibilidad): lo pide el ajuste o lo decide la superficie si el lienzo OpenGL no
+    /// arranca. Sin lienzo no hay tarjeta que informar ni dónde aplicar los sombreadores del escalado inteligente.
+    /// </summary>
+    internal bool PintaPorSoftware { get; set; }
 
     internal nint Manejador => _mpv;
     internal void ContarFotograma() => Interlocked.Increment(ref _fotogramas);
@@ -258,7 +265,7 @@ public sealed partial class MotorMpv : IMotorVideo
         if (!string.IsNullOrWhiteSpace(nombre)) _tarjeta = new TarjetaGrafica(nombre.Trim(), MotorVideo.FabricantePorNombre($"{fabricante} {nombre}"), 0);
     }
 
-    public TarjetaGrafica? TarjetaEnUso => _tarjeta;
+    public TarjetaGrafica? TarjetaEnUso => PintaPorSoftware ? null : _tarjeta;
 
     // ── Escalado inteligente: Anime4K (sombreadores que libmpv aplica al pintar) ──
 
@@ -277,7 +284,7 @@ public sealed partial class MotorMpv : IMotorVideo
         {
             if (value == _escalado) return;
             Ordenar("change-list", "glsl-shaders", "clr", "");
-            _escalado = value && CargarSombreadores();
+            _escalado = value && !PintaPorSoftware && CargarSombreadores();
         }
     }
 

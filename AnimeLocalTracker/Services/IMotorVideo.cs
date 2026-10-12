@@ -31,7 +31,8 @@ public sealed record PistaAudioMotor(int Indice, string? Idioma, string? Titulo)
 public sealed record PistaSubtitulosMotor(int Indice, string? Idioma, string? Titulo, bool EsImagen, bool EsAss, string? RutaExterna);
 
 /// <summary>Lo que el motor necesita saber antes de abrir el primer archivo.</summary>
-public sealed record AjustesInicialesMotor(bool AceleracionPorHardware, string? TarjetaGrafica, IReadOnlyList<FiltroAudio> FiltrosAudio);
+/// <param name="VideoPorSoftware">Modo de compatibilidad: pintar sin OpenGL, aunque el equipo lo tenga.</param>
+public sealed record AjustesInicialesMotor(bool AceleracionPorHardware, string? TarjetaGrafica, IReadOnlyList<FiltroAudio> FiltrosAudio, bool VideoPorSoftware = false);
 
 /// <summary>
 /// El motor de video del reproductor de episodios, sin tipos de ninguna biblioteca. Es lo que el reproductor le pedía a Flyleaf, ni más

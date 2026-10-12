@@ -211,6 +211,19 @@ public class RendimientoVideoTests
             .Should().Be((ModosRendimientoVideo.Exactos, false, (string?)null, ModosRendimientoVideo.Desactivado));
     }
 
+    [Fact]
+    public async Task Configuracion_ElModoDeCompatibilidadSeCargaYSeGuarda()
+    {
+        new AppSettings().VideoPorSoftware.Should().BeFalse("apagado por defecto: solo para equipos donde el video no se ve");
+        var (vm, config) = CrearConfiguracion(new AppSettings { VideoPorSoftware = true });
+        vm.VideoPorSoftware.Should().BeTrue();
+
+        vm.VideoPorSoftware = false;
+        await vm.GuardarPreferenciasAsync();
+
+        config.VideoPorSoftware.Should().BeFalse();
+    }
+
     // === Configuración: motor de video (etapa 5 de libmpv) ===
 
     private static (ConfiguracionViewModel Vm, AppSettings Config) CrearConfiguracionConMotor(AppSettings config, bool hayMotorNuevo)

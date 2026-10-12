@@ -63,6 +63,8 @@ internal static partial class LibMpv
 
     // ── Pintado (render.h, render_gl.h) ──
     internal const int ParametroTipoApi = 1, ParametroInicioGl = 2, ParametroFbo = 3, ParametroVoltearY = 4, ParametroBloquearHastaSuMomento = 12;
+    // Pintado por software (API "sw"): tamaño (int[2]), formato de píxel (texto), bytes por fila (size_t*) y el búfer donde pinta.
+    internal const int ParametroTamanoSw = 17, ParametroFormatoSw = 18, ParametroPasoSw = 19, ParametroPunteroSw = 20;
     internal const ulong HayFotogramaNuevo = 1;
 
     [StructLayout(LayoutKind.Sequential)]

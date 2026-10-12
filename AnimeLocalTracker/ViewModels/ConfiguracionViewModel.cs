@@ -359,6 +359,7 @@ public partial class ConfiguracionViewModel : ObservableObject
 
     [ObservableProperty] private string _modoSaltosVideo = ModosRendimientoVideo.Automatico;
     [ObservableProperty] private bool _aceleracionHardwareVideo = true;
+    [ObservableProperty] private bool _videoPorSoftware;
     [ObservableProperty] private string _tarjetaGraficaVideo = string.Empty;
     [ObservableProperty] private string _escaladoInteligenteVideo = ModosRendimientoVideo.Automatico;
     [ObservableProperty] private string _diagnosticoEquipoTexto = string.Empty;
@@ -518,6 +519,7 @@ public partial class ConfiguracionViewModel : ObservableObject
         MotorDeVideo = MotorNuevoDisponible ? MotoresDeVideo.Normalizar(config.MotorVideo) : MotoresDeVideo.Clasico;
         ModoSaltosVideo = config.ModoSaltosVideo is ModosRendimientoVideo.Exactos or ModosRendimientoVideo.Rapidos ? config.ModoSaltosVideo : ModosRendimientoVideo.Automatico;
         AceleracionHardwareVideo = config.AceleracionHardwareVideo;
+        VideoPorSoftware = config.VideoPorSoftware;
         TarjetaGraficaVideo = config.TarjetaGraficaVideo ?? string.Empty;
         EscaladoInteligenteVideo = config.EscaladoInteligenteVideo is ModosRendimientoVideo.Activado or ModosRendimientoVideo.Desactivado ? config.EscaladoInteligenteVideo : ModosRendimientoVideo.Automatico;
         // El registro de Windows es la fuente de verdad (no AppSettings): así se refleja si el
@@ -740,6 +742,7 @@ public partial class ConfiguracionViewModel : ObservableObject
             if (MotorNuevoDisponible) config.MotorVideo = MotoresDeVideo.Normalizar(MotorDeVideo); // sin libmpv se muestra el clásico, pero no se pisa lo guardado
             config.ModoSaltosVideo = string.IsNullOrEmpty(ModoSaltosVideo) ? ModosRendimientoVideo.Automatico : ModoSaltosVideo;
             config.AceleracionHardwareVideo = AceleracionHardwareVideo;
+            config.VideoPorSoftware = VideoPorSoftware;
             config.TarjetaGraficaVideo = string.IsNullOrWhiteSpace(TarjetaGraficaVideo) ? null : TarjetaGraficaVideo;
             config.EscaladoInteligenteVideo = string.IsNullOrEmpty(EscaladoInteligenteVideo) ? ModosRendimientoVideo.Automatico : EscaladoInteligenteVideo;
             config.TeclaPanicoActiva = TeclaPanicoActiva;
