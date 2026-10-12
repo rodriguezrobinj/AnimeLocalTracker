@@ -37,6 +37,28 @@ public class VistasSinTextoFijoTests
     }
 
     [Fact]
+    public void LosIconosDeLasVistas_ExistenEnLaBiblioteca()
+    {
+        // Un nombre de icono que la versión instalada de MaterialDesignThemes no trae no falla al compilar: falla al abrir la vista.
+        // De una versión a otra cambian (la compilación ci1462 renombró Rewind10 y FastForward10).
+        string proyecto = Path.Combine(RaizDelRepositorio(), "AnimeLocalTracker");
+        var icono = new Regex(@"<materialDesign:PackIcon\b[^>]*?\bKind=""([A-Za-z0-9]+)""", RegexOptions.Compiled);
+        var desconocidos = new List<string>();
+
+        foreach (string archivo in Directory.EnumerateFiles(proyecto, "*.xaml", SearchOption.AllDirectories)
+                     .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}") && !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}")))
+        {
+            foreach (Match m in icono.Matches(File.ReadAllText(archivo)))
+            {
+                if (!Enum.TryParse<MaterialDesignThemes.Wpf.PackIconKind>(m.Groups[1].Value, out _))
+                    desconocidos.Add($"{Path.GetFileName(archivo)}: {m.Groups[1].Value}");
+            }
+        }
+
+        desconocidos.Should().BeEmpty("cada icono de las vistas tiene que existir en la versión de MaterialDesignThemes del proyecto");
+    }
+
+    [Fact]
     public void LaVistaDelMotorNuevo_NoTieneCapasDeSubtitulosPropias()
     {
         // Con libmpv los subtítulos van dentro del video: una capa de la app encima los mostraría dos veces.
