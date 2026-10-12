@@ -761,6 +761,28 @@ public sealed class MotorMpvTests : IClassFixture<VideoDePrueba>
 
     // ── Modo de compatibilidad: libmpv pinta por software, sin OpenGL ──
 
+    /// <summary>
+    /// Pinta en <paramref name="pixeles"/> (320×180) hasta que sale un fotograma con el archivo ya abierto y avanzando. El primer
+    /// fotograma puede pintarse antes de que el motor dé el archivo por abierto (su hilo de eventos aún está leyendo las pistas):
+    /// quien mirase ahí el estado del motor lo vería «abriendo» (así falló en el CI la captura, que devolvía null).
+    /// </summary>
+    private static async Task PintarHastaQueReproduzca(MotorMpv motor, PintorPorSoftware pintor, byte[] pixeles)
+    {
+        var fijado = GCHandle.Alloc(pixeles, GCHandleType.Pinned);
+        try
+        {
+            // EsperarHasta vuelve a preguntar al terminar, y pintar dos veces seguidas no da dos fotogramas nuevos: se recuerda.
+            bool pintado = false;
+            await EsperarHasta(() => pintado || (pintado =
+                pintor.Pintar(fijado.AddrOfPinnedObject(), 320, 180, 320 * 4)
+                && motor.Estado == EstadoMotor.Reproduciendo && motor.Posicion > TimeSpan.FromMilliseconds(200)));
+        }
+        finally
+        {
+            fijado.Free();
+        }
+    }
+
     [Fact]
     public async Task PintorPorSoftware_PintaUnFotogramaDeUnClipReal()
     {
@@ -769,22 +791,12 @@ public sealed class MotorMpvTests : IClassFixture<VideoDePrueba>
         int avisos = 0;
         using var pintor = PintorPorSoftware.Crear(motor, () => Interlocked.Increment(ref avisos));
         pintor.Should().NotBeNull("pintar por software no depende de la tarjeta gráfica");
+        var pixeles = new byte[320 * 4 * 180];
 
         motor.Abrir(_video.Ruta);
-        await EsperarHasta(() => Volatile.Read(ref avisos) > 0);
+        await PintarHastaQueReproduzca(motor, pintor!, pixeles);
 
-        const int ancho = 320, alto = 180, paso = ancho * 4;
-        var pixeles = new byte[paso * alto];
-        var fijado = GCHandle.Alloc(pixeles, GCHandleType.Pinned);
-        try
-        {
-            await EsperarHasta(() => pintor!.Pintar(fijado.AddrOfPinnedObject(), ancho, alto, paso));
-        }
-        finally
-        {
-            fijado.Free();
-        }
-
+        Volatile.Read(ref avisos).Should().BeGreaterThan(0, "libmpv avisa de cada fotograma: es lo que despierta a la superficie");
         pixeles.Count(b => b > 32).Should().BeGreaterThan(pixeles.Length / 10, "el clip es una carta de colores, no una imagen en negro");
     }
 
@@ -796,16 +808,7 @@ public sealed class MotorMpvTests : IClassFixture<VideoDePrueba>
         using var motor = MotorMpv.Crear(Ajustes, sinSonido: true)!;
         using var pintor = PintorPorSoftware.Crear(motor, () => { });
         motor.Abrir(_video.Ruta);
-        var pixeles = new byte[320 * 4 * 180];
-        var fijado = GCHandle.Alloc(pixeles, GCHandleType.Pinned);
-        try
-        {
-            await EsperarHasta(() => pintor!.Pintar(fijado.AddrOfPinnedObject(), 320, 180, 320 * 4));
-        }
-        finally
-        {
-            fijado.Free();
-        }
+        await PintarHastaQueReproduzca(motor, pintor!, new byte[320 * 4 * 180]);
 
         var imagen = motor.CapturarFotograma();
 
