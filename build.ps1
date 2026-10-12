@@ -49,10 +49,14 @@ function Invoke-Build {
     # solución): el build de la solución podía terminar con "OK" dejando el ensamblado
     # de tests AUSENTE (runner limpio, CI) u OBSOLETO (obj poblado en local) — el doble
     # pase no lo garantizaba. --no-incremental fuerza siempre el producto final real.
-    # El proyecto de benchmarks se compila bajo demanda (workflow benchmarks.yml).
     & dotnet build "$root\AnimeLocalTracker\AnimeLocalTracker.csproj" -c $Configuration --nologo -v q -nodeReuse:false --no-incremental
     if ($LASTEXITCODE -ne 0) { return $false }
     & dotnet build "$root\AnimeLocalTracker.Tests\AnimeLocalTracker.Tests.csproj" -c $Configuration --nologo -v q -nodeReuse:false --no-incremental
+    if ($LASTEXITCODE -ne 0) { return $false }
+    # Los benchmarks solo se EJECUTAN bajo demanda (workflow benchmarks.yml), pero se compilan siempre: implementan a mano
+    # interfaces de la app (IDatabaseService…) y, sin esto, un método nuevo los rompía sin que nadie lo viera hasta el flujo
+    # semanal (en rojo del 5 al 12 de octubre de 2026). Sin recompilar la app: ya está hecha dos líneas más arriba.
+    & dotnet build "$root\AnimeLocalTracker.Benchmarks\AnimeLocalTracker.Benchmarks.csproj" -c $Configuration --nologo -v q -nodeReuse:false --no-incremental -p:BuildProjectReferences=false
     if ($LASTEXITCODE -ne 0) { return $false }
     return $true
 }
