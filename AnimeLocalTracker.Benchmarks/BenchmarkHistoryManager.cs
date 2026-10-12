@@ -50,6 +50,15 @@ public static class BenchmarkHistoryManager
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
+    /// <summary>
+    /// Cambio de tiempo (en %) a partir del cual un benchmark se marca como mejora o regresión. 5 en el equipo de desarrollo, donde
+    /// la máquina es siempre la misma. El flujo de GitHub lo sube con ANIMELOCALTRACKER_BENCH_UMBRAL: allí cada ejecución cae en una
+    /// máquina distinta y el mismo código varía entre un 7 y un 26 % (ejecuciones del 21-sep, 28-sep y 12-oct de 2026).
+    /// </summary>
+    public static double UmbralPorcentaje =>
+        double.TryParse(Environment.GetEnvironmentVariable("ANIMELOCALTRACKER_BENCH_UMBRAL"), System.Globalization.NumberStyles.Float,
+            System.Globalization.CultureInfo.InvariantCulture, out double umbral) && umbral > 0 ? umbral : 5.0;
+
     public static string GetDefaultHistoryDirectory()
     {
         // OPS-01: la ruta se puede fijar con la variable ANIMELOCALTRACKER_BENCH_HISTORY
@@ -161,11 +170,11 @@ public static class BenchmarkHistoryManager
                     comp.MemoryDeltaPercent = ((currentMetric.AllocatedBytes - prevMetric.AllocatedBytes) / prevMetric.AllocatedBytes) * 100.0;
                 }
 
-                if (comp.LatencyDeltaPercent <= -5.0)
+                if (comp.LatencyDeltaPercent <= -UmbralPorcentaje)
                 {
                     comp.Status = "⚡ MEJORA";
                 }
-                else if (comp.LatencyDeltaPercent >= 5.0)
+                else if (comp.LatencyDeltaPercent >= UmbralPorcentaje)
                 {
                     comp.Status = "⚠️ REGRESIÓN";
                 }

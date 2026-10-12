@@ -1,7 +1,7 @@
 name: Benchmarks (manual / semanal)
 
 # OPS-01: los benchmarks de rendimiento existían pero nunca se ejecutaban ni en CI ni de
-# forma persistida. Este workflow genera la línea base y el historial comparativo (±5%):
+# forma persistida. Este workflow genera la línea base y el historial comparativo (aquí ±30 %; ±5 % en local):
 #   - manualmente desde Acciones (workflow_dispatch), o
 #   - automáticamente cada lunes a las 03:00 UTC.
 # No bloquea pushes: es un job informativo que sube los reportes como artefacto.
@@ -13,6 +13,7 @@ on:
 
 permissions:
   contents: read
+  actions: read   # para bajar el historial que dejó la ejecución anterior
 
 jobs:
   benchmarks:
@@ -29,11 +30,33 @@ jobs:
       with:
         dotnet-version: '8.0.x'
 
+    # Cada ejecución arranca en una máquina limpia y BenchmarkHistory/ no está en el repo: sin esto no había con qué comparar y
+    # todos los benchmarks salían siempre como "NUEVO". Se recupera el historial de la última ejecución en verde (los artefactos
+    # duran 90 días); el paso de subida de abajo lo vuelve a guardar ya con esta ejecución añadida. Si no hay ninguna, o su
+    # artefacto caducó, se sigue sin historial: esta ejecución queda como línea base.
+    - name: Restore Previous Benchmark History
+      shell: powershell
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        $anterior = gh run list --workflow benchmarks.yml --branch main --status success --limit 1 --json databaseId --jq '.[0].databaseId'
+        if ($anterior) {
+          gh run download $anterior --name benchmark-history --dir BenchmarkHistory
+          if ($LASTEXITCODE -eq 0) { Write-Host "Historial recuperado de la ejecucion $anterior." }
+          else { Write-Host "::warning::No se pudo bajar el historial de la ejecucion $anterior; esta queda como linea base." }
+        } else {
+          Write-Host "No hay ejecucion anterior en verde: esta queda como linea base."
+        }
+        exit 0
+
     - name: Run Benchmarks and Generate Reports
       shell: powershell
       env:
         # El historial comparativo vive en la raíz del repo (misma ruta que usa el script).
         ANIMELOCALTRACKER_BENCH_HISTORY: ${{ github.workspace }}/BenchmarkHistory
+        # Aquí cada ejecución cae en una máquina distinta: el mismo código varía entre un 7 y un 26 % (medido). Con el 5 % de
+        # fábrica saldrían regresiones falsas casi cada semana; solo se marca lo que cambie un 30 % o más.
+        ANIMELOCALTRACKER_BENCH_UMBRAL: '30'
       run: |
         powershell -ExecutionPolicy Bypass -File .\run_benchmarks_and_reports.ps1 -Target benchmarks -BenchmarkCategory 4
 
