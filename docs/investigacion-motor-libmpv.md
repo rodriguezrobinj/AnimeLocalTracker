@@ -1,6 +1,6 @@
 # Diseño: migrar el reproductor de episodios de Flyleaf a libmpv
 
-Fecha: 2026-10-10. Estado: diseño aprobado en conversación, pendiente de revisión por escrito. Cada etapa tendrá su propio plan (`docs/plan-motor-libmpv-etapa-N.md`) cuando le toque.
+Fecha: 2026-10-10. Estado al 2026-10-11: las seis etapas están hechas; la 6 (retirada de Flyleaf) está implementada y verificada, a falta de subirla. Cada etapa tiene su plan con notas de ejecución (`docs/plan-motor-libmpv-etapa-N.md`). Lo que sigue describe el diseño tal como se pensó; donde la etapa 6 lo cambió, se dice.
 
 Antecedentes: sección 5.1 de `docs/investigacion-ecosistema-poliglota.md` (por qué se evaluó y el primer prototipo).
 
@@ -166,9 +166,9 @@ libmpv se arranca siempre con `config=no`, `load-scripts=no`, `ytdl=no`, `input-
 
 **Pintado.** `SuperficieMpv` usa `OpenTK.GLWpfControl` (OpenGL compartido con WPF a través de Direct3D) y la interfaz de pintado de libmpv (`vo=libmpv`). libmpv avisa cuando hay fotograma nuevo y la superficie lo pinta en el siguiente paso de composición de WPF, sin bloquear el hilo de la interfaz.
 
-**Controles.** `ReproductorMpvView` copia el árbol de controles de `ReproductorView` y lo coloca encima de la superficie como WPF normal. Sobran en la vista nueva la reflexión que apaga el ratón nativo de Flyleaf, el rodeo de los enlaces congelados en la raíz del `FlyleafHost` y el gancho de los bordes del mini reproductor.
+**Controles.** `ReproductorMpvView` copia el árbol de controles de `ReproductorView` y lo coloca encima de la superficie como WPF normal. Sobran en la vista nueva la reflexión que apaga el ratón nativo de Flyleaf, el rodeo de los enlaces congelados en la raíz del `FlyleafHost` y el gancho de los bordes del mini reproductor. Desde la etapa 6 solo existe esa vista, con su nombre de siempre: `ReproductorView`.
 
-**Qué vista se abre.** El reproductor expone qué motor usa y la plantilla de `App.xaml` elige `ReproductorView` o `ReproductorMpvView`. Navegación, ficha e historial no cambian.
+**Qué vista se abre.** El reproductor expone qué motor usa y la plantilla de `App.xaml` elige `ReproductorView` o `ReproductorMpvView`. Navegación, ficha e historial no cambian. Desde la etapa 6 la plantilla es una sola vista y el reproductor ya no elige motor.
 
 **Mini reproductor.** La misma ventana flotante de hoy con la vista dentro. Al pasar del formato normal al mini, la superficie se crea en la otra ventana y libmpv vuelve a engancharse sin cortar la reproducción. **Sin probar**: la etapa 3 empieza comprobándolo; si hubiera corte, la alternativa es mover la superficie entre ventanas en vez de recrearla.
 
@@ -179,10 +179,11 @@ libmpv se arranca siempre con `config=no`, `load-scripts=no`, `ytdl=no`, `input-
 | Saltos | Exactos o a fotograma clave. En Automático, exactos |
 | Aceleración por hardware | Decodificación por la gráfica encendida o apagada |
 | Escalado inteligente | Anime4K (sección 6) |
-| Tarjeta gráfica | Con este modo de pintado no se elige (la decide el lienzo): la fila se oculta con el motor nuevo (etapa 5) |
-| Motor de video | «Nuevo (libmpv)» o «Clásico (Flyleaf)», desde la etapa 5. Se aplica al abrir el siguiente episodio |
+| Tarjeta gráfica | Con este modo de pintado no se elige (la decide el lienzo): la fila se retiró en la etapa 6 |
+| Motor de video | Existió en la etapa 5 («Nuevo» o «Clásico»); retirada en la etapa 6: solo queda libmpv |
+| Modo de compatibilidad de video | Etapa 6: pintar por software aunque el equipo tenga OpenGL |
 
-**Modo de compatibilidad.** Si el lienzo OpenGL no arranca (máquina virtual, escritorio remoto, controlador antiguo): mientras exista Flyleaf se usa el motor clásico y se anota en el registro (hecho en la etapa 5: `ReproductorViewModel.PasarAlMotorClasico`; el episodio se reabre donde iba y el resto de la sesión ya no lo intenta). Para después de la retirada, la candidata es la salida por software de libmpv sobre una imagen de WPF, limitada al tamaño de la ventana.
+**Modo de compatibilidad (definitivo desde la etapa 6).** libmpv pinta por software (`MPV_RENDER_API_TYPE_SW`, `Services/PintorPorSoftware`) sobre una imagen de WPF dentro de la misma `SuperficieMpv`. Entra solo si el lienzo OpenGL no se puede crear o libmpv no puede pintar en él (máquina virtual, escritorio remoto, controlador antiguo): como aún no había pintor, el archivo no se había cargado y el episodio empieza donde tenía que empezar; el registro lo anota una vez. Además hay un interruptor, «Modo de compatibilidad de video» (Configuración → Reproducción, apagado por defecto), para lo que la app no puede detectar: un lienzo que se crea pero se ve negro o con fallos. Por software no hay escalado inteligente (Anime4K necesita OpenGL) y se pinta como mucho a 1920×1080 (en una ventana mayor WPF amplía). Si tampoco se puede por software, el reproductor avisa una vez («Este equipo no puede mostrar el video») y no reabre. Hasta la etapa 5 este papel lo hacía el motor clásico (`PasarAlMotorClasico`), que ya no existe.
 
 **Salida por software, medida en la etapa 5 (2026-10-11).** Arnés desechable: la interfaz de pintado por software de libmpv (`MPV_RENDER_API_TYPE_SW`, formato `bgr0`) sobre un `WriteableBitmap` del tamaño de la ventana, pintando en el hilo de la interfaz. Intel HD 620, i5-7300U (4 hilos), ventana de 1366×705, 45 s por caso desde el minuto 2, sin sonido ni subtítulos:
 
@@ -195,6 +196,42 @@ libmpv se arranca siempre con `config=no`, `load-scripts=no`, `ytdl=no`, `input-
 | AV1 1080p 10 bits, por software (decodifica el procesador) | 24,0 | 0 | 3,4 ms (peor 10) | 16 % | 224 MB |
 
 La salida por software aguanta el video a su ritmo con un coste pequeño (unos 4 puntos de procesador más y 3 ms por fotograma en el hilo de la interfaz, que no se retrasó más de 11 ms) y gasta menos memoria que el lienzo. **Recomendación para la etapa 6:** retirar Flyleaf con esta salida como modo de compatibilidad, previa comprobación dentro de la app. **Lo que la medida no dice** (y la etapa 4 enseñó que el arnés no basta): cómo va con subtítulos ASS con muchas capas, con los controles encima y en una ventana más grande (1080p o 4K, donde el coste crece con los píxeles), ni en un equipo sin aceleración de verdad (allí WPF también compone por software); además sin OpenGL no hay Anime4K y el reescalado es el básico. Todo eso se mide en la app antes de quitar nada.
+
+**Salida por software, medida dentro de la app (etapa 6, 2026-10-11).** Ya no es un arnés: `SuperficieMpv` pinta con `PintorPorSoftware` sobre una imagen de WPF. Mismo equipo, perfil aislado, ventana maximizada (zona de video de 1366×728), cada caso con la app recién abierta, el episodio reanudado en el minuto 2 y unos 65 s de reproducción; procesador y memoria son los del proceso entero durante 60 s. Los fotogramas y los perdidos salen de la línea «Al salir» del registro. «ASS» es Youjo Senki 03 desde 3:20, con tres carteles en el tramo.
+
+| Caso | Controles | Fotogramas | Perdidos | Procesador | Memoria (media / pico) | Primera imagen |
+|---|---|---|---|---|---|---|
+| H.264 1080p, por software | ocultos | 1606 | 4 | 22 % | 378 / 389 MB | 0,70 s |
+| H.264 1080p, por software | visibles | 1588 | 0 | 21 % | 377 / 384 MB | 0,59 s |
+| AV1 1080p 10 bits, por software | ocultos | 1625 | 0 | 32 % | 426 / 434 MB | 0,52 s |
+| AV1 1080p 10 bits, por software | visibles | 1602 | 1 | 29 % | 424 / 433 MB | 0,50 s |
+| H.264 con carteles ASS, por software | ocultos | 1589 | 0 | 20 % | 377 / 386 MB | 0,62 s |
+| H.264 con carteles ASS, por software | visibles | 1592 | 0 | 21 % | 378 / 389 MB | 0,56 s |
+| H.264 1080p, lienzo OpenGL | ocultos | 1571 | 0 | 13 % | 483 / 548 MB | 1,93 s |
+| H.264 1080p, lienzo OpenGL | visibles | 1575 | 1 | 13 % | 486 / 556 MB | 1,51 s |
+| AV1 1080p 10 bits, lienzo OpenGL | ocultos | 1590 | 9 | 24 % | 537 / 611 MB | 1,38 s |
+| AV1 1080p 10 bits, lienzo OpenGL | visibles | 1585 | 1 | 26 % | 540 / 613 MB | 1,37 s |
+| H.264 con carteles ASS, lienzo OpenGL | ocultos | 1575 | 5 | 15 % | 489 / 550 MB | 1,36 s |
+| H.264 con carteles ASS, lienzo OpenGL | visibles | 1579 | 0 | 14 % | 490 / 552 MB | 1,38 s |
+
+Por software se pierde como mucho un 0,25 % de los fotogramas (un 0,06 % con los controles a la vista), cuesta entre 5 y 9 puntos de procesador más que el lienzo, gasta unos 110 MB menos y enseña la primera imagen antes (no hay que crear el contexto OpenGL). Los subtítulos ASS se ven con su estilo y sus carteles en su sitio, y los diálogos suben por encima de los controles igual que con el lienzo.
+
+En una misma sesión por software (6224 fotogramas, 15 perdidos, un 0,24 %): pausa (el fotograma se queda quieto), saltos de ±10 s con teclado y con el botón, cambio a otra pista de subtítulos, pantalla completa (1366×768) y vuelta, mini reproductor y vuelta, y el borde del mini arrastrado 6 veces de 420×236 a unos 850×475 y vuelta (480 cambios de tamaño: 416 MB antes, 435 MB de pico, 415 MB después: la imagen se recrea sin acumular memoria). `Esc` sale como siempre.
+
+**Coste según el tamaño** (lo que esta pantalla no da), con el mismo `PintorPorSoftware` sin ventana, 20 s por caso:
+
+| Video | Tamaño pintado | Pintar cada fotograma | Perdidos | Procesador |
+|---|---|---|---|---|
+| H.264 1080p | 1366×705 | 2,9 ms (peor 25) | 0 | 5 % |
+| H.264 1080p | 1920×1080 | 3,3 ms (peor 12) | 1 | 6 % |
+| H.264 1080p | 3840×2160 | 15,2 ms (peor 33) | 2 | 31 % |
+| AV1 1080p 10 bits | 1366×705 | 3,4 ms (peor 39) | 4 | 14 % |
+| AV1 1080p 10 bits | 1920×1080 | 4,4 ms (peor 18) | 1 | 15 % |
+| AV1 1080p 10 bits | 3840×2160 | 18,1 ms (peor 60) | 1 | 40 % |
+
+A 4K cada fotograma ocuparía el hilo de la interfaz 15–18 ms (casi la mitad del tiempo a 24 fotogramas por segundo, y no daría abasto con un video a 60): **el tope de 1920×1080 se queda**. En una ventana mayor libmpv pinta a ese tamaño (3–4 ms) y WPF amplía.
+
+**Sigue sin medir:** un equipo sin aceleración de verdad (allí WPF también compone por software), y una pantalla con la escala de Windows por encima del 100 %. La captura de fotograma en este modo no se pulsó en la app (escribe en Imágenes y en el portapapeles): la cubre la prueba `PorSoftware_LaCapturaDeFotogramaDaLaImagenDelVideo`.
 
 ## 6. Anime4K
 
@@ -218,9 +255,9 @@ Cada una termina en algo comprobable en la app y lleva su propio plan.
 | 3. Paridad | Subtítulos, pistas de audio, ecualizador y modo noche, capturas, mini reproductor, pantalla completa, atajos, ajustes de rendimiento, informe de video | Cada función de la lista de comprobación del reproductor actual hace lo mismo con el motor nuevo |
 | 4. Anime4K | Sección 6 | Se enciende, se nota y se apaga solo al perder fotogramas |
 | 5. Predeterminado | libmpv por defecto; «Motor de video: Nuevo / Clásico» en Configuración → Reproducción; modo de compatibilidad | Una versión publicada y usada un tiempo sin volver al clásico |
-| 6. Retirada | Fuera `MotorFlyleaf`, `ReproductorView`, `ParcheSubtitulosFlyleaf`, `SubtitleAssRenderer`, `SubtitleCuesExtractorService`, `SubtitulosAss`, y los paquetes FlyleafLib, FlyleafLib.Controls.WPF, Flyleaf.FFmpeg y Lib.Harmony; MaterialDesignThemes a una versión estable | La app compila y pasa sin ninguna referencia a Flyleaf |
+| 6. Retirada | Fuera `MotorFlyleaf`, la vista clásica, `ParcheSubtitulosFlyleaf`, `SubtitleAssRenderer`, `SubtitleCuesExtractorService`, `SubtitulosAss`, y los paquetes FlyleafLib, FlyleafLib.Controls.WPF, Flyleaf.FFmpeg y Lib.Harmony; MaterialDesignThemes a la estable 5.3.2; antes, el modo de compatibilidad por software | La app compila y pasa sin ninguna referencia a Flyleaf. **Hecha el 2026-10-11** (`docs/plan-motor-libmpv-etapa-6.md`); la vista vuelve a llamarse `ReproductorView` |
 
-Durante las etapas 2 a 5 hay dos vistas del reproductor: cualquier cambio en los controles habría que hacerlo en las dos, así que el reproductor no se toca por otros motivos hasta la etapa 6. La etapa 5 es el punto de no retorno práctico; hasta ahí todo se revierte apagando un ajuste.
+Durante las etapas 2 a 5 hubo dos vistas del reproductor. Hasta la etapa 5 todo se revertía apagando un ajuste; la etapa 6 ya no tiene interruptor: se deshace revirtiendo sus commits. La condición que este diseño ponía para darla por buena («una versión publicada y usada un tiempo sin volver al clásico») no llegó a cumplirse: ninguna versión publicada llevó libmpv con el clásico como salida, y quien actualice pasará de Flyleaf a libmpv directamente, con el modo por software como única red.
 
 ## 8. Empaquetado y licencia
 

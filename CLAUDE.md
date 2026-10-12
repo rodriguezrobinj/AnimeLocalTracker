@@ -1,6 +1,6 @@
 # AnimeLocalTracker
 
-App de escritorio WPF (.NET 8) para trackear anime local: biblioteca, reproductor (Flyleaf), sincronización con AniList, descargas, y un núcleo políglota (Rust FFI + daemon Python) para parsing/fingerprinting/scraping.
+App de escritorio WPF (.NET 8) para trackear anime local: biblioteca, reproductor (libmpv), sincronización con AniList, descargas, y un núcleo políglota (Rust FFI + daemon Python) para parsing/fingerprinting/scraping.
 
 Reglas de arquitectura y convenciones del proyecto (compartidas con otras herramientas de agente vía `.agents/rules/`, importadas aquí para que Claude Code también las use):
 
