@@ -355,6 +355,31 @@ public class ActualizacionesResumenYFiltrosTests
     }
 
     [Fact]
+    public async Task ElGuardadoPeriodicoDelReproductor_ActualizaLaTarjetaSinRehacerLaLista()
+    {
+        // Llega cada 3 s mientras se ve el episodio: rehacer lista y chips cada vez congelaba el video un instante.
+        var sut = await CargarConLosCuatroEstadosAsync();
+        var (lista, filtros) = (sut.ItemsAgrupados, sut.Filtros);
+
+        sut.Receive(new EpisodioActualizadoMensaje(2, 12, false, 600, 1400, SoloProgreso: true));
+
+        Episodio(sut, 12).Estado.Should().Be(EstadoActualizacion.EnProgreso);
+        sut.ItemsAgrupados.Should().BeSameAs(lista);
+        sut.Filtros.Should().BeSameAs(filtros);
+    }
+
+    [Fact]
+    public async Task ElGuardadoPeriodicoQueDejaElEpisodioVisto_SiActualizaLosContadores()
+    {
+        var sut = await CargarConLosCuatroEstadosAsync();
+
+        sut.Receive(new EpisodioActualizadoMensaje(2, 12, true, 0, 1400, SoloProgreso: true));
+
+        sut.TotalSinVer.Should().Be(2);
+        sut.TotalListos.Should().Be(1);
+    }
+
+    [Fact]
     public async Task UnMensajeDeUnEpisodioQueNoEstaEnLaLista_SeIgnora()
     {
         var sut = await CargarConLosCuatroEstadosAsync();

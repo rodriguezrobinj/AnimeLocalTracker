@@ -642,9 +642,15 @@ public partial class ActualizacionesViewModel : ObservableObject, IAlEntrarEnPes
         var item = Items.FirstOrDefault(i => i.AniListId == message.AnimeId && i.NumeroEpisodio == message.NumeroEpisodio);
         if (item == null) return;
 
+        bool cambioVisto = item.Visto != message.VistoLocal;
         item.Visto = message.VistoLocal;
         item.ProgresoSegundos = message.ProgresoSegundos;
         if (message.TotalSegundos > 0) item.TotalSegundos = message.TotalSegundos;
+
+        // El guardado periódico del reproductor (cada 3 s) casi siempre solo mueve el reloj: la tarjeta se pone al día sola.
+        // Contadores, chips y lista dependen de "visto"; rehacerlos en cada aviso congelaba el video un instante (se pinta en
+        // el hilo de la interfaz).
+        if (message.SoloProgreso && !cambioVisto) return;
         ActualizarResumenYFiltro();
     }
 

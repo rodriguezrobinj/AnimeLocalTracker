@@ -295,6 +295,9 @@ public partial class HistorialViewModel : ObservableObject, IAlEntrarEnPestana, 
 
         if (item != null)
         {
+            var antes = (item.GrupoTemporal, item.VistoLocal, item.EnProgreso);
+            bool subio = false;
+
             // Cada guardado de progreso del reproductor ya estampa UltimaReproduccion = ahora en
             // la BD (PlaybackStateService), así que reflejarlo en memoria deja la lista igual que
             // tras una recarga: la fila sube al principio y pasa de "Ayer" a "Hoy" en vivo.
@@ -303,11 +306,21 @@ public partial class HistorialViewModel : ObservableObject, IAlEntrarEnPestana, 
                 item.UltimaReproduccion = DateTime.UtcNow;
 
                 int indice = ItemsHistorial.IndexOf(item);
-                if (indice > 0) ItemsHistorial.Move(indice, 0);
+                subio = indice > 0;
+                if (subio) ItemsHistorial.Move(indice, 0);
             }
             item.VistoLocal = message.VistoLocal;
             item.ProgresoSegundos = message.ProgresoSegundos;
             if (message.TotalSegundos > 0) item.TotalSegundos = message.TotalSegundos;
+
+            // El reproductor avisa cada 3 s mientras se ve un episodio, y casi siempre solo avanzó el reloj: la fila se pone al
+            // día sola (es observable). Rehacer la lista y los filtros en cada aviso ocupaba el hilo de la interfaz 60-90 ms, y
+            // el video, que se pinta en ese mismo hilo, se quedaba congelado un instante cada 3 segundos.
+            if (!subio && antes == (item.GrupoTemporal, item.VistoLocal, item.EnProgreso))
+            {
+                ActualizarTiempoVisto();
+                return;
+            }
             ActualizarContadores();
             AplicarFiltro();
         }
@@ -395,12 +408,16 @@ public partial class HistorialViewModel : ObservableObject, IAlEntrarEnPestana, 
         TotalEnProgreso = ItemsHistorial.Count(i => i.EnProgreso);
         TotalCompletados = ItemsHistorial.Count(i => i.VistoLocal);
 
-        // Tiempo visto: capítulo completo si está visto; si no, lo reproducido hasta ahora.
+        ActualizarTiempoVisto();
+        ActualizarFiltros();
+    }
+
+    /// <summary>Tiempo visto: capítulo completo si está visto; si no, lo reproducido hasta ahora.</summary>
+    private void ActualizarTiempoVisto()
+    {
         double segundos = ItemsHistorial.Sum(i => i.VistoLocal && i.TotalSegundos > 0 ? i.TotalSegundos : i.ProgresoSegundos);
         var t = TimeSpan.FromSeconds(Math.Max(0, segundos));
         TiempoVistoTexto = t.TotalHours >= 1 ? $"{(int)t.TotalHours} h {t.Minutes} min" : $"{(int)t.TotalMinutes} min";
-
-        ActualizarFiltros();
     }
 
     private void ActualizarFiltros()

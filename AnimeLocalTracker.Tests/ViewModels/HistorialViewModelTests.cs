@@ -358,6 +358,45 @@ public class HistorialViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task Receive_GuardadoPeriodicoSinCambioDeEstado_ActualizaLaFilaSinRehacerLaLista()
+    {
+        // El reproductor avisa cada 3 s. Rehacer la lista y los filtros en cada aviso ocupaba el hilo de la interfaz 60-90 ms
+        // y el video, que se pinta en ese mismo hilo, se quedaba congelado un instante cada 3 segundos.
+        var sut = CrearSut(
+            [new AnimeItem { AniListId = 5, Titulo = "Youjo Senki" }],
+            [new RegistroEpisodio { AniListId = 5, NumeroEpisodio = 3, ProgresoSegundos = 120, TotalSegundos = 1400, UltimaReproduccion = DateTime.UtcNow }]);
+        await sut.CargarHistorialAsync();
+        var item = sut.ItemsHistorial.Single();
+        var (lista, filtrados, filtros) = (sut.ItemsAgrupados, sut.ItemsFiltrados, sut.Filtros);
+
+        sut.Receive(new EpisodioActualizadoMensaje(5, 3, false, 183, 1400, SoloProgreso: true));
+
+        item.ProgresoSegundos.Should().Be(183);
+        sut.TiempoVistoTexto.Should().Be("3 min", "el tiempo visto sí sigue al día");
+        sut.ItemsAgrupados.Should().BeSameAs(lista);
+        sut.ItemsFiltrados.Should().BeSameAs(filtrados);
+        sut.Filtros.Should().BeSameAs(filtros);
+    }
+
+    [Fact]
+    public async Task Receive_GuardadoPeriodicoQueCambiaElEstado_SiRehaceLaLista()
+    {
+        // Un episodio por empezar pasa a "en progreso": cambia el contador del filtro y, con ese filtro puesto, la lista.
+        var sut = CrearSut(
+            [new AnimeItem { AniListId = 5, Titulo = "Youjo Senki" }],
+            [new RegistroEpisodio { AniListId = 5, NumeroEpisodio = 3, ProgresoSegundos = 2, TotalSegundos = 1400, UltimaReproduccion = DateTime.UtcNow }]);
+        await sut.CargarHistorialAsync();
+        sut.CambiarFiltro("EnProgreso");
+        sut.ItemsFiltrados.Should().BeEmpty();
+
+        sut.Receive(new EpisodioActualizadoMensaje(5, 3, false, 9, 1400, SoloProgreso: true));
+
+        sut.TotalEnProgreso.Should().Be(1);
+        sut.ItemsFiltrados.Should().ContainSingle();
+        sut.ItemsAgrupados.OfType<HistorialItemViewModel>().Should().ContainSingle();
+    }
+
+    [Fact]
     public void Receive_MarcadoManualDesdeDetalle_NoFabricaFechaNiReordena()
     {
         // Arrange
