@@ -96,9 +96,12 @@ public class DetalleExtrasTests : IDisposable
         var sut = CrearSut();
         await sut.InicializarAsync(anime);
 
-        // Cancelar la carga de fondo disparada por InicializarAsync para que no pise el test
-        var campo = typeof(DetalleViewModel).GetField("_ctsCargaFicha", BindingFlags.NonPublic | BindingFlags.Instance);
-        ((CancellationTokenSource?)campo?.GetValue(sut))?.Cancel();
+        // La carga inicial calcula el espacio en segundo plano, y aquí se espera a que termine. Cancelarla no basta: si ya pasó su
+        // comprobación de cancelación escribe el resultado igual, y podía hacerlo justo después de que la prueba vaciara los campos
+        // (fallaba a ratos con «2 KB»). En la app no pasa: allí las dos cosas corren en el hilo de la interfaz, una detrás de otra.
+        var limite = DateTime.UtcNow.AddSeconds(10);
+        while (sut.EspacioEnDiscoTooltip.Length == 0 && DateTime.UtcNow < limite) await Task.Delay(10);
+        sut.EspacioEnDiscoTooltip.Should().NotBeEmpty("la carga inicial termina de calcular el espacio (lo último que escribe de lo que aquí se mira)");
         sut.TieneEspacioEnDisco = false;
         sut.EspacioEnDiscoTexto = string.Empty;
 
