@@ -41,7 +41,10 @@ public class BenchmarkMetricComparison
 
 public class BenchmarkComparisonResult
 {
+    /// <summary>La ejecución anterior más reciente (null si es la primera).</summary>
     public BenchmarkRunRecord? BaselineRun { get; set; }
+    /// <summary>Cuántas ejecuciones anteriores entran en la referencia (la mediana de sus tiempos).</summary>
+    public int BaselineRunCount { get; set; }
     public BenchmarkRunRecord CurrentRun { get; set; } = null!;
     public List<BenchmarkMetricComparison> MetricComparisons { get; set; } = new();
 }
@@ -133,20 +136,41 @@ public static class BenchmarkHistoryManager
         return run;
     }
 
+    /// <summary>Cuántas ejecuciones anteriores, como mucho, forman la referencia con la que se compara.</summary>
+    public const int EjecucionesDeReferencia = 5;
+
+    private static double Mediana(IEnumerable<double> valores)
+    {
+        var v = valores.OrderBy(x => x).ToList();
+        return v.Count == 0 ? 0 : v.Count % 2 == 1 ? v[v.Count / 2] : (v[v.Count / 2 - 1] + v[v.Count / 2]) / 2;
+    }
+
+    /// <summary>
+    /// Compara con la MEDIANA de las últimas ejecuciones, no solo con la anterior: en GitHub cada ejecución cae en una máquina
+    /// distinta y una sola lenta o rápida daba falsas alarmas (un bucle de 1 µs sin cambios de código: 1,68, 1,40, 1,25 y 1,68 µs
+    /// en cuatro ejecuciones seguidas). Con una sola ejecución anterior es lo mismo que antes. Un cambio real sigue marcándose
+    /// durante varias ejecuciones, hasta que pasa a ser lo habitual.
+    /// </summary>
     public static BenchmarkComparisonResult CompareWithPrevious(BenchmarkRunRecord currentRun, string? historyDir = null)
     {
         var history = LoadHistory(currentRun.BenchmarkCategory, historyDir);
-        var previousRun = history.LastOrDefault(h => h.RunId != currentRun.RunId);
+        var anteriores = history.Where(h => h.RunId != currentRun.RunId).TakeLast(EjecucionesDeReferencia).ToList();
 
         var result = new BenchmarkComparisonResult
         {
-            BaselineRun = previousRun,
+            BaselineRun = anteriores.LastOrDefault(),
+            BaselineRunCount = anteriores.Count,
             CurrentRun = currentRun
         };
 
         foreach (var currentMetric in currentRun.Metrics)
         {
-            var prevMetric = previousRun?.Metrics.FirstOrDefault(m => m.BenchmarkName == currentMetric.BenchmarkName);
+            var previas = anteriores.SelectMany(r => r.Metrics.Where(m => m.BenchmarkName == currentMetric.BenchmarkName).Take(1)).ToList();
+            var prevMetric = previas.Count == 0 ? null : new BenchmarkMetricRecord
+            {
+                MeanNanoseconds = Mediana(previas.Select(m => m.MeanNanoseconds)),
+                AllocatedBytes = Mediana(previas.Select(m => m.AllocatedBytes))
+            };
 
             var comp = new BenchmarkMetricComparison
             {
@@ -205,7 +229,7 @@ public static class BenchmarkHistoryManager
         
         if (comparison.BaselineRun != null)
         {
-            sb.AppendLine($"- **Comparado contra Línea Base:** `{comparison.BaselineRun.RunId}` ({comparison.BaselineRun.Timestamp:yyyy-MM-dd HH:mm:ss} UTC)");
+            sb.AppendLine($"- **Comparado contra:** la mediana de las últimas {comparison.BaselineRunCount} ejecuciones (la más reciente: `{comparison.BaselineRun.RunId}`, {comparison.BaselineRun.Timestamp:yyyy-MM-dd HH:mm:ss} UTC)");
         }
         else
         {
@@ -213,7 +237,7 @@ public static class BenchmarkHistoryManager
         }
         sb.AppendLine();
 
-        sb.AppendLine("| Benchmark | Latencia Anterior | Latencia Actual | Delta Latencia | Memoria Ant. | Memoria Act. | Delta Memoria | Estado |");
+        sb.AppendLine("| Benchmark | Latencia de Referencia | Latencia Actual | Delta Latencia | Memoria Ant. | Memoria Act. | Delta Memoria | Estado |");
         sb.AppendLine("| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |");
 
         foreach (var m in comparison.MetricComparisons)
@@ -241,7 +265,7 @@ public static class BenchmarkHistoryManager
         Console.WriteLine($" Ejecución: {comparison.CurrentRun.RunId} ({comparison.CurrentRun.Timestamp:yyyy-MM-dd HH:mm:ss} UTC)");
         if (comparison.BaselineRun != null)
         {
-            Console.WriteLine($" Comparativa vs: {comparison.BaselineRun.RunId} ({comparison.BaselineRun.Timestamp:yyyy-MM-dd HH:mm:ss} UTC)");
+            Console.WriteLine($" Comparativa vs: mediana de las últimas {comparison.BaselineRunCount} ejecuciones (la más reciente: {comparison.BaselineRun.RunId}, {comparison.BaselineRun.Timestamp:yyyy-MM-dd HH:mm:ss} UTC)");
         }
         Console.WriteLine("------------------------------------------------------------------------------------------");
         Console.WriteLine($"{"Benchmark",-42} | {"Actual",-12} | {"Delta",-10} | {"Memoria",-10} | {"Estado",-10}");
