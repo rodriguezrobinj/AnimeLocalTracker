@@ -36,6 +36,32 @@ public sealed class SuperficieMpv : Grid, IDisposable
         return nueva;
     }
 
+    private static GLWpfControlSettings AjustesDelLienzo() => new() { MajorVersion = 3, MinorVersion = 3, RenderContinuously = false };
+
+    /// <summary>
+    /// Con la app en reposo, antes del primer episodio: arranca OpenGL una vez y lo suelta. El primer lienzo de la sesión carga el
+    /// controlador de la tarjeta y crea el contexto en el hilo de la interfaz, con la ventana congelada al pulsar «reproducir»
+    /// (0,36 s medidos con el disco ya leído; en una sesión real el primer episodio tardó 1,6 s en tener dónde pintar, frente a
+    /// 0,2 s los demás); los siguientes lienzos tardan 0,04 s.
+    /// </summary>
+    public static void Precalentar()
+    {
+        if (Environment.GetEnvironmentVariable(VariableSinOpenGl) == "1") return;
+        try
+        {
+            var reloj = System.Diagnostics.Stopwatch.StartNew();
+            var lienzo = new GLWpfControl();
+            lienzo.Start(AjustesDelLienzo());
+            lienzo.Dispose();
+            AppLogger.Info("SuperficieMpv", $"[Perf] Lienzo OpenGL preparado por adelantado en {reloj.ElapsedMilliseconds} ms.");
+        }
+        catch (Exception ex)
+        {
+            // Sin OpenGL: el primer episodio lo descubrirá igual y pintará por software.
+            AppLogger.Debug("SuperficieMpv", $"No se pudo preparar el lienzo OpenGL por adelantado: {ex.Message}");
+        }
+    }
+
     /// <summary>Después, no ahora: quien avisa está a medio cargar una vista o a medio pintar, y la respuesta cierra este motor.</summary>
     private static void AvisarSinSalida(MotorMpv motor, string motivo) =>
         Dispatcher.CurrentDispatcher.BeginInvoke(() => { if (!motor.Desechado) motor.AvisarSinSalida(motivo); });
@@ -90,7 +116,7 @@ public sealed class SuperficieMpv : Grid, IDisposable
                 _lienzo = new GLWpfControl();
                 Children.Add(_lienzo);
                 _lienzo.Render += PintarEnElLienzo;
-                _lienzo.Start(new GLWpfControlSettings { MajorVersion = 3, MinorVersion = 3, RenderContinuously = false });
+                _lienzo.Start(AjustesDelLienzo());
             }
             catch (Exception ex)
             {

@@ -183,6 +183,12 @@ public partial class MainWindow : Window, IVentanaPrincipal
                 await System.Threading.Tasks.Task.Delay(PausaEntrePestanas);
             }
 
+            // Antes que las pestañas, el reproductor: su primera apertura es la espera que más se nota (ver
+            // SuperficieMpv.Precalentar). La biblioteca de video (120 MB) se carga fuera del hilo de la interfaz.
+            _ = System.Threading.Tasks.Task.Run(() => Services.Native.LibMpv.Disponible);
+            if (App.ServiceProvider.GetService<ISettingsService>()?.ObtenerConfiguracion()?.VideoPorSoftware != true)
+                await EnReposoAsync(Controls.SuperficieMpv.Precalentar);
+
             foreach (var obtener in pestanas)
             {
                 await EnReposoAsync(() =>

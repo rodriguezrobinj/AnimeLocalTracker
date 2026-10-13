@@ -394,6 +394,7 @@ namespace AnimeLocalTracker.Views
 
             // Suscribir al pipeline global de input mientras la vista está cargada (se quita en Unloaded).
             InputManager.Current.PreProcessInput += InputManager_PreProcessInput;
+            EscucharTeclasDe(Window.GetWindow(this));
             _fadeTimer.Start();
 
             // Restaurar el foco con prioridad baja, con la vista ya colocada
@@ -417,6 +418,7 @@ namespace AnimeLocalTracker.Views
             CuentaAtrasSiguiente.BeginAnimation(OpacityProperty, null);
             CuentaAtrasSiguiente.Opacity = 0;
             InputManager.Current.PreProcessInput -= InputManager_PreProcessInput;
+            EscucharTeclasDe(null);
             _fadeTimer.Stop();
             Mouse.OverrideCursor = null;
 
@@ -552,9 +554,12 @@ namespace AnimeLocalTracker.Views
         }
 
         /// <summary>True si el ratón está sobre un botón o un deslizador de los controles del reproductor.</summary>
-        private bool PunteroSobreUnControl()
+        private bool PunteroSobreUnControl() => EsParteDeUnControl(Mouse.DirectlyOver as DependencyObject);
+
+        /// <summary>True si <paramref name="elemento"/> es un botón o un deslizador de los controles del reproductor, o está dentro de uno.</summary>
+        private bool EsParteDeUnControl(DependencyObject? elemento)
         {
-            for (var elemento = Mouse.DirectlyOver as DependencyObject; elemento != null; elemento = Padre(elemento))
+            for (; elemento != null; elemento = Padre(elemento))
             {
                 if (elemento is ButtonBase or Slider) return true;
                 if (ReferenceEquals(elemento, OverlayControls)) return false;
@@ -627,18 +632,20 @@ namespace AnimeLocalTracker.Views
         // IsMoveToPointEnabled del slider alinea el CENTRO del thumb con el clic y lo recorta
         // dentro de la pista, lo que desplaza hasta ~4% de la duración en los extremos.
         // Aquí calculamos el valor exacto con corrección por el ancho del thumb.
+        // Vale para las dos barras, la grande y la del mini (la que recibe el clic llega en sender): sin esto el deslizador solo
+        // mueve su bolita, sin saltar en el video, y la posición real la devuelve a su sitio al instante.
         private void ProgressBarArea_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            if (DataContext is not ReproductorViewModel vm || vm.TotalSeconds <= 0)
+            if (sender is not FrameworkElement barra || DataContext is not ReproductorViewModel vm || vm.TotalSeconds <= 0)
                 return;
 
             // No interferir con el arrastre del pulgar (el thumb gestiona su propio drag)
             if (EsDentroDeThumb(e.OriginalSource as DependencyObject))
                 return;
 
-            double x = e.GetPosition(ProgressBarArea).X;
-            double ancho = Math.Max(1d, ProgressBarArea.ActualWidth);
-            double halfThumb = ObtenerMitadAnchoThumb();
+            double x = e.GetPosition(barra).X;
+            double ancho = Math.Max(1d, barra.ActualWidth);
+            double halfThumb = ObtenerMitadAnchoThumb(barra);
             double usable = Math.Max(1d, ancho - 2 * halfThumb);
 
             double ratio = Math.Clamp((x - halfThumb) / usable, 0d, 1d);
@@ -719,9 +726,9 @@ namespace AnimeLocalTracker.Views
             return false;
         }
 
-        private double ObtenerMitadAnchoThumb()
+        private double ObtenerMitadAnchoThumb(DependencyObject? barra = null)
         {
-            var thumb = EncontrarHijo<Thumb>(SliderTiempo);
+            var thumb = EncontrarHijo<Thumb>(barra ?? SliderTiempo);
             double ancho = thumb?.ActualWidth ?? 0;
             if (ancho <= 0) ancho = 12; // ancho típico del thumb de MaterialDesign
             return ancho / 2;
@@ -790,15 +797,15 @@ namespace AnimeLocalTracker.Views
 
         private void ReproductorView_PreviewMouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
-            if (DataContext is ReproductorViewModel vm && vm.EsModoMini)
+            // Solo en el mini, y solo sobre el video: lo devuelve al formato habitual. En cualquier otro caso el doble clic no se da
+            // por atendido: Windows cuenta como doble clic el segundo de dos clics seguidos (medio segundo), y al darlo por atendido
+            // aquí el botón de debajo no lo recibía (cerrar un menú y volver a pulsar su botón no lo abría; dos «+10 s» seguidos
+            // saltaban una sola vez).
+            if (DataContext is ReproductorViewModel { EsModoMini: true } vm && !EsParteDeUnControl(e.OriginalSource as DependencyObject))
             {
                 vm.RestaurarFormatoHabitualCommand.Execute(null);
                 e.Handled = true;
-                return;
             }
-
-            // El doble clic no hace nada más en el reproductor (no alterna la pantalla completa).
-            e.Handled = true;
         }
 
         private static T? FindVisualParent<T>(DependencyObject? child) where T : DependencyObject
@@ -874,6 +881,27 @@ namespace AnimeLocalTracker.Views
                 e.Handled = true;
                 RegistrarActividad();
             }
+        }
+
+        // === Atajos con el foco fuera de la vista ===
+        // Las teclas pasan por la vista (ReproductorView_PreviewKeyDown) mientras el foco del teclado está dentro de ella. Cuando el
+        // control que lo tenía desaparece (la opción elegida de un menú que se cierra, un botón que se oculta), WPF deja el foco en
+        // la propia ventana y las teclas ya no pasaban por aquí: Espacio no pausaba hasta pulsar un botón del reproductor con el
+        // ratón. Por eso la vista escucha también a su ventana (la principal o la del mini) mientras está cargada.
+        private Window? _ventanaConTeclas;
+
+        internal void EscucharTeclasDe(Window? ventana)
+        {
+            if (ReferenceEquals(_ventanaConTeclas, ventana)) return;
+            if (_ventanaConTeclas != null) _ventanaConTeclas.PreviewKeyDown -= Ventana_PreviewKeyDown;
+            _ventanaConTeclas = ventana;
+            if (_ventanaConTeclas != null) _ventanaConTeclas.PreviewKeyDown += Ventana_PreviewKeyDown;
+        }
+
+        /// <summary>Solo con el foco en la propia ventana: en otro control suyo (el botón de un diálogo) la tecla es de ese control.</summary>
+        private void Ventana_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (ReferenceEquals(e.OriginalSource, sender)) ReproductorView_PreviewKeyDown(sender, e);
         }
 
         /// <summary>

@@ -1010,15 +1010,19 @@
                                 <RowDefinition Height="Auto"/> <!-- Botones reproducción -->
                             </Grid.RowDefinitions>
 
-                            <!-- Scrubber interactivo -->
-                            <Slider Grid.Row="0" Minimum="0" Maximum="{Binding TotalSeconds}" Value="{Binding CurrentSeconds, Mode=TwoWay}"
-                                    Style="{StaticResource TimelineSliderStyle}" Height="18" Margin="0,0,0,2"
-                                    AutomationProperties.Name="{loc:T Player_ProgresoEpisodio}"
-                                    IsMoveToPointEnabled="True" Focusable="True"
-                                    primitives:Thumb.DragStarted="Slider_DragStarted"
-                                    primitives:Thumb.DragDelta="Slider_DragDelta"
-                                    primitives:Thumb.DragCompleted="Slider_DragCompleted"
-                                    VerticalAlignment="Center" />
+                            <!-- Scrubber interactivo. El clic lo atiende la rejilla, como en la barra grande: el deslizador por sí solo
+                                 mueve la bolita pero no salta en el video (solo saltaba arrastrándola). -->
+                            <Grid x:Name="BarraProgresoMini" Grid.Row="0" Cursor="Hand" Background="Transparent"
+                                  PreviewMouseLeftButtonDown="ProgressBarArea_PreviewMouseLeftButtonDown">
+                                <Slider Minimum="0" Maximum="{Binding TotalSeconds}" Value="{Binding CurrentSeconds, Mode=TwoWay}"
+                                        Style="{StaticResource TimelineSliderStyle}" Height="18" Margin="0,0,0,2"
+                                        AutomationProperties.Name="{loc:T Player_ProgresoEpisodio}"
+                                        IsMoveToPointEnabled="True" Focusable="True"
+                                        primitives:Thumb.DragStarted="Slider_DragStarted"
+                                        primitives:Thumb.DragDelta="Slider_DragDelta"
+                                        primitives:Thumb.DragCompleted="Slider_DragCompleted"
+                                        VerticalAlignment="Center" />
+                            </Grid>
 
                             <Grid Grid.Row="1">
                                 <Grid.ColumnDefinitions>
