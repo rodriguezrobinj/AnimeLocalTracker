@@ -36,6 +36,8 @@ public class AnimeLibraryService
         return await _databaseService.ExisteAnimeAsync(aniListId);
     }
 
+    private const int MaxLongitudCarpeta = 100;
+
     private static readonly string[] NombresReservados =
         ["CON", "PRN", "AUX", "NUL", .. Enumerable.Range(0, 10).SelectMany(n => new[] { $"COM{n}", $"LPT{n}" })];
 
@@ -47,7 +49,10 @@ public class AnimeLibraryService
     /// </summary>
     internal static string NombreDeCarpeta(string titulo, int aniListId)
     {
-        string nombre = string.Join("_", titulo.Split(Path.GetInvalidFileNameChars())).Trim().TrimEnd('.', ' ');
+        string nombre = string.Join("_", titulo.Split(Path.GetInvalidFileNameChars())).Trim();
+        // Tope de longitud: Windows y la mayoría de reproductores no abren rutas de más de 260 caracteres (carpeta + "\Episodio NN.mp4").
+        if (nombre.Length > MaxLongitudCarpeta) nombre = nombre[..MaxLongitudCarpeta];
+        nombre = nombre.TrimEnd('.', ' ');
         if (nombre.Length == 0) return $"Anime {aniListId}";
 
         string sinExtension = nombre.Split('.')[0].TrimEnd();

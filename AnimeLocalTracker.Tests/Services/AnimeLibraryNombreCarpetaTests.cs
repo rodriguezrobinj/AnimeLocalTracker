@@ -29,4 +29,13 @@ public class AnimeLibraryNombreCarpetaTests
         nombre.Should().Be(esperado);
         Path.GetFullPath(Path.Combine(@"D:\Anime", nombre)).Should().StartWith(@"D:\Anime\", "la carpeta del anime siempre queda DENTRO de la biblioteca");
     }
+
+    [Fact]
+    public void NombreDeCarpeta_AcortaTitulosLargosParaNoPasarDe260CaracteresDeRuta()
+    {
+        string nombre = AnimeLibraryService.NombreDeCarpeta(new string('a', 300) + " b. ", 42);
+
+        nombre.Length.Should().BeLessThanOrEqualTo(100);
+        nombre.Should().NotEndWith(" ").And.NotEndWith(".");
+    }
 }
