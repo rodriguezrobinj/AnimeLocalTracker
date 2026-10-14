@@ -322,7 +322,10 @@ public partial class HistorialViewModel : ObservableObject, IAlEntrarEnPestana, 
                 return;
             }
             ActualizarContadores();
-            AplicarFiltro();
+            // La lista solo cambia si la fila sube, cambia de grupo de fecha o, con un filtro de estado puesto, entra o sale de él.
+            // Al marcarse visto el episodio que se está viendo no pasa nada de eso, y rehacerla congelaba el video justo al salir
+            // el aviso de Auto-Tracking.
+            if (subio || antes.GrupoTemporal != item.GrupoTemporal || FiltroActual != FiltroHistorial.Todos) AplicarFiltro();
         }
         else if (esReproduccionReal)
         {

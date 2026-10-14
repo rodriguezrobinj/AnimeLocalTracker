@@ -26,7 +26,9 @@ public sealed record PistaSubtitulosMotor(int Indice, string? Idioma, string? Ti
 /// <summary>Lo que el motor necesita saber antes de abrir el primer archivo.</summary>
 /// <param name="VideoPorSoftware">Modo de compatibilidad: pintar sin OpenGL, aunque el equipo lo tenga.</param>
 /// <param name="ColorLigero">Interpolar el color de la forma más barata para la tarjeta, a cambio de bordes de color algo menos nítidos.</param>
-public sealed record AjustesInicialesMotor(bool AceleracionPorHardware, IReadOnlyList<FiltroAudio> FiltrosAudio, bool VideoPorSoftware = false, bool ColorLigero = false);
+/// <param name="CarpetaShaders">Dónde guardar los shaders ya compilados para no compilarlos en cada apertura; null, sin guardar (pruebas).</param>
+public sealed record AjustesInicialesMotor(bool AceleracionPorHardware, IReadOnlyList<FiltroAudio> FiltrosAudio, bool VideoPorSoftware = false,
+    bool ColorLigero = false, string? CarpetaShaders = null);
 
 /// <summary>
 /// El motor de video del reproductor de episodios, sin tipos de ninguna biblioteca. Lo implementan <c>MotorMpv</c> (libmpv) y el

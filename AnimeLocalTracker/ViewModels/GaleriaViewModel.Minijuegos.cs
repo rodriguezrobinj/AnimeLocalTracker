@@ -69,8 +69,7 @@ public partial class GaleriaViewModel
     /// </summary>
     public async Task AlEntrarAsync()
     {
-        // Sin filtros ni orden especial no cambia nada de lo que se ve: no se rehace la lista en balde.
-        if (HayFiltrosActivos || TieneFiltrosAvanzadosActivos) RefrescarFiltro();
+        RefrescarFiltroSiAlgoDependeDeLosDatos();
         if (MostrandoMinijuegos) await PrepararMinijuegosAsync();
     }
 

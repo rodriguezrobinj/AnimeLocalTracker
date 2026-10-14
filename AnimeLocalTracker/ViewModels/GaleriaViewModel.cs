@@ -228,6 +228,12 @@ public partial class GaleriaViewModel : ObservableObject, IAlEntrarEnPestana, ID
         OnPropertyChanged(nameof(SeleccionadosTexto));
     }
 
+    /// <summary>Sin filtros ni orden especial, lo que cambie dentro de un anime no lo mueve de sitio: no se rehace la lista en balde.</summary>
+    private void RefrescarFiltroSiAlgoDependeDeLosDatos()
+    {
+        if (HayFiltrosActivos || TieneFiltrosAvanzadosActivos) RefrescarFiltro();
+    }
+
     partial void OnTextoBusquedaChanged(string value) => RefrescarFiltro();
     partial void OnGeneroSeleccionadoChanged(string value) => RefrescarFiltro();
     partial void OnTemporadaSeleccionadaChanged(string value) => RefrescarFiltro();
@@ -438,8 +444,9 @@ public partial class GaleriaViewModel : ObservableObject, IAlEntrarEnPestana, ID
                     if (anime == null || anime.EpisodiosVistos == vistos) return;
 
                     anime.EpisodiosVistos = vistos;
-                    // "Pendientes" y el orden por progreso dependen de lo visto: sin refrescar, el anime se quedaba donde estaba.
-                    RefrescarFiltro();
+                    // "Pendientes" y el orden por progreso dependen de lo visto: sin refrescar, el anime se quedaba donde estaba. Sin
+                    // ellos no hace falta, y rehacer la lista de toda la biblioteca congelaba el video al salir el aviso de Auto-Tracking.
+                    RefrescarFiltroSiAlgoDependeDeLosDatos();
                 }
 
                 var dispatcher = System.Windows.Application.Current?.Dispatcher;

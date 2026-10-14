@@ -379,6 +379,25 @@ public class HistorialViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task Receive_AutoTrackingDelEpisodioQueSeEstaViendo_ActualizaContadoresSinRehacerLaLista()
+    {
+        // Al marcarse visto el episodio en curso (ya arriba del todo, sin filtro de estado) la lista queda igual. Rehacerla
+        // congelaba el video justo cuando salía el aviso de Auto-Tracking (medido: ~90 ms con la pestaña oculta bajo el video).
+        var sut = CrearSut(
+            [new AnimeItem { AniListId = 5, Titulo = "Youjo Senki" }],
+            [new RegistroEpisodio { AniListId = 5, NumeroEpisodio = 3, ProgresoSegundos = 1300, TotalSegundos = 1400, UltimaReproduccion = DateTime.UtcNow }]);
+        await sut.CargarHistorialAsync();
+        var item = sut.ItemsHistorial.Single();
+        var lista = sut.ItemsAgrupados;
+
+        sut.Receive(new EpisodioActualizadoMensaje(5, 3, true, 0, 1400));
+
+        item.VistoLocal.Should().BeTrue();
+        sut.TotalCompletados.Should().Be(1);
+        sut.ItemsAgrupados.Should().BeSameAs(lista);
+    }
+
+    [Fact]
     public async Task Receive_GuardadoPeriodicoQueCambiaElEstado_SiRehaceLaLista()
     {
         // Un episodio por empezar pasa a "en progreso": cambia el contador del filtro y, con ese filtro puesto, la lista.

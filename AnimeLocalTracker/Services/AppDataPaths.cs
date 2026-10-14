@@ -32,6 +32,8 @@ public static class AppDataPaths
     public static string AudioFingerprintsDir { get; } = Path.Combine(DataRoot, "AudioFingerprints");
     /// <summary>Lista de openings/endings de AnimeThemes por anime (un JSON pequeño cada uno): la música sale al instante y también sin conexión.</summary>
     public static string AnimeThemesCatalogDir { get; } = Path.Combine(DataRoot, "AnimeThemesCatalog");
+    /// <summary>Shaders del video ya compilados por libmpv (escalado Anime4K incluido): sin ellos, cada episodio los compila al abrirse.</summary>
+    public static string ShaderCacheDir { get; } = Path.Combine(DataRoot, "ShaderCache");
     public static string PluginsFolder { get; } = Path.Combine(DataRoot, "Plugins");
     public static string TorrentsCacheDir { get; } = Path.Combine(DataRoot, "TorrentsCache");
     public static string BibliotecaDb { get; } = Path.Combine(DataRoot, "biblioteca.db");

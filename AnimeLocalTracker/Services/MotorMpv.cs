@@ -82,6 +82,10 @@ public sealed partial class MotorMpv : IMotorVideo
             // Sin valor, el color se interpola con el filtro de la imagen (lanczos): en una gráfica integrada con video 1080p son
             // 7 de los 17 ms de tarjeta de cada fotograma (medido en una HD 620).
             if (ajustes.ColorLigero) LibMpv.mpv_set_option_string(mpv, "cscale", "bilinear");
+            // Compilar los shaders (Anime4K sobre todo) se hace en el hilo de la interfaz, que es donde se pinta: en una HD 620 el
+            // primer fotograma tardaba 280 ms y el video se congelaba al abrir, justo con el aviso de «Continuando desde». Con los
+            // ya compilados guardados, 120 ms. Si el controlador cambia, libmpv descarta lo guardado y vuelve a compilar.
+            if (ajustes.CarpetaShaders != null) LibMpv.mpv_set_option_string(mpv, "gpu-shader-cache-dir", ajustes.CarpetaShaders);
             // Diagnóstico: el registro propio de libmpv, solo si se pide con esta variable de entorno (ruta del archivo).
             if (Environment.GetEnvironmentVariable("ANIMELOCALTRACKER_MPV_LOG") is { Length: > 0 } registroMpv)
             {

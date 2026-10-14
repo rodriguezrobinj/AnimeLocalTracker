@@ -116,6 +116,25 @@ public class GaleriaEstadoVistaTests
     }
 
     [Fact]
+    public async Task AlVerUnEpisodio_SinFiltrosNiOrden_NoRehaceLaLista()
+    {
+        // Rehacer la lista de toda la biblioteca congelaba el video ~130 ms al salir el aviso de Auto-Tracking, y sin filtros ni
+        // orden especial nada cambia de sitio: basta con que la tarjeta cuente un visto más.
+        var pelicula = new AnimeItem { AniListId = 1, Titulo = "Akira", TotalEpisodios = 1 };
+        var sut = await CrearCargadaAsync(pelicula, new AnimeItem { AniListId = 2, Titulo = "Bleach", TotalEpisodios = 366 });
+        _database.Setup(d => d.ObtenerRegistrosPorAnimeAsync(1))
+            .ReturnsAsync(new List<RegistroEpisodio> { new() { AniListId = 1, NumeroEpisodio = 1, VistoLocal = true } });
+        int rehechas = 0;
+        ((System.Collections.Specialized.INotifyCollectionChanged)sut.BibliotecaFiltrada!).CollectionChanged += (_, _) => rehechas++;
+
+        sut.Receive(new EpisodioActualizadoMensaje(1, 1, VistoLocal: true));
+        await Task.Delay(150);
+
+        pelicula.EpisodiosVistos.Should().Be(1);
+        rehechas.Should().Be(0);
+    }
+
+    [Fact]
     public async Task AlVolverALaGaleria_ElFiltroDeEstadoReflejaLoCambiadoEnLaFicha()
     {
         var bleach = new AnimeItem { AniListId = 1, Titulo = "Bleach", EstadoUsuario = "CURRENT" };
