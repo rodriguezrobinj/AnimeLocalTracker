@@ -77,6 +77,20 @@
             </Border>
         </DataTemplate>
 
+        <!-- Sección de la categoría: oculta salvo que su Tag (el bool EsSeccionX) diga que es la activa. Con
+             Visibility="{Binding …}" las seis se veían en la primera maquetación (el enlace aún no se ha resuelto al crear la
+             vista desde su plantilla): se construían todas y la primera visita a Configuración congelaba la app ~0,5 s más. -->
+        <Style x:Key="CfgSeccion" TargetType="ScrollViewer" BasedOn="{StaticResource {x:Type ScrollViewer}}">
+            <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
+            <Setter Property="HorizontalScrollBarVisibility" Value="Disabled"/>
+            <Setter Property="Visibility" Value="Collapsed"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}" Value="True">
+                    <Setter Property="Visibility" Value="Visible"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
         <!-- Grupo: tarjeta que agrupa filas separadas por líneas finas -->
         <Style x:Key="CfgGroup" TargetType="Border" BasedOn="{StaticResource AppCard}">
             <Setter Property="CornerRadius" Value="14"/>
@@ -336,8 +350,7 @@
                 <Grid Grid.Row="0">
 
                     <!-- ── 1. BIBLIOTECA Y DATOS ── -->
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
-                                  Visibility="{Binding EsSeccionBiblioteca, Converter={StaticResource BoolToVis}}">
+                    <ScrollViewer Style="{StaticResource CfgSeccion}" Tag="{Binding EsSeccionBiblioteca}">
                         <StackPanel Margin="0,0,20,8">
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
                                 <Border Style="{StaticResource CfgChip}"><materialDesign:PackIcon Kind="FolderMultiple" Style="{StaticResource CfgChipIcon}"/></Border>
@@ -521,8 +534,7 @@
                     </ScrollViewer>
 
                     <!-- ── 2. REPRODUCCIÓN ── -->
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
-                                  Visibility="{Binding EsSeccionReproduccion, Converter={StaticResource BoolToVis}}">
+                    <ScrollViewer Style="{StaticResource CfgSeccion}" Tag="{Binding EsSeccionReproduccion}">
                         <StackPanel Margin="0,0,20,8">
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
                                 <Border Style="{StaticResource CfgChip}"><materialDesign:PackIcon Kind="PlayCircleOutline" Style="{StaticResource CfgChipIcon}"/></Border>
@@ -880,8 +892,7 @@
                     </ScrollViewer>
 
                     <!-- ── 3. ATAJOS DE TECLADO ── -->
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
-                                  Visibility="{Binding EsSeccionAtajos, Converter={StaticResource BoolToVis}}">
+                    <ScrollViewer Style="{StaticResource CfgSeccion}" Tag="{Binding EsSeccionAtajos}">
                         <StackPanel Margin="0,0,20,8">
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
                                 <Border Style="{StaticResource CfgChip}"><materialDesign:PackIcon Kind="KeyboardOutline" Style="{StaticResource CfgChipIcon}"/></Border>
@@ -945,8 +956,7 @@
                     </ScrollViewer>
 
                     <!-- ── 4. DESCARGAS Y CUENTA ── -->
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
-                                  Visibility="{Binding EsSeccionDescargas, Converter={StaticResource BoolToVis}}">
+                    <ScrollViewer Style="{StaticResource CfgSeccion}" Tag="{Binding EsSeccionDescargas}">
                         <StackPanel Margin="0,0,20,8">
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
                                 <Border Style="{StaticResource CfgChip}"><materialDesign:PackIcon Kind="CloudDownloadOutline" Style="{StaticResource CfgChipIcon}"/></Border>
@@ -1039,8 +1049,7 @@
                     </ScrollViewer>
 
                     <!-- ── 5. GENERAL ── -->
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
-                                  Visibility="{Binding EsSeccionGeneral, Converter={StaticResource BoolToVis}}">
+                    <ScrollViewer Style="{StaticResource CfgSeccion}" Tag="{Binding EsSeccionGeneral}">
                         <StackPanel Margin="0,0,20,8">
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
                                 <Border Style="{StaticResource CfgChip}"><materialDesign:PackIcon Kind="TuneVariant" Style="{StaticResource CfgChipIcon}"/></Border>
@@ -1156,8 +1165,7 @@
                     </ScrollViewer>
 
                     <!-- ── 6. PLUGINS ── -->
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
-                                  Visibility="{Binding EsSeccionPlugins, Converter={StaticResource BoolToVis}}">
+                    <ScrollViewer Style="{StaticResource CfgSeccion}" Tag="{Binding EsSeccionPlugins}">
                         <StackPanel Margin="0,0,20,8">
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
                                 <Border Style="{StaticResource CfgChip}"><materialDesign:PackIcon Kind="Puzzle" Style="{StaticResource CfgChipIcon}"/></Border>

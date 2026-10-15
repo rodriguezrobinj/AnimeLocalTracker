@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using AnimeLocalTracker.Messages;
 using AnimeLocalTracker.Models;
@@ -21,6 +22,34 @@ public class CalendarioViewModelTests
         {
             await Task.Delay(25);
         }
+    }
+
+    [Fact]
+    public async Task CargaInicial_UsaLaPortadaYaDecodificadaDeLaCacheCompartida()
+    {
+        // Con la ruta del archivo como Source, WPF decodificaba cada portada a tamaño completo en el hilo de la interfaz al
+        // pintarla: ~0,5 s congelada la app la primera vez que se veía el Calendario (o mientras se preparaba en segundo plano).
+        var animeLocal = new AnimeItem { AniListId = 21, Estado = "RELEASING", UrlPortada = "https://s4.anilist.co/onepiece.jpg" };
+        var dbMock = new Mock<IDatabaseService>();
+        dbMock.Setup(d => d.ObtenerAnimesLigerosAsync()).ReturnsAsync(new List<AnimeItem> { animeLocal });
+        var trackingMock = new Mock<IAnimeTrackingService>();
+        trackingMock
+            .Setup(t => t.ObtenerCalendarioEmisionAsync(It.IsAny<List<int>>(), It.IsAny<long>(), It.IsAny<long>()))
+            .ReturnsAsync((true, new List<AiringEpisode>
+            {
+                new() { AniListId = 21, Titulo = "One Piece", NumeroEpisodio = 1172, FechaEmision = DateTime.UtcNow }
+            }));
+        var portada = System.Windows.Media.Imaging.BitmapSource.Create(1, 1, 96, 96, System.Windows.Media.PixelFormats.Bgr32, null, new byte[4], 4);
+        portada.Freeze();
+        var imagenes = new Mock<IImageCacheService>();
+        imagenes.Setup(i => i.ObtenerPortadaAsync(21, animeLocal.UrlPortada, It.IsAny<int>())).ReturnsAsync(portada);
+
+        var vm = new CalendarioViewModel(dbMock.Object, trackingMock.Object, imagenes: imagenes.Object);
+        await EsperarCargaInicialAsync(vm);
+        await Task.Delay(100);
+
+        var episodio = new[] { vm.Lunes, vm.Martes, vm.Miercoles, vm.Jueves, vm.Viernes, vm.Sabado, vm.Domingo }.SelectMany(d => d).Single();
+        episodio.Portada.Should().BeSameAs(portada);
     }
 
     [Fact]

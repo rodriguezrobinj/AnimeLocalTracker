@@ -37,6 +37,7 @@ public partial class ActualizacionesViewModel : ObservableObject, IAlEntrarEnPes
     private readonly IFileScannerService _fileScannerService;
     private readonly PythonEpisodeEnricher? _enricher;
     private readonly IDialogService? _dialogService;
+    private readonly IImageCacheService? _imagenes;
     private string _filtroActual = FiltroTodos;
     private readonly SemaphoreSlim _cargaLock = new(1, 1);
 
@@ -129,9 +130,11 @@ public partial class ActualizacionesViewModel : ObservableObject, IAlEntrarEnPes
         IFileScannerService fileScannerService,
         PythonEpisodeEnricher? enricher = null,
         IDialogService? dialogService = null,
-        IProgramacionEmisionService? programacion = null)
+        IProgramacionEmisionService? programacion = null,
+        IImageCacheService? imagenes = null)
     {
         _databaseService = databaseService;
+        _imagenes = imagenes;
         _animeTrackingService = animeTrackingService;
         _programacion = programacion ?? new ProgramacionEmisionService(animeTrackingService, databaseService);
         _downloadService = downloadService;
@@ -279,6 +282,7 @@ public partial class ActualizacionesViewModel : ObservableObject, IAlEntrarEnPes
 
             Items = new ObservableCollection<ActualizacionItemViewModel>(lista);
             ActualizarResumenYFiltro();
+            _ = PonerPortadasAsync(lista, dicAnimes);
         }
         catch (Exception ex)
         {
@@ -289,6 +293,27 @@ public partial class ActualizacionesViewModel : ObservableObject, IAlEntrarEnPes
             EstaCargando = false;
             NotificarEstados();
             _cargaLock.Release();
+        }
+    }
+
+    /// <summary>
+    /// Las portadas salen de la caché que comparte con la Galería: casi todas ya están en memoria, decodificadas pequeñas, y las
+    /// que faltan se decodifican fuera del hilo de la interfaz (ver CalendarioViewModel).
+    /// </summary>
+    private async Task PonerPortadasAsync(IEnumerable<ActualizacionItemViewModel> items, IReadOnlyDictionary<int, AnimeItem> animes)
+    {
+        if (_imagenes == null) return;
+        try
+        {
+            foreach (var delAnime in items.GroupBy(i => i.AniListId))
+            {
+                var portada = await _imagenes.ObtenerPortadaAsync(delAnime.Key, animes.GetValueOrDefault(delAnime.Key)?.UrlPortada);
+                foreach (var item in delAnime) item.Portada = portada;
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("ActualizacionesViewModel", $"No se pudieron poner las portadas: {ex.Message}");
         }
     }
 

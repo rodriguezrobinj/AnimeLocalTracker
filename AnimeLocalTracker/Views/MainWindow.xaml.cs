@@ -155,8 +155,8 @@ public partial class MainWindow : Window, IVentanaPrincipal
         {
             await System.Threading.Tasks.Task.Delay(EsperaAntesDePrecalentar);
 
-            // De la más usada a la menos; cada ViewModel se pide al llegar su turno (crearlo también cuesta). "Acerca de" se
-            // queda fuera: es la más cara de construir (dibuja el registro de cambios) y la que menos se visita.
+            // De la más usada a la menos; cada ViewModel se pide al llegar su turno (crearlo también cuesta). "Acerca de", la que
+            // menos se visita, va al final de todo (ver abajo).
             Func<object>[] pestanas =
             [
                 () => navegacion.ObtenerVista(Pestanas.Historial), () => navegacion.ObtenerVista(Pestanas.Actualizaciones), () => navegacion.ObtenerVista(Pestanas.Calendario),
@@ -219,6 +219,13 @@ public partial class MainWindow : Window, IVentanaPrincipal
                     });
                 }
             }
+
+            // Lo último: dibujar el registro de cambios la hace la más cara de construir (~0,25 s la primera visita, con la app
+            // congelada). En reposo no se nota.
+            await EnReposoAsync(() =>
+            {
+                if (ContenedorVistaPrincipal.Precalentar(navegacion.ObtenerVista(Pestanas.AcercaDe))) hechas++;
+            });
 
             AppLogger.Info("MainWindow", $"[Perf] Pestañas preparadas por adelantado: {hechas} en {msTrabajo} ms de trabajo, repartidos en {reloj.ElapsedMilliseconds} ms.");
         }

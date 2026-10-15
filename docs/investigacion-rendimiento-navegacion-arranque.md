@@ -17,7 +17,7 @@ antivirus de Windows activo.
 | Cambiar a una pestaña ya visitada | 105 – 440 ms (siempre, en cada visita) | **3 – 20 ms** |
 | Primera visita a Configuración | 400 – 640 ms | **3 – 7 ms** (ya está preparada) |
 | Primera visita a Historial, Actualizaciones, Calendario, Estadísticas, Logros, Descargas, Agregar | 105 – 270 ms | **8 – 45 ms** |
-| Primera visita a Acerca de | 990 ms | 280 ms (no se prepara por adelantado; las siguientes, 3 ms) |
+| Primera visita a Acerca de | 990 ms | 280 ms sin preparar; **7 ms** desde 2026-10-14, que se prepara la última, en reposo |
 | Volver a la Galería desde otra pestaña o desde una ficha | 300 – 440 ms | **5 – 35 ms**, y en el mismo punto de desplazamiento |
 | Abrir la ficha de un anime (hasta verla pintada) | 330 – 550 ms | **75 – 160 ms** (2.ª ronda, sección 9) |
 | Abrir Registros desde Configuración | 260 – 540 ms | **37 – 50 ms** (la primera vez, 177 ms) |

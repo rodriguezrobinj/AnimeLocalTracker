@@ -60,6 +60,34 @@ public class ActualizacionesViewModelTests
     }
 
     [Fact]
+    public async Task Cargar_UsaLaPortadaYaDecodificadaDeLaCacheCompartida()
+    {
+        // Con la ruta del archivo como Source, WPF decodificaba cada portada a tamaño completo (460x650) en el hilo de la
+        // interfaz al pintar la tarjeta, y la guardaba así en memoria.
+        _dbMock.Setup(d => d.ObtenerAnimesLigerosAsync()).ReturnsAsync(new List<AnimeItem>
+        {
+            new() { AniListId = 1, Titulo = "One Piece", Estado = "RELEASING", RutaCarpeta = @"C:\Anime\OnePiece", UrlPortada = "https://s4.anilist.co/op.jpg" }
+        });
+        _dbMock.Setup(d => d.ObtenerTodosLosRegistrosAsync()).ReturnsAsync(new List<RegistroEpisodio>());
+        _trackingMock.Setup(t => t.ObtenerCalendarioEmisionAsync(It.IsAny<List<int>>(), It.IsAny<long>(), It.IsAny<long>()))
+            .ReturnsAsync((true, new List<AiringEpisode>
+            {
+                new() { AniListId = 1, NumeroEpisodio = 1120, FechaEmision = DateTime.UtcNow.AddHours(-3) }
+            }));
+        var portada = System.Windows.Media.Imaging.BitmapSource.Create(1, 1, 96, 96, System.Windows.Media.PixelFormats.Bgr32, null, new byte[4], 4);
+        portada.Freeze();
+        var imagenes = new Mock<IImageCacheService>();
+        imagenes.Setup(i => i.ObtenerPortadaAsync(1, "https://s4.anilist.co/op.jpg", It.IsAny<int>())).ReturnsAsync(portada);
+        var sut = new ActualizacionesViewModel(_dbMock.Object, _trackingMock.Object, _downloadMock.Object, _fileScannerMock.Object,
+            imagenes: imagenes.Object);
+
+        await sut.CargarActualizacionesAsync();
+        await Task.Delay(100);
+
+        sut.Items.Single().Portada.Should().BeSameAs(portada);
+    }
+
+    [Fact]
     public async Task Recarga_SinConexion_DeberiaConservarElFeedYaCargado()
     {
         // Arrange: primera carga con éxito.

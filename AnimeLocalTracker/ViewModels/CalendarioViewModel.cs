@@ -14,6 +14,7 @@ namespace AnimeLocalTracker.ViewModels;
 public partial class CalendarioViewModel : ObservableObject, IAlEntrarEnPestana, IDisposable
 {
     private readonly IDatabaseService _databaseService;
+    private readonly IImageCacheService? _imagenes;
     private readonly IAnimeTrackingService _animeTrackingService;
     private readonly IProgramacionEmisionService _programacion;
     private readonly SemaphoreSlim _cargaLock = new(1, 1);
@@ -47,9 +48,10 @@ public partial class CalendarioViewModel : ObservableObject, IAlEntrarEnPestana,
     public ObservableCollection<AiringEpisode> Domingo { get; } = new();
 
     public CalendarioViewModel(IDatabaseService databaseService, IAnimeTrackingService animeTrackingService,
-        IProgramacionEmisionService? programacion = null)
+        IProgramacionEmisionService? programacion = null, IImageCacheService? imagenes = null)
     {
         _databaseService = databaseService;
+        _imagenes = imagenes;
         _animeTrackingService = animeTrackingService;
         _programacion = programacion ?? new ProgramacionEmisionService(animeTrackingService, databaseService);
 
@@ -100,6 +102,27 @@ public partial class CalendarioViewModel : ObservableObject, IAlEntrarEnPestana,
                      .Concat(Viernes).Concat(Sabado).Concat(Domingo))
         {
             episodio.ActualizarEstadoEmitido();
+        }
+    }
+
+    /// <summary>
+    /// Las portadas salen de la caché que comparte con la Galería: casi todas ya están en memoria, decodificadas pequeñas, y las
+    /// que faltan se decodifican fuera del hilo de la interfaz.
+    /// </summary>
+    private async Task PonerPortadasAsync(IEnumerable<AiringEpisode> episodios, IReadOnlyDictionary<int, string> urlsPortada)
+    {
+        if (_imagenes == null) return;
+        try
+        {
+            foreach (var delAnime in episodios.GroupBy(e => e.AniListId))
+            {
+                var portada = await _imagenes.ObtenerPortadaAsync(delAnime.Key, urlsPortada.GetValueOrDefault(delAnime.Key));
+                foreach (var episodio in delAnime) episodio.Portada = portada;
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Debug("CalendarioViewModel", $"No se pudieron poner las portadas: {ex.Message}");
         }
     }
 
@@ -195,6 +218,9 @@ public partial class CalendarioViewModel : ObservableObject, IAlEntrarEnPestana,
                     case DayOfWeek.Sunday: Domingo.Add(eps); break;
                 }
             }
+
+            var urlsPortada = animes.GroupBy(a => a.AniListId).ToDictionary(g => g.Key, g => g.First().UrlPortada);
+            _ = PonerPortadasAsync(schedule, urlsPortada);
         }
         catch (Exception ex)
         {

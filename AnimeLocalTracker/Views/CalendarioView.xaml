@@ -3,40 +3,52 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
              xmlns:loc="clr-namespace:AnimeLocalTracker.Services"
-             xmlns:behaviors="clr-namespace:AnimeLocalTracker.Behaviors"
              TextElement.Foreground="{DynamicResource MaterialDesignBody}"
              Background="Transparent">
 
     <UserControl.Resources>
+        <!-- Botón que cubre toda la tarjeta: transparente, con un velo azul suave al pasar el ratón y al pulsar. El de Material
+             Design (sombra, ripple, estados) costaba ~160 ms con las ~40 tarjetas que se construyen a la vez al abrir la pestaña. -->
+        <Style x:Key="CalTarjetaBoton" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Velo" Background="Transparent" BorderBrush="Transparent" BorderThickness="1" CornerRadius="8"/>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Velo" Property="Background" Value="{StaticResource Brush.AccentStrongTint}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Velo" Property="Background" Value="{StaticResource Brush.AccentTint}"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Velo" Property="BorderBrush" Value="{StaticResource Brush.AccentSoft}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- Estilo para las listas de cada día -->
         <DataTemplate x:Key="AiringEpisodeTemplate">
-            <!-- PERF-05: sin elevación (sombra) — con ~40 tarjetas realizadas a la vez sin
-                 virtualizar, la sombra por defecto de Card se renderiza 40 veces de golpe al
-                 cargar, sumando al pico de lag inicial sin aportar nada visual perceptible
-                 a este tamaño de tarjeta. -->
-            <materialDesign:Card Margin="0,0,0,10" Background="#1B222C" UniformCornerRadius="8" Padding="0"
-                                  materialDesign:ElevationAssist.Elevation="Dp0">
+            <!-- Piezas ligeras a propósito: al abrir la pestaña se construyen ~40 tarjetas de golpe y la interfaz se congelaba
+                 ~0,45 s (medido). Un Border en vez de materialDesign:Card y la portada como ImageBrush, que respeta la esquina
+                 redondeada sin el recorte de la Card. La portada ya llega decodificada de la caché compartida con la Galería:
+                 no hace falta shimmer mientras carga (sin portada se ve el fondo). -->
+            <Border Margin="0,0,0,10" Background="#1B222C" CornerRadius="8">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="56"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
-                    <!-- Portada (recorte fijo, sin distorsión).
-                         PERF-05/PERF-06: el shimmer se ata al estado REAL de carga de esta Image
-                         concreta vía ImageLoadingBehavior (no a un cronómetro fijo ni a "para
-                         siempre") — así solo anima mientras esta tarjeta en particular sigue
-                         cargando, y se apaga (Visibility=Collapsed, sin costo de composición) en
-                         cuanto la portada real está lista, sin importar si tarda 100ms o 5s. -->
-                    <Border Grid.Column="0" CornerRadius="8,0,0,8" ClipToBounds="True" Height="72">
-                        <Grid>
-                            <Border Background="{StaticResource Brush.SurfaceControl}" />
-                            <Border Style="{StaticResource ShimmerEffectStyle}"
-                                    Visibility="{Binding (behaviors:ImageLoadingBehavior.IsLoaded), ElementName=Portada, Converter={StaticResource InverseBoolToVis}}"/>
-                            <Image x:Name="Portada" behaviors:ImageLoadingBehavior.Track="True"
-                                   Source="{Binding UrlPortada, TargetNullValue={x:Null}, FallbackValue={x:Null}, IsAsync=True}"
-                                   Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" SnapsToDevicePixels="True"/>
-                        </Grid>
+                    <Border Grid.Column="0" CornerRadius="8,0,0,8" Height="72" Background="{StaticResource Brush.SurfaceControl}"/>
+                    <Border Grid.Column="0" CornerRadius="8,0,0,8" Height="72">
+                        <Border.Background>
+                            <ImageBrush ImageSource="{Binding Portada, TargetNullValue={x:Null}}" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality"/>
+                        </Border.Background>
                     </Border>
 
                     <!-- Información (compacta: filas fijas, sin desbordes) -->
@@ -78,10 +90,7 @@
                     <Button Grid.Column="0" Grid.ColumnSpan="2"
                             Command="{Binding DataContext.AbrirAnimeCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                             CommandParameter="{Binding}"
-                            HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
-                            HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
-                            Background="Transparent" BorderThickness="0" Padding="0" Margin="0"
-                            Cursor="Hand" Panel.ZIndex="20"
+                            Style="{StaticResource CalTarjetaBoton}" Panel.ZIndex="20"
                             ToolTip="{loc:T Cal_AbrirFichaTip}">
                         <AutomationProperties.Name>
                             <MultiBinding Converter="{StaticResource LocalizedFormat}">
@@ -91,7 +100,7 @@
                         </AutomationProperties.Name>
                     </Button>
                 </Grid>
-            </materialDesign:Card>
+            </Border>
         </DataTemplate>
         
         <Style TargetType="TextBlock" x:Key="DayHeaderStyle" BasedOn="{StaticResource AppText.Section}">

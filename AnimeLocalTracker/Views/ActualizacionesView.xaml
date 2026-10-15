@@ -210,7 +210,7 @@
                                                 <materialDesign:PackIcon Kind="MoviePlayOutline" Foreground="#475569" Width="24" Height="24"
                                                                          HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                             </Border>
-                                            <Image Source="{Binding RutaPortada, TargetNullValue={x:Null}}" Stretch="UniformToFill"/>
+                                            <Image Source="{Binding Portada, TargetNullValue={x:Null}}" Stretch="UniformToFill"/>
                                             <ProgressBar Value="{Binding PorcentajeProgreso, Mode=OneWay}" Style="{StaticResource AppWatchProgressBar.Overlay}"
                                                          Visibility="{Binding TieneProgresoGuardado, Converter={StaticResource BoolToVis}}"/>
                                         </Grid>

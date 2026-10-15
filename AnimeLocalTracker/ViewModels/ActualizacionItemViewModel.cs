@@ -30,6 +30,10 @@ public partial class ActualizacionItemViewModel : ObservableObject
     public string RutaPortada { get; init; } = string.Empty;
     public DateTime FechaEmision { get; init; }
 
+    /// <summary>La portada ya decodificada (pequeña) de la caché que comparte con la Galería; ver <see cref="Models.AiringEpisode.Portada"/>.</summary>
+    [ObservableProperty]
+    private System.Windows.Media.ImageSource? _portada;
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(Estado))]
     [NotifyPropertyChangedFor(nameof(PorDescargar))]
