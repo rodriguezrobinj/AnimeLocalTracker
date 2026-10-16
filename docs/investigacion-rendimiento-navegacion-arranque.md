@@ -224,6 +224,73 @@ Memoria tras recorrerlo todo: ≈ 410 – 420 MB privados (≈ 395 MB tras la pr
 
 ---
 
+## 10. Tercera ronda (2026-10-15): animaciones en reposo y precalentamiento que no llegaba
+
+Pedido: acercar a 0 ms el arranque y la carga de pestañas. Medido con perfil aislado (258 animes, portadas reales copiadas)
+y con `dotnet-trace` sobre el hilo de la interfaz. Ojo: ese día un proceso de Antigravity IDE ocupaba >1 núcleo de forma
+continua y el disco C: estaba lleno (0–260 MB libres); todo iba ~2,5× más lento que en un día normal ("entorno .NET listo"
+1,8–2,2 s frente a 0,2 s), así que las cifras absolutas de ese día no se comparan con las de rondas anteriores.
+
+| Qué | Antes | Ahora |
+|---|---|---|
+| Hilo de la interfaz con la app en reposo (Galería en pantalla, sin tocar nada) | 416 ms ocupados cada 15 s (≈ 28 ms/s, a 60 fps sin parar) | **0 ms** |
+| Lo mismo tras recorrer todas las pestañas y abrir fichas | ídem o más | **0 ms** |
+| Ficha preparada por adelantado | puesto 10 de 15; con el ratón en movimiento, el primer paso esperó 30 s | **la primera**, ~6 s después de abrir |
+| Primeras visitas reales sin preparar (registros del usuario) | ficha 802 ms, Configuración 764 ms, Registros 504 ms | se preparan antes de que se suela llegar a ellas |
+
+Qué se cambió:
+
+- **Brillo de carga (`ShimmerEffectStyle`)**: era un `Storyboard` infinito que arrancaba en `Loaded`. Ocultar el Border no lo
+  para: el reloj de animaciones sigue avanzando y WPF pinta a 60 fps aunque no se vea nada. Ahora arranca al hacerse visible y
+  se retira (`RemoveStoryboard`) al ocultarse. Además, en la ficha (póster), Historial, Actualizaciones y Agregar el brillo
+  estaba DEBAJO de la imagen y nunca se ocultaba: ahora se oculta con `ImageLoadingBehavior` al cargar la imagen (el icono de
+  reserva queda fuera del brillo, visible si no hay portada). Una ficha sin portada muestra la tarjeta oscura en vez de un
+  brillo eterno.
+- **Precalentamiento** (`MainWindow.PrecalentarPestanasAsync`): basta con 0,4 s sin tocar ratón/teclado (antes 1 s, que
+  quien mueve el ratón por la Galería casi nunca cumplía); orden nuevo: ficha → lienzo de video → Actualizaciones →
+  Historial → Configuración → Calendario → Descargas → Estadísticas → Logros → Agregar → Registros → minijuegos → Acerca de.
+
+- **Ficha: las filas de episodios se reutilizan.** Cada ficha tiene un ViewModel nuevo con su propia colección, así que al
+  enlazarla `ItemsSource` cambiaba y WPF tiraba todas las filas (un Reset vacía también su reserva de reciclado): ~60 % del
+  coste de abrir una ficha. Ahora la lista de `DetalleView` tiene su propia colección (`_filasEpisodios`), una para todas las
+  fichas, y copia en ella la de la ficha actual con `ColeccionReemplazable.SincronizarCon` (sustituye elemento a elemento:
+  WPF le cambia los datos a la fila ya construida; con más de 200 cambios rehace con un solo Reset). Solo escucha a la ficha
+  actual, así que una carga tardía de la anterior no llega a la pantalla. Hasta que la ficha nueva pone su lista
+  (`EpisodiosFichaViewModel.ListaMostrada`) las filas anteriores siguen ahí pero ocultas (Hidden: ni se ven ni reciben
+  clics); vaciarla las tiraría. Medido (6 fichas, mismo día y equipo): "pintada" 60–191 → **7–43 ms** a partir de la segunda;
+  trabajo del hilo de la interfaz por ficha 177–280 → 112–154 ms. Comprobado por UIA que cada ficha muestra sus episodios
+  (12 → 2 → 2 → 13 filas, empezando por el último episodio de cada una).
+- **`IndicadorDescarga` se construye al verse**, no al crearse la fila (cada fila de la ficha y de Actualizaciones lleva uno
+  y casi nunca hay descargas): ~12 ms menos por ficha nueva.
+
+**Medición final, versión anterior contra actual** (ambas Debug, perfil aislado con portadas, 6 rondas alternadas —4 con la
+anterior primero y 2 al revés—, recorrido completo: 10 pestañas y 5 fichas; con el disco ya liberado):
+
+| Qué | Antes | Ahora |
+|---|---|---|
+| CPU de la app en 15 s de reposo tras el recorrido (proceso entero, incluido el dibujado) | **10,9 s** (≈ 70 % de un núcleo) | **0,1 s** |
+| Ficha, lista pintada (de la 2.ª en adelante, 24 aperturas) | 67 ms | **38 ms** |
+| Ficha, todo asentado | 124 ms | **74 ms** |
+| Primera ficha (aún construye filas) | 196 / 280 ms | 199 / 242 ms |
+| Ventana visible / tarjetas dibujadas | 3,75 / 4,64 s | 3,83 / 4,68 s (igual: nada de esto toca el arranque) |
+| Pestañas ya preparadas | 10 ms | 9 ms |
+
+Ojo al medir A/B: la segunda app de cada pareja arranca ~200 ms más lenta (con la anterior siempre primero, la actual salía
+un 7 % peor; al invertir el orden, mejor). Alternar el orden.
+
+**Versión precompilada (Release + ReadyToRun) contra Debug**, misma tarde, 4 rondas alternadas: estilos de `App.xaml` −10 %,
+construir la ventana −18 %, lienzo de video −18 %, primera ficha −24 %; pero ventana visible y tarjetas solo −2 %, y fichas
+siguientes y pestañas igual. El coste está en WPF colocando y dibujando (ya precompilado en las dos), no en compilar nuestro
+código: usar a diario la de Debug apenas cuesta. Se descarta como mejora pendiente.
+
+Lo que se vio y NO se tocó:
+
+- **Arranque**: el reparto no cambió (estilos de `App.xaml` ≈ 0,35 s, construir la ventana ≈ 0,35 s, primera colocación y
+  pintado ≈ 0,75 s, tarjetas ≈ 0,65 s en un día normal). La build precompilada no lo cambia (ver arriba): lo que queda es
+  trabajo de WPF y de Material Design.
+- Al trazar con UIA, las consultas del script se ejecutan en el hilo de la app (ráfagas de ~450 ms de código nativo dentro de
+  `HwndSubclass`): no confundirlas con trabajo de la app.
+
 ## 6. Cómo volver a medir
 
 El medidor se queda en la app. En el registro de cada sesión (`%LocalAppData%\AnimeLocalTrackerData\Logs\sesiones`):

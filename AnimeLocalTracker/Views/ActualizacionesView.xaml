@@ -5,6 +5,7 @@
              xmlns:loc="clr-namespace:AnimeLocalTracker.Services"
              xmlns:ctl="clr-namespace:AnimeLocalTracker.Controls"
              xmlns:vm="clr-namespace:AnimeLocalTracker.ViewModels"
+             xmlns:behaviors="clr-namespace:AnimeLocalTracker.Behaviors"
              xmlns:sys="clr-namespace:System;assembly=System.Runtime"
              TextElement.Foreground="{DynamicResource MaterialDesignBody}"
              Background="Transparent">
@@ -206,11 +207,12 @@
                                     <Border x:Name="Portada" Width="66" Height="94" CornerRadius="10" ClipToBounds="True" Background="{StaticResource Brush.Surface3}">
                                         <Grid>
                                             <!-- Placeholder DEBAJO de la imagen: se ve si la portada falla o aún carga -->
-                                            <Border Style="{StaticResource ShimmerEffectStyle}">
-                                                <materialDesign:PackIcon Kind="MoviePlayOutline" Foreground="#475569" Width="24" Height="24"
-                                                                         HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                            </Border>
-                                            <Image Source="{Binding Portada, TargetNullValue={x:Null}}" Stretch="UniformToFill"/>
+                                            <materialDesign:PackIcon Kind="MoviePlayOutline" Foreground="#475569" Width="24" Height="24"
+                                                                     HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            <Border Style="{StaticResource ShimmerEffectStyle}"
+                                                    Visibility="{Binding (behaviors:ImageLoadingBehavior.IsLoaded), ElementName=ImgPortada, Converter={StaticResource InverseBoolToVis}}"/>
+                                            <Image x:Name="ImgPortada" behaviors:ImageLoadingBehavior.Track="True"
+                                                   Source="{Binding Portada, TargetNullValue={x:Null}}" Stretch="UniformToFill"/>
                                             <ProgressBar Value="{Binding PorcentajeProgreso, Mode=OneWay}" Style="{StaticResource AppWatchProgressBar.Overlay}"
                                                          Visibility="{Binding TieneProgresoGuardado, Converter={StaticResource BoolToVis}}"/>
                                         </Grid>

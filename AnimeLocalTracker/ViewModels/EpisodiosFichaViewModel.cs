@@ -116,6 +116,13 @@ public sealed partial class EpisodiosFichaViewModel : ObservableObject,
 
     public ColeccionReemplazable<EpisodioItem> EpisodiosDelAnime { get; } = [];
 
+    /// <summary>
+    /// La ficha ya puso su lista (<see cref="Mostrar"/>). Hasta entonces <see cref="EpisodiosDelAnime"/> está vacía porque aún
+    /// no se leyó, no porque el anime no tenga episodios: la vista mantiene ocultas las filas de la ficha anterior para
+    /// reutilizarlas en vez de tirarlas.
+    /// </summary>
+    [ObservableProperty] private bool _listaMostrada;
+
     [ObservableProperty]
     private bool _ordenAscendente = false;
 
@@ -334,6 +341,7 @@ public sealed partial class EpisodiosFichaViewModel : ObservableObject,
         anime.EpisodiosVistos = lectura.Vistos;
         _todosLosEpisodios.AddRange(lectura.Filas);
         AplicarFiltrosYOrdenamiento();
+        ListaMostrada = true;
     }
 
     /// <summary>Cambio de idioma con la ficha abierta: el desplegable de filtro y el aviso de huecos se retraducen.</summary>

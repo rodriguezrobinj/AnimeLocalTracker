@@ -42,25 +42,26 @@
                     </Setter.Value>
                 </Setter>
                 <Style.Triggers>
-                    <EventTrigger RoutedEvent="Loaded">
-                        <BeginStoryboard>
-                            <!-- PERF-04/PERF-06: "Forever" es correcto AQUÍ — el contrato de este estilo
-                                 es que quien lo use SIEMPRE oculte el Border (Visibility=Collapsed) en
-                                 cuanto la imagen real termine de cargar (ver ImageLoadingBehavior y/o
-                                 AnimeCoverLoadingConverter, según la vista). Un elemento Collapsed no se
-                                 compone ni se pinta, así que una animación "Forever" en él no cuesta nada
-                                 una vez oculto — el costo real vivía en dejarlo VISIBLE para siempre
-                                 (Calendario, antes de atarlo a ImageLoadingBehavior), no en la duración de
-                                 la animación en sí. Poner aquí un límite fijo (se probó RepeatBehavior=3x)
-                                 fue un error: rompía el caso de Galería, donde la carga a veces tarda más
-                                 de esa ventana y el shimmer se veía "congelado" (estático) en vez de
-                                 desaparecer o seguir animando hasta que la portada real esté lista. -->
-                            <Storyboard RepeatBehavior="Forever">
-                                <DoubleAnimation Storyboard.TargetProperty="(Border.Background).(LinearGradientBrush.RelativeTransform).(TranslateTransform.X)"
-                                                 From="-1" To="1" Duration="0:0:1.5" />
-                            </Storyboard>
-                        </BeginStoryboard>
-                    </EventTrigger>
+                    <!-- PERF-04/PERF-06: "Forever" solo mientras el Border se ve. Quien use este estilo lo oculta en
+                         cuanto la imagen real carga (ImageLoadingBehavior o AnimeCoverLoadingConverter). Ocultarlo no
+                         basta para que la animación deje de costar: su reloj sigue avanzando y obliga a WPF a pintar a
+                         60 fps aunque no se vea nada (medido: ~17 ms de cada segundo del hilo de la interfaz en reposo,
+                         2026-10-15). Por eso se retira al dejar de verse (portada cargada, pestaña oculta, ventana
+                         minimizada) y vuelve a empezar si reaparece. Un límite fijo (RepeatBehavior=3x) no sirve: en la
+                         Galería la carga a veces tarda más y el brillo se quedaba congelado. -->
+                    <Trigger Property="IsVisible" Value="True">
+                        <Trigger.EnterActions>
+                            <BeginStoryboard x:Name="BrilloCargando">
+                                <Storyboard RepeatBehavior="Forever">
+                                    <DoubleAnimation Storyboard.TargetProperty="(Border.Background).(LinearGradientBrush.RelativeTransform).(TranslateTransform.X)"
+                                                     From="-1" To="1" Duration="0:0:1.5" />
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </Trigger.EnterActions>
+                        <Trigger.ExitActions>
+                            <RemoveStoryboard BeginStoryboardName="BrilloCargando"/>
+                        </Trigger.ExitActions>
+                    </Trigger>
                 </Style.Triggers>
             </Style>
             

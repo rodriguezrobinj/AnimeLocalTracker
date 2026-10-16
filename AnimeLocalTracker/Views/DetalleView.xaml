@@ -4,6 +4,7 @@
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
              xmlns:loc="clr-namespace:AnimeLocalTracker.Services"
              xmlns:ctl="clr-namespace:AnimeLocalTracker.Controls"
+             xmlns:behaviors="clr-namespace:AnimeLocalTracker.Behaviors"
              TextElement.Foreground="{DynamicResource MaterialDesignBody}"
              Background="#121212">
     <UserControl.Resources>
@@ -289,8 +290,10 @@
                                          materialDesign:ElevationAssist.Elevation="Dp8" Background="#1A1A1A" 
                                          HorizontalAlignment="Center" Margin="0,0,0,12">
                         <Grid>
-                            <Border Style="{StaticResource ShimmerEffectStyle}" CornerRadius="16" />
-                            <Image Source="{Binding AnimeSeleccionado.PortadaVisible, TargetNullValue={x:Null}, FallbackValue={x:Null}, IsAsync=True}" 
+                            <Border Style="{StaticResource ShimmerEffectStyle}" CornerRadius="16"
+                                    Visibility="{Binding (behaviors:ImageLoadingBehavior.IsLoaded), ElementName=ImgPoster, Converter={StaticResource InverseBoolToVis}}"/>
+                            <Image x:Name="ImgPoster" behaviors:ImageLoadingBehavior.Track="True"
+                                   Source="{Binding AnimeSeleccionado.PortadaVisible, TargetNullValue={x:Null}, FallbackValue={x:Null}, IsAsync=True}"
                                    Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" SnapsToDevicePixels="True"/>
                         </Grid>
                     </materialDesign:Card>
@@ -906,7 +909,9 @@
 
                 <!-- LISTA DE EPISODIOS VIRTUALIZADA CON DISEÑO VERTICAL COMPLETO -->
                 <Grid Grid.Row="2">
-                    <ListBox x:Name="ListaEpisodios" ItemsSource="{Binding Episodios.EpisodiosDelAnime}"
+                    <!-- ItemsSource: la copia de la vista (DetalleView.xaml.cs, FilasEpisodios), que pasa de una ficha a otra
+                         sin tirar las filas ya construidas. -->
+                    <ListBox x:Name="ListaEpisodios"
                              MouseDoubleClick="ListaEpisodios_MouseDoubleClick" KeyDown="ListaEpisodios_KeyDown"
                              Background="Transparent" BorderThickness="0"
                              ScrollViewer.VerticalScrollBarVisibility="Auto" Padding="0,0,10,60"

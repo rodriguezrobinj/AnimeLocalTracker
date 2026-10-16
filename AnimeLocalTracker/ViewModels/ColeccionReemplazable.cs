@@ -30,6 +30,39 @@ public sealed class ColeccionReemplazable<T> : ObservableCollection<T>
         return true;
     }
 
+    /// <summary>Por encima de tantos avisos sale más caro avisar uno a uno que rehacer la lista (One Piece: 1.180 filas).</summary>
+    private const int MaxCambiosUnoAUno = 200;
+
+    /// <summary>
+    /// Deja la colección con exactamente <paramref name="origen"/> sustituyendo elemento a elemento en vez de rehacerla. Una
+    /// lista en pantalla conserva así sus filas ya construidas y solo les cambia los datos: un Reset las tira todas, también
+    /// las que WPF tenía guardadas para reciclar. Con muchos cambios rehace la lista con un solo aviso.
+    /// </summary>
+    public void SincronizarCon(IReadOnlyList<T> origen)
+    {
+        var comparador = EqualityComparer<T>.Default;
+        int comunes = System.Math.Min(Count, origen.Count);
+        int cambios = System.Math.Abs(Count - origen.Count);
+        for (int i = 0; i < comunes; i++)
+        {
+            if (!comparador.Equals(Items[i], origen[i])) cambios++;
+        }
+
+        if (cambios == 0) return;
+        if (cambios > MaxCambiosUnoAUno)
+        {
+            ReemplazarSiCambia(origen);
+            return;
+        }
+
+        for (int i = 0; i < comunes; i++)
+        {
+            if (!comparador.Equals(Items[i], origen[i])) this[i] = origen[i];
+        }
+        while (Count > origen.Count) RemoveAt(Count - 1);
+        for (int i = Count; i < origen.Count; i++) Add(origen[i]);
+    }
+
     private bool MismoContenido(IReadOnlyList<T> nuevos)
     {
         if (nuevos.Count != Count) return false;

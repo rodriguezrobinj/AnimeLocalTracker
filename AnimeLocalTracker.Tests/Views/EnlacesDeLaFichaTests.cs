@@ -79,7 +79,8 @@ public class EnlacesDeLaFichaTests
 
         Regex.Matches(xaml, @"DataContext\.Episodios\.\w+Command").Count.Should().BeGreaterThan(3);
         Regex.Matches(xaml, @"PlacementTarget\.Tag\.Episodios\.\w+Command").Count.Should().BeGreaterThan(3);
-        xaml.Should().Contain("{Binding Episodios.EpisodiosDelAnime}").And.Contain("{Binding Musica.ToggleMusicaCommand}")
+        // La lista en sí la llena la vista por código (DetalleView.xaml.cs); el XAML enlaza a su recuento.
+        xaml.Should().Contain("{Binding Episodios.EpisodiosDelAnime.Count}").And.Contain("{Binding Musica.ToggleMusicaCommand}")
             .And.Contain("{Binding Seguimiento.AbrirEditorSeguimientoCommand}");
     }
 

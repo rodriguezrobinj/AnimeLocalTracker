@@ -140,8 +140,10 @@ public partial class MainWindow : Window, IVentanaPrincipal
 
     private static readonly TimeSpan EsperaAntesDePrecalentar = TimeSpan.FromSeconds(4);
     private static readonly TimeSpan PausaEntrePestanas = TimeSpan.FromMilliseconds(350);
-    /// <summary>Sin tocar ratón ni teclado durante este tiempo se considera que el usuario no está en medio de algo.</summary>
-    private const int MsSinEntradaParaPrecalentar = 1000;
+    /// <summary>Sin tocar ratón ni teclado durante este tiempo se considera que el usuario no está en medio de algo. Con 1 s, quien
+    /// mueve el ratón por la Galería no lo cumplía nunca: el primer paso llegó a esperar 30 s y las primeras visitas a la ficha o a
+    /// Configuración se pagaban enteras al pulsar (0,5-1,9 s, registros de 2026-10-15).</summary>
+    private const int MsSinEntradaParaPrecalentar = 400;
 
     public void PrecalentarPestanasEnReposo()
     {
@@ -155,13 +157,13 @@ public partial class MainWindow : Window, IVentanaPrincipal
         {
             await System.Threading.Tasks.Task.Delay(EsperaAntesDePrecalentar);
 
-            // De la más usada a la menos; cada ViewModel se pide al llegar su turno (crearlo también cuesta). "Acerca de", la que
-            // menos se visita, va al final de todo (ver abajo).
+            // De la más usada a la menos (registros de navegación reales); cada ViewModel se pide al llegar su turno (crearlo también
+            // cuesta). "Acerca de", la que menos se visita, va al final de todo (ver abajo).
             Func<object>[] pestanas =
             [
-                () => navegacion.ObtenerVista(Pestanas.Historial), () => navegacion.ObtenerVista(Pestanas.Actualizaciones), () => navegacion.ObtenerVista(Pestanas.Calendario),
-                () => navegacion.ObtenerVista(Pestanas.Descargas), () => navegacion.ObtenerVista(Pestanas.Estadisticas), () => navegacion.ObtenerVista(Pestanas.Logros),
-                () => navegacion.ObtenerVista(Pestanas.AgregarAnime), () => navegacion.ObtenerVista(Pestanas.Configuracion), navegacion.ObtenerVisorRegistros
+                () => navegacion.ObtenerVista(Pestanas.Actualizaciones), () => navegacion.ObtenerVista(Pestanas.Historial), () => navegacion.ObtenerVista(Pestanas.Configuracion),
+                () => navegacion.ObtenerVista(Pestanas.Calendario), () => navegacion.ObtenerVista(Pestanas.Descargas), () => navegacion.ObtenerVista(Pestanas.Estadisticas),
+                () => navegacion.ObtenerVista(Pestanas.Logros), () => navegacion.ObtenerVista(Pestanas.AgregarAnime), navegacion.ObtenerVisorRegistros
             ];
 
             var reloj = System.Diagnostics.Stopwatch.StartNew();
@@ -183,8 +185,18 @@ public partial class MainWindow : Window, IVentanaPrincipal
                 await System.Threading.Tasks.Task.Delay(PausaEntrePestanas);
             }
 
-            // Antes que las pestañas, el reproductor: su primera apertura es la espera que más se nota (ver
-            // SuperficieMpv.Precalentar). La biblioteca de video (120 MB) se carga fuera del hilo de la interfaz.
+            // Primero la ficha: es el destino más frecuente y el paso previo a reproducir. Su vista es una sola y pasa de un anime
+            // al siguiente; se deja construida con una ficha vacía, que se descarta enseguida, y la primera que abras ya solo le
+            // cambia los datos.
+            await EnReposoAsync(() =>
+            {
+                var fichaVacia = navegacion.CrearDetalle();
+                if (ContenedorVistaPrincipal.Precalentar(fichaVacia)) hechas++;
+                fichaVacia.Dispose();
+            });
+
+            // Después el reproductor: su primera apertura es la espera que más se nota (ver SuperficieMpv.Precalentar). La
+            // biblioteca de video (120 MB) se carga fuera del hilo de la interfaz.
             _ = System.Threading.Tasks.Task.Run(() => Services.Native.LibMpv.Disponible);
             if (App.ServiceProvider.GetService<ISettingsService>()?.ObtenerConfiguracion()?.VideoPorSoftware != true)
                 await EnReposoAsync(Controls.SuperficieMpv.Precalentar);
@@ -196,15 +208,6 @@ public partial class MainWindow : Window, IVentanaPrincipal
                     if (ContenedorVistaPrincipal.Precalentar(obtener())) hechas++;
                 });
             }
-
-            // La ficha: su vista es una sola y pasa de un anime al siguiente. Se deja construida con una ficha vacía,
-            // que se descarta enseguida; la primera que abras ya solo le cambia los datos.
-            await EnReposoAsync(() =>
-            {
-                var fichaVacia = navegacion.CrearDetalle();
-                if (ContenedorVistaPrincipal.Precalentar(fichaVacia)) hechas++;
-                fichaVacia.Dispose();
-            });
 
             // Las secciones internas de la Galería: el menú de minijuegos y, después, cada juego (uno por paso).
             if (BuscarDescendiente<GaleriaView>(ContenedorVistaPrincipal) is { } galeria)

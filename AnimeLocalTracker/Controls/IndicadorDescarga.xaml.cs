@@ -20,9 +20,20 @@ public partial class IndicadorDescarga : UserControl
         set => SetValue(ProgresoProperty, value);
     }
 
-    public IndicadorDescarga()
+    private bool _construido;
+
+    /// <summary>
+    /// El dibujo se construye la primera vez que se ve, no al crearse: cada fila de la ficha y de Actualizaciones lleva uno y
+    /// casi nunca se está descargando nada (construirlo en todas costaba ~12 ms por ficha, medido 2026-10-15).
+    /// </summary>
+    public IndicadorDescarga() => IsVisibleChanged += AlVerse;
+
+    private void AlVerse(object sender, DependencyPropertyChangedEventArgs e)
     {
+        if (e.NewValue is not true) return;
+        IsVisibleChanged -= AlVerse;
         InitializeComponent();
+        _construido = true;
         Actualizar();
     }
 
@@ -32,6 +43,7 @@ public partial class IndicadorDescarga : UserControl
 
     private void Actualizar()
     {
+        if (!_construido) return;
         bool espera = EnEspera(Progreso);
         Espera.Visibility = espera ? Visibility.Visible : Visibility.Collapsed;
         Avance.Visibility = espera ? Visibility.Collapsed : Visibility.Visible;

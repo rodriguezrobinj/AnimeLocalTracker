@@ -4,6 +4,7 @@
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
              xmlns:vwp="clr-namespace:WpfToolkit.Controls;assembly=VirtualizingWrapPanel"
              xmlns:loc="clr-namespace:AnimeLocalTracker.Services"
+             xmlns:behaviors="clr-namespace:AnimeLocalTracker.Behaviors"
              TextElement.Foreground="{DynamicResource MaterialDesignBody}"
              Background="Transparent"
              SnapsToDevicePixels="True"
@@ -296,10 +297,12 @@
                                 <Grid Grid.Row="0">
                                     <!-- Efecto "bones": shimmer de fondo mientras la portada carga;
                                          la imagen, al cargar, la cubre por completo. -->
-                                    <Border Style="{StaticResource ShimmerEffectStyle}" />
+                                    <Border Style="{StaticResource ShimmerEffectStyle}"
+                                            Visibility="{Binding (behaviors:ImageLoadingBehavior.IsLoaded), ElementName=ImgPortada, Converter={StaticResource InverseBoolToVis}}"/>
 
                                     <!-- Portada con imagen asíncrona en alta calidad -->
-                                    <Image Source="{Binding PortadaUrl, IsAsync=True, TargetNullValue={x:Null}, FallbackValue={x:Null}}"
+                                    <Image x:Name="ImgPortada" behaviors:ImageLoadingBehavior.Track="True"
+                                           Source="{Binding PortadaUrl, IsAsync=True, TargetNullValue={x:Null}, FallbackValue={x:Null}}"
                                            Stretch="UniformToFill" 
                                            RenderOptions.BitmapScalingMode="HighQuality"
                                            RenderOptions.EdgeMode="Aliased"

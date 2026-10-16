@@ -23,6 +23,7 @@ public partial class DetalleView : UserControl
     {
         var reloj = System.Diagnostics.Stopwatch.StartNew();
         InitializeComponent();
+        ListaEpisodios.ItemsSource = _filasEpisodios;
         long msCreada = reloj.ElapsedMilliseconds;
         // La vista se construye una vez (se reutiliza de un anime al siguiente): cuánto costó y cuándo quedó colocada.
         RoutedEventHandler? alCargar = null;
@@ -45,6 +46,7 @@ public partial class DetalleView : UserControl
                 ObservarMusica(_vmObservado.Musica);
                 _vmObservado.Seguimiento.PropertyChanged += Seguimiento_PropertyChanged;
             }
+            ObservarEpisodios(_vmObservado?.Episodios);
 
             // Aplazado: aquí WPF está en mitad de propagar el DataContext de la ficha, y dárselo ahora mismo a las ventanas ya
             // creadas (otra propagación, anidada) puede cortar la primera y dejar controles sin datos.
@@ -115,6 +117,50 @@ public partial class DetalleView : UserControl
 
         _vmObservado.PropertyChanged -= Ficha_PropertyChanged;
         _vmObservado.Seguimiento.PropertyChanged -= Seguimiento_PropertyChanged;
+    }
+
+    // === Lista de episodios: la vista es una para todas las fichas y su lista también. Cada ficha trae su propia colección;
+    //     enlazarla directamente hacía que WPF tirase todas las filas construidas en cada ficha (~60 % de abrir una, medido
+    //     2026-10-15). La vista copia en la suya la de la ficha actual, elemento a elemento, y WPF solo les cambia los datos.
+    //     Solo escucha a la ficha actual: una carga tardía de la anterior ya no llega a la pantalla. ===
+
+    private readonly ColeccionReemplazable<AnimeLocalTracker.Models.EpisodioItem> _filasEpisodios = [];
+    private EpisodiosFichaViewModel? _episodiosObservados;
+
+    private void ObservarEpisodios(EpisodiosFichaViewModel? episodios)
+    {
+        if (_episodiosObservados != null)
+        {
+            _episodiosObservados.EpisodiosDelAnime.CollectionChanged -= Episodios_CollectionChanged;
+            _episodiosObservados.PropertyChanged -= Episodios_PropertyChanged;
+        }
+        _episodiosObservados = episodios;
+        if (episodios != null)
+        {
+            episodios.EpisodiosDelAnime.CollectionChanged += Episodios_CollectionChanged;
+            episodios.PropertyChanged += Episodios_PropertyChanged;
+        }
+        CopiarEpisodios();
+    }
+
+    private void Episodios_CollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e) =>
+        Core.HiloUi.Ejecutar(CopiarEpisodios);
+
+    private void Episodios_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(EpisodiosFichaViewModel.ListaMostrada)) Core.HiloUi.Ejecutar(CopiarEpisodios);
+    }
+
+    /// <summary>
+    /// Mientras la ficha nueva no ha puesto su lista, las filas de la anterior siguen ahí para reutilizarlas, pero ocultas y sin
+    /// poder pulsarse (Hidden: no se ven ni reciben clics). Vaciar la lista ahora las tiraría.
+    /// </summary>
+    private void CopiarEpisodios()
+    {
+        var episodios = _episodiosObservados;
+        bool lista = episodios?.ListaMostrada == true;
+        if (lista) _filasEpisodios.SincronizarCon(episodios!.EpisodiosDelAnime);
+        ListaEpisodios.Visibility = lista ? Visibility.Visible : Visibility.Hidden;
     }
 
     private MusicaFichaViewModel? _musicaObservada;

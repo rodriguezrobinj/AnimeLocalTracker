@@ -15,3 +15,35 @@ public class IndicadorDescargaTests
     public void EnEspera_SoloSinAvanceOYaAlCien(double progreso, bool esperado) =>
         IndicadorDescarga.EnEspera(progreso).Should().Be(esperado);
 }
+
+[Collection("WpfSmoke")]
+public class IndicadorDescargaVistaTests
+{
+    private readonly WpfHostFixture _host;
+
+    public IndicadorDescargaVistaTests(WpfHostFixture host) => _host = host;
+
+    [Fact]
+    public void SoloSeConstruyeAlVerse_YMuestraElAvanceQueLlegoAntes()
+    {
+        _host.Ejecutar(() =>
+        {
+            // Como en una fila sin descarga: oculto. El avance puede llegar antes de que se vea.
+            var indicador = new IndicadorDescarga { Progreso = 40 };
+            var fila = new System.Windows.Controls.Grid { Visibility = System.Windows.Visibility.Collapsed, Children = { indicador } };
+            using var fuente = new System.Windows.Interop.HwndSource(new System.Windows.Interop.HwndSourceParameters("prueba") { ParentWindow = new System.IntPtr(-3) })
+            {
+                RootVisual = fila
+            };
+
+            indicador.Content.Should().BeNull("mientras no se ve no se construye nada");
+
+            fila.Visibility = System.Windows.Visibility.Visible;
+            fila.UpdateLayout();
+
+            indicador.Content.Should().NotBeNull();
+            ((System.Windows.UIElement)indicador.FindName("Avance")).Visibility.Should().Be(System.Windows.Visibility.Visible, "40 % es avance, no espera");
+            ((System.Windows.UIElement)indicador.FindName("Espera")).Visibility.Should().Be(System.Windows.Visibility.Collapsed);
+        });
+    }
+}
