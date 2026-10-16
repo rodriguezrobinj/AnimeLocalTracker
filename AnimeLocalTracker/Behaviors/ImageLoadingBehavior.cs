@@ -1,7 +1,7 @@
 using System;
-using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -41,14 +41,17 @@ public static class ImageLoadingBehavior
     {
         if (d is not Image image || e.NewValue is not true) return;
 
-        // AddValueChanged: única forma de enterarse de cambios en Source sin importar el modo
-        // del binding — necesario porque en listas virtualizadas el mismo Image se recicla con
-        // una Source distinta en cada scroll, sin recrear el elemento (Track solo cambia una vez).
-        DependencyPropertyDescriptor.FromProperty(Image.SourceProperty, typeof(Image))
-            ?.AddValueChanged(image, (_, _) => ReaccionarACambioDeSource(image));
-
-        ReaccionarACambioDeSource(image);
+        // Hay que enterarse de cada cambio de Source: en listas virtualizadas el mismo Image se recicla con otra Source al
+        // desplazarse, sin recrearse (Track solo cambia una vez). Un enlace de la propia imagen a su Source vive y muere con
+        // ella; AddValueChanged la dejaba registrada para siempre en una tabla global, con su imagen en memoria, cada vez que
+        // una lista rehacía sus filas.
+        BindingOperations.SetBinding(image, FuenteProperty, new Binding(nameof(Image.Source)) { RelativeSource = RelativeSource.Self });
+        if (image.Source is null) ReaccionarACambioDeSource(image); // con Source ya puesta, el enlace acaba de avisar
     }
+
+    private static readonly DependencyProperty FuenteProperty =
+        DependencyProperty.RegisterAttached("Fuente", typeof(ImageSource), typeof(ImageLoadingBehavior),
+            new PropertyMetadata(null, (d, _) => ReaccionarACambioDeSource((Image)d)));
 
     private static void ReaccionarACambioDeSource(Image image)
     {
@@ -77,7 +80,8 @@ public static class ImageLoadingBehavior
             watchdog.Stop();
             bitmap.DownloadCompleted -= OnCompleted;
             bitmap.DownloadFailed -= OnFailed;
-            SetIsLoaded(image, true);
+            // Si entretanto la imagen se recicló con otra Source, este aviso es de la anterior: no oculta el brillo de la nueva.
+            if (ReferenceEquals(image.Source, bitmap)) SetIsLoaded(image, true);
         }
         void OnCompleted(object? s, EventArgs e) => Completar();
         void OnFailed(object? s, ExceptionEventArgs e) => Completar();

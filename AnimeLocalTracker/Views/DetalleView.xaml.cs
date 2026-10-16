@@ -231,8 +231,11 @@ public partial class DetalleView : UserControl
 
     private void Reproducir(AnimeLocalTracker.Models.EpisodioItem episodio)
     {
-        var comando = _vmObservado?.Episodios.ReproducirEpisodioCommand;
-        if (episodio.Descargado && comando?.CanExecute(episodio) == true) comando.Execute(episodio);
+        // Mientras la ficha nueva lee sus episodios, la lista guarda ocultas las filas de la anterior (ver CopiarEpisodios):
+        // un Enter que llegue justo entonces no debe reproducir un episodio de otro anime.
+        if (_vmObservado is not { } ficha || !ficha.Episodios.Todos.Contains(episodio)) return;
+        var comando = ficha.Episodios.ReproducirEpisodioCommand;
+        if (episodio.Descargado && comando.CanExecute(episodio)) comando.Execute(episodio);
     }
 
     /// <summary>El episodio de la fila que contiene ese elemento (null si no está en una fila), y si el elemento es un botón de la fila.</summary>
