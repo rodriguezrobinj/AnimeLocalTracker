@@ -26,6 +26,7 @@ Una skill de nivel inferior nunca puede relajar una regla de nivel superior. Si 
 | Texto visible nuevo o cambiado (etiquetas, diálogos, fechas; ES/EN) | `localizacion` | Más `wpf-mvvm.md` #1. Claves en las dos mitades de `LocalizationService`. |
 | Hacer commit y subir (solo si el usuario lo pide) | `commit-es` | Mensaje en español con tildes, sin firma de Claude, solo a `main`. |
 | Cambiar el núcleo Rust (FFI) o el daemon Python | `nucleo-poliglota` | Más `polyglot-ffi.md`. Incluye dependencias con hashes y regenerar `AnimeTrackerTools.exe`. |
+| Delegar una tarea acotada en Antigravity (`agy`) | `delegar-antigravity` | Autorizado por el usuario (2026-10-15) a criterio de Claude Code, solo dentro de los límites del skill; el resultado siempre se revisa con `git diff` y `repo-build-test`. |
 | Cambiar el esquema de la base de datos (columna, tabla, índice, datos) | `migracion-db` | Más `persistence.md` #6. Se verifica sobre una copia de la base real con `perfil-aislado`. |
 | Diseñar una función nueva con decisiones abiertas | `superpowers:brainstorming` | Solo si hay decisiones de diseño reales (ver punto 4). |
 | Plan de varios pasos | `superpowers:writing-plans` | |
@@ -58,7 +59,7 @@ Una skill de nivel inferior nunca puede relajar una regla de nivel superior. Si 
 Entran en conflicto con decisiones ya tomadas del propietario del proyecto:
 
 - **Git**: no hacer commit ni push sin que el usuario lo pida. Cuando se pida subir, se sube **solo a `main`**, sin ramas ni PRs. Por tanto, no usar `using-git-worktrees` ni `finishing-a-development-branch`. El commit de documentos de diseño que piden `brainstorming`/`writing-plans` se omite.
-- **Subagentes**: no lanzar subagentes salvo que el usuario lo pida. No usar `subagent-driven-development` ni `dispatching-parallel-agents` por iniciativa propia.
+- **Subagentes**: no lanzar subagentes salvo que el usuario lo pida. No usar `subagent-driven-development` ni `dispatching-parallel-agents` por iniciativa propia. Excepción autorizada: delegar en Antigravity con el skill `delegar-antigravity`.
 - **Colores y literales de UI**: ninguna skill de estilo puede introducir colores nuevos. Rige `ui-wpf-vistas.md` (paleta `Brush.*`/`AppText.*`).
 - **Instancia del usuario**: las pruebas en vivo solo cierran el proceso que lanzó el propio agente (por PID). Jamás `Stop-Process` a ciegas.
 - **Datos reales**: los tests y scripts nunca escriben ni borran bajo `AppDataPaths` (token de AniList, BD, ajustes).

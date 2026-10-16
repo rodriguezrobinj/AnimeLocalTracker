@@ -56,3 +56,13 @@ Para tareas estructurales grandes, leer el documento correspondiente antes de to
 - Reglas activas: `.agents/rules/` (`wpf-mvvm.md`, `polyglot-ffi.md`, `persistence.md`, `comunicacion-explicaciones.md`, `ui-wpf-vistas.md`, `skills-orquestacion.md`).
 - Skills del repo en `.claude/skills/` (cada `SKILL.md` es un procedimiento legible por cualquier agente): `repo-build-test` (build y pruebas), `wpf-add-view`, `wpf-visual-verification`, `perfil-aislado` (probar la app sin tocar datos reales), `migracion-db` (cambios de esquema SQLite), `commit-es` (commit y subida: español con tildes, solo a `main`, sin firma de Claude), `localizacion` (texto ES/EN) y `nucleo-poliglota` (núcleo Rust y daemon Python).
 - Guardarraíles para Claude Code en `.claude/hooks/` (bloquean `--borrar-datos`, cerrar la app por nombre, `git push` fuera de `main` y escribir en la carpeta de datos real); prueba: `python .claude/hooks/test_hooks.py`.
+
+## Trabajo con varios agentes (Claude Code, Antigravity)
+
+- **Una sola fuente de reglas**: lo que deba valer para todos va aquí o en `.agents/rules/`; `CLAUDE.md` solo lleva lo específico de Claude Code.
+- **Los hooks de `.claude/hooks/` solo existen en Claude Code.** Otro agente no los ejecuta: las prohibiciones de arriba (`--borrar-datos`, cerrar la app por nombre, push fuera de `main`, tocar `AppDataPaths`) las cumple él por esta guía. Ante la duda, no ejecutar y preguntar.
+- **Entrega por documento y por git**: el plan vive en `docs/plan-<tema>.md`; quien recibe una tarea la toma de ahí (un paso concreto, no "todo el plan") y deja el resultado como cambios sin commitear.
+- **Sin commit ni push** por parte del agente delegado; subir solo a petición del usuario con `commit-es`.
+- **Un agente a la vez por archivo**: nunca dos editando lo mismo en paralelo.
+- **Lo que se delega bien**: lectura y revisión de diffs, búsquedas, logs, textos ES/EN, pruebas de un ViewModel concreto, documentación. **Se queda con Claude Code**: migraciones de esquema, reproductor, descargas y cualquier cambio multi-módulo (requieren `migracion-db` / `perfil-aislado`).
+- **Quien termina verifica** con `repo-build-test` (proporcional al cambio) antes de decir "listo".

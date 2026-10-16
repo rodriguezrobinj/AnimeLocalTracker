@@ -28,9 +28,15 @@
       "PowerShell(git show *)",
       "PowerShell(gh run list *)",
       "PowerShell(gh run view *)",
-      "PowerShell(gh release list *)"
+      "PowerShell(gh release list *)",
+      "Bash(agy --mode plan *)",
+      "Bash(agy --mode accept-edits *)",
+      "PowerShell(agy --mode plan *)",
+      "PowerShell(agy --mode accept-edits *)"
     ],
     "deny": [
+      "Bash(agy *--dangerously-skip-permissions*)",
+      "PowerShell(agy *--dangerously-skip-permissions*)",
       "Read(~/AppData/Local/AnimeLocalTrackerData/anilist_token*)",
       "Edit(~/AppData/Local/AnimeLocalTrackerData/**)",
       "Write(~/AppData/Local/AnimeLocalTrackerData/**)"
