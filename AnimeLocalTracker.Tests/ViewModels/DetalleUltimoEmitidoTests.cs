@@ -81,6 +81,49 @@ public class DetalleUltimoEmitidoTests : IDisposable
         _db.Verify(d => d.ActualizarAnimeAsync(It.Is<AnimeItem>(a => a.TotalEpisodios == 13)), Times.Once);
     }
 
+    // Total guardado desactualizado ("1") con los capítulos 2 y 3 ya bajados a mano: la lista ya tiene sus filas, así que antes se
+    // salía sin subir el total y el contador seguía en "1".
+    [Fact]
+    public async Task SiLaFilaYaExistePorqueTienesElArchivo_ElTotalSubeIgual()
+    {
+        _escaner.Setup(e => e.EscanearEpisodiosAsync(_carpeta)).ReturnsAsync(Enumerable.Range(1, 3).Select(n => new EpisodioItem { NumeroEpisodio = n }).ToList());
+        _db.Setup(d => d.ObtenerRegistrosPorAnimeAsync(7)).ReturnsAsync(new List<RegistroEpisodio>());
+        double p = 0;
+        _descargas.Setup(d => d.EstaDescargando(It.IsAny<int>(), It.IsAny<int>(), out p)).Returns(false);
+        var proxima = YaEmitido(3);
+        _proxima.Setup(s => s.ObtenerAsync(7, "RELEASING", It.IsAny<bool>())).ReturnsAsync(proxima);
+        _monitor.Setup(m => m.UltimoEmitido(proxima, It.Is<AnimeItem>(a => a.AniListId == 7), It.IsAny<DateTime>())).Returns(3);
+        var sut = CrearSut(_monitor.Object);
+
+        await sut.InicializarAsync(Anime(1));
+        await EsperarAsync(() => sut.AnimeSeleccionado!.TotalEpisodios == 3);
+
+        sut.AnimeSeleccionado!.TotalEpisodios.Should().Be(3);
+        _db.Verify(d => d.ActualizarAnimeAsync(It.Is<AnimeItem>(a => a.TotalEpisodios == 3)), Times.Once);
+    }
+
+    // Total desconocido (0) con archivos hasta el 3 y AniList diciendo que el último emitido es el 2: fijar el total en 2
+    // recortaría el 3 de la lista (ver CalcularMaxEpisodio).
+    [Fact]
+    public async Task SiLaFilaYaExisteYElTotalEsDesconocido_NoSeFijaElTotal()
+    {
+        _escaner.Setup(e => e.EscanearEpisodiosAsync(_carpeta)).ReturnsAsync(Enumerable.Range(1, 3).Select(n => new EpisodioItem { NumeroEpisodio = n }).ToList());
+        _db.Setup(d => d.ObtenerRegistrosPorAnimeAsync(7)).ReturnsAsync(new List<RegistroEpisodio>());
+        double p = 0;
+        _descargas.Setup(d => d.EstaDescargando(It.IsAny<int>(), It.IsAny<int>(), out p)).Returns(false);
+        var proxima = YaEmitido(2);
+        _proxima.Setup(s => s.ObtenerAsync(7, "RELEASING", It.IsAny<bool>())).ReturnsAsync(proxima);
+        _monitor.Setup(m => m.UltimoEmitido(proxima, It.Is<AnimeItem>(a => a.AniListId == 7), It.IsAny<DateTime>())).Returns(2);
+        var sut = CrearSut(_monitor.Object);
+
+        await sut.InicializarAsync(Anime(0));
+        await EsperarAsync(() => sut.Episodios.EpisodiosDelAnime.Count >= 3);
+        await Task.Delay(100);
+
+        sut.AnimeSeleccionado!.TotalEpisodios.Should().Be(0);
+        _db.Verify(d => d.ActualizarAnimeAsync(It.IsAny<AnimeItem>()), Times.Never);
+    }
+
     [Fact]
     public async Task ElEpisodioNuevo_SeAñadeSinDescargarYSinMarcarComoVisto()
     {

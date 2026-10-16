@@ -27,6 +27,41 @@ public class AnimeItemTarjetaTests
     public void EstadoVisual_DiceElEstadoDeEmision(string estado, string esperado) =>
         new AnimeItem { Estado = estado }.EstadoVisual.Should().Be(esperado);
 
+    // "3 de 1 vistos": el total guardado se quedó atrás cuando salieron los capítulos 2 y 3. Un episodio visto ya salió, pero
+    // solo se corrige lo que se pinta: el total guardado no se toca.
+    [Fact]
+    public void LoVisto_NoSeMuestraPorEncimaDelTotalConocido()
+    {
+        var anime = new AnimeItem { TotalEpisodios = 1 };
+
+        anime.EpisodiosVistos = 3;
+
+        anime.ProgresoEpisodiosTexto.Should().Be("3 de 3 vistos");
+        anime.ProgresoPorcentaje.Should().Be(100);
+        anime.TotalEpisodios.Should().Be(1);
+    }
+
+    [Fact]
+    public void SiAniListCorrigeElTotalAlaBaja_ElTotalGuardadoLoRespeta()
+    {
+        var anime = new AnimeItem { TotalEpisodios = 24, EpisodiosVistos = 24 };
+
+        anime.TotalEpisodios = 12; // AniList parte la serie en temporadas
+
+        anime.TotalEpisodios.Should().Be(12);
+    }
+
+    [Fact]
+    public void ConTotalDesconocido_NoSeInventaElTotal()
+    {
+        var anime = new AnimeItem { TotalEpisodios = 0 };
+
+        anime.EpisodiosVistos = 4;
+
+        anime.TotalEpisodios.Should().Be(0);
+        anime.ProgresoPorcentaje.Should().Be(0);
+    }
+
     [Fact]
     public void AlCambiarElEstado_LaTarjetaSeEntera()
     {

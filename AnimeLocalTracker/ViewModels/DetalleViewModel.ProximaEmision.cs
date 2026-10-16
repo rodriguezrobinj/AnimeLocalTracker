@@ -113,9 +113,13 @@ public partial class DetalleViewModel
 
         int emitido = _monitorEmision.UltimoEmitido(proxima, anime, DateTime.UtcNow);
         Episodios.UltimoEmitido = emitido; // alimenta el botón "Descargar temporada"
-        if (emitido <= Episodios.Todos.Count) return;
+        bool filaNueva = emitido > Episodios.Todos.Count;
+        if (filaNueva) Episodios.AnadirFilasHasta(emitido);
 
-        Episodios.AnadirFilasHasta(emitido);
+        // El total se sube aunque la fila ya exista (capítulo recién emitido que ya descargaste o viste): antes se salía antes de
+        // tiempo y el contador se quedaba en "1" mientras la lista ya tenía el 3. Con total desconocido (0) y la fila ya presente
+        // no se toca: fijarlo en lo emitido recortaría los archivos locales por encima (ver CalcularMaxEpisodio).
+        if (emitido <= anime.TotalEpisodios || (!filaNueva && anime.TotalEpisodios == 0)) return;
         anime.TotalEpisodios = emitido;
 
         try

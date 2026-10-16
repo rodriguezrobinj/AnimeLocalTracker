@@ -83,13 +83,17 @@ public partial class AnimeItem : ObservableObject
     private int _episodiosVistos;
 #pragma warning restore CS0657
 
+    // Solo para pintar ("3 de 1 vistos"): un episodio visto ya salió, así que lo visto no se muestra por encima del total. El total
+    // guardado no se toca (AniList puede corregirlo a la baja y con 0 se desconoce; subirlo recortaría la lista de la ficha).
+    private int TotalMostrado => TotalEpisodios > 0 ? Math.Max(TotalEpisodios, EpisodiosVistos) : 0;
+
     [Ignore]
     [JsonIgnore]
     public int NuevosEpisodios => TotalEpisodios > EpisodiosVistos ? (TotalEpisodios - EpisodiosVistos) : 0;
 
     [Ignore]
     [JsonIgnore]
-    public double ProgresoPorcentaje => TotalEpisodios > 0 ? (EpisodiosVistos / (double)TotalEpisodios) * 100 : 0;
+    public double ProgresoPorcentaje => TotalMostrado > 0 ? (EpisodiosVistos / (double)TotalMostrado) * 100 : 0;
 
     [Ignore]
     [JsonIgnore]
@@ -97,7 +101,7 @@ public partial class AnimeItem : ObservableObject
 
     [Ignore]
     [JsonIgnore]
-    public string ProgresoEpisodiosTexto => string.Format(AnimeLocalTracker.Services.LocalizationService.T("Epi_ProgresoEpisodiosTexto"), EpisodiosVistos, TotalEpisodios);
+    public string ProgresoEpisodiosTexto => string.Format(AnimeLocalTracker.Services.LocalizationService.T("Epi_ProgresoEpisodiosTexto"), EpisodiosVistos, TotalMostrado);
 
 
     // === PROPIEDADES VISUALES (NO SE GUARDAN EN SQLITE) ===
