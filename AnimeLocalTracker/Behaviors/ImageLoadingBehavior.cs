@@ -39,49 +39,67 @@ public static class ImageLoadingBehavior
 
     private static void OnTrackChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
-        if (d is not Image image || e.NewValue is not true) return;
+        if (d is not Image image) return;
+
+        if (e.NewValue is not true)
+        {
+            BindingOperations.ClearBinding(image, FuenteProperty);
+            CancelarEspera(image);
+            // Sin seguimiento ya nadie avisará del fin de la descarga: el brillo no puede quedarse esperándolo.
+            SetIsLoaded(image, true);
+            return;
+        }
 
         // Hay que enterarse de cada cambio de Source: en listas virtualizadas el mismo Image se recicla con otra Source al
         // desplazarse, sin recrearse (Track solo cambia una vez). Un enlace de la propia imagen a su Source vive y muere con
         // ella; AddValueChanged la dejaba registrada para siempre en una tabla global, con su imagen en memoria, cada vez que
         // una lista rehacía sus filas.
+        var antes = image.GetValue(FuenteProperty);
         BindingOperations.SetBinding(image, FuenteProperty, new Binding(nameof(Image.Source)) { RelativeSource = RelativeSource.Self });
-        if (image.Source is null) ReaccionarACambioDeSource(image); // con Source ya puesta, el enlace acaba de avisar
+        // Si al enlazar la Source no cambió (null) no hubo aviso: se evalúa aquí. Si cambió, ya se evaluó una vez.
+        if (ReferenceEquals(image.GetValue(FuenteProperty), antes)) ReaccionarACambioDeSource(image);
     }
 
     private static readonly DependencyProperty FuenteProperty =
         DependencyProperty.RegisterAttached("Fuente", typeof(ImageSource), typeof(ImageLoadingBehavior),
-            new PropertyMetadata(null, (d, _) => ReaccionarACambioDeSource((Image)d)));
+            new PropertyMetadata(null, (d, _) => { if (GetTrack((Image)d)) ReaccionarACambioDeSource((Image)d); }));
+
+    /// <summary>Suelta la espera de la descarga de la Source anterior (temporizador y avisos del bitmap), si la hay.</summary>
+    private static readonly DependencyProperty CancelarEsperaProperty =
+        DependencyProperty.RegisterAttached("CancelarEspera", typeof(Action), typeof(ImageLoadingBehavior), new PropertyMetadata(null));
+
+    private static void CancelarEspera(Image image) => (image.GetValue(CancelarEsperaProperty) as Action)?.Invoke();
 
     private static void ReaccionarACambioDeSource(Image image)
     {
+        // Si la imagen se recicló con otra Source, la espera de la anterior ya no sirve: soltarla para que su temporizador y
+        // sus avisos no retengan la imagen ni oculten el brillo de la nueva al terminar.
+        CancelarEspera(image);
         SetIsLoaded(image, false);
 
-        if (image.Source is not BitmapImage bitmap)
+        // BitmapSource y no BitmapImage: una Source enlazada a una ruta o URL en texto llega como BitmapFrame, que también se
+        // descarga (portadas de AniList en Agregar anime).
+        if (image.Source is not BitmapSource { IsDownloading: true } bitmap)
         {
-            // Sin nada que cargar (Source null u otro tipo de ImageSource ya resuelto): no hay
-            // por qué esperar.
-            SetIsLoaded(image, true);
-            return;
-        }
-
-        if (!bitmap.IsDownloading)
-        {
-            // Ya decodificada — típico de archivos locales (miniaturas/portadas en disco), que
-            // no pasan por el pipeline de descarga async: mostrarla ya, sin shimmer de por medio.
+            // Nada que esperar: sin Source, otro tipo de ImageSource o ya decodificada (archivos locales, que no pasan por la
+            // descarga asíncrona). Mostrarla ya, sin brillo de por medio.
             SetIsLoaded(image, true);
             return;
         }
 
         var watchdog = new DispatcherTimer { Interval = TiempoMaximoEspera };
 
-        void Completar()
+        void Soltar()
         {
             watchdog.Stop();
             bitmap.DownloadCompleted -= OnCompleted;
             bitmap.DownloadFailed -= OnFailed;
-            // Si entretanto la imagen se recicló con otra Source, este aviso es de la anterior: no oculta el brillo de la nueva.
-            if (ReferenceEquals(image.Source, bitmap)) SetIsLoaded(image, true);
+            image.ClearValue(CancelarEsperaProperty);
+        }
+        void Completar()
+        {
+            Soltar();
+            SetIsLoaded(image, true);
         }
         void OnCompleted(object? s, EventArgs e) => Completar();
         void OnFailed(object? s, ExceptionEventArgs e) => Completar();
@@ -89,6 +107,7 @@ public static class ImageLoadingBehavior
         bitmap.DownloadCompleted += OnCompleted;
         bitmap.DownloadFailed += OnFailed;
         watchdog.Tick += (_, _) => Completar();
+        image.SetValue(CancelarEsperaProperty, (Action)Soltar);
         watchdog.Start();
     }
 }

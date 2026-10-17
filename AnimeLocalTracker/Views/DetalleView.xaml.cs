@@ -83,6 +83,9 @@ public partial class DetalleView : UserControl
         AvisosPopup.IsOpen = false;
         MarcarPopup.IsOpen = false;
         HerramientasPopup.IsOpen = false;
+        // El menú de una fila resuelve sus comandos por la ficha actual: abierto al cambiar de anime, ejecutaría los de la nueva
+        // con el episodio de la anterior.
+        if (Resources["MenuEpisodio"] is ContextMenu menuEpisodio) menuEpisodio.IsOpen = false;
     }
 
     /// <summary>
@@ -153,7 +156,9 @@ public partial class DetalleView : UserControl
 
     /// <summary>
     /// Mientras la ficha nueva no ha puesto su lista, las filas de la anterior siguen ahí para reutilizarlas, pero ocultas y sin
-    /// poder pulsarse (Hidden: no se ven ni reciben clics). Vaciar la lista ahora las tiraría.
+    /// poder pulsarse. Vaciar la lista ahora las tiraría. Hidden quita los clics pero no el teclado: sin desactivarla, un Enter o
+    /// Espacio en un botón con el foco lanzaría el comando de la ficha nueva con el episodio de la anterior (reproducirlo o
+    /// descargarlo en la carpeta de otro anime).
     /// </summary>
     private void CopiarEpisodios()
     {
@@ -161,6 +166,7 @@ public partial class DetalleView : UserControl
         bool lista = episodios?.ListaMostrada == true;
         if (lista) _filasEpisodios.SincronizarCon(episodios!.EpisodiosDelAnime);
         ListaEpisodios.Visibility = lista ? Visibility.Visible : Visibility.Hidden;
+        ListaEpisodios.IsEnabled = lista;
     }
 
     private MusicaFichaViewModel? _musicaObservada;
@@ -231,11 +237,8 @@ public partial class DetalleView : UserControl
 
     private void Reproducir(AnimeLocalTracker.Models.EpisodioItem episodio)
     {
-        // Mientras la ficha nueva lee sus episodios, la lista guarda ocultas las filas de la anterior (ver CopiarEpisodios):
-        // un Enter que llegue justo entonces no debe reproducir un episodio de otro anime.
-        if (_vmObservado is not { } ficha || !ficha.Episodios.Todos.Contains(episodio)) return;
-        var comando = ficha.Episodios.ReproducirEpisodioCommand;
-        if (episodio.Descargado && comando.CanExecute(episodio)) comando.Execute(episodio);
+        var comando = _vmObservado?.Episodios.ReproducirEpisodioCommand;
+        if (episodio.Descargado && comando?.CanExecute(episodio) == true) comando.Execute(episodio);
     }
 
     /// <summary>El episodio de la fila que contiene ese elemento (null si no está en una fila), y si el elemento es un botón de la fila.</summary>

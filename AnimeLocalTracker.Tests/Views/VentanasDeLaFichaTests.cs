@@ -15,7 +15,7 @@ namespace AnimeLocalTracker.Tests.Views;
 
 /// <summary>
 /// Las ventanas de la ficha (editor de seguimiento y música) viven en su propia vista y se crean cuando ya se han pedido,
-/// recibiendo su ViewModel en ese momento.
+/// recibiendo su ViewModel en ese momento. Y la lista de episodios, que la vista reutiliza de una ficha a la siguiente.
 /// </summary>
 [Collection("WpfSmoke")]
 public class VentanasDeLaFichaTests
@@ -118,6 +118,59 @@ public class VentanasDeLaFichaTests
             // Las filas de la lista salen de una plantilla (no están en el árbol lógico): este título es el de la barra.
             Descendientes<TextBlock>(vista).Select(t => t.Text).Should().Contain("We Are!");
             vm.DetenerMusica();
+        });
+    }
+
+    /// <summary>La ficha completa pide además estos convertidores de App.xaml.</summary>
+    private static void PrepararRecursosDeLaFicha()
+    {
+        CargarEstilosDeLaFicha();
+        var recursos = Application.Current.Resources;
+        if (!recursos.Contains("LocalizedFormat")) recursos["LocalizedFormat"] = new AnimeLocalTracker.Converters.LocalizedFormatConverter();
+        if (!recursos.Contains("GeneroTraducido")) recursos["GeneroTraducido"] = new AnimeLocalTracker.Converters.GeneroTraducidoConverter();
+    }
+
+    private static DetalleViewModel Ficha() => new(Mock.Of<IAnimeTrackingService>(), Mock.Of<IDatabaseService>(), Mock.Of<IAuthService>(),
+        Mock.Of<IFileScannerService>(), Mock.Of<IDialogService>(), Mock.Of<IDownloadService>());
+
+    [Fact]
+    public void MenuDeUnEpisodio_AbiertoAlCambiarDeFicha_SeCierra()
+    {
+        // Sus opciones llegan a los comandos de la ficha nueva con el episodio de la anterior (reproducirlo, descargarlo).
+        _host.Ejecutar(() =>
+        {
+            PrepararRecursosDeLaFicha();
+            var vista = new DetalleView { DataContext = Ficha() };
+            var menu = (ContextMenu)vista.Resources["MenuEpisodio"];
+            menu.IsOpen = true;
+            menu.IsOpen.Should().BeTrue();
+
+            vista.DataContext = Ficha();
+
+            menu.IsOpen.Should().BeFalse();
+        });
+    }
+
+    [Fact]
+    public void ListaDeEpisodios_MientrasLaFichaNuevaLeeLosSuyos_NoAdmiteNingunaEntrada()
+    {
+        _host.Ejecutar(() =>
+        {
+            PrepararRecursosDeLaFicha();
+
+            var anterior = Ficha();
+            anterior.Episodios.Mostrar(new AnimeItem { AniListId = 1, Titulo = "Frieren", TotalEpisodios = 1 },
+                new EpisodiosFichaViewModel.Lectura([new EpisodioItem { NumeroEpisodio = 1 }], 0, 0, 0));
+            var vista = new DetalleView { DataContext = anterior };
+            var lista = (ListBox)vista.FindName("ListaEpisodios");
+            lista.IsEnabled.Should().BeTrue();
+
+            vista.DataContext = Ficha(); // aún no ha leído sus episodios: las filas de la anterior se quedan para reutilizarlas
+
+            lista.Visibility.Should().Be(Visibility.Hidden);
+            // Hidden quita los clics, no el teclado: un Enter en un botón de una fila con el foco lanzaría el comando de la ficha
+            // nueva con el episodio de la anterior.
+            lista.IsEnabled.Should().BeFalse();
         });
     }
 }
