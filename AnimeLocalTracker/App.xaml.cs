@@ -51,12 +51,15 @@ public partial class App : Application
         this.DispatcherUnhandledException += (s, args) =>
         {
             AppLogger.Error("App", "UI Thread Exception", args.Exception);
-            AppLogger.Flush(); // el diálogo puede acabar en cierre: que el error ya esté en disco
+            args.Handled = true; // Prevenir cierre inesperado
             // SEC-12: no exponer mensajes internos (rutas, versiones, drivers) en la UI;
             // el detalle completo queda en el log de la aplicación.
-            MessageBox.Show("Ocurrió un error inesperado.\nEl detalle técnico se ha guardado en el registro de la aplicación.",
-                            "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
-            args.Handled = true; // Prevenir cierre inesperado
+            MostrarAvisoSinAnidar(() =>
+            {
+                AppLogger.Flush(); // el diálogo puede acabar en cierre: que el error ya esté en disco
+                MessageBox.Show("Ocurrió un error inesperado.\nEl detalle técnico se ha guardado en el registro de la aplicación.",
+                                "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+            });
         };
         
         // 2. Excepciones no manejadas en hilos secundarios (fatal)
@@ -95,6 +98,28 @@ public partial class App : Application
             }
             catch { }
         };
+    }
+
+    private static bool _avisoDeErrorAbierto;
+
+    /// <summary>
+    /// Muestra el aviso de error inesperado salvo que ya haya uno abierto (devuelve si lo mostró). Su diálogo sigue procesando
+    /// la cola de la ventana: un error que se repite en cada pasada de diseño volvía a saltar dentro de él y abría otro, hasta
+    /// agotar la pila y cerrar la app sin dejar rastro (0xC00000FD, 2026-10-17). El error se registra igual. Solo hilo de UI.
+    /// </summary>
+    internal static bool MostrarAvisoSinAnidar(Action mostrar)
+    {
+        if (_avisoDeErrorAbierto) return false;
+        _avisoDeErrorAbierto = true;
+        try
+        {
+            mostrar();
+            return true;
+        }
+        finally
+        {
+            _avisoDeErrorAbierto = false;
+        }
     }
 
     internal static void ConfigureServices(IServiceCollection services)

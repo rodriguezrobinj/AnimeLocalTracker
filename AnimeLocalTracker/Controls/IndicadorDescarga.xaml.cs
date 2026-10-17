@@ -32,6 +32,20 @@ public partial class IndicadorDescarga : UserControl
     {
         if (e.NewValue is not true) return;
         IsVisibleChanged -= AlVerse;
+        // En una fila que nace descargando se hace visible mientras WPF aún monta la plantilla (su BeginInit sigue abierto):
+        // construirlo ahí abre otro BeginInit sobre el mismo control y lanza en cada pasada de diseño (cierre del 2026-10-17).
+        if (IsInitialized) Construir();
+        else Initialized += AlInicializarse;
+    }
+
+    private void AlInicializarse(object? sender, System.EventArgs e)
+    {
+        Initialized -= AlInicializarse;
+        Construir();
+    }
+
+    private void Construir()
+    {
         InitializeComponent();
         _construido = true;
         Actualizar();

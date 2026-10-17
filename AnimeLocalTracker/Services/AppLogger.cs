@@ -129,11 +129,15 @@ public static class AppLogger
         {
             lock (_estado)
             {
+                // Se resume lo suprimido hasta ahora, pero la ventana de cada mensaje sigue: con Flush tras cada error (el aviso
+                // de error de la interfaz lo hacía), vaciarlas dejaba pasar entero un error de diseño repetido en cada
+                // fotograma (441 trazas en 6 s, 2026-10-17).
                 foreach (var ((fuente, plantilla), r) in _repeticiones)
                 {
-                    if (r.Suprimidas > 0) EncolarResumen(fuente, plantilla, r);
+                    if (r.Suprimidas == 0) continue;
+                    EncolarResumen(fuente, plantilla, r);
+                    r.Suprimidas = 0;
                 }
-                _repeticiones.Clear();
             }
             lock (_escritura)
             {

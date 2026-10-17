@@ -87,6 +87,27 @@ public class AppLoggerTests
     }
 
     [Fact]
+    public void ErroresRepetidos_SiguenLimitados_AunqueSeEscribaTrasCadaUno()
+    {
+        // El aviso de error de la interfaz escribe el registro tras cada error (puede acabar en cierre). Ese Flush reiniciaba
+        // el recuento de repetidos: un error de diseño que se repetía en cada fotograma escribió 441 trazas en 6 s.
+        string fuente = Fuente();
+        for (int i = 0; i < 12; i++)
+        {
+            AppLogger.Error(fuente, "UI Thread Exception", new InvalidOperationException("BeginInit anidado"));
+            AppLogger.Flush();
+        }
+
+        var lineas = LeerSesion().Split('\n').Where(l => l.Contains($"[{fuente}]")).ToList();
+        lineas.Count(l => l.Contains("ERROR") && !l.Contains("repetido")).Should().Be(AppLogger.MaxRepeticionesPorMinuto);
+        lineas.Where(l => l.Contains("repetido")).Sum(VecesSuprimidas).Should().Be(12 - AppLogger.MaxRepeticionesPorMinuto,
+            "lo que no se escribe entero queda contado en los resúmenes");
+    }
+
+    private static int VecesSuprimidas(string resumen) =>
+        int.Parse(System.Text.RegularExpressions.Regex.Match(resumen, @"repetido (\d+) ve").Groups[1].Value);
+
+    [Fact]
     public void Plantilla_IgnoraLosNumeros()
     {
         AppLogger.Plantilla("Reintento 3 en 2 s (api:443)").Should().Be(AppLogger.Plantilla("Reintento 14 en 16 s (api:443)"));
