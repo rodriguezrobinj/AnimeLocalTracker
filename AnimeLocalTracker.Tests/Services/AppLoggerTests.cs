@@ -80,6 +80,7 @@ public class AppLoggerTests
     {
         string fuente = Fuente();
         for (int i = 0; i < 12; i++) AppLogger.Info(fuente, $"Reintento {i} en {i * 2} s (Host desconocido)");
+        AppLogger.Flush(resumirRepetidos: true); // como al cerrar la app (si no, al acabar el minuto)
 
         var lineas = LeerSesion().Split('\n').Where(l => l.Contains($"[{fuente}]")).ToList();
         lineas.Count(l => l.Contains("Reintento")).Should().Be(AppLogger.MaxRepeticionesPorMinuto + 1, "5 escritas + el resumen");
@@ -97,15 +98,14 @@ public class AppLoggerTests
             AppLogger.Error(fuente, "UI Thread Exception", new InvalidOperationException("BeginInit anidado"));
             AppLogger.Flush();
         }
+        LeerSesion().Should().NotContain($"[{fuente}] (repetido", "un Flush normal no suelta resúmenes parciales");
+        AppLogger.Flush(resumirRepetidos: true);
 
         var lineas = LeerSesion().Split('\n').Where(l => l.Contains($"[{fuente}]")).ToList();
         lineas.Count(l => l.Contains("ERROR") && !l.Contains("repetido")).Should().Be(AppLogger.MaxRepeticionesPorMinuto);
-        lineas.Where(l => l.Contains("repetido")).Sum(VecesSuprimidas).Should().Be(12 - AppLogger.MaxRepeticionesPorMinuto,
-            "lo que no se escribe entero queda contado en los resúmenes");
+        lineas.Where(l => l.Contains("repetido")).Should().ContainSingle()
+            .Which.Should().Contain($"repetido {12 - AppLogger.MaxRepeticionesPorMinuto} veces más", "lo suprimido queda contado en un solo resumen");
     }
-
-    private static int VecesSuprimidas(string resumen) =>
-        int.Parse(System.Text.RegularExpressions.Regex.Match(resumen, @"repetido (\d+) ve").Groups[1].Value);
 
     [Fact]
     public void Plantilla_IgnoraLosNumeros()

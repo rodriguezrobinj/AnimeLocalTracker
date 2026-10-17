@@ -69,20 +69,20 @@ public class IndicadorDescargaVistaTests
 
             fila.UpdateLayout();
 
-            var indicador = BuscarIndicador(fila);
+            var indicador = BuscarIndicador(fila)!;
+            indicador.Should().NotBeNull();
             indicador.Content.Should().NotBeNull("visible desde el principio: se construye en cuanto termina de inicializarse");
             ((System.Windows.UIElement)indicador.FindName("Avance")).Visibility.Should().Be(System.Windows.Visibility.Visible);
         });
     }
 
-    private static IndicadorDescarga BuscarIndicador(System.Windows.DependencyObject raiz)
+    private static IndicadorDescarga? BuscarIndicador(System.Windows.DependencyObject raiz)
     {
         if (raiz is IndicadorDescarga indicador) return indicador;
         for (int i = 0; i < System.Windows.Media.VisualTreeHelper.GetChildrenCount(raiz); i++)
         {
-            try { return BuscarIndicador(System.Windows.Media.VisualTreeHelper.GetChild(raiz, i)); }
-            catch (System.InvalidOperationException) { }
+            if (BuscarIndicador(System.Windows.Media.VisualTreeHelper.GetChild(raiz, i)) is { } encontrado) return encontrado;
         }
-        throw new System.InvalidOperationException("No hay IndicadorDescarga en el árbol.");
+        return null;
     }
 }

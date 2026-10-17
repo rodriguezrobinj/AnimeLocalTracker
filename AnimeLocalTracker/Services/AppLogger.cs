@@ -102,7 +102,7 @@ public static class AppLogger
         _ = Task.Run(LimpiarRegistrosAntiguos);
 
         // Al cerrar: escribir lo pendiente (incluidos los resúmenes de mensajes repetidos).
-        AppDomain.CurrentDomain.ProcessExit += (_, _) => Flush();
+        AppDomain.CurrentDomain.ProcessExit += (_, _) => Flush(resumirRepetidos: true);
     }
 
     public static void Debug(string source, string message) => Log("DEBUG", source, message);
@@ -122,21 +122,23 @@ public static class AppLogger
     /// <summary>
     /// Escribe YA todo lo pendiente, sin esperar al siguiente lote. Llamarlo antes de que el proceso pueda
     /// morir (error fatal): antes el error que tumbaba la app quedaba en memoria y nunca llegaba al disco.
+    /// <paramref name="resumirRepetidos"/> solo al cerrar: resume lo suprimido y olvida las ventanas de repetición. Un Flush
+    /// normal no las toca: con Flush tras cada error, vaciarlas dejaba pasar entero un error de diseño repetido en cada
+    /// fotograma (441 trazas en 6 s, 2026-10-17), y resumir sin cerrarlas llenaba el registro de resúmenes parciales.
     /// </summary>
-    public static void Flush()
+    public static void Flush(bool resumirRepetidos = false)
     {
         try
         {
-            lock (_estado)
+            if (resumirRepetidos)
             {
-                // Se resume lo suprimido hasta ahora, pero la ventana de cada mensaje sigue: con Flush tras cada error (el aviso
-                // de error de la interfaz lo hacía), vaciarlas dejaba pasar entero un error de diseño repetido en cada
-                // fotograma (441 trazas en 6 s, 2026-10-17).
-                foreach (var ((fuente, plantilla), r) in _repeticiones)
+                lock (_estado)
                 {
-                    if (r.Suprimidas == 0) continue;
-                    EncolarResumen(fuente, plantilla, r);
-                    r.Suprimidas = 0;
+                    foreach (var ((fuente, plantilla), r) in _repeticiones)
+                    {
+                        if (r.Suprimidas > 0) EncolarResumen(fuente, plantilla, r);
+                    }
+                    _repeticiones.Clear();
                 }
             }
             lock (_escritura)

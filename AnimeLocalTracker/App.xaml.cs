@@ -52,14 +52,12 @@ public partial class App : Application
         {
             AppLogger.Error("App", "UI Thread Exception", args.Exception);
             args.Handled = true; // Prevenir cierre inesperado
+            AppLogger.Flush(); // un error de la interfaz puede acabar en cierre: que ya esté en disco
             // SEC-12: no exponer mensajes internos (rutas, versiones, drivers) en la UI;
             // el detalle completo queda en el log de la aplicación.
-            MostrarAvisoSinAnidar(() =>
-            {
-                AppLogger.Flush(); // el diálogo puede acabar en cierre: que el error ya esté en disco
-                MessageBox.Show("Ocurrió un error inesperado.\nEl detalle técnico se ha guardado en el registro de la aplicación.",
-                                "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
-            });
+            MostrarAvisoSinAnidar(args.Exception, () =>
+                MessageBox.Show(LocalizationService.T("Dlg_ErrorInesperadoMsj"), LocalizationService.T("Dlg_ErrorTitulo"),
+                                MessageBoxButton.OK, MessageBoxImage.Warning));
         };
         
         // 2. Excepciones no manejadas en hilos secundarios (fatal)
@@ -75,7 +73,7 @@ public partial class App : Application
             }
             // El proceso muere justo después (y en ese caso ProcessExit no llega): sin esto el error que
             // tumbó la app se quedaba en la cola de memoria y nunca llegaba al registro.
-            AppLogger.Flush();
+            AppLogger.Flush(resumirRepetidos: true);
         };
         
         // 3. Excepciones de Tasks async no observadas
@@ -101,15 +99,17 @@ public partial class App : Application
     }
 
     private static bool _avisoDeErrorAbierto;
+    private static readonly HashSet<string> _erroresAvisados = new();
 
     /// <summary>
-    /// Muestra el aviso de error inesperado salvo que ya haya uno abierto (devuelve si lo mostró). Su diálogo sigue procesando
-    /// la cola de la ventana: un error que se repite en cada pasada de diseño volvía a saltar dentro de él y abría otro, hasta
-    /// agotar la pila y cerrar la app sin dejar rastro (0xC00000FD, 2026-10-17). El error se registra igual. Solo hilo de UI.
+    /// Muestra el aviso de error inesperado salvo que ya haya uno abierto o que ese mismo error (tipo y mensaje) ya se avisara
+    /// en esta sesión (devuelve si lo mostró). Su diálogo sigue procesando la cola de la ventana: un error que se repite en cada
+    /// pasada de diseño volvía a saltar dentro de él y abría otro, hasta agotar la pila y cerrar la app sin dejar rastro
+    /// (0xC00000FD, 2026-10-17); y al cerrarlo volvería a abrirse en la pasada siguiente. El error se registra igual. Solo hilo de UI.
     /// </summary>
-    internal static bool MostrarAvisoSinAnidar(Action mostrar)
+    internal static bool MostrarAvisoSinAnidar(Exception error, Action mostrar)
     {
-        if (_avisoDeErrorAbierto) return false;
+        if (_avisoDeErrorAbierto || !_erroresAvisados.Add($"{error.GetType().FullName}: {error.Message}")) return false;
         _avisoDeErrorAbierto = true;
         try
         {
