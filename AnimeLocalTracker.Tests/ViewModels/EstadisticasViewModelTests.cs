@@ -23,14 +23,36 @@ public class EstadisticasViewModelTests
     private static readonly string[] GenerosEsperados = { "Acción", "Drama", "Comedia" };
 
     private static (EstadisticasViewModel Vm, Mock<IDatabaseService> Db) CrearVm(
-        List<AnimeItem>? animes = null, List<RegistroEpisodio>? registros = null, IFranquiciaService? franquicias = null)
+        List<AnimeItem>? animes = null, List<RegistroEpisodio>? registros = null, IFranquiciaService? franquicias = null,
+        TimeProvider? reloj = null)
     {
         var dbMock = new Mock<IDatabaseService>();
         dbMock.Setup(d => d.ObtenerTodosLosAnimesAsync()).ReturnsAsync(animes ?? new List<AnimeItem>());
         dbMock.Setup(d => d.ObtenerTodosLosRegistrosAsync()).ReturnsAsync(registros ?? new List<RegistroEpisodio>());
         return (new EstadisticasViewModel(dbMock.Object, Mock.Of<IAnimeTrackingService>(), Mock.Of<IAuthService>(), Mock.Of<IDialogService>(),
-            franquiciaService: franquicias), dbMock);
+            franquiciaService: franquicias) { Reloj = reloj ?? TimeProvider.System }, dbMock);
     }
+
+    /// <summary>Un instante fijo en una zona fija: las pruebas de "día local" no dependen de la zona de la máquina (el CI va en UTC).</summary>
+    private sealed class RelojFijo(DateTimeOffset ahora, TimeZoneInfo zona) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => ahora.ToUniversalTime();
+        public override TimeZoneInfo LocalTimeZone => zona;
+    }
+
+    private static readonly TimeZoneInfo Colombia = TimeZoneInfo.CreateCustomTimeZone("Prueba UTC-5", TimeSpan.FromHours(-5), "UTC-5", "UTC-5");
+
+    /// <summary>Viernes 16 de octubre de 2026, 23:00 en UTC−5 (ya es sábado 17 en UTC).</summary>
+    private static readonly RelojFijo NocheDelViernes = new(new DateTimeOffset(2026, 10, 16, 23, 0, 0, TimeSpan.FromHours(-5)), Colombia);
+
+    /// <summary>Como lo devuelve sqlite-net: UTC con Kind=Unspecified.</summary>
+    private static DateTime GuardadaEnBase(DateTimeOffset instante) => DateTime.SpecifyKind(instante.UtcDateTime, DateTimeKind.Unspecified);
+
+    private static List<RegistroEpisodio> Vistos(params DateTimeOffset[] instantes) => instantes
+        .Select((t, i) => new RegistroEpisodio { AniListId = 1, NumeroEpisodio = i + 1, VistoLocal = true, UltimaReproduccion = GuardadaEnBase(t) })
+        .ToList();
+
+    private static readonly List<AnimeItem> UnAnime = new() { new() { AniListId = 1, Titulo = "Frieren", TotalEpisodios = 28 } };
 
     [Fact]
     public async Task CargarEstadisticas_BibliotecaVacia_DeberiaMostrarCerosSinError()
@@ -369,5 +391,86 @@ public class EstadisticasViewModelTests
         {
             LocalizationService.Instance.Idioma = "es";
         }
+    }
+
+    [Fact]
+    public async Task UnaReproduccionCuentaEnSuDiaLocal_EnElMapaLaActividadYLaRacha()
+    {
+        // 21:00 del viernes en UTC−5 = 02:00 del sábado en UTC: agrupar por la fecha UTC la mandaría al sábado.
+        var (vm, _) = CrearVm(UnAnime, Vistos(new DateTimeOffset(2026, 10, 16, 21, 0, 0, TimeSpan.FromHours(-5))), reloj: NocheDelViernes);
+
+        await vm.CargarEstadisticasAsync();
+
+        var viernes = new DateTime(2026, 10, 16);
+        vm.MapaCalor!.Celdas.Single(c => c.Fecha == viernes).Episodios.Should().Be(1);
+        vm.MapaCalor.Celdas.Where(c => c.Nivel >= 0).Max(c => c.Fecha).Should().Be(viernes, "hoy es viernes en la zona del usuario");
+        vm.ActividadSemana.Last().Valor.Should().Be(1, "la última barra es hoy");
+        vm.RachaActual.Should().Be(string.Format(LocalizationService.T("Stats_DiasFormato"), 1));
+    }
+
+    [Fact]
+    public async Task ConUnSoloEpisodio_ElResumenDelMapaVaEnSingular()
+    {
+        var (vm, _) = CrearVm(UnAnime, Vistos(new DateTimeOffset(2026, 10, 15, 20, 0, 0, TimeSpan.FromHours(-5))), reloj: NocheDelViernes);
+
+        await vm.CargarEstadisticasAsync();
+
+        vm.MapaCalorResumen.Should().Be(string.Format(LocalizationService.T("Stats_ConstanciaSubFormato"),
+            LocalizationService.T("Stats_ConstanciaEpisodioUno"), LocalizationService.T("Stats_ConstanciaDiaUno")));
+    }
+
+    [Fact]
+    public async Task ConVariosEpisodiosYDias_ElResumenVaEnPlural()
+    {
+        var (vm, _) = CrearVm(UnAnime, Vistos(
+            new DateTimeOffset(2026, 10, 14, 20, 0, 0, TimeSpan.FromHours(-5)),
+            new DateTimeOffset(2026, 10, 15, 20, 0, 0, TimeSpan.FromHours(-5)),
+            new DateTimeOffset(2026, 10, 15, 21, 0, 0, TimeSpan.FromHours(-5))), reloj: NocheDelViernes);
+
+        await vm.CargarEstadisticasAsync();
+
+        vm.MapaCalorResumen.Should().Be(string.Format(LocalizationService.T("Stats_ConstanciaSubFormato"),
+            string.Format(LocalizationService.T("Stats_ConstanciaEpisodiosFormato"), 3),
+            string.Format(LocalizationService.T("Stats_ConstanciaDiasFormato"), 2)));
+    }
+
+    [Fact]
+    public async Task UnaReproduccionConFechaFutura_NoCuentaEnNingunaCifraPorDia()
+    {
+        // Reloj del sistema adelantado al guardarla: mañana en la zona del usuario.
+        var (vm, _) = CrearVm(UnAnime, Vistos(new DateTimeOffset(2026, 10, 17, 12, 0, 0, TimeSpan.FromHours(-5))), reloj: NocheDelViernes);
+
+        await vm.CargarEstadisticasAsync();
+
+        vm.MapaCalor!.TotalEpisodios.Should().Be(0);
+        vm.ActividadSemana.Sum(b => b.Valor).Should().Be(0);
+        vm.PromedioDiarioTexto.Should().Be($"{0.0:F1}");
+        vm.RachaMaxima.Should().Be(string.Format(LocalizationService.T("Stats_DiasFormato"), 0));
+        vm.MapaCalorResumen.Should().Be(LocalizationService.T("Stats_ConstanciaVacia"));
+    }
+
+    [Fact]
+    public async Task AlRecargarConLosMismosDatos_SeConservaElMismoMapa()
+    {
+        // Un mapa nuevo hace que la vista rehaga sus ~430 elementos aunque nada haya cambiado.
+        var (vm, _) = CrearVm(UnAnime, Vistos(new DateTimeOffset(2026, 10, 15, 20, 0, 0, TimeSpan.FromHours(-5))), reloj: NocheDelViernes);
+        await vm.CargarEstadisticasAsync();
+        var primero = vm.MapaCalor;
+
+        await vm.CargarEstadisticasAsync();
+
+        vm.MapaCalor.Should().BeSameAs(primero);
+    }
+
+    [Fact]
+    public async Task SinReproduccionesEnElAnio_ElMapaQuedaVacioConSuAviso()
+    {
+        var registros = new List<RegistroEpisodio> { new() { AniListId = 1, NumeroEpisodio = 1, VistoLocal = true } }; // marcado a mano: sin fecha
+        var (vm, _) = CrearVm(UnAnime, registros);
+
+        await vm.CargarEstadisticasAsync();
+
+        vm.MapaCalor!.TotalEpisodios.Should().Be(0);
+        vm.MapaCalorResumen.Should().Be(LocalizationService.T("Stats_ConstanciaVacia"));
     }
 }

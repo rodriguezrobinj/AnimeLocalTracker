@@ -76,6 +76,17 @@ public partial class EstadisticasViewModel : ObservableObject, IAlEntrarEnPestan
     [ObservableProperty] private List<BarraDato> _actividadSemana = new();
     [ObservableProperty] private string _promedioDiarioTexto = "0";
 
+    /// <summary>Reloj y zona horaria de "hoy" y del día local de cada reproducción (se fija en las pruebas).</summary>
+    internal TimeProvider Reloj { get; init; } = TimeProvider.System;
+
+    /// <summary>Fecha de la base (UTC con Kind=Unspecified, persistence.md #4) en la zona horaria del <see cref="Reloj"/>.</summary>
+    private DateTime ALocal(DateTime fecha) => TimeZoneInfo.ConvertTime(
+        fecha.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(fecha, DateTimeKind.Utc) : fecha, Reloj.LocalTimeZone);
+
+    // === CONSTANCIA: mapa de calor de las últimas 53 semanas ===
+    [ObservableProperty] private MapaCalor? _mapaCalor;
+    [ObservableProperty] private string _mapaCalorResumen = "";
+
     // === ESTADO DE LA LISTA ===
     [ObservableProperty] private List<BarraDato> _listaPorEstado = new();
 
@@ -275,7 +286,16 @@ public partial class EstadisticasViewModel : ObservableObject, IAlEntrarEnPestan
         var registrosPorAnime = registros.ToLookup(r => r.AniListId);
 
         var vistos = registros.Where(r => r.VistoLocal).ToList();
-        var porDia = vistos.ToLookup(r => r.UltimaReproduccion?.Date);
+        var hoy = Reloj.GetLocalNow().Date;
+        // Día LOCAL de cada episodio visto con fecha (persistence.md #4: la base guarda UTC). Antes se agrupaba por la fecha
+        // UTC: lo visto a las 21:00 en Colombia contaba para el día siguiente. Una fecha posterior a hoy solo puede venir de
+        // un reloj adelantado: no cuenta. Lo usan el mapa, la actividad, las rachas y los años, que así cuadran entre sí.
+        var diasVistos = vistos
+            .Where(r => r.UltimaReproduccion.HasValue)
+            .Select(r => ALocal(r.UltimaReproduccion!.Value).Date)
+            .Where(d => d <= hoy)
+            .ToList();
+        var porDia = diasVistos.ToLookup(d => d);
 
         // === RESUMEN ===
         TotalAnimes = animes.Count;
@@ -307,17 +327,31 @@ public partial class EstadisticasViewModel : ObservableObject, IAlEntrarEnPestan
         int maxDia = 1;
         for (int i = 6; i >= 0; i--)
         {
-            var dia = DateTime.Today.AddDays(-i);
+            var dia = hoy.AddDays(-i);
             int n = porDia[dia].Count();
-            actividad.Add((dia.ToString("ddd d"), n));
+            actividad.Add((dia.ToString("ddd d", LocalizationService.Cultura), n));
             maxDia = Math.Max(maxDia, n);
         }
         ActividadSemana = actividad
             .Select(a => new BarraDato(a.Etiqueta, a.Valor, (a.Valor / (double)maxDia) * 420.0))
             .ToList();
 
-        int semana = porDia.Where(g => g.Key.HasValue && g.Key.Value >= DateTime.Today.AddDays(-6)).Sum(g => g.Count());
+        int semana = porDia.Where(g => g.Key >= hoy.AddDays(-6)).Sum(g => g.Count());
         PromedioDiarioTexto = $"{semana / 7.0:F1}";
+
+        // === CONSTANCIA ===
+        var mapa = CalculadorMapaCalor.Calcular(diasVistos, hoy, LocalizationService.Cultura);
+        // Mismos días y textos (lo normal al volver a la pestaña): conservar el mapa evita que la vista rehaga sus ~430 elementos.
+        if (MapaCalor is null || !MapaCalor.Celdas.SequenceEqual(mapa.Celdas)) MapaCalor = mapa;
+        MapaCalorResumen = mapa.TotalEpisodios == 0
+            ? LocalizationService.T("Stats_ConstanciaVacia")
+            : string.Format(LocalizationService.T("Stats_ConstanciaSubFormato"),
+                mapa.TotalEpisodios == 1
+                    ? LocalizationService.T("Stats_ConstanciaEpisodioUno")
+                    : string.Format(LocalizationService.T("Stats_ConstanciaEpisodiosFormato"), mapa.TotalEpisodios),
+                mapa.DiasActivos == 1
+                    ? LocalizationService.T("Stats_ConstanciaDiaUno")
+                    : string.Format(LocalizationService.T("Stats_ConstanciaDiasFormato"), mapa.DiasActivos));
 
         // === ESTADO DE LA LISTA (EstadoUsuario) ===
         var porEstado = animes
@@ -349,9 +383,8 @@ public partial class EstadisticasViewModel : ObservableObject, IAlEntrarEnPestan
         ActualizarTop(animes, vistos, franquicias);
 
         // === POR AÑO ===
-        var porAnio = vistos
-            .Where(r => r.UltimaReproduccion.HasValue)
-            .GroupBy(r => r.UltimaReproduccion!.Value.Year)
+        var porAnio = diasVistos
+            .GroupBy(d => d.Year)
             .OrderByDescending(g => g.Key)
             .Take(6)
             .ToList();
@@ -402,9 +435,8 @@ public partial class EstadisticasViewModel : ObservableObject, IAlEntrarEnPestan
         }
 
         // Mejor año
-        var mejorAnio = vistos
-            .Where(r => r.UltimaReproduccion.HasValue)
-            .GroupBy(r => r.UltimaReproduccion!.Value.Year)
+        var mejorAnio = diasVistos
+            .GroupBy(d => d.Year)
             .OrderByDescending(g => g.Count())
             .FirstOrDefault();
         if (mejorAnio != null)
@@ -416,16 +448,14 @@ public partial class EstadisticasViewModel : ObservableObject, IAlEntrarEnPestan
         // Horas por mes (desde el primer registro)
         var primerRegistro = registros
             .Where(r => r.UltimaReproduccion.HasValue)
-            .Select(r => r.UltimaReproduccion!.Value)
-            .DefaultIfEmpty(DateTime.Today)
+            .Select(r => ALocal(r.UltimaReproduccion!.Value))
+            .DefaultIfEmpty(hoy)
             .Min();
-        int meses = Math.Max(1, ((DateTime.Today.Year - primerRegistro.Year) * 12) + DateTime.Today.Month - primerRegistro.Month + 1);
+        int meses = Math.Max(1, ((hoy.Year - primerRegistro.Year) * 12) + hoy.Month - primerRegistro.Month + 1);
         HorasPorMes = $"{horas / meses:F1} h";
 
         // Rachas (días consecutivos con al menos 1 episodio visto)
-        var diasConActividad = vistos
-            .Where(r => r.UltimaReproduccion.HasValue)
-            .Select(r => r.UltimaReproduccion!.Value.Date)
+        var diasConActividad = diasVistos
             .Distinct()
             .OrderBy(d => d)
             .ToList();
@@ -443,7 +473,7 @@ public partial class EstadisticasViewModel : ObservableObject, IAlEntrarEnPestan
             rachaMax = Math.Max(rachaMax, consecutivos);
 
             // Racha actual: hacia atrás desde hoy (o ayer si hoy no hay actividad)
-            var fin = diasConActividad.Contains(DateTime.Today) ? DateTime.Today : DateTime.Today.AddDays(-1);
+            var fin = diasConActividad.Contains(hoy) ? hoy : hoy.AddDays(-1);
             rachaActual = 0;
             var cursor = fin;
             while (diasConActividad.Contains(cursor))

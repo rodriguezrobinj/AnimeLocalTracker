@@ -24,6 +24,34 @@
             <GradientStop Color="#FBBF24" Offset="0"/>
             <GradientStop Color="#F59E0B" Offset="1"/>
         </LinearGradientBrush>
+        <!-- Celda del mapa de constancia. El nivel llega por Tag (Nivel de DiaCalor en la cuadrícula, número fijo en la
+             leyenda); el DataTrigger compara también un Tag numérico con el texto del Value. -->
+        <Style x:Key="CeldaMapa" TargetType="Border">
+            <Setter Property="Width" Value="11"/>
+            <Setter Property="Height" Value="11"/>
+            <Setter Property="Margin" Value="1.5"/>
+            <Setter Property="CornerRadius" Value="2"/>
+            <Setter Property="Background" Value="{StaticResource Brush.Success}"/>
+            <Setter Property="ToolTipService.InitialShowDelay" Value="150"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}" Value="-1">
+                    <Setter Property="Background" Value="Transparent"/>
+                    <Setter Property="ToolTipService.IsEnabled" Value="False"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}" Value="0">
+                    <Setter Property="Background" Value="{StaticResource Brush.SurfaceChip}"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}" Value="1">
+                    <Setter Property="Opacity" Value="0.30"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}" Value="2">
+                    <Setter Property="Opacity" Value="0.55"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}" Value="3">
+                    <Setter Property="Opacity" Value="0.80"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
     </UserControl.Resources>
 
     <Grid ClipToBounds="True" MaxWidth="1280">
@@ -232,6 +260,83 @@
                         </Grid>
                     </Border>
                 </Grid>
+
+                <!-- ══ FILA 2B: CONSTANCIA (mapa de calor de las últimas 53 semanas) ══ -->
+                <Border Background="{StaticResource Brush.Surface1}" BorderBrush="{StaticResource Brush.Border}" BorderThickness="1"
+                        CornerRadius="14" Padding="22,18" Margin="0,0,0,16">
+                    <StackPanel>
+                        <Grid Margin="0,0,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="{loc:T Stats_Constancia}" FontSize="14" FontWeight="Bold" Foreground="{StaticResource Brush.TextPrimary}" Margin="0,0,0,4"/>
+                                <TextBlock Text="{Binding MapaCalorResumen}" FontSize="11" Foreground="{StaticResource Brush.TextSecondary}"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
+                                <TextBlock Text="{loc:T Stats_Menos}" FontSize="10" Foreground="{StaticResource Brush.TextTertiary}" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                <Border Style="{StaticResource CeldaMapa}" Tag="0"/>
+                                <Border Style="{StaticResource CeldaMapa}" Tag="1"/>
+                                <Border Style="{StaticResource CeldaMapa}" Tag="2"/>
+                                <Border Style="{StaticResource CeldaMapa}" Tag="3"/>
+                                <Border Style="{StaticResource CeldaMapa}" Tag="4"/>
+                                <TextBlock Text="{loc:T Stats_Mas}" FontSize="10" Foreground="{StaticResource Brush.TextTertiary}" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- Todo escala junto para ocupar el ancho de la tarjeta (y encogerse con la ventana mínima). No es una lista
+                             desplazable: 371 celdas fijas, sin virtualización (ui-wpf-vistas.md #2 no aplica). -->
+                        <Viewbox Stretch="Uniform" StretchDirection="Both">
+                            <!-- Margen derecho: la etiqueta de mes de la última columna puede ser más ancha que la columna ("sept"); así el
+                                 Viewbox la cuenta al escalar y no se pinta sobre el relleno de la tarjeta. -->
+                            <Grid x:Name="CuadriculaMapaCalor" Margin="0,0,8,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="14"/><RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <ItemsControl Grid.Row="1" ItemsSource="{Binding MapaCalor.Dias}" Margin="0,0,6,0" Focusable="False">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate><UniformGrid Rows="7" Columns="1"/></ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding}" FontSize="8" Height="14" Foreground="{StaticResource Brush.TextTertiary}"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <!-- Un Canvas por columna: el nombre del mes se sale de su columna de 14 px sin recortarse. -->
+                                <ItemsControl x:Name="MesesMapaCalor" Grid.Column="1" ItemsSource="{Binding MapaCalor.Meses}" Focusable="False">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate><UniformGrid Rows="1" Columns="53"/></ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Canvas Height="14">
+                                                <TextBlock Text="{Binding}" FontSize="8" Foreground="{StaticResource Brush.TextTertiary}"/>
+                                            </Canvas>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <ItemsControl x:Name="CeldasMapaCalor" Grid.Row="1" Grid.Column="1" ItemsSource="{Binding MapaCalor.Celdas}" Focusable="False">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate><UniformGrid Rows="7" Columns="53"/></ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <!-- El nombre accesible sale del dato (DiaCalor.ToString), no de este Border. -->
+                                            <Border Style="{StaticResource CeldaMapa}" Tag="{Binding Nivel}" ToolTip="{Binding Texto}"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </Grid>
+                        </Viewbox>
+                    </StackPanel>
+                </Border>
 
                 <!-- ══ FILA 3: DONUTS (ESTADO | GÉNEROS) ══ -->
                 <Grid Margin="0,0,0,16">
