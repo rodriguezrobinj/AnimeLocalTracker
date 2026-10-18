@@ -47,12 +47,15 @@ public static partial class FirmaTitulo
         public bool ConflictoTemporada(double umbral = 0.8) => SinImportarTemporada >= umbral && MismaTemporada < umbral;
     }
 
-    /// <summary>Minúsculas, sin tildes, solo letras/dígitos separados por un espacio.</summary>
+    /// <summary>
+    /// Minúsculas, sin tildes, solo letras/dígitos separados por un espacio. FormKD (y no FormD) convierte además los caracteres de
+    /// ancho completo de los títulos japoneses ("第２期", "Ｉｓｅｋａｉ") en sus equivalentes ASCII: \d los acepta y int.Parse lanzaba.
+    /// </summary>
     public static string Normalizar(string? texto)
     {
         if (string.IsNullOrWhiteSpace(texto)) return "";
         var sinTildes = new StringBuilder(texto.Length);
-        foreach (char c in texto.Normalize(NormalizationForm.FormD))
+        foreach (char c in texto.Normalize(NormalizationForm.FormKD))
         {
             if (CharUnicodeInfo.GetUnicodeCategory(c) == UnicodeCategory.NonSpacingMark) continue;
             sinTildes.Append(char.IsLetterOrDigit(c) ? char.ToLowerInvariant(c) : ' ');

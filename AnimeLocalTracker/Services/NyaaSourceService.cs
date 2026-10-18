@@ -110,7 +110,8 @@ public static partial class NyaaRssParser
     /// <summary>Analiza el título de un release de Nyaa (nunca lanza).</summary>
     public static ReleaseNyaa AnalizarRelease(string titulo)
     {
-        string t = ExtensionRegex().Replace(titulo ?? "", "").Trim();
+        // FormKC: dígitos y letras de ancho completo ("０３") a ASCII; \d los acepta e int.Parse lanzaba con ellos.
+        string t = ExtensionRegex().Replace((titulo ?? "").Normalize(System.Text.NormalizationForm.FormKC), "").Trim();
 
         string? grupo = null;
         Match etiqueta;

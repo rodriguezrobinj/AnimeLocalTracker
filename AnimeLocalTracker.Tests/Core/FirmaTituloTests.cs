@@ -79,4 +79,15 @@ public class FirmaTituloTests
     {
         FirmaTitulo.EsAlfabetoBuscable(titulo, incluirJapones).Should().Be(esperado);
     }
+
+    // Títulos japoneses con dígitos de ancho completo ("第２期"): \d los acepta e int.Parse lanzaba (salió al soltar un torrent
+    // con "佐々木とピーちゃん 第２期" en la biblioteca).
+    [Fact]
+    public void DigitosDeAnchoCompleto_SeLeenComoNumerosNormales()
+    {
+        var lectura = FirmaTitulo.Interpretar("佐々木とピーちゃん 第２期");
+
+        lectura.Should().ContainSingle().Which.Temporada.Should().Be(2);
+        FirmaTitulo.Normalizar("Ｉｓｅｋａｉ　Ｎｏｎｂｉｒｉ　Ｎｏｕｋａ ２").Should().Be("isekai nonbiri nouka 2");
+    }
 }

@@ -278,4 +278,12 @@ public class NyaaRssParserTests
         elegido.Should().NotBeNull();
         elegido!.Value.Seeders.Should().BeGreaterThan(1); // el de 1 semilla ("[LowSeed]") queda fuera
     }
+
+    [Fact]
+    public void AnalizarRelease_ConDigitosDeAnchoCompleto_NoLanzaYLeeElEpisodio()
+    {
+        var release = NyaaRssParser.AnalizarRelease("[Grupo] Isekai Nonbiri Nouka ２ - ０３ [1080p]");
+
+        release.Episodio.Should().Be(3);
+    }
 }
