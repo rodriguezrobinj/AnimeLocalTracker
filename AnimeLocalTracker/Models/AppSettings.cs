@@ -189,7 +189,9 @@ public class AppSettings
         ["AnteriorEpisodio"] = "B",
         ["ModoMini"] = "P",
         ["Cerrar"] = "Escape",
-        ["CapturarFrame"] = "C"
+        ["CapturarFrame"] = "C",
+        ["MarcarInicioClip"] = "I",
+        ["MarcarFinClip"] = "O"
     };
 
     /// <summary>Devuelve la tecla configurada para una acción (con fallback al valor por defecto).</summary>

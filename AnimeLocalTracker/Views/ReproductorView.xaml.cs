@@ -868,6 +868,10 @@ namespace AnimeLocalTracker.Views
             }
             else if (k == vm.ObtenerTeclaPara("CapturarFrame"))
                 vm.CapturarFrameCommand.Execute(null);
+            else if (k == vm.ObtenerTeclaPara("MarcarInicioClip"))
+                vm.MarcarInicioClipCommand.Execute(null);
+            else if (k == vm.ObtenerTeclaPara("MarcarFinClip"))
+                vm.MarcarFinClipCommand.Execute(null);
             else if (k == vm.ObtenerTeclaPara("ModoMini"))
                 vm.AlternarModoMiniCommand.Execute(null);
             else if (k == vm.ObtenerTeclaPara("Cerrar"))

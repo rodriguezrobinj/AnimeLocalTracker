@@ -355,10 +355,12 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         IFotogramasClaveService? fotogramasClaveService = null,
         ILimpiadorDeEpisodios? limpiadorDeEpisodios = null,
         Func<AjustesInicialesMotor, IMotorVideo?>? fabricaMotor = null,
-        IDiscordPresenceService? discordPresence = null)
+        IDiscordPresenceService? discordPresence = null,
+        Services.Clips.IClipService? clipService = null)
     {
         _fabricaMotor = fabricaMotor ?? (EsEntornoPruebas() ? null : CrearMotor);
         _discord = discordPresence;
+        _clipService = clipService;
         _databaseService = databaseService;
         _limpiadorDeEpisodios = limpiadorDeEpisodios;
         _settingsService = settingsService;
@@ -1423,6 +1425,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         _rutaVideo = rutaVideo;
         _animeId = animeId;
         _episodio = episodio;
+        ReiniciarClip(); // las marcas eran del episodio anterior
         OnPropertyChanged(nameof(Episodio));
         _rutaPortada = rutaPortada;
         TituloAnime = tituloAnime;
@@ -1759,6 +1762,8 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             "ModoMini" => "P",
             "Cerrar" => "Escape",
             "CapturarFrame" => "C",
+            "MarcarInicioClip" => "I",
+            "MarcarFinClip" => "O",
             _ => string.Empty
         };
         // Sin configuración cargada también valen las teclas de siempre (antes quedaban todas sin asignar).

@@ -414,6 +414,33 @@
                             </StackPanel>
                         </Button>
 
+                        <!-- Clip: tramo marcado con I/O y los botones para crearlo (ReproductorViewModel.Clips). -->
+                        <Border Grid.Row="0" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="0,0,0,14"
+                                Visibility="{Binding MostrarPanelClip, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                Background="{StaticResource Brush.SurfaceDialog}" BorderBrush="{StaticResource Brush.BorderControl}" BorderThickness="1"
+                                CornerRadius="8" Padding="12,4,4,4">
+                            <StackPanel Orientation="Horizontal">
+                                <materialDesign:PackIcon Kind="ContentCut" Width="18" Height="18" VerticalAlignment="Center"
+                                                         Foreground="{StaticResource Brush.Accent}" Margin="0,0,8,0"/>
+                                <TextBlock Text="{Binding TextoRangoClip}" Foreground="{StaticResource Brush.TextPrimary}" FontSize="13"
+                                           FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <Button Content="MP4" Command="{Binding CrearClipMp4Command}" Style="{StaticResource MaterialDesignFlatButton}"
+                                        Foreground="{StaticResource Brush.Accent}" Padding="10,0" Height="30" Cursor="Hand"
+                                        Visibility="{Binding Mp4Disponible, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                        ToolTip="{loc:T Player_ClipMp4Tooltip}" AutomationProperties.Name="{loc:T Player_ClipMp4Tooltip}"/>
+                                <Button Content="GIF" Command="{Binding CrearClipGifCommand}" Style="{StaticResource MaterialDesignFlatButton}"
+                                        Foreground="{StaticResource Brush.Accent}" Padding="10,0" Height="30" Cursor="Hand"
+                                        Visibility="{Binding Mp4Disponible, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                        IsEnabled="{Binding GifDisponible}" ToolTipService.ShowOnDisabled="True"
+                                        ToolTip="{loc:T Player_ClipGifTooltip}" AutomationProperties.Name="{loc:T Player_ClipGifTooltip}"/>
+                                <Button Command="{Binding DescartarClipCommand}" Style="{StaticResource MaterialDesignToolButton}"
+                                        Width="30" Height="30" Padding="0" Cursor="Hand" Foreground="{StaticResource Brush.TextSecondary}"
+                                        ToolTip="{loc:T Player_ClipDescartar}" AutomationProperties.Name="{loc:T Player_ClipDescartar}">
+                                    <materialDesign:PackIcon Kind="Close" Width="16" Height="16"/>
+                                </Button>
+                            </StackPanel>
+                        </Border>
+
                         <!-- Barra de progreso interactiva con Bolita Scrubber -->
                         <Grid Grid.Row="1" Margin="0,0,0,15">
                             <Grid x:Name="ProgressBarArea" Cursor="Hand" Background="Transparent"

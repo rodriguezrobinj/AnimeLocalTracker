@@ -283,6 +283,9 @@ public partial class App : Application
         // Estado "Viendo" en el perfil de Discord mientras se reproduce un episodio (apagado por defecto).
         services.AddSingleton<AnimeLocalTracker.Services.Discord.IDiscordPresenceService, AnimeLocalTracker.Services.Discord.DiscordPresenceService>();
 
+        // Clips MP4/GIF de un tramo del episodio (ffmpeg embebido), desde el reproductor.
+        services.AddSingleton<AnimeLocalTracker.Services.Clips.IClipService, AnimeLocalTracker.Services.Clips.ClipService>();
+
         services.AddSingleton<IVideoIntegrityService, VideoIntegrityService>();
 
         // Logros por niveles: evaluación, persistencia de desbloqueos y avisos
