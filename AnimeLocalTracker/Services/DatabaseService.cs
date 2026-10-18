@@ -138,10 +138,14 @@ public class DatabaseService : IDatabaseService, IDisposable
         // MAL conectado envía la biblioteca sin bajar nada de lo que MAL ya tenga.
         (25, "lo último enviado a MyAnimeList por anime (sincronización app → MAL)", CrearTablaSincronizacionMalAsync),
         // v26: tabla nueva (clave = "anime_episodio"; se lee siempre por clave, sin índice). Empieza vacía.
-        (26, "desfase de subtítulos y audio por capítulo (teclas Z/X y J/K del reproductor)", CrearTablaDesfaseEpisodioAsync)
+        (26, "desfase de subtítulos y audio por capítulo (teclas Z/X y J/K del reproductor)", CrearTablaDesfaseEpisodioAsync),
+        // v27: tabla nueva (clave = AniListId; se lee entera, sin índice). Empieza vacía: se llena al abrir el orden de visionado.
+        (27, "datos de AniList de las partes de una saga (orden de visionado de la ficha)", CrearTablaRelacionadoInfoAsync)
     };
 
     private static Task CrearTablaDesfaseEpisodioAsync(SQLiteAsyncConnection conexion) => conexion.CreateTableAsync<DesfaseEpisodio>();
+
+    private static Task CrearTablaRelacionadoInfoAsync(SQLiteAsyncConnection conexion) => conexion.CreateTableAsync<AnimeRelacionadoInfo>();
 
     private static Task CrearTablaSincronizacionMalAsync(SQLiteAsyncConnection conexion) => conexion.CreateTableAsync<SincronizacionMal>();
 
@@ -1258,6 +1262,7 @@ public class DatabaseService : IDatabaseService, IDisposable
             db.Execute("DELETE FROM PreferenciaEmision;");
             db.Execute("DELETE FROM AjusteAudio;");
             db.Execute("DELETE FROM DesfaseEpisodio;");
+            db.Execute("DELETE FROM AnimeRelacionadoInfo;");
             db.Execute("DELETE FROM DatosExtraAnime;");
             db.Execute("DELETE FROM PartidaMinijuego;");
             db.Execute("DELETE FROM PersonajeAnime;");
@@ -1294,6 +1299,21 @@ public class DatabaseService : IDatabaseService, IDisposable
     public async Task<List<RelacionAnimeSync>> ObtenerRelacionesSincronizadasAsync()
     {
         return await _lectura.Table<RelacionAnimeSync>().ToListAsync();
+    }
+
+    public async Task<List<AnimeRelacionadoInfo>> ObtenerRelacionadosInfoAsync()
+    {
+        return await _lectura.Table<AnimeRelacionadoInfo>().ToListAsync();
+    }
+
+    public async Task GuardarRelacionadosInfoAsync(IEnumerable<AnimeRelacionadoInfo> infos)
+    {
+        var lista = infos?.Where(i => i.AniListId > 0).ToList() ?? new List<AnimeRelacionadoInfo>();
+        if (lista.Count == 0) return;
+        await EscribirAsync(db =>
+        {
+            foreach (var info in lista) db.InsertOrReplace(info);
+        });
     }
 
     public async Task GuardarRelacionesAnimeAsync(IReadOnlyDictionary<int, List<RelacionAnime>> relacionesPorAnime)

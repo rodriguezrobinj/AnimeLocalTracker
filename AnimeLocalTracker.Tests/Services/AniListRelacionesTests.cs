@@ -124,4 +124,19 @@ public class AniListRelacionesTests
 
         (await _sut.ObtenerRelacionesLoteAsync(new[] { 1 })).Should().BeEmpty();
     }
+
+    [Fact]
+    public async Task ConsultaPorLotes_PideElFormato_YLoDevuelve()
+    {
+        Responder(HttpStatusCode.OK, @"{ ""data"": { ""Page"": { ""media"": [
+            { ""id"": 21, ""title"": { ""romaji"": ""Mugen Ressha-hen"" }, ""format"": ""MOVIE"",
+              ""startDate"": { ""year"": 2020, ""month"": 10, ""day"": 16 }, ""coverImage"": { ""extraLarge"": ""https://img/21.jpg"" } }
+        ] } } }");
+
+        var resultado = await _sut.ObtenerAnimesPorIdsLoteAsync(new[] { 21 });
+
+        _peticiones.Should().ContainSingle().Which.Should().Contain("format");
+        resultado[21].Format.Should().Be("MOVIE");
+        resultado[21].StartDate!.Month.Should().Be(10);
+    }
 }

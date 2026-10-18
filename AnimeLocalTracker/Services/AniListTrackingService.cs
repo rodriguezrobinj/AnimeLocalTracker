@@ -356,6 +356,7 @@ public class AniListTrackingService : IAnimeTrackingService
                             description(asHtml: false)
                             genres
                             episodes
+                            format
                             status
                             startDate { year month day }
                             season

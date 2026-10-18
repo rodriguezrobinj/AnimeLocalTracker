@@ -186,6 +186,8 @@ public Task ActualizarAnimesAsync(IEnumerable<AnimeItem> animes) => Task.Complet
         public Task GuardarAjusteAudioAsync(AjusteAudio ajuste) => Task.CompletedTask;
         public Task<DesfaseEpisodio?> ObtenerDesfaseEpisodioAsync(int aniListId, int numeroEpisodio) => Task.FromResult<DesfaseEpisodio?>(null);
         public Task GuardarDesfaseEpisodioAsync(int aniListId, int numeroEpisodio, int subtitulosMs, int audioMs) => Task.CompletedTask;
+        public Task<List<AnimeRelacionadoInfo>> ObtenerRelacionadosInfoAsync() => Task.FromResult(new List<AnimeRelacionadoInfo>());
+        public Task GuardarRelacionadosInfoAsync(IEnumerable<AnimeRelacionadoInfo> infos) => Task.CompletedTask;
     }
 
     private class DummyTrackingService : IAnimeTrackingService

@@ -306,6 +306,7 @@ public partial class App : Application
 
         // Franquicias (temporadas, películas, spin-offs) para el top de Estadísticas por tiempo visto
         services.AddSingleton<AnimeLocalTracker.Services.Franquicias.IFranquiciaService, AnimeLocalTracker.Services.Franquicias.FranquiciaService>();
+        services.AddSingleton<AnimeLocalTracker.Services.Franquicias.IOrdenVisionadoService, AnimeLocalTracker.Services.Franquicias.OrdenVisionadoService>();
 
         // Orquestación de skip-times (resolución MAL ID + reglas de evaluación)
         // Audio oficial de los OP/ED (AnimeThemes) para ubicarlos dentro de los episodios sin pasos manuales, y su caché en disco

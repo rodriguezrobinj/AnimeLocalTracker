@@ -45,6 +45,7 @@ public partial class DetalleView : UserControl
                 _vmObservado.PropertyChanged += Ficha_PropertyChanged;
                 ObservarMusica(_vmObservado.Musica);
                 _vmObservado.Seguimiento.PropertyChanged += Seguimiento_PropertyChanged;
+                _vmObservado.OrdenVisionado.PropertyChanged += OrdenVisionado_PropertyChanged;
             }
             ObservarEpisodios(_vmObservado?.Episodios);
 
@@ -75,6 +76,8 @@ public partial class DetalleView : UserControl
         // La música de la ficha no debe seguir sonando en otras pestañas (salvo que el usuario lo haya pedido: entonces
         // la propia música sabe que se quedó de fondo y no se corta).
         _ultimoVm?.Musica.AlOcultarLaFicha();
+        // La ventana del orden de visionado no debe seguir abierta al volver a la ficha desde otra pestaña.
+        if (_ultimoVm?.OrdenVisionado.MostrandoOrdenVisionado == true) _ultimoVm.OrdenVisionado.CerrarCommand.Execute(null);
         CerrarMenus();
     }
 
@@ -120,6 +123,7 @@ public partial class DetalleView : UserControl
 
         _vmObservado.PropertyChanged -= Ficha_PropertyChanged;
         _vmObservado.Seguimiento.PropertyChanged -= Seguimiento_PropertyChanged;
+        _vmObservado.OrdenVisionado.PropertyChanged -= OrdenVisionado_PropertyChanged;
     }
 
     // === Lista de episodios: la vista es una para todas las fichas y su lista también. Cada ficha trae su propia colección;
@@ -198,6 +202,11 @@ public partial class DetalleView : UserControl
         if (e.PropertyName == nameof(MusicaFichaViewModel.MostrandoPanelMusica)) Core.HiloUi.Ejecutar(MostrarVentanasSiCorresponde);
     }
 
+    private void OrdenVisionado_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(OrdenVisionadoFichaViewModel.MostrandoOrdenVisionado)) Core.HiloUi.Ejecutar(MostrarVentanasSiCorresponde);
+    }
+
     private void Seguimiento_PropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(SeguimientoEditorViewModel.MostrandoEditorSeguimiento)) Core.HiloUi.Ejecutar(MostrarVentanasSiCorresponde);
@@ -212,6 +221,10 @@ public partial class DetalleView : UserControl
         var seguimiento = _vmObservado?.Seguimiento;
         if (AnfitrionSeguimiento.Content is EditorSeguimientoView editor) editor.DataContext = seguimiento;
         else if (seguimiento?.MostrandoEditorSeguimiento == true) AnfitrionSeguimiento.Content = new EditorSeguimientoView { DataContext = seguimiento };
+
+        var orden = _vmObservado?.OrdenVisionado;
+        if (AnfitrionOrdenVisionado.Content is OrdenVisionadoView ventanaOrden) ventanaOrden.DataContext = orden;
+        else if (orden?.MostrandoOrdenVisionado == true) AnfitrionOrdenVisionado.Content = new OrdenVisionadoView { DataContext = orden };
     }
 
     // === Lista de episodios: doble clic o Enter reproducen; "Ir al ep." lleva la lista hasta ese episodio ===

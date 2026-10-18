@@ -142,4 +142,8 @@ public interface IDatabaseService
 
     /// <summary>Reemplaza las aristas de cada anime consultado y lo marca como sincronizado (aunque no tenga ninguna).</summary>
     Task GuardarRelacionesAnimeAsync(IReadOnlyDictionary<int, List<RelacionAnime>> relacionesPorAnime);
+    /// <summary>Datos de AniList guardados de las partes de sagas (orden de visionado de la ficha). La tabla entera.</summary>
+    Task<List<AnimeRelacionadoInfo>> ObtenerRelacionadosInfoAsync();
+    /// <summary>Guarda (o sustituye) los datos de esas partes.</summary>
+    Task GuardarRelacionadosInfoAsync(IEnumerable<AnimeRelacionadoInfo> infos);
 }

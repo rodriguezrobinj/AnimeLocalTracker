@@ -62,6 +62,7 @@ public partial class DetalleViewModel : ObservableObject,
         _ctsCargaFicha?.Cancel();
         _ctsCargaFicha?.Dispose();
         Episodios.Dispose();
+        OrdenVisionado.Dispose();
         // Con "seguir sonando fuera de la ficha" y un tema sonando, la música no se libera: se queda de fondo.
         if (_musicaDeFondo?.Conservar(Musica) != true) Musica.Dispose();
         GC.SuppressFinalize(this);
@@ -75,6 +76,9 @@ public partial class DetalleViewModel : ObservableObject,
 
     /// <summary>Openings y endings del anime: lista, descargas y reproducción (su ventana es <c>PanelMusicaView</c>).</summary>
     public MusicaFichaViewModel Musica { get; private set; }
+
+    /// <summary>Ventana "Orden de visionado" de la saga (su vista es <c>OrdenVisionadoView</c>).</summary>
+    public OrdenVisionadoFichaViewModel OrdenVisionado { get; }
 
     private readonly IMusicaDeFondoService? _musicaDeFondo;
 
@@ -136,7 +140,8 @@ public partial class DetalleViewModel : ObservableObject,
         IEnlacesMusicaService? enlacesMusica = null,
         IEstadoConexionService? estadoConexion = null,
         IMusicaDeFondoService? musicaDeFondo = null,
-        Services.Recomendaciones.IParecidosService? parecidos = null)
+        Services.Recomendaciones.IParecidosService? parecidos = null,
+        Services.Franquicias.IOrdenVisionadoService? ordenVisionado = null)
     {
         _musicaDeFondo = musicaDeFondo;
         _parecidos = parecidos;
@@ -153,6 +158,7 @@ public partial class DetalleViewModel : ObservableObject,
             () => Episodios.Todos.Count > 0 ? Episodios.Todos.Count : Episodios.EpisodiosDelAnime.Count);
         Musica = new MusicaFichaViewModel(dialogService, animeThemesService, animeThemesDownload, audioTrackPlayer, audioDuration,
             enlacesMusica, settingsService, Episodios.EpisodioMasAltoVisto, estadoConexion, musicaDeFondo);
+        OrdenVisionado = new OrdenVisionadoFichaViewModel(ordenVisionado, dialogService);
 
         // Lo que la lista de episodios no sabe hacer por sí misma: el espacio en disco es de la cabecera, y la música no debe
         // sonar bajo el video.
@@ -177,6 +183,7 @@ public partial class DetalleViewModel : ObservableObject,
         EstaConectado = _authService.EstaAutenticado();
         AnimeSeleccionado = anime;
         EsFavoritoAnime = anime.EsFavorito;
+        OrdenVisionado.Preparar(anime.AniListId);
         // Manda la base de datos, no la copia con la que llega el anime (la Galería pudo leerlo antes de activar la protección).
         anime.ConservarVideos = await _databaseService.ObtenerConservarVideosAsync(anime.AniListId);
         ConservarVideosAnime = anime.ConservarVideos;
@@ -206,6 +213,7 @@ public partial class DetalleViewModel : ObservableObject,
         _ = CargarDatosExtraAsync(ctFicha);
         _ = CargarPreferenciasEmisionAsync(ctFicha);
         CargaParecidos = CargarParecidosAsync(anime, ctFicha);
+        _ = OrdenVisionado.ComprobarDisponibleAsync(ctFicha);
         if (!musicaRecuperada)
         {
             Musica.CargarEnlacesMusica(anime);

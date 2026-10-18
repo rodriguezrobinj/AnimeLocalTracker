@@ -1,0 +1,165 @@
+<UserControl x:Class="AnimeLocalTracker.Views.OrdenVisionadoView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+             xmlns:loc="clr-namespace:AnimeLocalTracker.Services"
+             xmlns:vm="clr-namespace:AnimeLocalTracker.ViewModels"
+             xmlns:sys="clr-namespace:System;assembly=System.Runtime"
+             TextElement.Foreground="{DynamicResource MaterialDesignBody}"
+             Visibility="{Binding MostrandoOrdenVisionado, Converter={StaticResource BoolToVis}}">
+    <!-- Ventana "Orden de visionado" de la ficha. DataContext: OrdenVisionadoFichaViewModel. Se dibuja encima, como la de música;
+         clic fuera de la tarjeta o Escape la cierran. -->
+    <Grid x:Name="FondoOrden" Background="{StaticResource Brush.Scrim}" MouseLeftButtonDown="FondoOrden_MouseLeftButtonDown">
+        <materialDesign:Card x:Name="OrdenCard" Width="640" MaxHeight="640" Margin="28" VerticalAlignment="Center" HorizontalAlignment="Center"
+                             UniformCornerRadius="16" Background="{StaticResource Brush.SurfaceDialog}" BorderBrush="{StaticResource Brush.BorderStrong}" BorderThickness="1"
+                             materialDesign:ElevationAssist.Elevation="Dp16" Padding="20,16" Focusable="True" FocusVisualStyle="{x:Null}">
+            <materialDesign:Card.InputBindings>
+                <KeyBinding Key="Escape" Command="{Binding CerrarCommand}"/>
+            </materialDesign:Card.InputBindings>
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- Cabecera -->
+                <Grid Grid.Row="0" Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="{loc:T Det_OrdenVisionado}" FontWeight="Bold" FontSize="14" Foreground="{StaticResource Brush.TextPrimary}"/>
+                        <TextBlock Text="{loc:T Det_OrdenSub}" FontSize="11" Foreground="{StaticResource Brush.TextTertiary}" Margin="0,2,0,0"/>
+                    </StackPanel>
+                    <Button Grid.Column="1" Command="{Binding CerrarCommand}" Style="{StaticResource MaterialDesignToolButton}" Width="28" Height="28"
+                            VerticalAlignment="Top" Cursor="Hand" ToolTip="{loc:T Det_OrdenCerrar}" AutomationProperties.Name="{loc:T Det_OrdenCerrar}">
+                        <materialDesign:PackIcon Kind="Close" Width="18" Height="18" Foreground="{StaticResource Brush.IconMuted}"/>
+                    </Button>
+                </Grid>
+
+                <!-- Aviso sin conexión -->
+                <Border Grid.Row="1" Visibility="{Binding SinConexion, Converter={StaticResource BoolToVis}}" Background="{StaticResource Brush.WarningTint}"
+                        CornerRadius="8" Padding="10,6" Margin="0,0,0,8">
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon Kind="WifiOff" Width="14" Height="14" Foreground="{StaticResource Brush.Warning}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <TextBlock Text="{loc:T Det_OrdenSinConexion}" FontSize="11" Foreground="{StaticResource Brush.WarningSoft}" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Cargando (solo mientras no hay nada que enseñar) -->
+                <ProgressBar Grid.Row="2" Style="{StaticResource MaterialDesignCircularProgressBar}" IsIndeterminate="True" Width="32" Height="32"
+                             HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,24"
+                             Visibility="{Binding MostrarCargando, Converter={StaticResource BoolToVis}}"/>
+
+                <!-- Estado vacío -->
+                <StackPanel Grid.Row="2" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,24"
+                            Visibility="{Binding MostrarVacio, Converter={StaticResource BoolToVis}}">
+                    <materialDesign:PackIcon Kind="FormatListNumbered" Width="36" Height="36" HorizontalAlignment="Center" Foreground="{StaticResource Brush.IconMuted}"/>
+                    <TextBlock Text="{loc:T Det_OrdenVacio}" Style="{StaticResource AppEmptyText}" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="360" Margin="0,8,0,0"/>
+                </StackPanel>
+
+                <!-- Lista -->
+                <ListBox x:Name="ListaOrden" Grid.Row="2" ItemsSource="{Binding Filas}"
+                         VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.ScrollUnit="Pixel"
+                         ScrollViewer.CanContentScroll="True" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         Background="Transparent" BorderThickness="0"
+                         Visibility="{Binding SinPartes, Converter={StaticResource InverseBoolToVis}}">
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="Focusable" Value="False"/>
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListBoxItem"><ContentPresenter/></ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                    <ListBox.Resources>
+                        <!-- Cabecera del grupo "Aparte" -->
+                        <DataTemplate DataType="{x:Type sys:String}">
+                            <TextBlock Text="{Binding}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource Brush.TextTertiary}" Margin="4,14,0,6"/>
+                        </DataTemplate>
+
+                        <!-- Una parte de la saga -->
+                        <DataTemplate DataType="{x:Type vm:FilaOrdenVisionado}">
+                            <Border x:Name="Fondo" CornerRadius="10" Padding="8,6" Margin="0,0,0,4" Background="Transparent" Cursor="Hand"
+                                    MouseLeftButtonUp="Fila_MouseLeftButtonUp">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="28"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{Binding NumeroTexto}" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource Brush.TextTertiary}" VerticalAlignment="Center"/>
+
+                                    <!-- Portada: el marcador va debajo (se ve si la imagen no carga) -->
+                                    <Grid Grid.Column="1" Width="36" Height="52" Margin="0,0,10,0">
+                                        <Border CornerRadius="6" Background="{StaticResource Brush.SurfaceChip}">
+                                            <materialDesign:PackIcon Kind="ImageOutline" Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{StaticResource Brush.IconMuted}"/>
+                                        </Border>
+                                        <Image Source="{Binding UrlPortada, TargetNullValue={x:Null}}" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality">
+                                            <Image.Clip><RectangleGeometry Rect="0,0,36,52" RadiusX="6" RadiusY="6"/></Image.Clip>
+                                        </Image>
+                                    </Grid>
+
+                                    <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Titulo}" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource Brush.TextPrimary}" TextTrimming="CharacterEllipsis"/>
+                                        <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                            <TextBlock Text="{Binding Subtitulo}" FontSize="11" Foreground="{StaticResource Brush.TextTertiary}" VerticalAlignment="Center"/>
+                                            <Border Visibility="{Binding EsActual, Converter={StaticResource BoolToVis}}" Background="{StaticResource Brush.AccentTint}" CornerRadius="6" Padding="6,1" Margin="8,0,0,0">
+                                                <TextBlock Text="{loc:T Det_OrdenEstasAqui}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource Brush.AccentSoft}"/>
+                                            </Border>
+                                            <Border Visibility="{Binding EsSiguiente, Converter={StaticResource BoolToVis}}" Background="{StaticResource Brush.SuccessTint}" CornerRadius="6" Padding="6,1" Margin="8,0,0,0">
+                                                <TextBlock Text="{loc:T Det_OrdenSiguiente}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource Brush.Success}"/>
+                                            </Border>
+                                        </StackPanel>
+                                    </StackPanel>
+
+                                    <!-- Estado, o el botón de añadir -->
+                                    <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,0,0">
+                                        <StackPanel Orientation="Horizontal" Visibility="{Binding PuedeAnadir, Converter={StaticResource InverseBoolToVis}}">
+                                            <materialDesign:PackIcon x:Name="IconoEstado" Kind="{Binding IconoEstado}" Width="15" Height="15" VerticalAlignment="Center" Margin="0,0,5,0" Foreground="{StaticResource Brush.TextSoft}"/>
+                                            <TextBlock Text="{Binding TextoEstado}" FontSize="11" VerticalAlignment="Center" Foreground="{StaticResource Brush.TextSoft}"/>
+                                        </StackPanel>
+                                        <Button Visibility="{Binding PuedeAnadir, Converter={StaticResource BoolToVis}}" Style="{StaticResource DetChipButton}"
+                                                Command="{Binding DataContext.AnadirCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}"
+                                                ToolTip="{loc:T Det_OrdenAnadir}" AutomationProperties.Name="{loc:T Det_OrdenAnadir}" Cursor="Hand">
+                                            <StackPanel Orientation="Horizontal">
+                                                <materialDesign:PackIcon Kind="PlusCircleOutline" Width="13" Height="13" Foreground="{StaticResource Brush.Accent}" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                                <TextBlock Text="{loc:T Det_OrdenAnadir}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource Brush.AccentSoft}" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                            <DataTemplate.Triggers>
+                                <DataTrigger Binding="{Binding EsExtra}" Value="True">
+                                    <Setter TargetName="Fondo" Property="Margin" Value="28,0,0,4"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding EsActual}" Value="True">
+                                    <Setter TargetName="Fondo" Property="Background" Value="{StaticResource Brush.SurfaceControl}"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding PuedeAbrir}" Value="False">
+                                    <Setter TargetName="Fondo" Property="Cursor" Value="Arrow"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Estado}" Value="Vista">
+                                    <Setter TargetName="IconoEstado" Property="Foreground" Value="{StaticResource Brush.Success}"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Estado}" Value="AMedias">
+                                    <Setter TargetName="IconoEstado" Property="Foreground" Value="{StaticResource Brush.Accent}"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Estado}" Value="Descargada">
+                                    <Setter TargetName="IconoEstado" Property="Foreground" Value="{StaticResource Brush.AccentSoft}"/>
+                                </DataTrigger>
+                            </DataTemplate.Triggers>
+                        </DataTemplate>
+                    </ListBox.Resources>
+                </ListBox>
+            </Grid>
+        </materialDesign:Card>
+    </Grid>
+</UserControl>

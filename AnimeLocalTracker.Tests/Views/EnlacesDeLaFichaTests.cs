@@ -64,6 +64,7 @@ public class EnlacesDeLaFichaTests
         RutasRotas(xaml, "{Binding Episodios", typeof(EpisodiosFichaViewModel)).Should().BeEmpty();
         RutasRotas(xaml, "{Binding Musica", typeof(MusicaFichaViewModel)).Should().BeEmpty();
         RutasRotas(xaml, "{Binding Seguimiento", typeof(SeguimientoEditorViewModel)).Should().BeEmpty();
+        RutasRotas(xaml, "{Binding OrdenVisionado", typeof(OrdenVisionadoFichaViewModel)).Should().BeEmpty();
         RutasRotas(xaml, "Path=\"Episodios", typeof(EpisodiosFichaViewModel)).Should().BeEmpty();
 
         // Desde las filas y los menús, que llegan a la ficha por el control o por el Tag de la fila.
@@ -81,7 +82,8 @@ public class EnlacesDeLaFichaTests
         Regex.Matches(xaml, @"PlacementTarget\.Tag\.Episodios\.\w+Command").Count.Should().BeGreaterThan(3);
         // La lista en sí la llena la vista por código (DetalleView.xaml.cs); el XAML enlaza a su recuento.
         xaml.Should().Contain("{Binding Episodios.EpisodiosDelAnime.Count}").And.Contain("{Binding Musica.ToggleMusicaCommand}")
-            .And.Contain("{Binding Seguimiento.AbrirEditorSeguimientoCommand}");
+            .And.Contain("{Binding Seguimiento.AbrirEditorSeguimientoCommand}")
+            .And.Contain("{Binding OrdenVisionado.AbrirCommand}");
     }
 
     [Fact]
@@ -89,6 +91,7 @@ public class EnlacesDeLaFichaTests
     {
         RutasRotas(LeerVista("PanelMusicaView.xaml"), "{Binding DataContext", typeof(MusicaFichaViewModel)).Should().BeEmpty();
         RutasRotas(LeerVista("EditorSeguimientoView.xaml"), "{Binding DataContext", typeof(SeguimientoEditorViewModel)).Should().BeEmpty();
+        RutasRotas(LeerVista("OrdenVisionadoView.xaml"), "{Binding DataContext", typeof(OrdenVisionadoFichaViewModel)).Should().BeEmpty();
     }
 
     [Theory]

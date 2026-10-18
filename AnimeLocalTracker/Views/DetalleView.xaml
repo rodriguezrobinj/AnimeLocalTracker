@@ -583,6 +583,16 @@
                             </StackPanel>
                         </Button>
 
+                        <!-- Orden de visionado de la saga (ventana encima; ver OrdenVisionadoView) -->
+                        <Button Command="{Binding OrdenVisionado.AbrirCommand}" Style="{StaticResource DetChipButton}" Margin="0,0,8,6" VerticalAlignment="Center"
+                                Visibility="{Binding OrdenVisionado.HayOrdenVisionado, Converter={StaticResource BoolToVis}}"
+                                ToolTip="{loc:T Det_OrdenVisionadoTip}" AutomationProperties.Name="{loc:T Det_OrdenVisionado}">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <materialDesign:PackIcon Kind="FormatListNumbered" Width="13" Height="13" Foreground="{StaticResource Brush.Accent}" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                <TextBlock Text="{loc:T Det_OrdenVisionado}" FontSize="11" Foreground="{StaticResource Brush.AccentSoft}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+
                         <!-- Chips de Géneros -->
                         <ItemsControl ItemsSource="{Binding AnimeSeleccionado.GenerosLista}" VerticalAlignment="Center">
                             <ItemsControl.ItemsPanel>
@@ -1230,6 +1240,9 @@
         <!-- PARTE 3b: VENTANA DE OPENINGS & ENDINGS. Vive en PanelMusicaView y se crea la primera vez que se abre (ver
              DetalleView.xaml.cs): la mayoría de las visitas a una ficha nunca la abren. -->
         <ContentControl x:Name="AnfitrionMusica" Panel.ZIndex="95" Focusable="False"/>
+
+        <!-- PARTE 3c: VENTANA DE ORDEN DE VISIONADO. Vive en OrdenVisionadoView y se crea la primera vez que se abre. -->
+        <ContentControl x:Name="AnfitrionOrdenVisionado" Panel.ZIndex="96" Focusable="False"/>
 
     </Grid>
 </UserControl>
