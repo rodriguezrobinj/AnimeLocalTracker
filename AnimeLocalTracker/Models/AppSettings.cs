@@ -197,7 +197,11 @@ public class AppSettings
         ["Cerrar"] = "Escape",
         ["CapturarFrame"] = "C",
         ["MarcarInicioClip"] = "I",
-        ["MarcarFinClip"] = "O"
+        ["MarcarFinClip"] = "O",
+        ["RetrasarSubtitulos"] = "Z",
+        ["AdelantarSubtitulos"] = "X",
+        ["RetrasarAudio"] = "J",
+        ["AdelantarAudio"] = "K"
     };
 
     /// <summary>Devuelve la tecla configurada para una acción (con fallback al valor por defecto).</summary>

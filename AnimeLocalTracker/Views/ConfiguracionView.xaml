@@ -950,6 +950,38 @@
                                             <ComboBoxItem Content="S" Tag="S"/><ComboBoxItem Content="K" Tag="K"/>
                                         </ComboBox>
                                     </ctl:SettingRow>
+                                    <Border Style="{StaticResource CfgDivider}"/>
+
+                                    <ctl:SettingRow MinHeight="52" Padding="20,8" Title="{loc:T Atajo_RetrasarSubtitulos}">
+                                        <ComboBox SelectedValue="{Binding Atajos[RetrasarSubtitulos], Mode=TwoWay}" SelectedValuePath="Tag" Height="34" MinWidth="140"
+                                                  AutomationProperties.Name="{loc:T Atajo_RetrasarSubtitulos}">
+                                            <ComboBoxItem Content="Z" Tag="Z"/><ComboBoxItem Content="G" Tag="G"/>
+                                        </ComboBox>
+                                    </ctl:SettingRow>
+                                    <Border Style="{StaticResource CfgDivider}"/>
+
+                                    <ctl:SettingRow MinHeight="52" Padding="20,8" Title="{loc:T Atajo_AdelantarSubtitulos}">
+                                        <ComboBox SelectedValue="{Binding Atajos[AdelantarSubtitulos], Mode=TwoWay}" SelectedValuePath="Tag" Height="34" MinWidth="140"
+                                                  AutomationProperties.Name="{loc:T Atajo_AdelantarSubtitulos}">
+                                            <ComboBoxItem Content="X" Tag="X"/><ComboBoxItem Content="H" Tag="H"/>
+                                        </ComboBox>
+                                    </ctl:SettingRow>
+                                    <Border Style="{StaticResource CfgDivider}"/>
+
+                                    <ctl:SettingRow MinHeight="52" Padding="20,8" Title="{loc:T Atajo_RetrasarAudio}">
+                                        <ComboBox SelectedValue="{Binding Atajos[RetrasarAudio], Mode=TwoWay}" SelectedValuePath="Tag" Height="34" MinWidth="140"
+                                                  AutomationProperties.Name="{loc:T Atajo_RetrasarAudio}">
+                                            <ComboBoxItem Content="J" Tag="J"/><ComboBoxItem Content="+" Tag="OemPlus"/>
+                                        </ComboBox>
+                                    </ctl:SettingRow>
+                                    <Border Style="{StaticResource CfgDivider}"/>
+
+                                    <ctl:SettingRow MinHeight="52" Padding="20,8" Title="{loc:T Atajo_AdelantarAudio}">
+                                        <ComboBox SelectedValue="{Binding Atajos[AdelantarAudio], Mode=TwoWay}" SelectedValuePath="Tag" Height="34" MinWidth="140"
+                                                  AutomationProperties.Name="{loc:T Atajo_AdelantarAudio}">
+                                            <ComboBoxItem Content="K" Tag="K"/><ComboBoxItem Content="−" Tag="OemMinus"/>
+                                        </ComboBox>
+                                    </ctl:SettingRow>
                                 </StackPanel>
                             </Border>
                         </StackPanel>

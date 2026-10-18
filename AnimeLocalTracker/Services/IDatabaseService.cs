@@ -119,6 +119,10 @@ public interface IDatabaseService
     /// <summary>Sonido guardado para ese anime (episodio 0) o para ese capítulo; null si no hay.</summary>
     Task<AjusteAudio?> ObtenerAjusteAudioAsync(int aniListId, int numeroEpisodio);
     Task GuardarAjusteAudioAsync(AjusteAudio ajuste);
+    /// <summary>Desfase de subtítulos y audio ajustado en ese capítulo; null si no se tocó.</summary>
+    Task<DesfaseEpisodio?> ObtenerDesfaseEpisodioAsync(int aniListId, int numeroEpisodio);
+    /// <summary>Guarda el desfase del capítulo; con los dos a 0 borra la fila. Sin anime (id ≤ 0) no hace nada.</summary>
+    Task GuardarDesfaseEpisodioAsync(int aniListId, int numeroEpisodio, int subtitulosMs, int audioMs);
     Task<PreferenciaEmision?> ObtenerPreferenciaEmisionAsync(int aniListId);
     Task GuardarPreferenciaEmisionAsync(PreferenciaEmision preferencia);
     Task<List<PreferenciaEmision>> ObtenerPreferenciasEmisionActivasAsync();

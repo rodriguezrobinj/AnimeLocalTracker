@@ -136,8 +136,12 @@ public class DatabaseService : IDatabaseService, IDisposable
         (24, "tags de AniList de cada anime (\"Parecidos en tu biblioteca\" de la ficha)", AgregarColumnasTemporadaFavoritoAsync),
         // v25: tabla nueva (clave = AniListId; se lee entera en cada pasada, sin índice). Empieza vacía: la primera pasada con
         // MAL conectado envía la biblioteca sin bajar nada de lo que MAL ya tenga.
-        (25, "lo último enviado a MyAnimeList por anime (sincronización app → MAL)", CrearTablaSincronizacionMalAsync)
+        (25, "lo último enviado a MyAnimeList por anime (sincronización app → MAL)", CrearTablaSincronizacionMalAsync),
+        // v26: tabla nueva (clave = "anime_episodio"; se lee siempre por clave, sin índice). Empieza vacía.
+        (26, "desfase de subtítulos y audio por capítulo (teclas Z/X y J/K del reproductor)", CrearTablaDesfaseEpisodioAsync)
     };
+
+    private static Task CrearTablaDesfaseEpisodioAsync(SQLiteAsyncConnection conexion) => conexion.CreateTableAsync<DesfaseEpisodio>();
 
     private static Task CrearTablaSincronizacionMalAsync(SQLiteAsyncConnection conexion) => conexion.CreateTableAsync<SincronizacionMal>();
 
@@ -1253,6 +1257,7 @@ public class DatabaseService : IDatabaseService, IDisposable
             db.Execute("DELETE FROM ProximaEmisionLocal;");
             db.Execute("DELETE FROM PreferenciaEmision;");
             db.Execute("DELETE FROM AjusteAudio;");
+            db.Execute("DELETE FROM DesfaseEpisodio;");
             db.Execute("DELETE FROM DatosExtraAnime;");
             db.Execute("DELETE FROM PartidaMinijuego;");
             db.Execute("DELETE FROM PersonajeAnime;");
@@ -1441,6 +1446,23 @@ public class DatabaseService : IDatabaseService, IDisposable
         if (ajuste == null || ajuste.AniListId <= 0) return;
         ajuste.Clave = AjusteAudio.ClaveDe(ajuste.AniListId, ajuste.NumeroEpisodio);
         await EscribirAsync(db => db.InsertOrReplace(ajuste));
+    }
+
+    public async Task<DesfaseEpisodio?> ObtenerDesfaseEpisodioAsync(int aniListId, int numeroEpisodio) =>
+        await _lectura.FindAsync<DesfaseEpisodio>(DesfaseEpisodio.ClaveDe(aniListId, numeroEpisodio));
+
+    public async Task GuardarDesfaseEpisodioAsync(int aniListId, int numeroEpisodio, int subtitulosMs, int audioMs)
+    {
+        if (aniListId <= 0) return;
+        string clave = DesfaseEpisodio.ClaveDe(aniListId, numeroEpisodio);
+        await EscribirAsync(db =>
+        {
+            if (subtitulosMs == 0 && audioMs == 0) db.Delete<DesfaseEpisodio>(clave);
+            else db.InsertOrReplace(new DesfaseEpisodio
+            {
+                Clave = clave, AniListId = aniListId, NumeroEpisodio = numeroEpisodio, SubtitulosMs = subtitulosMs, AudioMs = audioMs
+            });
+        });
     }
 
     public async Task<PreferenciaEmision?> ObtenerPreferenciaEmisionAsync(int aniListId)

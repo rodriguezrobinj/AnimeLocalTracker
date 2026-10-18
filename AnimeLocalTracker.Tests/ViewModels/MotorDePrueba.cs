@@ -40,6 +40,10 @@ public sealed class MotorDePrueba : IMotorVideo
     public double Velocidad { set => VelocidadPuesta = value; }
     public int Volumen { set => VolumenPuesto = value; }
     public bool Silencio { set => SilencioPuesto = value; }
+    public int DesfaseSubtitulosPuesto { get; set; }
+    public int DesfaseAudioPuesto { get; set; }
+    public int DesfaseSubtitulosMs { set => DesfaseSubtitulosPuesto = value; }
+    public int DesfaseAudioMs { set => DesfaseAudioPuesto = value; }
     public bool AceleracionPorHardware { set => AceleracionPuesta = value; }
 
     private long _fotogramas;

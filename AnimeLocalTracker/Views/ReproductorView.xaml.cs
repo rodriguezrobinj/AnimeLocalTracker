@@ -876,6 +876,15 @@ namespace AnimeLocalTracker.Views
                 vm.AlternarModoMiniCommand.Execute(null);
             else if (k == vm.ObtenerTeclaPara("Cerrar"))
                 vm.TeclaCerrar(); // sale del reproductor sin quitar la pantalla completa
+            // Al final: si el usuario puso J o K para retroceder o saltar la intro en Configuración, gana su elección.
+            else if (k == vm.ObtenerTeclaPara("RetrasarSubtitulos"))
+                vm.RetrasarSubtitulosCommand.Execute(null);
+            else if (k == vm.ObtenerTeclaPara("AdelantarSubtitulos"))
+                vm.AdelantarSubtitulosCommand.Execute(null);
+            else if (k == vm.ObtenerTeclaPara("RetrasarAudio"))
+                vm.RetrasarAudioCommand.Execute(null);
+            else if (k == vm.ObtenerTeclaPara("AdelantarAudio"))
+                vm.AdelantarAudioCommand.Execute(null);
             else
                 ejecutado = false;
 

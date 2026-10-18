@@ -548,6 +548,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         motor.AperturaTerminada += AlTerminarApertura;
         Motor = motor;
         AplicarEstiloSubtitulosAlMotor();
+        AplicarDesfaseAlMotor();
     }
 
     private MotorMpv? CrearMotor(AjustesInicialesMotor ajustes)
@@ -1318,6 +1319,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         //    archivo ya lo sustituye, y pararlo antes repetía ese trabajo en el hilo de la interfaz (~200 ms bloqueada
         //    en cada cambio de episodio). El audio viejo se silencia justo antes de abrir y la tapa cubre la última imagen.
         AsegurarMotorInicializado();
+        CargarDesfaseDelEpisodio(animeId, episodio, version);
 
         // 2. El video queda tapado desde ya: se destapa con el primer fotograma o, si hay que reanudar, cuando el salto al punto
         //    guardado se asienta (VigilarArranqueAsync). Antes se destapaba en el primer instante de reproducción y se veía el 0:00.
@@ -1764,6 +1766,10 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             "CapturarFrame" => "C",
             "MarcarInicioClip" => "I",
             "MarcarFinClip" => "O",
+            "RetrasarSubtitulos" => "Z",
+            "AdelantarSubtitulos" => "X",
+            "RetrasarAudio" => "J",
+            "AdelantarAudio" => "K",
             _ => string.Empty
         };
         // Sin configuración cargada también valen las teclas de siempre (antes quedaban todas sin asignar).

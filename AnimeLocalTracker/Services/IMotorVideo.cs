@@ -54,6 +54,10 @@ public interface IMotorVideo : IDisposable
     double Velocidad { set; }
     int Volumen { set; }
     bool Silencio { set; }
+    /// <summary>Retraso de los subtítulos en ms (positivo = salen más tarde). Sigue puesto al abrir otro archivo.</summary>
+    int DesfaseSubtitulosMs { set; }
+    /// <summary>Retraso del audio en ms (positivo = suena más tarde). Sigue puesto al abrir otro archivo.</summary>
+    int DesfaseAudioMs { set; }
 
     /// <summary>Fotogramas presentados desde que se abrió el archivo, reproduciendo o en pausa.</summary>
     long FotogramasMostrados { get; }

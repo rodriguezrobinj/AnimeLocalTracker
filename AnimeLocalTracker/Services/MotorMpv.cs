@@ -244,6 +244,8 @@ public sealed partial class MotorMpv : IMotorVideo
     public double Velocidad { set => Fijar("speed", value.ToString("F2", CultureInfo.InvariantCulture)); }
     public int Volumen { set => Fijar("volume", Math.Clamp(value, 0, 100).ToString(CultureInfo.InvariantCulture)); }
     public bool Silencio { set => Fijar("mute", value ? "yes" : "no"); }
+    public int DesfaseSubtitulosMs { set => Fijar("sub-delay", (value / 1000.0).ToString(CultureInfo.InvariantCulture)); }
+    public int DesfaseAudioMs { set => Fijar("audio-delay", (value / 1000.0).ToString(CultureInfo.InvariantCulture)); }
 
     public long FotogramasMostrados => Interlocked.Read(ref _fotogramas);
     public bool DecodificaPorHardware => _hayArchivo && Leer("hwdec-current") is { Length: > 0 } actual && actual != "no";
