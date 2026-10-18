@@ -292,6 +292,7 @@ public partial class MainWindow : Window, IVentanaPrincipal
             }
 
             _ventanaMini?.Hide(); // el mini reproductor también desaparece: es un modo discreto
+            App.ServiceProvider.GetService<AnimeLocalTracker.Services.Discord.IDiscordPresenceService>()?.Suprimir(); // y el estado de Discord
             App.ServiceProvider.GetService<ISystemTrayService>()?.IniciarEnBandeja();
             AppLogger.Info("MainWindow", "Modo discreto activado (tecla de pánico).");
         });

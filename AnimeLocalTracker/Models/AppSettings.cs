@@ -164,6 +164,10 @@ public class AppSettings
     /// tecla en TODAS las aplicaciones mientras esté activo, no solo en AnimeLocalTracker.</summary>
     public string TeclaPanico { get; set; } = "F12";
 
+    /// <summary>Mostrar en el perfil de Discord el anime y el episodio que se está viendo (Rich Presence). Apagado por defecto:
+    /// es información pública para los amigos del usuario.</summary>
+    public bool DiscordRichPresence { get; set; } = false;
+
     /// <summary>
     /// Atajos de teclado configurables del reproductor: acción → tecla.
     /// Claves: PlayPausa, PantallaCompleta, Silenciar, SubirVolumen, BajarVolumen,

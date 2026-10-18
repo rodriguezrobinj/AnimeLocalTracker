@@ -12,6 +12,7 @@ using CommunityToolkit.Mvvm.Messaging;
 using AnimeLocalTracker.Messages;
 using AnimeLocalTracker.Models;
 using AnimeLocalTracker.Services;
+using AnimeLocalTracker.Services.Discord;
 using AnimeLocalTracker.Services.Logros;
 
 namespace AnimeLocalTracker.ViewModels;
@@ -33,6 +34,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
     /// <summary>Fotogramas clave del episodio abierto (null hasta leerlos, ~1 s tras abrir): ver <see cref="Saltar"/>.</summary>
     private IReadOnlyList<double>? _fotogramasClave;
     private readonly ISystemMediaControlsService? _smtc;
+    private readonly IDiscordPresenceService? _discord;
     private readonly IScreenSaverPreventionService? _screenSaverPrevention;
     private CancellationTokenSource? _skipCts;
 
@@ -352,9 +354,11 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
         IPlaybackSeekCoordinator? seekCoordinator = null,
         IFotogramasClaveService? fotogramasClaveService = null,
         ILimpiadorDeEpisodios? limpiadorDeEpisodios = null,
-        Func<AjustesInicialesMotor, IMotorVideo?>? fabricaMotor = null)
+        Func<AjustesInicialesMotor, IMotorVideo?>? fabricaMotor = null,
+        IDiscordPresenceService? discordPresence = null)
     {
         _fabricaMotor = fabricaMotor ?? (EsEntornoPruebas() ? null : CrearMotor);
+        _discord = discordPresence;
         _databaseService = databaseService;
         _limpiadorDeEpisodios = limpiadorDeEpisodios;
         _settingsService = settingsService;
@@ -2033,6 +2037,8 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                     await ManejarFinDeEpisodioAsync(ct);
                 }
 
+                PublicarPresenciaDiscord();
+
                 // Sondeo adaptativo: 250ms mientras reproduce, 1000ms cuando está en pausa/detenido
                 // Mientras abre, cada 100 ms: antes el primer tick "reproduciendo" llegaba al segundo de abrir.
                 int delayMs = Motor?.Estado == EstadoMotor.Reproduciendo ? 250 : (_haCompletadoOpen ? 1000 : 100);
@@ -2048,6 +2054,18 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
                 await Task.Delay(1000, ct);
             }
         }
+    }
+
+    /// <summary>
+    /// Estado de Discord desde el bucle de progreso: así cubre pausa, saltos, fin y cambio de episodio vengan de donde vengan
+    /// (teclado, SMTC, mini reproductor). El servicio decide si hay que reenviar. Nada hasta que el video abrió ni con la
+    /// reanudación pendiente: el motor aún dice 0:00 y Discord mostraría el episodio empezando de cero.
+    /// </summary>
+    private void PublicarPresenciaDiscord()
+    {
+        if (_discord == null || Motor == null || !_haCompletadoOpen || _reanudacionPendiente) return;
+        _discord.Actualizar(new EstadoPresencia(_animeId, TituloAnime, _episodio, Motor.Posicion.TotalSeconds,
+            Motor.Duracion.TotalSeconds, Motor.Estado == EstadoMotor.Reproduciendo));
     }
 
     /// <summary>
@@ -2285,6 +2303,7 @@ public partial class ReproductorViewModel : ObservableObject, IDisposable
             _smtc.PreviousRequested -= OnSmtcPreviousRequested;
             _smtc.Deshabilitar();
         }
+        _discord?.Limpiar();
 
         _ = GuardarProgresoActualAsync();
 

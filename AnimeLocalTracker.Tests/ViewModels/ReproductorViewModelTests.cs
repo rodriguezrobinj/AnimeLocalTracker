@@ -826,4 +826,16 @@ public class ReproductorViewModelTests
         // Assert
         ventanaMock.Verify(v => v.SalirModoPiP(), Times.Once);
     }
+
+    [Fact]
+    public void Dispose_BorraElEstadoDeDiscord()
+    {
+        var discord = new Mock<AnimeLocalTracker.Services.Discord.IDiscordPresenceService>();
+        var sut = new ReproductorViewModel(_dbMock.Object, _trackingMock.Object, _authMock.Object, discordPresence: discord.Object);
+        sut.CargarVideo("C:\\Anime\\Ep01.mkv", 101, "Frieren", 1);
+
+        sut.Dispose();
+
+        discord.Verify(d => d.Limpiar(), Times.Once);
+    }
 }

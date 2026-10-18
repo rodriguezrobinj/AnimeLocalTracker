@@ -1104,6 +1104,13 @@
                                         <ToggleButton IsChecked="{Binding IniciarConWindows}" Style="{StaticResource CfgSwitch}"
                                                       AutomationProperties.Name="{loc:T Cfg_IniciarConWindows}"/>
                                     </ctl:SettingRow>
+                                    <Border Style="{StaticResource CfgDivider}"/>
+
+                                    <ctl:SettingRow Title="{loc:T Cfg_DiscordPresencia}"
+                                                    Description="{loc:T Cfg_DiscordPresenciaSub}">
+                                        <ToggleButton IsChecked="{Binding DiscordRichPresence}" Style="{StaticResource CfgSwitch}"
+                                                      AutomationProperties.Name="{loc:T Cfg_DiscordPresencia}"/>
+                                    </ctl:SettingRow>
                                 </StackPanel>
                             </Border>
 

@@ -465,6 +465,10 @@ public sealed class LocalizationService : INotifyPropertyChanged
         ["Reg_SinResultados"] = "Ninguna entrada coincide con los filtros",
         ["Cfg_TeclaPanico"] = "Activar tecla de pánico (modo discreto)",
         ["Cfg_TeclaPanicoSub"] = "Un atajo global (funciona aunque la app no tenga el foco) silencia el video y minimiza AnimeLocalTracker a la bandeja al instante",
+        ["Cfg_DiscordPresencia"] = "Mostrar lo que veo en Discord",
+        ["Cfg_DiscordPresenciaSub"] = "Mientras ves un episodio, tu perfil de Discord muestra el anime, el episodio y el tiempo que queda. Necesita Discord abierto en este PC",
+        ["Discord_EnPausaFormato"] = "{0} · En pausa",
+        ["Discord_VerEnAniList"] = "Ver en AniList",
         ["Cfg_TeclaPanicoAtajo"] = "Tecla asignada",
         ["Cfg_TeclaPanicoAtajoSub"] = "Escape queda reservado en TODAS las aplicaciones mientras esta opción esté activa, no solo en AnimeLocalTracker — F12 es más seguro",
 
@@ -1872,6 +1876,10 @@ public sealed class LocalizationService : INotifyPropertyChanged
         ["Reg_SinResultados"] = "No entries match the filters",
         ["Cfg_TeclaPanico"] = "Enable panic key (discreet mode)",
         ["Cfg_TeclaPanicoSub"] = "A global shortcut (works even without focus) instantly mutes the video and minimizes AnimeLocalTracker to the tray",
+        ["Cfg_DiscordPresencia"] = "Show what I'm watching on Discord",
+        ["Cfg_DiscordPresenciaSub"] = "While you watch an episode, your Discord profile shows the anime, the episode and the time left. Requires Discord running on this PC",
+        ["Discord_EnPausaFormato"] = "{0} · Paused",
+        ["Discord_VerEnAniList"] = "View on AniList",
         ["Cfg_TeclaPanicoAtajo"] = "Assigned key",
         ["Cfg_TeclaPanicoAtajoSub"] = "Escape gets reserved in ALL applications while this is on, not just AnimeLocalTracker — F12 is safer",
 

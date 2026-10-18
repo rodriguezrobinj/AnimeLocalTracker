@@ -277,6 +277,7 @@ public partial class ConfiguracionViewModel : ObservableObject
     [ObservableProperty] private double _velocidadReproduccionDefecto = 1.0;
     [ObservableProperty] private bool _iniciarConWindows = false;
     [ObservableProperty] private bool _teclaPanicoActiva = false;
+    [ObservableProperty] private bool _discordRichPresence = false;
     [ObservableProperty] private string _teclaPanico = "F12";
 
     /// <summary>Atajos de teclado configurables (acción → tecla). Se enlaza por índice desde XAML.</summary>
@@ -484,6 +485,7 @@ public partial class ConfiguracionViewModel : ObservableObject
         IniciarConWindows = _startupService?.EstaHabilitado() ?? false;
         TeclaPanicoActiva = config.TeclaPanicoActiva;
         TeclaPanico = config.TeclaPanico == "Escape" ? "Escape" : "F12";
+        DiscordRichPresence = config.DiscordRichPresence;
         Atajos = config.Atajos ?? new Dictionary<string, string>();
         OnPropertyChanged(nameof(Atajos));
 
@@ -703,6 +705,7 @@ public partial class ConfiguracionViewModel : ObservableObject
             config.EscaladoInteligenteVideo = string.IsNullOrEmpty(EscaladoInteligenteVideo) ? ModosRendimientoVideo.Automatico : EscaladoInteligenteVideo;
             config.TeclaPanicoActiva = TeclaPanicoActiva;
             config.TeclaPanico = TeclaPanico == "Escape" ? "Escape" : "F12";
+            config.DiscordRichPresence = DiscordRichPresence;
             config.Atajos = new Dictionary<string, string>(Atajos);
 
             await _settingsService.GuardarConfiguracionAsync(config);

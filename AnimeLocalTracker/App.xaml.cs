@@ -280,6 +280,9 @@ public partial class App : Application
         // Tecla de pánico / modo discreto: hotkey global (RegisterHotKey) atado al HWND de MainWindow.
         services.AddSingleton<IPanicKeyService, PanicKeyService>();
 
+        // Estado "Viendo" en el perfil de Discord mientras se reproduce un episodio (apagado por defecto).
+        services.AddSingleton<AnimeLocalTracker.Services.Discord.IDiscordPresenceService, AnimeLocalTracker.Services.Discord.DiscordPresenceService>();
+
         services.AddSingleton<IVideoIntegrityService, VideoIntegrityService>();
 
         // Logros por niveles: evaluación, persistencia de desbloqueos y avisos
