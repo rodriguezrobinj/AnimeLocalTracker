@@ -121,9 +121,10 @@ public class GaleriaAccionesTests
     [Fact]
     public async Task AlAbrir_NoPreguntaPorLosQueYaEstanEnEmisionOTerminados()
     {
+        // Con todos sus datos: estado, temporada y tags (desde v24 un anime sin tags también se pide, una vez).
         await CrearAsync(
-            new AnimeItem { AniListId = 1, Titulo = "Bleach", Estado = "FINISHED", Temporada = "FALL", AnioLanzamiento = 2004 },
-            new AnimeItem { AniListId = 2, Titulo = "One Piece", Estado = "RELEASING", Temporada = "FALL", AnioLanzamiento = 1999 });
+            new AnimeItem { AniListId = 1, Titulo = "Bleach", Estado = "FINISHED", Temporada = "FALL", AnioLanzamiento = 2004, Etiquetas = "[]" },
+            new AnimeItem { AniListId = 2, Titulo = "One Piece", Estado = "RELEASING", Temporada = "FALL", AnioLanzamiento = 1999, Etiquetas = "[]" });
 
         _tracking.Verify(t => t.ObtenerAnimesPorIdsLoteAsync(It.IsAny<IEnumerable<int>>(), It.IsAny<string?>()), Times.Never);
     }

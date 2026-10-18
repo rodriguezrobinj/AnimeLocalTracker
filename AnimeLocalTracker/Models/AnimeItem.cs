@@ -126,6 +126,13 @@ public partial class AnimeItem : ObservableObject
     /// </summary>
     public bool ConservarVideos { get; set; }
 
+    /// <summary>
+    /// Tags de AniList con su porcentaje, en JSON (ver <see cref="Services.Recomendaciones.EtiquetasAnime"/>): los usa "Parecidos en
+    /// tu biblioteca". Los trae la actualización por lotes al arrancar. Migración v24; NULL en los animes que ya estaban hasta
+    /// la siguiente actualización.
+    /// </summary>
+    public string? Etiquetas { get; set; }
+
     /// <summary>Tu estado con el anime, como lo enseña la tarjeta de la Galería (antes mostraba si seguía en emisión).</summary>
     [Ignore]
     [JsonIgnore]

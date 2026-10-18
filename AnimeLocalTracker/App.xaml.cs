@@ -286,6 +286,9 @@ public partial class App : Application
         // Clips MP4/GIF de un tramo del episodio (ffmpeg embebido), desde el reproductor.
         services.AddSingleton<AnimeLocalTracker.Services.Clips.IClipService, AnimeLocalTracker.Services.Clips.ClipService>();
 
+        // "Parecidos en tu biblioteca" de la ficha (cálculo local con tags, géneros y sinopsis).
+        services.AddSingleton<AnimeLocalTracker.Services.Recomendaciones.IParecidosService, AnimeLocalTracker.Services.Recomendaciones.ParecidosService>();
+
         // Avisos (episodio emitido, serie terminada) en un canal de Discord del usuario por webhook.
         services.AddHttpClient(AnimeLocalTracker.Services.Webhook.WebhookDiscordService.NombreCliente).ConCorteSinConexion();
         services.AddSingleton<AnimeLocalTracker.Services.Webhook.IWebhookDiscordService, AnimeLocalTracker.Services.Webhook.WebhookDiscordService>();

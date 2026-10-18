@@ -112,6 +112,10 @@ public class AniListMedia
     [JsonPropertyName("startDate")]
     public AniListFuzzyDate? StartDate { get; set; }
 
+    /// <summary>Tags con su porcentaje (solo en la consulta por lotes; null si no se pidieron). Para "Parecidos en tu biblioteca".</summary>
+    [JsonPropertyName("tags")]
+    public List<AniListTag>? Tags { get; set; }
+
     // NUEVO: temporada de estreno (WINTER/SPRING/SUMMER/FALL) para filtrar por temporada/año
     [JsonPropertyName("season")]
     public string? Season { get; set; }
@@ -294,4 +298,19 @@ public class AniListUser
 
     [JsonPropertyName("avatar")]
     public AniListAvatar? Avatar { get; set; }
+}
+/// <summary>Un tag de AniList ("Time Manipulation") con cuánto lo votó la comunidad (0-100) y si destripa la trama.</summary>
+public class AniListTag
+{
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = string.Empty;
+
+    [JsonPropertyName("rank")]
+    public int Rank { get; set; }
+
+    [JsonPropertyName("isMediaSpoiler")]
+    public bool IsMediaSpoiler { get; set; }
+
+    [JsonPropertyName("isGeneralSpoiler")]
+    public bool IsGeneralSpoiler { get; set; }
 }

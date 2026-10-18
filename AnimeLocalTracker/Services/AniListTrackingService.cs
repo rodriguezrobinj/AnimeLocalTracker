@@ -360,6 +360,7 @@ public class AniListTrackingService : IAnimeTrackingService
                             startDate { year month day }
                             season
                             nextAiringEpisode { episode airingAt }
+                            tags { name rank isMediaSpoiler isGeneralSpoiler }
                             mediaListEntry {
                                 id
                                 status

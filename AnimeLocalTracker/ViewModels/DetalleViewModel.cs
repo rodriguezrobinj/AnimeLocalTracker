@@ -135,9 +135,11 @@ public partial class DetalleViewModel : ObservableObject,
         ISettingsService? settingsService = null,
         IEnlacesMusicaService? enlacesMusica = null,
         IEstadoConexionService? estadoConexion = null,
-        IMusicaDeFondoService? musicaDeFondo = null)
+        IMusicaDeFondoService? musicaDeFondo = null,
+        Services.Recomendaciones.IParecidosService? parecidos = null)
     {
         _musicaDeFondo = musicaDeFondo;
+        _parecidos = parecidos;
         _proximaEmision = proximaEmision;
         _datosExtra = datosExtra;
         _monitorEmision = monitorEmision;
@@ -169,6 +171,7 @@ public partial class DetalleViewModel : ObservableObject,
     {
         ReiniciarContadorProximo();
         ReiniciarExtras();
+        ReiniciarParecidos();
         bool musicaRecuperada = RecuperarMusicaDeFondo(anime);
         if (!musicaRecuperada) Musica.ReiniciarMusica();
         EstaConectado = _authService.EstaAutenticado();
@@ -202,6 +205,7 @@ public partial class DetalleViewModel : ObservableObject,
         _ = CalcularEspacioEnDiscoAsync(ctFicha);
         _ = CargarDatosExtraAsync(ctFicha);
         _ = CargarPreferenciasEmisionAsync(ctFicha);
+        CargaParecidos = CargarParecidosAsync(anime, ctFicha);
         if (!musicaRecuperada)
         {
             Musica.CargarEnlacesMusica(anime);

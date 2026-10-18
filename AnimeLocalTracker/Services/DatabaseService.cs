@@ -130,7 +130,10 @@ public class DatabaseService : IDatabaseService, IDisposable
         // Un episodio con dos filas era posible por una carrera entre guardados (v22 la cierra): se unen las que ya hay (con copia
         // previa de la base) y el índice (AniListId, NumeroEpisodio) pasa a ser único.
         (22, "episodios sin filas repetidas (se unen) + índice único por (anime, episodio)", DeduplicarRegistrosEpisodioAsync),
-        (23, "repetir los análisis de OP/ED que quedaron sin opening (ahora se busca también pasado el minuto 8)", DescartarAnalisisSkipSinOpeningAsync)
+        (23, "repetir los análisis de OP/ED que quedaron sin opening (ahora se busca también pasado el minuto 8)", DescartarAnalisisSkipSinOpeningAsync),
+        // v24: columna nueva del modelo (misma vía que v4/v19/v21). Los animes que ya estaban quedan con NULL hasta que la
+        // actualización por lotes del arranque traiga sus tags.
+        (24, "tags de AniList de cada anime (\"Parecidos en tu biblioteca\" de la ficha)", AgregarColumnasTemporadaFavoritoAsync)
     };
 
     /// <summary>
@@ -545,12 +548,30 @@ public class DatabaseService : IDatabaseService, IDisposable
     private static bool TieneConservarVideos(SQLiteConnection db, int aniListId)
         => db.ExecuteScalar<int>("SELECT COUNT(*) FROM AnimeItem WHERE AniListId = ? AND ConservarVideos = 1", aniListId) > 0;
 
+    /// <summary>
+    /// Una copia del anime sin tags (las lecturas "ligeras" no traen la columna; un JSON anterior a v24 tampoco) no puede borrar
+    /// los que ya están guardados: null = "no lo sé", se conserva lo de la base. Solo los cambia un valor nuevo de verdad.
+    /// </summary>
+    private static void ConservarEtiquetas(SQLiteConnection db, IEnumerable<AnimeItem> animes)
+    {
+        var sinEtiquetas = animes.Where(a => a.Etiquetas == null).ToList();
+        if (sinEtiquetas.Count == 0) return;
+
+        var guardadas = db.Query<AnimeItem>("SELECT AniListId, Etiquetas FROM AnimeItem WHERE Etiquetas IS NOT NULL")
+            .ToDictionary(a => a.AniListId, a => a.Etiquetas);
+        foreach (var anime in sinEtiquetas)
+        {
+            if (guardadas.TryGetValue(anime.AniListId, out var etiquetas)) anime.Etiquetas = etiquetas;
+        }
+    }
+
     public async Task GuardarAnimeAsync(AnimeItem anime)
     {
         await EscribirAsync(db =>
         {
             // Reemplazar la fila de un anime que ya existía no puede apagarle la protección de "Conservar los videos".
             if (!anime.ConservarVideos) anime.ConservarVideos = TieneConservarVideos(db, anime.AniListId);
+            ConservarEtiquetas(db, new[] { anime });
 
             // InsertOrReplace actualiza el registro si el AniListId ya existe, o lo inserta si es nuevo
             db.InsertOrReplace(anime);
@@ -905,6 +926,7 @@ public class DatabaseService : IDatabaseService, IDisposable
         // IMP-03: todo o nada — una sola transacción; cualquier fallo revierte el lote completo
         await _conexion.RunInTransactionAsync(db =>
         {
+            ConservarEtiquetas(db, animesUnicos); // un JSON anterior a v24 no trae tags
             foreach (var anime in animesUnicos) db.InsertOrReplace(anime);
             AplicarUpsertRegistros(db, registrosValidos);
         });
@@ -1178,6 +1200,7 @@ public class DatabaseService : IDatabaseService, IDisposable
         await EscribirAsync(db =>
         {
             anime.ConservarVideos = TieneConservarVideos(db, anime.AniListId);
+            ConservarEtiquetas(db, new[] { anime });
             db.Update(anime);
         });
     }
@@ -1192,6 +1215,7 @@ public class DatabaseService : IDatabaseService, IDisposable
         {
             var protegidos = db.QueryScalars<int>("SELECT AniListId FROM AnimeItem WHERE ConservarVideos = 1").ToHashSet();
             foreach (var anime in lista) anime.ConservarVideos = protegidos.Contains(anime.AniListId);
+            ConservarEtiquetas(db, lista);
             db.UpdateAll(lista, runInTransaction: false);
         });
     }

@@ -580,13 +580,13 @@ public partial class GaleriaViewModel : ObservableObject, IAlEntrarEnPestana, ID
     /// más revisa:
     /// - los que no están ni en emisión ni terminados (sin estrenar, en pausa, sin dato): el estado solo se refrescaba con el botón
     ///   Actualizar, así que un anime que ya se había estrenado seguía "sin estrenar", con 0 episodios y fuera de Actualizaciones;
-    /// - los que no tienen temporada ni año (añadidos antes de guardarse ese dato: los combos de la galería salían vacíos).
+    /// - los que no tienen temporada ni año (añadidos antes de guardarse ese dato: los combos de la galería salían vacíos);
+    /// - los que aún no tienen tags (bases anteriores a v24): "Parecidos en tu biblioteca" los necesita. Una vez guardados ("[]"
+    ///   si AniList no tiene ninguno) no se vuelven a pedir.
     /// </summary>
     private async Task CompletarDatosDeAniListEnSegundoPlanoAsync(IEnumerable<AnimeItem> animes)
     {
-        var pendientes = animes
-            .Where(a => a.Estado is not ("RELEASING" or "FINISHED" or "CANCELLED") || (string.IsNullOrWhiteSpace(a.Temporada) && a.AnioLanzamiento <= 0))
-            .ToList();
+        var pendientes = animes.Where(NecesitaDatosDeAniList).ToList();
         if (pendientes.Count == 0) return;
 
         try
@@ -1047,7 +1047,12 @@ public partial class GaleriaViewModel : ObservableObject, IAlEntrarEnPestana, ID
     /// y, con cuenta, tu estado con el anime. Devuelve los que cambiaron y la hora del próximo episodio de cada uno, para guardarlos.
     /// En el hilo de la interfaz: los AnimeItem están enlazados a las tarjetas.
     /// </summary>
-    private static (List<AnimeItem> Modificados, List<ProximaEmisionLocal> Emisiones) AplicarDatosDeAniList(
+    internal static bool NecesitaDatosDeAniList(AnimeItem a)
+        => a.Estado is not ("RELEASING" or "FINISHED" or "CANCELLED")
+           || (string.IsNullOrWhiteSpace(a.Temporada) && a.AnioLanzamiento <= 0)
+           || a.Etiquetas == null;
+
+    internal static (List<AnimeItem> Modificados, List<ProximaEmisionLocal> Emisiones) AplicarDatosDeAniList(
         IEnumerable<AnimeItem> animes, Dictionary<int, AniListMedia> datosLote, bool conCuenta, HashSet<int> estadosSinEnviar)
     {
         var modificados = new List<Models.AnimeItem>();
@@ -1075,6 +1080,17 @@ public partial class GaleriaViewModel : ObservableObject, IAlEntrarEnPestana, ID
                 {
                     anime.Temporada = temporadaFresca;
                     anime.AnioLanzamiento = anioFresco;
+                    cambio = true;
+                }
+            }
+
+            // Tags para "Parecidos en tu biblioteca" (vienen en la misma respuesta). Sin el campo se conservan los que hubiera.
+            if (datosFrescos.Tags is { } tags)
+            {
+                string etiquetas = Services.Recomendaciones.EtiquetasAnime.Serializar(tags);
+                if (!string.Equals(anime.Etiquetas, etiquetas, StringComparison.Ordinal))
+                {
+                    anime.Etiquetas = etiquetas;
                     cambio = true;
                 }
             }

@@ -355,6 +355,51 @@
                         </UniformGrid>
                     </Border>
 
+                    <!-- PARECIDOS EN TU BIBLIOTECA: pendientes que se parecen a este anime (DetalleViewModel.Parecidos, como mucho 5) -->
+                    <StackPanel Width="255" Margin="0,20,0,0" Visibility="{Binding HayParecidos, Converter={StaticResource BoolToVis}}">
+                        <TextBlock Text="{loc:T Det_ParecidosTitulo}" FontSize="12" FontWeight="SemiBold"
+                                   Foreground="{StaticResource Brush.TextSecondary}" Margin="4,0,0,8"/>
+                        <ItemsControl ItemsSource="{Binding Parecidos}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Command="{Binding DataContext.AbrirParecidoCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding}" Style="{StaticResource MaterialDesignFlatButton}"
+                                            Height="Auto" Padding="6" Margin="0,0,0,4" Cursor="Hand"
+                                            HorizontalContentAlignment="Stretch" materialDesign:ButtonAssist.CornerRadius="8"
+                                            ToolTip="{Binding Anime.Titulo}" AutomationProperties.Name="{Binding Anime.Titulo}">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="44"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <!-- Miniportada: el icono queda debajo de la imagen y se ve si no carga -->
+                                            <materialDesign:Card Width="44" Height="62" UniformCornerRadius="6" Background="{StaticResource Brush.Surface3}">
+                                                <Grid>
+                                                    <materialDesign:PackIcon Kind="ImageOutline" Width="18" Height="18" HorizontalAlignment="Center"
+                                                                             VerticalAlignment="Center" Foreground="{StaticResource Brush.IconMuted}"/>
+                                                    <Image Source="{Binding Anime.PortadaVisible, TargetNullValue={x:Null}, FallbackValue={x:Null}}"
+                                                           Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality"/>
+                                                </Grid>
+                                            </materialDesign:Card>
+                                            <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Anime.Titulo}" FontSize="12.5" FontWeight="SemiBold" TextWrapping="Wrap"
+                                                           MaxHeight="34" TextTrimming="CharacterEllipsis" Foreground="{StaticResource Brush.TextPrimary}"/>
+                                                <TextBlock Text="{Binding TextoTemas}" FontSize="11" TextWrapping="Wrap" Margin="0,2,0,0"
+                                                           Foreground="{StaticResource Brush.TextTertiary}"/>
+                                                <Border Background="{StaticResource Brush.SuccessTint}" CornerRadius="4" Padding="6,1"
+                                                        HorizontalAlignment="Left" Margin="0,4,0,0"
+                                                        Visibility="{Binding TieneEnDisco, Converter={StaticResource BoolToVis}}">
+                                                    <TextBlock Text="{Binding TextoEnDisco}" FontSize="10.5" FontWeight="SemiBold"
+                                                               Foreground="{StaticResource Brush.Success}"/>
+                                                </Border>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+
                 </StackPanel>
             </ScrollViewer>
 
