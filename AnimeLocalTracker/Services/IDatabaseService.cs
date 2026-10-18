@@ -99,6 +99,13 @@ public interface IDatabaseService
     Task GuardarSeguimientoLocalAsync(SeguimientoLocal seguimiento);
     /// <summary>Cambios del editor de seguimiento hechos sin conexión, a la espera de subirse a AniList.</summary>
     Task<List<SeguimientoLocal>> ObtenerSeguimientosPendientesAsync();
+    Task<List<SeguimientoLocal>> ObtenerSeguimientosLocalesAsync();
+
+    /// <summary>Lo último enviado a MyAnimeList por anime (ver <see cref="SincronizacionMal"/>).</summary>
+    Task<List<SincronizacionMal>> ObtenerSincronizacionesMalAsync();
+    Task GuardarSincronizacionMalAsync(SincronizacionMal sincronizacion);
+    /// <summary>Al desconectar MAL: la próxima conexión vuelve a revisar toda la biblioteca.</summary>
+    Task BorrarSincronizacionesMalAsync();
 
     /// <summary>Guarda la programación que dio AniList para esos animes en esa ventana (la reemplaza entera).</summary>
     Task GuardarEmisionesAsync(IReadOnlyCollection<int> animeIds, long inicioUnix, long finUnix, IReadOnlyList<EmisionGuardada> emisiones);

@@ -426,9 +426,15 @@ public partial class ConfiguracionViewModel : ObservableObject
         IPluginService pluginService,
         IStartupService? startupService = null,
         IOrganizadorMusicaService? organizadorMusica = null,
-        Services.Webhook.IWebhookDiscordService? webhook = null)
+        Services.Webhook.IWebhookDiscordService? webhook = null,
+        Services.Mal.IMalAuthService? malAuth = null,
+        Services.Mal.IMalApiClient? malApi = null,
+        Services.Mal.IMalSyncService? malSync = null)
     {
         _webhook = webhook;
+        _malAuth = malAuth;
+        _malApi = malApi;
+        _malSync = malSync;
         _settingsService = settingsService;
         _authService = authService;
         _databaseService = databaseService;
@@ -439,6 +445,7 @@ public partial class ConfiguracionViewModel : ObservableObject
         _organizadorMusica = organizadorMusica;
 
         CargarDatosConfiguracion();
+        CargarEstadoMal();
 
         // Este ajuste también se cambia desde la ventana de música de la ficha (la chincheta). Esta pantalla se crea una sola
         // vez: sin ponerse al día, su "Guardar" volvería a escribir el valor viejo encima del que se eligió allí.

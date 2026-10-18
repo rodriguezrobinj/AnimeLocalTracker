@@ -1028,7 +1028,7 @@
                             </Border>
 
                             <TextBlock Text="{loc:T Cfg_GrupoCuenta}" Style="{StaticResource CfgGroupCaption}"/>
-                            <Border Style="{StaticResource CfgGroup}" Margin="0">
+                            <Border Style="{StaticResource CfgGroup}">
                                 <ctl:SettingRow Title="{Binding EstadoAutenticacionTexto}"
                                                 Description="{loc:T Cfg_SyncSub}">
                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -1044,6 +1044,27 @@
                                         </Button>
                                     </StackPanel>
                                 </ctl:SettingRow>
+                            </Border>
+
+                            <!-- MyAnimeList (app → MAL). Solo con el Client ID de la app configurado. -->
+                            <Border Style="{StaticResource CfgGroup}" Margin="0" Visibility="{Binding MalDisponible, Converter={StaticResource BoolToVis}}">
+                                <StackPanel>
+                                    <ctl:SettingRow Title="{Binding MalEstadoTexto}" Description="{loc:T Cfg_MalSub}">
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <Button Command="{Binding ConectarMalCommand}" Style="{StaticResource CfgRowButton}" MinWidth="0"
+                                                    Content="{loc:T Cfg_MalConectar}" AutomationProperties.Name="{loc:T Cfg_MalConectar}"
+                                                    Visibility="{Binding MalConectado, Converter={StaticResource InverseBoolToVis}}"/>
+                                            <Button Command="{Binding SincronizarMalCommand}" Style="{StaticResource CfgRowButton}" MinWidth="0"
+                                                    Content="{loc:T Cfg_MalSincronizar}" AutomationProperties.Name="{loc:T Cfg_MalSincronizar}"
+                                                    Visibility="{Binding MalConectado, Converter={StaticResource BoolToVis}}"/>
+                                            <Button Command="{Binding DesconectarMalCommand}" Style="{StaticResource CfgDangerButton}" MinWidth="0" Margin="8,0,0,0"
+                                                    Content="{loc:T Cfg_MalDesconectar}" AutomationProperties.Name="{loc:T Cfg_MalDesconectar}"
+                                                    Visibility="{Binding MalConectado, Converter={StaticResource BoolToVis}}"/>
+                                        </StackPanel>
+                                    </ctl:SettingRow>
+                                    <TextBlock Text="{Binding MalUltimaPasadaTexto}" Style="{StaticResource AppText.Caption}" Margin="20,0,20,12"
+                                               Visibility="{Binding MalConectado, Converter={StaticResource BoolToVis}}"/>
+                                </StackPanel>
                             </Border>
                         </StackPanel>
                     </ScrollViewer>

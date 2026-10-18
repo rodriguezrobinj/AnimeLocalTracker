@@ -133,8 +133,13 @@ public class DatabaseService : IDatabaseService, IDisposable
         (23, "repetir los análisis de OP/ED que quedaron sin opening (ahora se busca también pasado el minuto 8)", DescartarAnalisisSkipSinOpeningAsync),
         // v24: columna nueva del modelo (misma vía que v4/v19/v21). Los animes que ya estaban quedan con NULL hasta que la
         // actualización por lotes del arranque traiga sus tags.
-        (24, "tags de AniList de cada anime (\"Parecidos en tu biblioteca\" de la ficha)", AgregarColumnasTemporadaFavoritoAsync)
+        (24, "tags de AniList de cada anime (\"Parecidos en tu biblioteca\" de la ficha)", AgregarColumnasTemporadaFavoritoAsync),
+        // v25: tabla nueva (clave = AniListId; se lee entera en cada pasada, sin índice). Empieza vacía: la primera pasada con
+        // MAL conectado envía la biblioteca sin bajar nada de lo que MAL ya tenga.
+        (25, "lo último enviado a MyAnimeList por anime (sincronización app → MAL)", CrearTablaSincronizacionMalAsync)
     };
+
+    private static Task CrearTablaSincronizacionMalAsync(SQLiteAsyncConnection conexion) => conexion.CreateTableAsync<SincronizacionMal>();
 
     /// <summary>
     /// v23: el opening solo se buscaba en los primeros 8 minutos y un episodio doble o con una apertura larga quedaba guardado sin él
@@ -1257,6 +1262,7 @@ public class DatabaseService : IDatabaseService, IDisposable
             db.Execute("DELETE FROM MediaAnimeAv1Verificado;");
             db.Execute("DELETE FROM EmisionGuardada;");
             db.Execute("DELETE FROM SeguimientoLocal;");
+            db.Execute("DELETE FROM SincronizacionMal;");
         });
 
         // Un DELETE solo marca las filas como libres: títulos, rutas e historial seguían legibles dentro del archivo
@@ -1490,6 +1496,14 @@ public class DatabaseService : IDatabaseService, IDisposable
     {
         return await _lectura.Table<SeguimientoLocal>().Where(s => s.Pendiente).ToListAsync();
     }
+
+    public Task<List<SeguimientoLocal>> ObtenerSeguimientosLocalesAsync() => _lectura.Table<SeguimientoLocal>().ToListAsync();
+
+    public Task<List<SincronizacionMal>> ObtenerSincronizacionesMalAsync() => _lectura.Table<SincronizacionMal>().ToListAsync();
+
+    public Task GuardarSincronizacionMalAsync(SincronizacionMal sincronizacion) => EscribirAsync(db => db.InsertOrReplace(sincronizacion));
+
+    public Task BorrarSincronizacionesMalAsync() => EscribirAsync(db => db.Execute("DELETE FROM SincronizacionMal;"));
 
     public async Task<List<ProximaEmisionLocal>> ObtenerProximasEmisionesAsync()
     {

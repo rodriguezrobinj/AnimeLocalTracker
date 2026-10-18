@@ -289,6 +289,12 @@ public partial class App : Application
         // "Parecidos en tu biblioteca" de la ficha (cálculo local con tags, géneros y sinopsis).
         services.AddSingleton<AnimeLocalTracker.Services.Recomendaciones.IParecidosService, AnimeLocalTracker.Services.Recomendaciones.ParecidosService>();
 
+        // Sincronización con MyAnimeList (app → MAL, sin bajar nunca nada). Apagada mientras no haya Client ID.
+        services.AddHttpClient(AnimeLocalTracker.Services.Mal.MalAuthService.NombreCliente).ConCorteSinConexion();
+        services.AddSingleton<AnimeLocalTracker.Services.Mal.IMalAuthService, AnimeLocalTracker.Services.Mal.MalAuthService>();
+        services.AddSingleton<AnimeLocalTracker.Services.Mal.IMalApiClient, AnimeLocalTracker.Services.Mal.MalApiClient>();
+        services.AddSingleton<AnimeLocalTracker.Services.Mal.IMalSyncService, AnimeLocalTracker.Services.Mal.MalSyncService>();
+
         // Avisos (episodio emitido, serie terminada) en un canal de Discord del usuario por webhook.
         services.AddHttpClient(AnimeLocalTracker.Services.Webhook.WebhookDiscordService.NombreCliente).ConCorteSinConexion();
         services.AddSingleton<AnimeLocalTracker.Services.Webhook.IWebhookDiscordService, AnimeLocalTracker.Services.Webhook.WebhookDiscordService>();
@@ -671,6 +677,7 @@ public partial class App : Application
         // Avisos y descarga automática de episodios nuevos (animes con la opción activada en su ficha).
         Paso("monitor de emisión", () => ServiceProvider.GetRequiredService<IEmisionMonitorService>().Iniciar());
         Paso("avisos en Discord", () => ServiceProvider.GetRequiredService<AnimeLocalTracker.Services.Webhook.IWebhookDiscordService>().Iniciar());
+        Paso("sincronización con MAL", () => ServiceProvider.GetRequiredService<AnimeLocalTracker.Services.Mal.IMalSyncService>().Iniciar());
 
         // Indicador de conexión: al volver internet sincroniza al momento lo hecho sin conexión.
         Paso("estado de conexión", () => ServiceProvider.GetRequiredService<IEstadoConexionService>().Iniciar());
