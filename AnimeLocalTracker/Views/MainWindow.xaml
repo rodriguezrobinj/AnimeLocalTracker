@@ -17,11 +17,8 @@
         WindowState="Maximized"
         KeyDown="Window_KeyDown"
         PreviewKeyDown="Window_PreviewKeyDown">
-    
-
-    <WindowChrome.WindowChrome>
-        <WindowChrome CaptionHeight="0" ResizeBorderThickness="0" CornerRadius="0" GlassFrameThickness="0" UseAeroCaptionButtons="False" />
-    </WindowChrome.WindowChrome>
+    <!-- Sin WindowChrome: no hace falta (sin marco ni bordes de redimensionar) y recorta la ventana maximizada al área de
+         trabajo, con lo que la pantalla completa no tapaba la barra de tareas sin pasar por WindowState Normal. -->
 
     <Window.Resources>
         <Style TargetType="ScrollBar" BasedOn="{StaticResource MaterialDesignScrollBarMinimal}" />
@@ -192,7 +189,6 @@
                         <materialDesign:PackIcon Kind="PlayCircle" Foreground="{StaticResource Brush.AccentStrong}" Width="20" Height="20" VerticalAlignment="Center" Margin="0,0,8,0"/>
                         <TextBlock Text="AnimeTracker" FontWeight="Bold" Foreground="{DynamicResource MaterialDesignBodyLight}" VerticalAlignment="Center" FontSize="14"/>
                         <Button Command="{Binding BuscarActualizacionesManualCommand}"
-                                WindowChrome.IsHitTestVisibleInChrome="True"
                                 ToolTip="{loc:T Nav_ComprobarUpdates}"
                                 AutomationProperties.Name="{loc:T Nav_ComprobarUpdates}"
                                 Style="{StaticResource MaterialDesignFlatButton}"
@@ -207,7 +203,7 @@
 
                         <!-- Estado de conexión: sin internet (la app sigue con lo guardado) o cambios esperando a subirse a AniList.
                              Un solo distintivo aquí en vez de avisos en cada pestaña; el detalle, en el tooltip. -->
-                        <Border WindowChrome.IsHitTestVisibleInChrome="True" Height="22" CornerRadius="11" Padding="8,0" Margin="8,0,0,0"
+                        <Border Height="22" CornerRadius="11" Padding="8,0" Margin="8,0,0,0"
                                 Background="{StaticResource Brush.Surface3}" VerticalAlignment="Center"
                                 Visibility="{Binding IndicadorConexionVisible, Converter={StaticResource BoolToVis}}"
                                 ToolTip="{Binding TextoEstadoConexion}" AutomationProperties.Name="{Binding TextoEstadoConexion}">
@@ -222,16 +218,16 @@
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
-                        <Button WindowChrome.IsHitTestVisibleInChrome="True" Click="BtnPantallaCompleta_Click" Width="45" Height="45" Style="{StaticResource MaterialDesignFlatButton}" Padding="0" Foreground="{DynamicResource MaterialDesignBodyLight}" ToolTip="{loc:T Nav_PantallaCompleta}" AutomationProperties.Name="{loc:T Win_BtnPantallaCompleta}">
+                        <Button Click="BtnPantallaCompleta_Click" Width="45" Height="45" Style="{StaticResource MaterialDesignFlatButton}" Padding="0" Foreground="{DynamicResource MaterialDesignBodyLight}" ToolTip="{loc:T Nav_PantallaCompleta}" AutomationProperties.Name="{loc:T Win_BtnPantallaCompleta}">
                             <materialDesign:PackIcon Kind="Fullscreen" />
                         </Button>
-                        <Button WindowChrome.IsHitTestVisibleInChrome="True" Click="BtnMinimizar_Click" Width="45" Height="45" Style="{StaticResource MaterialDesignFlatButton}" Padding="0" Foreground="{DynamicResource MaterialDesignBodyLight}" AutomationProperties.Name="{loc:T Win_BtnMinimizar}">
+                        <Button Click="BtnMinimizar_Click" Width="45" Height="45" Style="{StaticResource MaterialDesignFlatButton}" Padding="0" Foreground="{DynamicResource MaterialDesignBodyLight}" AutomationProperties.Name="{loc:T Win_BtnMinimizar}">
                             <materialDesign:PackIcon Kind="WindowMinimize" />
                         </Button>
-                        <Button WindowChrome.IsHitTestVisibleInChrome="True" Click="BtnMaximizar_Click" Width="45" Height="45" Style="{StaticResource MaterialDesignFlatButton}" Padding="0" Foreground="{DynamicResource MaterialDesignBodyLight}" IsEnabled="False" AutomationProperties.Name="{loc:T Win_BtnMaximizar}">
+                        <Button Click="BtnMaximizar_Click" Width="45" Height="45" Style="{StaticResource MaterialDesignFlatButton}" Padding="0" Foreground="{DynamicResource MaterialDesignBodyLight}" IsEnabled="False" AutomationProperties.Name="{loc:T Win_BtnMaximizar}">
                             <materialDesign:PackIcon Kind="WindowMaximize" />
                         </Button>
-                        <Button WindowChrome.IsHitTestVisibleInChrome="True" Click="BtnCerrar_Click" Width="45" Height="45" Style="{StaticResource MaterialDesignFlatButton}" Padding="0" Foreground="{DynamicResource MaterialDesignBodyLight}" AutomationProperties.Name="{loc:T Win_BtnCerrarApp}">
+                        <Button Click="BtnCerrar_Click" Width="45" Height="45" Style="{StaticResource MaterialDesignFlatButton}" Padding="0" Foreground="{DynamicResource MaterialDesignBodyLight}" AutomationProperties.Name="{loc:T Win_BtnCerrarApp}">
                             <materialDesign:PackIcon Kind="Close" />
                         </Button>
                     </StackPanel>

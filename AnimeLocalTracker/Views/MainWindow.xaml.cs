@@ -12,8 +12,6 @@ public partial class MainWindow : Window, IVentanaPrincipal
     public bool IsFullScreen { get; private set; }
     public bool EsModoPiP { get; private set; }
 
-    private System.Windows.Shell.WindowChrome? _chromeCache;
-
     // Mini reproductor: ventana flotante propia (ver EntrarModoPiP). Se recuerda dónde la dejó el usuario durante la sesión.
     private MiniReproductorWindow? _ventanaMini;
     private static Rect? _ultimoRectMini;
@@ -369,47 +367,45 @@ public partial class MainWindow : Window, IVentanaPrincipal
 
     private void EntrarPantallaCompleta()
     {
-        IsFullScreen = true; // Desactiva WM_GETMINMAXINFO → permite cubrir toda la pantalla
-
-        // 1. Guardar y quitar WindowChrome (es el que impide cubrir la barra de tareas)
-        _chromeCache ??= System.Windows.Shell.WindowChrome.GetWindowChrome(this);
-        System.Windows.Shell.WindowChrome.SetWindowChrome(this, null);
-
-        // 2. Ocultar barra de título
+        IsFullScreen = true; // WM_GETMINMAXINFO deja de limitar al área de trabajo
         BarraTitulo.Visibility = Visibility.Collapsed;
-
-        // 3. Configurar ventana para fullscreen real
-        WindowStyle = WindowStyle.None;
-        ResizeMode  = ResizeMode.NoResize; 
-        Topmost     = true; 
-
-        // 4. Forzar refresco (Normal → Maximized) para que WPF recalcule sin límites
-        WindowState = WindowState.Normal;
-        WindowState = WindowState.Maximized;
+        Topmost = true;
+        AjustarAlModo();
     }
 
     private void SalirPantallaCompleta()
     {
-        IsFullScreen = false; // Reactiva WM_GETMINMAXINFO → respeta barra de tareas
-
-        // 1. Restaurar barra de título
+        IsFullScreen = false; // WM_GETMINMAXINFO vuelve a respetar la barra de tareas
         BarraTitulo.Visibility = Visibility.Visible;
-        
-        // 2. Restaurar propiedades de ventana
-        WindowStyle = WindowStyle.None;
-        ResizeMode  = ResizeMode.CanResize;
-        Topmost     = false;
-        
-        // 3. Re-maximizar (ahora WM_GETMINMAXINFO limitará al área de trabajo)
-        WindowState = WindowState.Normal;
-        WindowState = WindowState.Maximized;
-        
-        // 4. Restaurar WindowChrome
-        if (_chromeCache != null)
-        {
-            System.Windows.Shell.WindowChrome.SetWindowChrome(this, _chromeCache);
-        }
+        Topmost = false;
+        AjustarAlModo();
     }
+
+    /// <summary>
+    /// Lleva la ventana maximizada al monitor entero (pantalla completa) o a su área de trabajo con UN solo cambio de tamaño,
+    /// como hacen los reproductores. Antes se pasaba por WindowState Normal y de vuelta a Maximized: la ventana se veía un
+    /// instante a 1100×700 y Windows animaba dos veces (medido el 2026-10-18), así que entrar y salir daba un tirón.
+    /// </summary>
+    private void AjustarAlModo()
+    {
+        var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+        if (WindowState == WindowState.Maximized && MonitorDeVentana.Areas(hwnd, out var monitor, out var trabajo))
+        {
+            var r = IsFullScreen ? monitor : trabajo;
+            SetWindowPos(hwnd, IntPtr.Zero, r.Left, r.Top, r.Right - r.Left, r.Bottom - r.Top, SwpNoZOrder | SwpNoActivate);
+        }
+        else if (WindowState == WindowState.Normal)
+        {
+            WindowState = WindowState.Maximized;
+        }
+        // Minimizada: al restaurarla, WM_GETMINMAXINFO ya da el tamaño del modo actual.
+    }
+
+    private const uint SwpNoZOrder = 0x0004, SwpNoActivate = 0x0010;
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy, uint flags);
 
     // ═══════════════════════════════════════════════════════════════
     //  Mini reproductor: el video pasa a una ventana flotante propia,
