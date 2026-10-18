@@ -16,7 +16,8 @@
         ResizeMode="NoResize"
         WindowState="Maximized"
         KeyDown="Window_KeyDown"
-        PreviewKeyDown="Window_PreviewKeyDown">
+        PreviewKeyDown="Window_PreviewKeyDown"
+        AllowDrop="True" PreviewDragOver="Window_PreviewDragOver" PreviewDragLeave="Window_PreviewDragLeave" PreviewDrop="Window_PreviewDrop">
     <!-- Sin WindowChrome: no hace falta (sin marco ni bordes de redimensionar) y recorta la ventana maximizada al área de
          trabajo, con lo que la pantalla completa no tapaba la barra de tareas sin pasar por WindowState Normal. -->
 
@@ -447,6 +448,74 @@
                                             Content="{loc:T Dlg_Cancelar}"
                                             Command="{Binding SelectorTorrentService.CancelarSelectorCommand}"/>
                                 </Grid>
+                            </Border>
+                        </Grid>
+                    </Border>
+                </Grid>
+
+                <!-- ══ TORRENT ARRASTRADO O MAGNET PEGADO: capa al arrastrar, espera del magnet y cuadro de confirmación ══ -->
+                <Grid x:Name="CapaSoltarTorrent" Visibility="Collapsed" Grid.Column="0" Grid.ColumnSpan="2"
+                      Style="{StaticResource AppOverlayScrim}" Panel.ZIndex="2002" IsHitTestVisible="False">
+                    <Border Style="{StaticResource AppDialogCard}" Padding="28,22">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="Magnet" Width="26" Height="26" VerticalAlignment="Center" Foreground="{DynamicResource Brush.Accent}" Margin="0,0,12,0"/>
+                            <TextBlock Text="{loc:T Desc_ImportarSoltar}" Style="{StaticResource AppText.Section}" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <Grid Visibility="{Binding ImportarTorrent.ObteniendoInformacion, Converter={StaticResource BoolToVis}}"
+                      Grid.Column="0" Grid.ColumnSpan="2" Style="{StaticResource AppOverlayScrim}" Panel.ZIndex="2001">
+                    <Border Style="{StaticResource AppDialogCard}" Padding="28,22" AutomationProperties.Name="{loc:T Desc_ImportarObteniendo}">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal">
+                                <ProgressBar Style="{StaticResource MaterialDesignCircularProgressBar}" IsIndeterminate="True" Width="22" Height="22" Margin="0,0,12,0"/>
+                                <TextBlock Text="{loc:T Desc_ImportarObteniendo}" Style="{StaticResource AppText.Section}" FontSize="15" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <Button HorizontalAlignment="Right" Margin="0,16,0,0" Style="{StaticResource AppDialogGhostButton}"
+                                    Content="{loc:T Dlg_Cancelar}" Command="{Binding ImportarTorrent.CancelarCommand}"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <Grid Visibility="{Binding ImportarTorrent.Visible, Converter={StaticResource BoolToVis}}"
+                      Grid.Column="0" Grid.ColumnSpan="2" Style="{StaticResource AppOverlayScrim}" Panel.ZIndex="2001">
+                    <Border Style="{StaticResource AppDialogCard}" Width="560"
+                            KeyboardNavigation.TabNavigation="Cycle" AutomationProperties.Name="{loc:T Desc_ImportarTitulo}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <Grid Margin="26,24,26,14">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Border Width="48" Height="48" CornerRadius="14" VerticalAlignment="Center" Margin="0,0,16,0" Background="{DynamicResource Brush.AccentTint}">
+                                    <materialDesign:PackIcon Kind="Magnet" Width="26" Height="26" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource Brush.Accent}"/>
+                                </Border>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="{loc:T Desc_ImportarTitulo}" Style="{StaticResource AppText.Section}" FontSize="18"/>
+                                    <TextBlock Text="{Binding ImportarTorrent.NombreTorrent}" Style="{StaticResource AppText.Secondary}" TextWrapping="Wrap" Margin="0,3,0,0"/>
+                                </StackPanel>
+                            </Grid>
+                            <StackPanel Grid.Row="1" Margin="26,0,26,18">
+                                <TextBlock Text="{loc:T Desc_ImportarAnime}" Style="{StaticResource AppText.Caption}" Margin="0,0,0,4"/>
+                                <ComboBox ItemsSource="{Binding ImportarTorrent.Animes}" SelectedItem="{Binding ImportarTorrent.AnimeElegido, Mode=TwoWay}"
+                                          DisplayMemberPath="Titulo" materialDesign:HintAssist.Hint="{loc:T Desc_ImportarElegirAnime}"
+                                          IsTextSearchEnabled="True" TextSearch.TextPath="Titulo" Height="38"
+                                          AutomationProperties.Name="{loc:T Desc_ImportarAnime}"/>
+                                <TextBlock Text="{Binding ImportarTorrent.TextoEpisodios}" Style="{StaticResource AppText.Body}" Margin="0,14,0,0"/>
+                                <TextBlock Text="{Binding ImportarTorrent.TextoDetalle}" Style="{StaticResource AppText.Caption}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                <TextBlock Text="{Binding ImportarTorrent.TextoCarpeta}" Style="{StaticResource AppText.Caption}" TextTrimming="CharacterEllipsis" Margin="0,4,0,0"/>
+                            </StackPanel>
+                            <Border Grid.Row="2" Background="{DynamicResource Brush.Surface2}" CornerRadius="0,0,16,16" Padding="20,14">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                    <Button Style="{StaticResource AppDialogGhostButton}" Content="{loc:T Dlg_Cancelar}" Command="{Binding ImportarTorrent.CancelarCommand}" Margin="0,0,8,0"/>
+                                    <Button Style="{StaticResource AppDialogPrimaryButton}" Content="{loc:T Desc_ImportarDescargar}" Command="{Binding ImportarTorrent.DescargarCommand}"/>
+                                </StackPanel>
                             </Border>
                         </Grid>
                     </Border>

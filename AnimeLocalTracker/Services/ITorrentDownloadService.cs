@@ -53,4 +53,10 @@ public interface ITorrentDownloadService
     /// (<paramref name="seguirSembrando"/> de descargas anteriores). Se llama al cerrar
     /// la app — no hay sembrado persistente entre sesiones en este alcance.</summary>
     Task DetenerTodoElSeedingAsync();
+
+    /// <summary>
+    /// Descarga los metadatos de un enlace magnet (lo que tendría el .torrent) pidiéndoselos a los pares. Null si el enlace no es
+    /// válido. Lanza <see cref="OperationCanceledException"/> si se cancela (el llamador pone el límite de tiempo).
+    /// </summary>
+    Task<byte[]?> ObtenerTorrentDeMagnetAsync(string enlace, CancellationToken ct);
 }

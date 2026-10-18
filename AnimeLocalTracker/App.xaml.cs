@@ -155,6 +155,9 @@ public partial class App : Application
         services.AddSingleton<IDialogService, DialogService>();
         // Fase 2d: overlay para elegir un torrent a mano entre varios candidatos.
         services.AddSingleton<ISelectorTorrentService, SelectorTorrentService>();
+        // Torrents soltados en la ventana o pegados como magnet (cuadro "Descargar torrent").
+        services.AddSingleton(sp => new Services.Torrents.ImportadorTorrent(sp.GetRequiredService<ITorrentDownloadService>(), AppDataPaths.TorrentsImportadosDir));
+        services.AddSingleton<Services.Torrents.IImportarTorrentService, Services.Torrents.ImportarTorrentService>();
         services.AddSingleton<IAuthService, AuthService>();
         services.AddSingleton<IGamepadService, GamepadService>();
         services.AddSingleton<IPluginService, PluginService>();
@@ -514,7 +517,8 @@ public partial class App : Application
     [
         typeof(IHttpClientFactory), typeof(IAuthService), typeof(IAnimeTrackingService), typeof(IImageCacheService),
         typeof(IPerfilAniListService), typeof(AnimeLibraryService), typeof(IDialogService), typeof(ISelectorTorrentService),
-        typeof(IUpdateService), typeof(NewEpisodeNotifier), typeof(IDownloadService), typeof(IAnimeThemesDownloadService)
+        typeof(IUpdateService), typeof(NewEpisodeNotifier), typeof(IDownloadService), typeof(IAnimeThemesDownloadService),
+        typeof(Services.Torrents.IImportarTorrentService)
     ];
 
     private readonly bool _esPrimeraInstancia;

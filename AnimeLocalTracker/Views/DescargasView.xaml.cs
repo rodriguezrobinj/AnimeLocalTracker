@@ -1,7 +1,10 @@
+using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using AnimeLocalTracker.Services;
+using AnimeLocalTracker.ViewModels;
 
 namespace AnimeLocalTracker.Views;
 
@@ -57,5 +60,18 @@ public partial class DescargasView : UserControl
     private void CerrarMenuOpciones_Click(object sender, RoutedEventArgs e)
     {
         MenuOpcionesPopup.IsOpen = false;
+    }
+
+    private async void ImportarTorrent_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (DataContext is DescargasViewModel { ImportarTorrent: { Ocupado: false } servicio })
+                await EntradaTorrent.PortapapelesOArchivoAsync(servicio);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn("DescargasView", $"No se pudo importar el torrent: {ex.Message}");
+        }
     }
 }

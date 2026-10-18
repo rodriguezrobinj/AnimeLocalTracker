@@ -111,13 +111,19 @@ public partial class DescargasViewModel : ObservableObject, IAlEntrarEnPestana, 
     [ObservableProperty]
     private bool _sinResultados;
 
+    /// <summary>Botón "Añadir torrent o magnet" (null en pruebas: el botón no se ve).</summary>
+    public Services.Torrents.IImportarTorrentService? ImportarTorrent { get; }
+    public bool PuedeImportarTorrent => ImportarTorrent != null;
+
     public DescargasViewModel(IDownloadService downloadService, IDatabaseService? database = null,
-        IAnimeThemesDownloadService? descargasMusica = null, IAnimeThemesService? catalogoMusica = null)
+        IAnimeThemesDownloadService? descargasMusica = null, IAnimeThemesService? catalogoMusica = null,
+        Services.Torrents.IImportarTorrentService? importarTorrent = null)
     {
         _downloadService = downloadService;
         _database = database;
         _descargasMusica = descargasMusica;
         _catalogoMusica = catalogoMusica;
+        ImportarTorrent = importarTorrent;
         WeakReferenceMessenger.Default.Register<DescargaProgresoMensaje>(this);
         WeakReferenceMessenger.Default.Register<DescargaHistorialActualizadoMensaje>(this);
         WeakReferenceMessenger.Default.Register<DescargaMusicaProgresoMensaje>(this);

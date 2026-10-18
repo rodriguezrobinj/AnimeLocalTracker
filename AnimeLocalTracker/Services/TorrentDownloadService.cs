@@ -163,7 +163,9 @@ public class TorrentDownloadService : ITorrentDownloadService, IDisposable
         IProgress<(double Progreso, double VelocidadBps)>? progress = null,
         CancellationToken ct = default)
     {
-        if (!Core.UrlSeguridad.EsUrlNyaaPermitida(torrentUrl))
+        // Torrents soltados en la ventana: solo de su carpeta (ver ImportadorTorrent.RutaLocalPermitida); el resto, solo de Nyaa.
+        string? rutaLocal = Torrents.ImportadorTorrent.RutaLocalPermitida(torrentUrl, AppDataPaths.TorrentsImportadosDir);
+        if (rutaLocal == null && !Core.UrlSeguridad.EsUrlNyaaPermitida(torrentUrl))
             return new ResultadoTorrent(false, null, LocalizationService.T("Desc_TorrentUrlNoPermitida"));
 
         TorrentManager? manager = null;
@@ -172,8 +174,15 @@ public class TorrentDownloadService : ITorrentDownloadService, IDisposable
         try
         {
             byte[] torrentBytes;
-            using (var req = new HttpRequestMessage(HttpMethod.Get, torrentUrl))
+            if (rutaLocal != null)
             {
+                if (!File.Exists(rutaLocal) || new FileInfo(rutaLocal).Length > MaxTorrentBytes)
+                    return new ResultadoTorrent(false, null, LocalizationService.T("Desc_TorrentImportadoNoExiste"));
+                torrentBytes = await File.ReadAllBytesAsync(rutaLocal, ct);
+            }
+            else
+            {
+                using var req = new HttpRequestMessage(HttpMethod.Get, torrentUrl);
                 using var res = await _httpClient.SendAsync(req, ct);
                 if (!res.IsSuccessStatusCode)
                     return new ResultadoTorrent(false, null, string.Format(LocalizationService.T("Desc_TorrentHttpFormato"), (int)res.StatusCode));
@@ -349,6 +358,13 @@ public class TorrentDownloadService : ITorrentDownloadService, IDisposable
             try { await manager.TrackerManager.AddTrackerAsync(new Uri(url)); }
             catch (Exception ex) { AppLogger.Debug("TorrentDownloadService", $"No se pudo añadir el rastreador {url}: {ex.Message}"); }
         }
+    }
+
+    public async Task<byte[]?> ObtenerTorrentDeMagnetAsync(string enlace, CancellationToken ct)
+    {
+        if (!MagnetLink.TryParse(enlace?.Trim() ?? string.Empty, out var magnet)) return null;
+        var datos = await _engine.DownloadMetadataAsync(magnet, ct);
+        return datos.ToArray();
     }
 
     public async Task DetenerTodoElSeedingAsync()

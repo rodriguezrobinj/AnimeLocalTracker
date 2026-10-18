@@ -36,6 +36,8 @@ public static class AppDataPaths
     public static string ShaderCacheDir { get; } = Path.Combine(DataRoot, "ShaderCache");
     public static string PluginsFolder { get; } = Path.Combine(DataRoot, "Plugins");
     public static string TorrentsCacheDir { get; } = Path.Combine(DataRoot, "TorrentsCache");
+    /// <summary>.torrent soltados en la ventana o resueltos de un magnet (la cola de descargas los usa al reanudar).</summary>
+    public static string TorrentsImportadosDir { get; } = Path.Combine(DataRoot, "TorrentsImportados");
     public static string BibliotecaDb { get; } = Path.Combine(DataRoot, "biblioteca.db");
     public static string TokenPath { get; } = Path.Combine(DataRoot, "anilist_token.txt");
     public static string SettingsPath { get; } = Path.Combine(DataRoot, "settings.json");

@@ -100,6 +100,15 @@
 
             <!-- Acciones (a la derecha) -->
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                <Button Click="ImportarTorrent_Click" Height="40" Padding="16,0" Margin="0,0,10,0"
+                        Style="{StaticResource MaterialDesignOutlinedButton}" materialDesign:ButtonAssist.CornerRadius="10" Cursor="Hand"
+                        Visibility="{Binding PuedeImportarTorrent, Converter={StaticResource BoolToVis}}"
+                        ToolTip="{loc:T Desc_ImportarBotonTip}" AutomationProperties.Name="{loc:T Desc_ImportarBoton}">
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon Kind="Magnet" Width="18" Height="18" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <TextBlock Text="{loc:T Desc_ImportarBoton}" FontWeight="SemiBold" FontSize="13.5" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
                 <Button Command="{Binding AlternarPausaTodasCommand}" Height="40" Padding="18,0" Margin="0,0,10,0"
                         Style="{StaticResource AppPrimaryButton}"
                         materialDesign:ButtonAssist.CornerRadius="10" Cursor="Hand"

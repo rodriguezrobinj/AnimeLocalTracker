@@ -97,6 +97,9 @@ public partial class MainViewModel : ObservableObject,
     /// <summary>Fase 2d: overlay para elegir un torrent a mano — mismo patrón que <see cref="DialogService"/>.</summary>
     public ISelectorTorrentService SelectorTorrentService { get; }
 
+    /// <summary>Cuadro "Descargar torrent" (arrastrar / Ctrl+V / botón de Descargas). Null en pruebas que no lo usan.</summary>
+    public Services.Torrents.IImportarTorrentService? ImportarTorrent { get; }
+
     public string VersionAppTexto => _updateService.ObtenerVersionActual();
 
     // === BARRA LATERAL ===
@@ -156,7 +159,8 @@ public partial class MainViewModel : ObservableObject,
         NewEpisodeNotifier newEpisodeNotifier,
         ISystemTrayService systemTrayService,
         IAnimeThemesDownloadService? descargasMusica = null,
-        IMusicaDeFondoService? musicaDeFondo = null)
+        IMusicaDeFondoService? musicaDeFondo = null,
+        Services.Torrents.IImportarTorrentService? importarTorrent = null)
     {
         MusicaDeFondo = musicaDeFondo;
         _descargasMusica = descargasMusica;
@@ -167,6 +171,7 @@ public partial class MainViewModel : ObservableObject,
         _updateService = updateService;
         DialogService = dialogService;
         SelectorTorrentService = selectorTorrentService;
+        ImportarTorrent = importarTorrent;
         _databaseService = databaseService;
         _fileScannerService = fileScannerService;
         _newEpisodeNotifier = newEpisodeNotifier;

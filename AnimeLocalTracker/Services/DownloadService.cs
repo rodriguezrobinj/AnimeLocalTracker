@@ -81,6 +81,15 @@ public class DownloadService : IDownloadService
     private readonly IConectividadRed? _conectividad;
     private readonly ConcurrentDictionary<string, DownloadState> _activeDownloads = new();
 
+    /// <summary>
+    /// Turno por torrent: los episodios del mismo torrent se bajan de uno en uno (añadir el mismo torrent dos veces al motor
+    /// retira el anterior). Se espera ANTES de pedir hueco, así que los que esperan no ocupan huecos de descarga.
+    /// </summary>
+    private readonly ConcurrentDictionary<string, SemaphoreSlim> _turnosTorrent = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Carpeta de los .torrent importados (ver ImportadorTorrent). Las pruebas la cambian.</summary>
+    internal string CarpetaTorrentsImportados { get; set; } = AppDataPaths.TorrentsImportadosDir;
+
     // Gestor de slots de concurrencia (redimensionable en caliente según DescargasSimultaneas)
     private readonly object _slotLock = new();
     private readonly List<(string Key, TaskCompletionSource<bool> Tcs)> _slotWaiters = new();
@@ -433,6 +442,14 @@ public class DownloadService : IDownloadService
         {
             AppLogger.Info("DownloadService", $"Limpieza de torrents abandonados: {resultado.Carpetas} carpeta(s) temporal(es), {resultado.Bytes / 1024d / 1024d:F0} MB liberados.");
         }
+
+        // .torrent soltados en la ventana que ya no usa ninguna descarga de la cola.
+        var enUso = _activeDownloads.Values
+            .Select(s => Torrents.ImportadorTorrent.RutaLocalPermitida(s.Torrent?.TorrentUrl, CarpetaTorrentsImportados))
+            .OfType<string>()
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        int importados = Torrents.ImportadorTorrent.LimpiarHuerfanos(CarpetaTorrentsImportados, enUso);
+        if (importados > 0) AppLogger.Info("DownloadService", $"Limpieza de torrents importados sin uso: {importados}.");
     }
 
     /// <summary>
@@ -989,9 +1006,14 @@ public class DownloadService : IDownloadService
         state.Ejecucion = Task.Run(async () =>
         {
             bool slotAdquirido = false;
+            var turno = _turnosTorrent.GetOrAdd(string.IsNullOrEmpty(candidato.InfoHash) ? candidato.TorrentUrl : candidato.InfoHash,
+                _ => new SemaphoreSlim(1, 1));
+            bool turnoTomado = false;
             try
             {
                 await EsperarEjecucionAnteriorAsync(anterior, ct);
+                await turno.WaitAsync(ct);
+                turnoTomado = true;
                 await AdquirirSlotAsync(key, state, ct);
                 slotAdquirido = true;
                 state.EnCola = false;
@@ -1028,6 +1050,7 @@ public class DownloadService : IDownloadService
             finally
             {
                 if (slotAdquirido) LiberarSlot();
+                if (turnoTomado) turno.Release();
             }
         });
     }

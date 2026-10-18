@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using System.Windows;
 using AnimeLocalTracker.Services;
 using AnimeLocalTracker.ViewModels;
@@ -59,6 +60,53 @@ public partial class MainWindow : Window, IVentanaPrincipal
             vmSel.SelectorTorrentService.CancelarSelectorCommand.Execute(null);
             e.Handled = true;
         }
+        else if (e.Key == System.Windows.Input.Key.Escape && ImportarTorrent is { Ocupado: true } abierto)
+        {
+            abierto.CancelarCommand.Execute(null);
+            e.Handled = true;
+        }
+        else if (e.Key == System.Windows.Input.Key.V && System.Windows.Input.Keyboard.Modifiers == System.Windows.Input.ModifierKeys.Control
+                 && ImportarTorrent is { Ocupado: false } servicio && !EntradaTorrent.FocoEnCajaDeTexto()
+                 && EntradaTorrent.MagnetDelPortapapeles() is { } magnet)
+        {
+            e.Handled = true;
+            _ = ImportarMagnetSinBloquearAsync(servicio, magnet);
+        }
+    }
+
+    // === Torrent arrastrado o magnet pegado (ver EntradaTorrent) ===
+
+    private Services.Torrents.IImportarTorrentService? ImportarTorrent => (DataContext as MainViewModel)?.ImportarTorrent;
+
+    private void Window_PreviewDragOver(object sender, DragEventArgs e)
+    {
+        bool acepta = ImportarTorrent is { Ocupado: false } && EntradaTorrent.EsAceptable(e.Data);
+        e.Effects = acepta ? DragDropEffects.Copy : DragDropEffects.None;
+        CapaSoltarTorrent.Visibility = acepta ? Visibility.Visible : Visibility.Collapsed;
+        if (acepta) e.Handled = true;
+    }
+
+    private void Window_PreviewDragLeave(object sender, DragEventArgs e) => CapaSoltarTorrent.Visibility = Visibility.Collapsed;
+
+    private async void Window_PreviewDrop(object sender, DragEventArgs e)
+    {
+        CapaSoltarTorrent.Visibility = Visibility.Collapsed;
+        if (ImportarTorrent is not { Ocupado: false } servicio || !EntradaTorrent.EsAceptable(e.Data)) return;
+        e.Handled = true;
+        try
+        {
+            await EntradaTorrent.SoltarAsync(servicio, e.Data);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn("MainWindow", $"No se pudo importar el torrent soltado: {ex.Message}");
+        }
+    }
+
+    private static async Task ImportarMagnetSinBloquearAsync(Services.Torrents.IImportarTorrentService servicio, string magnet)
+    {
+        try { await servicio.ImportarMagnetAsync(magnet); }
+        catch (Exception ex) { AppLogger.Warn("MainWindow", $"No se pudo importar el magnet pegado: {ex.Message}"); }
     }
 
     // ═══════════════════════════════════════════════════════════════
