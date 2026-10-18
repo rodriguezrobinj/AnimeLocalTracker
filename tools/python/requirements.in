@@ -7,7 +7,7 @@
 #   Ya no lleva --pre (se puso por anitopy, retirado el 2026-10-08): el lock se regeneró sin él el 2026-10-11. Los topes de
 #   abajo se pusieron cuando con --pre el resolvedor elegía betas; se conservan como versiones probadas.
 #   Ojo con Dependabot: regenera el lock solo desde este archivo, sin pyproject.toml, y borra yt-dlp, playwright y otros
-#   (PR #18, CI en rojo). Sus PR de este directorio se cierran y la subida se hace a mano con el comando de arriba.
+#   (PR #18 y #20, CI en rojo). Sus PR de este directorio se cierran y la subida se hace a mano con el comando de arriba.
 # El lock se instala con:  python -m pip install --require-hashes -r tools/python/requirements.txt
 #                          python -m pip install --no-deps -e tools/python
 
