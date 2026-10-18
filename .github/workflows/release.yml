@@ -11,6 +11,13 @@ on:
 permissions:
   contents: write
 
+# CI-08: con el pwsh por defecto, GitHub solo mira el código de salida del ÚLTIMO comando de cada paso: un
+# `pip install --require-hashes` fallido (SEC-04) dejaba el paso en verde. Así, cualquier comando que termine con error
+# corta el paso. Los pasos con `shell: powershell` explícito no cambian.
+defaults:
+  run:
+    shell: pwsh -Command "$PSNativeCommandUseErrorActionPreference = $true; . '{0}'"
+
 # DEV-07: nunca dos releases en paralelo; sin cancel-in-progress para no
 # interrumpir una subida a mitad (los runs siguientes se encolan).
 concurrency:
@@ -81,7 +88,8 @@ jobs:
       run: |
         # CI-01: la caché restaura ~/.cargo/bin pero no ~/.cargo/.crates.toml, y `cargo install` fallaba con
         # "binary cargo-audit.exe already exists". Se instala solo si falta la versión fijada.
-        $versionInstalada = (& cargo audit --version 2>$null) -join ' '
+        # Sin cargo-audit, `cargo audit --version` falla: aquí ese fallo se espera (CI-08).
+        $versionInstalada = try { (& cargo audit --version 2>$null) -join ' ' } catch { '' }
         if ($versionInstalada -notmatch '0\.22\.2') {
           cargo install cargo-audit --locked --version 0.22.2 --force
         }

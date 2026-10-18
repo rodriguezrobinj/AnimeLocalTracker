@@ -16,6 +16,14 @@ concurrency:
 permissions:
   contents: read
 
+# CI-08: con el pwsh por defecto, GitHub solo mira el código de salida del ÚLTIMO comando de cada paso: si fallaba
+# `pip install --require-hashes` (SEC-04) el paso seguía en verde y el error salía después en otro sitio, o en ninguno
+# (PR #20 de Dependabot). Así, cualquier comando que termine con error corta el paso. Los pasos con `shell: powershell`
+# explícito no cambian.
+defaults:
+  run:
+    shell: pwsh -Command "$PSNativeCommandUseErrorActionPreference = $true; . '{0}'"
+
 jobs:
   build-and-test:
     name: Build, Test & SCA Security Audit
@@ -83,8 +91,8 @@ jobs:
         # CI-01: la caché restaura ~/.cargo/bin (con cargo-audit.exe) pero NO ~/.cargo/.crates.toml, así que
         # `cargo install` veía un binario "desconocido" y fallaba con "binary cargo-audit.exe already exists
         # in destination" (≈18 % de los runs). Se instala solo si falta la versión fijada, y con --force por
-        # si el binario cacheado no coincide.
-        $versionInstalada = (& cargo audit --version 2>$null) -join ' '
+        # si el binario cacheado no coincide. Sin cargo-audit, `cargo audit --version` falla: aquí ese fallo se espera (CI-08).
+        $versionInstalada = try { (& cargo audit --version 2>$null) -join ' ' } catch { '' }
         if ($versionInstalada -notmatch '0\.22\.2') {
           cargo install cargo-audit --locked --version 0.22.2 --force
         }
