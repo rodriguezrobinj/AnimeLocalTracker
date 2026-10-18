@@ -19,6 +19,12 @@ public interface IMalSyncService
     /// <summary>Una pasada ya; null si MAL no está conectado o ya hay una en marcha.</summary>
     Task<ResumenSincronizacionMal?> SincronizarAhoraAsync(CancellationToken ct);
 
+    /// <summary>
+    /// Borra lo apuntado como enviado (al conectar una cuenta: lo de una conexión anterior, quizá de otra cuenta o perdida sin
+    /// pasar por "Desconectar", no vale). Espera a que termine la pasada en curso, que podría apuntar un anime justo después.
+    /// </summary>
+    Task OlvidarEnviadosAsync();
+
     ResumenSincronizacionMal? UltimaPasada { get; }
 
     event Action<ResumenSincronizacionMal>? PasadaTerminada;
@@ -86,9 +92,22 @@ public sealed class MalSyncService : IMalSyncService, IDisposable
         }
     }
 
+    public async Task OlvidarEnviadosAsync()
+    {
+        await _unaPasada.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            await _db.BorrarSincronizacionesMalAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            _unaPasada.Release();
+        }
+    }
+
     private async Task<ResumenSincronizacionMal> PasadaAsync(CancellationToken ct)
     {
-        var animes = await _db.ObtenerTodosLosAnimesAsync().ConfigureAwait(false) ?? new();
+        var animes = await _db.ObtenerAnimesLigerosAsync().ConfigureAwait(false) ?? new();
         var vistos = await _db.ObtenerEpisodiosVistosPorAnimeAsync().ConfigureAwait(false) ?? new();
         var seguimientos = (await _db.ObtenerSeguimientosLocalesAsync().ConfigureAwait(false) ?? new()).ToDictionary(s => s.AniListId);
         var enviados = (await _db.ObtenerSincronizacionesMalAsync().ConfigureAwait(false) ?? new()).ToDictionary(s => s.AniListId);

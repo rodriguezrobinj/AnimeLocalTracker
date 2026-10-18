@@ -42,12 +42,22 @@ public class MalTests
         => MapeoMal.Progreso(vistos, editor, total).Should().Be(esperado);
 
     [Fact]
-    public void Deseado_UsaElSeguimientoLocalSiExiste()
+    public void Deseado_ElSeguimientoLocalAportaProgresoYNota()
     {
-        var anime = new AnimeItem { AniListId = 1, MalId = 52991, EstadoUsuario = "PLANNING", TotalEpisodios = 28 };
+        var anime = new AnimeItem { AniListId = 1, MalId = 52991, EstadoUsuario = "CURRENT", TotalEpisodios = 28 };
+        var seguimiento = new SeguimientoLocal { AniListId = 1, Estado = "CURRENT", Progreso = 16, Puntaje = 85 };
+
+        MapeoMal.Deseado(anime, seguimiento, vistos: 14).Should().Be(new EstadoMal("watching", 16, 9));
+    }
+
+    [Fact]
+    public void Deseado_ElEstadoEsElDelAnime_AunqueElSeguimientoLocalSeaViejo()
+    {
+        // Abrió el editor estando "viendo" y luego terminó la serie reproduciéndola: el seguimiento local no se toca.
+        var anime = new AnimeItem { AniListId = 1, MalId = 52991, EstadoUsuario = "COMPLETED", TotalEpisodios = 28 };
         var seguimiento = new SeguimientoLocal { AniListId = 1, Estado = "CURRENT", Progreso = 10, Puntaje = 85 };
 
-        MapeoMal.Deseado(anime, seguimiento, vistos: 14).Should().Be(new EstadoMal("watching", 14, 9));
+        MapeoMal.Deseado(anime, seguimiento, vistos: 28).Should().Be(new EstadoMal("completed", 28, 9));
     }
 
     [Fact]
@@ -75,12 +85,24 @@ public class MalTests
         => ReglaMal.QueEnviar(new EstadoMal("watching", 14, 9), enMal: null).Should().Be(new EstadoMal("watching", 14, 9));
 
     [Fact]
-    public void MalVaMasAdelantado_NoSeToca()
-        => ReglaMal.QueEnviar(new EstadoMal("watching", 14, 9), new EstadoMal("watching", 20, 0)).Should().BeNull();
+    public void MalVaMasAdelantado_IgualSalvoEso_NoSeToca()
+        => ReglaMal.QueEnviar(new EstadoMal("watching", 14, 0), new EstadoMal("watching", 20, 0)).Should().BeNull();
+
+    [Fact]
+    public void MalVaMasAdelantado_ConservaSusEpisodiosPeroEnviaEstadoYNota()
+        => ReglaMal.QueEnviar(new EstadoMal("dropped", 5, 9), new EstadoMal("watching", 12, 0)).Should().Be(new EstadoMal("dropped", 12, 9));
 
     [Fact]
     public void MalCompletadoYLaAppNo_NoSeToca()
         => ReglaMal.QueEnviar(new EstadoMal("watching", 28, 0), new EstadoMal("completed", 28, 8)).Should().BeNull();
+
+    [Fact]
+    public void MalCompletadoYLaAppNo_SigueCompletadoPeroLlegaLaNota()
+        => ReglaMal.QueEnviar(new EstadoMal("watching", 20, 9), new EstadoMal("completed", 28, 8)).Should().Be(new EstadoMal("completed", 28, 9));
+
+    [Fact]
+    public void PlaneadoEnLaAppYEnMalEmpezadoSinEpisodios_NoBajaAPlaneado()
+        => ReglaMal.QueEnviar(new EstadoMal("plan_to_watch", 0, 7), new EstadoMal("watching", 0, 0)).Should().Be(new EstadoMal("watching", 0, 7));
 
     [Fact]
     public void LaAppVaMasAdelantada_SeEnvia()

@@ -25,6 +25,9 @@ public interface IMalAuthService
 
     /// <summary>Token de acceso vigente (lo renueva si está por caducar); null si no hay conexión con MAL o no se pudo renovar.</summary>
     Task<string?> TokenValidoAsync(CancellationToken ct);
+
+    /// <summary>MAL rechazó <paramref name="tokenRechazado"/> antes de su caducidad: lo renueva (si nadie lo hizo ya) y devuelve el nuevo; null si no se pudo.</summary>
+    Task<string?> RenovarAsync(string tokenRechazado, CancellationToken ct);
 }
 
 /// <summary>
@@ -46,6 +49,9 @@ public sealed class MalAuthService : IMalAuthService, IDisposable
     private readonly AlmacenTokenMal _almacen;
     private readonly TimeProvider _reloj;
     private readonly SemaphoreSlim _renovando = new(1, 1);
+    private readonly object _cerrojo = new();
+    private TokensMal? _tokens;
+    private bool _tokensLeidos;
 
     public MalAuthService(IHttpClientFactory http) : this(http, ClientIdMal, new AlmacenTokenMal(), TimeProvider.System) { }
 
@@ -59,37 +65,82 @@ public sealed class MalAuthService : IMalAuthService, IDisposable
 
     public bool Configurado => _clientId.Length > 0;
 
-    public bool Conectado => _almacen.Leer() != null;
+    public bool Conectado => Tokens != null;
 
-    public void Desconectar() => _almacen.Guardar(null);
+    public void Desconectar() => Guardar(null);
 
     public void Dispose() => _renovando.Dispose();
 
-    public async Task<string?> TokenValidoAsync(CancellationToken ct)
+    /// <summary>Los tokens, leídos del disco (y descifrados) una sola vez.</summary>
+    private TokensMal? Tokens
     {
-        var tokens = _almacen.Leer();
+        get
+        {
+            lock (_cerrojo)
+            {
+                if (!_tokensLeidos)
+                {
+                    _tokens = _almacen.Leer();
+                    _tokensLeidos = true;
+                }
+                return _tokens;
+            }
+        }
+    }
+
+    private void Guardar(TokensMal? tokens)
+    {
+        lock (_cerrojo)
+        {
+            _almacen.Guardar(tokens);
+            _tokens = tokens;
+            _tokensLeidos = true;
+        }
+    }
+
+    /// <summary>Guarda <paramref name="nuevos"/> solo si los tokens siguen siendo <paramref name="esperados"/>: una renovación que
+    /// responde después de "Desconectar" (o de conectar otra cuenta) no debe volver a conectar la vieja.</summary>
+    private bool Reemplazar(TokensMal esperados, TokensMal? nuevos)
+    {
+        lock (_cerrojo)
+        {
+            if (!ReferenceEquals(Tokens, esperados)) return false;
+            Guardar(nuevos);
+            return true;
+        }
+    }
+
+    public Task<string?> TokenValidoAsync(CancellationToken ct) => TokenAsync(null, ct);
+
+    public Task<string?> RenovarAsync(string tokenRechazado, CancellationToken ct) => TokenAsync(tokenRechazado, ct);
+
+    private bool Vigente(TokensMal tokens, string? tokenRechazado)
+        => tokens.AccessToken != tokenRechazado && tokens.CaducaUtc - _reloj.GetUtcNow().UtcDateTime > MargenRenovacion;
+
+    private async Task<string?> TokenAsync(string? tokenRechazado, CancellationToken ct)
+    {
+        var tokens = Tokens;
         if (tokens == null) return null;
-        if (tokens.CaducaUtc - _reloj.GetUtcNow().UtcDateTime > MargenRenovacion) return tokens.AccessToken;
+        if (Vigente(tokens, tokenRechazado)) return tokens.AccessToken;
 
         await _renovando.WaitAsync(ct).ConfigureAwait(false);
         try
         {
             // Otra petición pudo renovarlo mientras se esperaba turno.
-            tokens = _almacen.Leer();
+            tokens = Tokens;
             if (tokens == null) return null;
-            if (tokens.CaducaUtc - _reloj.GetUtcNow().UtcDateTime > MargenRenovacion) return tokens.AccessToken;
+            if (Vigente(tokens, tokenRechazado)) return tokens.AccessToken;
 
             var (nuevos, rechazado) = await PedirTokensAsync(new()
             {
                 ["client_id"] = _clientId, ["grant_type"] = "refresh_token", ["refresh_token"] = tokens.RefreshToken,
             }, ct).ConfigureAwait(false);
-            if (nuevos != null) return nuevos.AccessToken;
+            if (nuevos != null) return Reemplazar(tokens, nuevos) ? nuevos.AccessToken : null;
 
-            if (rechazado)
+            if (rechazado && Reemplazar(tokens, null))
             {
                 // Permiso revocado o renovación caducada: hay que volver a conectar (un corte de red no desconecta).
                 AppLogger.Warn(Origen, "MAL rechazó la renovación del permiso: la cuenta queda desconectada.");
-                Desconectar();
             }
             return null;
         }
@@ -129,24 +180,41 @@ public sealed class MalAuthService : IMalAuthService, IDisposable
 
         using var limite = CancellationTokenSource.CreateLinkedTokenSource(ct);
         limite.CancelAfter(TimeSpan.FromMinutes(2));
-        while (!limite.IsCancellationRequested)
+        Task<HttpListenerContext>? contexto = null;
+        try
         {
-            var contexto = listener.GetContextAsync();
-            if (await Task.WhenAny(contexto, Task.Delay(Timeout.Infinite, limite.Token)).ConfigureAwait(false) != contexto) break;
-
-            var peticion = await contexto.ConfigureAwait(false);
-            if (peticion.Request.Url?.AbsolutePath != "/callback")
+            while (!limite.IsCancellationRequested)
             {
-                peticion.Response.StatusCode = 404;
-                peticion.Response.Close();
-                continue;
-            }
+                contexto = listener.GetContextAsync();
+                if (await Task.WhenAny(contexto, Task.Delay(Timeout.Infinite, limite.Token)).ConfigureAwait(false) != contexto) break;
 
-            string? codigo = peticion.Request.QueryString["code"];
-            bool ok = codigo != null && peticion.Request.QueryString["state"] == state
-                      && await CanjearCodigoAsync(codigo, verificador, limite.Token).ConfigureAwait(false);
-            await ResponderAsync(peticion.Response, LocalizationService.T(ok ? "Cfg_MalNavegadorOk" : "Cfg_MalNavegadorError")).ConfigureAwait(false);
-            return ok;
+                var peticion = await contexto.ConfigureAwait(false);
+                contexto = null;
+                if (peticion.Request.Url?.AbsolutePath != "/callback")
+                {
+                    peticion.Response.StatusCode = 404;
+                    peticion.Response.Close();
+                    continue;
+                }
+
+                if (peticion.Request.QueryString["state"] != state)
+                {
+                    // Una pestaña de un intento anterior (o una redirección repetida): no es la respuesta a este, se sigue esperando.
+                    await ResponderAsync(peticion.Response, LocalizationService.T("Cfg_MalNavegadorError")).ConfigureAwait(false);
+                    continue;
+                }
+
+                string? codigo = peticion.Request.QueryString["code"];
+                bool ok = codigo != null && await CanjearCodigoAsync(codigo, verificador, limite.Token).ConfigureAwait(false);
+                await ResponderAsync(peticion.Response, LocalizationService.T(ok ? "Cfg_MalNavegadorOk" : "Cfg_MalNavegadorError")).ConfigureAwait(false);
+                return ok;
+            }
+        }
+        finally
+        {
+            // La espera pendiente falla al cerrarse el servidor local: se observa para que no salga como error sin atender.
+            _ = contexto?.ContinueWith(t => _ = t.Exception, CancellationToken.None,
+                TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
         }
 
         AppLogger.Warn(Origen, "La conexión con MAL caducó (2 minutos sin respuesta del navegador).");
@@ -160,10 +228,11 @@ public sealed class MalAuthService : IMalAuthService, IDisposable
             ["client_id"] = _clientId, ["grant_type"] = "authorization_code", ["code"] = codigo,
             ["redirect_uri"] = Redireccion, ["code_verifier"] = verificador,
         }, ct).ConfigureAwait(false);
+        if (tokens != null) Guardar(tokens);
         return tokens != null;
     }
 
-    /// <summary>Pide tokens y los guarda. <c>Rechazado</c> = MAL dijo que no (400/401); un error de red no lo es.</summary>
+    /// <summary>Pide tokens (sin guardarlos). <c>Rechazado</c> = MAL dijo que no (400/401); un error de red no lo es.</summary>
     private async Task<(TokensMal? Tokens, bool Rechazado)> PedirTokensAsync(Dictionary<string, string> formulario, CancellationToken ct)
     {
         try
@@ -180,7 +249,6 @@ public sealed class MalAuthService : IMalAuthService, IDisposable
             var json = JsonNode.Parse(await respuesta.Content.ReadAsStringAsync(ct).ConfigureAwait(false))!;
             var tokens = new TokensMal(json["access_token"]!.GetValue<string>(), json["refresh_token"]!.GetValue<string>(),
                 _reloj.GetUtcNow().UtcDateTime.AddSeconds(json["expires_in"]!.GetValue<int>()));
-            _almacen.Guardar(tokens);
             return (tokens, false);
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException or NullReferenceException or InvalidOperationException)

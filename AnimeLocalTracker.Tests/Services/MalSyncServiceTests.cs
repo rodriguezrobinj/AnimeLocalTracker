@@ -25,7 +25,7 @@ public class MalSyncServiceTests
     {
         _auth.SetupGet(a => a.Configurado).Returns(true);
         _auth.SetupGet(a => a.Conectado).Returns(true);
-        _db.Setup(d => d.ObtenerTodosLosAnimesAsync()).ReturnsAsync(new List<AnimeItem> { Frieren, Erased });
+        _db.Setup(d => d.ObtenerAnimesLigerosAsync()).ReturnsAsync(new List<AnimeItem> { Frieren, Erased });
         _db.Setup(d => d.ObtenerEpisodiosVistosPorAnimeAsync()).ReturnsAsync(new Dictionary<int, int> { [Frieren.AniListId] = 14, [Erased.AniListId] = 12 });
         _db.Setup(d => d.ObtenerSeguimientosLocalesAsync()).ReturnsAsync(new List<SeguimientoLocal>());
         _db.Setup(d => d.ObtenerSincronizacionesMalAsync()).ReturnsAsync(new List<SincronizacionMal>());
@@ -104,6 +104,28 @@ public class MalSyncServiceTests
 
         (await Servicio().SincronizarAhoraAsync(CancellationToken.None)).Should().BeNull();
         _api.Verify(a => a.LeerAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task OlvidarEnviados_EsperaALaPasadaEnCursoYBorraDespues()
+    {
+        // Lo que la pasada apunte justo antes de borrar no debe quedar para la próxima cuenta.
+        var orden = new List<string>();
+        var leer = new TaskCompletionSource<(ResultadoMal, EstadoMal?)>();
+        _api.Setup(a => a.LeerAsync(It.IsAny<int>(), It.IsAny<CancellationToken>())).Returns(leer.Task);
+        _db.Setup(d => d.GuardarSincronizacionMalAsync(It.IsAny<SincronizacionMal>())).Callback(() => orden.Add("guardar")).Returns(Task.CompletedTask);
+        _db.Setup(d => d.BorrarSincronizacionesMalAsync()).Callback(() => orden.Add("borrar")).Returns(Task.CompletedTask);
+        var servicio = Servicio();
+
+        var pasada = servicio.SincronizarAhoraAsync(CancellationToken.None);
+        var olvidar = servicio.OlvidarEnviadosAsync();
+        olvidar.IsCompleted.Should().BeFalse();
+
+        leer.SetResult((ResultadoMal.Ok, null));
+        await pasada;
+        await olvidar;
+
+        orden.Should().HaveCount(3).And.EndWith("borrar");
     }
 
     [Fact]

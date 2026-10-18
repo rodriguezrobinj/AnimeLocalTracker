@@ -300,6 +300,7 @@ public partial class ConfiguracionViewModel : ObservableObject
         OnPropertyChanged(nameof(TotalAnimesTexto));
         foreach (var color in ColoresSubtitulos) color.Refrescar();
         foreach (var plugin in PluginsDetalle) plugin.RefrescarTextos();
+        RefrescarTextosMal();
         if (SeccionActiva == SeccionConfiguracion.Reproduccion) ActualizarRendimientoVideo();
         // LOC-08: avisa a los ViewModels con colecciones/texto compuesto en código (Galería,
         // Agregar Anime, Acerca de) para que se regeneren en el nuevo idioma.

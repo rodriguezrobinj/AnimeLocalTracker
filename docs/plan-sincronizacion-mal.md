@@ -10,7 +10,7 @@ Ejemplo: terminas el episodio 14 de Frieren y, como mucho 5 minutos después, MA
 
 ## Decisiones tomadas
 
-- **Alcance al conectar:** toda la biblioteca, una vez; después solo los cambios. **Nunca se baja nada**: antes de escribir un anime se lee lo que tiene MAL; si MAL va más adelantado en progreso, o lo tiene `completed` y la app no, no se toca (y se apunta como sincronizado para no volver a preguntar).
+- **Alcance al conectar:** toda la biblioteca, una vez; después solo los cambios. **Nunca se baja nada**: antes de escribir un anime se lee lo que tiene MAL; lo que MAL tenga por delante se conserva (más episodios, `completed` cuando la app no, un anime empezado frente a `plan_to_watch`) y el resto del cambio (estado, nota) se envía igual; si con eso no queda nada distinto, no se toca (y se apunta como sincronizado para no volver a preguntar).
 - **Datos:** progreso, estado y nota. Sin fechas.
 - **Enfoque:** espejo por diferencias. Por cada anime con MalId se calcula el estado deseado desde los datos locales y se compara con lo último enviado (tabla `SincronizacionMal`, migración v25); solo se envía lo distinto. Descartados: cola de eventos en los 6 puntos que hoy envían a AniList (frágil) y reenviar dentro del servicio de AniList (sin sesión de AniList no enviaría nada).
 - Simkl queda fuera de esta fase.
@@ -18,7 +18,7 @@ Ejemplo: terminas el episodio 14 de Frieren y, como mucho 5 minutos después, MA
 ## Conversión
 
 - Progreso = máx(episodios vistos en local, `SeguimientoLocal.Progreso`), sin pasar de `TotalEpisodios` si se conoce. Con estado `completed` y total conocido, el progreso es el total (terminado en AniList sin archivos en disco: con 0, la regla de no bajar nada impediría marcarlo completado en MAL; visto en la revisión final).
-- Estado (de `SeguimientoLocal.Estado` si existe; si no, `AnimeItem.EstadoUsuario`): CURRENT y REPEATING → `watching`, COMPLETED → `completed`, PAUSED → `on_hold`, DROPPED → `dropped`, PLANNING → `plan_to_watch`. Sin estado: `watching` si hay algo visto; si no hay nada visto, el anime no se envía (no se añade a la lista de MAL).
+- Estado (de `AnimeItem.EstadoUsuario`, que también cambian la reproducción y AniList; `SeguimientoLocal` solo aporta progreso y nota): CURRENT y REPEATING → `watching`, COMPLETED → `completed`, PAUSED → `on_hold`, DROPPED → `dropped`, PLANNING → `plan_to_watch`. Sin estado: `watching` si hay algo visto; si no hay nada visto, el anime no se envía (no se añade a la lista de MAL).
 - Nota: `SeguimientoLocal.Puntaje` (0–100) → `round(p / 10)` en 0–10, redondeo hacia arriba en .5 (85 → 9); 0 = sin nota.
 
 ## Regla "no bajar nada" (función pura)
@@ -46,8 +46,8 @@ Dado lo deseado y lo que MAL tiene (o nada si no está en su lista):
 
 ## Sincronización
 
-- `MalSyncService` (singleton): pasada al arrancar (30 s después), cada 5 min, y con "Sincronizar ahora". Una pasada a la vez. Lee animes (`ObtenerTodosLosAnimesAsync`), vistos por anime, seguimientos locales y `SincronizacionMal`; para cada anime con MalId cuyo deseado ≠ último enviado: GET, decisión, PATCH si toca, guardar el nuevo "último enviado".
-- `SincronizacionMal(AniListId PK, MalId, Estado, Progreso, Nota, EnviadoUtc)` — v25 (`CreateTableAsync`). Desconectar la borra (al reconectar, otra pasada completa sin bajar nada).
+- `MalSyncService` (singleton): pasada al arrancar (30 s después), cada 5 min, y con "Sincronizar ahora". Una pasada a la vez. Lee animes (`ObtenerAnimesLigerosAsync`), vistos por anime, seguimientos locales y `SincronizacionMal`; para cada anime con MalId cuyo deseado ≠ último enviado: GET, decisión, PATCH si toca, guardar el nuevo "último enviado".
+- `SincronizacionMal(AniListId PK, MalId, Estado, Progreso, Nota, EnviadoUtc)` — v25 (`CreateTableAsync`). Conectar una cuenta la borra, esperando a la pasada en curso (otra pasada completa sin bajar nada); así no importa cómo se perdió la conexión anterior (Desconectar, permiso revocado, tokens ilegibles).
 - Sin internet (`ConCorteSinConexion`) o sin conectar: la pasada no hace nada.
 
 ## Ajustes

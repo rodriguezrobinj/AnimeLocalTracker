@@ -37,7 +37,8 @@ internal static class MapeoMal
         if (anime.MalId is not > 0) return null;
 
         int progreso = Progreso(vistos, seguimiento?.Progreso ?? 0, anime.TotalEpisodios);
-        string? estado = Estado(seguimiento?.Estado ?? anime.EstadoUsuario, progreso);
+        // El estado, del anime: lo cambian también la reproducción (terminar la serie) y AniList, que no tocan el seguimiento local.
+        string? estado = Estado(anime.EstadoUsuario, progreso);
         if (estado == null) return null;
 
         // Completado = todos vistos, aunque no estén en el disco (terminado en AniList, archivos borrados): con el progreso local
@@ -54,11 +55,12 @@ internal static class ReglaMal
     public static EstadoMal? QueEnviar(EstadoMal deseado, EstadoMal? enMal)
     {
         if (enMal == null) return deseado;
-        if (enMal.Estado == "completed" && deseado.Estado != "completed") return null;
-        if (enMal.Progreso > deseado.Progreso) return null;
 
-        // Sin nota en la app no se borra la que el usuario puso en MAL.
-        var envio = deseado.Nota == 0 ? deseado with { Nota = enMal.Nota } : deseado;
+        // Lo que MAL tiene por delante se conserva (completado, episodios, un anime ya empezado frente a "planeado"); el resto
+        // del cambio (estado, nota) se envía igual. Sin nota en la app no se borra la que el usuario puso en MAL.
+        bool conservarEstado = enMal.Estado == "completed" || (deseado.Estado == "plan_to_watch" && enMal.Estado.Length > 0);
+        var envio = new EstadoMal(conservarEstado ? enMal.Estado : deseado.Estado, Math.Max(deseado.Progreso, enMal.Progreso),
+            deseado.Nota == 0 ? enMal.Nota : deseado.Nota);
         return envio == enMal ? null : envio;
     }
 }

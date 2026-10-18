@@ -6,7 +6,7 @@ namespace AnimeLocalTracker.Models;
 /// <summary>
 /// Lo último que la app dejó en la lista de MyAnimeList para un anime (o lo que MAL tenía cuando decidió no tocarlo). La
 /// sincronización solo vuelve a escribir un anime si lo que quiere enviar es distinto de esto. Tabla creada por la migración v25;
-/// desconectar MAL la vacía.
+/// conectar una cuenta de MAL la vacía (<see cref="Services.Mal.IMalSyncService.OlvidarEnviadosAsync"/>).
 /// </summary>
 public class SincronizacionMal
 {

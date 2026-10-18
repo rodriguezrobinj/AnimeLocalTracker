@@ -64,6 +64,7 @@ public class ConfiguracionMalTests
         await sut.ConectarMalCommand.ExecuteAsync(null);
 
         sut.MalConectado.Should().BeTrue();
+        _sync.Verify(s => s.OlvidarEnviadosAsync(), Times.Once); // lo apuntado de otra conexión (u otra cuenta) no vale
         _sync.Verify(s => s.SincronizarAhoraAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -80,15 +81,14 @@ public class ConfiguracionMalTests
     }
 
     [Fact]
-    public async Task Desconectar_BorraLosTokensYLoEnviado()
+    public void Desconectar_BorraLosTokens()
     {
         var sut = CrearSut(conectado: true);
         _auth.Setup(a => a.Desconectar()).Callback(() => _auth.SetupGet(a => a.Conectado).Returns(false));
 
-        await sut.DesconectarMalCommand.ExecuteAsync(null);
+        sut.DesconectarMalCommand.Execute(null);
 
         _auth.Verify(a => a.Desconectar(), Times.Once);
-        _db.Verify(d => d.BorrarSincronizacionesMalAsync(), Times.Once);
         sut.MalConectado.Should().BeFalse();
     }
 

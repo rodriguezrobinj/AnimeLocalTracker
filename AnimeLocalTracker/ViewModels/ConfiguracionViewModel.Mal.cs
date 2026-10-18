@@ -82,18 +82,26 @@ public partial class ConfiguracionViewModel
 
         _malUsuario = null;
         ActualizarEstadoMal();
+        if (_malSync != null) await _malSync.OlvidarEnviadosAsync(); // cuenta nueva: se vuelve a revisar todo
         await CargarUsuarioMalAsync();
         await SincronizarMalAsync(); // la primera pasada envía la biblioteca (sin bajar nada de lo que MAL ya tenga)
     }
 
     [RelayCommand]
-    private async Task DesconectarMalAsync()
+    private void DesconectarMal()
     {
         _malAuth?.Desconectar();
-        await _databaseService.BorrarSincronizacionesMalAsync(); // al reconectar, se vuelve a revisar todo
         _malUsuario = null;
         MalUltimaPasadaTexto = string.Empty;
         ActualizarEstadoMal();
+    }
+
+    /// <summary>Al cambiar de idioma: los textos del grupo de MAL se componen en código.</summary>
+    private void RefrescarTextosMal()
+    {
+        if (!MalDisponible) return;
+        if (!MalConectando) ActualizarEstadoMal();
+        if (MalUltimaPasadaTexto.Length > 0 && _malSync?.UltimaPasada is { } ultima) MostrarPasadaMal(ultima);
     }
 
     [RelayCommand]

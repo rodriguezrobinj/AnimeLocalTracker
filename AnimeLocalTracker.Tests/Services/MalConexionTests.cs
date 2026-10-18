@@ -161,13 +161,50 @@ public sealed class MalConexionTests : IDisposable
 
     [Theory]
     [InlineData(HttpStatusCode.TooManyRequests, ResultadoMal.LimiteAlcanzado)]
-    [InlineData(HttpStatusCode.Unauthorized, ResultadoMal.SinSesion)]
     [InlineData(HttpStatusCode.InternalServerError, ResultadoMal.Error)]
     public async Task Leer_Errores(HttpStatusCode codigo, ResultadoMal esperado)
     {
         _red.Responder(codigo, "{}");
 
         (await Api().LeerAsync(1, CancellationToken.None)).Resultado.Should().Be(esperado);
+    }
+
+    [Fact]
+    public async Task TokenInvalidadoAntesDeCaducar_LoRenuevaYReintenta()
+    {
+        // Contraseña cambiada en MAL: el token guardado aún "vale" 10 días, pero MAL ya no lo acepta.
+        _red.Responder(HttpStatusCode.Unauthorized, "{}");
+        _red.Responder(HttpStatusCode.OK, RespuestaTokens);
+        _red.Responder(HttpStatusCode.OK, """{"id":1,"name":"robin_anime"}""");
+
+        (await Api().UsuarioAsync(CancellationToken.None)).Should().Be("robin_anime");
+        _red.Peticiones[1].Cuerpo.Should().Contain("grant_type=refresh_token");
+        _red.Peticiones[2].Autorizacion.Should().Be("Bearer acceso1");
+    }
+
+    [Fact]
+    public async Task TokenInvalidadoYRenovacionRechazada_SinSesionYDesconectado()
+    {
+        _red.Responder(HttpStatusCode.Unauthorized, "{}");
+        _red.Responder(HttpStatusCode.BadRequest, """{"error":"invalid_grant"}""");
+        Almacen().Guardar(new TokensMal("acceso0", "revocado", _reloj.GetUtcNow().UtcDateTime.AddDays(10)));
+        var auth = Auth();
+
+        (await new MalApiClient(Fabrica(), auth).LeerAsync(1, CancellationToken.None)).Resultado.Should().Be(ResultadoMal.SinSesion);
+        auth.Conectado.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task RenovacionQueRespondeTrasDesconectar_NoVuelveAConectar()
+    {
+        Almacen().Guardar(new TokensMal("viejo", "renovar0", _reloj.GetUtcNow().UtcDateTime.AddMinutes(-1)));
+        _red.Responder(HttpStatusCode.OK, RespuestaTokens);
+        var auth = Auth();
+        _red.AlPedir = auth.Desconectar; // el usuario pulsa "Desconectar" mientras MAL responde a la renovación
+
+        (await auth.TokenValidoAsync(CancellationToken.None)).Should().BeNull();
+        auth.Conectado.Should().BeFalse();
+        Almacen().Leer().Should().BeNull();
     }
 
     [Fact]
@@ -208,12 +245,14 @@ public sealed class MalConexionTests : IDisposable
         private readonly Queue<(HttpStatusCode, string)> _respuestas = new();
         public List<(HttpMethod Metodo, string Url, string Cuerpo, string? Autorizacion)> Peticiones { get; } = new();
         public Exception? Excepcion { get; set; }
+        public Action? AlPedir { get; set; }
 
         public void Responder(HttpStatusCode codigo, string json) => _respuestas.Enqueue((codigo, json));
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             if (Excepcion != null) throw Excepcion;
+            AlPedir?.Invoke();
             string cuerpo = request.Content == null ? "" : await request.Content.ReadAsStringAsync(cancellationToken);
             Peticiones.Add((request.Method, request.RequestUri!.ToString(), cuerpo, request.Headers.Authorization?.ToString()));
             var (codigo, json) = _respuestas.Count > 0 ? _respuestas.Dequeue() : (HttpStatusCode.OK, "{}");
