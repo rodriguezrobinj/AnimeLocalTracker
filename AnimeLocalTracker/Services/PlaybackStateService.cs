@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using AnimeLocalTracker.Models;
+using CommunityToolkit.Mvvm.Messaging;
 
 namespace AnimeLocalTracker.Services;
 
@@ -117,6 +118,17 @@ public class PlaybackStateService : IPlaybackStateService
         return new ResultadoGuardadoProgreso(progresoAGuardar, durSec, registro?.VistoLocal ?? datos.FueMarcadoComoVisto);
     }
 
+    /// <summary>
+    /// Ver de verdad (y por primera vez) el último episodio de una serie ya finalizada la termina: aviso para el canal de Discord.
+    /// Se decide en local, sin AniList, para que funcione sin sesión ni conexión.
+    /// </summary>
+    private async Task AvisarSiTerminoLaSerieAsync(int animeId, int episodio)
+    {
+        var anime = await _databaseService.ObtenerAnimePorIdAsync(animeId);
+        if (anime is not { Estado: "FINISHED", TotalEpisodios: > 0 } || episodio < anime.TotalEpisodios) return;
+        WeakReferenceMessenger.Default.Send(new Messages.SerieTerminadaMensaje(animeId, anime.Titulo, anime.UrlPortada, anime.TotalEpisodios));
+    }
+
     public async Task<bool> MarcarComoVistoYSincronizarAsync(int animeId, int episodio, string rutaVideo, double duracionSegundos, bool registrarReproduccion = true)
     {
         // FUN-004: un episodio sin número (0 = archivo sin dígitos) nunca debe marcarse ni
@@ -132,6 +144,7 @@ public class PlaybackStateService : IPlaybackStateService
             // 1. Guardar localmente
             var registros = await _databaseService.ObtenerRegistrosPorAnimeAsync(animeId);
             var registro = registros?.FirstOrDefault(r => r.NumeroEpisodio == episodio);
+            bool yaVisto = registro?.VistoLocal == true;
 
             // El "historial" refleja VISIONADO REAL: solo la reproducción (auto-track al
             // terminar de ver) registra la fecha; el marcado manual no debe parecer visto hoy.
@@ -154,6 +167,7 @@ public class PlaybackStateService : IPlaybackStateService
                 };
             }
             await _databaseService.GuardarRegistroEpisodioAsync(registro);
+            if (registrarReproduccion && !yaVisto) await AvisarSiTerminoLaSerieAsync(animeId, episodio);
 
             // 2. Guardar en AniList
             var token = _authService.ObtenerTokenGuardado();

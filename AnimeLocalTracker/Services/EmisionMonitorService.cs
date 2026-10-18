@@ -179,6 +179,7 @@ public sealed class EmisionMonitorService : IEmisionMonitorService, IRecipient<D
             ? string.Format(LocalizationService.T("Emision_AvisoUno"), anime.Titulo, hasta)
             : string.Format(LocalizationService.T("Emision_AvisoVarios"), anime.Titulo, hasta - desde + 1, desde, hasta);
         Avisar(LocalizationService.T("Emision_AvisoTitulo"), mensaje, "BellRing", "#F59E0B");
+        WeakReferenceMessenger.Default.Send(new EpisodioEmitidoMensaje(anime.AniListId, anime.Titulo, anime.UrlPortada, desde, hasta)); // canal de Discord
     }
 
     /// <summary>

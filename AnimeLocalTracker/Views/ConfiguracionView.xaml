@@ -1059,7 +1059,7 @@
                                 </StackPanel>
                             </StackPanel>
 
-                            <Border Style="{StaticResource CfgGroup}" Margin="0">
+                            <Border Style="{StaticResource CfgGroup}">
                                 <StackPanel>
                                     <ctl:SettingRow Title="{loc:T Cfg_Idioma}"
                                                     Description="{loc:T Cfg_IdiomaSub}">
@@ -1110,6 +1110,44 @@
                                                     Description="{loc:T Cfg_DiscordPresenciaSub}">
                                         <ToggleButton IsChecked="{Binding DiscordRichPresence}" Style="{StaticResource CfgSwitch}"
                                                       AutomationProperties.Name="{loc:T Cfg_DiscordPresencia}"/>
+                                    </ctl:SettingRow>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Avisos en un canal de Discord (webhook). La URL guardada no se vuelve a mostrar: es secreta. -->
+                            <TextBlock Text="{loc:T Cfg_GrupoWebhook}" Style="{StaticResource CfgGroupCaption}"/>
+                            <Border Style="{StaticResource CfgGroup}">
+                                <StackPanel>
+                                    <ctl:SettingRow Title="{loc:T Cfg_WebhookUrl}" Description="{loc:T Cfg_WebhookUrlSub}">
+                                        <StackPanel MinWidth="300">
+                                            <TextBox Text="{Binding UrlWebhook, UpdateSourceTrigger=PropertyChanged}"
+                                                     Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                                                     materialDesign:HintAssist.Hint="https://discord.com/api/webhooks/…"
+                                                     materialDesign:HintAssist.IsFloating="False"
+                                                     AutomationProperties.Name="{loc:T Cfg_WebhookUrl}"/>
+                                            <TextBlock Text="{loc:T Cfg_WebhookGuardado}" Style="{StaticResource AppText.Caption}"
+                                                       Foreground="{StaticResource Brush.Success}" Margin="2,6,0,0" TextWrapping="Wrap"
+                                                       Visibility="{Binding HayWebhookGuardado, Converter={StaticResource BoolToVis}}"/>
+                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                                                <Button Command="{Binding ProbarWebhookCommand}" Style="{StaticResource CfgRowButton}" MinWidth="0"
+                                                        Content="{loc:T Cfg_WebhookProbar}" AutomationProperties.Name="{loc:T Cfg_WebhookProbar}"/>
+                                                <Button Command="{Binding QuitarWebhookCommand}" Style="{StaticResource CfgDangerButton}" MinWidth="0" Margin="8,0,0,0"
+                                                        Content="{loc:T Cfg_WebhookQuitar}" AutomationProperties.Name="{loc:T Cfg_WebhookQuitar}"
+                                                        Visibility="{Binding HayWebhookGuardado, Converter={StaticResource BoolToVis}}"/>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </ctl:SettingRow>
+                                    <Border Style="{StaticResource CfgDivider}"/>
+
+                                    <ctl:SettingRow Title="{loc:T Cfg_WebhookEmision}" Description="{loc:T Cfg_WebhookEmisionSub}">
+                                        <ToggleButton IsChecked="{Binding WebhookAvisarEmision}" Style="{StaticResource CfgSwitch}"
+                                                      AutomationProperties.Name="{loc:T Cfg_WebhookEmision}"/>
+                                    </ctl:SettingRow>
+                                    <Border Style="{StaticResource CfgDivider}"/>
+
+                                    <ctl:SettingRow Title="{loc:T Cfg_WebhookSerie}" Description="{loc:T Cfg_WebhookSerieSub}">
+                                        <ToggleButton IsChecked="{Binding WebhookAvisarSerieTerminada}" Style="{StaticResource CfgSwitch}"
+                                                      AutomationProperties.Name="{loc:T Cfg_WebhookSerie}"/>
                                     </ctl:SettingRow>
                                 </StackPanel>
                             </Border>

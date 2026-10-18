@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using AnimeLocalTracker.Messages;
 using AnimeLocalTracker.Models;
 using AnimeLocalTracker.Services;
+using CommunityToolkit.Mvvm.Messaging;
 using FluentAssertions;
 using Moq;
 using Xunit;
@@ -279,5 +280,28 @@ public class EmisionMonitorServiceTests
 
         _bandeja.Verify(b => b.MostrarNotificacion(It.IsAny<string>(), It.Is<string>(m => m.Contains("Frieren") && m.Contains("12"))), Times.Once);
         _dialogos.Verify(d => d.MostrarToast(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Aviso_PublicaElEpisodioEmitidoParaElCanalDeDiscord()
+    {
+        var recibidos = new List<EpisodioEmitidoMensaje>();
+        var receptor = new object();
+        CommunityToolkit.Mvvm.Messaging.WeakReferenceMessenger.Default.Register<object, EpisodioEmitidoMensaje>(receptor,
+            (_, m) => { if (m.AnimeId == 7) lock (recibidos) recibidos.Add(m); });
+        try
+        {
+            _anime.UrlPortada = "https://s4.anilist.co/frieren.jpg";
+            Preferencias(new PreferenciaEmision { AniListId = 7, Avisar = true, UltimoAvisado = 11 });
+            ProximaEmision(12, TimeSpan.FromMinutes(-3));
+
+            await CrearSut().EjecutarCicloAsync();
+
+            recibidos.Should().ContainSingle().Which.Should().Be(new EpisodioEmitidoMensaje(7, "Frieren", "https://s4.anilist.co/frieren.jpg", 12, 12));
+        }
+        finally
+        {
+            CommunityToolkit.Mvvm.Messaging.WeakReferenceMessenger.Default.UnregisterAll(receptor);
+        }
     }
 }

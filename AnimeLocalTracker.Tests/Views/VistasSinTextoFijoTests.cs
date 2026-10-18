@@ -27,6 +27,7 @@ public class VistasSinTextoFijoTests
         "Enter", "Escape",
         "Español", "English",
         "·  SHA-256",
+        "https://discord.com/api/webhooks/…",
     };
 
     private static string RaizDelRepositorio()

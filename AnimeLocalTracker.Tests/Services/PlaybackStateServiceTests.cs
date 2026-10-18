@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using AnimeLocalTracker.Models;
 using AnimeLocalTracker.Services;
+using CommunityToolkit.Mvvm.Messaging;
 using FluentAssertions;
 using Moq;
 using Xunit;
@@ -253,5 +254,56 @@ public class PlaybackStateServiceTests
         var resultado = await CrearSut().ObtenerPosicionParaReanudarAsync(16498, 5);
 
         resultado!.Value.Posicion.Should().Be(3000);
+    }
+
+    // ── Serie terminada (aviso al canal de Discord) ──
+
+    private const int AnimeTerminable = 987654;
+
+    private List<Messages.SerieTerminadaMensaje> EscucharSerieTerminada(object receptor)
+    {
+        var recibidos = new List<Messages.SerieTerminadaMensaje>();
+        CommunityToolkit.Mvvm.Messaging.WeakReferenceMessenger.Default.Register<object, Messages.SerieTerminadaMensaje>(receptor,
+            (_, m) => { if (m.AnimeId == AnimeTerminable) lock (recibidos) recibidos.Add(m); });
+        return recibidos;
+    }
+
+    private void Serie(string estado, int total, bool ultimoYaVisto = false)
+    {
+        _dbMock.Setup(d => d.ObtenerAnimePorIdAsync(AnimeTerminable)).ReturnsAsync(new AnimeItem
+        {
+            AniListId = AnimeTerminable, Titulo = "Frieren", Estado = estado, TotalEpisodios = total, UrlPortada = "https://s4.anilist.co/x.jpg",
+        });
+        _dbMock.Setup(d => d.ObtenerRegistrosPorAnimeAsync(AnimeTerminable)).ReturnsAsync(new List<RegistroEpisodio>
+        {
+            new() { AniListId = AnimeTerminable, NumeroEpisodio = total, VistoLocal = ultimoYaVisto },
+        });
+    }
+
+    [Theory]
+    [InlineData("FINISHED", 28, 28, true, false, 1)]   // último episodio de una serie terminada, visto de verdad
+    [InlineData("FINISHED", 28, 27, true, false, 0)]   // un episodio intermedio
+    [InlineData("RELEASING", 28, 28, true, false, 0)]  // la serie sigue en emisión
+    [InlineData("FINISHED", 28, 28, false, false, 0)]  // marcado a mano, no visto
+    [InlineData("FINISHED", 28, 28, true, true, 0)]    // re-ver el final no repite el aviso
+    [InlineData("FINISHED", 0, 28, true, false, 0)]    // total desconocido
+    public async Task MarcarComoVisto_AvisaSerieTerminadaSoloAlVerElFinalPorPrimeraVez(string estado, int total, int episodio,
+        bool reproduccion, bool yaVisto, int avisos)
+    {
+        var receptor = new object();
+        var recibidos = EscucharSerieTerminada(receptor);
+        try
+        {
+            Serie(estado, total, yaVisto);
+
+            await CrearSut().MarcarComoVistoYSincronizarAsync(AnimeTerminable, episodio, @"C:\Anime\Frieren\Ep.mkv", 1440, registrarReproduccion: reproduccion);
+
+            recibidos.Should().HaveCount(avisos);
+            if (avisos == 1) recibidos[0].Should().Be(new Messages.SerieTerminadaMensaje(AnimeTerminable, "Frieren", "https://s4.anilist.co/x.jpg", 28));
+        }
+        finally
+        {
+            CommunityToolkit.Mvvm.Messaging.WeakReferenceMessenger.Default.UnregisterAll(receptor);
+        }
     }
 }

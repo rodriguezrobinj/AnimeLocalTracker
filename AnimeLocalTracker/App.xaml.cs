@@ -286,6 +286,10 @@ public partial class App : Application
         // Clips MP4/GIF de un tramo del episodio (ffmpeg embebido), desde el reproductor.
         services.AddSingleton<AnimeLocalTracker.Services.Clips.IClipService, AnimeLocalTracker.Services.Clips.ClipService>();
 
+        // Avisos (episodio emitido, serie terminada) en un canal de Discord del usuario por webhook.
+        services.AddHttpClient(AnimeLocalTracker.Services.Webhook.WebhookDiscordService.NombreCliente).ConCorteSinConexion();
+        services.AddSingleton<AnimeLocalTracker.Services.Webhook.IWebhookDiscordService, AnimeLocalTracker.Services.Webhook.WebhookDiscordService>();
+
         services.AddSingleton<IVideoIntegrityService, VideoIntegrityService>();
 
         // Logros por niveles: evaluación, persistencia de desbloqueos y avisos
@@ -663,6 +667,7 @@ public partial class App : Application
 
         // Avisos y descarga automática de episodios nuevos (animes con la opción activada en su ficha).
         Paso("monitor de emisión", () => ServiceProvider.GetRequiredService<IEmisionMonitorService>().Iniciar());
+        Paso("avisos en Discord", () => ServiceProvider.GetRequiredService<AnimeLocalTracker.Services.Webhook.IWebhookDiscordService>().Iniciar());
 
         // Indicador de conexión: al volver internet sincroniza al momento lo hecho sin conexión.
         Paso("estado de conexión", () => ServiceProvider.GetRequiredService<IEstadoConexionService>().Iniciar());

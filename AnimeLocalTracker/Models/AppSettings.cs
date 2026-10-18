@@ -168,6 +168,12 @@ public class AppSettings
     /// es información pública para los amigos del usuario.</summary>
     public bool DiscordRichPresence { get; set; } = false;
 
+    /// <summary>Avisos en el canal de Discord del usuario (webhook): episodio emitido de un anime con "Avisar" y serie terminada.
+    /// Encendidos por defecto: sin URL de webhook guardada no se envía nada.</summary>
+    public bool WebhookAvisarEmision { get; set; } = true;
+
+    public bool WebhookAvisarSerieTerminada { get; set; } = true;
+
     /// <summary>
     /// Atajos de teclado configurables del reproductor: acción → tecla.
     /// Claves: PlayPausa, PantallaCompleta, Silenciar, SubirVolumen, BajarVolumen,

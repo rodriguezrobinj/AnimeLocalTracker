@@ -425,8 +425,10 @@ public partial class ConfiguracionViewModel : ObservableObject
         CacheMaintenanceService cacheMaintenanceService,
         IPluginService pluginService,
         IStartupService? startupService = null,
-        IOrganizadorMusicaService? organizadorMusica = null)
+        IOrganizadorMusicaService? organizadorMusica = null,
+        Services.Webhook.IWebhookDiscordService? webhook = null)
     {
+        _webhook = webhook;
         _settingsService = settingsService;
         _authService = authService;
         _databaseService = databaseService;
@@ -486,6 +488,9 @@ public partial class ConfiguracionViewModel : ObservableObject
         TeclaPanicoActiva = config.TeclaPanicoActiva;
         TeclaPanico = config.TeclaPanico == "Escape" ? "Escape" : "F12";
         DiscordRichPresence = config.DiscordRichPresence;
+        WebhookAvisarEmision = config.WebhookAvisarEmision;
+        WebhookAvisarSerieTerminada = config.WebhookAvisarSerieTerminada;
+        HayWebhookGuardado = _webhook?.UrlGuardada != null;
         Atajos = config.Atajos ?? new Dictionary<string, string>();
         OnPropertyChanged(nameof(Atajos));
 
@@ -670,6 +675,13 @@ public partial class ConfiguracionViewModel : ObservableObject
     [RelayCommand]
     public async Task GuardarPreferenciasAsync()
     {
+        // Una URL de webhook mal pegada no debe guardarse a medias junto al resto: se avisa y no se guarda nada.
+        if (UrlWebhookEscritaInvalida)
+        {
+            await AvisarUrlWebhookInvalida();
+            return;
+        }
+
         try
         {
             var config = _settingsService.ObtenerConfiguracion();
@@ -706,9 +718,12 @@ public partial class ConfiguracionViewModel : ObservableObject
             config.TeclaPanicoActiva = TeclaPanicoActiva;
             config.TeclaPanico = TeclaPanico == "Escape" ? "Escape" : "F12";
             config.DiscordRichPresence = DiscordRichPresence;
+            config.WebhookAvisarEmision = WebhookAvisarEmision;
+            config.WebhookAvisarSerieTerminada = WebhookAvisarSerieTerminada;
             config.Atajos = new Dictionary<string, string>(Atajos);
 
             await _settingsService.GuardarConfiguracionAsync(config);
+            GuardarUrlWebhookEscrita();
             _startupService?.Sincronizar(IniciarConWindows);
 
             await _dialogService.MostrarDialogoAsync(
