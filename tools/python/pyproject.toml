@@ -4,7 +4,7 @@ version = "1.0.0"
 description = "Motor de automatizacion, extraccion de streams y benchmarks para AnimeLocalTracker."
 requires-python = ">=3.10"
 dependencies = [
-    "yt-dlp==2026.8.19",
+    "yt-dlp==2026.10.21",
     "playwright>=1.45.0"
 ]
 
