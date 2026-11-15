@@ -37,7 +37,7 @@
 
     <ItemGroup>
       <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
-      <PackageReference Include="MaterialDesignThemes" Version="5.3.2" />
+      <PackageReference Include="MaterialDesignThemes" Version="5.4.0" />
       <PackageReference Include="MdXaml" Version="1.27.0" />
       <!-- Descargas por torrent (Nyaa.si, MVP): MIT, activamente mantenida. -->
       <PackageReference Include="MonoTorrent" Version="3.0.2" />
